@@ -55,8 +55,7 @@ export function createSnapshot<
   // every key clones successfully do we expose the restore closure.
   // If any single clone throws, the partial snapshot is discarded and
   // the throw propagates — the caller never gets a restore() that
-  // would overwrite un-snapshotted facts with `undefined`. (R2 sec
-  // C-R2-2.)
+  // would overwrite un-snapshotted facts with `undefined`.
   const snapshot = {} as Pick<F, K>;
   for (const key of keys) {
     snapshot[key] = clone(facts[key], key) as F[K];

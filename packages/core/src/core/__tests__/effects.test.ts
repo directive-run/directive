@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { t } from "../../index.js";
 import { createEffectsManager } from "../effects.js";
 import { createFacts } from "../facts.js";
+import { derivationDep } from "../tracking.js";
 
 // ============================================================================
 // Helpers
@@ -181,6 +182,137 @@ describe("effects", () => {
       // "name" change should still NOT trigger — explicit deps override auto-tracking
       await manager.runEffects(new Set(["name"]));
       expect(runFn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ============================================================================
+  // Resolving declared `deps` names
+  // ============================================================================
+  //
+  // A `deps` name is resolved against what the system holds when the effect is
+  // considered, not when it was registered, because the piecemeal API lets the
+  // derivation a name refers to arrive second. What is worth carrying forward
+  // between reconciles is only the names still capable of changing meaning — a
+  // name that already means a declared fact cannot come to mean a derivation,
+  // since a collision resolves toward the fact.
+
+  describe("declared deps resolution", () => {
+    /** A manager wired the way the engine wires it, over a mutable module set. */
+    function setupResolving(
+      deps: string[],
+      known: { facts?: string[]; derivations?: string[] } = {},
+    ) {
+      const factNames = new Set(known.facts ?? []);
+      const derivationNames = new Set(known.derivations ?? []);
+
+      const isDerivation = vi.fn(
+        (name: string) => derivationNames.has(name) && !factNames.has(name),
+      );
+      const isFactKey = vi.fn((name: string) => factNames.has(name));
+
+      const { store, facts } = createFacts({ schema });
+      facts.count = 0;
+      facts.name = "alice";
+
+      const runFn = vi.fn();
+      const manager = createEffectsManager({
+        definitions: { log: { deps, run: runFn } } as Parameters<
+          typeof createEffectsManager
+        >[0]["definitions"],
+        facts: facts as never,
+        store: store as never,
+        isDerivation,
+        isFactKey,
+      });
+
+      return {
+        manager,
+        runFn,
+        isDerivation,
+        isFactKey,
+        factNames,
+        derivationNames,
+      };
+    }
+
+    it("stops asking about a deps name that already means a declared fact", async () => {
+      const { manager, isDerivation, isFactKey } = setupResolving(["count"], {
+        facts: ["count", "name"],
+      });
+
+      await manager.runEffects(new Set(["count"]));
+      isDerivation.mockClear();
+      isFactKey.mockClear();
+
+      for (let i = 0; i < 5; i++) {
+        await manager.runEffects(new Set(["count"]));
+      }
+
+      // The name was settled by the first resolution. Nothing about the merged
+      // module set can change what it means, so nothing asks again.
+      expect(isDerivation).not.toHaveBeenCalled();
+      expect(isFactKey).not.toHaveBeenCalled();
+    });
+
+    it("keeps asking about a deps name the system holds nothing under", async () => {
+      const { manager, isDerivation, derivationNames } = setupResolving(
+        ["doubled"],
+        { facts: ["count", "name"] },
+      );
+
+      await manager.runEffects(new Set(["count"]));
+      isDerivation.mockClear();
+
+      await manager.runEffects(new Set(["count"]));
+      expect(
+        isDerivation.mock.calls.some((call) => call[0] === "doubled"),
+      ).toBe(true);
+
+      // And when it finally means something, it is picked up and the asking
+      // stops.
+      derivationNames.add("doubled");
+      await manager.runEffects(new Set(["count"]));
+      isDerivation.mockClear();
+
+      await manager.runEffects(new Set(["count"]));
+      expect(isDerivation).not.toHaveBeenCalled();
+    });
+
+    it("wakes on the namespaced name once a deps name becomes a derivation", async () => {
+      const { manager, runFn, derivationNames } = setupResolving(["doubled"], {
+        facts: ["count", "name"],
+      });
+
+      // Nothing holds `doubled`, so the bare name is what is recorded, and the
+      // invalidation set never carries it.
+      await manager.runEffects(new Set([derivationDep("doubled")]));
+      expect(runFn).not.toHaveBeenCalled();
+
+      derivationNames.add("doubled");
+      await manager.runEffects(new Set([derivationDep("doubled")]));
+      expect(runFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops asking once a deps name becomes a declared fact", async () => {
+      const { manager, runFn, isDerivation, isFactKey, factNames } =
+        setupResolving(["later"], { facts: ["count", "name"] });
+
+      await manager.runEffects(new Set(["count"]));
+      expect(runFn).not.toHaveBeenCalled();
+
+      // A module registered afterwards declares it. The bare name was already
+      // the right one, so nothing about the dependency set moves — what changes
+      // is that the question is now answered.
+      factNames.add("later");
+      await manager.runEffects(new Set(["later"]));
+      expect(runFn).toHaveBeenCalledTimes(1);
+
+      isDerivation.mockClear();
+      isFactKey.mockClear();
+      await manager.runEffects(new Set(["later"]));
+      expect(isDerivation).not.toHaveBeenCalled();
+      expect(isFactKey).not.toHaveBeenCalled();
+      expect(runFn).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -621,7 +753,7 @@ describe("effects", () => {
       ).toThrow(/does not exist/);
     });
 
-    // R2 fix: onGates leaked across assignDefinition. A data-form `on`
+    // Regression: onGates leaked across assignDefinition. A data-form `on`
     // effect's compiled gate persisted in shouldRun after a swap to a
     // function-form effect, gating runs that should now be unconditional.
     it("clears a stale `on` gate when swapping to a function-form effect", async () => {
@@ -857,6 +989,107 @@ describe("effects", () => {
 
       expect(onError).toHaveBeenCalledWith("asyncEffect", err);
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ==========================================================================
+  // Async auto-tracking
+  // ==========================================================================
+
+  describe("async auto-tracking", () => {
+    it("does not re-run for a fact read only after an await", async () => {
+      const seen: number[] = [];
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { store, manager } = setup({
+        watcher: {
+          run: async (facts: { count: number; name: string }) => {
+            void facts.count;
+            await Promise.resolve();
+            seen.push(facts.count);
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+      store.set("name", "bob");
+      await manager.runEffects(new Set(["name"]));
+
+      // `name` is read past the await, so it was never recorded — the effect
+      // is deaf to it. This is the documented limitation; the assertion pins
+      // it so the warning below stays truthful.
+      expect(seen).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it("warns once when every read is past the await", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          run: async (facts: { count: number }) => {
+            await Promise.resolve();
+            void facts.count;
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+      await manager.runEffects(new Set(["count"]));
+      await manager.runEffects(new Set(["count"]));
+
+      const messages = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((message) => message.includes('Async effect "watcher"'));
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain("runs on every reconcile");
+      warn.mockRestore();
+    });
+
+    it("stays quiet for an async effect whose reads are hoisted above the await", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          run: async (facts: { count: number }) => {
+            const count = facts.count;
+            await Promise.resolve();
+            void count;
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+
+      expect(
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes("Async effect"),
+        ),
+      ).toHaveLength(0);
+      warn.mockRestore();
+    });
+
+    it("stays quiet for an async effect with explicit deps", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          deps: ["count"],
+          run: async () => {
+            await Promise.resolve();
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+
+      expect(
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes("Async effect"),
+        ),
+      ).toHaveLength(0);
+      warn.mockRestore();
     });
   });
 });

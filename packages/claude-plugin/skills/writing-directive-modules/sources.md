@@ -35,6 +35,36 @@ Do I need to subscribe to an external event stream?
 └── No → You probably want an effect, resolver, or event handler instead.
 ```
 
+**If you take the `effect` branch, guard on the value.** An effect that owns a connection tears it down before every re-run, so what re-runs the effect decides how often the connection is dropped and rebuilt. A `deps` entry naming a *fact* wakes on a change — writing a fact its current value is not one, so nothing happens. A `deps` entry naming a *derivation* wakes whenever the facts underneath it move, whether or not the derived value moved with them: a derivation is lazy and has no value to compare at the moment its inputs change, and producing one would mean running it.
+
+So `deps: ["shouldConnect"]` on a derivation reading `userId` and `beats` reconnects on every heartbeat, while `shouldConnect` stays `true` throughout. Keep the last value and return early when it has not moved:
+
+```typescript
+let connected: WebSocket | null = null;
+
+effects: {
+  socket: {
+    deps: ["shouldConnect"],
+    run: () => {
+      const shouldConnect = system.derive.shouldConnect;
+      if (shouldConnect === (connected !== null)) {
+        return; // The value did not move — leave the socket alone.
+      }
+      if (!shouldConnect) {
+        connected?.close();
+        connected = null;
+        return;
+      }
+      connected = new WebSocket("/ws");
+    },
+  },
+}
+```
+
+The guard replaces the cleanup return rather than sitting beside it — a returned cleanup runs before every re-run, including the ones the guard exists to make into no-ops. The cost is that the socket is yours to close at `system.stop()`, since nothing holds a cleanup for it. The full note is on `EffectDef`.
+
+A `source` does not have this shape at all — it mounts once at `system.start()` and tears down at `system.stop()` — which is a reason to prefer it whenever the subscription does not genuinely depend on a fact.
+
 ## Basic Source
 
 ```typescript

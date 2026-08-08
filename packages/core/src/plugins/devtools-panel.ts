@@ -135,7 +135,7 @@ export function createPanel(
   statusRow.appendChild(statusEl);
   container.appendChild(statusRow);
 
-  // Time-travel controls — 44px touch targets (M6)
+  // Time-travel controls — 44px touch targets
   const historySection = document.createElement("div");
   Object.assign(historySection.style, {
     display: "none",
@@ -349,7 +349,7 @@ export function createPanel(
   timelineDetails.appendChild(timelineSvg);
   container.appendChild(timelineDetails);
 
-  // Constraints section — per-clause whenExplain tree (R4.E)
+  // Constraints section — per-clause whenExplain tree
   const constraintsSectionRefs = (() => {
     const details = document.createElement("details");
     details.style.marginBottom = "4px";
@@ -533,7 +533,7 @@ export function createPanel(
   }
   document.addEventListener("keydown", onGlobalKeyDown);
 
-  // Mount — guard document.body (M1)
+  // Mount — guard document.body
   function mount() {
     if (destroyed) {
       return;
@@ -931,7 +931,7 @@ export function setupHistoryButtons(
 }
 
 // ============================================================================
-// Constraint whenExplain rendering (R4.E)
+// Constraint whenExplain rendering
 // ============================================================================
 
 /**

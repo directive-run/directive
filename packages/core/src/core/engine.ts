@@ -41,7 +41,12 @@ import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { type SourcesManager, createSourcesManager } from "./sources.js";
-import { BLOCKED_PROPS } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  derivationDepId,
+  describeDep,
+  isDerivationDep,
+} from "./tracking.js";
 import type {
   ConstraintsDef,
   DerivationsDef,
@@ -67,6 +72,29 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
 // ============================================================================
 // Engine Implementation
 // ============================================================================
+
+/**
+ * The changed-key the error boundary files when an effect throws under the
+ * `"retry"` strategy.
+ *
+ * Not a fact key — no fact by this name can exist, and no dependency set names
+ * it, so it selects nothing. Every consumer of the changed-key set matches
+ * names against dependencies, which means this one is inert everywhere it is
+ * read: it marks the pass as having had something happen without claiming that
+ * any particular thing changed.
+ *
+ * The retry pass itself is scheduled outright at the point the key is filed,
+ * beside the `add`, rather than inferred from the set being non-empty. The key
+ * is filed anyway so that everything downstream of the effects phase in that
+ * pass — the constraint evaluation the set is copied into, and a history
+ * snapshot if the raise happened outside a reconcile — sees a set consistent
+ * with a reconcile having been asked for.
+ *
+ * It does not survive the pass. `state.changedKeys` is cleared once it has been
+ * copied for constraint evaluation, so nothing hands the key back to the phase
+ * that raised it.
+ */
+const EFFECT_RETRY_KEY = "*";
 
 /**
  * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
@@ -357,17 +385,76 @@ export function createEngine<S extends Schema>(
   let dispatchDepth = 0;
   let shouldTakeSnapshot = false;
 
-  // Dev-mode: Warn if a fact and derivation share the same name
+  // Dev-mode: Warn if a fact and derivation share the same name.
+  //
+  // Tracking handles it — the two are separate names inside every dependency
+  // set and invalidation set, and a constraint gated on one is not woken by the
+  // other. This warns because it is hard to *read*: `facts.ready` and
+  // `derived.ready` sit a line apart meaning different things, and a reviewer
+  // has to check which proxy every one of them came off.
   if (isDevelopment) {
     const derivationNames = new Set(Object.keys(mergedDerive));
     for (const key of Object.keys(mergedSchema)) {
       if (derivationNames.has(key)) {
         console.warn(
-          `[Directive] "${key}" exists as both a fact and a derivation. This may cause unexpected dependency tracking behavior.`,
+          `[Directive] "${key}" exists as both a fact and a derivation. They are tracked separately and will not invalidate each other, but two things one name apart are hard to read — consider renaming one.`,
         );
       }
     }
   }
+
+  /**
+   * Whether an explicit `deps` entry names a derivation.
+   *
+   * Auto-tracking already files a derivation read under a namespace;
+   * a `deps` array is written by hand and cannot. This is what brings the two
+   * onto one keyspace, and it is answered here because the engine is the only
+   * thing holding the merged module set — a name that means nothing at
+   * registration time can mean a derivation after a second module joins, so it
+   * is a live lookup rather than a snapshot.
+   *
+   * A fact key of the same name wins. `deps` has meant fact keys since it
+   * existed, the collision is already warned about above, and resolving it
+   * toward the older meaning cannot break a module that predates derivation
+   * dependencies working at all.
+   */
+  const isDerivationDepName = (name: string): boolean =>
+    name in mergedDerive && !(name in mergedSchema);
+
+  /**
+   * Whether an explicit `deps` entry names a declared fact.
+   *
+   * The companion to `isDerivationDepName`, and live for the same reason:
+   * `registerModule` adds to the merged schema after the engine exists. It
+   * exists so a dependency resolver can tell "this name means a fact" from
+   * "this name means nothing yet" — the first is settled, because the rule
+   * above hands a collision to the fact, and the second is the only case worth
+   * revisiting.
+   */
+  const isFactKeyName = (name: string): boolean => name in mergedSchema;
+
+  /**
+   * `isDerivationDepName`, plus the record that someone is now watching.
+   *
+   * An effect or constraint that names a derivation in `deps` is watching it as
+   * surely as one whose body reads it — more surely, since a body may read
+   * conditionally — but nothing about a hand-written name announces itself the
+   * way a tracked read does. Asking what the name means is the moment the
+   * intent is visible, so it is the moment it gets recorded. Only names that
+   * turn out to be derivations are recorded; a fact key resolves through the
+   * other branch and never reaches here.
+   *
+   * What the record buys is at the drain: with nothing watching, the transitive
+   * "may have moved" closure is never computed at all.
+   */
+  const observeDerivationDepName = (name: string): boolean => {
+    if (!isDerivationDepName(name)) {
+      return false;
+    }
+    derivationsManager.markObserved(name);
+
+    return true;
+  };
 
   // Create plugin manager
   const pluginManager: PluginManager<S> = createPluginManager();
@@ -376,7 +463,7 @@ export function createEngine<S extends Schema>(
   }
   // Cached plugin check — updated on register/unregister for O(1) hot-path access
   let _hasPlugins = pluginManager.getPlugins().length > 0;
-  // R19 hardening — reentry depth counter for `system.notify.guardrailBlocked`
+  // reentry depth counter for `system.notify.guardrailBlocked`
   // so a hostile plugin can't synchronously re-emit through the broadcast
   // fabric and overflow the stack. Capped at depth 4 (one legitimate
   // plugin-reacting-to-plugin chain is fine; deeper is a smell).
@@ -515,6 +602,8 @@ export function createEngine<S extends Schema>(
     definitions: mergedEffects,
     facts,
     store,
+    isDerivation: observeDerivationDepName,
+    isFactKey: isFactKeyName,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
@@ -544,7 +633,7 @@ export function createEngine<S extends Schema>(
       }
 
       if (strategy === "retry") {
-        state.changedKeys.add("*");
+        state.changedKeys.add(EFFECT_RETRY_KEY);
         scheduleReconcile();
       }
     },
@@ -619,6 +708,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedConstraints,
     facts,
     requirementKeys,
+    isDerivation: observeDerivationDepName,
     onEvaluate: (id, active) => {
       if (hasPlugins()) {
         // For data-form `when` constraints, pass the per-clause breakdown
@@ -975,7 +1065,7 @@ export function createEngine<S extends Schema>(
           `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. This usually means resolvers are creating circular requirement chains. Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
         );
       }
-      // Drain pending fact changes so they don't leak into the next trace entry (M4)
+      // Drain pending fact changes so they don't leak into the next trace entry
       if (traceEnabled) {
         traceManager.drainPendingChanges();
       }
@@ -1023,7 +1113,23 @@ export function createEngine<S extends Schema>(
       // Note: Derivations are already invalidated immediately when facts change
       // (in the onChange/onBatch callbacks), so we don't need to do it here
 
-      // Run effects for changed keys
+      // Run effects for changed keys.
+      //
+      // Auto-tracked dependencies are whatever the body read, which is fact
+      // keys *and* derivations, so the notification set has to carry both or
+      // half of every tracked dependency set matches nothing. Folded in here
+      // rather than at the source so `changedKeys` stays a record of facts up
+      // to the point the snapshot label is taken, and carried under the
+      // derivation namespace so the two kinds of name cannot be confused for
+      // each other.
+      //
+      // Asked once per reconcile rather than pushed on every fact write. The
+      // question is "which watched derivations may have moved", its answer is a
+      // transitive closure over the derivation graph, and a derivation that
+      // nothing reads back stays stale — so pushing it meant re-walking the
+      // whole downstream graph per write forever, while the set it fed is
+      // drained once per pass regardless.
+      derivationsManager.collectInvalidated(state.changedKeys);
       await effectsManager.runEffects(state.changedKeys);
 
       // Copy changed keys for constraint evaluation before clearing
@@ -1053,7 +1159,7 @@ export function createEngine<S extends Schema>(
             currentTrace.constraintsHit.push({
               id: cId,
               priority: cState.priority,
-              deps: cDeps ? [...cDeps] : [],
+              deps: cDeps ? Array.from(cDeps, describeDep) : [],
               meta: mergedConstraints[cId]?.meta,
             });
           }
@@ -1422,7 +1528,7 @@ export function createEngine<S extends Schema>(
         count: number,
         category?: string,
       ): void {
-        // R19 hardening — the public surface accepts a caller-supplied
+        // the public surface accepts a caller-supplied
         // `plugin` string. A malicious or buggy third-party plugin
         // holding a `System` ref could otherwise forge audit events
         // claiming `plugin: "fact-pii-guardrail"` (or any other
@@ -1882,7 +1988,7 @@ export function createEngine<S extends Schema>(
       errorBoundary.clearErrors();
       settlementListeners.clear();
       historyListeners.clear();
-      // Clean up trace state (C1)
+      // Clean up trace state
       traceManager.destroy();
       // Clean up dynamic definition state
       definitions.destroy();
@@ -1941,7 +2047,7 @@ export function createEngine<S extends Schema>(
       // — a partial teardown is better than a hang while the runtime
       // is impatient to evict.
       //
-      // Bug-fix per R11: deadline<=0 used to construct the IIFE,
+      // Bug-fix per deadline<=0 used to construct the IIFE,
       // return synchronously, and let the IIFE run detached with no
       // error path. Now we either await it or attach a swallow-catch
       // so the unhandled-rejection surface is bounded.
@@ -2231,14 +2337,22 @@ export function createEngine<S extends Schema>(
       const constraintState = constraintsManager.getState(req.fromConstraint);
       const resolverStatus = resolversManager.getStatus(requirementId);
 
-      // Get relevant facts from the constraint's tracked dependencies
+      // Get the relevant values from the constraint's tracked dependencies.
+      // A `when()` may have been gated on a derivation rather than a fact, and
+      // an explanation that dropped those (or looked them up in the fact store,
+      // where they are not) would show `undefined` for the value the constraint
+      // actually turned on.
       const relevantFacts: Record<string, unknown> = {};
       const constraintDeps = constraintsManager.getDependencies(
         req.fromConstraint,
       );
       if (constraintDeps) {
-        for (const key of constraintDeps) {
-          relevantFacts[key] = store.get(key);
+        for (const dep of constraintDeps) {
+          relevantFacts[describeDep(dep)] = isDerivationDep(dep)
+            ? derivationsManager.get(
+                derivationDepId(dep) as keyof DerivationsDef<S>,
+              )
+            : store.get(dep);
         }
       } else {
         // Fallback: include all facts if deps not tracked

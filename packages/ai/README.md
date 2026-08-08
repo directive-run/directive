@@ -11,7 +11,7 @@ AI agent orchestration with guardrails, cost tracking, and multi-agent coordinat
 - **Guardrails** &ndash; input, output, and tool call validation with retry support
 - **Multi-agent orchestration** &ndash; parallel, sequential, and supervisor patterns
 - **Cost tracking** &ndash; per-call token usage with pricing constants for every provider
-- **Streaming** &ndash; async iterable streams with backpressure and streaming guardrails
+- **Streaming** &ndash; per-delta token streaming that survives every runner wrapper, as an async iterable of typed chunks
 - **Provider adapters** &ndash; swap providers by changing one import, not your codebase
 
 ## Install
@@ -19,6 +19,13 @@ AI agent orchestration with guardrails, cost tracking, and multi-agent coordinat
 ```bash
 npm install @directive-run/core @directive-run/ai
 ```
+
+Requires **`@directive-run/core` 1.25.0 or newer**. The cost path imports a
+value from core rather than only a type &ndash; the one function that reconciles
+the two spellings of the cache-write token count &ndash; so an older core
+resolves, installs, and then misprices cached calls at runtime. The peer range
+is `^1.25.0`; if your package manager warns about it, upgrade core rather than
+overriding the range.
 
 Provider adapters are subpath exports &ndash; no extra packages needed.
 
@@ -55,7 +62,8 @@ Adapters are thin wrappers around each provider's HTTP API. No SDK dependencies 
 | API key required | Yes | Yes | No | Yes |
 | Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; | `createGeminiStreamingRunner` |
 | Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; | &ndash; |
-| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | &ndash; | `GEMINI_PRICING` |
+| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | `OLLAMA_PRICING` | `GEMINI_PRICING` |
+| Alias (same table) | `OPENAI_TOKEN_PRICING` | `ANTHROPIC_TOKEN_PRICING` | `OLLAMA_TOKEN_PRICING` | `GEMINI_TOKEN_PRICING` |
 | Prompt caching | &ndash; | `promptCaching: "automatic"` | &ndash; | &ndash; |
 | Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; | &ndash; |
 
@@ -75,6 +83,214 @@ const cost =
   estimateCost(inputTokens, OPENAI_PRICING["gpt-4o"].input) +
   estimateCost(outputTokens, OPENAI_PRICING["gpt-4o"].output);
 ```
+
+### One pricing constant, every cost surface
+
+Each `*_PRICING` entry carries the same rates under both field spellings, so
+there is no wrong constant to grab. `estimateCost` reads the bare `.input` /
+`.output` numbers; `withBudget` and `createConstraintRouter` are typed against
+`TokenPricing` and read `.inputPerMillion` / `.outputPerMillion`. Both pairs are
+derived from one source, so they cannot drift. Where a provider prices cache
+tokens separately, `.cacheRead` / `.cacheWrite` and their `*PerMillion`
+spellings come along the same way:
+
+```typescript
+import { withBudget } from "@directive-run/ai";
+import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
+
+const pricing = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"];
+const guarded = withBudget(runner, {
+  pricing,
+  budgets: [{ window: "day", maxCost: 10, pricing }],
+});
+```
+
+`ANTHROPIC_TOKEN_PRICING` and its siblings are aliases for the same tables, kept
+so existing code keeps working.
+
+Hand-built pricing objects are still validated at construction. A rate that is
+missing, non-finite, or negative throws with a message naming the fix &ndash; it
+used to produce `NaN` or negative costs that silently disabled the budget, which
+is the worst possible failure for a spend guard. Zero is accepted: local models
+genuinely bill nothing.
+
+Use `toTokenPricingTable` to widen your own `{ input, output }` table the same
+way:
+
+```typescript
+import { toTokenPricingTable } from "@directive-run/ai";
+
+const MY_PRICING = toTokenPricingTable({ "my-model": { input: 3, output: 15 } });
+```
+
+### Cache tokens are priced, not free
+
+`TokenPricing` carries two optional cache rates alongside input and output:
+
+```typescript
+const pricing = {
+  inputPerMillion: 3,
+  outputPerMillion: 15,
+  cacheReadPerMillion: 0.3,   // optional – defaults to inputPerMillion
+  cacheWritePerMillion: 3.75, // optional – defaults to inputPerMillion
+};
+```
+
+When a rate is omitted, cache tokens are billed at the **input** rate. That is
+deliberately conservative and never free: with prompt caching on, `inputTokens`
+is only the uncached remainder, so pricing input and output alone would read a
+heavily cached run as nearly costless while the provider bills it in full &ndash;
+and a cache *write* bills above the input rate on every provider that offers
+one. `ANTHROPIC_PRICING` publishes the real ratios (cache read 0.1x input, cache
+write 1.25x input), so no configuration is needed to price Anthropic caching
+correctly.
+
+> **Which cache TTL the write rate assumes.** Anthropic prices a cache write at
+> 1.25x the input rate on the **5-minute** cache and 2.0x on the **1-hour**
+> cache. `cacheWritePerMillion` is one number and cannot express both, and the
+> published tables carry the 5-minute multiplier &ndash; the default TTL, and the
+> one the shipped adapter requests. If you use the 1-hour cache, pass your own
+> pricing object; otherwise cache writes bill at 1.6x under what the provider
+> charges. Expressing both would take a pricing dimension the type does not
+> have, and adding one is not part of this change.
+
+The cache-write **count** has one canonical name, `tokenUsage.cacheWriteTokens`,
+matching the rate that prices it. `tokenUsage.cacheCreationTokens` is a
+documented alias, after Anthropic's wire format, and is what the adapters
+populate. Supply either; when both are present the larger is billed. The two are
+reconciled in a single function &ndash; `normalizeTokenUsage`, in
+`@directive-run/core` &ndash; that every consumer of token usage routes through,
+including `createAgentMetrics().trackRun`. Teaching each consumer both spellings
+is what left one of them knowing only one.
+
+## Cost Caps &ndash; `withBudget`
+
+`withBudget` wraps any runner with a per-call cap and rolling time-window caps.
+
+```typescript
+import { withBudget, BudgetExceededError } from "@directive-run/ai";
+import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
+
+const pricing = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"];
+
+const guarded = withBudget(baseRunner, {
+  maxCostPerCall: 0.10,
+  pricing,                        // required for maxCostPerCall to do anything
+  charsPerToken: 4,               // input-token estimate, default 4
+  estimatedOutputMultiplier: 1.0, // 0.3 for summarization, 3.0 for generation
+  budgets: [
+    { window: "hour", maxCost: 5.00, pricing },
+    { window: "day", maxCost: 50.00, pricing },
+  ],
+  onBudgetExceeded: ({ estimated, actual, remaining, window, phase }) => {
+    if (phase === "pre-call") {
+      console.warn(`[budget] ${window} blocked – est $${estimated.toFixed(4)}, remaining $${remaining.toFixed(4)}`);
+      return;
+    }
+    console.warn(`[budget] ${window} overran after the fact – billed $${actual!.toFixed(4)} against a $${remaining.toFixed(4)} cap`);
+  },
+});
+```
+
+### `onBudgetExceeded` fires in two phases &ndash; only one of them throws
+
+| `phase` | When | Thrown | Money spent |
+|---|---|---|---|
+| `"pre-call"` | The estimate exceeds a cap | `BudgetExceededError` | none &ndash; the call never ran |
+| `"post-call"` | The provider billed more than `maxCostPerCall` | nothing | already spent |
+
+The `"post-call"` case is the one to read twice if you already use this
+callback: it fires **after a call that succeeded**, once the money is gone.
+`withBudget` gates an *estimate*, so a call estimated at a cent that bills five
+dollars clears the gate; it cannot be blocked, but it is reported rather than
+absorbed in silence. Treat `phase: "post-call"` as an alert, not as a failure,
+and do not retry on it.
+
+`estimated` is always the pre-call estimate, in both phases. `actual` is what
+the provider billed and is present only when `phase` is `"post-call"`. The
+callback receives a frozen copy, so writing to it cannot alter the
+`BudgetExceededError` that follows.
+
+Window caps are reported after the fact too, not only `maxCostPerCall`: a call
+that estimated under its remaining hour and billed over it lands in the ledger
+with `window: "hour"` and `phase: "post-call"`. It used to pass unremarked, and
+the *next* call was the one that got blocked.
+
+**Two budgets on the same window share one ledger.** A call is recorded there
+once, at the first budget's rates for that window; each budget's own rates still
+gate its own pre-call estimate. Recording once per *budget* billed a $3 call as
+$6 against a shared hour, so `getSpent` read double and a pair of $100 hourly
+caps started blocking at roughly half the spend they were configured for.
+
+### Reading spend
+
+```typescript
+import type { BudgetRunner } from "@directive-run/ai";
+
+const runner = guarded as BudgetRunner;
+
+runner.getSpent("hour");   // rolling hour window; 0 if no hour budget configured
+runner.getSpent("day");    // rolling day window
+runner.getSpent("total");  // lifetime spend for this runner
+runner.getUnpricedCallCount(); // recent calls charged from what they delivered, not from billed usage
+runner.getFailedCallSpend("hour"); // how much of getSpent("hour") was charged for calls that threw
+```
+
+`getSpent("total")` is priced with the top-level `pricing` when supplied, and
+otherwise with the first budget window's rates &ndash; it returns `0` only when
+neither is configured. Every set of rates on one runner must agree: two budgets
+sharing a window, or a top-level `pricing` that prices a call differently from a
+window's, are refused at construction rather than resolved by declaration order.
+
+`getUnpricedCallCount()` is how you find out the ledger is approximate. When a
+runner reports no `tokenUsage`, reports a token count that is not a non-negative
+integer, reports zero of every token class or says outright that usage was not
+reported, throws, delivers text for a generation the surviving result does not
+describe, or reports counts that price out to a non-finite cost, `withBudget`
+charges what the call *delivered* &ndash; the assistant text on the result, or
+the deltas that reached your `onToken` &ndash; instead of skipping the call,
+counts it here, and warns once per condition. The count is kept over a rolling
+window, the widest budget window configured or an hour when there is none, so an
+outage that ends ages out of it. A count that tracks your call rate means the
+runner never reports usable usage and every `getSpent` figure is measured rather
+than billed. Set `maxUnpricedCalls` to turn the count into a ceiling: the runner
+then refuses with `UnpricedCallLimitError` rather than enforcing a hard budget
+against measurements indefinitely.
+
+`getFailedCallSpend(window)` splits that figure. A call that throws reports no
+usage, so whatever reached your `onToken` before it failed is measured and
+charged &ndash; a gateway that strips the completion marker generated, delivered
+and billed the whole response, and the throw comes afterwards. A failure that
+delivered nothing is charged nothing: there is no observation to price, and a
+refused connection should not consume a window of a budget that outlives the
+outage. Subtract this from `getSpent(window)` for spend attributable to calls
+that returned. A figure approaching `getSpent` means a cap is filling up with
+calls that break part-way through rather than with work. Calls this runner's own
+caps blocked are in neither figure, and neither is a `BudgetExceededError` or
+`UnpricedCallLimitError` raised by a nested `withBudget` &ndash; those provably
+never reached a provider, so they are charged nothing.
+
+`createConstraintRouter` has the same accessor, for the same reason. A cost fact
+pinned at zero is not a smaller error than an approximate one &ndash; it is the
+kind that makes a `facts.totalCost > N` failover unreachable.
+
+**What the estimate is, and is not.** It reads the input string alone: no agent
+instructions, no conversation history, no tool definitions, all of which the
+provider bills. It charges input tokens at the highest of the input, cache-read,
+and cache-write rates, because before the call there is no way to know how the
+provider will split them and an estimate below the eventual bill is a cap that
+does not gate. It is a floor, useful for gating and for standing in when a
+provider reports nothing &ndash; not a prediction.
+
+### Configuration is validated at construction
+
+Rates and caps are read once, validated, and copied when the wrapper is built.
+A rate that is missing, non-finite, negative, or `-0` throws with a message
+naming the fix; a `window` that is not `"hour"` or `"day"` throws rather than
+silently disabling the cap; and mutating the objects you passed in afterwards
+has no effect. Zero rates are accepted &ndash; local models genuinely bill nothing
+&ndash; but pairing all-zero rates with a non-zero cap warns, since that cap can
+never trip.
 
 ## Prompt Caching (Anthropic)
 
@@ -100,7 +316,43 @@ const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
 
 > **Minimum cacheable prefix (the #1 gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; roughly 1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, and 4096 on Opus & Haiku-4.5. There is no error: caching just doesn't happen and `cacheReadTokens` stays `0` across repeat calls (that `0` is your diagnostic). Because Directive caches `agent.instructions`, short instructions commonly fall below this threshold. The `ephemeral` breakpoint also has a **5-minute default TTL** &ndash; prefixes not re-read within that window are evicted.
 
-> **Cost tracking caveat.** `withBudget` / `estimateCost` currently weight all tokens equally, so with caching on they do **not** yet reflect the cheaper cache-read (~0.1x) or pricier cache-write (~1.25x) rates &ndash; a cached run will read as more expensive than it actually is. Cache-aware cost pricing is a planned follow-up.
+> **Cost tracking.** `withBudget` and `createConstraintRouter` price all four token classes. Cache rates come from the pricing object's `cacheReadPerMillion` / `cacheWritePerMillion`, and `ANTHROPIC_PRICING` publishes the real ratios (read 0.1x input, write 1.25x input). A hand-built pricing object that omits them bills cache tokens at the input rate &ndash; conservative, so a cached run reads as somewhat more expensive than it is, never as free. `estimateCost` takes one bare rate and one token count, so it prices whichever class you hand it; sum the classes yourself if you use it directly.
+
+## Streaming
+
+`runStream` emits one token chunk per completed message by default. Pass `deltas: true`, or an `onToken` callback, to get one chunk per provider delta.
+
+```typescript
+const { stream, result } = orchestrator.runStream(agent, "Write a report", {
+  deltas: true,
+});
+
+for await (const chunk of stream) {
+  if (chunk.type === "token") process.stdout.write(chunk.data);
+  // `stream_restart` means the response is starting over - a retry, a schema
+  // retry, or a fallback to another provider. Discard everything you rendered
+  // for the current generation.
+  if (chunk.type === "stream_restart") ui.clear();
+}
+
+const final = await result;
+```
+
+> **`chunk.data` is untrusted text.** It is the model's output byte for byte, and a terminal interprets what you write to it &ndash; escape sequences can clear the screen, move the cursor, or rewrite lines already printed. A single sequence can also arrive split across two deltas, so sanitizing each chunk on its own does not help. Sanitize the accumulated text, or render into something that does not interpret control codes.
+
+Use `onToken` when you want the deltas somewhere of your own. It is awaited, so returning a promise applies real backpressure &ndash; the adapter stops reading the provider stream until it settles.
+
+```typescript
+const { stream } = orchestrator.runStream(agent, prompt, {
+  onToken: async (token) => {
+    await socket.send(token);
+  },
+});
+```
+
+Streaming is a field on the options every runner already receives, not a separate runner, so it composes: `withRetry`, `withBudget`, `withFallback`, `withModelSelection` and `withStructuredOutput` all forward it, and a budgeted runner still enforces its budget while streaming.
+
+Backpressure strategies (`backpressure`, `bufferSize`) belong to a `StreamRunner` built by `createStreamingRunner` &ndash; they are not `runStream` options. See the [AI Guide](https://directive.run/docs/ai) for the full chunk union.
 
 ## Lifecycle Hooks
 

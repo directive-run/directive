@@ -189,7 +189,7 @@ export {
 } from "./builtin-guardrails.js";
 
 /**
- * Tier 0 Mandatory Companion to `liveContext`. Closes the source →
+ * Mandatory companion to `liveContext`. Closes the source →
  * fact → agent-prompt PII bypass at the fact-store boundary. Symmetric
  * with the other built-in guardrails: re-exported here so consumers
  * who follow the "main-barrel" idiom find it, AND from the
@@ -218,8 +218,20 @@ export {
   validateBaseURL,
   createRunner,
   type CreateRunnerOptions,
+  type ParseEventStreamOptions,
   type ParsedResponse,
+  type RunnerStreamingSupport,
+  type StreamEventResult,
+  type StreamTotals,
+  type StreamWireFormat,
 } from "./agent-utils.js";
+
+// A streaming HTTP failure throws this, and the release notes describe it as
+// the contract: it carries the status, the retry interval the server asked for,
+// and the request id you would quote in a support ticket. None of that is
+// reachable without the class — `instanceof` needs the constructor, and reading
+// the fields off a bare `Error` needs a cast.
+export { ProviderHTTPError } from "./adapters/shared.js";
 
 // ============================================================================
 // Middleware Composition
@@ -271,6 +283,8 @@ export {
   type DoneChunk,
   type ErrorChunk,
   type StreamChunk,
+  type StreamRestartChunk,
+  type StreamRestartReason,
   type StreamRunOptions,
   type StreamRunner,
   type StreamingRunResult,
@@ -281,6 +295,8 @@ export {
   type MultiplexedStreamResult,
   type MergedTaggedStreamResult,
   mergeTaggedStreams,
+  StreamConsumerError,
+  isStreamConsumerError,
 } from "./streaming.js";
 
 /**
@@ -359,6 +375,7 @@ export {
   type HandoffResult,
   type RunAgentRequirement,
   type MultiAgentRunCallOptions,
+  type MultiAgentStreamCallOptions,
 } from "./multi-agent-orchestrator.js";
 
 /**
@@ -569,12 +586,31 @@ export {
 export {
   withBudget,
   BudgetExceededError,
+  UnpricedCallLimitError,
+  toTokenPricingTable,
+  type BareTokenRates,
   type BudgetConfig,
   type BudgetRunner,
   type BudgetWindow,
+  type BudgetWindowName,
+  type ModelPricing,
   type TokenPricing,
   type BudgetExceededDetails,
 } from "./budget.js";
+
+// Shared cost-pricing primitives — the module every cost surface calls into.
+export {
+  requireModelPricing,
+  snapshotCallUsage,
+  snapshotTokenPricing,
+  priceCall,
+  describeUnpricedReason,
+  type PricedCall,
+  type ResolvedPricing,
+  type ResolvedUsage,
+  type UnpricedReason,
+  type UsageSnapshot,
+} from "./pricing.js";
 
 // Smart Model Selection
 export {

@@ -985,10 +985,15 @@ describe("hardened proxy util.inspect.custom hook", () => {
     const proxy = createModuleFactsProxy(facts, "auth");
 
     const inspect = (proxy as unknown as Record<symbol, unknown>)[inspectSym];
-    // No ownKeys configured on createModuleFactsProxy → snapshot is empty
-    // but the function exists and does not throw on access.
+    // The hook exists so a printer sees real keys and values instead of
+    // trapping on the proxy. It renders the module's own facts, unprefixed —
+    // this asserted `{}` while the proxy had no `ownKeys`, which made a
+    // debugger's view of a namespaced module look empty.
     expect(typeof inspect).toBe("function");
-    expect((inspect as () => unknown)()).toEqual({});
+    expect((inspect as () => unknown)()).toEqual({
+      token: "abc",
+      role: "admin",
+    });
   });
 
   it("namespaced facts proxy snapshot enumerates module namespaces", () => {
@@ -1065,5 +1070,50 @@ describe("createModuleFactsProxy non-JSON warning (item 20)", () => {
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// Enumeration of a namespaced module's facts
+// ============================================================================
+
+describe("a namespaced module's facts enumerate", () => {
+  /**
+   * Reads worked without this, which is what made it quiet: every property
+   * access returned the right value while `{ ...facts }` produced `{}`. Spread
+   * is the ordinary way to snapshot a module's state, so the empty object read
+   * as an empty module rather than as a missing proxy trap.
+   */
+  it("yields its keys to spread, Object.keys and JSON.stringify", () => {
+    const store: Record<string, unknown> = {
+      [`auth${SEPARATOR}token`]: "abc",
+      [`auth${SEPARATOR}expires`]: 42,
+      [`cart${SEPARATOR}items`]: 3,
+    };
+
+    const facts = createModuleFactsProxy(store, "auth");
+
+    expect(Object.keys({ ...facts }).sort()).toEqual(["expires", "token"]);
+    expect(Object.keys(facts).sort()).toEqual(["expires", "token"]);
+    expect(JSON.parse(JSON.stringify(facts))).toEqual({
+      token: "abc",
+      expires: 42,
+    });
+
+    // Another module's keys stay out of it — the prefix filter is what makes
+    // one flat store legible as separate modules.
+    expect(Object.keys(facts)).not.toContain("items");
+  });
+
+  it("reflects a key added after the proxy was built", () => {
+    const store: Record<string, unknown> = {};
+    const facts = createModuleFactsProxy(store, "auth");
+
+    expect(Object.keys(facts)).toEqual([]);
+
+    facts.token = "abc";
+
+    expect(Object.keys(facts)).toEqual(["token"]);
+    expect({ ...facts }).toEqual({ token: "abc" });
   });
 });

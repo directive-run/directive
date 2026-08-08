@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * R4.E — devtools panel renders per-clause whenExplain tree.
+ * devtools panel renders per-clause whenExplain tree.
  *
  * The plumbing already existed (the `constraint.evaluate` event carries
  * `whenExplain?: ClauseResult[]`, `engine.explain()` renders the tree
@@ -41,7 +41,7 @@ function findConstraintsBody(): HTMLElement | null {
   return null;
 }
 
-describe("devtools whenExplain panel (R4.E)", () => {
+describe("devtools whenExplain panel", () => {
   it("renders Constraints section with empty state on start", () => {
     const mod = createModule("empty", {
       schema: {

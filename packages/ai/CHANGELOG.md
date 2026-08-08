@@ -257,7 +257,7 @@
 
 - [#59](https://github.com/directive-run/directive/pull/59) [`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Walker Proxy / cycle / NaN surgical hardening + emitInit cascading registration + MCP recipe enforcement
 
-  An adversarial review against v1.19.1 surfaced three new Proxy-based attack chains in the walker that the v1.19.1 array-snapshot fix introduced (each round of narrow patches opens a slightly different bypass; this round trades narrower fixes for an architectural rewrite that's queued separately). One asymmetric snapshot bug in `emitInit`, one NaN clamp gap, and a documented-only multi-tenant pattern with a prose/code contradiction.
+  Three new Proxy-based attack chains in the walker, introduced by the v1.19.1 array-snapshot fix (each narrow patch opens a slightly different bypass; this release trades narrower fixes for an architectural rewrite that's queued separately). Plus one asymmetric snapshot bug in `emitInit`, one NaN clamp gap, and a documented-only multi-tenant pattern with a prose/code contradiction.
 
   ### Walker hardening
 
@@ -287,20 +287,19 @@
 
 - [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Follow-on fixes — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
 
-  Three small follow-on fixes the prior round's Tier 1 didn't cover:
+  Three small follow-on fixes not covered by the previous release:
 
   **MCP holder pattern — multi-tenant safe factory.** The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
 
   **`broadcast` snapshots `plugins` before iteration.** A plugin hook callback that called `manager.unregister(...)` (or whose `system.observe()` unsubscribe spliced the array) used to shift indices mid-iteration, silently skipping the NEXT plugin — typically the audit-ledger or `createFactPIIGuardrail`. The broadcaster now iterates a snapshot taken at call time, so reentrant `unregister` no longer corrupts the broadcast.
 
-  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel.** The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
+  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel.** The required companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
 
-- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Adversarial review Tier 1 — walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
+- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
 
-  An adversarial multi-lens review against the v1.19.0 source-primitive
-  surface returned roughly 30 critical findings. This patch closes the
-  four highest-impact clusters; the remaining items are tracked for a
-  follow-up minor.
+  Roughly 30 critical issues were found in the v1.19.0 source-primitive
+  surface. This patch closes the four highest-impact clusters; the
+  remaining items are tracked for a follow-up minor.
 
   ### Critical fixes
 
@@ -339,7 +338,7 @@
   **`LiveContextOptions.mode` restored as `@deprecated` for source-compat.**
   v1.18.0 shipped to npm with `mode: "inject-system-message"
 | "restart"` on the public `LiveContextOptions` interface. v1.19.0
-  removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
+  removed it. The v1.19.0 changeset asserted "v1.18.0 has not yet
   shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0
   published 2026-06-08 05:42 UTC, 1.19.0 published 2026-06-09 14:21
   UTC — 32hr live with the field). Removing an exported field of an
@@ -374,8 +373,9 @@
 - [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Five remaining critical fixes to documented surfaces of the source primitive.
 
   This patch closes the five critical issues affecting documented but
-  unreachable or misleading public APIs of v1.18.0. With Tier 1 (already
-  merged) + this Tier 2, all ten ship-blocking critical issues are resolved.
+  unreachable or misleading public APIs of v1.18.0. With the earlier batch
+  (already merged) plus this one, all ten ship-blocking critical issues are
+  resolved.
 
   ### Critical fixes
 
@@ -408,7 +408,7 @@
   walker previously short-circuited on `Array.isArray(value)`, so the
   dominant real-world Supabase realtime shape
   (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
-  silently bypassed the Tier 0 guard. The walker now inspects array
+  silently bypassed the guard. The walker now inspects array
   elements at the same depth budget, rebuilding the array if any element
   matched. Maps and Sets remain out of scope by design (consumers must
   wire a `customDetector` for those). 2 new regression tests covering
@@ -447,7 +447,7 @@ unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
   ### Critical fixes
 
   **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
-  subpath**. The Tier 0 Mandatory Companion to `liveContext` was
+  subpath**. The mandatory companion to `liveContext` was
   declared in `guardrails/index.ts` but the actual tsup entry for the
   subpath (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
   `packages/knowledge/ai/ai-sources.md` (Sources × Security section) failed
@@ -534,7 +534,7 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
   the raw PII reach observers + breakpoints + audit-ledger before the
   redaction completed.
 
-  Wires as the Tier 0 prerequisite for the upcoming
+  Wires as the mandatory prerequisite for the upcoming
   `runStream({ liveContext })` recipe, which would otherwise expand the
   fact-injection bypass surface into the mid-stream context updates the
   agent reads while generating.
@@ -565,7 +565,7 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
 - [#52](https://github.com/directive-run/directive/pull/52) [`e0ecd16`](https://github.com/directive-run/directive/commit/e0ecd160c9c947e6c9976dfc08fdac959eb46431) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `attachSourcesToOtel` — pipe core source.\* observation events into the
   same OTel tracer the AI plugin uses
 
-  The R5 observability reviewer found `@directive-run/ai/otel.ts`
+  An observability review found `@directive-run/ai/otel.ts`
   subscribes only to the AI `DebugTimeline` event stream, so the four
   `ObservationEvent.source.*` variants (`source.attach`,
   `source.publish`, `source.detach`, `source.error`) shipped by the
@@ -600,8 +600,7 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
     the exporter sees 1000 events/sec on 10 long-lived spans, well
     within typical OTel collector budgets.
   - `directive.source.error` — short-duration error-status span with
-    `directive.phase`, `error.message` (truncated by the manager at the
-    R7 boundary).
+    `directive.phase`, `error.message` (truncated by the manager).
 
   Optional `publishSampleRate` (default 1.0) sub-samples publish events
   for very high-throughput sources.
@@ -832,10 +831,10 @@ tearDownLiveContext())` ran → subscription died. The distinction
 
 - [#52](https://github.com/directive-run/directive/pull/52) [`dc30477`](https://github.com/directive-run/directive/commit/dc30477379def350bcf8998b9ce3883641e71bbd) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createFactPIIGuardrail` Luhn validation + `attachSourcesToOtel` span-leak fix + `walkDepth` option
 
-  Three targeted fixes against the Tier 1 phases shipped immediately
+  Three targeted fixes against the phases shipped immediately
   before this patch.
 
-  **`createFactPIIGuardrail` — credit-card false positives.** The R9
+  **`createFactPIIGuardrail` — credit-card false positives.** A
   self-review found the inlined `\b(?:\d[ -]?){13,19}\b` regex would
   sweep up phone numbers, tracking IDs, and any 13-19 digit sequence
   formatted with separators as credit cards. The shipping path now
@@ -847,8 +846,8 @@ tearDownLiveContext())` ran → subscription died. The distinction
 
   **`createFactPIIGuardrail` — `walkDepth` option for nested objects.**
   The previous one-level object walk silently passed deeper PII (e.g.
-  `{ profile: { email } }`) through unredacted. The R9 review flagged
-  this as a security limitation that wasn't documented. The plugin now
+  `{ profile: { email } }`) through unredacted. Review flagged this as
+  a security limitation that wasn't documented. The plugin now
   accepts an optional `walkDepth: 1 | 2 | 3 | 4 | 5` (default `1`,
   clamped to `[1, 5]` to prevent pathological recursion on cyclic
   structures). Arrays, Maps, and Sets remain out of scope at any depth —
@@ -856,7 +855,7 @@ tearDownLiveContext())` ran → subscription died. The distinction
   the consumer-specific structure.
 
   **`attachSourcesToOtel` — active spans no longer leak on unsubscribe.**
-  The R9 review found the helper's returned unsubscribe just detached the
+  Review found the helper's returned unsubscribe just detached the
   `system.observe()` subscriber, leaving every active `directive.source.attached`
   span open forever in the collector. The helper now ends each active
   span with status `OK` and a `directive.detached: true` attribute when

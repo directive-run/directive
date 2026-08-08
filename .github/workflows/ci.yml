@@ -24,6 +24,20 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Must precede the build. The knowledge package builds api-skeleton.md
+      # from docs/generated/api-reference.json, which lives in the sibling
+      # directive-docs repo — absent on a runner that checks out this
+      # repository alone. That build step now fails rather than emitting a
+      # placeholder, because the placeholder is how a stub reached npm, so the
+      # file has to be on disk before `build` runs rather than after it.
+      #
+      # directive-docs uploads the same JSON to the latest GitHub release on
+      # each cut. A failed fetch fails the job: the build immediately after it
+      # cannot succeed without this file, and stopping here says why in one
+      # line instead of surfacing as a confusing build error two steps later.
+      - name: Fetch api-reference.json from latest release
+        run: .github/scripts/fetch-api-reference.sh
+
       - run: pnpm -r --filter './packages/*' build
 
       - run: pnpm test -- --run
@@ -37,28 +51,7 @@ jobs:
       # the budget intentionally when shipping a deliberate new feature.
       - run: pnpm size
 
-      # The knowledge package's `generate` step builds api-skeleton.md from
-      # docs/generated/api-reference.json, which lives in the sibling
-      # directive-docs repo. directive-docs uploads the same JSON to the
-      # latest GitHub release on each cut; CI fetches that artifact so the
-      # freshness check has a real source to compare against. If the artifact
-      # is unavailable (e.g. first-time setup, network hiccup), the check is
-      # skipped with a warning rather than failing CI.
-      - name: Fetch api-reference.json from latest release
-        id: fetch_api_reference
-        run: |
-          mkdir -p ../directive-docs/docs/generated
-          if curl -sfL https://github.com/directive-run/directive/releases/latest/download/api-reference.json \
-            -o ../directive-docs/docs/generated/api-reference.json; then
-            echo "fetched=true" >> "$GITHUB_OUTPUT"
-            echo "[ci] fetched api-reference.json from latest release"
-          else
-            echo "fetched=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::api-reference.json not available from latest release; knowledge freshness check skipped"
-          fi
-
       - name: Check knowledge freshness
-        if: steps.fetch_api_reference.outputs.fetched == 'true'
         # Soft-warns instead of failing CI. The check IS valuable for
         # catching mid-cycle drift (someone edited a source export
         # without regenerating api-skeleton.md), but EVERY first commit
@@ -95,6 +88,12 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Same reason as the build-and-test job: building the packages requires
+      # api-reference.json on disk, and this runner has no sibling docs
+      # checkout either.
+      - name: Fetch api-reference.json from latest release
+        run: .github/scripts/fetch-api-reference.sh
 
       - run: pnpm -r --filter './packages/*' build
 

@@ -322,7 +322,7 @@ describe("createGeminiStreamingRunner", () => {
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
           'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":"!"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"!"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
         ]),
       );
 
@@ -333,7 +333,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "Hi", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["Hello", " world", "!"]);
@@ -345,7 +347,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
         ]),
       );
 
@@ -369,7 +371,7 @@ describe("createGeminiStreamingRunner", () => {
       .mockResolvedValue(
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"chunk1"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":"chunk2"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"chunk2"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
         ]),
       );
 
@@ -380,7 +382,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["chunk1", "chunk2"]);
@@ -391,7 +395,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"Done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"Done"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
         ]),
       );
 
@@ -415,7 +419,7 @@ describe("createGeminiStreamingRunner", () => {
       .mockResolvedValue(
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}],"usageMetadata":{"promptTokenCount":15,"candidatesTokenCount":8}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":15,"candidatesTokenCount":8}}',
         ]),
       );
 
@@ -453,7 +457,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"final"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"final"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
           "data: [DONE]",
         ]),
       );
@@ -465,7 +469,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["final"]);
@@ -477,7 +483,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
         ]),
       );
 
@@ -491,8 +497,15 @@ describe("createGeminiStreamingRunner", () => {
       signal: controller.signal,
     });
 
+    // The fetch gets the caller's signal folded together with the stream
+    // deadline's, not the caller's object itself – asserting on identity would
+    // say the deadline had taken the only signal slot, which is the trade this
+    // combination exists to avoid. What matters is that the caller's abort
+    // still reaches the request.
     const [, init] = mockFetch.mock.calls[0]!;
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal.aborted).toBe(false);
+    controller.abort();
+    expect(init.signal.aborted).toBe(true);
   });
 
   it("calls hooks.onError on failure", async () => {

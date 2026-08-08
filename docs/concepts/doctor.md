@@ -37,7 +37,7 @@ Three finding types, two buckets:
 | `subset` | `warnings` | The candidate's range is strictly within the existing rule's range. The candidate is **redundant**, not in conflict – surfaced as a warning. |
 | `overlap` | `warnings` | The two rules touch the same fact with non-trivial intersection. Surfaced as a warning – they *can* coexist. |
 
-> **M17 – subset is a warning, not a contradiction.** A subset rule co-fires with its parent; it's noise (the existing rule already covers it), not a conflict. Prior versions bucketed `subset` under `contradictions` – if you're upgrading, move your assertions accordingly.
+> **subset is a warning, not a contradiction.** A subset rule co-fires with its parent; it's noise (the existing rule already covers it), not a conflict. Prior versions bucketed `subset` under `contradictions` – if you're upgrading, move your assertions accordingly.
 
 ## `doctor.checkAbortOn` – abortOn:/bind: collision check
 
@@ -56,13 +56,13 @@ doctor.checkAbortOn(candidate, system.inspect());
 //   }
 ```
 
-> **F-3 – `checkAbortOn` returns `{ warnings }` only.** Earlier R-cycles shipped `{ contradictions, warnings }` (where `contradictions` was always `[]` in v1). The empty slot encouraged callers to write dead branches, so it's gone – abort-binding collisions are *warnings* by default and each finding carries a `severity: "warning"` discriminator. Callers running stricter pre-deploy lints can promote findings to `severity: "error"` themselves and route on the discriminator. v2 may surface a structured `errors` field; the discriminator is the migration shim.
+> **`checkAbortOn` returns `{ warnings }` only.** Earlier versions shipped `{ contradictions, warnings }` (where `contradictions` was always `[]` in v1). The empty slot encouraged callers to write dead branches, so it's gone – abort-binding collisions are *warnings* by default and each finding carries a `severity: "warning"` discriminator. Callers running stricter pre-deploy lints can promote findings to `severity: "error"` themselves and route on the discriminator. v2 may surface a structured `errors` field; the discriminator is the migration shim.
 
-> **M5 – engine still enforces the runtime binding gate.** A doctor pass is advisory rather than fatal – the system already refuses overlapping abort-bindings at runtime. Use `checkAbortOn` to fail fast in pre-deploy lints / CI.
+> **engine still enforces the runtime binding gate.** A doctor pass is advisory rather than fatal – the system already refuses overlapping abort-bindings at runtime. Use `checkAbortOn` to fail fast in pre-deploy lints / CI.
 
 > **F1 – `system.inspect().constraints[].abortOn` is now populated automatically** from the constraint definition's `abortOn:` field. `checkAbortOn(candidate, system.inspect())` works against any system without manual annotation. `bind:` is reserved as a v2 promise – the type slot is in place but the runtime does not yet emit a `bind` field on inspect snapshots.
 
-> **v1 LIMITATION (M4):** `checkAbortOn` returns `{ warnings: [] }` when constraints expose neither `abortOn:` nor `bind:` metadata. No false positives.
+> **v1 LIMITATION:** `checkAbortOn` returns `{ warnings: [] }` when constraints expose neither `abortOn:` nor `bind:` metadata. No false positives.
 
 > **Renamed from `doctor.checkOwns` (v1.22.0).** The constraint-binding field was renamed `owns:` → `abortOn:` to reflect the actual semantics (the resolver aborts on listed-fact changes; it does not assert ownership). The doctor method renamed alongside for consistency.
 

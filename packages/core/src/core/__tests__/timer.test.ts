@@ -211,7 +211,7 @@ describe("timerOps integration with virtualClock", () => {
   });
 });
 
-describe("R1 sec C4: elapsedMs clamps at 0 on clock skew", () => {
+describe("elapsedMs clamps at 0 on clock skew", () => {
   it("returns 0 not negative when nowMs < startedAtMs", () => {
     const s = startTimer(initialTimerState(), 1_000);
     expect(elapsedMs(s, 500)).toBe(0); // clock stepped back
@@ -235,7 +235,7 @@ describe("R1 sec C4: elapsedMs clamps at 0 on clock skew", () => {
   });
 });
 
-describe("R1 sec M1: pausedDurationMs clamps on clock skew", () => {
+describe("pausedDurationMs clamps on clock skew", () => {
   it("resumeTimer does not accumulate negative pause duration", () => {
     let s = startTimer(initialTimerState(), 0);
     s = pauseTimer(s, 100);
@@ -254,7 +254,7 @@ describe("R1 sec M1: pausedDurationMs clamps on clock skew", () => {
   });
 });
 
-describe("R1 sec M9: registerRepeat resets pausedDurationMs", () => {
+describe("registerRepeat resets pausedDurationMs", () => {
   it("repeat after pause/resume does not double-count prior pause", () => {
     const c = virtualClock(0);
     const ops = timerOps({ ms: 1_000, mode: "repeat" });

@@ -21,9 +21,17 @@ import {
   setBridgeFact,
 } from "@directive-run/core/adapter-utils";
 import type { CircuitBreaker } from "@directive-run/core/plugins";
+import { tokensForBudget } from "./agent-utils.js";
 import type { AgentMemory } from "./memory.js";
 import { formatSystemMeta } from "./meta-context.js";
-import type { StreamChunk as StreamChunkBase } from "./streaming.js";
+import {
+  ChunkBuffer,
+  type StreamChunk as StreamChunkBase,
+  type StreamRestartReason,
+  type TokenSink,
+  reportIfRunnerIgnoredOnToken,
+  sliceTailByCodePoint,
+} from "./streaming.js";
 
 import type {
   AgentLike,
@@ -57,6 +65,7 @@ import {
   type DebugTimeline,
   createDebugTimeline,
   createDebugTimelinePlugin,
+  timelineTokenCounts,
 } from "./debug-timeline.js";
 
 import {
@@ -293,6 +302,46 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   metaContext?: boolean;
 }
 
+/**
+ * What one live stream is doing right now.
+ *
+ * A stalled stream looks identical from outside the library to a slow one, and
+ * the difference is the whole diagnosis: a consumer that stopped pulling shows
+ * a buffer filling and chunks being dropped, while a provider that stopped
+ * sending shows a buffer at zero and no first token. Reading these is free —
+ * every figure is a counter the stream already keeps.
+ */
+export interface StreamStats {
+  /** Chunks buffered and not yet read by the consumer. */
+  bufferedChunks: number;
+  /** Chunks the buffer refused or evicted because the consumer fell behind. */
+  droppedChunks: number;
+  /**
+   * Milliseconds from the start of the run to the first `token` chunk, or
+   * `undefined` when none has been emitted yet. A stream stuck here has not
+   * heard from the provider.
+   */
+  timeToFirstTokenMs?: number;
+  /** `token` chunks emitted for the current generation. */
+  deltaCount: number;
+  /**
+   * Which generation is being assembled. 1 until the first restart, and 1 for
+   * the whole run when deltas were not requested — without them nothing is
+   * part-rendered and there is no boundary to draw.
+   */
+  generation: number;
+  /**
+   * How many times the runner was re-invoked and replayed the response — an
+   * agent retry, a schema retry, a fallback, a reroute. Rising steadily means
+   * spend is a multiple of what the call count suggests.
+   *
+   * Counted whether or not deltas were requested, unlike {@link generation}.
+   */
+  restarts: number;
+  /** Whether the stream has reached a terminal chunk. */
+  closed: boolean;
+}
+
 /** Streaming run result from orchestrator */
 export interface OrchestratorStreamResult<T = unknown> {
   /** Async iterator for streaming chunks */
@@ -301,6 +350,8 @@ export interface OrchestratorStreamResult<T = unknown> {
   result: Promise<RunResult<T>>;
   /** Abort the stream */
   abort: () => void;
+  /** A reading of this stream's progress, for diagnosing a stall. */
+  getStats: () => StreamStats;
   /**
    * RFC 0005: cancel the in-flight generation but keep the
    * `liveContext` subscription attached. Distinct from `abort()`:
@@ -431,6 +482,34 @@ export interface RunCallOptions {
   outputSchema?: SafeParseable<unknown> | null;
   /** Override max schema retries for this call. */
   maxSchemaRetries?: number;
+  /**
+   * Request per-delta streaming for this call. Deltas arrive here as the
+   * provider produces them while `run` still resolves to one complete
+   * {@link RunResult} – a caller who wants both does not have to reach for
+   * `runStream`.
+   *
+   * This is a request, not a guarantee: a runner that cannot stream ignores it
+   * and the run behaves exactly as it does today. Every runner wrapper
+   * forwards the option verbatim, so it survives `withRetry`, `withBudget`,
+   * `withFallback`, model selection and structured output.
+   *
+   * Annotated `=> void` to match {@link RunOptions.onToken} – TypeScript lets a
+   * callback typed `=> void` return anything, so `(token) => buffer.push(token)`
+   * and an async callback are both assignable, and the promise is awaited
+   * either way.
+   */
+  onToken?: (token: string) => void;
+  /**
+   * Called when something re-invokes the runner and the response starts over –
+   * an agent retry, a structured-output schema retry, or a wrapper falling back
+   * to another provider. Everything delivered through {@link RunCallOptions.onToken}
+   * so far is void.
+   *
+   * `runStream` reports the same boundary as a `stream_restart` chunk. This is
+   * the channel for callers who took the documented shortcut of `run` with
+   * `onToken` instead.
+   */
+  onStreamRestart?: (reason: StreamRestartReason) => void;
 }
 
 /** Orchestrator instance */
@@ -459,12 +538,50 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
    *
    * const finalResult = await result;
    * ```
+   *
+   * @example Real per-delta streaming
+   * ```typescript
+   * // `runStream` emits one token chunk per completed message by default;
+   * // pass `deltas: true`, or an `onToken` callback, to get one chunk per
+   * // provider delta.
+   * const { stream } = orchestrator.runStream(agent, input, { deltas: true });
+   * ```
    */
   runStream<T>(
     agent: AgentLike,
     input: string,
     options?: {
       signal?: AbortSignal;
+      /**
+       * Request per-delta `token` chunks on the stream.
+       *
+       * `runStream` emits one token chunk per completed message by default;
+       * pass `deltas: true`, or an `onToken` callback, to get one chunk per
+       * provider delta. Supplying `onToken` implies `deltas: true`, so nothing
+       * that works today changes.
+       *
+       * Retry, guardrails, tool-call approval, breakpoints, memory and the
+       * facts bridge all still apply: this is an option travelling the path
+       * the orchestrator already uses, not a substituted runner. When the
+       * runner is re-invoked – agent retry, structured-output schema retry, or
+       * a self-healing reroute – a `stream_restart` chunk marks the boundary.
+       *
+       * @default false
+       */
+      deltas?: boolean;
+      /**
+       * Receive each provider delta as it arrives, in addition to the per-delta
+       * `token` chunks it turns on. Implies {@link deltas} – a caller who only
+       * wants the chunks should pass `deltas: true` instead of a no-op
+       * callback.
+       *
+       * The callback is awaited, so returning a promise applies real
+       * backpressure: the adapter will not read the next chunk off the wire
+       * until it settles.
+       *
+       * Annotated `=> void` to match {@link RunOptions.onToken}.
+       */
+      onToken?: (token: string) => void;
       /**
        * RFC 0005: bind the in-flight LLM run to a Directive system's
        * facts. When a watched fact changes, the orchestrator emits a
@@ -507,6 +624,14 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   cancelBreakpoint(id: string, reason?: string): void;
   /** Get all currently pending breakpoint requests. */
   getPendingBreakpoints(): BreakpointRequest[];
+  /**
+   * How many streams handed out by `runStream` are still open.
+   *
+   * A number that only rises is the signature of consumers abandoning streams
+   * without aborting them: each one holds a provider request open and keeps
+   * accruing spend. `destroy()` is what closes them all.
+   */
+  getActiveStreamCount(): number;
   /** Destroy the orchestrator, releasing all resources. */
   destroy(): void;
 }
@@ -806,7 +931,7 @@ export function createAgentOrchestrator<
 
   system.start();
 
-  // ---- R1 C7 — Budget pre-flight + TOCTOU reservation ----
+  // ---- Budget pre-flight + TOCTOU reservation ----
   //
   // The legacy budget constraint fires AFTER `tokenUsage` is updated,
   // so a single run can overshoot by the full call cost AND N
@@ -835,6 +960,64 @@ export function createAgentOrchestrator<
     }
   }
 
+  /**
+   * Add a call's tokens to the agent's running total, and fire the budget
+   * warning if this is the call that crosses the threshold.
+   *
+   * Called the moment a provider call ends, on either outcome, by both `run`
+   * and `runStream`. The accrual used to sit after the output guardrails and
+   * the `pre_output_guardrails` breakpoint, which put two throwing steps
+   * between the spend and the ceiling that bounds it: an input that reliably
+   * trips an output guardrail bought fifty provider calls and five hundred
+   * thousand tokens against a thousand-token cap, with `facts.agent.tokenUsage`
+   * still reading zero.
+   */
+  function accrueTokenUsage(tokens: number): void {
+    if (tokens <= 0) {
+      return;
+    }
+    let shouldWarn = false;
+    let percentage = 0;
+    system.batch(() => {
+      const currentAgent = getAgentState(system.facts);
+      const newTokenUsage = currentAgent.tokenUsage + tokens;
+      setAgentState(system.facts, {
+        ...currentAgent,
+        tokenUsage: newTokenUsage,
+      });
+
+      if (maxTokenBudget && onBudgetWarning) {
+        percentage = newTokenUsage / maxTokenBudget;
+        const warningFired = getBridgeFact<boolean>(
+          system.facts,
+          "__budgetWarningFired",
+        );
+        if (percentage >= budgetWarningThreshold && !warningFired) {
+          setBridgeFact(system.facts, "__budgetWarningFired", true);
+          shouldWarn = true;
+        }
+      }
+    });
+
+    // Callbacks should not run inside a batch.
+    if (shouldWarn) {
+      try {
+        onBudgetWarning!({
+          currentTokens: getAgentState(system.facts).tokenUsage,
+          maxBudget: maxTokenBudget!,
+          percentage,
+        });
+      } catch (callbackError) {
+        if (debug) {
+          console.debug(
+            "[Directive Orchestrator] onBudgetWarning threw:",
+            callbackError,
+          );
+        }
+      }
+    }
+  }
+
   // Helper to run agent with guardrails
   async function runAgentWithGuardrails<T>(
     agent: AgentLike,
@@ -843,7 +1026,7 @@ export function createAgentOrchestrator<
     opts?: RunOptions,
     callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
-    // ---- Budget pre-flight (R1 C7) ----
+    // ---- Budget pre-flight ----
     //
     // Reject BEFORE the LLM call when current usage + in-flight
     // reservations + this call's estimated cost would exceed the cap.
@@ -1016,6 +1199,46 @@ export function createAgentOrchestrator<
     throw error;
   }
 
+  /**
+   * The runner as configured: structured output first, then the circuit
+   * breaker, so the breaker counts each schema attempt.
+   *
+   * Both entry points build it here. `runStream` used to invoke the bare
+   * `runner` instead, which meant an orchestrator configured with an
+   * `outputSchema` or a `circuitBreaker` quietly had neither the moment the
+   * caller streamed – the one path where a schema retry is also a visible
+   * generation boundary.
+   */
+  function buildEffectiveRunner(callOptions?: RunCallOptions): AgentRunner {
+    const effectiveSchema =
+      callOptions?.outputSchema !== undefined
+        ? callOptions.outputSchema
+        : outputSchema;
+
+    let effectiveRunner = runner;
+    if (effectiveSchema) {
+      effectiveRunner = withStructuredOutput(runner, {
+        schema: effectiveSchema,
+        maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
+      });
+    }
+
+    // Circuit-breaker per attempt. When `circuitBreaker` is configured and
+    // `retryInsideCircuit` is false (the new default), wrap the runner so
+    // every retry attempt inside `executeAgentWithRetry` is gated by the
+    // breaker. Each failure counts toward `failureThreshold`; an open breaker
+    // short-circuits remaining retries.
+    if (circuitBreaker && !retryInsideCircuit) {
+      const inner = effectiveRunner;
+      effectiveRunner = (<U>(a: AgentLike, i: string, o?: RunOptions) =>
+        circuitBreaker!.execute(() =>
+          inner<U>(a, i, o),
+        )) as typeof effectiveRunner;
+    }
+
+    return effectiveRunner;
+  }
+
   async function runAgentWithGuardrailsBody<T>(
     agent: AgentLike,
     input: string,
@@ -1023,7 +1246,7 @@ export function createAgentOrchestrator<
     opts?: RunOptions,
     callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
-    // ---- Circuit-breaker composition (R1 Distrib C2) ----
+    // ---- Circuit-breaker composition ----
     //
     // Two strategies, controlled by `retryInsideCircuit`:
     //
@@ -1246,42 +1469,60 @@ export function createAgentOrchestrator<
       }
     }
 
-    // Structured output wrapping
-    const effectiveSchema =
-      callOptions?.outputSchema !== undefined
-        ? callOptions.outputSchema
-        : outputSchema;
+    const effectiveRunner = buildEffectiveRunner(callOptions);
 
-    let effectiveRunner = runner;
-    if (effectiveSchema) {
-      effectiveRunner = withStructuredOutput(runner, {
-        schema: effectiveSchema,
-        maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
-      });
-    }
+    // Per-delta streaming for `run`. `RunCallOptions` is a distinct type from
+    // `RunOptions` and the internal `opts` is undefined on this path, so the
+    // caller's `onToken` has to be forwarded explicitly. The wrapper counts
+    // deltas so a runner that quietly ignored the request can be named.
+    //
+    // `onToken` is annotated `=> void` so that `(token) => buffer.push(token)`
+    // stays assignable, but the adapters await whatever it returns. Read it
+    // back as value-returning so the wrapper can hand the caller's promise
+    // along and leave backpressure intact.
+    const callerOnToken = (callOptions?.onToken ?? opts?.onToken) as
+      | TokenSink
+      | undefined;
+    let runDeltaCount = 0;
+    // What the provider delivered, measured as it arrives. A call that throws
+    // has no result to read, and this is all there is to charge it from.
+    let runDeltaChars = 0;
+    const countingOnToken = callerOnToken
+      ? (token: string): unknown => {
+          runDeltaCount++;
+          runDeltaChars += token.length;
 
-    // Circuit-breaker per attempt (R1 Distrib C2). When `circuitBreaker`
-    // is configured and `retryInsideCircuit` is false (the new default),
-    // wrap the runner so every retry attempt inside
-    // `executeAgentWithRetry` is gated by the breaker. Each failure
-    // counts toward `failureThreshold`; an open breaker short-circuits
-    // remaining retries.
-    if (circuitBreaker && !retryInsideCircuit) {
-      const inner = effectiveRunner;
-      effectiveRunner = (<U>(a: AgentLike, i: string, o?: RunOptions) =>
-        circuitBreaker!.execute(() =>
-          inner<U>(a, i, o),
-        )) as typeof effectiveRunner;
-    }
+          return callerOnToken(token);
+        }
+      : undefined;
 
-    // Run the agent with retry support
-    const result = await executeAgentWithRetry<T>(
+    // The same boundary `runStream` reports as a `stream_restart` chunk. It
+    // travels on the options object, so the wrappers below – retry, fallback,
+    // structured output – report their own re-invocations through it without
+    // the orchestrator having to know they are there.
+    const callerOnStreamRestart =
+      callOptions?.onStreamRestart ?? opts?.onStreamRestart;
+    const notifyStreamRestart = (reason: StreamRestartReason): void => {
+      try {
+        callerOnStreamRestart?.(reason);
+      } catch {
+        /* consumer callback errors must not disrupt the run */
+      }
+    };
+
+    // Run the agent with retry support. What it cost is accrued the moment it
+    // ends, before anything that can throw between here and the ceiling.
+    const agentCall = executeAgentWithRetry<T>(
       effectiveRunner,
       agent,
       input,
       {
         ...opts,
         signal: opts?.signal,
+        onToken: countingOnToken,
+        onStreamRestart: callerOnStreamRestart
+          ? notifyStreamRestart
+          : undefined,
         onMessage: (message) => {
           const currentConversation = getConversation(system.facts);
           const updated = [...currentConversation, message];
@@ -1378,6 +1619,8 @@ export function createAgentOrchestrator<
         ? {
             ...agentRetry,
             onRetry: (attempt, error, delayMs) => {
+              // The orchestrator's own retry re-invokes the runner too.
+              notifyStreamRestart("retry");
               agentRetry.onRetry?.(attempt, error, delayMs);
               fireHook("onAgentRetry", {
                 agentName: agent.name,
@@ -1390,6 +1633,24 @@ export function createAgentOrchestrator<
             },
           }
         : undefined,
+    );
+
+    let result: RunResult<T>;
+    try {
+      result = await agentCall;
+    } catch (err) {
+      // Charge what arrived before it failed, and nothing when nothing did.
+      accrueTokenUsage(tokensForBudget(input, undefined, runDeltaChars));
+
+      throw err;
+    }
+    accrueTokenUsage(tokensForBudget(input, result, runDeltaChars));
+
+    reportIfRunnerIgnoredOnToken(
+      agent.name,
+      callerOnToken !== undefined,
+      runDeltaCount,
+      result.output,
     );
 
     // Breakpoint: pre_output_guardrails
@@ -1466,52 +1727,18 @@ export function createAgentOrchestrator<
       }
     }
 
-    // Update state
-    let shouldFireBudgetWarning = false;
-    let budgetPercentage = 0;
+    // Update state. Tokens were accrued when the call ended, so this writes
+    // only what the guardrails could still have changed.
     system.batch(() => {
       const currentAgent = getAgentState(system.facts);
-      const newTokenUsage = currentAgent.tokenUsage + result.totalTokens;
       setAgentState(system.facts, {
         ...currentAgent,
         status: "completed",
         output: result.output,
-        tokenUsage: newTokenUsage,
         turnCount: currentAgent.turnCount + result.messages.length,
         completedAt: Date.now(),
       });
-
-      // Check budget warning threshold
-      if (maxTokenBudget && onBudgetWarning) {
-        budgetPercentage = newTokenUsage / maxTokenBudget;
-        const warningFired = getBridgeFact<boolean>(
-          system.facts,
-          "__budgetWarningFired",
-        );
-        if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
-          setBridgeFact(system.facts, "__budgetWarningFired", true);
-          shouldFireBudgetWarning = true;
-        }
-      }
     });
-
-    // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
-    if (shouldFireBudgetWarning) {
-      try {
-        onBudgetWarning!({
-          currentTokens: getAgentState(system.facts).tokenUsage,
-          maxBudget: maxTokenBudget!,
-          percentage: budgetPercentage,
-        });
-      } catch (callbackError) {
-        if (debug) {
-          console.debug(
-            "[Directive Orchestrator] onBudgetWarning threw:",
-            callbackError,
-          );
-        }
-      }
-    }
 
     // Store messages in memory if configured (best-effort)
     if (memory && result.messages.length > 0) {
@@ -1546,8 +1773,7 @@ export function createAgentOrchestrator<
         snapshotId: null,
         outputLength: outputStr?.length ?? 0,
         totalTokens: result.totalTokens,
-        inputTokens: result.tokenUsage?.inputTokens ?? 0,
-        outputTokens: result.tokenUsage?.outputTokens ?? 0,
+        ...timelineTokenCounts(result.tokenUsage),
         durationMs: Date.now() - startTime,
         modelId: agent.model ?? undefined,
         output: outputStr.slice(0, MAX_VERBOSE_LENGTH),
@@ -1586,6 +1812,23 @@ export function createAgentOrchestrator<
 
   // Assign the function to the forward-declared variable
   runAgentWithGuardrailsFn = runAgentWithGuardrails;
+
+  // ---- Live stream registry ----
+  // Streams handed out by `runStream` that have not reached a terminal chunk.
+  // `destroy()` walks this so an in-flight run is aborted and its consumers
+  // released; a stream left open at that moment parks every `for await` on a
+  // waiter that nothing will ever resolve, and leaves the provider request –
+  // and the spend it is accruing – with nothing to cancel it.
+  //
+  // Each entry removes itself the moment its stream closes, whether that is
+  // `done`, an error, or `abort()`, so the set holds only what is genuinely
+  // open. Without that a long-lived orchestrator would accumulate one entry
+  // per completed run forever, which is the worse version of this bug.
+  const liveStreams = new Set<{ shutdown: () => void }>();
+  // `liveContext` subscriptions still attached after their stream closed —
+  // only `interrupt()` leaves one that way, and `destroy()` still has to
+  // detach it.
+  const liveContextTeardowns = new Set<() => void>();
 
   // ---- Breakpoint infrastructure ----
   const breakpointModifications = new Map<string, BreakpointModifications>();
@@ -1875,12 +2118,16 @@ export function createAgentOrchestrator<
       input: string,
       options: {
         signal?: AbortSignal;
+        deltas?: boolean;
+        onToken?: (token: string) => void;
         liveContext?: LiveContextOptions<F & OrchestratorState>;
       } = {},
     ): OrchestratorStreamResult<T> {
       const abortController = new AbortController();
       const MAX_STREAM_BUFFER = 10_000;
-      const chunks: OrchestratorStreamChunk[] = [];
+      const chunks = new ChunkBuffer<OrchestratorStreamChunk>(
+        MAX_STREAM_BUFFER,
+      );
       const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> =
         [];
       let closed = false;
@@ -1888,6 +2135,38 @@ export function createAgentOrchestrator<
       let tokenCount = 0;
       const MAX_ACCUMULATED_OUTPUT = 100_000;
       let accumulatedOutput = "";
+      // Chunks lost because the consumer fell behind – reported on `done`.
+      let droppedChunks = 0;
+      // `token` chunks emitted for the current generation. Reset at every
+      // generation boundary so `deltaCount` describes the response the
+      // consumer is currently assembling, not the ones that were abandoned.
+      let deltaCount = 0;
+      // Which generation the consumer is assembling. 1 until the first
+      // re-invocation of the runner.
+      let generation = 1;
+      // How many of those deltas have already been attributed to a completed
+      // assistant message. The difference tells `onMessage` whether real
+      // deltas arrived for the message it is being handed.
+      let deltasAttributedToMessages = 0;
+      // Deltas that came from the runner rather than from whole-message
+      // synthesis, across every generation. Zero at the end of a run that
+      // asked for streaming means the runner ignored the request.
+      let realDeltaCount = 0;
+      // Characters of those deltas, across every generation. A run that throws
+      // has no result to price, and this is what the provider delivered.
+      let realDeltaChars = 0;
+      // How many times the runner was re-invoked, whether or not deltas were
+      // asked for. `generation` only moves when they were, so reporting
+      // `generation - 1` made restarts structurally zero on the buffered path –
+      // a figure that read "none happened" when it meant "not measured".
+      let restarts = 0;
+      // When the first `token` chunk was emitted. Undefined until then, which
+      // is what distinguishes a provider that has said nothing from a consumer
+      // that has read nothing.
+      let firstTokenAt: number | undefined;
+      // `onToken` implies `deltas` – a callback is only useful if deltas flow.
+      const streamRequested =
+        options.deltas === true || options.onToken !== undefined;
 
       // Combine external abort signal
       let abortHandler: (() => void) | undefined;
@@ -1905,20 +2184,32 @@ export function createAgentOrchestrator<
       // Push a chunk to the stream
       const pushChunk = (chunk: OrchestratorStreamChunk) => {
         if (closed) return;
+        if (firstTokenAt === undefined && chunk.type === "token") {
+          firstTokenAt = Date.now();
+        }
         const waiter = waiters.shift();
         if (waiter) {
           waiter(chunk);
         } else {
-          chunks.push(chunk);
-          // FIFO eviction when buffer exceeds max
-          if (chunks.length > MAX_STREAM_BUFFER) {
-            chunks.shift();
-          }
+          // Drop the NEWEST droppable chunk on overflow. Evicting the oldest
+          // kept the tail of a response and silently deleted its beginning,
+          // which at per-delta granularity is the difference between a
+          // truncated answer and a beheaded one. A control chunk is admitted
+          // ahead of any droppable chunk still buffered, but the cap applies
+          // to it too – exempting control chunks let a stalled consumer
+          // accumulate them without limit.
+          droppedChunks += chunks.admit(chunk);
         }
       };
 
+      // Registered in `liveStreams` for as long as this stream is open. The
+      // real body is assigned below, once `tearDownLiveContext` exists.
+      const streamHandle: { shutdown: () => void } = { shutdown: () => {} };
+
       // Close the stream
       const closeStream = () => {
+        // This stream is no longer something `destroy()` needs to reach.
+        liveStreams.delete(streamHandle);
         closed = true;
         cleanup();
         for (const waiter of waiters) {
@@ -1926,6 +2217,61 @@ export function createAgentOrchestrator<
         }
         waiters.length = 0;
       };
+
+      // Append to the partial output the consumer sees on `interrupted` and
+      // `guardrail_triggered`, keeping the tail bounded without bisecting a
+      // surrogate pair.
+      const appendToAccumulated = (text: string) => {
+        accumulatedOutput = sliceTailByCodePoint(
+          accumulatedOutput + text,
+          MAX_ACCUMULATED_OUTPUT,
+        );
+      };
+
+      // A generation boundary: the runner is about to be re-invoked and will
+      // replay the whole response, so everything the consumer rendered for the
+      // previous generation is void. Only emitted when the caller asked for
+      // deltas – without that the response arrives as a single whole-message
+      // chunk and there is nothing part-rendered to discard.
+      const beginGeneration = (reason: StreamRestartReason) => {
+        // A re-invocation happened whether or not anyone is rendering deltas,
+        // and `getStats()` reports it either way.
+        restarts++;
+        if (!streamRequested) {
+          return;
+        }
+        generation++;
+        pushChunk({ type: "stream_restart", reason, generation });
+        deltaCount = 0;
+        deltasAttributedToMessages = 0;
+        accumulatedOutput = "";
+      };
+
+      // The orchestrator's own `onToken`, handed to the runner through the
+      // options it already builds – so deltas arrive with retry, guardrails,
+      // tool-call approval and the facts bridge all still in force. The
+      // caller's callback is invoked last and its return value passed back, so
+      // returning a promise still applies backpressure to the provider. With
+      // `deltas: true` and no callback there is nothing to await and the
+      // chunks are the whole point.
+      const callerOnToken = options.onToken as TokenSink | undefined;
+      const handleDelta = streamRequested
+        ? (token: string): unknown => {
+            deltaCount++;
+            realDeltaCount++;
+            realDeltaChars += token.length;
+            appendToAccumulated(token);
+            pushChunk({
+              type: "token",
+              data: token,
+              deltaCount,
+              generation,
+              tokenCount: deltaCount,
+            });
+
+            return callerOnToken?.(token);
+          }
+        : undefined;
 
       // RFC 0005: wire liveContext subscriptions BEFORE the resultPromise
       // IIFE constructs (which starts running synchronously). Even though
@@ -2060,10 +2406,55 @@ export function createAgentOrchestrator<
           liveContextUnsub();
           liveContextUnsub = null;
         }
+        liveContextTeardowns.delete(tearDownLiveContext);
       };
+      // `interrupt()` deliberately leaves this subscription attached after the
+      // stream itself is gone, so `destroy()` cannot reach it through
+      // `liveStreams` any more. Keep it reachable here instead.
+      if (liveContextUnsub) {
+        liveContextTeardowns.add(tearDownLiveContext);
+      }
+
+      // Whether the run has reached its own end – either outcome. Set inside
+      // the run itself rather than from a `.then`, so a shutdown issued in the
+      // same tick as the run's completion cannot see a stale `false`.
+      let runSettled = false;
+      // Rejects the caller's `result` when the stream is torn down and the run
+      // is still going. A runner is handed an `AbortSignal`, but nothing
+      // obliges it to honor one: aborting and closing released consumers
+      // parked on the iterator and left `result` pending forever, so a
+      // graceful shutdown waiting on it never finished. Rejecting with the
+      // signal's own reason gives that caller exactly what a signal-honoring
+      // runner would have given them.
+      let rejectResult: ((reason: unknown) => void) | undefined;
+      const shutdownRejection = new Promise<never>((_resolve, reject) => {
+        rejectResult = reject;
+      });
+      // Nothing awaits this until the race below, and a stream torn down after
+      // its run settled never reaches the race at all.
+      shutdownRejection.catch(() => {});
+
+      // Everything the caller's `abort()` does, and what `destroy()` calls on
+      // any stream still open. Registered before the run starts so a stream
+      // that fails on its first tick is still reachable.
+      const shutdownStream = (): void => {
+        abortController.abort();
+        tearDownLiveContext();
+        closeStream();
+        if (!runSettled) {
+          rejectResult?.(
+            abortController.signal.reason ??
+              new Error(
+                "[Directive] Stream was shut down before the run settled.",
+              ),
+          );
+        }
+      };
+      streamHandle.shutdown = shutdownStream;
+      liveStreams.add(streamHandle);
 
       // Run the agent with streaming callbacks
-      const resultPromise = (async (): Promise<RunResult<T>> => {
+      const runPromise = (async (): Promise<RunResult<T>> => {
         pushChunk({
           type: "progress",
           phase: "starting",
@@ -2117,6 +2508,33 @@ export function createAgentOrchestrator<
             message: "Starting agent",
           });
 
+          // Same timeline entry `run` writes, at the same point – after input
+          // guardrails pass and before the runner is invoked. Stream chunks
+          // are consumed once and then gone, so without this a streamed run
+          // left nothing behind for anyone reconstructing it afterwards, while
+          // the multi-agent orchestrator's streaming path recorded it all
+          // along. Written verbatim so an entry cannot be traced back to the
+          // path that produced it.
+          if (timeline) {
+            timeline.record({
+              type: "agent_start",
+              timestamp: Date.now(),
+              agentId: agent.name,
+              snapshotId: null,
+              inputLength: processedInput.length,
+              modelId: agent.model ?? undefined,
+              ...(agent.instructions
+                ? {
+                    instructions: agent.instructions.slice(
+                      0,
+                      MAX_VERBOSE_LENGTH,
+                    ),
+                  }
+                : {}),
+              input: processedInput.slice(0, MAX_VERBOSE_LENGTH),
+            });
+          }
+
           // Update state
           system.batch(() => {
             const currentAgent = getAgentState(system.facts);
@@ -2129,13 +2547,21 @@ export function createAgentOrchestrator<
             });
           });
 
-          // Run agent with streaming callbacks and retry support
-          const result = await executeAgentWithRetry<T>(
-            runner,
+          // Run agent with streaming callbacks and retry support. The runner
+          // is the configured one – structured output and the circuit breaker
+          // included – so a streamed run is gated and validated exactly like a
+          // buffered one.
+          const agentCall = executeAgentWithRetry<T>(
+            buildEffectiveRunner(),
             agent,
             processedInput,
             {
               signal: abortController.signal,
+              onToken: handleDelta,
+              // Every wrapper that re-invokes the runner – the schema retry
+              // above, and any `withRetry`/`withFallback` the caller composed
+              // around their own runner – reports the boundary here.
+              onStreamRestart: beginGeneration,
               onMessage: (message) => {
                 const currentConversation = getConversation(system.facts);
                 setConversation(system.facts, [
@@ -2144,19 +2570,30 @@ export function createAgentOrchestrator<
                 ]);
                 pushChunk({ type: "message", message });
 
-                // Approximate token counting from content
                 if (message.role === "assistant" && message.content) {
+                  // Real deltas for this message already landed on the stream
+                  // and in `accumulatedOutput`. Synthesizing a whole-message
+                  // token chunk on top of them would deliver the response
+                  // twice. Measured per message rather than per run, so a
+                  // later turn that arrives without deltas still gets one.
+                  const deltasForThisMessage =
+                    deltaCount - deltasAttributedToMessages;
+                  deltasAttributedToMessages = deltaCount;
+                  if (deltasForThisMessage > 0) {
+                    return;
+                  }
+
+                  // Approximate token counting from content
                   const newTokens = Math.ceil(message.content.length / 4);
                   tokenCount += newTokens;
-                  accumulatedOutput += message.content;
-                  if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                    accumulatedOutput = accumulatedOutput.slice(
-                      -MAX_ACCUMULATED_OUTPUT,
-                    );
-                  }
+                  deltaCount++;
+                  deltasAttributedToMessages = deltaCount;
+                  appendToAccumulated(message.content);
                   pushChunk({
                     type: "token",
                     data: message.content,
+                    deltaCount,
+                    generation,
                     tokenCount,
                   });
                 }
@@ -2241,8 +2678,18 @@ export function createAgentOrchestrator<
                   });
                 }
 
+                // Identical to the write `run` performs, cap included. The
+                // streaming path used to append without bounding, so a long
+                // streamed session grew the fact forever and a consumer
+                // reading it could tell which path had produced it.
                 const currentToolCalls = getToolCalls(system.facts);
-                setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+                const updatedToolCalls = [...currentToolCalls, toolCall];
+                setToolCalls(
+                  system.facts,
+                  updatedToolCalls.length > MAX_TOOL_CALLS
+                    ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
+                    : updatedToolCalls,
+                );
 
                 if (toolCall.result) {
                   pushChunk({
@@ -2254,7 +2701,41 @@ export function createAgentOrchestrator<
                 }
               },
             },
-            agentRetry,
+            // Each retry re-invokes the runner and replays the response from
+            // the beginning, so the consumer needs a boundary between the two.
+            agentRetry
+              ? {
+                  ...agentRetry,
+                  onRetry: (attempt, error, delayMs) => {
+                    beginGeneration("retry");
+                    agentRetry.onRetry?.(attempt, error, delayMs);
+                  },
+                }
+              : undefined,
+          );
+
+          let result: RunResult<T>;
+          try {
+            result = await agentCall;
+          } catch (err) {
+            // Charge what the provider delivered before it failed. The
+            // guardrails and the breakpoint below can throw too, which is why
+            // this sits against the call rather than after them.
+            accrueTokenUsage(
+              tokensForBudget(processedInput, undefined, realDeltaChars),
+            );
+
+            throw err;
+          }
+          accrueTokenUsage(
+            tokensForBudget(processedInput, result, realDeltaChars),
+          );
+
+          reportIfRunnerIgnoredOnToken(
+            agent.name,
+            streamRequested,
+            realDeltaCount,
+            result.output,
           );
 
           // Run output guardrails
@@ -2308,6 +2789,29 @@ export function createAgentOrchestrator<
             }
           }
 
+          // The closing half of the pair `run` writes, recorded after output
+          // guardrails have had their chance to transform the output so the
+          // entry describes what the caller actually received.
+          if (timeline) {
+            const outputStr =
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output);
+            timeline.record({
+              type: "agent_complete",
+              timestamp: Date.now(),
+              agentId: agent.name,
+              snapshotId: null,
+              outputLength: outputStr?.length ?? 0,
+              totalTokens: result.totalTokens,
+              inputTokens: result.tokenUsage?.inputTokens ?? 0,
+              outputTokens: result.tokenUsage?.outputTokens ?? 0,
+              durationMs: Date.now() - startTime,
+              modelId: agent.model ?? undefined,
+              output: outputStr?.slice(0, MAX_VERBOSE_LENGTH),
+            });
+          }
+
           // Update final state
           system.batch(() => {
             const currentAgent = getAgentState(system.facts);
@@ -2315,7 +2819,8 @@ export function createAgentOrchestrator<
               ...currentAgent,
               status: "completed",
               output: result.output,
-              tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+              // Tokens were accrued when the call ended, the same way the
+              // buffered path accrues them.
               turnCount: currentAgent.turnCount + result.messages.length,
               completedAt: Date.now(),
             });
@@ -2326,7 +2831,7 @@ export function createAgentOrchestrator<
             type: "done",
             totalTokens: result.totalTokens,
             duration,
-            droppedTokens: 0,
+            droppedTokens: droppedChunks,
           });
           closeStream();
 
@@ -2335,13 +2840,23 @@ export function createAgentOrchestrator<
           pushChunk({
             type: "error",
             error: error instanceof Error ? error : new Error(String(error)),
+            // A run that dropped chunks and then failed reported nothing about
+            // the loss, because only `done` carried the figure.
+            droppedTokens: droppedChunks,
           });
           closeStream();
           throw error;
+        } finally {
+          runSettled = true;
         }
       })();
 
+      // The run itself, or the teardown, whichever reaches an end first. On
+      // every path but a runner that ignores its signal, the run wins.
+      const resultPromise = Promise.race([runPromise, shutdownRejection]);
+
       // Prevent unhandled rejection if caller only consumes stream (not .result)
+      runPromise.catch(() => {});
       resultPromise.catch(() => {});
 
       // Create async iterator
@@ -2349,7 +2864,7 @@ export function createAgentOrchestrator<
         [Symbol.asyncIterator](): AsyncIterator<OrchestratorStreamChunk> {
           return {
             async next(): Promise<IteratorResult<OrchestratorStreamChunk>> {
-              if (chunks.length > 0) {
+              if (chunks.size > 0) {
                 return { done: false, value: chunks.shift()! };
               }
               if (closed) {
@@ -2386,7 +2901,7 @@ export function createAgentOrchestrator<
       // rejects; swallow with .catch so a rejected resultPromise (e.g. a
       // guardrail block) doesn't surface as an unhandled rejection when
       // the caller only consumes the stream side of the contract.
-      resultPromise
+      runPromise
         .finally(() => {
           if (!interruptInitiated) {
             tearDownLiveContext();
@@ -2397,11 +2912,18 @@ export function createAgentOrchestrator<
       return {
         stream,
         result: resultPromise,
-        abort: () => {
-          abortController.abort();
-          tearDownLiveContext();
-          closeStream();
-        },
+        abort: shutdownStream,
+        getStats: (): StreamStats => ({
+          bufferedChunks: chunks.size,
+          droppedChunks,
+          ...(firstTokenAt !== undefined
+            ? { timeToFirstTokenMs: firstTokenAt - startTime }
+            : {}),
+          deltaCount,
+          generation,
+          restarts,
+          closed,
+        }),
         interrupt: (reason?: string) => {
           // RFC 0005: distinct from `abort()` — cancel the in-flight
           // LLM run but leave `liveContext` subscriptions alive so
@@ -2422,6 +2944,20 @@ export function createAgentOrchestrator<
             changedKeys: [],
           });
           abortController.abort();
+          // Everything `abort()` does about settling, which `interrupt` did
+          // not do at all: a runner that ignores its signal left `result`
+          // pending forever, the handle in `liveStreams`, and
+          // `getActiveStreamCount()` counting a stream nobody could reach.
+          // The multi-agent orchestrator's `interrupt` has always mapped to a
+          // full shutdown; the only thing kept alive here is the liveContext
+          // subscription, which is the whole point of the method.
+          closeStream();
+          if (!runSettled) {
+            rejectResult?.(
+              abortController.signal.reason ??
+                new Error("[Directive] Stream was interrupted."),
+            );
+          }
         },
       };
     },
@@ -2651,7 +3187,26 @@ export function createAgentOrchestrator<
       return [...bpState.pending];
     },
 
+    getActiveStreamCount(): number {
+      return liveStreams.size;
+    },
+
     destroy(): void {
+      // Streams still open at this point have consumers parked on the
+      // iterator and a provider request still running. Abort each so the
+      // request stops costing money, and close it so a `for await` observes
+      // the stream ending instead of waiting forever. Iterate a copy – each
+      // shutdown removes its own entry.
+      for (const handle of [...liveStreams]) {
+        handle.shutdown();
+      }
+      liveStreams.clear();
+      // An interrupted stream keeps its `liveContext` subscription on purpose;
+      // shutting the orchestrator down is where it finally goes.
+      for (const tearDown of [...liveContextTeardowns]) {
+        tearDown();
+      }
+      liveContextTeardowns.clear();
       system.destroy();
     },
   };

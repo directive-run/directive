@@ -692,7 +692,17 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
     facts: Readonly<InferSchema<M["facts"]>>,
     prev: InferSchema<M["facts"]> | null,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
-  deps?: Array<string & keyof InferSchema<M["facts"]>>;
+  /**
+   * Fact keys **and** derivation IDs, the same as a module-defined effect's.
+   *
+   * A derivation is a legitimate thing for an effect to depend on, and the
+   * runtime resolves the name against whatever derivations the system holds at
+   * the moment the effect is considered — which for this API may be more than
+   * it held when the effect was registered.
+   */
+  deps?: Array<
+    (string & keyof InferSchema<M["facts"]>) | (string & keyof M["derivations"])
+  >;
   /**
    * Optional declarative trigger — a {@link FactPredicate} that gates whether
    * `run()` fires. Mutually exclusive with `deps`.

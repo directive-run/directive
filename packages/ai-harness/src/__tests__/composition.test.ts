@@ -1,0 +1,386 @@
+/**
+ * A composition is presets in a row, and the thing that crosses between them is
+ * a finished document.
+ *
+ * The property worth testing is narrow and easy to lose: step two's personas
+ * can see step one's *synthesis* and nothing else. If the composition ever
+ * started forwarding transcripts, or stopped forwarding anything, the chain
+ * would still run and still write files — so the assertions here read the
+ * prompts the runner was actually handed rather than the results.
+ */
+
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import type {
+  AgentLike,
+  AgentRunner,
+  RunOptions,
+  RunResult,
+} from "@directive-run/ai";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import { runComposition } from "../core/composition.js";
+import type { HarnessEvent } from "../core/events.js";
+import { createMockRunner } from "../core/mock-runner.js";
+import type { PresetConfig } from "../core/preset-types.js";
+import {
+  type Scratch,
+  cannedTurn,
+  createScratch,
+  testPreset,
+} from "./fixtures.js";
+
+const FIRST_MARKER = "FIRST-STEP-CONCLUSION-9f3a";
+const SECOND_MARKER = "SECOND-STEP-CONCLUSION-11c7";
+
+function stepPreset(id: string, synthName: string): PresetConfig {
+  return testPreset({
+    id,
+    maxIterations: 2,
+    budgetUsd: 5,
+    synthesizer: {
+      name: synthName,
+      systemPrompt: "You synthesize.",
+      promptTemplate: "Transcript:\n{{transcript}}",
+      maxTokens: 1000,
+    },
+  });
+}
+
+interface Recorded {
+  agent: string;
+  input: string;
+}
+
+function recordingRunner(recorded: Recorded[]): AgentRunner {
+  const base = createMockRunner({
+    responses: {
+      alpha: [1, 2, 3, 4].map((turn) => cannedTurn("alpha", turn)),
+      beta: [1, 2, 3, 4].map((turn) => cannedTurn("beta", turn)),
+      gamma: [1, 2, 3, 4].map((turn) => cannedTurn("gamma", turn)),
+      "synth-one": [FIRST_MARKER],
+      "synth-two": [SECOND_MARKER],
+    },
+  });
+
+  return <T = unknown>(
+    agent: AgentLike,
+    input: string,
+    options?: RunOptions,
+  ): Promise<RunResult<T>> => {
+    recorded.push({ agent: agent.name, input });
+
+    return base<T>(agent, input, options);
+  };
+}
+
+describe("runComposition", () => {
+  let scratch: Scratch;
+
+  beforeEach(async () => {
+    scratch = await createScratch();
+  });
+
+  afterEach(async () => {
+    await scratch.cleanup();
+  });
+
+  it("hands each step's synthesis to the next one as prior context", async () => {
+    const recorded: Recorded[] = [];
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+
+    const result = await runComposition(presets, "the original subject", {
+      runner: recordingRunner(recorded),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      runId: "compose",
+      retry: { maxRetries: 0 },
+    });
+
+    expect(result.steps.map((step) => step.presetId)).toEqual([
+      "first",
+      "second",
+    ]);
+    expect(result.synthesis).toContain(SECOND_MARKER);
+
+    // Step one saw the input and nothing else.
+    const firstPersona = recorded.find((entry) => entry.agent === "alpha");
+    expect(firstPersona?.input).toContain("the original subject");
+    expect(firstPersona?.input).not.toContain(FIRST_MARKER);
+
+    // Step two's personas saw step one's conclusion — and only its conclusion.
+    const stepTwoStart = recorded.findIndex(
+      (entry) => entry.agent === "synth-one",
+    );
+    const stepTwoPrompts = recorded
+      .slice(stepTwoStart + 1)
+      .filter((entry) => entry.agent === "alpha");
+    expect(stepTwoPrompts.length).toBeGreaterThan(0);
+    expect(stepTwoPrompts[0]?.input).toContain(FIRST_MARKER);
+    expect(stepTwoPrompts[0]?.input).toContain("the original subject");
+    // Step one's turns are not forwarded — only what its synthesizer made of
+    // them.
+    expect(stepTwoPrompts[0]?.input).not.toContain("end-of-alpha-1");
+  });
+
+  it("gives every step its own transcript and writes one combined document", async () => {
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+
+    const result = await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      runId: "files",
+      retry: { maxRetries: 0 },
+    });
+
+    const paths = result.steps.map((step) => step.transcriptPath);
+    expect(new Set(paths).size).toBe(2);
+    expect(paths[0]).toContain("files-1-first");
+    expect(paths[1]).toContain("files-2-second");
+
+    for (const path of paths) {
+      expect(await readFile(path, "utf8")).toContain("# Synthesis");
+    }
+
+    const combined = await readFile(result.combinedPath, "utf8");
+    expect(combined).toContain("**Input:** the subject");
+    expect(combined).toContain("## 1. first");
+    expect(combined).toContain("## 2. second");
+    expect(combined).toContain(FIRST_MARKER);
+    expect(combined).toContain(SECOND_MARKER);
+  });
+
+  it("brackets every step's chain events with a step-scoped pair", async () => {
+    const events: HarnessEvent[] = [];
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+
+    await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      runId: "events",
+      retry: { maxRetries: 0 },
+      onEvent: (event) => events.push(event),
+    });
+
+    const types = events.map((event) => event.type);
+    expect(types[0]).toBe("composition:started");
+    expect(types.at(-1)).toBe("composition:complete");
+
+    const started = events.filter(
+      (event) => event.type === "composition:step:started",
+    );
+    expect(started.map((event) => event.presetId)).toEqual(["first", "second"]);
+    expect(started.map((event) => event.step)).toEqual([1, 2]);
+    expect(started.every((event) => event.total === 2)).toBe(true);
+
+    // Every chain event sits inside exactly one step's bracket, which is what
+    // lets a surface attribute a turn without the turn carrying a step field.
+    const firstOpen = types.indexOf("composition:step:started");
+    const firstClose = types.indexOf("composition:step:complete");
+    const chainStarts = types
+      .map((type, index) => (type === "chain:started" ? index : -1))
+      .filter((index) => index >= 0);
+    expect(chainStarts).toHaveLength(2);
+    expect(chainStarts[0]).toBeGreaterThan(firstOpen);
+    expect(chainStarts[0]).toBeLessThan(firstClose);
+    expect(chainStarts[1]).toBeGreaterThan(firstClose);
+  });
+
+  it("sums spend across steps", async () => {
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+
+    const result = await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+    });
+
+    const summed = result.steps.reduce(
+      (total, step) => total + step.spentUsd,
+      0,
+    );
+    expect(result.spentUsd).toBeCloseTo(summed, 10);
+    expect(result.spentUsd).toBeGreaterThan(0);
+  });
+
+  it("stops the whole composition when a step is interrupted, and still synthesizes", async () => {
+    const controller = new AbortController();
+    const events: HarnessEvent[] = [];
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+    presets[0] = { ...(presets[0] as PresetConfig), maxIterations: 20 };
+
+    const result = await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+      signal: controller.signal,
+      onEvent: (event) => {
+        events.push(event);
+        if (event.type === "turn:completed" && event.iteration === 0) {
+          queueMicrotask(() => controller.abort());
+        }
+      },
+    });
+
+    expect(result.interrupted).toBe(true);
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]?.stopReason).toBe("interrupted");
+    // Interrupting asks for the closing document early; it does not throw the
+    // transcript away.
+    expect(result.steps[0]?.synthesis).toContain(FIRST_MARKER);
+
+    const started = events.filter(
+      (event) => event.type === "composition:step:started",
+    );
+    expect(started).toHaveLength(1);
+  });
+
+  it("lets the turn in flight finish when the interrupt lands mid-stream", async () => {
+    // The test above aborts between turns, where there is nothing in flight for
+    // a cancel to reach. This aborts while a turn is streaming, which is the
+    // arrangement an operator's Ctrl-C actually produces — and the one where
+    // handing the resolver's own signal to the provider turned the interrupt
+    // into a provider failure.
+    const controller = new AbortController();
+    const events: HarnessEvent[] = [];
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+    presets[0] = { ...(presets[0] as PresetConfig), maxIterations: 20 };
+
+    const result = await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+      signal: controller.signal,
+      onEvent: (event) => {
+        events.push(event);
+        if (event.type === "turn:delta" && event.iteration === 1) {
+          queueMicrotask(() => controller.abort());
+        }
+      },
+    });
+
+    expect(result.interrupted).toBe(true);
+    expect(result.failure).toBe("");
+    expect(result.steps).toHaveLength(1);
+    // The step reports the operator's act, not a fault, and it still wrote its
+    // closing document.
+    expect(result.steps[0]?.stopReason).toBe("interrupted");
+    expect(result.steps[0]?.synthesis).toContain(FIRST_MARKER);
+    // Nothing anywhere in the composition called it an error.
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+    // And the composition closed itself out rather than waiting on a step it
+    // had let go of.
+    expect(events.some((event) => event.type === "composition:complete")).toBe(
+      true,
+    );
+  });
+
+  it("starts nothing at all when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runComposition(
+      [stepPreset("first", "synth-one")],
+      "x",
+      {
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        signal: controller.signal,
+      },
+    );
+
+    expect(result.steps).toHaveLength(0);
+    expect(result.spentUsd).toBe(0);
+    expect(result.interrupted).toBe(true);
+  });
+
+  it("refuses an empty composition", async () => {
+    await expect(
+      runComposition([], "x", {
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      }),
+    ).rejects.toThrow(/at least one preset/);
+  });
+
+  // ==========================================================================
+  // A step that cannot run
+  // ==========================================================================
+
+  it("closes itself out when a step's harness cannot be built", async () => {
+    // A file already sitting at the name step one is about to open. The store
+    // refuses reuse, so the harness throws before the step has run anything —
+    // which used to leave the dispatched counter permanently ahead of the
+    // completed one, pin `stepInFlight`, and mean the composition never wrote
+    // itself up.
+    const runId = "squatted";
+    await writeFile(join(scratch.dir, `${runId}-1-first.md`), "taken", "utf8");
+
+    const events: HarnessEvent[] = [];
+    const result = await runComposition(
+      [stepPreset("first", "synth-one"), stepPreset("second", "synth-two")],
+      "the subject",
+      {
+        runId,
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => events.push(event),
+      },
+    );
+
+    expect(result.steps).toHaveLength(0);
+    expect(result.failure).toMatch(/already has a transcript/);
+
+    const types = events.map((event) => event.type);
+    expect(types.at(-1)).toBe("composition:complete");
+    expect(
+      events.some((event) => event.type === "error" && event.scope === "step"),
+    ).toBe(true);
+  });
+
+  it("charges a step whose run never reported against the composition's ceiling", async () => {
+    // The first step's second preset is squatted, so step two throws at
+    // construction while step one has already been billed. The composition's
+    // spend has to come out of the steps' ledgers rather than out of the
+    // reports they made, because one of them made none.
+    const runId = "partial";
+    await writeFile(join(scratch.dir, `${runId}-2-second.md`), "taken", "utf8");
+
+    const result = await runComposition(
+      [stepPreset("first", "synth-one"), stepPreset("second", "synth-two")],
+      "the subject",
+      {
+        runId,
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+      },
+    );
+
+    expect(result.steps).toHaveLength(1);
+    expect(result.failure).toMatch(/already has a transcript/);
+    // Step one's spend survives step two's failure, and the total is still the
+    // sum of what the steps were billed.
+    expect(result.spentUsd).toBeGreaterThan(0);
+    expect(result.spentUsd).toBeCloseTo(result.steps[0]?.spentUsd ?? 0, 10);
+    expect(result.spentUsd).toBeLessThanOrEqual(result.budgetUsd);
+  });
+});

@@ -11,7 +11,43 @@
  */
 
 import type { Plugin } from "@directive-run/core";
+import { normalizeTokenUsage } from "@directive-run/core/plugins";
 import type { DebugEvent, DebugEventType } from "./types.js";
+
+/**
+ * Resolve a provider-reported token usage into the four counts an
+ * `agent_complete` event carries.
+ *
+ * The timeline is a reporting surface, so an unusable count becomes `0` rather
+ * than propagating: a `NaN` rendered into a timeline UI is a broken row, and a
+ * count inherited from `Object.prototype` is not one the provider sent.
+ *
+ * Both cache classes are resolved here, through the same normalizer every other
+ * token consumer uses. Reading `result.tokenUsage?.inputTokens ?? 0` inline —
+ * which is what the orchestrators did — silently drops them, so a run that read
+ * ten million tokens from the cache showed a timeline entry claiming it had
+ * consumed almost nothing, and the cheapest way to see where a run's tokens
+ * went reported the wrong answer.
+ *
+ * @param usage - The runner's `tokenUsage`, exactly as it arrived.
+ */
+export function timelineTokenCounts(usage: unknown): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+} {
+  const counts = normalizeTokenUsage(usage);
+  const reportable = (count: number | undefined): number =>
+    count !== undefined && Number.isInteger(count) && count >= 0 ? count : 0;
+
+  return {
+    inputTokens: reportable(counts.inputTokens),
+    outputTokens: reportable(counts.outputTokens),
+    cacheReadTokens: reportable(counts.cacheReadTokens),
+    cacheWriteTokens: reportable(counts.cacheWriteTokens),
+  };
+}
 
 /** A12: Known event types for import validation */
 const KNOWN_EVENT_TYPES: Set<string> = new Set([

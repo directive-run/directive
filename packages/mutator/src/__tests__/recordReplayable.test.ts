@@ -9,7 +9,7 @@ import {
   recordReplayable,
 } from "../index.js";
 
-describe("R2.B recordReplayable() — basic invocation", () => {
+describe("recordReplayable() — basic invocation", () => {
   it("runs the handler exactly like cancellable() when no abort fires", async () => {
     interface Facts {
       count: number;
@@ -41,7 +41,7 @@ describe("R2.B recordReplayable() — basic invocation", () => {
   });
 });
 
-describe("R2.B recordReplayable() — onCancel fires on supersession", () => {
+describe("recordReplayable() — onCancel fires on supersession", () => {
   it("delivers a structured CancelEvent the moment the prior signal aborts", async () => {
     interface Facts {
       result: string;
@@ -173,7 +173,7 @@ describe("R2.B recordReplayable() — onCancel fires on supersession", () => {
   });
 });
 
-describe("R2.B recordReplayable() — onCancel fires on timeout", () => {
+describe("recordReplayable() — onCancel fires on timeout", () => {
   it("delivers a CancelEvent with kind='timeout' and afterMs preserved", async () => {
     const clock = virtualClock(0);
     let captured: CancelEvent<Record<string, never>, { x: number }> | undefined;
@@ -209,7 +209,7 @@ describe("R2.B recordReplayable() — onCancel fires on timeout", () => {
   });
 });
 
-describe("R2.B recordReplayable() — robustness", () => {
+describe("recordReplayable() — robustness", () => {
   it("swallows errors thrown inside onCancel — abort path stays clean", async () => {
     const resolvers: Array<() => void> = [];
     const wrapped = recordReplayable<Record<string, never>, { tag: string }>(

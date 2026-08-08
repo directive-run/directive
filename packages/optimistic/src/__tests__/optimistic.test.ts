@@ -120,7 +120,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     expect(facts.b).toBe(200); // not in keys list, stays mutated
   });
 
-  it("R1: typo in keys array is a compile error (typecheck)", () => {
+  it("typo in keys array is a compile error (typecheck)", () => {
     type F = { values: string[]; count: number };
     // @ts-expect-error — 'valuess' is not a key of F
     withOptimistic<F>(["valuess"])(async ({ facts }) => {
@@ -132,7 +132,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     expect(true).toBe(true);
   });
 
-  it("R1 sec/M2: createSnapshot throws OptimisticCloneError on object containing a function", () => {
+  it("createSnapshot throws OptimisticCloneError on object containing a function", () => {
     // Functions cannot survive structuredClone — DataCloneError. We
     // re-throw as a typed OptimisticCloneError with the offending key,
     // so the violation is loud rather than silent (the original JSON
@@ -148,7 +148,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     );
   });
 
-  it("R1 sec/M2: OptimisticCloneError carries the offending key + cause", () => {
+  it("OptimisticCloneError carries the offending key + cause", () => {
     const facts = { x: { fn: () => {} } };
     try {
       createSnapshot(facts, ["x"]);
@@ -161,7 +161,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     }
   });
 
-  it("R2 sec C-R2-2: snapshot is atomic — failed key throws BEFORE returning restore", () => {
+  it("snapshot is atomic — failed key throws BEFORE returning restore", () => {
     // 'b' contains a non-cloneable function; 'a' and 'c' are fine.
     const facts: { a: number; b: { fn: () => void }; c: string } = {
       a: 1,
@@ -179,7 +179,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     expect(facts.c).toBe("original");
   });
 
-  it("R2 sec C-R2-2: input keys array can be mutated after capture without affecting restore", () => {
+  it("input keys array can be mutated after capture without affecting restore", () => {
     type F = { x: number; y: number };
     const facts: F = { x: 1, y: 2 };
     const keys: (keyof F)[] = ["x"];
@@ -194,7 +194,7 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     expect(facts.y).toBe(200);
   });
 
-  it("R1: structuredClone handles cycles natively — no false positives", () => {
+  it("structuredClone handles cycles natively — no false positives", () => {
     type Node = { name: string; child?: Node };
     const node: Node = { name: "a" };
     node.child = node; // cycle — structuredClone preserves

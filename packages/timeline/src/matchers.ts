@@ -58,7 +58,7 @@ function frames(input: unknown): TimelineFrame[] {
       "[timeline-matchers] input.frames is missing or not an array",
     );
   }
-  // R2 sec C-3: filter out frames lacking a structurally-valid
+  // filter out frames lacking a structurally-valid
   // `event.type`. Untrusted JSON (e.g. a hostile prod-error dump)
   // could embed `frames: [{ ts: 0, event: null }]` which would
   // crash matcher iteration with a bare TypeError instead of
@@ -139,7 +139,7 @@ function toReachInMs(
   for (const f of fs) {
     if (f.event.type !== "fact.change") continue;
     if (f.event.key !== factKey) continue;
-    // R2 sec M-2: structural equality instead of JSON.stringify.
+    // structural equality instead of JSON.stringify.
     // JSON-roundtrip equality drops NaN/undefined/Infinity (NaN
     // coerces to null; undefined keys disappear), producing false
     // positive matches. structuredEqual compares directly.

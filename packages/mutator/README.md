@@ -201,7 +201,7 @@ need runtime checks, validate at the boundary before dispatch.
 The mutator earns its weight when you have **multi-variant async work
 with a discriminator**. That's the 12-instance shape from the migration.
 
-## Auto-cancel on supersede (R1.C `cancellable()`)
+## Auto-cancel on supersede (`cancellable()`)
 
 For mutations where a fresh dispatch should cancel the prior in-flight
 one – type-ahead search, debounce, throttle, request dedup – wrap
@@ -260,7 +260,7 @@ type CancelReason =
 Use it inside handlers to distinguish how the cancellation arrived
 (e.g. log a different message for timeouts vs supersession).
 
-## Recording cancellations for replay (R2.B `recordReplayable()`)
+## Recording cancellations for replay (`recordReplayable()`)
 
 `recordReplayable()` is `cancellable()` plus a synchronous `onCancel`
 callback that fires the moment the AbortController calls `abort()` –

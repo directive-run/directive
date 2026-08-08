@@ -173,7 +173,7 @@
   ### Critical fixes
 
   **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
-  subpath.** The Tier 0 Mandatory Companion to `liveContext` was declared
+  subpath.** The mandatory companion to `liveContext` was declared
   in `guardrails/index.ts` but the actual tsup entry for the subpath
   (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
   `packages/knowledge/ai/ai-sources.md` (Sources × Security section)

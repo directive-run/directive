@@ -55,14 +55,21 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^1.0.0",
+    "@directive-run/core": "^1.18.0",
+    "@directive-run/query": "^1.0.0",
     "lit": ">=3"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
+    "@directive-run/query": "workspace:*",
     "@types/node": "^25.2.0",
     "lit": "^3.1.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
+  },
+  "peerDependenciesMeta": {
+    "@directive-run/query": {
+      "optional": true
+    }
   }
 }

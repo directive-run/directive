@@ -339,6 +339,59 @@ describe("createSubscription", () => {
       expect(state.isComplete).toBe(false);
     });
 
+    it("survives an unrelated fact change", async () => {
+      let capturedCallbacks: { onData: (d: unknown) => void } | null = null;
+      const subscribe = vi.fn((_params: unknown, callbacks: unknown) => {
+        capturedCallbacks = callbacks as { onData: (d: unknown) => void };
+      });
+
+      const sub = createSubscription({
+        name: "price",
+        // A constant key, which is the ordinary case — and the one where the
+        // effect records no dependencies, so Directive re-runs it on every
+        // reconcile. A re-run fires the effect's cleanup, and the cleanup used
+        // to abort the stream and never put it back: the subscription died the
+        // first time anything else in the system moved, with no error and the
+        // resource state frozen on whatever had arrived.
+        key: () => ({ ticker: "AAPL" }),
+        subscribe,
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: { unrelated: t.number() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+          init: (facts: Record<string, unknown>) => {
+            facts.unrelated = 0;
+          },
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await flushMicrotasks(20);
+
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      // Something else entirely changes.
+      (system.facts as Record<string, unknown>).unrelated = 1;
+      await flushMicrotasks(20);
+
+      // The stream was not re-established, because it was never torn down.
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      capturedCallbacks!.onData({ price: 1, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      const state = system.read("price") as ResourceState<unknown>;
+      expect(state.status).toBe("success");
+
+      system.destroy();
+    });
+
     it("calls cleanup when system is destroyed", async () => {
       const cleanup = vi.fn();
       const sub = createSubscription({
@@ -363,6 +416,69 @@ describe("createSubscription", () => {
 
       system.destroy();
       expect(cleanup).toHaveBeenCalled();
+    });
+
+    it("destroying one system leaves another system's stream alone", async () => {
+      const cleanup = vi.fn();
+      const captured: Array<{ onData: (data: unknown) => void }> = [];
+
+      // One definition, two systems — the shape of request-scoped systems,
+      // isolated tests, and a worker serving more than one tenant.
+      const sub = createSubscription({
+        name: "price",
+        key: () => ({ ticker: "AAPL" }),
+        subscribe: (_params: unknown, callbacks: unknown) => {
+          captured.push(callbacks as { onData: (data: unknown) => void });
+
+          return cleanup;
+        },
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+
+      const first = createSystem({ module: mod });
+      first.start();
+      await flushMicrotasks(20);
+      const second = createSystem({ module: mod });
+      second.start();
+      await flushMicrotasks(20);
+
+      expect(captured).toHaveLength(2);
+      captured[0]!.onData({ price: 1, ticker: "AAPL" });
+      captured[1]!.onData({ price: 2, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      first.destroy();
+
+      // Only the stopping system's stream was closed.
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(second.isRunning).toBe(true);
+
+      const afterDestroy = second.read("price") as ResourceState<unknown>;
+      expect(afterDestroy.status).toBe("success");
+
+      // The state above reads healthy either way — what a closed stream
+      // actually costs is everything that arrives afterwards.
+      captured[1]!.onData({ price: 3, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      const state = second.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
+      expect(state.data).toEqual({ price: 3, ticker: "AAPL" });
+
+      second.destroy();
+      expect(cleanup).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -396,5 +512,65 @@ describe("createSubscription", () => {
       expect(state.data).toEqual({ price: 100, ticker: "AAPL" });
       expect(state.isSuccess).toBe(true);
     });
+  });
+});
+
+// ============================================================================
+// Teardown isolation
+// ============================================================================
+
+describe("teardown on system stop", () => {
+  it("closes every stream even when one unsubscribe throws", async () => {
+    // These close independent streams. A throw used to escape the loop that
+    // runs them, so the streams registered after the failing one stayed open
+    // — and stayed reporting their last value, which is why nobody noticed.
+    const order: string[] = [];
+
+    const first = createSubscription({
+      name: "first",
+      key: () => ({ id: 1 }),
+      subscribe: () => {
+        return () => {
+          order.push("first");
+          throw new Error("teardown blew up");
+        };
+      },
+    });
+
+    const second = createSubscription({
+      name: "second",
+      key: () => ({ id: 2 }),
+      subscribe: () => {
+        return () => {
+          order.push("second");
+        };
+      },
+    });
+
+    const mod = createModule(
+      "test",
+      withQueries([first, second], {
+        schema: {
+          facts: {},
+          derivations: {},
+          events: {},
+          requirements: {},
+        } satisfies ModuleSchema,
+      }),
+    );
+    const system = createSystem({ module: mod });
+    system.start();
+    await flushMicrotasks();
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(() => {
+      system.stop();
+    }).not.toThrow();
+
+    expect(order).toEqual(["first", "second"]);
+    expect(errors).toHaveBeenCalled();
+
+    errors.mockRestore();
   });
 });

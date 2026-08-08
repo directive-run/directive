@@ -819,7 +819,7 @@ export function createResolversManager<S extends Schema>(
           onClobberSuppressed(clobberCount - CLOBBER_EMIT_CAP);
         }
       }
-      // RFC 0003 + R4.J — tag the abort with structured clobber detail so
+      // RFC 0003 — tag the abort with structured clobber detail so
       // `handleRetryError` can construct `ShouldRetryContext.reason =
       // "clobbered"` for a user-supplied `shouldRetry(err, n, ctx)`.
       // The reason payload is read via `signal.reason` (Web standard,
@@ -978,7 +978,7 @@ export function createResolversManager<S extends Schema>(
     const abortContext = readClobberReason(controller.signal);
 
     if (controller.signal.aborted) {
-      // R4.J — consult shouldRetry for clobbered/timeout abort reasons
+      // Consult shouldRetry for clobbered/timeout abort reasons
       // so a user policy can opt to fail-loud on "clobbered" (record an
       // error) instead of yielding silently. Default behaviour (no
       // shouldRetry, or `shouldRetry(...) === true`) is the historical

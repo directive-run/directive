@@ -1,6 +1,5 @@
 /**
- * Tests for the Web Worker adapter — R6 SECURITY fix:
- * unbounded `pendingRequests` Map must be reclaimed on timeout and on
+ * Tests for the Web Worker adapter — SECURITY:  * unbounded `pendingRequests` Map must be reclaimed on timeout and on
  * worker error, with opt-out via `timeoutMs: 0 | Infinity`.
  */
 

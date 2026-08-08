@@ -188,7 +188,11 @@ describe("derivations", () => {
 
       const deps = manager.getDependencies("quadrupled");
 
-      expect(deps.has("doubled")).toBe(true);
+      // Reported as it is written in source. Internally a dependency on a
+      // derivation is namespaced so it cannot collide with a fact key of the
+      // same name; `getDependencies` unwraps that for the reader.
+      expect(deps.has("derive.doubled")).toBe(true);
+      expect(deps.has("doubled")).toBe(false);
     });
   });
 

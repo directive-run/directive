@@ -92,7 +92,7 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
   // must be cleared in `finally` so the host can call `evict()` again
   // after recovery. Without try/finally, a one-time rejection would
   // permanently latch the gate.
-  it("system.evict() clears isEvicting on inner-work rejection (R19)", async () => {
+  it("system.evict() clears isEvicting on inner-work rejection", async () => {
     let onEvictCalls = 0;
     const moduleWithRejectingEvict = createModule("evictReject", {
       schema: { facts: { ok: t.boolean() } },
@@ -128,7 +128,7 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
 
   // follow-up: `system.start()` refuses to start during an evict()
   // in flight, and after destroy. Cloudflare DO failover scenario.
-  it("system.start() is a no-op when isEvicting or isDestroyed (R19)", async () => {
+  it("system.start() is a no-op when isEvicting or isDestroyed", async () => {
     const system = createSystem({ module: counterModule });
     system.start();
     await system.evict();

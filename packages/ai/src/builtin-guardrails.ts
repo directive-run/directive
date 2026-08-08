@@ -39,11 +39,13 @@ import { safeStringify } from "@directive-run/core/internals";
  *
  * @public
  */
-export function createPIIGuardrail(options: {
-  patterns?: RegExp[];
-  redact?: boolean;
-  redactReplacement?: string;
-}): GuardrailFn<InputGuardrailData> {
+export function createPIIGuardrail(
+  options: {
+    patterns?: RegExp[];
+    redact?: boolean;
+    redactReplacement?: string;
+  } = {},
+): GuardrailFn<InputGuardrailData> {
   const {
     patterns = [
       /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
@@ -148,10 +150,12 @@ export interface RateLimitGuardrail extends GuardrailFn<InputGuardrailData> {
  *
  * @public
  */
-export function createRateLimitGuardrail(options: {
-  maxTokensPerMinute?: number;
-  maxRequestsPerMinute?: number;
-}): RateLimitGuardrail {
+export function createRateLimitGuardrail(
+  options: {
+    maxTokensPerMinute?: number;
+    maxRequestsPerMinute?: number;
+  } = {},
+): RateLimitGuardrail {
   const { maxTokensPerMinute = 100000, maxRequestsPerMinute = 60 } = options;
 
   const maxEntries = Math.max(maxRequestsPerMinute, 1000);
@@ -241,12 +245,14 @@ export function createRateLimitGuardrail(options: {
  *
  * @public
  */
-export function createToolGuardrail(options: {
-  allowlist?: string[];
-  denylist?: string[];
-  /** @default false */
-  caseSensitive?: boolean;
-}): GuardrailFn<ToolCallGuardrailData> {
+export function createToolGuardrail(
+  options: {
+    allowlist?: string[];
+    denylist?: string[];
+    /** @default false */
+    caseSensitive?: boolean;
+  } = {},
+): GuardrailFn<ToolCallGuardrailData> {
   const { allowlist, denylist, caseSensitive = false } = options;
 
   const normalizedAllowlist = allowlist?.map((t) =>
@@ -484,14 +490,16 @@ export function createOutputTypeGuardrail(options: {
  *
  * @public
  */
-export function createLengthGuardrail(options: {
-  /** Maximum characters in output */
-  maxCharacters?: number;
-  /** Maximum estimated tokens in output */
-  maxTokens?: number;
-  /** Custom token estimator (default: chars / 4) */
-  estimateTokens?: (text: string) => number;
-}): GuardrailFn<OutputGuardrailData> {
+export function createLengthGuardrail(
+  options: {
+    /** Maximum characters in output */
+    maxCharacters?: number;
+    /** Maximum estimated tokens in output */
+    maxTokens?: number;
+    /** Custom token estimator (default: chars / 4) */
+    estimateTokens?: (text: string) => number;
+  } = {},
+): GuardrailFn<OutputGuardrailData> {
   const {
     maxCharacters,
     maxTokens,

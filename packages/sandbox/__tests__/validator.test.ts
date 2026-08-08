@@ -126,12 +126,12 @@ describe("validateSandboxInput", () => {
     expect(errors).toEqual([]);
   });
 
-  it("DOES flag denied identifier reached via property access (audit-closure)", () => {
+  it("DOES flag denied identifier reached via property access", () => {
     // v0.1.0/v0.2.0 incorrectly allowed `obj.process` because `process`
     // was a property name. v0.3.0 closes this — we cannot statically
     // prove `obj` is safe, so `.process` is rejected regardless of
-    // receiver. This is the property-access bypass the AE audit
-    // (docs/AE-AUDIT-SANDBOX.md) called out as P0-S1.
+    // receiver. This closes the property-access bypass: any denied
+    // identifier was reachable simply by reading it off an object.
     const errors = validateSandboxInput([
       {
         path: "src/main.ts",
@@ -242,8 +242,8 @@ describe("validateSandboxInput", () => {
   });
 
   /**
-   * PoC chains from docs/AE-AUDIT-SANDBOX.md. Each one was a working
-   * sandbox escape in v0.1.0/v0.2.0; v0.3.0 must reject all of them.
+   * Known escape chains. Each one was a working sandbox escape in
+   * v0.1.0/v0.2.0; v0.3.0 must reject all of them.
    * Adding a new escape vector? Add a test here FIRST, prove it fails,
    * THEN write the fix.
    */

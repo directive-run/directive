@@ -38,7 +38,14 @@ export interface ModuleConfig<M extends ModuleSchema> {
   init?: (facts: Facts<M["facts"]>) => void;
   derive?: TypedDerivationsDef<M>;
   events?: TypedEventsDef<M>;
-  effects?: EffectsDef<M["facts"]>;
+  /**
+   * Fire-and-forget side effects.
+   *
+   * `deps` on one of these may name a fact key **or** one of this module's
+   * derivations — the second parameter is what makes the derivation IDs
+   * available to the type, and it matches what the runtime accepts.
+   */
+  effects?: EffectsDef<M["facts"], keyof M["derivations"] & string>;
   /**
    * Typed external event sources. See {@link SourceDef} for the primitive's
    * lifecycle + rationale. Each source attaches at `system.start()` and
@@ -565,7 +572,9 @@ export function createModule<const M extends ModuleSchema>(
     // Cast to TypedDerivationsDef for ModuleDef compatibility (runtime handles both types)
     derive: (config.derive ?? {}) as TypedDerivationsDef<M>,
     events: config.events ?? ({} as TypedEventsDef<M>),
-    effects: config.effects as EffectsDef<M["facts"]> | undefined,
+    effects: config.effects as
+      | EffectsDef<M["facts"], keyof M["derivations"] & string>
+      | undefined,
     sources: (config as { sources?: SourcesDef }).sources,
     constraints: config.constraints as TypedConstraintsDef<M> | undefined,
     resolvers: config.resolvers,

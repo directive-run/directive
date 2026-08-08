@@ -34,10 +34,10 @@ function setupDerivations(
 }
 
 // ============================================================================
-// P0-1: Iterative invalidateDerivation (no stack overflow)
+// Iterative invalidateDerivation (no stack overflow)
 // ============================================================================
 
-describe("P0-1: iterative invalidateDerivation", () => {
+describe("iterative invalidateDerivation", () => {
   it("handles 200+ chained derivations without stack overflow", () => {
     const CHAIN_LENGTH = 200;
     const schema: Record<string, unknown> = { root: t.number() };
@@ -153,10 +153,10 @@ describe("P0-1: iterative invalidateDerivation", () => {
 });
 
 // ============================================================================
-// P0-2: FactsStore destroy
+// FactsStore destroy
 // ============================================================================
 
-describe("P0-2: FactsStore destroy", () => {
+describe("FactsStore destroy", () => {
   it("subscribe callbacks don't fire after destroy", () => {
     const store = createFactsStore({
       schema: { count: t.number() },
@@ -247,10 +247,10 @@ describe("P0-2: FactsStore destroy", () => {
 });
 
 // ============================================================================
-// P1-1: Conditional topo sort rebuild
+// Conditional topo sort rebuild
 // ============================================================================
 
-describe("P1-1: conditional topo sort rebuild", () => {
+describe("conditional topo sort rebuild", () => {
   it("registers constraints without after deps without full graph rebuild", () => {
     const { facts } = createFacts({
       schema: { status: t.string() },
@@ -308,10 +308,10 @@ describe("P1-1: conditional topo sort rebuild", () => {
 });
 
 // ============================================================================
-// P1-2: Effects deps stability optimization
+// Effects deps stability optimization
 // ============================================================================
 
-describe("P1-2: effects deps stability", () => {
+describe("effects deps stability", () => {
   it("skips re-tracking after deps stabilize", async () => {
     const { store, facts } = createFacts({
       schema: { count: t.number(), name: t.string() },
@@ -498,10 +498,10 @@ describe("P1-2: effects deps stability", () => {
 });
 
 // ============================================================================
-// P1-3: Resolver cache LRU
+// Resolver cache LRU
 // ============================================================================
 
-describe("P1-3: resolver cache LRU", () => {
+describe("resolver cache LRU", () => {
   it("resolves the same requirement type repeatedly via cache", () => {
     const onStart = vi.fn();
     const { store, facts } = createFacts({
@@ -545,10 +545,10 @@ describe("P1-3: resolver cache LRU", () => {
 });
 
 // ============================================================================
-// P2-4: derivedProxy missing setPrototypeOf trap
+// derivedProxy missing setPrototypeOf trap
 // ============================================================================
 
-describe("P2-4: derivedProxy setPrototypeOf trap", () => {
+describe("derivedProxy setPrototypeOf trap", () => {
   it("setPrototypeOf trap rejects on derivedProxy", () => {
     const { manager } = setupDerivations({
       doubled: (facts) => (facts.count as number) * 2,

@@ -36,9 +36,10 @@
  * ```
  */
 
+import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
-import { withTracking } from "./tracking.js";
+import { derivationDep, describeDep, withTracking } from "./tracking.js";
 import type {
   EffectsDef,
   Facts,
@@ -139,6 +140,16 @@ interface EffectState {
   enabled: boolean;
   hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
   dependencies: Set<string> | null; // null = not yet tracked
+  /**
+   * Declared `deps` names that name nothing the system holds yet — neither a
+   * fact key nor a derivation — kept so they can be asked again. Empty once
+   * every name has resolved, which for a `deps` array written against declared
+   * facts is from the first call; `null` for an effect with no explicit `deps`.
+   * See {@link EffectState.hasExplicitDeps}.
+   */
+  unresolvedDeps: string[] | null;
+  /** The raw `deps` array, for re-resolving {@link EffectState.unresolvedDeps}. */
+  rawDeps: readonly string[] | null;
   cleanup: (() => void) | null; // cleanup function returned by last run()
   /** How many consecutive runs produced the same deps (auto-tracked only) */
   stableRunCount: number;
@@ -158,6 +169,33 @@ export interface CreateEffectsOptions<S extends Schema> {
   facts: Facts<S>;
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
+  /**
+   * Whether a name in an explicit `deps` array refers to a derivation.
+   *
+   * An auto-tracked derivation read is recorded under an internal namespace and
+   * a hand-written one is not, so without this `deps: ["total"]` naming a
+   * derivation records a name nothing ever invalidates and the effect never
+   * re-runs — while the auto-tracked equivalent works, which is what makes it
+   * look correct.
+   *
+   * Supplied by the engine, which is the only thing that knows the merged
+   * module set. Defaults to "nothing is a derivation".
+   */
+  isDerivation?: (name: string) => boolean;
+  /**
+   * Whether a name in an explicit `deps` array refers to a declared fact.
+   *
+   * Only used to decide which names are worth asking about again. A name that
+   * already means a fact is settled — {@link CreateEffectsOptions.isDerivation}
+   * resolves a fact/derivation collision toward the fact, so a declared fact key
+   * cannot later come to mean a derivation — and re-asking it every reconcile is
+   * work with no reachable answer.
+   *
+   * Supplied by the engine alongside `isDerivation`, from the same merged module
+   * set. Defaults to "nothing is a declared fact", which costs a re-ask per
+   * reconcile and decides nothing differently.
+   */
+  isFactKey?: (name: string) => boolean;
   /** Called when an effect executes, with the fact keys that triggered it. */
   onRun?: (id: string, deps: string[]) => void;
   /** Called when an effect's `run()` or cleanup function throws. */
@@ -214,7 +252,15 @@ export interface CreateEffectsOptions<S extends Schema> {
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
-  const { definitions, facts, store, onRun, onError } = options;
+  const {
+    definitions,
+    facts,
+    store,
+    isDerivation = () => false,
+    isFactKey = () => false,
+    onRun,
+    onError,
+  } = options;
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
@@ -232,6 +278,75 @@ export function createEffectsManager<S extends Schema>(
     (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean
   >();
 
+  /**
+   * Whether the system now holds something under this name, either way.
+   *
+   * A name that means a fact and a name that means a derivation are both
+   * answered: the first keeps the bare key, the second takes the namespaced
+   * form, and either way the question has been settled and does not need asking
+   * again.
+   */
+  function isKnownName(name: string): boolean {
+    return isDerivation(name) || isFactKey(name);
+  }
+
+  /**
+   * A declared `deps` array, on the keyspace auto-tracking uses, plus the names
+   * that the system does not yet hold anything under.
+   *
+   * `isDerivation` is a live lookup over the merged module set, so what a name
+   * means is not fixed when the effect is registered — registering an effect
+   * and then the derivation it names is an ordinary thing to do with the
+   * piecemeal API, and the name means a derivation only after the second call.
+   * Resolving once at registration made that order significant and silently so:
+   * the effect kept the bare name, nothing ever announces a bare derivation
+   * name, and the effect never ran again.
+   *
+   * A name the system already holds is not carried forward. That is the whole
+   * of the second return value: it is the list of names still capable of
+   * changing meaning, and for the ordinary `deps` array — every name a fact the
+   * module declares — it is empty on the first call and stays that way.
+   */
+  function resolveDeps(raw: readonly string[]): {
+    dependencies: Set<string>;
+    unresolved: string[];
+  } {
+    const dependencies = new Set<string>();
+    const unresolved: string[] = [];
+
+    for (const name of raw) {
+      if (isDerivation(name)) {
+        dependencies.add(derivationDep(name));
+      } else {
+        dependencies.add(name);
+        if (!isFactKey(name)) {
+          unresolved.push(name);
+        }
+      }
+    }
+
+    return { dependencies, unresolved };
+  }
+
+  /**
+   * Ask the unresolved names again, and rebuild if the system has since come to
+   * hold one of them. A no-op once every name has resolved, and a handful of
+   * property lookups until then.
+   */
+  function refreshDeps(state: EffectState): void {
+    const pending = state.unresolvedDeps;
+    if (state.rawDeps === null || pending === null || pending.length === 0) {
+      return;
+    }
+    if (!pending.some(isKnownName)) {
+      return;
+    }
+
+    const resolved = resolveDeps(state.rawDeps);
+    state.dependencies = resolved.dependencies;
+    state.unresolvedDeps = resolved.unresolved;
+  }
+
   /** Initialize state for an effect */
   function initState(id: string): EffectState {
     const def = definitions[id];
@@ -246,14 +361,26 @@ export function createEffectsManager<S extends Schema>(
 
     let dependencies: Set<string> | null = null;
     let hasExplicitDeps = false;
+    let unresolvedDeps: string[] | null = null;
+    let rawDeps: readonly string[] | null = null;
 
     if (def.deps) {
-      dependencies = new Set(def.deps as string[]);
+      // Resolved against the module's derivation names, because auto-tracking
+      // files a derivation read under a namespace and a hand-written name has
+      // no way to know that. Without this, the documented escape hatch is dead
+      // for exactly the dependency it is most often reached for.
+      rawDeps = def.deps as string[];
+      const resolved = resolveDeps(rawDeps);
+      dependencies = resolved.dependencies;
+      unresolvedDeps = resolved.unresolved;
       hasExplicitDeps = true;
     } else if (def.on !== undefined) {
       // Declarative trigger — deps are extracted statically from the
       // predicate; the predicate is the gate evaluated after the
-      // dep-overlap pre-filter in shouldRun(). A non-predicate value here
+      // dep-overlap pre-filter in shouldRun(). Not resolved against derivation
+      // names the way `deps` is: the predicate is evaluated against the facts
+      // snapshot, which carries no derivations, so every path it names is a
+      // fact key by construction. A non-predicate value here
       // is a user error and must throw (matches the friendly throw used by
       // constraints/derivations) instead of silently no-op-ing.
       if (!isPredicate(def.on)) {
@@ -283,6 +410,8 @@ export function createEffectsManager<S extends Schema>(
       enabled: true,
       hasExplicitDeps,
       dependencies,
+      unresolvedDeps,
+      rawDeps,
       cleanup: null,
       stableRunCount: 0,
       depsStable: false,
@@ -328,6 +457,11 @@ export function createEffectsManager<S extends Schema>(
     if (!state.enabled) {
       return false;
     }
+
+    // Declared names that the system did not hold at registration are re-asked
+    // here rather than trusted from it — see `resolveDeps`. Names it did hold
+    // are settled and this costs nothing.
+    refreshDeps(state);
 
     // If effect has tracked deps (explicit or auto-tracked), check if any changed
     if (state.dependencies) {
@@ -448,6 +582,51 @@ export function createEffectsManager<S extends Schema>(
     }
   }
 
+  /**
+   * Effects already warned about reading facts past an `await`.
+   *
+   * Once per effect, not once per run: an effect that runs every reconcile
+   * would otherwise turn one design note into a log.
+   */
+  const warnedAsync = new Set<string>();
+
+  /**
+   * Say so, once, when an async auto-tracked effect read nothing it could be
+   * woken by.
+   *
+   * The tracking context is a synchronous stack: it is pushed, the body runs,
+   * and it is popped the moment the body *returns* — which for an `async` body
+   * is at its first `await`. Everything the continuation reads afterwards falls
+   * outside it and is recorded as a dependency of nothing. An effect whose reads
+   * are all past that boundary therefore ends up with an empty dependency set,
+   * which this manager reads as "no dependencies known" and runs on *every*
+   * reconcile. It looks like it works, because it does fire; what it has lost is
+   * any relationship between when it fires and what it reads.
+   *
+   * **Why not warn on every async auto-tracked effect**, the way core warns on
+   * every async constraint without `deps`. Because there is a correct shape —
+   * hoist every read above the first `await` — and nothing distinguishes it from
+   * the broken one at runtime, so a broad warning fires on correct code with no
+   * way to say "I did that". This repo has such an effect. A warning that cannot
+   * be satisfied gets muted, and a muted warning protects nothing. The empty
+   * dependency set is the case that is unambiguous, and it is the one worth
+   * interrupting someone for.
+   *
+   * Triggered on the return value rather than a declaration flag, because
+   * effects have no `async: true` to key on — and the return value is the truth
+   * where a flag is a claim.
+   */
+  function warnAsyncAutoTracked(id: string, deps: Set<string>): void {
+    if (deps.size > 0 || warnedAsync.has(id)) {
+      return;
+    }
+    warnedAsync.add(id);
+
+    console.warn(
+      `[Directive] Async effect "${id}" recorded no dependencies, so it runs on every reconcile. Auto-tracking cannot see across an \`await\` — the tracking context closes when the body returns its promise — and this effect read nothing before its first one. Add \`deps: ["key1", "key2"]\`, or move the reads above the first \`await\`.`,
+    );
+  }
+
   /** Run an auto-tracked effect, re-tracking dependencies each time */
   async function runAutoTrackedEffect(
     state: EffectState,
@@ -476,6 +655,9 @@ export function createEffectsManager<S extends Schema>(
     // If the effect is async, wait for it and capture cleanup
     let result = trackingResult.value;
     if (result instanceof Promise) {
+      if (isDevelopment) {
+        warnAsyncAutoTracked(state.id, trackedDeps);
+      }
       result = await result;
     }
     storeCleanup(state, result);
@@ -496,7 +678,10 @@ export function createEffectsManager<S extends Schema>(
     // Run previous cleanup before re-running
     runCleanup(state);
 
-    onRun?.(id, state.dependencies ? [...state.dependencies] : []);
+    onRun?.(
+      id,
+      state.dependencies ? Array.from(state.dependencies, describeDep) : [],
+    );
 
     try {
       if (!state.hasExplicitDeps) {
@@ -636,7 +821,10 @@ export function createEffectsManager<S extends Schema>(
       // Run cleanup of previous run
       runCleanup(state);
 
-      onRun?.(id, state.dependencies ? [...state.dependencies] : []);
+      onRun?.(
+        id,
+        state.dependencies ? Array.from(state.dependencies, describeDep) : [],
+      );
 
       try {
         let effectPromise: unknown;

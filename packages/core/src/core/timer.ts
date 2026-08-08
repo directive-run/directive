@@ -94,7 +94,6 @@ export function elapsedMs(state: TimerFactState, nowMs: number): number {
   //     stays false past the deadline)
   //   - make remainingMs report values > the configured ms total
   //   - silently wrap into pausedDurationMs accumulation downstream
-  // (R1 sec C4.)
   if (state.status === "paused" && state.pausedAtMs !== null) {
     return Math.max(
       0,
@@ -166,7 +165,7 @@ export function resumeTimer(
   // Clamp pausedFor at 0 — clock step-back between pause and resume
   // would otherwise produce a negative pausedDurationMs accumulation,
   // which propagates into elapsedMs (returns inflated values), which
-  // prematurely completes countdowns. (R1 sec M1.)
+  // prematurely completes countdowns.
   const pausedFor = Math.max(0, nowMs - state.pausedAtMs);
   return {
     ...state,
@@ -205,13 +204,13 @@ export function registerRepeat(
   // Defensible-illegal: registerRepeat from a paused state would
   // otherwise advance startedAtMs while leaving status === 'paused',
   // producing an inconsistent state (logically running by clock math
-  // but reads as paused). No-op instead. (R2 sec m-R2-2.)
+  // but reads as paused). No-op instead.
   if (state.status === "paused") return state;
   // Reset pausedDurationMs on each repeat so accumulated pause time
   // from prior intervals does not double-count into the next
   // interval's elapsed math. Without this reset, every repeat after a
   // pause would arithmetic-drift the next deadline by the cumulative
-  // pause window. (R1 sec M9.)
+  // pause window.
   return {
     ...state,
     startedAtMs: state.startedAtMs + ms,

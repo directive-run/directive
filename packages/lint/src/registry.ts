@@ -2,8 +2,7 @@
  * Rule metadata registry. Sources from `./rule-metadata.ts` which
  * has zero `ts-morph` dependency chain — so `index.ts`'s static
  * import of this module does NOT eagerly load ts-morph at consumer
- * `import` time (the v0.1.0 / v0.2.0 regression that AE Audit
- * 0.2.2 P0-1 flagged).
+ * `import` time (the v0.1.0 / v0.2.0 regression).
  *
  * Executable rule implementations live in `./rules/*.ts` and load
  * ts-morph; they're loaded only when `runRules` / `applyFix` is

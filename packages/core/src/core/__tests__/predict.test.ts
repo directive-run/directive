@@ -9,7 +9,7 @@ describe("predict — happy path", () => {
     expect(result.whenExplain.every((c) => c.pass)).toBe(true);
   });
 
-  it("does not leak the input predicate reference on the result (M15)", () => {
+  it("does not leak the input predicate reference on the result", () => {
     const p = { cartTotal: { $gte: 50 } };
     const result = predict(p, { cartTotal: 75 });
     expect(result).not.toHaveProperty("predicate");

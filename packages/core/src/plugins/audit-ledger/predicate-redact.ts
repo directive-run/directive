@@ -4,7 +4,7 @@
  * Cached `whenSpec` operand pointers (e.g. `{ email: { $eq:
  * "alice@x.com" } }`) flow into every `constraint.evaluate` entry —
  * without scrubbing, the email would land in the audit trail in
- * plaintext on every evaluation. (C2)
+ * plaintext on every evaluation.
  *
  * `redactWhenSpec` deep-clones the spec, walks it via `walkPredicate`,
  * and replaces operand values at PII-tagged fact paths with
@@ -66,7 +66,7 @@ function replaceAtPath(
  * Walk a predicate spec and replace operands at PII-tagged fact paths
  * with `"[redacted]"`. Returns the input as-is when redaction is
  * disabled (`capturePII: true`) or no PII tags are registered;
- * otherwise returns a deep clone with the leaf values rewritten. (C2)
+ * otherwise returns a deep clone with the leaf values rewritten.
  */
 export function redactWhenSpec(
   spec: unknown,

@@ -187,7 +187,7 @@ export interface PluginManager<_S extends Schema = any> {
     category?: string,
   ): void;
 
-  // Clobber loop hooks (v1.23.0 — R4.J)
+  // Clobber loop hooks (v1.23.0)
   emitClobberLoopDetected(
     event: import("./types/system.js").ObservationEvent & {
       type: "resolver.clobber.loop.detected";
@@ -328,7 +328,7 @@ export function createPluginManager<
 
     // Lifecycle hooks (emitInit is async, handled separately)
     async emitInit(system: System<any>): Promise<void> {
-      // R15 — track which plugins have already received `onInit` via a
+      // track which plugins have already received `onInit` via a
       // WeakSet, then loop over the LIVE `plugins` array until quiet.
       // This handles two distinct concerns:
       //   1. Index-shift attack: a plugin's `onInit` that calls
@@ -429,7 +429,7 @@ export function createPluginManager<
     // Guardrail hooks (RFC 0010)
     emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
 
-    // Clobber loop hooks (v1.23.0 — R4.J)
+    // Clobber loop hooks (v1.23.0)
     emitClobberLoopDetected: broadcast("onClobberLoopDetected"),
     emitClobberLoopResolved: broadcast("onClobberLoopResolved"),
 

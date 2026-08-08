@@ -83,6 +83,7 @@ export {
   type HandoffResult,
   type RunAgentRequirement,
   type MultiAgentRunCallOptions,
+  type MultiAgentStreamCallOptions,
 } from "./multi-agent-orchestrator.js";
 
 // Pattern visualization

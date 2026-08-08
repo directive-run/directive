@@ -252,7 +252,7 @@ describe("createConstraintRouter", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("createConstraintRouter config validation", () => {
@@ -278,7 +278,7 @@ describe("createConstraintRouter config validation", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("createConstraintRouter callback isolation", () => {
@@ -319,7 +319,7 @@ describe("createConstraintRouter callback isolation", () => {
 });
 
 // ============================================================================
-// Deep-clone RoutingFacts (C4)
+// Deep-clone RoutingFacts
 // ============================================================================
 
 describe("RoutingFacts immutability", () => {
@@ -352,7 +352,7 @@ describe("RoutingFacts immutability", () => {
 });
 
 // ============================================================================
-// Pre-sorted Constraints (M9)
+// Pre-sorted Constraints
 // ============================================================================
 
 describe("constraint priority sorting", () => {
@@ -373,5 +373,185 @@ describe("constraint priority sorting", () => {
 
     const result = await runner(mockAgent(), "hello");
     expect(result.output).toBe("from:ollama"); // Highest priority wins
+  });
+});
+
+// ============================================================================
+// Provider pricing is validated and snapshotted
+// ============================================================================
+
+describe("createConstraintRouter provider pricing", () => {
+  function runnerReporting(
+    tokenUsage: Record<string, number> | undefined,
+  ): AgentRunner {
+    return vi.fn(async () => ({
+      output: "ok",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 0,
+      ...(tokenUsage ? { tokenUsage } : {}),
+    })) as unknown as AgentRunner;
+  }
+
+  it("rejects a negative rate, which would win preferCheapest on every call", () => {
+    // A negative rate sorts below every real provider and drives totalCost
+    // downwards without limit, so a cost-based failover constraint can never
+    // fire.
+    expect(() =>
+      createConstraintRouter({
+        providers: [
+          {
+            name: "cheap",
+            runner: makeProviderRunner("cheap"),
+            pricing: { inputPerMillion: -1000, outputPerMillion: 15 },
+          },
+        ],
+        defaultProvider: "cheap",
+      }),
+    ).toThrow(
+      /providers\[cheap\].pricing.inputPerMillion must not be negative/,
+    );
+  });
+
+  it("rejects a NaN rate", () => {
+    expect(() =>
+      createConstraintRouter({
+        providers: [
+          {
+            name: "openai",
+            runner: makeProviderRunner("openai"),
+            pricing: { inputPerMillion: Number.NaN, outputPerMillion: 15 },
+          },
+        ],
+        defaultProvider: "openai",
+      }),
+    ).toThrow(/must be a finite number/);
+  });
+
+  it("names createConstraintRouter, not another wrapper, in the message", () => {
+    let message = "";
+    try {
+      createConstraintRouter({
+        providers: [
+          {
+            name: "openai",
+            runner: makeProviderRunner("openai"),
+            pricing: { inputPerMillion: Number.NaN, outputPerMillion: 15 },
+          },
+        ],
+        defaultProvider: "openai",
+      });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+
+    expect(message).toContain("createConstraintRouter");
+    expect(message).not.toContain("withBudget");
+  });
+
+  it("keeps routing on cost after the caller mutates the pricing object", async () => {
+    const mutable = { inputPerMillion: 3, outputPerMillion: 15 };
+    const router = createConstraintRouter({
+      providers: [
+        {
+          name: "primary",
+          runner: runnerReporting({
+            inputTokens: 1_000_000,
+            outputTokens: 1_000_000,
+          }),
+          pricing: mutable,
+        },
+      ],
+      defaultProvider: "primary",
+    });
+
+    mutable.inputPerMillion = Number.NaN;
+    mutable.outputPerMillion = Number.NaN;
+
+    await router(mockAgent(), "hello");
+
+    expect(router.facts.totalCost).toBeCloseTo(18, 10);
+  });
+
+  it("a failover constraint keeps firing after a call reports poisoned usage", async () => {
+    // NaN in facts.totalCost makes `facts.totalCost > 1` false forever, so the
+    // failover silently stops working and never recovers.
+    const router = createConstraintRouter({
+      providers: [
+        {
+          name: "primary",
+          runner: runnerReporting({
+            inputTokens: Number.NaN,
+            outputTokens: 50,
+          }),
+          pricing: { inputPerMillion: 3, outputPerMillion: 15 },
+        },
+        { name: "backup", runner: makeProviderRunner("backup") },
+      ],
+      defaultProvider: "primary",
+      constraints: [
+        { when: (facts) => facts.totalCost > 1, provider: "backup" },
+      ],
+    });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await router(mockAgent(), "hello");
+    warn.mockRestore();
+
+    expect(Number.isFinite(router.facts.totalCost)).toBe(true);
+    // Charged at the estimate rather than dropped: a poisoned count is a
+    // reporting failure, not a free call, and zero would leave the cost fact
+    // permanently below any threshold a constraint tests against.
+    expect(router.facts.providers.primary?.totalCost).toBeGreaterThan(0);
+    expect(router.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("bills cache tokens into facts.totalCost", async () => {
+    const router = createConstraintRouter({
+      providers: [
+        {
+          name: "primary",
+          runner: runnerReporting({
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 1_000_000,
+            cacheCreationTokens: 1_000_000,
+          }),
+          pricing: {
+            inputPerMillion: 3,
+            outputPerMillion: 15,
+            cacheReadPerMillion: 0.3,
+            cacheWritePerMillion: 3.75,
+          },
+        },
+      ],
+      defaultProvider: "primary",
+    });
+
+    await router(mockAgent(), "hello");
+
+    expect(router.facts.totalCost).toBeCloseTo(4.05, 10);
+  });
+
+  it("reads each provider field once, so a getter cannot rename a provider mid-flight", async () => {
+    let reads = 0;
+    const provider = {
+      get name() {
+        reads++;
+
+        return reads > 1 ? "ghost" : "primary";
+      },
+      runner: makeProviderRunner("primary"),
+    };
+
+    const router = createConstraintRouter({
+      providers: [provider],
+      defaultProvider: "primary",
+    });
+
+    await router(mockAgent(), "hello");
+
+    expect(router.facts.lastProvider).toBe("primary");
+    expect(Object.keys(router.facts.providers)).toEqual(["primary"]);
   });
 });

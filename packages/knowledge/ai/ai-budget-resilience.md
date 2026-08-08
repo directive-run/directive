@@ -19,12 +19,17 @@ What failure mode are you guarding against?
 
 ## `withBudget(runner, config)` — cost caps
 
-`BudgetConfig` controls per-call and per-window cost limits. The `onBudgetExceeded` callback fires before the wrapper throws `BudgetExceededError`. There is NO `budgetWarningThreshold` or `onWarning` option on this wrapper — for percentage-based warnings, use `onBudgetWarning` on `createAgentOrchestrator` instead.
+`BudgetConfig` controls per-call and per-window cost limits. `onBudgetExceeded` fires in two phases and only one of them throws — see below. There is NO `budgetWarningThreshold` or `onWarning` option on this wrapper — for percentage-based warnings, use `onBudgetWarning` on `createAgentOrchestrator` instead.
 
 ```typescript
 import { withBudget } from "@directive-run/ai";
 
-const pricing = { inputPerMillion: 3, outputPerMillion: 15 };
+const pricing = {
+  inputPerMillion: 3,
+  outputPerMillion: 15,
+  cacheReadPerMillion: 0.3,   // optional — defaults to inputPerMillion
+  cacheWritePerMillion: 3.75, // optional — defaults to inputPerMillion
+};
 
 const budgetRunner = withBudget(baseRunner, {
   maxCostPerCall: 0.10,
@@ -35,11 +40,27 @@ const budgetRunner = withBudget(baseRunner, {
     { window: "hour", maxCost: 5.00, pricing },
     { window: "day",  maxCost: 50.00, pricing },
   ],
-  onBudgetExceeded: ({ estimated, remaining, window }) => {
-    console.warn(`[budget] ${window} would overshoot — est $${estimated.toFixed(4)}, remaining $${remaining.toFixed(4)}`);
+  onBudgetExceeded: ({ estimated, actual, remaining, window, phase }) => {
+    if (phase === "pre-call") {
+      console.warn(`[budget] ${window} blocked — est $${estimated.toFixed(4)}, remaining $${remaining.toFixed(4)}`);
+      return;
+    }
+    // phase === "post-call": the call already succeeded and the money is spent.
+    console.warn(`[budget] ${window} overran — billed $${actual!.toFixed(4)} against a $${remaining.toFixed(4)} cap`);
   },
 });
 ```
+
+### `phase` — the callback does not always precede a throw
+
+| `phase` | Trigger | Throws | Money spent |
+|---|---|---|---|
+| `"pre-call"` | The pre-call estimate exceeds a cap | `BudgetExceededError` | none — the call never ran |
+| `"post-call"` | The provider billed more than `maxCostPerCall`, or pushed a rolling window past its cap | nothing | already spent |
+
+`withBudget` gates an *estimate*. A call estimated at a cent that bills five dollars clears the gate, so the overrun can only be reported, never blocked. Treat `phase: "post-call"` as an alert, not a failure — do NOT retry on it.
+
+`estimated` is the pre-call estimate in both phases. `actual` is what the provider billed and is present only when `phase` is `"post-call"`. The callback gets a frozen copy, so mutating it cannot alter the `BudgetExceededError` that follows a `"pre-call"` report.
 
 Catching the throw:
 
@@ -54,6 +75,38 @@ try {
   }
 }
 ```
+
+### Reading spend
+
+```typescript
+import type { BudgetRunner } from "@directive-run/ai";
+
+const runner = budgetRunner as BudgetRunner;
+
+runner.getSpent("hour");       // rolling hour window; 0 if no hour budget is configured
+runner.getSpent("day");        // rolling day window
+runner.getSpent("total");      // lifetime spend for this runner
+runner.getUnpricedCallCount(); // recent calls charged from what they delivered, not from billed usage
+runner.getFailedCallSpend("hour"); // how much of getSpent("hour") was charged for calls that threw
+```
+
+`getSpent("total")` is priced with the top-level `pricing` when supplied, otherwise with the first budget window's rates; it returns `0` only when neither is configured.
+
+Two budgets on the same `window` are two caps reading one running total. A call is recorded there once, at the first budget's rates for that window — each budget's own rates still gate its own pre-call estimate.
+
+When a call cannot be priced from what the provider reported, `withBudget` charges what the call *delivered* — the assistant text on the result, or the deltas that reached your `onToken` — rather than counting it as free, increments `getUnpricedCallCount()`, and warns once per condition. Six conditions land there: no `tokenUsage` at all, a non-finite or negative count, a report of zero input, output, *and* cache tokens (no provider bills a call that ran at nothing), a runner that said outright that usage was not reported, a runner that threw, text delivered for a generation the surviving result does not describe (a retry, a fallback, a schema re-ask), and counts that price out to a non-finite cost. The count is kept over a rolling window — the widest budget window configured, or an hour when there is none — so an outage that ends ages out of it. A count that tracks your call rate means every `getSpent` figure is measured rather than billed.
+
+`getFailedCallSpend(window)` splits that figure out. A call that throws reports no usage, so whatever reached your `onToken` before it failed is measured and charged — a gateway that strips the completion marker generated, delivered and billed the whole response, and the throw comes afterwards. A failure that delivered nothing is charged nothing: a DNS failure or a refused connection never reached a provider, and neither did a call a nested `withBudget` refused before dispatch. Subtract this from `getSpent(window)` for spend attributable to calls that returned.
+
+Set `maxUnpricedCalls` to stop enforcing a hard ceiling against measurements indefinitely — the runner then refuses with `UnpricedCallLimitError` once that many recent calls have gone unpriced.
+
+### Config is validated and copied at construction
+
+Rates, caps, and window names are read once, validated, and copied when the wrapper is built. A rate that is missing, non-finite, negative, or `-0` throws; a `window` other than `"hour"` or `"day"` throws rather than silently disabling the cap; mutating the objects you passed in afterwards has no effect. Zero rates are accepted (local models bill nothing) but warn when paired with a non-zero cap, since such a cap can never trip. Budgets sharing a window share one ledger, so they must price it identically — differing rates throw, because a call recorded at one set of rates would be gated by a cap expecting the other.
+
+All four token classes are priced: input, output, cache read, and cache write. Cache rates default to the input rate when omitted — conservative, never free. `cacheWriteTokens` is the canonical count name; `cacheCreationTokens` is a documented alias of it, and adapters populate that one. Supply either — both resolve in a single function every token consumer routes through. Published `cacheWritePerMillion` rates assume the 5-minute cache TTL — a 1-hour cache writes at 2.0x input rather than 1.25x, so pass your own rate if you use it.
+
+The pre-call estimate charges input tokens at the highest of the input, cache-read, and cache-write rates: before the call there is no way to know how the provider will split them, and an estimate under the eventual bill is a cap that does not gate. It still reads the input string alone — not instructions, history, or tools — so it runs well under a real bill and is a floor, not a prediction.
 
 ## `withRetry(runner, config)` — transient-error retry
 
@@ -263,21 +316,30 @@ Routes each runner call to a provider based on runtime context.
 
 ```typescript
 import { createConstraintRouter } from "@directive-run/ai";
+import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
+import { OPENAI_PRICING } from "@directive-run/ai/openai";
 
 const router = createConstraintRouter({
   providers: [
-    { name: "ollama",    runner: ollamaRunner,    costPerMillion: 0 },
-    { name: "anthropic", runner: anthropicRunner, costPerMillion: 3 },
-    { name: "openai",    runner: openaiRunner,    costPerMillion: 5 },
+    { name: "ollama",    runner: ollamaRunner },
+    { name: "anthropic", runner: anthropicRunner, pricing: ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"] },
+    { name: "openai",    runner: openaiRunner,    pricing: OPENAI_PRICING["gpt-4o"] },
   ],
+  defaultProvider: "anthropic",             // required
   constraints: [
-    { when: (ctx) => ctx.budgetRemaining < 1.0, prefer: "ollama" },
-    { when: (ctx) => ctx.priority === "high",   prefer: "anthropic" },
+    { when: (facts) => facts.totalCost > 100, provider: "ollama", priority: 10 },
+    { when: (facts) => (facts.providers["anthropic"]?.errorCount ?? 0) > 5, provider: "openai" },
   ],
+  preferCheapest: false,   // opt-in cheapest-provider heuristic, default false
+  errorCooldownMs: 30_000, // skip a provider this long after an error, default 30000
 });
 ```
 
-`router` returns an `AgentRunner` you pass directly to an orchestrator. The router's context fields depend on your config; check the `ConstraintRouterConfig` type for the full surface.
+There is NO `costPerMillion` field and NO `prefer` key: providers take `pricing` in `TokenPricing` shape (any `*_PRICING` entry works as-is), and a constraint names its target with `provider`. The `when` predicate receives `RoutingFacts` — `totalCost`, `callCount`, `errorCount`, `lastProvider`, `avgLatencyMs`, and per-provider stats under `providers` — not an ad-hoc context object.
+
+`router` returns an `AgentRunner` you pass directly to an orchestrator, plus a `facts` getter for inspection and a `getUnpricedCallCount()` accessor. Provider pricing is validated and copied at construction, on the same terms as `withBudget`: negative, `-0`, and non-finite rates throw, and a poisoned `tokenUsage` never reaches `facts.totalCost` as `NaN` — which would stop every cost-based constraint from ever firing again.
+
+A call the provider reported no usable usage for is charged its pre-call estimate and counted, exactly as in `withBudget`. It used to be charged `0`, which reads as a free call: `facts.totalCost` stayed at zero for the life of a router whose runner never populated `tokenUsage`, and a `facts.totalCost > N` failover never fired.
 
 ## Composing wrappers
 

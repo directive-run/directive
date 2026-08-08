@@ -265,7 +265,7 @@ describe("@directive-run/timeline", () => {
     expect(formatTimeline(undefined)).toBe("(no timeline)");
   });
 
-  it("R1 sec M3: registry evicts oldest entries past the cap", () => {
+  it("registry evicts oldest entries past the cap", () => {
     setRegistryCap(3);
     try {
       const systems: { destroy: () => void }[] = [];
@@ -289,14 +289,14 @@ describe("@directive-run/timeline", () => {
     }
   });
 
-  it("R1 sec M3: setRegistryCap rejects invalid values", () => {
+  it("setRegistryCap rejects invalid values", () => {
     expect(() => setRegistryCap(0)).toThrow();
     expect(() => setRegistryCap(-1)).toThrow();
     expect(() => setRegistryCap(Number.NaN)).toThrow();
     expect(() => setRegistryCap(Number.POSITIVE_INFINITY)).toThrow();
   });
 
-  it("R1.A serialize/deserialize round-trips via JSON", () => {
+  it("serialize/deserialize round-trips via JSON", () => {
     const sys = createSystem({
       module: buildCounter({ loadInitial: async () => 7 }),
     });
@@ -317,7 +317,7 @@ describe("@directive-run/timeline", () => {
     sys.destroy();
   });
 
-  it("R1.A deserialize rejects invalid input", () => {
+  it("deserialize rejects invalid input", () => {
     expect(() => deserializeTimeline(null)).toThrow(/expected object/);
     expect(() =>
       deserializeTimeline({ version: 99, id: "x", startedAtMs: 0, frames: [] }),
@@ -335,7 +335,7 @@ describe("@directive-run/timeline", () => {
     ).toThrow(/frames must be an array/);
   });
 
-  it("R1.A replayTimeline re-dispatches recorded MUTATE-shaped fact changes", async () => {
+  it("replayTimeline re-dispatches recorded MUTATE-shaped fact changes", async () => {
     // Build a synthetic timeline frame stream that looks like what
     // @directive-run/mutator would emit: a fact.change on
     // pendingMutation transitioning null → { kind, payload, status:
@@ -377,7 +377,7 @@ describe("@directive-run/timeline", () => {
     expect(dispatched[0]?.payload).toEqual({ by: 5 });
   });
 
-  it("R1.A replayTimeline skips non-dispatchable frames by default", async () => {
+  it("replayTimeline skips non-dispatchable frames by default", async () => {
     const synthetic = {
       version: 1 as const,
       id: "synthetic-skip",
@@ -405,9 +405,9 @@ describe("@directive-run/timeline", () => {
     expect(dispatched).toHaveLength(0);
   });
 
-  it("R5 sec #8: hostile timeline with own __proto__/constructor/prototype keys does not propagate them into the dispatch", async () => {
+  it("hostile timeline with own __proto__/constructor/prototype keys does not propagate them into the dispatch", async () => {
     // Hostile timeline JSON that includes attacker-controlled own
-    // properties on `next`. After the R5 fix, these MUST be stripped
+    // properties on `next`. These MUST be stripped
     // before the spread-into-dispatch — otherwise downstream user code
     // doing Object.assign(target, event) inherits the malicious keys.
     const hostile = {
@@ -449,7 +449,7 @@ describe("@directive-run/timeline", () => {
     expect(Object.prototype.hasOwnProperty.call(ev, "prototype")).toBe(false);
   });
 
-  it("R1.A replayTimeline { dispatchable: false } walks every frame", async () => {
+  it("replayTimeline { dispatchable: false } walks every frame", async () => {
     const synthetic = {
       version: 1 as const,
       id: "synthetic-walk",
@@ -487,7 +487,7 @@ describe("@directive-run/timeline", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-// R2.A — bisectTimeline
+// bisectTimeline
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -540,7 +540,7 @@ function makeCountingSystem(): ReplayableSystem & {
   return sys;
 }
 
-describe("R2.A bisectTimeline", () => {
+describe("bisectTimeline", () => {
   it("locates the first failing frame in a 16-frame synthetic timeline", async () => {
     // Threshold: assertion fails as soon as count > 7. 8th increment
     // (frame index 7) is the trigger.
@@ -691,7 +691,7 @@ describe("R2.A bisectTimeline", () => {
     expect(result.firstFailingFrameIndex).toBe(0);
   });
 
-  it("R5 DX M1: BisectResult exposes a `kind` discriminator alongside legacy booleans", async () => {
+  it("BisectResult exposes a `kind` discriminator alongside legacy booleans", async () => {
     // Each of the four outcomes maps to a distinct kind value.
     const tl = makeIncTimeline(8);
     const counting = makeCountingSystem;
@@ -753,7 +753,7 @@ describe("R2.A bisectTimeline", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-// R2.C — diffTimelines
+// diffTimelines
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -848,7 +848,7 @@ function makeTimeline(
   };
 }
 
-describe("R2.C diffTimelines", () => {
+describe("diffTimelines", () => {
   it("reports identical=true for two byte-equal timelines", () => {
     const a = makeTimeline("a", [
       { kind: "constraint", cid: "loadOnLoading" },
@@ -1031,7 +1031,7 @@ describe("R2.C diffTimelines", () => {
     expect(diff.frameCountDelta).toBe(0);
   });
 
-  it("R5 arch C1: same logical error at different frame indices is NOT reported as new on both sides", () => {
+  it("same logical error at different frame indices is NOT reported as new on both sides", () => {
     // The original errorKey included frameIndex, which meant any
     // unrelated count delta earlier in the timeline shifted the
     // error's index and made the SAME logical error look like two

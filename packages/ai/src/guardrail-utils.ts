@@ -7,6 +7,7 @@
  * @module
  */
 
+import { isStreamConsumerError } from "./streaming.js";
 import type {
   AgentLike,
   AgentRetryConfig,
@@ -225,6 +226,13 @@ export async function executeAgentWithRetry<T>(
       return await runner<T>(agent, input, options);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // A consumer callback that threw is not an agent failure: another
+      // attempt pays the provider again to hand the same response to the same
+      // callback.
+      if (isStreamConsumerError(lastError)) {
+        break;
+      }
 
       // Check if error is retryable and we have more attempts
       if (attempt < maxAttempts) {

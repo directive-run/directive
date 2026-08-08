@@ -1,0 +1,389 @@
+/**
+ * The one event union every surface renders from.
+ *
+ * The CLI, the SDK, and (later) MCP and HTTP all read this and nothing else.
+ * That is the whole point of the file: a surface that needs a field the union
+ * does not carry is a signal to widen the union, never to reach past it into
+ * the module's facts. Facts are the chain's private state; these events are its
+ * public account of itself.
+ *
+ * Nothing here is surface-specific. There are no ANSI codes, no HTML, no
+ * `Response` objects, no formatting decisions of any kind — a phase name and a
+ * dollar figure, not "◆ synthesizing… ($1.23)". Rendering belongs to whoever
+ * consumes the event.
+ *
+ * @module
+ */
+
+// ============================================================================
+// Chain vocabulary
+// ============================================================================
+
+/**
+ * Where the chain currently is.
+ *
+ * Every value is *derived* from facts rather than assigned — see
+ * `ChainDerived.phase` in `./module.js`. Nothing writes a phase, so no code
+ * path can put the chain in a phase its facts do not justify.
+ */
+export type ChainPhase =
+  /** Nothing has been asked of the chain yet. */
+  | "idle"
+  /** Personas are taking turns. */
+  | "taking-turns"
+  /** Turning is over; the synthesizer is producing the closing document. */
+  | "synthesizing"
+  /**
+   * The chain finished — with or without a closing document.
+   *
+   * Which of the two is `synthesisSkipped` on `chain:complete`, not
+   * `stopReason`: a chain stops for one reason and pays for its closing
+   * document out of what is left, and every stop reason can land either way.
+   */
+  | "complete"
+  /** The synthesizer itself failed, so there is no closing document. */
+  | "failed";
+
+/**
+ * Why the chain stopped adding turns.
+ *
+ * `""` while it has not stopped. The precedence when several apply at once is
+ * fixed and documented on the `stopReason` derivation: the hard budget floor
+ * outranks a failure, which outranks an interrupt, which outranks the predicted
+ * budget stop, which outranks the iteration ceiling.
+ */
+export type StopReason =
+  | ""
+  /** A turn resolver threw and the chain cut over to synthesis early. */
+  | "error"
+  /** An operator called `abort()`. */
+  | "interrupted"
+  /**
+   * The budget ran out.
+   *
+   * Either the next turn could not be paid for out of what was left — the
+   * ordinary, graceful case — or the runner's hard ledger floor refused a call
+   * outright, which means the chain's own arithmetic mispredicted. Both are the
+   * same fact about the run and report the same way; `budgetHalted` on the
+   * module tells them apart for anyone who needs to.
+   */
+  | "budget"
+  /** The configured iteration ceiling was reached. */
+  | "max-iterations";
+
+/**
+ * Which part of the chain an error came from.
+ *
+ * `"listener"` is the odd one and belongs here anyway: a surface that throws
+ * while rendering is not a chain failure and must not become one, but it is also
+ * not something the chain may quietly swallow. The chain has no console — it
+ * reports on this stream and nothing else — so a listener that throws is
+ * reported on this stream, to the listeners that did not.
+ *
+ * `"transcript"` and `"step"` are the same kind of thing one layer out. A store
+ * that cannot write does not stop the chain that was writing through it, and a
+ * step that failed does not stop the composition from closing itself out and
+ * saying what it got — but neither may pass unsaid.
+ */
+export type ErrorScope =
+  | "turn"
+  | "synthesis"
+  | "listener"
+  | "transcript"
+  | "step";
+
+/**
+ * Which step of a composition is speaking.
+ *
+ * A composition runs several presets end to end, and every one of them emits
+ * the ordinary chain events. A surface rendering a composition needs to know
+ * which step a `turn:completed` belongs to — and it can, because the steps are
+ * strictly sequential and each is bracketed by a `composition:step:started` and
+ * a `composition:step:complete`. The bracket carries the attribution, so the
+ * events inside it do not have to and stay identical to a single run's.
+ */
+export interface CompositionStep {
+  /** One-based position in the composition. */
+  step: number;
+  /** How many steps the composition has in total. */
+  total: number;
+  /** The preset driving this step. */
+  presetId: string;
+  /** The run ID of this step's own chain, and the stem of its transcript files. */
+  runId: string;
+}
+
+// ============================================================================
+// Events
+// ============================================================================
+
+/** Everything the chain spent and everything it has left, in one shape. */
+export interface CostSnapshot {
+  /** Dollars charged so far, straight from the budget runner's ledger. */
+  spentUsd: number;
+  /** The chain's ceiling, in dollars. */
+  budgetUsd: number;
+  /** `budgetUsd - spentUsd`, floored at zero. */
+  remainingUsd: number;
+  /** `spentUsd / budgetUsd`, in `[0, 1+]`. */
+  fraction: number;
+}
+
+export type HarnessEvent =
+  /** The chain accepted an input and is about to run its first turn. */
+  | {
+      type: "chain:started";
+      runId: string;
+      input: string;
+      personas: string[];
+      budgetUsd: number;
+      transcriptPath: string;
+      jsonlPath: string;
+      at: number;
+    }
+  /** A persona is about to speak. No text yet. */
+  | {
+      type: "turn:started";
+      iteration: number;
+      persona: string;
+      at: number;
+    }
+  /**
+   * One provider delta for the turn in flight.
+   *
+   * Not in the same category as the other events: it is the only one with no
+   * fact behind it, because a half-arrived turn is not chain state. A surface
+   * that only wants finished text can ignore it entirely and read
+   * `turn:completed`.
+   */
+  | {
+      type: "turn:delta";
+      iteration: number;
+      persona: string;
+      text: string;
+    }
+  /**
+   * The turn in flight is starting over — a retry, a fallback, or a schema
+   * re-ask replayed it — so every `turn:delta` already delivered for this
+   * iteration is void.
+   *
+   * Its only job is to keep a surface that renders deltas from showing two
+   * attempts end to end as one run-on turn. It travels with `turn:delta`
+   * because a consumer of one is always a consumer of the other.
+   */
+  | {
+      type: "turn:restarted";
+      iteration: number;
+      persona: string;
+      reason: string;
+    }
+  /** A turn finished and is now in the transcript. */
+  | {
+      type: "turn:completed";
+      iteration: number;
+      persona: string;
+      text: string;
+      costUsd: number;
+      at: number;
+    }
+  /** The running total moved. */
+  | ({ type: "cost:updated" } & CostSnapshot)
+  /**
+   * Spend crossed the configured warning fraction of the budget. Fires once
+   * per run, on the crossing — not on every turn above the line.
+   */
+  | ({ type: "budget:warning"; threshold: number } & CostSnapshot)
+  /**
+   * The run finished having spent more than it was given.
+   *
+   * Emitted once, immediately before `chain:complete`, when `fraction` is above
+   * one. The chain's ceilings are layered predictions over a pre-call ledger
+   * check, and a pre-call check can only refuse the call *after* the one that
+   * crossed the line — so an overshoot is possible by construction, and the one
+   * thing that must not happen is for it to be possible *and* silent. A run
+   * that finished at 138% of its budget used to report `phase: "complete"`, no
+   * budget stop, and no error, with the figure computed and discarded.
+   *
+   * `overshootUsd` is what was spent above the ceiling. It is the number worth
+   * acting on: a caller who set the budget from a quota needs to know the quota
+   * moved further than they authorized.
+   */
+  | ({
+      type: "budget:overrun";
+      /** Dollars spent above `budgetUsd`. */
+      overshootUsd: number;
+    } & CostSnapshot)
+  /**
+   * The closing document was given up on because it could not be paid for.
+   *
+   * The transcript is whole and the run is `"complete"` — nothing failed. What
+   * happened is that the chain's reserve turned out to be smaller than the
+   * synthesis it was reserving for, so rather than spend past the number it was
+   * given, the chain stops and says so. A surface should show this: a run that
+   * ends without its closing document and without an explanation is the outcome
+   * this event exists to prevent.
+   */
+  | ({
+      type: "budget:synthesis-skipped";
+      /** What the closing document was priced at, in dollars. */
+      reserveUsd: number;
+      /** Turns that did make it into the transcript. */
+      iterations: number;
+    } & CostSnapshot)
+  /** The synthesizer is about to read the transcript. */
+  | {
+      type: "synthesis:started";
+      iteration: number;
+      stopReason: StopReason;
+      at: number;
+    }
+  /** One provider delta of the closing document. */
+  | {
+      type: "synthesis:chunk";
+      text: string;
+    }
+  /**
+   * The closing document is starting over — a retry, a fallback, or a schema
+   * re-ask replayed it — so every `synthesis:chunk` already delivered is void.
+   *
+   * `turn:restarted` for the synthesizer, and it exists for the same reason: a
+   * surface that renders chunks as they arrive would otherwise show two
+   * abandoned attempts and the real document concatenated, with no boundary
+   * between them and no way to find one.
+   */
+  | {
+      type: "synthesis:restarted";
+      reason: string;
+    }
+  /**
+   * The chain moved from one phase to the next.
+   *
+   * The chain's heartbeat at chain granularity, where `turn:completed` is the
+   * heartbeat at turn granularity. Emitted on the transition only, so a
+   * surface can drive a stepper from it without deduplicating.
+   */
+  | {
+      type: "step:complete";
+      from: ChainPhase;
+      to: ChainPhase;
+      iteration: number;
+      spentUsd: number;
+    }
+  /**
+   * The chain reached a terminal phase.
+   *
+   * The last event a *chain* emits, and the one {@link Harness.run} resolves
+   * off. Not necessarily the last event a listener sees: a listener that throws
+   * while handling this one is reported back on the same stream, so an `error`
+   * with `scope: "listener"` can follow it. That report is delivered to every
+   * listener, including the one that threw.
+   */
+  | {
+      type: "chain:complete";
+      runId: string;
+      phase: Extract<ChainPhase, "complete" | "failed">;
+      stopReason: StopReason;
+      iterations: number;
+      spentUsd: number;
+      budgetUsd: number;
+      /** The closing document, or `""` when synthesis never ran or failed. */
+      synthesis: string;
+      /**
+       * Whether `synthesis` is empty because it could not be afforded, rather
+       * than because it failed or never came due.
+       */
+      synthesisSkipped: boolean;
+      transcriptPath: string;
+      jsonlPath: string;
+      at: number;
+    }
+  /**
+   * A resolver threw after its retries were exhausted — or, with
+   * `scope: "listener"`, one of this stream's own consumers threw while
+   * rendering. See {@link ErrorScope}.
+   */
+  | {
+      type: "error";
+      scope: ErrorScope;
+      message: string;
+      /** The turn this happened on; absent for synthesis and for a listener. */
+      iteration?: number;
+      at: number;
+    }
+  /**
+   * Several presets are about to run end to end.
+   *
+   * Only a composition emits the four `composition:*` events. A single run
+   * emits none of them, so a surface written against the chain events alone
+   * renders a composition correctly — it just cannot say which step it is
+   * looking at.
+   */
+  | {
+      type: "composition:started";
+      runId: string;
+      /** The preset IDs, in the order they will run. */
+      presets: string[];
+      input: string;
+      at: number;
+    }
+  /** One step is about to run. Every chain event until its pair belongs to it. */
+  | ({ type: "composition:step:started"; at: number } & CompositionStep)
+  /**
+   * One step finished, and its synthesis is about to become context for the
+   * next one.
+   */
+  | ({
+      type: "composition:step:complete";
+      stopReason: StopReason;
+      iterations: number;
+      spentUsd: number;
+      /** This step's closing document — the next step's prior context. */
+      synthesis: string;
+      transcriptPath: string;
+      jsonlPath: string;
+      at: number;
+    } & CompositionStep)
+  /**
+   * The composition stopped before its remaining steps because the ceiling
+   * across every step was used up.
+   *
+   * `step` is the one that did *not* start. What ran before it is whole — this
+   * is not a partial step, it is a step declined. A caller that needs the rest
+   * needs a larger `totalBudgetUsd`.
+   */
+  | ({
+      type: "composition:budget-exhausted";
+      runId: string;
+      /** Spend across the steps that did run. */
+      spentUsd: number;
+      /** The composition's ceiling. */
+      budgetUsd: number;
+      /** The least this step would have needed to produce a closing document. */
+      requiredUsd: number;
+      at: number;
+    } & Omit<CompositionStep, "runId">)
+  /**
+   * Every step is done. The last event a composition emits, with the same
+   * caveat `chain:complete` carries: a listener that throws while handling it
+   * is reported back on this stream afterwards.
+   */
+  | {
+      type: "composition:complete";
+      runId: string;
+      /** Steps that actually ran, which is fewer than planned after an interrupt. */
+      steps: number;
+      /** Every step's spend, summed. */
+      spentUsd: number;
+      /** The ceiling that spend ran under, across every step. */
+      budgetUsd: number;
+      /** The file holding every step's synthesis, in order. */
+      combinedPath: string;
+      /** Whether an operator stopped the composition before its last step. */
+      interrupted: boolean;
+      /** Whether steps were declined because the ceiling was used up. */
+      budgetExhausted: boolean;
+      at: number;
+    };
+
+/** What a surface hands the harness to receive {@link HarnessEvent}s. */
+export type HarnessEventSink = (event: HarnessEvent) => void;

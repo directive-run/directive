@@ -218,7 +218,7 @@ describe("createBatchQueue", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("createBatchQueue config validation", () => {

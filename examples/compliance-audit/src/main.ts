@@ -359,6 +359,35 @@ function renderLedgerEntry(e: AuditEntry): string {
         <span class="kind">subject-erased</span>
         <span>subject erased: ${e.erased} entries via filter ${escapeHtml(e.filterHash.slice(0, 8))}</span>
       </div>`;
+    case "resolver.clobber.loop.detected":
+      return `<div class="entry fail">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">clobber loop</span>
+        <span>${escapeHtml(e.fact)}: ${e.count} rejections in ${e.windowMs}ms from ${e.participants.map((p) => escapeHtml(p)).join(", ")} (${e.severity})</span>
+      </div>`;
+    case "resolver.clobber.loop.resolved":
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">clobber resolved</span>
+        <span>${escapeHtml(e.fact)}: ${escapeHtml(e.resolution)} after ${e.durationMs}ms</span>
+      </div>`;
+    case "source.attach":
+    case "source.detach":
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">${e.kind === "source.attach" ? "source attach" : "source detach"}</span>
+        <span>${escapeHtml(e.sourceId)} on ${escapeHtml(e.moduleId)}</span>
+      </div>`;
+    case "source.error":
+      return `<div class="entry fail">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">source error</span>
+        <span>${escapeHtml(e.sourceId)} (${escapeHtml(e.phase)}): ${escapeHtml(e.error)}</span>
+      </div>`;
     default: {
       // Exhaustiveness check — any new AuditEntry kind shipped from
       // core forces this default arm to widen, which the compiler
@@ -497,7 +526,7 @@ function onErase(): void {
       };
   if (result.valid) {
     const erasedCount = result.erasedSeqs?.length ?? 0;
-    // (MAJOR-3) markerEntry is null when 0 entries matched — guard the
+    // markerEntry is null when 0 entries matched — guard the
     // string interpolation so a "marker #null" never lands in the UI.
     const markerNote = markerEntry
       ? `(marker #${markerEntry.seq})`

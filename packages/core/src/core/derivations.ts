@@ -11,7 +11,16 @@
 
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
-import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  derivationDep,
+  derivationDepId,
+  describeDep,
+  isDerivationDep,
+  isTracking,
+  trackAccess,
+  withTracking,
+} from "./tracking.js";
 import type {
   DefinitionMeta,
   DerivationState,
@@ -44,8 +53,36 @@ export interface DerivationsManager<
   subscribe(ids: Array<keyof D>, listener: () => void): () => void;
   /** Get the proxy for composition */
   getProxy(): DerivedValues<S, D>;
-  /** Get dependencies for a derivation */
+  /**
+   * Get what a derivation last read, as names a human reads.
+   *
+   * Fact keys keep their key; a dependency on another derivation reads
+   * `derive.total`. Internally the two live in one string keyspace separated by
+   * a namespace prefix, and this is the only place that encoding is unwrapped —
+   * an introspection accessor should not hand back a private separator.
+   *
+   * A fresh Set each call. Nothing on a hot path reads this.
+   */
   getDependencies(id: keyof D): Set<string>;
+  /**
+   * Record that something outside the derivation graph watches this derivation.
+   *
+   * A derivation read from inside a tracking context marks itself; a derivation
+   * named in a hand-written `deps` array cannot, because nothing reads it, so
+   * the engine says so on its behalf. Monotone — a name is never unmarked while
+   * the derivation exists, because a dependency set that stopped naming it may
+   * name it again on the next run and the cost of assuming it still watches is
+   * one entry in a Set.
+   */
+  markObserved(id: string): void;
+  /**
+   * Drain the derivations that may have moved since the last drain into `out`,
+   * under {@link derivationDep} names.
+   *
+   * See {@link CreateDerivationsOptions.onInvalidate} for why this is separate
+   * from the announcement, and what it costs.
+   */
+  collectInvalidated(out: Set<string>): void;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
   /** Override an existing derivation function */
@@ -75,7 +112,19 @@ export interface CreateDerivationsOptions<
     oldValue: unknown,
     deps: string[],
   ) => void;
-  /** Callback when a derivation is invalidated */
+  /**
+   * Callback when a derivation transitions from valid to stale.
+   *
+   * Edge-triggered, and deliberately so: it reports a state *change*, which is
+   * what a log line and a devtools timeline entry are for. A derivation that is
+   * already stale has not changed state, and repeating the announcement on
+   * every fact write turns a 200-derivation graph into two thousand log lines
+   * per ten writes and evicts everything else from a devtools ring buffer.
+   *
+   * Anything that needs to know a derivation *may have moved* — which is a
+   * different question, and one whose answer repeats while the derivation stays
+   * stale — reads {@link DerivationsManager.collectInvalidated} instead.
+   */
   onInvalidate?: (id: string) => void;
   /** Callback when a derivation errors */
   onError?: (id: string, error: unknown) => void;
@@ -176,6 +225,30 @@ export function createDerivationsManager<
   // Track which derivations depend on which other derivations
   const derivedToDerivedDeps = new Map<string, Set<string>>();
 
+  /**
+   * Derivations something outside the graph watches — see
+   * {@link DerivationsManager.markObserved}.
+   *
+   * Empty is the common case and the cheap one: with nothing watching, an
+   * invalidation has no audience outside the graph and {@link collectInvalidated}
+   * does no work at all.
+   */
+  const observedIds = new Set<string>();
+
+  /**
+   * Derivations whose own dependency changed since the last drain.
+   *
+   * The roots of the "may have moved" question, recorded rather than answered:
+   * the answer is their transitive closure, and walking that costs the whole
+   * downstream graph, so it is walked once per drain instead of once per fact
+   * write — and only when something is watching. A Set of derivation IDs, so a
+   * write storm between two drains cannot make it larger than the graph.
+   */
+  const invalidationRoots = new Set<string>();
+
+  /** Set by `invalidateAll()`, which has every derivation as a root. */
+  let allInvalidated = false;
+
   // Deferred notification: during invalidation, collect IDs to notify.
   // Listeners fire AFTER all invalidations complete so they see consistent state.
   let invalidationDepth = 0;
@@ -190,32 +263,45 @@ export function createDerivationsManager<
   // ---- Shared dependency-map helpers ----
 
   /**
-   * Remove `id` from the dep-set keyed by `dep`. Deletes empty sets.
-   * Uses `states.has(dep)` (not `definitions`) because during unregister
-   * the definition may already be deleted while state still exists.
+   * Which map a tracked dependency belongs in, and under what key.
+   *
+   * The namespace decides, not a lookup. Both maps used to be selected by
+   * asking whether a *name* was also a derivation — `definitions[dep]` on the
+   * way in, `states.has(dep)` on the way out — which answers the wrong question
+   * for a module carrying a fact and a derivation of the same name. A derivation
+   * reading `facts.ready` alongside a sibling derivation named `ready` had its
+   * fact dependency filed under derivations, so changing the fact never
+   * invalidated it. The prefix says which kind the read was, at the point the
+   * read happened, and nothing downstream has to guess.
    */
+  function depMapFor(dep: string): {
+    map: Map<string, Set<string>>;
+    key: string;
+  } {
+    if (isDerivationDep(dep)) {
+      return { map: derivedToDerivedDeps, key: derivationDepId(dep) };
+    }
+
+    return { map: factToDerivedDeps, key: dep };
+  }
+
+  /** Remove `id` from the dep-set keyed by `dep`. Deletes empty sets. */
   function removeDepLink(dep: string, id: string): void {
-    const map = states.has(dep) ? derivedToDerivedDeps : factToDerivedDeps;
-    const depSet = map.get(dep);
+    const { map, key } = depMapFor(dep);
+    const depSet = map.get(key);
     depSet?.delete(id);
     if (depSet && depSet.size === 0) {
-      map.delete(dep);
+      map.delete(key);
     }
   }
 
-  /**
-   * Add `id` to the dep-set keyed by `dep`, creating the set if needed.
-   * Uses `definitions[dep]` (not `states`) because when adding a new link
-   * the definition must exist — this is the forward path during recomputation.
-   */
+  /** Add `id` to the dep-set keyed by `dep`, creating the set if needed. */
   function addDepLink(dep: string, id: string): void {
-    const map = definitions[dep as keyof D]
-      ? derivedToDerivedDeps
-      : factToDerivedDeps;
-    let depSet = map.get(dep);
+    const { map, key } = depMapFor(dep);
+    let depSet = map.get(key);
     if (!depSet) {
       depSet = new Set();
-      map.set(dep, depSet);
+      map.set(key, depSet);
     }
     depSet.add(id);
   }
@@ -228,6 +314,58 @@ export function createDerivationsManager<
     }
     for (const dep of state.dependencies) {
       removeDepLink(dep, id);
+    }
+  }
+
+  /**
+   * A derivation's definition has been replaced. Mark it stale, and carry that
+   * through to everything composed on top of it.
+   *
+   * A new function means a new value, which means every derivation that read
+   * this one is holding a value computed from the old one. Marking only this
+   * derivation leaves those caches standing and, worse, leaves a valid
+   * derivation sitting downstream of a stale one — the one shape the
+   * invalidation walk assumes cannot happen, since it stops at the stale
+   * frontier on the grounds that everything past it is stale already. From
+   * then on every walk stops here and the dependents are never woken again.
+   *
+   * Shared by the two ways a definition can be replaced — assigning over it,
+   * and registering a module whose `derive` names it — because they are the
+   * same act and diverging on either obligation is how one of them acquired
+   * this defect while the other did not.
+   *
+   * Deliberately does not touch the dependency set. Keeping it is what lets
+   * the next recompute's diff remove the links the old definition tracked;
+   * discarding it compares the new dependencies against nothing and leaves
+   * every old link in place.
+   */
+  function invalidateReplacedDefinition(id: string): void {
+    const state = states.get(id);
+    if (!state) {
+      return;
+    }
+
+    const wasStale = state.isStale;
+    state.isStale = true;
+    state.depsStable = false;
+    state.stableRunCount = 0;
+    pendingNotifications.add(id);
+    if (!wasStale) {
+      onInvalidate?.(id);
+    }
+    invalidationRoots.add(id);
+
+    invalidationDepth++;
+    try {
+      const visited = new Set<string>([id]);
+      const dependents = derivedToDerivedDeps.get(id);
+      if (dependents) {
+        for (const dependent of dependents) {
+          invalidateDerivation(dependent, visited);
+        }
+      }
+    } finally {
+      invalidationDepth--;
     }
   }
 
@@ -256,6 +394,8 @@ export function createDerivationsManager<
     listeners.delete(id);
     pendingNotifications.delete(id);
     derivationMeta.delete(id);
+    observedIds.delete(id);
+    invalidationRoots.delete(id);
   }
 
   /** Initialize state for a derivation */
@@ -341,9 +481,11 @@ export function createDerivationsManager<
       // Update dependency tracking
       updateDependencies(id, deps);
 
-      // Notify callback (guard avoids [...deps] allocation when no listener)
+      // Notify callback (guard avoids the allocation when no listener).
+      // Described, not raw: a plugin and a trace entry are both read by a
+      // person, and the namespace separator is an internal encoding.
       if (onCompute) {
-        onCompute(id, value, oldValue, [...deps]);
+        onCompute(id, value, oldValue, Array.from(deps, describeDep));
       }
 
       return value;
@@ -446,11 +588,26 @@ export function createDerivationsManager<
    *
    * Accepts an optional shared `visited` Set so that `invalidateMany` can
    * coalesce multiple root invalidations into a single traversal.
+   *
+   * **Staleness latches, so the walk stops at the stale frontier.** A derivation
+   * that is already stale has nothing to re-mark, and — because a derivation
+   * only becomes valid by reading every dependency back — everything downstream
+   * of a stale derivation is stale too. Walking through it would re-decide
+   * facts already decided, once per fact write, over the whole downstream graph.
+   *
+   * That leaves the other question — which derivations *may have moved* — which
+   * does repeat while a derivation stays stale, and which the frontier does not
+   * answer. That one is not pushed. `startId` is filed as a root and the
+   * transitive answer is computed at drain time, once per reconcile rather than
+   * once per write, and only when something is watching. See
+   * {@link DerivationsManager.collectInvalidated}.
    */
   function invalidateDerivation(
     startId: string,
     visited = new Set<string>(),
   ): void {
+    invalidationRoots.add(startId);
+
     const queue = [startId];
 
     while (queue.length > 0) {
@@ -498,8 +655,10 @@ export function createDerivationsManager<
       }
 
       // Track this derivation access so the consuming derivation
-      // records a dependency on it (enables composition invalidation)
-      trackAccess(prop);
+      // records a dependency on it (enables composition invalidation).
+      // Namespaced, so the dependency cannot be mistaken for a fact key of
+      // the same name — see DERIVATION_DEP_PREFIX.
+      trackAccess(derivationDep(prop));
 
       const state = getState(prop);
 
@@ -536,6 +695,32 @@ export function createDerivationsManager<
 
   const manager: DerivationsManager<S, D> = {
     get<K extends keyof D>(id: K): ReturnType<D[K]> {
+      // Register the access, exactly as the composition proxy does.
+      //
+      // These are two doors onto one value — `derived.total` inside a
+      // derivation body and `system.derive.total` from anywhere else — and only
+      // one of them used to record that the read happened. So a constraint
+      // whose `when()` consulted `system.derive.total` had its dependency on
+      // `total` silently dropped: it evaluated once and was never brought back,
+      // because nothing knew it cared. A no-op outside a tracking context,
+      // which is where the overwhelming majority of these reads happen.
+      //
+      // Namespaced, for the same reason the composition proxy is: a fact and a
+      // derivation may share a name, and a dependency set that could not tell
+      // them apart re-ran an effect gated on the fact whenever the derivation
+      // went stale.
+      //
+      // A read under tracking is also the definition of an outside watcher:
+      // whatever body is running had this derivation written into its
+      // dependency set, and that set is matched against the invalidation set
+      // every reconcile. A read with no tracking context — a component
+      // rendering, a test asserting — records nothing and watches nothing
+      // through this channel, so it does not mark.
+      if (isTracking()) {
+        trackAccess(derivationDep(id as string));
+        observedIds.add(id as string);
+      }
+
       const state = getState(id as string);
 
       if (state.isStale) {
@@ -587,6 +772,7 @@ export function createDerivationsManager<
 
     invalidateAll(): void {
       invalidationDepth++;
+      allInvalidated = true;
       try {
         for (const state of states.values()) {
           if (!state.isStale) {
@@ -629,18 +815,124 @@ export function createDerivationsManager<
     },
 
     getDependencies(id: keyof D): Set<string> {
-      return getState(id as string).dependencies;
+      const described = new Set<string>();
+      for (const dep of getState(id as string).dependencies) {
+        described.add(describeDep(dep));
+      }
+
+      return described;
+    },
+
+    markObserved(id: string): void {
+      observedIds.add(id);
+    },
+
+    collectInvalidated(out: Set<string>): void {
+      if (observedIds.size === 0) {
+        // Nothing outside the graph is watching, so there is no closure to
+        // compute and nothing to compute it for. The roots go, rather than
+        // accumulating for whoever watches first: a watcher starts watching by
+        // reading — a constraint's `when()`, an effect's body, an effect's
+        // `deps` resolving — and whatever it read, it read after these. Holding
+        // them back to deliver later would tell a fresh reader that a value it
+        // has just seen may have moved since.
+        invalidationRoots.clear();
+        allInvalidated = false;
+
+        return;
+      }
+
+      if (allInvalidated) {
+        for (const id of observedIds) {
+          out.add(derivationDep(id));
+        }
+        allInvalidated = false;
+        invalidationRoots.clear();
+
+        return;
+      }
+
+      if (invalidationRoots.size === 0) {
+        return;
+      }
+
+      const queue = [...invalidationRoots];
+      invalidationRoots.clear();
+      const seen = new Set(queue);
+
+      // Every watched derivation the walk can still reach is one it has not
+      // reached yet, so once it has reached all of them there is nothing left
+      // to find. `seen` makes each node arrive once, so this counts nodes, not
+      // arrivals. Turns a graph where the watched derivations sit near the
+      // changed fact into a walk of a few nodes rather than the whole cone.
+      const watched = observedIds.size;
+      let reached = 0;
+
+      while (queue.length > 0) {
+        const id = queue.pop()!;
+        if (observedIds.has(id)) {
+          out.add(derivationDep(id));
+          if (++reached >= watched) {
+            break;
+          }
+        }
+
+        const dependents = derivedToDerivedDeps.get(id);
+        if (!dependents) {
+          continue;
+        }
+        for (const dependent of dependents) {
+          if (!seen.has(dependent)) {
+            seen.add(dependent);
+            queue.push(dependent);
+          }
+        }
+      }
     },
 
     registerDefinitions(newDefs: DerivationsDef<S>): void {
       for (const [key, raw] of Object.entries(newDefs)) {
+        // Whether this key already names a live node. Registering over one is
+        // a *replacement* — the same act `assignDefinition` performs, reached
+        // through `system.registerModule` with a module whose `derive` names a
+        // derivation the system already has, which nothing refuses: the
+        // registration path checks fact-name collisions and never derivation
+        // ones.
+        //
+        // It has to be told apart from a genuinely new key, because a fresh
+        // state object is the wrong answer for a live one twice over. The old
+        // dependency set goes with it, so the diff that removes stale links on
+        // the next recompute compares against an empty set and every link the
+        // replaced definition tracked is left standing. And the node is reset
+        // to stale with nothing downstream told, which leaves a valid
+        // derivation sitting under a stale one — the one shape the
+        // invalidation walk assumes cannot happen, since it stops at the stale
+        // frontier on the grounds that everything past it is stale already.
+        // The damage is permanent rather than transient: every later walk
+        // stops at the same node, so its dependents are never woken again.
+        const replacing = states.has(key);
+
         if (typeof raw === "function") {
           (definitions as Record<string, unknown>)[key] = raw;
+          if (replacing) {
+            derivationMeta.delete(key);
+          }
         } else {
+          derivationMeta.delete(key);
           unwrapDerivationAt(key, raw);
         }
-        initState(key);
+
+        if (replacing) {
+          // Keeps the state — and with it the dependency set the diff needs —
+          // and carries the change through the graph. Exactly what assigning
+          // over the same name does, because it is the same thing happening.
+          invalidateReplacedDefinition(key);
+        } else {
+          initState(key);
+        }
       }
+
+      flushNotifications();
     },
 
     assignDefinition(
@@ -662,14 +954,7 @@ export function createDerivationsManager<
         unwrapDerivationAt(id, fn);
       }
 
-      // Mark stale so it recomputes with the new function
-      const state = states.get(id);
-      if (state) {
-        state.isStale = true;
-        state.depsStable = false;
-        state.stableRunCount = 0;
-        pendingNotifications.add(id);
-      }
+      invalidateReplacedDefinition(id);
 
       flushNotifications();
     },

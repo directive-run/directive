@@ -34,6 +34,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The knowledge package's build turns api-reference.json into
+      # api-skeleton.md, and that JSON lives in the sibling directive-docs
+      # repo, which this workflow does not check out. It used to write a
+      # five-line placeholder and exit zero when the file was missing, which
+      # is how a stub shipped in place of the entire API reference — to the
+      # knowledge package and to every skill copy inside the plugin. Nothing
+      # caught it, because the skill-sync check compares those copies against
+      # each other and identical stubs are perfectly in sync.
+      #
+      # The build now refuses to substitute a placeholder, so the release has
+      # to supply the real file. A failed fetch stops the release here rather
+      # than publishing something hollow.
+      - name: Fetch api-reference.json from latest release
+        run: .github/scripts/fetch-api-reference.sh
+
       - run: pnpm -r --filter './packages/*' build
 
       - run: pnpm -r --filter './packages/*' typecheck
@@ -116,6 +131,14 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
+
+      # This job generates the next api-reference.json, but it has to build
+      # the packages before it can, and that build needs the current one. Not
+      # circular — it reads the previous release's file and publishes a fresh
+      # one below.
+      - name: Fetch api-reference.json from latest release
+        run: .github/scripts/fetch-api-reference.sh
+
       - run: pnpm -r --filter './packages/*' build
 
       - name: Install docs tooling

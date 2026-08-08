@@ -78,7 +78,7 @@ export interface DOAlarmSourceOptions {
   /**
    * Event name to publish on every tick. Must match an event declared
    * on the module's schema (otherwise the engine drops the publish with
-   * `lastDropReason: 'invalid-event-name'` per the R6 telemetry).
+   * `lastDropReason: 'invalid-event-name'` per the drop telemetry).
    */
   eventName: string;
   /**

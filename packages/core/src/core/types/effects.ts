@@ -66,15 +66,101 @@ export type EffectCleanup = () => void;
  *   },
  * }
  * ```
+ *
+ * ## A fact dependency and a derivation dependency wake differently
+ *
+ * A fact dependency fires on a **change**. Writing `facts.userId = "u1"` when it
+ * is already `"u1"` is not a change, so the effect above does not re-run and the
+ * socket is not torn down and rebuilt.
+ *
+ * A derivation dependency fires on **possible movement**. A derivation is lazy:
+ * when the facts underneath it change, all the system knows is that its value
+ * may no longer be the cached one, and finding out costs running the derivation
+ * — which is the one thing a lazy value is not allowed to do on its own. So the
+ * effect is woken, and it is woken again on the next fact change, and the next,
+ * for as long as its inputs keep moving. The derived value staying `true`
+ * throughout does not quiet it. This is true whether the dependency is declared
+ * in `deps` or picked up by auto-tracking from a `system.derive.x` read in the
+ * body.
+ *
+ * That difference is invisible until an effect has a teardown. The socket below
+ * is closed and reopened on every heartbeat, because every heartbeat moves the
+ * facts `shouldConnect` reads even though `shouldConnect` itself never moves:
+ *
+ * @example
+ * ```typescript
+ * // Reopens on every write to `beats`.
+ * derive: { shouldConnect: (facts) => facts.userId !== "" && facts.beats >= 0 },
+ * effects: {
+ *   socket: {
+ *     deps: ["shouldConnect"],
+ *     run: () => {
+ *       const ws = new WebSocket("/ws");
+ *       return () => ws.close();
+ *     },
+ *   },
+ * }
+ * ```
+ *
+ * Guard on the value when the effect owns a resource. Read the derivation, keep
+ * what it was, and do nothing when it has not moved:
+ *
+ * @example
+ * ```typescript
+ * let connected: WebSocket | null = null;
+ *
+ * effects: {
+ *   socket: {
+ *     deps: ["shouldConnect"],
+ *     run: () => {
+ *       const shouldConnect = system.derive.shouldConnect;
+ *       if (shouldConnect === (connected !== null)) {
+ *         return; // The value did not move — leave the socket alone.
+ *       }
+ *       if (!shouldConnect) {
+ *         connected?.close();
+ *         connected = null;
+ *         return;
+ *       }
+ *       connected = new WebSocket("/ws");
+ *     },
+ *   },
+ * }
+ * ```
+ *
+ * The guard replaces the cleanup return rather than sitting beside it: a
+ * returned cleanup runs before every re-run, including the ones the guard exists
+ * to make into no-ops. That trade is the whole point, and it has a cost — the
+ * socket is now yours to close when the system stops, since nothing is holding a
+ * cleanup for it.
+ *
+ * An effect that only reads — logging, analytics, a metric — needs none of this.
  */
-export interface EffectDef<S extends Schema> {
+export interface EffectDef<
+  S extends Schema,
+  DerivationIds extends string = never,
+> {
   run(
     facts: Facts<S>,
     prev: InferSchema<S> | null,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
-  /** Optional explicit dependencies for optimization */
-  deps?: Array<keyof InferSchema<S>>;
+  /**
+   * Optional explicit dependencies for optimization.
+   *
+   * Fact keys **and** derivation IDs. A derivation is a legitimate thing for an
+   * effect to depend on — it is what auto-tracking records when the body reads
+   * one — and an async effect, whose reads happen past an `await` where
+   * auto-tracking cannot see them, has this as its only way to say so.
+   *
+   * `DerivationIds` is supplied by the module that owns the effect; standalone
+   * uses of this type get fact keys alone, which is all they have.
+   *
+   * A derivation named here wakes the effect on *possible* movement, not on a
+   * confirmed change — see the note on {@link EffectDef} above, and guard on the
+   * value if the effect owns a resource.
+   */
+  deps?: Array<(keyof InferSchema<S> & string) | DerivationIds>;
   /**
    * Optional declarative trigger — a {@link FactPredicate} that gates whether
    * `run()` fires: even when a dependency changes, the effect runs only if
@@ -89,4 +175,7 @@ export interface EffectDef<S extends Schema> {
 }
 
 /** Map of effect definitions */
-export type EffectsDef<S extends Schema> = Record<string, EffectDef<S>>;
+export type EffectsDef<
+  S extends Schema,
+  DerivationIds extends string = never,
+> = Record<string, EffectDef<S, DerivationIds>>;

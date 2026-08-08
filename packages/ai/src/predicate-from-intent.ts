@@ -42,7 +42,7 @@ import type { AgentLike, AgentRunner } from "./types.js";
 //   - `predicateHash(spec)` — synchronous djb2 of a stable-stringified
 //     predicate. Imported from `@directive-run/core` (the supported,
 //     semver-stable surface). Two semantically-identical predicates emitted
-//     with different whitespace / key-order produce the same hash. (N3)
+//     with different whitespace / key-order produce the same hash.
 //
 //   - `hashStringSha256(str)` — async SHA-256 via crypto.subtle when
 //     available, djb2 fallback otherwise. Used for `intentHash` —
@@ -137,7 +137,7 @@ export interface PredicateFromIntentOptions<_F = Record<string, unknown>> {
    */
   maxArrayOperandLength?: number;
   /**
-   * Optional `AbortSignal` for cooperative cancellation. (N6)
+   * Optional `AbortSignal` for cooperative cancellation.
    *
    * The retry loop checks `signal.aborted` between attempts AND forwards
    * the signal into the runner call itself (`runner(agent, input, { signal })`).
@@ -158,7 +158,7 @@ export interface PredicateFromIntentOptions<_F = Record<string, unknown>> {
    * When `true`, the {@link PredicateFromIntentProvenance} returned by
    * `predicateFromIntentWithProvenance` omits the raw `intent` string and
    * stores only the SHA-256 `intentHash`. Use this in PII-sensitive
-   * contexts where the original intent must not be persisted. (M6)
+   * contexts where the original intent must not be persisted.
    *
    * **Default `false` for back-compat.** For PII-sensitive deployments,
    * ALWAYS set `redactIntent: true` — the raw intent may contain
@@ -548,7 +548,7 @@ export async function predicateFromIntentRaw<F = Record<string, unknown>>(
 
     let runResult: Awaited<ReturnType<typeof runner>>;
     try {
-      // (N6) Forward the abort signal to the runner so in-flight LLM
+      // Forward the abort signal to the runner so in-flight LLM
       // calls can be cancelled mid-fetch. fetch-based adapters honor
       // this via the underlying fetch's `signal` option. Custom runners
       // that ignore the third arg fall back to between-retry cancellation.
@@ -768,7 +768,7 @@ export function predicateToolSpec(
 }
 
 // ============================================================================
-// Provenance (M24)
+// Provenance
 // ============================================================================
 
 export interface PredicateFromIntentProvenance {
@@ -793,7 +793,7 @@ export interface PredicateFromIntentProvenance {
   /**
    * SHA-256 hex hash of the sanitized intent string (or djb2 fallback
    * when `crypto.subtle` is unavailable). Always present — even when
-   * `intent` is omitted via `redactIntent`. (M6)
+   * `intent` is omitted via `redactIntent`.
    */
   readonly intentHash: string;
   /** Number of LLM calls that ran before the final predicate was accepted. */
@@ -805,7 +805,7 @@ export interface PredicateFromIntentProvenance {
    * before hashing). Two semantically-identical predicates emitted with
    * different whitespace or key order produce the SAME `predicateHash`.
    * Sufficient as a tamper-evident pointer alongside the persisted
-   * predicate. (N3)
+   * predicate.
    *
    * Renamed from `rawOutputHash` in v1.13.x — the old name hashed the
    * raw LLM output string, which made two whitespace-different responses
@@ -836,12 +836,12 @@ export interface PredicateFromIntentWithProvenanceResult<
  * Throws {@link PredicateFromIntentError} on retry exhaustion — same
  * semantics as the un-provenanced variant.
  *
- * **PII guidance (M6):** pass `redactIntent: true` to omit the raw
+ * **PII guidance:** pass `redactIntent: true` to omit the raw
  * intent from the provenance record and persist only the `intentHash`.
  * Useful when the intent itself is sensitive (medical, financial,
  * customer messages, etc.).
  *
- * **Hash semantics (N3):**
+ * **Hash semantics:**
  * - `predicateHash` hashes the VALIDATED predicate object via stable
  *   stringification — two whitespace-different LLM outputs that parse to
  *   the same predicate produce the same hash.
@@ -888,12 +888,12 @@ export async function predicateFromIntentWithProvenance<
 
   const sanitizedIntent = opts.redact ? opts.redact(opts.intent) : opts.intent;
   const model = opts.agent?.model ?? "unknown";
-  // (N3) Hash the VALIDATED predicate (stable canonical form), not the
+  // Hash the VALIDATED predicate (stable canonical form), not the
   // raw LLM output — two semantically-identical responses with different
   // whitespace / key order produce the same hash. Uses the supported
   // public `predicateHash` helper from `@directive-run/core`.
   const predicateHashValue = predicateHash(raw.predicate);
-  // (M6) Always hash the intent; raw intent string is included only when
+  // Always hash the intent; raw intent string is included only when
   // `redactIntent` is not set.
   const intentHash = await hashStringSha256(sanitizedIntent);
 

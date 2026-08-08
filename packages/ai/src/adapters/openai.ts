@@ -13,17 +13,35 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
-import type { AdapterHooks, AgentRunner } from "../types.js";
-import type { StreamingCallbackRunner } from "../types.js";
 import {
+  DEFAULT_STREAM_IDLE_MS,
+  DEFAULT_STREAM_STALL_MS,
+  createRunner,
+  createStreamDeadline,
+  validateBaseURL,
+  validateStreamTimeout,
+} from "../agent-utils.js";
+import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
+import {
+  type ModelPricing,
+  attachReportedUsage,
+  readReportedUsage,
+  toTokenPricingTable,
+} from "../pricing.js";
+import type { AdapterHooks, AgentRunner, StopReason } from "../types.js";
+import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
+import {
+  SSE_ACCEPT_HEADER,
+  anyTokenCountReported,
+  assertEventStreamResponse,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -32,34 +50,128 @@ import {
 // Pricing Constants
 // ============================================================================
 
+/** The single source of OpenAI rates. Widened below; never exported raw. */
+const OPENAI_RATES = {
+  "gpt-4.1": { input: 2, output: 8 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4-turbo": { input: 10, output: 30 },
+  "o4-mini": { input: 1.1, output: 4.4 },
+  o3: { input: 10, output: 40 },
+  "o3-mini": { input: 1.1, output: 4.4 },
+};
+
 /**
  * OpenAI model pricing (USD per million tokens).
  *
- * Use with `estimateCost()` for per-call cost tracking:
+ * Each entry carries the same two rates under both field spellings, so it works
+ * with every cost surface in the library without conversion: `.input` /
+ * `.output` for `estimateCost`, which takes a bare per-million number, and
+ * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
+ * are derived from one source, so they cannot drift.
+ *
+ * No separate cache rates are published for these models, so `withBudget`
+ * prices any cache tokens at the input rate — conservative, and never free.
+ *
+ * {@link OPENAI_TOKEN_PRICING} is an alias for this table, kept for callers
+ * that already reference it.
+ *
+ * @example
  * ```typescript
- * import { estimateCost } from '@directive-run/ai';
+ * import { estimateCost, withBudget } from '@directive-run/ai';
  * import { OPENAI_PRICING } from '@directive-run/ai/openai';
  *
+ * const rates = OPENAI_PRICING["gpt-4o"];
+ *
  * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, OPENAI_PRICING["gpt-4o"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, OPENAI_PRICING["gpt-4o"].output);
+ *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, rates.output);
+ *
+ * const guarded = withBudget(runner, {
+ *   pricing: rates,
+ *   budgets: [{ window: "day", maxCost: 10, pricing: rates }],
+ * });
  * ```
  *
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://openai.com/pricing
  */
-export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
-  {
-    "gpt-4.1": { input: 2, output: 8 },
-    "gpt-4.1-mini": { input: 0.4, output: 1.6 },
-    "gpt-4.1-nano": { input: 0.1, output: 0.4 },
-    "gpt-4o": { input: 2.5, output: 10 },
-    "gpt-4o-mini": { input: 0.15, output: 0.6 },
-    "gpt-4-turbo": { input: 10, output: 30 },
-    "o4-mini": { input: 1.1, output: 4.4 },
-    o3: { input: 10, output: 40 },
-    "o3-mini": { input: 1.1, output: 4.4 },
-  };
+export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
+  OPENAI_RATES,
+  "OPENAI_PRICING",
+);
+
+/**
+ * Alias for {@link OPENAI_PRICING} — the same object, not a copy.
+ *
+ * The two names once held different shapes, one for `estimateCost` and one for
+ * `withBudget`. They no longer do: a single widened table serves both, so
+ * whichever name a caller reaches for is the right one. This export remains so
+ * existing code keeps working.
+ */
+export const OPENAI_TOKEN_PRICING: Record<string, ModelPricing> =
+  OPENAI_PRICING;
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one OpenAI chat-completion SSE event.
+ *
+ * Shared by the streaming path of `createOpenAIRunner` and by
+ * `createOpenAIStreamingRunner` so the two cannot drift.
+ */
+/** OpenAI's `finish_reason` values, in the shared vocabulary. */
+const OPENAI_STOP_REASONS: Record<string, StopReason> = {
+  stop: "stop",
+  length: "length",
+  tool_calls: "tool_use",
+  function_call: "tool_use",
+  content_filter: "content_filter",
+};
+
+function parseOpenAIStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const choice = (event.choices as Record<string, unknown>[])?.[0];
+  const delta = choice?.delta as Record<string, unknown> | undefined;
+  if (delta?.content) {
+    result.text = delta.content as string;
+  }
+  // The completion ended. `[DONE]` says the same thing and the parser reads it
+  // directly, but gateways vary in which of the two they send.
+  if (choice?.finish_reason != null) {
+    result.terminal = true;
+    if (typeof choice.finish_reason === "string") {
+      result.rawStopReason = choice.finish_reason;
+      result.stopReason = OPENAI_STOP_REASONS[choice.finish_reason] ?? "other";
+    }
+  }
+
+  // Read the counts, not the container. A gateway that forwards
+  // `"usage":{"prompt_tokens":null,"completion_tokens":null}` has reported no
+  // usage at all; treating the object's presence as a report recorded the call
+  // as costing zero, which is the one answer that is certainly wrong.
+  if (event.usage) {
+    const usage = event.usage as Record<string, unknown>;
+    const promptTokens = readTokenCount(usage.prompt_tokens);
+    if (promptTokens !== undefined) {
+      result.inputTokens = promptTokens;
+    }
+    const completionTokens = readTokenCount(usage.completion_tokens);
+    if (completionTokens !== undefined) {
+      result.outputTokens = completionTokens;
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // OpenAI Runner
@@ -88,6 +200,20 @@ export interface OpenAIRunnerOptions {
    * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
    */
   responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
+  /**
+   * Ask the endpoint for a token-usage frame at the end of a streamed response
+   * (`stream_options: { include_usage: true }`).
+   *
+   * On by default, because without it a streamed call reports no usage at all
+   * and every ledger downstream falls back to an estimate. Turn it off for
+   * endpoints that reject the parameter rather than ignoring it: Azure OpenAI
+   * below api-version 2024-06-01 answers 400, which made every streamed call
+   * through such a deployment fail outright with no way to ask for anything
+   * else.
+   *
+   * @default true
+   */
+  includeUsage?: boolean;
 }
 
 /**
@@ -121,6 +247,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
     baseURL = "https://api.openai.com/v1",
     fetch: fetchFn = globalThis.fetch,
     timeoutMs,
+    includeUsage = true,
     hooks,
     temperature,
     topP,
@@ -139,12 +266,13 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
+    buildRequest: (agent, _input, messages, stream) => ({
       url: `${baseURL}/chat/completions`,
       init: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(stream ? { Accept: SSE_ACCEPT_HEADER } : {}),
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
@@ -162,6 +290,17 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
               : []),
             ...messages.map((m) => ({ role: m.role, content: m.content })),
           ],
+          // Omitted entirely when buffering, so the non-streaming request
+          // stays byte-for-byte what it was. `include_usage` keeps the token
+          // breakdown available on the streaming path.
+          ...(stream
+            ? {
+                stream: true,
+                ...(includeUsage
+                  ? { stream_options: { include_usage: true } }
+                  : {}),
+              }
+            : {}),
         }),
         ...(timeoutMs != null
           ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -173,13 +312,32 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
       const text = data.choices?.[0]?.message?.content ?? "";
       const inputTokens = data.usage?.prompt_tokens ?? 0;
       const outputTokens = data.usage?.completion_tokens ?? 0;
+      const finishReason = data.choices?.[0]?.finish_reason;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        ...(typeof finishReason === "string"
+          ? {
+              rawStopReason: finishReason,
+              stopReason: OPENAI_STOP_REASONS[finishReason] ?? "other",
+            }
+          : {}),
+        // Gateways that strip `usage` – or null out the counts inside it –
+        // leave zeros behind; say so rather than letting cost tracking read
+        // the response as free.
+        usageReported: anyTokenCountReported(
+          data.usage?.prompt_tokens,
+          data.usage?.completion_tokens,
+        ),
       };
+    },
+    streaming: {
+      adapterName: "OpenAI",
+      parseEvent: parseOpenAIStreamEvent,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -282,6 +440,42 @@ export interface OpenAIStreamingRunnerOptions {
    * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
    */
   responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
+  /**
+   * How long the stream may say nothing at all – not even a keep-alive – before
+   * the call is abandoned, in milliseconds.
+   *
+   * The gap between events, not the length of the call: a streamed response runs
+   * for as long as the model has something to say, so a wall-clock cap either
+   * truncates a long answer or bounds nothing. A stalled stream fails with an
+   * error named `"TimeoutError"`. `Infinity` disables it.
+   *
+   * @default 120_000
+   */
+  timeoutMs?: number;
+  /**
+   * How long the stream may stay alive and produce nothing, in milliseconds.
+   *
+   * Keep-alives do not restart this clock, which is the point of it: a provider
+   * wedged behind a queue keeps its connection warm indefinitely. `Infinity`
+   * disables it.
+   *
+   * @default 600_000
+   */
+  contentTimeoutMs?: number;
+  /**
+   * Ask the endpoint for a token-usage frame at the end of a streamed response
+   * (`stream_options: { include_usage: true }`).
+   *
+   * On by default, because without it a streamed call reports no usage at all
+   * and every ledger downstream falls back to an estimate. Turn it off for
+   * endpoints that reject the parameter rather than ignoring it: Azure OpenAI
+   * below api-version 2024-06-01 answers 400, which made every streamed call
+   * through such a deployment fail outright with no way to ask for anything
+   * else.
+   *
+   * @default true
+   */
+  includeUsage?: boolean;
 }
 
 /**
@@ -308,6 +502,9 @@ export function createOpenAIStreamingRunner(
     maxTokens,
     baseURL = "https://api.openai.com/v1",
     fetch: fetchFn = globalThis.fetch,
+    timeoutMs = DEFAULT_STREAM_IDLE_MS,
+    contentTimeoutMs = DEFAULT_STREAM_STALL_MS,
+    includeUsage = true,
     hooks,
     temperature,
     topP,
@@ -317,6 +514,12 @@ export function createOpenAIStreamingRunner(
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createOpenAIStreamingRunner");
+  validateStreamTimeout(timeoutMs, "createOpenAIStreamingRunner");
+  validateStreamTimeout(
+    contentTimeoutMs,
+    "createOpenAIStreamingRunner",
+    "contentTimeoutMs",
+  );
 
   const resolvedResponseFormat =
     responseFormat === "json"
@@ -325,12 +528,24 @@ export function createOpenAIStreamingRunner(
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
+    // `createStreamDeadline` was always provider-agnostic; it simply had not
+    // been adopted here. A streamed OpenAI call had nothing but the caller's
+    // own signal between it and a connection that stays open and silent.
+    const deadline = createStreamDeadline(
+      timeoutMs,
+      callbacks.signal,
+      "OpenAI",
+      {
+        contentMs: contentTimeoutMs,
+      },
+    );
 
     try {
       const response = await fetchFn(`${baseURL}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: SSE_ACCEPT_HEADER,
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
@@ -349,47 +564,29 @@ export function createOpenAIStreamingRunner(
             { role: "user", content: input },
           ],
           stream: true,
-          stream_options: { include_usage: true },
+          ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
         }),
-        signal: callbacks.signal,
+        signal: deadline.signal,
       });
+      deadline.progress();
 
       if (!response.ok) {
         await throwStreamingHTTPError(response, "OpenAI");
       }
+      await assertEventStreamResponse(response, "OpenAI");
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
+      const totals = await parseEventStream(
         reader,
         callbacks.onToken,
-        (event) => {
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-
-          const delta = (event.choices as Record<string, unknown>[])?.[0]
-            ?.delta as Record<string, unknown> | undefined;
-          if (delta?.content) {
-            result.text = delta.content as string;
-          }
-
-          if (event.usage) {
-            result.inputTokens =
-              ((event.usage as Record<string, unknown>)
-                .prompt_tokens as number) ?? 0;
-            result.outputTokens =
-              ((event.usage as Record<string, unknown>)
-                .completion_tokens as number) ?? 0;
-          }
-
-          return result;
-        },
+        parseOpenAIStreamEvent,
         "OpenAI",
+        "sse",
+        { signal: deadline.signal, deadline, requireTerminalEvent: true },
       );
 
+      const { fullText, inputTokens, outputTokens, usageReported } = totals;
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
 
@@ -404,11 +601,26 @@ export function createOpenAIStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+        {
+          stopReason: totals.stopReason,
+          rawStopReason: totals.rawStopReason,
+        },
+      );
     } catch (err) {
-      fireErrorHook(hooks, agent, input, err, startTime);
+      const error = deadline.expired
+        ? attachReportedUsage(deadline.reason, readReportedUsage(err))
+        : err;
+      fireErrorHook(hooks, agent, input, error, startTime);
 
-      throw err;
+      throw error;
+    } finally {
+      deadline.release();
     }
   };
 }

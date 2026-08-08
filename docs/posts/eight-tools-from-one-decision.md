@@ -85,7 +85,7 @@ Eleven hundred LOC for the data layer + plugin + React hook. Two days. Same pred
 
 It proves nothing new. The positioning post said: predicates are data, every consumer of the data participates, future tools are an afternoon of code. This release is two more afternoons.
 
-The first follow-up was the audit ledger. We had RFC-0003's `factsBaseline`, RFC-0004's data predicates, and R4.E's `whenExplain` – all the ingredients. The ledger is the tree-walker that captures them, plus a query API, plus a hash chain. The hard work was done before this sprint started; the ledger is what falls out when you ask "what's the smallest plugin that captures this data?"
+The first follow-up was the audit ledger. We had RFC-0003's `factsBaseline`, RFC-0004's data predicates, and `whenExplain` – all the ingredients. The ledger is the tree-walker that captures them, plus a query API, plus a hash chain. The hard work was done before this sprint started; the ledger is what falls out when you ask "what's the smallest plugin that captures this data?"
 
 The second was `predicateFromIntent`. We had the operator-set as a closed Zod-style enum, `validatePredicate` (structural), and the type-level `OperatorObject<V>` matrix encoding "which operators are valid on which kinds." The new piece is the *runtime* version of that matrix (`getOperatorsForKind`), plus a prompt builder, plus retry-with-feedback. Two days. Same predicate, fourth consumer.
 

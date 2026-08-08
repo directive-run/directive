@@ -157,7 +157,7 @@ describe("createAuditLedger — query API", () => {
     system.destroy();
   });
 
-  it("changedBetween filter parses ISO strings strictly (SEC M2)", () => {
+  it("changedBetween filter parses ISO strings strictly", () => {
     const sink = memorySink();
     for (let i = 0; i < 5; i++) {
       sink.write({
@@ -202,7 +202,7 @@ describe("createAuditLedger — query API", () => {
 });
 
 // ============================================================================
-// Capacity-bound ring buffer (SEC C3 for memory; SQLite is a separate sink)
+// Capacity-bound ring buffer (memory sink; SQLite is a separate sink)
 // ============================================================================
 
 describe("memorySink — bounded capacity", () => {
@@ -258,9 +258,9 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.destroy();
   });
 
-  it("verify() catches a tampered entry via a sink-level swap (SEC C1: stableStringify canonicalization)", async () => {
+  it("verify() catches a tampered entry via a sink-level swap (stableStringify canonicalization)", async () => {
     // Entries are now frozen at write time, so in-process mutation
-    // throws — see the "freezes entries at write time (C3)" test below.
+    // throws — see the "freezes entries at write time" test below.
     // To exercise the verify() tamper path, we install a sink wrapper
     // that swaps a payload at query time (modeling persisted-bytes
     // tampering on the way back from disk).
@@ -316,7 +316,7 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.destroy();
   });
 
-  it("verify({ strong: true }) THROWS — reserved for v2, no silent no-op (C1)", async () => {
+  it("verify({ strong: true }) THROWS — reserved for v2, no silent no-op", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -404,7 +404,7 @@ describe("createAuditLedger — plugin lifecycle", () => {
 });
 
 // ============================================================================
-// PII redaction (SEC M1)
+// PII redaction
 // ============================================================================
 
 describe("createAuditLedger — PII redaction", () => {
@@ -479,10 +479,10 @@ describe("createAuditLedger — PII redaction", () => {
 });
 
 // ============================================================================
-// R1 fixes — C2 whenSpec PII redaction
+// whenSpec PII redaction
 // ============================================================================
 
-describe("createAuditLedger — whenSpec PII operand redaction (C2)", () => {
+describe("createAuditLedger — whenSpec PII operand redaction", () => {
   function piiConstraintModule() {
     return createModule("pii-when", {
       schema: {
@@ -569,10 +569,10 @@ describe("createAuditLedger — whenSpec PII operand redaction (C2)", () => {
 });
 
 // ============================================================================
-// R1 fixes — C3 immutable entries
+// immutable entries
 // ============================================================================
 
-describe("createAuditLedger — frozen entries (C3)", () => {
+describe("createAuditLedger — frozen entries", () => {
   it("freezes entries at write time — in-process mutation throws", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -623,10 +623,10 @@ describe("createAuditLedger — frozen entries (C3)", () => {
 });
 
 // ============================================================================
-// R1 fixes — C4 whenSpec cache invalidation on assign()
+// whenSpec cache invalidation on assign()
 // ============================================================================
 
-describe("createAuditLedger — whenSpec cache refreshes on assign (C4)", () => {
+describe("createAuditLedger — whenSpec cache refreshes on assign", () => {
   it("captures the NEW whenSpec after constraints.assign(), not the stale one", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -682,10 +682,10 @@ describe("createAuditLedger — whenSpec cache refreshes on assign (C4)", () => 
 });
 
 // ============================================================================
-// R1 fixes — C8 erase()
+// erase()
 // ============================================================================
 
-describe("createAuditLedger — per-subject erase() (C8)", () => {
+describe("createAuditLedger — per-subject erase()", () => {
   it("replaces matching entries with tombstones and emits a chained marker", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -701,7 +701,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     const before = ledger.forFact("cartTotal").length;
     expect(before).toBeGreaterThan(0);
 
-    // (M7) erase returns `markerEntry` (the chained summary), not
+    // erase returns `markerEntry` (the chained summary), not
     // `tombstone` — N per-entry tombstones live in the sink itself.
     const { erased, markerEntry } = ledger.erase({ factPath: "cartTotal" });
     expect(erased).toBeGreaterThan(0);
@@ -719,7 +719,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     system.destroy();
   });
 
-  it("verify() recognizes tombstones as legitimate breaks (N1 + M1)", async () => {
+  it("verify() recognizes tombstones as legitimate breaks", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -758,7 +758,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     system.destroy();
   });
 
-  it("verify() still detects REAL tamper even when tombstones are present (N1)", async () => {
+  it("verify() still detects REAL tamper even when tombstones are present", async () => {
     // Use a sink wrapper to simulate persisted-bytes tampering on an
     // entry that has nothing to do with erasure.
     const realSink = memorySink();
@@ -819,7 +819,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     system.destroy();
   });
 
-  it("verify() throws on unknown hashAlgo discriminator (N5)", () => {
+  it("verify() throws on unknown hashAlgo discriminator", () => {
     const sink = memorySink();
     // Genesis entry with a bogus hashAlgo.
     sink.write({
@@ -837,7 +837,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     expect(() => ledger.verify()).toThrow(/unknown hashAlgo/i);
   });
 
-  it("erase marker uses filterHash + filterShape — no raw PII (N2)", async () => {
+  it("erase marker uses filterHash + filterShape — no raw PII", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -846,9 +846,9 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     system.start();
     await new Promise((r) => setTimeout(r, 0));
     // Mutate the PII-suggestively-named field to guarantee the filter
-    // matches at least one entry; under MAJOR-3 semantics, a 0-match
-    // erase emits no marker. We still verify the raw filter value
-    // never lands in the marker payload.
+    // matches at least one entry — a 0-match erase emits no marker at
+    // all, so there would be nothing to inspect. We still verify the raw
+    // filter value never lands in the marker payload.
     system.facts.cartTotal = 100;
     system.facts.region = "EU";
     await new Promise((r) => setTimeout(r, 0));
@@ -877,7 +877,7 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     system.destroy();
   });
 
-  it("erase marker filterShape marks changedBetween as '[range]' without values (N2)", async () => {
+  it("erase marker filterShape marks changedBetween as '[range]' without values", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -901,10 +901,10 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
 });
 
 // ============================================================================
-// R1 fixes — M9 snapshot / history navigate lifecycle
+// snapshot / history navigate lifecycle
 // ============================================================================
 
-describe("createAuditLedger — snapshot / history.navigate lifecycle (M9)", () => {
+describe("createAuditLedger — snapshot / history.navigate lifecycle", () => {
   it("captures system.snapshot when a snapshot is taken", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -960,7 +960,7 @@ describe("createAuditLedger — snapshot / history.navigate lifecycle (M9)", () 
 });
 
 // ============================================================================
-// R1 fixes — M22 function-form whenSource
+// function-form whenSource
 // ============================================================================
 
 describe("createAuditLedger — function-form whenSource (M22, N5)", () => {
@@ -1074,10 +1074,10 @@ describe("createAuditLedger — function-form whenSource (M22, N5)", () => {
 });
 
 // ============================================================================
-// R1 fixes — M23 truncation marker
+// truncation marker
 // ============================================================================
 
-describe("createAuditLedger — truncation marker (M23)", () => {
+describe("createAuditLedger — truncation marker", () => {
   it("emits system.truncated BEFORE the oldest entry is dropped", async () => {
     // Tight capacity so we overflow on a small number of entries.
     const sink = memorySink({ capacity: 4 });
@@ -1104,10 +1104,10 @@ describe("createAuditLedger — truncation marker (M23)", () => {
 });
 
 // ============================================================================
-// R1 fixes — M26 hashAlgo on every entry
+// hashAlgo on every entry
 // ============================================================================
 
-describe("createAuditLedger — hashAlgo canonicalization tag (M26)", () => {
+describe("createAuditLedger — hashAlgo canonicalization tag", () => {
   it("stamps hashAlgo: 'djb2-1' on every entry", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -1130,10 +1130,10 @@ describe("createAuditLedger — hashAlgo canonicalization tag (M26)", () => {
 });
 
 // ============================================================================
-// R3 fixes — F-5 schemaVersion on every entry
+// schemaVersion on every entry
 // ============================================================================
 
-describe("createAuditLedger — schemaVersion (F-5)", () => {
+describe("createAuditLedger — schemaVersion", () => {
   it("stamps schemaVersion: 1 on every entry", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
@@ -1178,7 +1178,7 @@ describe("createAuditLedger — schemaVersion (F-5)", () => {
 });
 
 // ============================================================================
-// R3 fixes — N7 tombstone forgery detection via internal sentinel
+// tombstone forgery detection via internal sentinel
 // ============================================================================
 
 describe("createAuditLedger — N7 tombstone forgery detection", () => {
@@ -1201,7 +1201,7 @@ describe("createAuditLedger — N7 tombstone forgery detection", () => {
 
     // Attacker holding a `sink` reference forges a tombstone entry
     // directly — exactly the pattern that would mask real tampering as
-    // legitimate erasure under R1/R2 semantics.
+    // legitimate erasure under current semantics.
     sink.write({
       seq: 99,
       ts: Date.now(),
@@ -1278,7 +1278,7 @@ describe("createAuditLedger — N7 tombstone forgery detection", () => {
 });
 
 // ============================================================================
-// R3 fixes — erasedSeqs deduplication for adjacent tombstones (Sec MAJOR)
+// erasedSeqs deduplication for adjacent tombstones
 // ============================================================================
 
 describe("createAuditLedger — erasedSeqs dedupes adjacent tombstones", () => {
@@ -1312,10 +1312,10 @@ describe("createAuditLedger — erasedSeqs dedupes adjacent tombstones", () => {
 });
 
 // ============================================================================
-// R3 fixes — MAJOR-3 erase 0-match guard
+// erase() 0-match guard
 // ============================================================================
 
-describe("createAuditLedger — MAJOR-3 erase 0-match guard", () => {
+describe("createAuditLedger — erase() 0-match guard", () => {
   it("erase() with no matches returns { erased: 0, markerEntry: null } and emits no marker", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({

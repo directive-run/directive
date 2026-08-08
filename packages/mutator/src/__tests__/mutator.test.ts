@@ -158,7 +158,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R1 sec C1: prototype-pollution kinds are rejected, not invoked", async () => {
+  it("prototype-pollution kinds are rejected, not invoked", async () => {
     const sys = buildSystem({ submit: async (v) => v });
     // Bypass the typed mutate() helper to simulate a hostile dispatch.
     sys.events.MUTATE({
@@ -180,7 +180,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R1 sec C1: __proto__ kind is rejected without invoking inherited", async () => {
+  it("__proto__ kind is rejected without invoking inherited", async () => {
     const sys = buildSystem({ submit: async (v) => v });
     sys.events.MUTATE({
       kind: "__proto__" as never,
@@ -197,7 +197,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R1 sec C1: even if Object.prototype is polluted, lookup is rejected", async () => {
+  it("even if Object.prototype is polluted, lookup is rejected", async () => {
     const polluted = "__polluted__";
     (Object.prototype as Record<string, unknown>)[polluted] = () => {
       throw new Error("polluted handler invoked!");
@@ -222,7 +222,7 @@ describe("@directive-run/mutator", () => {
     }
   });
 
-  it("R1 sec C2: long error messages are truncated to 500 chars", async () => {
+  it("long error messages are truncated to 500 chars", async () => {
     const longMessage = "x".repeat(2_000);
     const sys = buildSystem({
       submit: async () => {
@@ -242,7 +242,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R1 sec M5: in-flight mutation that is superseded does not get nulled by completing handler", async () => {
+  it("in-flight mutation that is superseded does not get nulled by completing handler", async () => {
     let release: (() => void) | undefined;
     const slowSubmit = vi.fn(
       () =>
@@ -268,7 +268,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R2 sec M-R2-1: non-Error throws are coerced safely", async () => {
+  it("non-Error throws are coerced safely", async () => {
     const sys = buildSystem({
       submit: async () => {
         // eslint-disable-next-line @typescript-eslint/no-throw-literal
@@ -283,7 +283,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R2 sec M-R2-1: Error with non-string .message does not crash truncateError", async () => {
+  it("Error with non-string .message does not crash truncateError", async () => {
     const sys = buildSystem({
       submit: async () => {
         const e = new Error();
@@ -306,7 +306,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R4 backlog: Error subclass with throwing message getter does not escape", async () => {
+  it("Error subclass with throwing message getter does not escape", async () => {
     class HostileError extends Error {
       override get message(): string {
         throw new Error("getter is hostile");
@@ -330,7 +330,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R2 sec M-R2-1: object thrown values coerce without crash", async () => {
+  it("object thrown values coerce without crash", async () => {
     const sys = buildSystem({
       submit: async () => {
         // eslint-disable-next-line @typescript-eslint/no-throw-literal
@@ -348,7 +348,7 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
-  it("R1: explicit 'failed' status is in the type union", () => {
+  it("explicit 'failed' status is in the type union", () => {
     // Type-level check — TS would catch removing 'failed' from the union.
     const failed: "pending" | "running" | "failed" = "failed";
     expect(failed).toBe("failed");

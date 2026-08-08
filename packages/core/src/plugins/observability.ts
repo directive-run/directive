@@ -34,6 +34,8 @@
  * ```
  */
 
+import { normalizeTokenUsage, readOwnNumber } from "./token-usage.js";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -797,12 +799,15 @@ export function createObservability(
  * const obs = createObservability({ serviceName: 'my-service' });
  * const agentMetrics = createAgentMetrics(obs);
  *
- * // Track an agent run
+ * // Track an agent run. Spreading a runner's `tokenUsage` in works directly —
+ * // `inputTokens` is only the uncached remainder on providers that cache.
  * agentMetrics.trackRun('support-agent', {
  *   success: true,
  *   latencyMs: 1500,
  *   inputTokens: 100,
  *   outputTokens: 500,
+ *   cacheReadTokens: 12_000,
+ *   cacheWriteTokens: 0,
  *   cost: 0.05,
  * });
  * ```
@@ -816,6 +821,22 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
         latencyMs: number;
         inputTokens?: number;
         outputTokens?: number;
+        /**
+         * Tokens read from the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheReadTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheWriteTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, under Anthropic's wire
+         * spelling. A documented alias of `cacheWriteTokens`, resolved by
+         * {@link normalizeTokenUsage} like everywhere else — supply either.
+         */
+        cacheCreationTokens?: number;
         cost?: number;
         toolCalls?: number;
       },
@@ -830,27 +851,53 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
 
       obs.observeHistogram("agent.latency", result.latencyMs, labels);
 
-      if (result.inputTokens !== undefined) {
-        obs.incrementCounter("agent.tokens.input", labels, result.inputTokens);
-        obs.incrementCounter("agent.tokens", labels, result.inputTokens);
+      // The token counts are read through the shared normalizer, so this
+      // surface accepts exactly the shapes every other token consumer accepts.
+      // It previously read `cacheWriteTokens` only, while every shipped adapter
+      // emits `cacheCreationTokens`, and a cached run under-reported by its
+      // whole cached prefix with nothing to indicate it.
+      const tokens = normalizeTokenUsage(result);
+
+      /**
+       * Add one caller-supplied amount to a cumulative counter, or drop it.
+       *
+       * Counters are cumulative, so one poisoned addend is permanent: a `NaN`
+       * turns every later reading of that counter into `NaN`, and an
+       * `Infinity` pins it there for the life of the process. Neither can be
+       * subtracted back out.
+       */
+      function addToCounter(metric: string, amount: number | undefined): void {
+        if (amount === undefined || !Number.isFinite(amount) || amount < 0) {
+          return;
+        }
+        obs.incrementCounter(metric, labels, amount);
       }
 
-      if (result.outputTokens !== undefined) {
-        obs.incrementCounter(
-          "agent.tokens.output",
-          labels,
-          result.outputTokens,
-        );
-        obs.incrementCounter("agent.tokens", labels, result.outputTokens);
+      /** Token classes also roll up into the combined `agent.tokens` counter. */
+      function countTokens(metric: string, count: number | undefined): void {
+        addToCounter(metric, count);
+        addToCounter("agent.tokens", count);
       }
 
-      if (result.cost !== undefined) {
-        obs.incrementCounter("agent.cost", labels, result.cost);
-      }
+      countTokens("agent.tokens.input", tokens.inputTokens);
+      countTokens("agent.tokens.output", tokens.outputTokens);
 
-      if (result.toolCalls !== undefined) {
-        obs.incrementCounter("agent.tool_calls", labels, result.toolCalls);
-      }
+      // Cache tokens count toward `agent.tokens` alongside input and output.
+      // On a provider that reports cache usage, `inputTokens` is the *uncached
+      // remainder*, so a run that reads a large cached prefix looks like a tiny
+      // run when only input and output are counted — the same under-reporting
+      // the cost ledger carried before cache classes were priced.
+      countTokens("agent.tokens.cache_read", tokens.cacheReadTokens);
+      countTokens("agent.tokens.cache_write", tokens.cacheWriteTokens);
+
+      // `cost` and `toolCalls` are read through the same own-property-gated
+      // reader as the token counts, and validated the same way. They sat three
+      // lines below the token guard reading `result.cost` bare, which is how a
+      // polluted `Object.prototype.cost` came to sum `1e308` into `agent.cost`
+      // on a call that reported no cost at all, and a `NaN` came to make the
+      // aggregate unreadable for the life of the process.
+      addToCounter("agent.cost", readOwnNumber(result, "cost"));
+      addToCounter("agent.tool_calls", readOwnNumber(result, "toolCalls"));
     },
 
     trackGuardrail(

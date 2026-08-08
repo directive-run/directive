@@ -481,7 +481,7 @@ describe("constraint `when` — $changed rejected unconditionally", () => {
 // regression: event { handler + patch } conflict dev-warn
 // ============================================================================
 
-describe("event handler + patch conflict (DX-R2)", () => {
+describe("event handler + patch conflict", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});

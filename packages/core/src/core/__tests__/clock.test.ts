@@ -115,7 +115,7 @@ describe("virtualClock", () => {
 });
 
 describe("defaultClock", () => {
-  it("returns a real clock — auto-detection removed (R1 sec M8)", () => {
+  it("returns a real clock — auto-detection removed", () => {
     const c = defaultClock();
     expect(typeof c.now).toBe("function");
     expect(typeof c.setTimeout).toBe("function");
@@ -130,7 +130,7 @@ describe("defaultClock", () => {
   });
 });
 
-describe("virtualClock — R1 sec C3 re-entrancy guard", () => {
+describe("virtualClock — re-entrancy guard", () => {
   it("a callback that schedules into the past does NOT pull nowMs backward", () => {
     const c = virtualClock(0);
     const observations: number[] = [];

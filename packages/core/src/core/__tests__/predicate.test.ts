@@ -257,11 +257,11 @@ describe("evaluatePredicate — edge cases", () => {
 // fix: deepEqual + $contains for Set / Map
 // ============================================================================
 
-// Before R2, `Object.keys(new Set(...)).length` was always `0`, so the
+// Previously, `Object.keys(new Set(...)).length` was always `0`, so the
 // final `keys.length === 0` short-circuit treated *any* two Sets (or any
 // two Maps) as equal regardless of contents. This corrupted $eq/$ne/$in/$nin
 // against Set/Map facts.
-describe("deepEqual handles Set and Map (S-R2-Set)", () => {
+describe("deepEqual handles Set and Map", () => {
   it("two empty Sets compare equal", () => {
     expect(evaluatePredicate({ s: { $eq: new Set() } }, { s: new Set() })).toBe(
       true,
@@ -396,7 +396,7 @@ describe("extractDeps", () => {
 });
 
 // ============================================================================
-// walkPredicate — shared structural visitor (R5 FIX 4)
+// walkPredicate — shared structural visitor
 // ============================================================================
 
 describe("walkPredicate", () => {
@@ -1153,10 +1153,10 @@ describe("evaluateTemplate prototype walk hardening", () => {
 });
 
 // ============================================================================
-// R2 — freezeSpec helper
+// freezeSpec helper
 // ============================================================================
 
-describe("R2 — freezeSpec helper", () => {
+describe("freezeSpec helper", () => {
   it("freezeSpec deeply freezes a nested object", () => {
     const spec = { a: { b: { c: 1 } }, arr: [{ x: 2 }] };
     const out = freezeSpec(spec);
@@ -1226,10 +1226,10 @@ describe("attributeError", () => {
 });
 
 // ============================================================================
-// R2 — isEmptyOrConfigPredicate
+// isEmptyOrConfigPredicate
 // ============================================================================
 
-describe("R2 — isEmptyOrConfigPredicate", () => {
+describe("isEmptyOrConfigPredicate", () => {
   it("returns true for empty `{}`", () => {
     expect(isEmptyOrConfigPredicate({})).toBe(true);
   });
@@ -1357,10 +1357,11 @@ describe("validatePredicate", () => {
     ).toThrow(/\$matches operand .* must be a RegExp/);
   });
 
-  // R6 FIX 1 — operand recursion. R5's walkPredicate hands the whole operand
-  // opaquely to the operator callback; checkOperand must recurse into a
-  // plain-object / array operand to catch a bigint/Set/Map/RegExp nested
-  // anywhere inside it (the R4 standalone validator did this).
+  // Operand recursion. `walkPredicate` hands the whole operand opaquely to
+  // the operator callback, so `checkOperand` must recurse into a plain-object
+  // / array operand to catch a bigint/Set/Map/RegExp nested anywhere inside
+  // it. A shallow check only inspects the operand's own type and lets a
+  // non-serializable value one level down pass validation.
   it("throws on a Set nested inside an $eq object operand", () => {
     expect(() =>
       validatePredicate({ f: { $eq: { nested: new Set() } } }),
@@ -1408,7 +1409,7 @@ describe("validatePredicate", () => {
 });
 
 // ============================================================================
-// Cycle / depth guards — predicate spec recursion (R4 FIX 2/3/4)
+// Cycle / depth guards — predicate spec recursion
 // ============================================================================
 
 describe("predicate spec cycle/depth guards", () => {
@@ -1550,8 +1551,8 @@ describe("predicate spec cycle/depth guards", () => {
   });
 
   it("a cyclic spec passes registration but evaluates to false", async () => {
-    // R4-FIX2 made containsChangedOperator cycle-safe, so registration
-    // succeeds. R4-FIX4's depth cap then defends evaluation.
+    // containsChangedOperator is cycle-safe, so registration
+    // succeeds. The depth cap then defends evaluation.
     const cyclic: Record<string, unknown> = { active: true };
     cyclic.loop = cyclic;
 
@@ -1586,7 +1587,7 @@ describe("predicate spec cycle/depth guards", () => {
 // M1 — validatePredicateAgainstSchema maxArrayOperandLength
 // ============================================================================
 
-describe("validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength (M1)", () => {
+describe("validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength", () => {
   const kindMap = getSchemaFieldKinds({
     facts: {
       region: t.string(),
@@ -1643,7 +1644,7 @@ describe("validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength (M
 // M2 — dangerousRegex + $matches ReDoS rejection
 // ============================================================================
 
-describe("dangerousRegex — nested-quantifier heuristic (M2)", () => {
+describe("dangerousRegex — nested-quantifier heuristic", () => {
   it("flags (a+)+", () => {
     expect(dangerousRegex("(a+)+")).toBe(true);
   });
@@ -1667,7 +1668,7 @@ describe("dangerousRegex — nested-quantifier heuristic (M2)", () => {
   });
 });
 
-describe("validatePredicateAgainstSchema — $matches ReDoS rejection (M2)", () => {
+describe("validatePredicateAgainstSchema — $matches ReDoS rejection", () => {
   const kindMap = getSchemaFieldKinds({
     facts: { name: t.string() },
   });

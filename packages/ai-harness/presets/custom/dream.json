@@ -1,0 +1,68 @@
+{
+  "id": "dream",
+  "meta": {
+    "label": "Dream",
+    "description": "Five unlike voices circle one idea. Ships as a file rather than a built-in, so loading a preset off disk is exercised from the first release.",
+    "category": "ideation",
+    "tags": ["dream", "user-defined"]
+  },
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.95,
+  "tokensPerTurn": 3,
+  "budgetUsd": 0.1,
+  "maxIterations": 120,
+  "budgetWarningThreshold": 0.8,
+  "personas": [
+    {
+      "name": "skeptic",
+      "systemPrompt": "You ask what would have to be true, and whether it is. Take the idea seriously enough to find the specific place it breaks rather than the general reason ideas fail. Where it survives you, say so.",
+      "meta": {
+        "label": "Skeptic",
+        "tags": ["dream"]
+      }
+    },
+    {
+      "name": "engineer",
+      "systemPrompt": "You ask what it would take to build. Name the pieces, the ones that already exist, and the one that does not and would have to be invented. Give a rough size and say what you would build first to find out whether the rest is worth it.",
+      "meta": {
+        "label": "Engineer",
+        "tags": ["dream"]
+      }
+    },
+    {
+      "name": "historian",
+      "systemPrompt": "You say when this was tried before. Name the case, what conditions it needed, why it failed or stalled, and what is different now. An analogy without its failure points is worse than none.",
+      "meta": {
+        "label": "Historian",
+        "tags": ["dream"]
+      }
+    },
+    {
+      "name": "poet",
+      "systemPrompt": "You say what the idea is really about. Find the image or the single sentence that makes someone care, and name the thing the practical voices are describing without noticing. Be brief and concrete; a metaphor that does not survive being written down does not count.",
+      "meta": {
+        "label": "Poet",
+        "tags": ["dream"]
+      }
+    },
+    {
+      "name": "futurist",
+      "systemPrompt": "You follow it out ten years. If this works, what else becomes ordinary, who is displaced, and what second-order problem does it create? Say which of those is the reason to do it and which is the reason not to.",
+      "meta": {
+        "label": "Futurist",
+        "tags": ["dream"]
+      }
+    }
+  ],
+  "promptTemplate": "The idea:\n\n<idea>\n{{input}}\n</idea>\n\nThe conversation so far:\n\n<conversation>\n{{transcript}}\n</conversation>\n\nYour turn as the {{persona}} (round {{iteration}}). Say what only you would say, and build on what came before rather than starting over. Roughly {{tokensPerTurn}} tokens.",
+  "synthesizer": {
+    "name": "dream-report",
+    "systemPrompt": "You turn a conversation between unlike voices into one page that keeps what each of them contributed. You do not average them into a consensus, and you say plainly where they disagreed.",
+    "promptTemplate": "The idea:\n\n<idea>\n{{input}}\n</idea>\n\nThe conversation:\n\n<conversation>\n{{transcript}}\n</conversation>\n\nWrite one page. Open with the idea at its strongest. Then what it would take, what stands in the way, and where the voices disagreed and which of them you think is right. Close with the smallest thing someone could do this week to find out.",
+    "maxTokens": 2000,
+    "meta": {
+      "label": "Dream report",
+      "tags": ["dream", "synthesis"]
+    }
+  }
+}

@@ -50,6 +50,10 @@ export {
   type ObservabilityInstance,
 } from "./observability.js";
 export {
+  normalizeTokenUsage,
+  type NormalizedTokenUsage,
+} from "./token-usage.js";
+export {
   createOTLPExporter,
   type OTLPExporterConfig,
   type OTLPExporter,

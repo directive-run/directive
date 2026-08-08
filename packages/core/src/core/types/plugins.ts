@@ -445,7 +445,7 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   ) => void;
 
   // ============================================================================
-  // Clobber Loop Hooks (v1.23.0 — R4.J)
+  // Clobber Loop Hooks (v1.23.0)
   // ============================================================================
 
   /**

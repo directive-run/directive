@@ -113,21 +113,35 @@ npm install @directive-run/ai
 ```
 
 ```typescript
-import { createAgentOrchestrator } from '@directive-run/ai';
-import { createAnthropicAdapter } from '@directive-run/ai/anthropic';
+import {
+  createAgentOrchestrator,
+  createModerationGuardrail,
+  createPIIGuardrail,
+} from '@directive-run/ai';
+import { createAnthropicRunner } from '@directive-run/ai/anthropic';
 
 const orchestrator = createAgentOrchestrator({
-  agent: {
-    name: "assistant",
-    model: createAnthropicAdapter({ model: "claude-sonnet-4-5-20250514" }),
-    systemPrompt: "You are a helpful assistant.",
-  },
+  runner: createAnthropicRunner({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+    model: "claude-sonnet-4-5-20250929",
+  }),
   guardrails: {
-    input: [promptInjectionGuardrail(), piiGuardrail()],
-    output: [contentModerationGuardrail()],
+    // Redacts SSNs and card numbers by default; pass `patterns` to add your own.
+    input: [createPIIGuardrail()],
+    // `checkFn` is yours — call your moderation endpoint, or match locally.
+    output: [
+      createModerationGuardrail({
+        checkFn: (text) => /\b(secret|confidential)\b/i.test(text),
+      }),
+    ],
   },
-  budget: { maxTotalCost: 1.00 },
+  maxTokenBudget: 100_000,
 });
+
+const result = await orchestrator.run(
+  { name: "assistant", instructions: "You are a helpful assistant." },
+  "Summarize this thread.",
+);
 ```
 
 - **4 LLM adapters** &ndash; OpenAI, Anthropic, Ollama, Gemini (pure `fetch`, zero SDK deps)

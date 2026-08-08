@@ -2,8 +2,8 @@
  * Hash chain primitives — canonicalization, djb2 dispatch, depth-2
  * freeze, and the in-module tombstone sentinel.
  *
- * `LEDGER_INTERNAL_TOKEN` is the heart of the tombstone-forgery defense
- * (N7). It MUST live in this single file and MUST NOT be re-exported
+ * `LEDGER_INTERNAL_TOKEN` is the heart of the tombstone-forgery defense.
+ * It MUST live in this single file and MUST NOT be re-exported
  * from the folder's public surface (`./index.ts`). The only external
  * surface that touches it is `verify()` and the tombstone factory in
  * `index.ts`, both of which import it directly from this module.
@@ -24,7 +24,7 @@ import type { AuditEntry } from "./types.js";
  * checks for it before accepting a `system.entry-erased` entry as a
  * legitimate chain break.
  *
- * (N7) Without this, a caller holding a raw `AuditLedgerSink` reference
+ * Without this, a caller holding a raw `AuditLedgerSink` reference
  * could write `{ kind: "system.entry-erased", … }` directly into the
  * sink to mask real tampering as legitimate erasure. The sentinel
  * raises the bar so only the in-process ledger plugin (which lives in
@@ -39,7 +39,7 @@ export const LEDGER_INTERNAL_TOKEN: unique symbol = Symbol(
 /**
  * Depth-2 freeze: freeze the entry, freeze each top-level value, and
  * freeze each clause in `whenExplain`. Cycle-safe + cheap; prevents
- * in-process payload mutation that would forge the chain. (C3)
+ * in-process payload mutation that would forge the chain.
  */
 export function freezeEntry(entry: AuditEntry): AuditEntry {
   for (const key of Object.keys(entry)) {
@@ -90,7 +90,7 @@ function syncHash(entry: AuditEntry): string {
 /**
  * Dispatch to the right hash function based on the entry's `hashAlgo`
  * discriminator. v1 has a single arm (`djb2-1`); the switch is in
- * place so v2 can add `"sha256-1"` without touching call sites. (N5)
+ * place so v2 can add `"sha256-1"` without touching call sites.
  *
  * v2 promise: when SHA-256 lands, this becomes `case "sha256-1": return
  * await asyncSha256(entry);` — verify() will become async accordingly.

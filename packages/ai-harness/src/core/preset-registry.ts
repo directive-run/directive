@@ -1,0 +1,174 @@
+/**
+ * Getting a preset from wherever the caller has one.
+ *
+ * Three sources — a built-in name, a JSON string, a path on disk — and one
+ * validator behind all of them. Every route ends at {@link validatePreset}, so
+ * "this preset is valid" means the same thing whether it was typed, fetched, or
+ * read off disk.
+ *
+ * @module
+ */
+
+import { BUILTIN_PRESETS } from "../presets/index.js";
+import { type PresetConfig, presetSchema } from "./preset-types.js";
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+/** The outcome of checking an unknown value against the preset schema. */
+export type PresetValidation =
+  | { valid: true; preset: PresetConfig }
+  | { valid: false; errors: string[] };
+
+/**
+ * Check an unknown value against the preset schema.
+ *
+ * Returns rather than throws, because the surfaces that call it directly — a
+ * config editor, an HTTP endpoint validating a request body — want every
+ * problem at once, not the first one. {@link assertPreset} is the throwing form
+ * for callers that only proceed on success.
+ */
+export function validatePreset(value: unknown): PresetValidation {
+  const result = presetSchema.safeParse(value);
+
+  if (!result.success) {
+    return {
+      valid: false,
+      errors: result.error.issues.map((issue) => {
+        const path = issue.path.join(".");
+
+        return path === "" ? issue.message : `${path}: ${issue.message}`;
+      }),
+    };
+  }
+
+  return { valid: true, preset: result.data };
+}
+
+/**
+ * Check a value and return it, or throw naming every problem.
+ *
+ * The throwing form exists so the error message is written once. A caller that
+ * validated itself and threw its own message would report the same bad preset
+ * differently depending on which door it came through.
+ *
+ * @param source - Where the value came from, for the error message.
+ */
+export function assertPreset(value: unknown, source: string): PresetConfig {
+  const result = validatePreset(value);
+
+  if (!result.valid) {
+    throw new Error(
+      `[ai-harness] Invalid preset from ${source}:\n  - ${result.errors.join("\n  - ")}`,
+    );
+  }
+
+  return result.preset;
+}
+
+// ============================================================================
+// Loading
+// ============================================================================
+
+/** The IDs of every preset that ships with the package. */
+export function listPresets(): string[] {
+  return Object.keys(BUILTIN_PRESETS).sort();
+}
+
+/** Whether a string looks like a JSON object rather than a name or a path. */
+function looksLikeJson(source: string): boolean {
+  return source.trimStart().startsWith("{");
+}
+
+/**
+ * Resolve a preset from a built-in name, a JSON string, or a path.
+ *
+ * Resolution order is name, then JSON, then path — cheapest and least ambiguous
+ * first. A built-in name never contains `{` or a path separator, so the three
+ * cases cannot be confused for one another.
+ *
+ * @example
+ * ```typescript
+ * await loadPreset("code-review");              // built-in
+ * await loadPreset('{"id":"ad-hoc", …}');       // literal
+ * await loadPreset("./presets/mine.json");      // file
+ * ```
+ */
+export async function loadPreset(
+  nameOrPathOrJson: string,
+): Promise<PresetConfig> {
+  const builtin = Object.hasOwn(BUILTIN_PRESETS, nameOrPathOrJson)
+    ? BUILTIN_PRESETS[nameOrPathOrJson]
+    : undefined;
+
+  if (builtin !== undefined) {
+    return assertPreset(builtin, `built-in preset "${nameOrPathOrJson}"`);
+  }
+
+  if (looksLikeJson(nameOrPathOrJson)) {
+    return assertPreset(
+      parseJson(nameOrPathOrJson, "JSON string"),
+      "JSON string",
+    );
+  }
+
+  let contents: string;
+  try {
+    // Imported here rather than at the top of the file. This is the one branch
+    // of the one function in `./` that needs a filesystem, and a static import
+    // would put `node:fs` in the package's entry graph — so every consumer of
+    // `createHarness` on a runtime without one would fail to load the module
+    // over a branch it never takes. A runtime with no filesystem lands in the
+    // `catch` below, which is the right answer: this path is not available.
+    const { readFile } = await import("node:fs/promises");
+    contents = await readFile(nameOrPathOrJson, "utf8");
+  } catch (error) {
+    const known = listPresets().join(", ");
+
+    throw new Error(
+      `[ai-harness] loadPreset: "${nameOrPathOrJson}" is not a built-in preset, not JSON, and could not be read as a file (${(error as Error).message}). Built-in presets: ${known}.`,
+    );
+  }
+
+  return assertPreset(
+    parseFile(contents, nameOrPathOrJson),
+    `file ${nameOrPathOrJson}`,
+  );
+}
+
+/** Parse JSON, saying where it came from when it will not parse. */
+function parseJson(text: string, source: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `[ai-harness] loadPreset: ${source} is not valid JSON — ${(error as Error).message}`,
+    );
+  }
+}
+
+/**
+ * Parse a file's contents, without quoting them back.
+ *
+ * The parser's own message embeds the bytes it choked on, and this branch runs
+ * on any path the caller names. Echoing it turns `loadPreset` into a way to read
+ * the opening bytes of a file the caller could not otherwise see — the head of a
+ * private key, the prefix of a credential — from a surface that prints its
+ * errors. So the file branch names the file, says what a preset file is, and
+ * stops.
+ *
+ * Schema failures keep their detail, and should: by then the document has parsed
+ * as JSON and every field-level message is about a document the caller is
+ * holding. It is the *parse* error, and only for a path, that quotes contents
+ * nobody has established the caller may read.
+ */
+function parseFile(contents: string, path: string): unknown {
+  try {
+    return JSON.parse(contents);
+  } catch {
+    throw new Error(
+      `[ai-harness] loadPreset: "${path}" was read but is not valid JSON. A preset file is a single JSON object with id, model, personas, tokensPerTurn, budgetUsd, maxIterations, promptTemplate, and synthesizer. The parser's own message is withheld because it quotes the file's contents, and a path that turns out not to be a preset should not be a way to read one. Check that this is the file you meant.`,
+    );
+  }
+}

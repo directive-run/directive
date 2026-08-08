@@ -33,9 +33,68 @@ export interface RunResult<T = unknown> {
   totalTokens: number;
   /** Breakdown of input vs output tokens, when available from the provider */
   tokenUsage?: TokenUsage;
+  /**
+   * Whether the provider actually reported token usage for this call.
+   *
+   * `false` means `tokenUsage` holds zeros because nothing was reported – not
+   * because nothing was spent. An OpenAI-compatible endpoint that ignores
+   * `stream_options.include_usage` (vLLM, LiteLLM, older gateways) is the
+   * common case. Cost tracking must treat such a call as *unpriceable* rather
+   * than free: `withBudget` charges its pre-call estimate instead and counts
+   * the call separately.
+   *
+   * Omitted entirely by runners that do not report the distinction, which is
+   * read as "usage is trustworthy" – the behavior every existing runner had.
+   */
+  usageReported?: boolean;
+  /**
+   * Why the provider stopped generating, normalized across providers.
+   *
+   * The distinction that matters is `"length"`: the model was cut off at its
+   * token ceiling mid-sentence. Every provider says so – Anthropic's
+   * `stop_reason: "max_tokens"`, OpenAI's `finish_reason: "length"`, Gemini's
+   * `finishReason: "MAX_TOKENS"`, Ollama's `done_reason: "length"` – and until
+   * this field existed all four arrived as a clean success indistinguishable
+   * from a complete answer, so a truncated response was parsed, validated and
+   * acted on as though the model had finished saying it.
+   *
+   * Omitted by runners that do not report it. See {@link RunResult.rawStopReason}
+   * for the provider's own spelling.
+   */
+  stopReason?: StopReason;
+  /**
+   * The provider's own spelling of {@link RunResult.stopReason}, verbatim.
+   *
+   * Normalization loses detail – Gemini's `"SAFETY"` and `"RECITATION"` both
+   * normalize to `"content_filter"` – and the detail is what a caller needs to
+   * decide what to do next.
+   */
+  rawStopReason?: string;
   /** True when result was served from semantic cache */
   isCached?: boolean;
 }
+
+/**
+ * Why a provider stopped generating, in one vocabulary for all of them.
+ *
+ * - `"stop"` – the model finished, or hit a caller-supplied stop sequence.
+ * - `"length"` – cut off at the output token ceiling. The answer is truncated.
+ * - `"tool_use"` – the model stopped to call a tool.
+ * - `"content_filter"` – a safety system ended it. Gemini's `SAFETY`,
+ *   `RECITATION` and `PROHIBITED_CONTENT`, OpenAI's `content_filter`,
+ *   Anthropic's `refusal`.
+ * - `"other"` – the provider reported a reason with no equivalent here. The
+ *   verbatim value is on {@link RunResult.rawStopReason}.
+ */
+export type StopReason =
+  | "stop"
+  | "length"
+  | "tool_use"
+  | "content_filter"
+  | "other";
+
+/** Why a new generation started – the runner was re-invoked and replays. */
+export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
 
 /** Breakdown of token usage by input/output */
 export interface TokenUsage {
@@ -47,10 +106,26 @@ export interface TokenUsage {
    */
   cacheReadTokens?: number;
   /**
-   * Tokens written to the provider's prompt cache, when available.
-   * Populated by adapters with prompt-caching enabled (e.g. Anthropic).
+   * Tokens written to the provider's prompt cache, under Anthropic's wire
+   * spelling. Populated by adapters with prompt-caching enabled.
+   *
+   * A documented alias of {@link TokenUsage.cacheWriteTokens}, which is the
+   * canonical name. Supply either; the two are reconciled in exactly one
+   * function (`normalizeTokenUsage`, in `@directive-run/core`), which every
+   * consumer of token usage routes through.
    */
   cacheCreationTokens?: number;
+  /**
+   * Tokens written to the provider's prompt cache. The canonical spelling —
+   * it matches the rate that prices it, `cacheWritePerMillion`.
+   *
+   * Two names exist because the count and its rate were named differently, and
+   * a runner that followed the rate's spelling reported a field nothing read:
+   * cache writes billed as zero, with no warning and no failed check. Supply
+   * either. When both are present the larger is billed, because under-counting
+   * is the failure mode worth avoiding.
+   */
+  cacheWriteTokens?: number;
 }
 
 /** Message from agent run */
@@ -68,7 +143,18 @@ export interface ToolCall {
   result?: string;
 }
 
-/** Run function type */
+/**
+ * Run function type.
+ *
+ * **A runner that wraps the errors it catches must keep the original reachable,
+ * or the ledger under-bills.** A streamed call reports its input token count in
+ * the provider's opening frame, long before it can fail, and when it does fail
+ * that count is recorded on the thrown error. Cost tracking reads it back by
+ * walking `cause` (and `lastError`) up to eight links, so a wrapper that sets
+ * `cause` — as `withRetry` and `withFallback` do — costs nothing. A wrapper that
+ * throws a fresh error without one drops the report, and every ceiling
+ * downstream then prices a call the provider charged in full at zero.
+ */
 export type AgentRunner = <T = unknown>(
   agent: AgentLike,
   input: string,
@@ -80,6 +166,18 @@ export type StreamingCallbackRunner = (
   agent: AgentLike,
   input: string,
   callbacks: {
+    /**
+     * Called with each text delta as it arrives. Awaited by the shipped
+     * adapters, so returning a promise applies backpressure to the provider
+     * stream – the reader does not pull the next chunk until it settles.
+     *
+     * Declared as returning `void` rather than `void | Promise<void>` on
+     * purpose. TypeScript lets a callback typed `=> void` return anything,
+     * so both `(t) => buffer.push(t)` and `async (t) => { await sink(t) }`
+     * are assignable, and both behave correctly – the promise is awaited
+     * either way. Widening the annotation would forfeit that rule and
+     * reject the first form, which is the shape most callers reach for.
+     */
     onToken?: (token: string) => void;
     onToolStart?: (tool: string, id: string, args: string) => void;
     onToolEnd?: (tool: string, id: string, result: string) => void;
@@ -94,6 +192,49 @@ export interface RunOptions {
   signal?: AbortSignal;
   onMessage?: (message: Message) => void;
   onToolCall?: (toolCall: ToolCall) => void | Promise<void>;
+  /**
+   * Present ⇒ the caller wants per-delta streaming from this run.
+   *
+   * This is a **request, not a guarantee**. A runner that cannot stream simply
+   * ignores it and returns the same buffered result it always would – there is
+   * no error and no capability to negotiate. Callers that need to know whether
+   * deltas actually arrived should count the calls they receive.
+   *
+   * Because streaming is an option on the runner rather than a second runner,
+   * it survives composition: every wrapper (`withRetry`, `withBudget`,
+   * `withFallback`, `withModelSelection`, `withStructuredOutput`) forwards
+   * `options` verbatim, so a wrapped runner streams with no wrapper changes and
+   * no wrapper can silently drop the capability.
+   *
+   * The callback is awaited, so returning a promise applies real backpressure to
+   * the provider – the adapter will not read the next chunk off the wire until
+   * it settles.
+   *
+   * Annotated `=> void` rather than `=> void | Promise<void>` deliberately.
+   * TypeScript allows a callback typed `=> void` to return any value, so
+   * `(t) => buffer.push(t)` and `async (t) => { await sink(t) }` are both
+   * assignable and both behave correctly. The wider annotation would reject
+   * the first – `push` returns a number – which is the form most callers
+   * write.
+   */
+  onToken?: (token: string) => void;
+  /**
+   * Called when something is about to re-invoke the runner with the same input,
+   * so everything already delivered through {@link RunOptions.onToken} for this
+   * run is void and the response arrives again from the beginning.
+   *
+   * Rides the same options object as `onToken` for the same reason: a wrapper
+   * that re-invokes the runner is the only code that knows a replay is coming,
+   * and every wrapper forwards these options verbatim. `withRetry`,
+   * `withFallback` and `withStructuredOutput` call it when they re-invoke, and
+   * the orchestrators call it for their own retries and reroutes. A consumer
+   * rendering deltas discards what it has rendered for the current generation
+   * when this fires.
+   *
+   * Without it a caller streaming through a retrying runner renders the first
+   * attempt and the second attempt end to end, as one run-on response.
+   */
+  onStreamRestart?: (reason: StreamRestartReason) => void;
 }
 
 // ============================================================================
@@ -802,6 +943,16 @@ export interface AgentCompleteEvent extends DebugEventBase {
   totalTokens: number;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Tokens read from the provider's prompt cache.
+   *
+   * Carried alongside input and output because `inputTokens` is only the
+   * *uncached remainder* on a provider that reports cache usage — without
+   * these, a heavily cached run reads on the timeline as a tiny one.
+   */
+  cacheReadTokens?: number;
+  /** Tokens written to the provider's prompt cache. */
+  cacheWriteTokens?: number;
   durationMs: number;
   modelId?: string;
   /** Truncated output text (max 5000 chars) */
