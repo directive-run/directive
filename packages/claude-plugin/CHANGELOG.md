@@ -1,5 +1,7 @@
 # @directive-run/claude-plugin
 
+## 1.25.0
+
 ## 1.24.1
 
 ### Patch Changes

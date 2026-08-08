@@ -1,5 +1,13 @@
 # @directive-run/example-permissions
 
+## 0.0.61
+
+### Patch Changes
+
+- Updated dependencies [[`fe46967`](https://github.com/directive-run/directive/commit/fe469672716e34f0747e84c551e22d142fd98a54), [`568f755`](https://github.com/directive-run/directive/commit/568f75520c36ba5085f650798ab624e717dabe8b), [`2996a18`](https://github.com/directive-run/directive/commit/2996a182b99c91270b1eacde3179918cb17a020a), [`8b27b86`](https://github.com/directive-run/directive/commit/8b27b862b4df60ce941e9620d7a315e1340d85be)]:
+  - @directive-run/core@1.25.0
+  - @directive-run/el@1.1.2
+
 ## 0.0.60
 
 ### Patch Changes
