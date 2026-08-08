@@ -46,8 +46,10 @@ jobs:
       # The build now refuses to substitute a placeholder, so the release has
       # to supply the real file. A failed fetch stops the release here rather
       # than publishing something hollow.
-      - name: Fetch api-reference.json from latest release
+      - name: Fetch api-reference.json from the newest release carrying it
         run: .github/scripts/fetch-api-reference.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
 
@@ -136,8 +138,10 @@ jobs:
       # the packages before it can, and that build needs the current one. Not
       # circular — it reads the previous release's file and publishes a fresh
       # one below.
-      - name: Fetch api-reference.json from latest release
+      - name: Fetch api-reference.json from the newest release carrying it
         run: .github/scripts/fetch-api-reference.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
 
