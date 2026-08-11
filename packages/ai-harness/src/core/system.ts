@@ -262,9 +262,6 @@ export function createHarnessSystem(
       },
     ],
   });
-  // The single-module form, so no namespace. The multi-module form is the whole
-  // reason `bind` takes one — see `HarnessChain.bind`.
-  chain.bind(system);
   system.start();
 
   let consumed = false;

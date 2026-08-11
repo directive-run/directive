@@ -292,23 +292,6 @@ export interface ChainDerived {
   phase: ChainPhase;
 }
 
-/**
- * Read one derivation.
- *
- * Constraints and effects receive a facts proxy that does not carry
- * derivations, so they reach them through this. It is pointed at the system
- * running the chain by {@link HarnessChain.bind}, between `createSystem()` and
- * `start()`.
- *
- * Reads through it are still tracked: the binding hands back the system's derive
- * proxy, which registers the access with whatever tracking context is open. A
- * constraint reading `turnPending` this way records a dependency on it and is
- * re-evaluated when it changes, exactly as if it had read a fact.
- */
-export type DerivedReader = <K extends keyof ChainDerived>(
-  key: K,
-) => ChainDerived[K];
-
 // ============================================================================
 // Module dependencies
 // ============================================================================
@@ -574,8 +557,8 @@ function isBudgetExhausted(error: unknown): boolean {
 // Module
 // ============================================================================
 
-function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
-  const { preset, runId, transcript, agents, emit, readDerived } = deps;
+function buildModule(deps: HarnessChainDeps & { preset: PresetConfig }) {
+  const { preset, runId, transcript, agents, emit } = deps;
   const now = deps.now ?? Date.now;
   const { orchestrator, budgetRunner } = agents;
   // The rates the ledger will bill at, so the reserve and the bill are the same
@@ -963,11 +946,11 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
        * change to a derivation, and this constraint does not notice.
        */
       runTurn: {
-        when: () => readDerived("turnPending"),
-        require: (facts) => ({
+        when: (_facts, derived) => derived.turnPending,
+        require: (facts, derived) => ({
           type: "RUN_TURN" as const,
           iteration: facts.iteration,
-          persona: readDerived("nextPersona"),
+          persona: derived.nextPersona,
           input: facts.input,
           previousTurn: facts.previousTurn,
         }),
@@ -980,11 +963,11 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
 
       /** Once the turns are over and there is something to read, close it out. */
       synthesize: {
-        when: () => readDerived("synthesisPending"),
-        require: (facts) => ({
+        when: (_facts, derived) => derived.synthesisPending,
+        require: (facts, derived) => ({
           type: "SYNTHESIZE" as const,
           iteration: facts.iteration,
-          stopReason: readDerived("stopReason"),
+          stopReason: derived.stopReason,
         }),
         meta: withPresetMeta(preset, {
           label: "Closing document",
@@ -1218,19 +1201,19 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       /** Announce a finished turn and what it did to the running total. */
       announceTurn: {
         deps: ["lastTurn"],
-        run: (facts, prev) => {
+        run: (facts, prev, derived) => {
           const record = facts.lastTurn;
           if (record === null || prev === null || prev.lastTurn === record) {
             return;
           }
 
-          const budgetUsd = readDerived("budgetUsd");
+          const budgetUsd = derived.budgetUsd;
           const spentUsd = facts.spentUsd;
           const cost = {
             spentUsd,
             budgetUsd,
-            remainingUsd: readDerived("remainingUsd"),
-            fraction: readDerived("budgetFraction"),
+            remainingUsd: derived.remainingUsd,
+            fraction: derived.budgetFraction,
           };
 
           emit({
@@ -1283,8 +1266,8 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
        * back the dependency list this effect exists to avoid keeping.
        */
       announcePhase: {
-        run: async (facts) => {
-          const phase = readDerived("phase");
+        run: async (facts, _prev, derived) => {
+          const phase = derived.phase;
           if (phase === announcedPhase) {
             return;
           }
@@ -1298,7 +1281,7 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
               runId: facts.runId,
               input: facts.input,
               personas: facts.preset.personas.map((persona) => persona.name),
-              budgetUsd: readDerived("budgetUsd"),
+              budgetUsd: derived.budgetUsd,
               transcriptPath: facts.transcriptPath,
               jsonlPath: facts.jsonlPath,
               at: now(),
@@ -1321,16 +1304,16 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
           // below. Auto-tracking closes at the first `await`, so a read after
           // it registers no dependency — and this effect is deliberately
           // dependency-declared by reading rather than by a `deps` list.
-          const stopReason = readDerived("stopReason");
-          const synthesisSkipped = readDerived("synthesisSkipped");
+          const stopReason = derived.stopReason;
+          const synthesisSkipped = derived.synthesisSkipped;
           const completion = {
             runId: facts.runId,
             iterations: facts.iteration,
             spentUsd: facts.spentUsd,
-            budgetUsd: readDerived("budgetUsd"),
-            remainingUsd: readDerived("remainingUsd"),
-            fraction: readDerived("budgetFraction"),
-            reserveUsd: readDerived("synthesisReserveUsd"),
+            budgetUsd: derived.budgetUsd,
+            remainingUsd: derived.remainingUsd,
+            fraction: derived.budgetFraction,
+            reserveUsd: derived.synthesisReserveUsd,
             synthesis: facts.synthesis,
             transcriptPath: facts.transcriptPath,
             jsonlPath: facts.jsonlPath,
@@ -1447,30 +1430,17 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
 export type HarnessModule = ReturnType<typeof buildModule>;
 
 // ============================================================================
-// The chain, and the one thing it needs from its system
+// The chain
 // ============================================================================
 
 /**
- * What {@link HarnessChain.bind} reads off a Directive system.
+ * The chain module. Hand it to `createSystem`, in either shape.
  *
- * Deliberately structural and deliberately tiny. Every `System` satisfies it,
- * and naming the two members it touches says plainly that binding is a read of
- * the derive proxy and nothing more.
- */
-export interface ChainHost {
-  /** Directive's system-mode discriminator: `module:` versus `modules:`. */
-  readonly _mode: "single" | "namespaced";
-  readonly derive: unknown;
-}
-
-/**
- * A chain module and the binding that connects it to the system running it.
- *
- * Two things rather than one because of an ordering that cannot be avoided: the
- * module's constraints and effects read derivations, derivations belong to a
- * system, and the system cannot exist until the module does. So the module is
- * built with a reader that is not pointed anywhere yet, and `bind` points it —
- * after `createSystem()`, before `start()`.
+ * It used to be a module *and* a binding step, because its constraints and
+ * effects read derivations and the only way to reach those was back through the
+ * system — which does not exist until after the module does. Core hands
+ * `derived` to constraints and effects directly now, so the module reads its own
+ * derivations and there is nothing left to connect.
  *
  * @example Composed into a system you own
  * ```typescript
@@ -1480,7 +1450,6 @@ export interface ChainHost {
  *   modules: { chain: chain.module, billing: billingModule },
  * });
  *
- * chain.bind(system, "chain");
  * system.start();
  * system.events.chain.start({ input: diff });
  * ```
@@ -1488,21 +1457,6 @@ export interface ChainHost {
 export interface HarnessChain {
   /** The Directive module. Hand it to `createSystem`. */
   module: HarnessModule;
-  /**
-   * Point the chain's constraints and effects at the system running them.
-   *
-   * @param system - The system the module was registered with.
-   * @param namespace - The key it was registered under, in the `modules:` form.
-   *   Omitted in the `module:` form, where there is no namespace to name.
-   *
-   * @throws If the system is namespaced and no namespace is given, or if the
-   *   namespace names no module. Both are refused loudly here because the
-   *   failure they would otherwise cause is silent: a namespaced derive proxy
-   *   resolves module names, not derivations, so an unnamespaced read returns
-   *   `undefined`, the gating derivation reads falsy, the constraint never
-   *   fires, and the chain sits idle with nothing to say about why.
-   */
-  bind(system: ChainHost, namespace?: string): void;
 }
 
 /**
@@ -1521,70 +1475,5 @@ export function createHarnessChain(deps: HarnessChainDeps): HarnessChain {
   const preset = assertPreset(deps.preset, "createHarnessChain(preset)");
   assertBudgetCoversSynthesis(preset, deps.agents.pricing);
 
-  // Bound by `bind` below. Constraints and effects read derivations through
-  // this because the facts proxy they are handed does not carry them; the read
-  // still goes through the derive proxy, so it is tracked exactly like a fact
-  // read.
-  const binding: { derived?: ChainDerived } = {};
-  const readDerived: DerivedReader = (key) => {
-    const derived = binding.derived;
-    if (derived === undefined) {
-      throw new Error(
-        "[ai-harness] a derivation was read before the chain was bound. Call chain.bind(system) — or chain.bind(system, namespace) in the multi-module form — between createSystem() and start().",
-      );
-    }
-
-    return derived[key];
-  };
-
-  return {
-    module: buildModule({ ...deps, preset, readDerived }),
-
-    bind(system, namespace) {
-      binding.derived = resolveChainDerived(system, namespace);
-    },
-  };
-}
-
-/**
- * The chain's derivations, from either shape of system.
- *
- * `createSystem({ module })` puts them on `system.derive` directly.
- * `createSystem({ modules })` puts a *module name* there and the derivations one
- * level down, so the same read that works in the first shape silently returns
- * `undefined` in the second. Which shape it is, is on the system; which
- * namespace, is not — so it is asked for, checked against the modules the system
- * actually has, and refused by name when it is wrong.
- */
-function resolveChainDerived(
-  system: ChainHost,
-  namespace: string | undefined,
-): ChainDerived {
-  if (system._mode !== "namespaced") {
-    if (namespace !== undefined) {
-      throw new Error(
-        `[ai-harness] bind() was given the namespace "${namespace}", but this system was built with createSystem({ module }) and has none. Drop the second argument, or build the system with createSystem({ modules: { ${namespace}: chain.module } }).`,
-      );
-    }
-
-    return system.derive as ChainDerived;
-  }
-
-  const derive = system.derive as Record<string, ChainDerived | undefined>;
-  const available = Object.keys(derive);
-
-  if (namespace === undefined) {
-    throw new Error(
-      `[ai-harness] bind() needs the name the chain module was registered under, because this system has more than one module and its derivations are namespaced. Pass chain.bind(system, "<name>") — this system's modules are: ${available.join(", ")}.`,
-    );
-  }
-
-  const derived = derive[namespace];
-  if (derived === undefined) {
-    throw new Error(
-      `[ai-harness] bind() was given the namespace "${namespace}", which names no module in this system. Its modules are: ${available.join(", ")}.`,
-    );
-  }
-
-  return derived;
+  return { module: buildModule({ ...deps, preset }) };
 }

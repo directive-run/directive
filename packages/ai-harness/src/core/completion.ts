@@ -36,9 +36,8 @@
 /**
  * What {@link awaitCompletion} needs from a Directive system.
  *
- * Structural and small, for the same reason `ChainHost` is: every `System`
- * satisfies it, and naming the two members says plainly that the watchdog is
- * two reads and nothing more.
+ * Structural and small: every `System` satisfies it, and naming the two members
+ * says plainly that the watchdog is two reads and nothing more.
  */
 export interface SettleableSystem {
   readonly isSettled: boolean;

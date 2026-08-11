@@ -318,7 +318,14 @@ interface CompositionDerived {
   compositionSettled: boolean;
 }
 
-/** Read one derivation. Pointed at the system between build and start. */
+/**
+ * Read one derivation from outside a constraint or effect.
+ *
+ * Those two are handed `derived` directly and use it. What is left is the step
+ * resolver, which core calls with `(req, context)` and no derivations, and the
+ * two reads `runComposition` makes after the system has settled. Pointed at the
+ * system between build and start.
+ */
 type ReadDerived = <K extends keyof CompositionDerived>(
   key: K,
 ) => CompositionDerived[K];
@@ -597,7 +604,7 @@ export async function runComposition(
        * or step order appears here.
        */
       runStep: {
-        when: () => readDerived("stepPending"),
+        when: (_facts, derived) => derived.stepPending,
         require: (facts) => ({
           type: "RUN_STEP" as const,
           step: facts.step,
@@ -793,13 +800,13 @@ export async function runComposition(
        * returns its promise.
        */
       close: {
-        run: async (facts) => {
-          if (facts.closed || !readDerived("compositionSettled")) {
+        run: async (facts, _prev, derived) => {
+          if (facts.closed || !derived.compositionSettled) {
             return;
           }
           facts.closed = true;
 
-          const budgetExhausted = readDerived("budgetExhausted");
+          const budgetExhausted = derived.budgetExhausted;
           const composedRunId = facts.runId;
           const composedInput = facts.input;
           const spentUsd = facts.spentUsd;
@@ -816,7 +823,7 @@ export async function runComposition(
               presetId: presets[facts.step]?.id ?? "",
               spentUsd,
               budgetUsd: facts.budgetUsd,
-              requiredUsd: readDerived("nextStepFloorUsd"),
+              requiredUsd: derived.nextStepFloorUsd,
               at: now(),
             });
           }

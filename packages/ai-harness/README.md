@@ -388,7 +388,7 @@ const result = await runComposition([codeReviewPreset, preMortemPreset], diff, {
 });
 ```
 
-**The chain inside your own system** – `createHarnessChain`. It hands back an ordinary Directive module plus the one call that points its constraints at the system running them.
+**The chain inside your own system** – `createHarnessChain`. It hands back an ordinary Directive module. Register it and start; there is nothing to connect.
 
 ```typescript
 import { createSystem } from "@directive-run/core";
@@ -408,12 +408,11 @@ const chain = createHarnessChain({
 });
 
 const system = createSystem({ modules: { chain: chain.module, billing: billingModule } });
-chain.bind(system, "chain");     // between createSystem() and start()
 system.start();
 system.events.chain.start({ input: diff });
 ```
 
-The chain then shares your plugins, your devtools session, and your reconciliation loop. `bind` needs the namespace in the `modules:` form and refuses it in the `module:` form, loudly, because getting it wrong otherwise means every gating derivation reads `undefined` and the chain sits idle saying nothing.
+The chain then shares your plugins, your devtools session, and your reconciliation loop. It used to need a binding call here too, because its constraints and effects read derivations and the only way to reach those was back through the system — which resolves a module *name* in the `modules:` form, so getting it wrong meant every gating derivation read `undefined` and the chain sat idle saying nothing. Core hands `derived` to constraints and effects directly now, scoped to the module that declared it, so the module reads its own derivations whichever shape of system it is in.
 
 `harness.system` is exposed on purpose in all of these. It is an ordinary Directive system – `inspect()` it, attach an observer, destroy it when you like. Hiding it behind a façade would only re-expose the same things under worse names. It is typed `System<never>`, though: the schema belongs to the module and the module is an implementation detail, so `system.facts.iteration` and `system.derive.stopReason` do not compile through it. A caller holds this handle to inspect and destroy, not to type against – the chain's account of itself is the event stream and the run result, and every figure you might want mid-run is on a `HarnessEvent`. Writing facts through it is not supported at all, because every fact has a resolver or an event handler that owns it.
 
