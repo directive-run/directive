@@ -236,6 +236,23 @@ export function createDerivationsManager<
   const observedIds = new Set<string>();
 
   /**
+   * How many derivation bodies are on the stack.
+   *
+   * The composition proxy is handed to derivation bodies *and*, since
+   * constraints and effects gained their `derived` parameter, to those too — so
+   * a read through it no longer implies the reader is inside the graph. This
+   * tells the two apart: at depth zero the reader is a constraint or an effect,
+   * which is an outside watcher and has to be recorded as one; deeper, it is
+   * one derivation composing another, which the `derivedToDerivedDeps` graph
+   * already invalidates without help.
+   *
+   * Counted rather than flagged because a derivation body may compute another
+   * derivation while running, and the inner one finishing does not put the
+   * reader back outside.
+   */
+  let computingDepth = 0;
+
+  /**
    * Derivations whose own dependency changed since the last drain.
    *
    * The roots of the "may have moved" question, recorded rather than answered:
@@ -442,6 +459,7 @@ export function createDerivationsManager<
     }
 
     state.isComputing = true;
+    computingDepth++;
 
     try {
       // Capture old value before recomputation
@@ -494,6 +512,7 @@ export function createDerivationsManager<
       throw error;
     } finally {
       state.isComputing = false;
+      computingDepth--;
     }
   }
 
@@ -659,6 +678,16 @@ export function createDerivationsManager<
       // Namespaced, so the dependency cannot be mistaken for a fact key of
       // the same name — see DERIVATION_DEP_PREFIX.
       trackAccess(derivationDep(prop));
+
+      // A read from outside a derivation body is a constraint's `when()` or an
+      // effect's `run()` reading its `derived` parameter, and that is an
+      // outside watcher: its dependency set is matched against the invalidation
+      // set every reconcile, so this derivation has to be in the set that gets
+      // collected. Without it the gate reads the value once and is never woken
+      // again — silently, which is the failure this parameter exists to end.
+      if (computingDepth === 0 && isTracking()) {
+        observedIds.add(prop);
+      }
 
       const state = getState(prop);
 

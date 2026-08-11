@@ -57,7 +57,7 @@ const cart = createModule("cart", {
 
   constraints: {
     trim: {
-      when: (facts) => facts.items.length > 100,
+      when: (_facts, derived) => derived.itemCount > 100,
       require: { type: "TRIM_CART" },
     },
   },

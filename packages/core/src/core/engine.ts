@@ -602,6 +602,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedEffects,
     facts,
     store,
+    derived: derivationsManager.getProxy() as Record<string, unknown>,
     isDerivation: observeDerivationDepName,
     isFactKey: isFactKeyName,
     onRun: (id, deps) => {
@@ -707,6 +708,7 @@ export function createEngine<S extends Schema>(
   const constraintsManager: ConstraintsManager<S> = createConstraintsManager({
     definitions: mergedConstraints,
     facts,
+    derived: derivationsManager.getProxy() as Record<string, unknown>,
     requirementKeys,
     isDerivation: observeDerivationDepName,
     onEvaluate: (id, active) => {

@@ -14,6 +14,7 @@ import type {
   DefinitionMeta,
   EffectsDef,
   Facts,
+  InferDerivations,
   ModuleDef,
   ModuleHooks,
   ModuleSchema,
@@ -43,9 +44,15 @@ export interface ModuleConfig<M extends ModuleSchema> {
    *
    * `deps` on one of these may name a fact key **or** one of this module's
    * derivations — the second parameter is what makes the derivation IDs
-   * available to the type, and it matches what the runtime accepts.
+   * available to the type, and it matches what the runtime accepts. The third
+   * types the `derived` argument `run()` receives, so an effect can read a
+   * derivation as a value rather than only name it as a dependency.
    */
-  effects?: EffectsDef<M["facts"], keyof M["derivations"] & string>;
+  effects?: EffectsDef<
+    M["facts"],
+    keyof M["derivations"] & string,
+    InferDerivations<M>
+  >;
   /**
    * Typed external event sources. See {@link SourceDef} for the primitive's
    * lifecycle + rationale. Each source attaches at `system.start()` and

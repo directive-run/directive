@@ -207,6 +207,22 @@ export interface CreateConstraintsOptions<S extends Schema> {
   definitions: ConstraintsDef<S>;
   /** Proxy-based facts object used to evaluate `when()` predicates. */
   facts: Facts<S>;
+  /**
+   * The system's derived values, handed to `when()` and `require()` as their
+   * second argument — the same object, and the same position, a derivation
+   * body already receives.
+   *
+   * A constraint that gates on a derivation used to have to reach back through
+   * `system.derive`, which is the single-module accessor: compose that module
+   * into a `createSystem({ modules })` and the identical read resolves a
+   * namespace instead of a value, the constraint goes falsy, and nothing runs
+   * with nothing logged. Passing it in removes the reach-back entirely.
+   *
+   * Reads through it track, so a constraint that consults a derivation is woken
+   * when that derivation moves. Supplied by the engine; a manager built without
+   * derivations gets an empty object, which is what it has.
+   */
+  derived?: Record<string, unknown>;
   /** Custom key functions for requirement deduplication, keyed by requirement type. */
   requirementKeys?: Record<string, RequirementKeyFn>;
   /** Default timeout in milliseconds for async constraint evaluation (defaults to 5 000). */
@@ -233,6 +249,14 @@ export interface CreateConstraintsOptions<S extends Schema> {
 
 /** Default async constraint timeout (5 seconds) */
 const DEFAULT_TIMEOUT = 5000;
+
+/**
+ * What a manager built without derivations hands to `when()` and `require()`.
+ * Frozen and shared — every such manager has the same nothing to offer.
+ */
+const EMPTY_DERIVED: Record<string, unknown> = Object.freeze(
+  Object.create(null),
+);
 
 /**
  * Create a manager that evaluates constraint rules and produces unmet
@@ -276,6 +300,7 @@ export function createConstraintsManager<S extends Schema>(
   const {
     definitions,
     facts,
+    derived = EMPTY_DERIVED,
     requirementKeys = {},
     defaultTimeout = DEFAULT_TIMEOUT,
     isDerivation = () => false,
@@ -679,7 +704,10 @@ export function createConstraintsManager<S extends Schema>(
    * forms are normalized to a function at manager construction, so by the
    * time this runs `def.when` is always a function.
    */
-  type WhenFn = (facts: Facts<S>) => boolean | Promise<boolean>;
+  type WhenFn = (
+    facts: Facts<S>,
+    derived: Record<string, unknown>,
+  ) => boolean | Promise<boolean>;
 
   /** Track or evaluate the `when()` predicate, returning the result and recording deps */
   function evaluateWhenPredicate(
@@ -691,11 +719,11 @@ export function createConstraintsManager<S extends Schema>(
     if (def.deps) {
       latestWhenDeps.set(id, explicitDeps(def.deps));
 
-      return whenFn(facts);
+      return whenFn(facts, derived);
     }
 
     // Track dependencies during evaluation
-    const tracked = withTracking(() => whenFn(facts));
+    const tracked = withTracking(() => whenFn(facts, derived));
     latestWhenDeps.set(id, tracked.deps);
 
     return tracked.value;
@@ -806,7 +834,10 @@ export function createConstraintsManager<S extends Schema>(
     }
 
     try {
-      const resultPromise = (def.when as WhenFn)(facts) as Promise<boolean>;
+      const resultPromise = (def.when as WhenFn)(
+        facts,
+        derived,
+      ) as Promise<boolean>;
 
       // Race against timeout (with proper cleanup)
       const result = await withTimeout(
@@ -883,7 +914,9 @@ export function createConstraintsManager<S extends Schema>(
     const requireDef = def.require;
     if (typeof requireDef === "function") {
       // Track dependencies when require is a function
-      const { value: output, deps } = withTracking(() => requireDef(facts));
+      const { value: output, deps } = withTracking(() =>
+        requireDef(facts, derived),
+      );
       const requirements = normalizeRequirements(
         output as RequirementOutput,
         id,

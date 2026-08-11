@@ -139,10 +139,21 @@ export type EffectCleanup = () => void;
 export interface EffectDef<
   S extends Schema,
   DerivationIds extends string = never,
+  Derived = Record<string, unknown>,
 > {
+  /**
+   * The effect body.
+   *
+   * `derived` is the system's derived values — read it rather than reaching
+   * back through `system.derive`, which is the single-module accessor and
+   * resolves a namespace instead of a value once the module is composed into a
+   * `createSystem({ modules })`. Third rather than second because `facts` and
+   * `prev` already hold the first two positions.
+   */
   run(
     facts: Facts<S>,
     prev: InferSchema<S> | null,
+    derived: Derived,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
   /**
@@ -178,4 +189,5 @@ export interface EffectDef<
 export type EffectsDef<
   S extends Schema,
   DerivationIds extends string = never,
-> = Record<string, EffectDef<S, DerivationIds>>;
+  Derived = Record<string, unknown>,
+> = Record<string, EffectDef<S, DerivationIds, Derived>>;

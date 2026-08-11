@@ -134,6 +134,14 @@ export interface EffectsManager<_S extends Schema = Schema> {
 /** Number of consecutive identical dep sets before skipping re-tracking */
 const STABLE_THRESHOLD = 3;
 
+/**
+ * What a manager built without derivations hands to `run()`. Frozen and
+ * shared — every such manager has the same nothing to offer.
+ */
+const EMPTY_DERIVED: Record<string, unknown> = Object.freeze(
+  Object.create(null),
+);
+
 /** Internal effect state */
 interface EffectState {
   id: string;
@@ -169,6 +177,25 @@ export interface CreateEffectsOptions<S extends Schema> {
   facts: Facts<S>;
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
+  /**
+   * The system's derived values, handed to `run()` as its third argument —
+   * after `facts` and `prev`, which already occupy the first two.
+   *
+   * An effect that reads a derivation used to have to reach back through
+   * `system.derive`, which is the single-module accessor: compose that module
+   * into a `createSystem({ modules })` and the identical read resolves a
+   * namespace instead of a value, silently. Passing it in removes the
+   * reach-back entirely.
+   *
+   * Reads through it track, so a synchronous effect that consults a derivation
+   * is woken when that derivation moves without naming it in `deps`. An async
+   * effect still has to declare — its reads happen past an `await`, where
+   * auto-tracking cannot see them, whichever door they came through.
+   *
+   * Supplied by the engine; a manager built without derivations gets an empty
+   * object, which is what it has.
+   */
+  derived?: Record<string, unknown>;
   /**
    * Whether a name in an explicit `deps` array refers to a derivation.
    *
@@ -256,6 +283,7 @@ export function createEffectsManager<S extends Schema>(
     definitions,
     facts,
     store,
+    derived = EMPTY_DERIVED,
     isDerivation = () => false,
     isFactKey = () => false,
     onRun,
@@ -538,7 +566,11 @@ export function createEffectsManager<S extends Schema>(
   ): Promise<void> {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(facts, previousSnapshot as InferSchema<S> | null);
+      effectPromise = def.run(
+        facts,
+        previousSnapshot as InferSchema<S> | null,
+        derived,
+      );
     });
     if (effectPromise instanceof Promise) {
       const result = await effectPromise;
@@ -646,6 +678,7 @@ export function createEffectsManager<S extends Schema>(
         effectPromise = def.run(
           facts,
           previousSnapshot as InferSchema<S> | null,
+          derived,
         );
       });
       return effectPromise;
@@ -832,6 +865,7 @@ export function createEffectsManager<S extends Schema>(
           effectPromise = def.run(
             facts,
             previousSnapshot as InferSchema<S> | null,
+            derived,
           );
         });
         if (effectPromise instanceof Promise) {

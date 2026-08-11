@@ -151,7 +151,7 @@ effects: {
 
 constraints: {
   trim: {
-    when: (facts) => facts.items.length > 100,
+    when: (_facts, derived) => derived.itemCount > 100,
     require: { type: "TRIM_CART" },
   },
 },
@@ -166,10 +166,21 @@ resolvers: {
 },
 ```
 
-Note the asymmetry: a derivation body receives `(facts, derived)`, but a
-constraint's `when()` and an effect's `run()` receive facts only. If a
-constraint needs to gate on something computed, compute it from facts in the
-predicate itself.
+All three receive the module's derivations. A derivation body is called
+`(facts, derived)`; a constraint's `when()` and `require()` take `derived`
+second as well, and an effect's `run()` takes it third, after `prev` — which is
+how the constraint above gates on `itemCount` instead of recounting the array.
+
+Read `derived` rather than reaching back through `system.derive`. The parameter
+is scoped to the module that declared it, so it keeps meaning the same thing
+once the module is composed into a `createSystem({ modules })` — `system.derive`
+resolves a module *name* in that shape, and the same read that returned a value
+in a single-module system silently returns `undefined`.
+
+Reads through it are tracked. A constraint or a synchronous effect that
+consults a derivation is re-evaluated when that derivation moves, without
+naming it in `deps`. An async effect still has to declare its dependencies —
+its reads happen past an `await`, where auto-tracking cannot see them.
 
 ## Reading external state (the hard case)
 
