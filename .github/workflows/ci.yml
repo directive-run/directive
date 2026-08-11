@@ -1,16 +1,30 @@
 name: CI
 
+# Every branch, not only main. Restricting this to `main` meant a branch
+# could accumulate work for weeks with nothing checking it, and the first
+# run happened when a pull request opened — by which point several
+# independent failures were stacked on each other, each hiding the next.
+# Two of them would have broken the release rather than the branch.
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
+  pull_request:
+
+# A branch push and its pull request would otherwise both fire for the same
+# commit. Same-repo work is covered by `push`; `pull_request` is left to do
+# the job for forks, where `push` does not reach us.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   build-and-test:
+    # Skip the pull_request event for branches in this repository, which
+    # `push` has already covered. Fork pull requests still run, since no
+    # push event reaches us for those.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -78,6 +92,7 @@ jobs:
           git diff --exit-code packages/claude-plugin/skills/
 
   e2e:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
