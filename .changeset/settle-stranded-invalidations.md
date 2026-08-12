@@ -19,3 +19,7 @@ An **effect** gated on a derivation that another effect's write invalidates is s
 Reaching effects means carrying the keys into the following pass, and that is the shape of a fix that was written and withdrawn once already: an effect that writes a fact inside its own dependency set then has no damping — a repeated value is suppressed by identity, but a changing one is not — and the reconcile loop runs away. Re-measured while preparing this change: 2,001 effect runs in 41 ms, bounded only by the probe's own counter.
 
 Closing it needs a bound on that feedback path, which is its own change. The boundary is now pinned by tests on both sides, so the next attempt starts from a description of the behavior rather than from silence.
+
+### If you construct a `SystemInspection`
+
+`pendingInvalidations` is required, not optional — it is always present in real engine output, and making it optional would force every reader to handle an `undefined` that never occurs. Test doubles and mocks that build the shape by hand need the field added.
