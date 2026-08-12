@@ -458,9 +458,23 @@ export function createModuleDeriveProxy(
     moduleDeriveProxyCache.set(derive, namespaceCache);
   }
 
+  const prefix = `${namespace}${SEPARATOR}`;
+
   const proxy = createHardenedProxy<Record<string, unknown>>({
-    get: (prop) => derive[`${namespace}${SEPARATOR}${prop}`],
-    has: (prop) => `${namespace}${SEPARATOR}${prop}` in derive,
+    get: (prop) => derive[`${prefix}${prop}`],
+    has: (prop) => `${prefix}${prop}` in derive,
+    // The flat store is keyed `ns::name` across every module in the system, so
+    // enumeration has to filter to this namespace and hand back bare names —
+    // otherwise spreading a module's `derived` would leak sibling modules' keys
+    // in their encoded form, which is both a scoping break and unreadable.
+    //
+    // `has` above only became answerable when the flat derive proxy gained its
+    // own `has` trap; before that it delegated to a bare `{}` target and
+    // reported `false` for every key that existed.
+    ownKeys: () =>
+      Object.keys(derive)
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => key.slice(prefix.length)),
   });
 
   namespaceCache.set(namespace, proxy);

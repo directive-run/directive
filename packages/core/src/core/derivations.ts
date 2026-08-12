@@ -236,6 +236,23 @@ export function createDerivationsManager<
   const observedIds = new Set<string>();
 
   /**
+   * How many derivation bodies are on the stack.
+   *
+   * The composition proxy is handed to derivation bodies *and*, since
+   * constraints and effects gained their `derived` parameter, to those too — so
+   * a read through it no longer implies the reader is inside the graph. This
+   * tells the two apart: at depth zero the reader is a constraint or an effect,
+   * which is an outside watcher and has to be recorded as one; deeper, it is
+   * one derivation composing another, which the `derivedToDerivedDeps` graph
+   * already invalidates without help.
+   *
+   * Counted rather than flagged because a derivation body may compute another
+   * derivation while running, and the inner one finishing does not put the
+   * reader back outside.
+   */
+  let computingDepth = 0;
+
+  /**
    * Derivations whose own dependency changed since the last drain.
    *
    * The roots of the "may have moved" question, recorded rather than answered:
@@ -442,6 +459,7 @@ export function createDerivationsManager<
     }
 
     state.isComputing = true;
+    computingDepth++;
 
     try {
       // Capture old value before recomputation
@@ -494,6 +512,7 @@ export function createDerivationsManager<
       throw error;
     } finally {
       state.isComputing = false;
+      computingDepth--;
     }
   }
 
@@ -660,6 +679,16 @@ export function createDerivationsManager<
       // the same name — see DERIVATION_DEP_PREFIX.
       trackAccess(derivationDep(prop));
 
+      // A read from outside a derivation body is a constraint's `when()` or an
+      // effect's `run()` reading its `derived` parameter, and that is an
+      // outside watcher: its dependency set is matched against the invalidation
+      // set every reconcile, so this derivation has to be in the set that gets
+      // collected. Without it the gate reads the value once and is never woken
+      // again — silently, which is the failure this parameter exists to end.
+      if (computingDepth === 0 && isTracking()) {
+        observedIds.add(prop);
+      }
+
       const state = getState(prop);
 
       // Recompute if stale
@@ -668,6 +697,67 @@ export function createDerivationsManager<
       }
 
       return state.cachedValue;
+    },
+
+    /**
+     * `"total" in derived`.
+     *
+     * Without this the question reaches the proxy's target, which is `{}`, and
+     * every membership test answers `false` on a populated object. That is the
+     * shape of failure this parameter exists to end: `when: (_f, d) => "x" in d`
+     * reads false forever, emits nothing, and says nothing about why.
+     *
+     * Tracks, because a membership test is a read — a constraint gated on
+     * whether a derivation exists has to be re-evaluated when the definition
+     * set changes, the same as one gated on its value.
+     */
+    has(_, prop: string | symbol) {
+      if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
+      if (!definitions[prop as keyof D]) {
+        return false;
+      }
+      trackAccess(derivationDep(prop));
+      if (computingDepth === 0 && isTracking()) {
+        observedIds.add(prop);
+      }
+
+      return true;
+    },
+
+    /**
+     * `Object.keys(derived)`, `{ ...derived }`, `JSON.stringify(derived)`.
+     *
+     * Paired with `getOwnPropertyDescriptor` below, because a key that
+     * `ownKeys` reports and the descriptor call then declines is skipped by
+     * every enumeration — the two traps only work together.
+     *
+     * Spreading forces every derivation in the module to compute, which is a
+     * real cost on a wide module and is why laziness is the default. It is
+     * still the right answer: a silent `{}` is worse than a computation the
+     * author asked for by writing a spread.
+     */
+    ownKeys() {
+      return Object.keys(definitions);
+    },
+
+    getOwnPropertyDescriptor(_, prop: string | symbol) {
+      if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
+      if (!definitions[prop as keyof D]) {
+        return undefined;
+      }
+
+      // `configurable: true` is required, not stylistic. A proxy may not report
+      // a non-configurable descriptor for a property its target does not have,
+      // and the target here is `{}` — reporting `false` throws a TypeError.
+      return {
+        enumerable: true,
+        configurable: true,
+        get: () => derivedProxy[prop as keyof DerivedValues<S, D>],
+      };
     },
 
     set() {
@@ -716,9 +806,18 @@ export function createDerivationsManager<
       // every reconcile. A read with no tracking context — a component
       // rendering, a test asserting — records nothing and watches nothing
       // through this channel, so it does not mark.
-      if (isTracking()) {
+      //
+      // Gated on `computingDepth` for the same reason the composition proxy is:
+      // a derivation body that happens to read through this door instead of its
+      // `derived` parameter is still an internal edge, and marking it observed
+      // put a node nothing outside the graph watches into the set that bounds
+      // the invalidation walk — inflating the bound and announcing a name no
+      // constraint or effect matches. Two doors onto one value; one rule.
+      if (computingDepth === 0 && isTracking()) {
         trackAccess(derivationDep(id as string));
         observedIds.add(id as string);
+      } else if (isTracking()) {
+        trackAccess(derivationDep(id as string));
       }
 
       const state = getState(id as string);

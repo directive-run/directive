@@ -65,28 +65,6 @@ export const wizardSchema = {
 } satisfies ModuleSchema;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-/** Inline step validity check for use in constraints (which only receive facts). */
-function isStepValid(facts: Record<string, unknown>, step: number): boolean {
-  if (step === 0) {
-    return (
-      (facts.email as string).includes("@") &&
-      (facts.password as string).length >= 8
-    );
-  }
-  if (step === 1) {
-    return (facts.name as string).trim().length > 0;
-  }
-  if (step === 2) {
-    return (facts.plan as string) !== "";
-  }
-
-  return false;
-}
-
-// ============================================================================
 // Wizard Module
 // ============================================================================
 
@@ -193,24 +171,28 @@ export const wizardModule = createModule("wizard", {
   // ============================================================================
 
   constraints: {
+    // `when` receives `derived` as its second argument — the same derivations
+    // the UI reads. No hand-rolled copy of the step-validity rules here.
     submit: {
       priority: 60,
-      when: (facts) => {
+      when: (facts, derived) => {
         const isLastStep = facts.currentStep === facts.totalSteps - 1;
-        const stepValid = isStepValid(facts, facts.currentStep);
 
-        return facts.advanceRequested && isLastStep && stepValid;
+        return (
+          facts.advanceRequested && isLastStep && derived.currentStepValid
+        );
       },
       require: { type: "SUBMIT_FORM" },
     },
 
     advance: {
       priority: 50,
-      when: (facts) => {
+      when: (facts, derived) => {
         const isLastStep = facts.currentStep === facts.totalSteps - 1;
-        const stepValid = isStepValid(facts, facts.currentStep);
 
-        return facts.advanceRequested && !isLastStep && stepValid;
+        return (
+          facts.advanceRequested && !isLastStep && derived.currentStepValid
+        );
       },
       require: { type: "ADVANCE_STEP" },
     },

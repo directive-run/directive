@@ -356,7 +356,13 @@ export function generateModule(
     code += "\n  constraints: {\n";
     code += "    needsProcessing: {\n";
     code += "      priority: 100,\n";
-    code += `      when: (facts) => facts.status === "pending",\n`;
+    if (includeDerive) {
+      // when() receives `derived` second — gate on the derivation rather
+      // than re-computing the same expression inside the constraint.
+      code += "      when: (_facts, derived) => derived.isReady,\n";
+    } else {
+      code += `      when: (facts) => facts.status === "ready",\n`;
+    }
     code += "      require: (facts) => ({\n";
     code += `        type: "PROCESS",\n`;
     code += "        input: facts.status,\n";
@@ -496,7 +502,9 @@ export const ${camelName} = createModule("${name}", {
   constraints: {
     needsRun: {
       priority: 100,
-      when: (facts) => facts.status === "thinking",
+      // when() and require() receive \`derived\` second — gate on the
+      // derivation instead of re-computing the same expression here
+      when: (_facts, derived) => derived.isThinking,
       require: (facts) => ({
         type: "RUN_AGENT",
         input: facts.input,

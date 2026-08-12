@@ -44,10 +44,10 @@ const cart = createModule("cart", {
 
   effects: {
     warnOnLargeCart: {
-      run: (facts, prev) => {
+      run: (_facts, prev, derived) => {
         if (
-          prev?.items.length !== facts.items.length &&
-          facts.items.length > 100
+          prev?.items.length !== derived.itemCount &&
+          derived.itemCount > 100
         ) {
           console.log("over 100");
         }
@@ -57,7 +57,7 @@ const cart = createModule("cart", {
 
   constraints: {
     trim: {
-      when: (facts) => facts.items.length > 100,
+      when: (_facts, derived) => derived.itemCount > 100,
       require: { type: "TRIM_CART" },
     },
   },

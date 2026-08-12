@@ -21,7 +21,7 @@ A constraint has two parts: `when` (condition) and `require` (what's needed).
 ```typescript
 constraints: {
   fetchUserWhenReady: {
-    // when() returns boolean – evaluated on every fact change
+    // when() returns boolean – evaluated on every fact or derivation change
     when: (facts) => facts.isAuthenticated && !facts.user,
 
     // require – the requirement to emit when condition is true.
@@ -62,6 +62,48 @@ constraints: {
   },
 },
 ```
+
+## Gating on a Derivation
+
+`when` and `require` both take `derived` as a second argument — this module's own derivations, in the same position a derivation body receives them.
+
+```typescript
+// WRONG – reaching back through system.derive from inside the module
+constraints: {
+  trim: {
+    when: () => system.derive.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+
+// CORRECT – read the derived parameter
+constraints: {
+  trim: {
+    when: (_facts, derived) => derived.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+```
+
+`system.derive` is the single-module accessor. `createSystem({ module })` puts a module's derivations directly on it; `createSystem({ modules })` puts a module *name* there and the derivations one level down. So the identical read that returned a value in the first shape returns `undefined` in the second — the gate goes falsy, the constraint never fires, and nothing is logged at any point. The `derived` parameter is scoped to the reading module, so it means the same thing either way.
+
+### Tracking through `derived`
+
+In a synchronous `when` or `require` that declares **no** `deps`, reads through `derived` are auto-tracked exactly like fact reads — the constraint re-evaluates when that derivation goes stale.
+
+Declaring `deps` routes past the auto-tracking wrapper, so nothing read inside is recorded — derivations and facts alike. If you declare `deps`, name every derivation you read:
+
+```typescript
+constraints: {
+  trim: {
+    deps: ["itemCount"], // deps entries may name derivations, not just facts
+    when: (_facts, derived) => derived.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+```
+
+An async `when()` is called outside the tracking wrapper entirely — see [Async Constraints](#async-constraints) below.
 
 ## Priority
 
@@ -138,7 +180,7 @@ constraints: {
 
 ### Why `deps` is Required for Async
 
-Synchronous constraints use auto-tracking (proxy-based). Async constraints cannot be auto-tracked because the function is suspended across await boundaries. The `deps` array tells the engine which facts to watch.
+Synchronous constraints use auto-tracking (proxy-based). Async constraints cannot be auto-tracked because the function is suspended across await boundaries — an async `when()` is called outside the tracking wrapper, so neither its fact reads nor its `derived` reads are recorded. The `deps` array tells the engine what to watch; entries may name facts or derivations.
 
 ```typescript
 // WRONG – async without deps, engine cannot track dependencies
@@ -252,7 +294,7 @@ constraints: {
 
 | Feature | Purpose | Triggers |
 |---|---|---|
-| Constraint | Declare a need (emit requirement) | Fact changes, re-evaluated automatically |
+| Constraint | Declare a need (emit requirement) | Fact or derivation changes, re-evaluated automatically |
 | Resolver | Fulfill a need (async work) | Requirement emitted by constraint |
 | Effect | React to changes (fire-and-forget) | Fact changes, runs after reconciliation |
 | Derivation | Compute a value (synchronous, cached) | Fact changes, recomputed lazily |

@@ -134,6 +134,14 @@ export interface EffectsManager<_S extends Schema = Schema> {
 /** Number of consecutive identical dep sets before skipping re-tracking */
 const STABLE_THRESHOLD = 3;
 
+/**
+ * What a manager built without derivations hands to `run()`. Frozen and
+ * shared — every such manager has the same nothing to offer.
+ */
+const EMPTY_DERIVED: Record<string, unknown> = Object.freeze(
+  Object.create(null),
+);
+
 /** Internal effect state */
 interface EffectState {
   id: string;
@@ -169,6 +177,31 @@ export interface CreateEffectsOptions<S extends Schema> {
   facts: Facts<S>;
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
+  /**
+   * The system's derived values, handed to `run()` as its third argument —
+   * after `facts` and `prev`, which already occupy the first two.
+   *
+   * An effect that reads a derivation used to have to reach back through
+   * `system.derive`, which is the single-module accessor: compose that module
+   * into a `createSystem({ modules })` and the identical read resolves a
+   * namespace instead of a value, silently. Passing it in removes the
+   * reach-back entirely.
+   *
+   * Reads through it track **on the auto-tracked path only** — a body with no
+   * explicit `deps`, reading before its first `await`. Two cases do not track,
+   * and both are the rule that already applies to facts:
+   *
+   * - `deps` declared: the array is the whole dependency set. A derivation read
+   *   through `derived` but not named there will not re-run the effect.
+   * - A read past an `await`: auto-tracking is a synchronous stack and has
+   *   already closed. Either name it in `deps` **or move the read above the
+   *   first `await`**, which is what the runtime warning tells you and which
+   *   keeps the body auto-tracked.
+   *
+   * Supplied by the engine; a manager built without derivations gets an empty
+   * object, which is what it has.
+   */
+  derived?: Record<string, unknown>;
   /**
    * Whether a name in an explicit `deps` array refers to a derivation.
    *
@@ -256,6 +289,7 @@ export function createEffectsManager<S extends Schema>(
     definitions,
     facts,
     store,
+    derived = EMPTY_DERIVED,
     isDerivation = () => false,
     isFactKey = () => false,
     onRun,
@@ -538,7 +572,11 @@ export function createEffectsManager<S extends Schema>(
   ): Promise<void> {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(facts, previousSnapshot as InferSchema<S> | null);
+      effectPromise = def.run(
+        facts,
+        previousSnapshot as InferSchema<S> | null,
+        derived,
+      );
     });
     if (effectPromise instanceof Promise) {
       const result = await effectPromise;
@@ -646,6 +684,7 @@ export function createEffectsManager<S extends Schema>(
         effectPromise = def.run(
           facts,
           previousSnapshot as InferSchema<S> | null,
+          derived,
         );
       });
       return effectPromise;
@@ -832,6 +871,7 @@ export function createEffectsManager<S extends Schema>(
           effectPromise = def.run(
             facts,
             previousSnapshot as InferSchema<S> | null,
+            derived,
           );
         });
         if (effectPromise instanceof Promise) {

@@ -188,18 +188,31 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   async?: boolean;
   /**
    * Condition the constraint requires. Either a function (sync or async)
-   * `(facts) => boolean`, or a declarative {@link FactPredicate} spec
+   * `(facts, derived) => boolean`, or a declarative {@link FactPredicate} spec
    * (e.g. `{ phase: "red", elapsed: { $gte: 30 } }`).
+   *
+   * `derived` is this module's own derivations, in the same position a
+   * derivation body receives them. Gate on it directly — reaching back through
+   * `system.derive` works in a single-module system and silently resolves a
+   * namespace once the module is composed with others.
    */
   when:
-    | ((facts: Facts<M["facts"]>) => boolean | Promise<boolean>)
+    | ((
+        facts: Facts<M["facts"]>,
+        derived: InferDerivations<M>,
+      ) => boolean | Promise<boolean>)
     | FactPredicate<InferFacts<M>>;
   /**
    * Requirement(s) to produce when condition is met.
+   *
+   * Receives `derived` as its second argument, same as `when`.
    */
   require:
     | RequirementOutput<InferRequirements<M>>
-    | ((facts: Facts<M["facts"]>) => RequirementOutput<InferRequirements<M>>);
+    | ((
+        facts: Facts<M["facts"]>,
+        derived: InferDerivations<M>,
+      ) => RequirementOutput<InferRequirements<M>>);
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
@@ -260,15 +273,21 @@ export interface CrossModuleConstraintDef<
    * `{ self: { phase: "red" }, auth: { token: { $exists: true } } }`.
    */
   when:
-    | ((facts: CrossModuleFactsWithSelf<M, Deps>) => boolean | Promise<boolean>)
+    | ((
+        facts: CrossModuleFactsWithSelf<M, Deps>,
+        derived: InferDerivations<M>,
+      ) => boolean | Promise<boolean>)
     | FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
   /**
    * Requirement(s) to produce when condition is met.
+   *
+   * Receives `derived` as its second argument, same as `when`.
    */
   require:
     | RequirementOutput<InferRequirements<M>>
     | ((
         facts: CrossModuleFactsWithSelf<M, Deps>,
+        derived: InferDerivations<M>,
       ) => RequirementOutput<InferRequirements<M>>);
   /** Timeout for async constraints (ms) */
   timeout?: number;
@@ -316,10 +335,18 @@ export interface CrossModuleEffectDef<
   M extends ModuleSchema,
   Deps extends CrossModuleDeps,
 > {
-  /** Effect function with cross-module facts access. Return a cleanup function for teardown. */
+  /**
+   * Effect function with cross-module facts access. Return a cleanup function
+   * for teardown.
+   *
+   * `derived` is this module's own derivations — read it rather than reaching
+   * back through `system.derive`, which resolves a namespace in a composed
+   * system. Third, because `facts` and `prev` hold the first two positions.
+   */
   run: (
     facts: CrossModuleFactsWithSelf<M, Deps>,
     prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
+    derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;
   /**
@@ -505,7 +532,11 @@ export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
   init?: (facts: Facts<M["facts"]>) => void;
   derive?: TypedDerivationsDef<M>;
   events?: TypedEventsDef<M>;
-  effects?: EffectsDef<M["facts"], keyof M["derivations"] & string>;
+  effects?: EffectsDef<
+    M["facts"],
+    keyof M["derivations"] & string,
+    InferDerivations<M>
+  >;
   /**
    * Typed external event sources. See {@link SourceDef} for the primitive's
    * lifecycle + rationale. Each source attaches at `system.start()` and

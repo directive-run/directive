@@ -2,7 +2,7 @@
 
 > Covers `@directive-run/core` and `@directive-run/react` — hallucination-prone API patterns to avoid.
 
-21 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
+22 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
 
 ## 1. Unnecessary Type Casting on Facts/Derivations
 
@@ -56,7 +56,50 @@ constraints: {
 },
 ```
 
-## 4. Nonexistent Schema Builders
+## 4. Reaching Back Through `system.derive` Inside a Constraint or Effect
+
+```typescript
+// WRONG – closing over system.derive to read this module's own derivation
+constraints: {
+  trim: {
+    when: () => system.derive.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+
+effects: {
+  warn: {
+    run: (facts, prev) => {
+      if (system.derive.itemCount > 100) {
+        console.warn("cart is large");
+      }
+    },
+  },
+},
+
+// CORRECT – derived is the second argument to when()/require(),
+// and the third to run(), after facts and prev
+constraints: {
+  trim: {
+    when: (_facts, derived) => derived.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+
+effects: {
+  warn: {
+    run: (facts, prev, derived) => {
+      if (derived.itemCount > 100) {
+        console.warn("cart is large");
+      }
+    },
+  },
+},
+```
+
+**Why:** `system.derive` is the single-module accessor. `createSystem({ module })` puts a module's derivations directly on it; `createSystem({ modules })` puts a module *name* there and the derivations one level down. The identical read that returned a number alone returns `undefined` once composed — the gate goes falsy, nothing fires, nothing is logged. A module that worked standalone breaks silently the moment it joins a system. `derived` is scoped to the reading module, so it means the same thing in both shapes.
+
+## 5. Nonexistent Schema Builders
 
 ```typescript
 // WRONG – t.map(), t.set(), t.promise() do not exist
@@ -78,7 +121,7 @@ schema: {
 },
 ```
 
-## 5. Abbreviating `context` to `ctx`
+## 6. Abbreviating `context` to `ctx`
 
 ```typescript
 // WRONG – never abbreviate context
@@ -92,7 +135,7 @@ resolve: async (req, context) => {
 },
 ```
 
-## 6. Flat Module Config (No schema Wrapper)
+## 7. Flat Module Config (No schema Wrapper)
 
 ```typescript
 // WRONG – properties must be inside schema.facts
@@ -112,7 +155,7 @@ createModule("timer", {
 });
 ```
 
-## 7. String-Based Event Dispatch
+## 8. String-Based Event Dispatch
 
 ```typescript
 // WRONG – there is no two-argument string-keyed dispatch signature
@@ -127,7 +170,7 @@ system.events.login({ token: "abc" });
 system.dispatch({ type: "login", token: "abc" });
 ```
 
-## 8. Direct Array/Object Mutation
+## 9. Direct Array/Object Mutation
 
 ```typescript
 // WRONG – proxy cannot detect in-place mutations
@@ -139,7 +182,7 @@ facts.items = [...facts.items, item];
 facts.config = { ...facts.config, theme: "dark" };
 ```
 
-## 9. Nonexistent `useDirective` Hook
+## 10. Nonexistent `useDirective` Hook
 
 ```typescript
 // WRONG – there is no useDirective hook
@@ -150,7 +193,7 @@ const count = useSelector(system, (s) => s.facts.count);
 const isLoading = useSelector(system, (s) => s.derive.isLoading);
 ```
 
-## 10. Bracket Notation for Namespaced Facts
+## 11. Bracket Notation for Namespaced Facts
 
 ```typescript
 // WRONG – internal separator is not part of the public API
@@ -162,7 +205,7 @@ const status = facts.auth.status;
 const token = facts.auth.token;
 ```
 
-## 11. Returning Data from Resolvers
+## 12. Returning Data from Resolvers
 
 ```typescript
 // WRONG – resolvers return void, not data
@@ -179,7 +222,7 @@ resolve: async (req, context) => {
 },
 ```
 
-## 12. Async Logic in `init`
+## 13. Async Logic in `init`
 
 ```typescript
 // WRONG – init is synchronous, facts assignment only
@@ -202,7 +245,7 @@ constraints: {
 },
 ```
 
-## 13. Missing `settle()` After `start()`
+## 14. Missing `settle()` After `start()`
 
 ```typescript
 // WRONG – constraints fire on start, resolvers are async
@@ -215,7 +258,7 @@ await system.settle();
 console.log(system.facts.data); // Resolved
 ```
 
-## 14. Missing `crossModuleDeps` Declaration
+## 15. Missing `crossModuleDeps` Declaration
 
 ```typescript
 // WRONG – accessing auth facts without declaring dependency
@@ -242,7 +285,7 @@ const dataModule = createModule("data", {
 });
 ```
 
-## 15. String Literal for `require`
+## 16. String Literal for `require`
 
 ```typescript
 // WRONG – require must be an object with type property
@@ -262,7 +305,7 @@ constraints: {
 },
 ```
 
-## 16. Passthrough Derivations
+## 17. Passthrough Derivations
 
 ```typescript
 // WRONG – derivation just returns a fact value unchanged
@@ -274,7 +317,7 @@ derive: {
 // system.facts.count instead of system.derive.count
 ```
 
-## 17. Deep Import Paths
+## 18. Deep Import Paths
 
 ```typescript
 // WRONG – internal module paths are not public API
@@ -288,7 +331,7 @@ import { createModule, createSystem } from "@directive-run/core";
 import { loggingPlugin } from "@directive-run/core/plugins";
 ```
 
-## 18. Async `when()` Without `deps`
+## 19. Async `when()` Without `deps`
 
 ```typescript
 // WRONG – async constraints need explicit deps for tracking
@@ -319,7 +362,7 @@ constraints: {
 },
 ```
 
-## 19. No Error Handling on Failing Resolvers
+## 20. No Error Handling on Failing Resolvers
 
 ```typescript
 // WRONG – unhandled errors crash the system
@@ -357,7 +400,7 @@ const system = createSystem({
 });
 ```
 
-## 20. Hand-Rolled External Subscriptions Inside React/`useEffect`
+## 21. Hand-Rolled External Subscriptions Inside React/`useEffect`
 
 When wrapping an external event stream (Supabase realtime, WebSocket, polling timer, browser listener) into a Directive system, do NOT write a React `useEffect` that owns the subscription and dispatches `sys.events.X()` from the callback — declare a `source` on the module instead. The runtime owns the mount / unmount lifecycle and observability. The component collapses to fact reads.
 
@@ -407,11 +450,11 @@ const gameModule = createModule('game', {
 
 See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
 
-## 21. Abbreviating Type Names (`*Def` instead of `*Definition`)
+## 22. Abbreviating Type Names (`*Def` instead of `*Definition`)
 
 ```typescript
 // WRONG – `Def` is short for `Definition`. Same anti-pattern as `ctx`
-// → `context` (entry #5). Source code reads better with spelled-out
+// → `context` (entry #6). Source code reads better with spelled-out
 // names; the minifier handles the bytes either way.
 import type { ModuleDef, SourceDef, ResolverDef } from "@directive-run/core";
 
@@ -463,11 +506,12 @@ Before generating any Directive code, verify:
 9. Imports from `@directive-run/core`, not deep paths
 10. `await system.settle()` after `system.start()`
 11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
+12. Constraints and effects read their own derivations through the `derived` parameter, never through a closed-over `system.derive`
 
 ## See also
 
 - [`naming.md`](./naming.md) — the strict canonical-term rules AND the alias map for cross-paradigm searches
-- [`sources.md`](./sources.md) — the source primitive (the right answer for #20)
+- [`sources.md`](./sources.md) — the source primitive (the right answer for #21)
 - [`constraints.md`](./constraints.md) — the constraint shape these anti-patterns reference (`facts` not in scope inside static `require:`, etc.)
 - [`resolvers.md`](./resolvers.md) — the resolver shape these anti-patterns reference (return `void`, mutate `context.facts`, `(req, context)` not `(req, ctx)`)
 - [`schema-types.md`](./schema-types.md) — the `t.*()` builders that exist and the hallucinated ones (`t.map`, `t.set`, `t.promise`, `t.date`) that don't

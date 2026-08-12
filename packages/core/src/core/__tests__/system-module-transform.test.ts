@@ -9,6 +9,16 @@ import type { ModuleDef, ModuleSchema } from "../types.js";
 // Helpers
 // ============================================================================
 
+/**
+ * A derive store for tests that only care about the facts half.
+ *
+ * The transform refuses to build a module's `derived` view without one, because
+ * a missing store makes every derivation read `undefined` and every gate that
+ * consults one silently falsy — see `moduleDerive`. These tests exercise the
+ * facts proxies, so they hand over an empty store rather than nothing at all.
+ */
+const EMPTY_DERIVE: Record<string, unknown> = {};
+
 const minimalSchema: ModuleSchema = {
   facts: { count: { _type: 0 }, name: { _type: "" } },
 };
@@ -480,7 +490,7 @@ describe("prefixModuleDefinition", () => {
 
       const constraint = result.constraints!["c::check"] as any;
       const flatFacts = { "c::count": 10 };
-      const whenResult = constraint.when(flatFacts);
+      const whenResult = constraint.when(flatFacts, EMPTY_DERIVE);
 
       expect(readCount).toBe(10);
       expect(whenResult).toBe(true);
@@ -502,7 +512,7 @@ describe("prefixModuleDefinition", () => {
 
       const constraint = result.constraints!["c::check"] as any;
 
-      expect(constraint.when({ "c::count": 2 })).toBe(false);
+      expect(constraint.when({ "c::count": 2 }, EMPTY_DERIVE)).toBe(false);
     });
 
     it("static require is passed through unchanged", () => {
@@ -538,7 +548,7 @@ describe("prefixModuleDefinition", () => {
 
       const constraint = result.constraints!["c::check"] as any;
       const flatFacts = { "c::name": "hello" };
-      const req = constraint.require(flatFacts);
+      const req = constraint.require(flatFacts, EMPTY_DERIVE);
 
       expect(req).toEqual({ type: "FETCH", id: "hello" });
     });
@@ -671,7 +681,10 @@ describe("prefixModuleDefinition", () => {
       );
 
       const constraint = result.constraints!["m::check"] as any;
-      constraint.when({ "m::count": 1, "other::token": "secret" });
+      constraint.when(
+        { "m::count": 1, "other::token": "secret" },
+        EMPTY_DERIVE,
+      );
 
       expect(readToken).toBe("secret");
     });
@@ -693,10 +706,10 @@ describe("prefixModuleDefinition", () => {
       );
 
       const constraint = result.constraints!["m::check"] as any;
-      const req = constraint.require({
-        "m::count": 1,
-        "other::token": "tok123",
-      });
+      const req = constraint.require(
+        { "m::count": 1, "other::token": "tok123" },
+        EMPTY_DERIVE,
+      );
 
       expect(req).toEqual({ type: "FETCH", id: "tok123" });
     });
@@ -1040,7 +1053,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const effect = result.effects!["e::log"] as any;
-      effect.run({ "e::count": 42 }, undefined);
+      effect.run({ "e::count": 42 }, undefined, EMPTY_DERIVE);
 
       expect(readCount).toBe(42);
     });
@@ -1061,7 +1074,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const effect = result.effects!["e::log"] as any;
-      effect.run({ "e::count": 10 }, { "e::count": 5 });
+      effect.run({ "e::count": 10 }, { "e::count": 5 }, EMPTY_DERIVE);
 
       expect(prevCount).toBe(5);
     });
@@ -1082,7 +1095,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const effect = result.effects!["e::log"] as any;
-      effect.run({ "e::count": 10 }, undefined);
+      effect.run({ "e::count": 10 }, undefined, EMPTY_DERIVE);
 
       expect(prevArg).toBeUndefined();
     });
@@ -1138,7 +1151,11 @@ describe("prefixModuleDefinition", () => {
       );
 
       const effect = result.effects!["m::log"] as any;
-      effect.run({ "m::count": 1, "other::token": "xyz" }, undefined);
+      effect.run(
+        { "m::count": 1, "other::token": "xyz" },
+        undefined,
+        EMPTY_DERIVE,
+      );
 
       expect(readToken).toBe("xyz");
     });
@@ -1164,6 +1181,7 @@ describe("prefixModuleDefinition", () => {
       effect.run(
         { "m::count": 1, "other::token": "new" },
         { "m::count": 0, "other::token": "old" },
+        EMPTY_DERIVE,
       );
 
       expect(prevToken).toBe("old");

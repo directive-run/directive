@@ -5,15 +5,16 @@
  * factory exists so a caller can put the chain next to their own modules,
  * sharing their plugins and their devtools session, instead of accepting the
  * system `createHarness` builds for them. It is also the arrangement that was
- * broken, and broken in the worst available way — `createSystem({ modules })`
- * namespaces derivations, an unnamespaced read of the derive proxy resolves a
- * *module name* rather than a derivation, so the gating derivation came back
- * `undefined`, the constraint went falsy, and the chain sat there. No error, no
- * output, nothing to search for.
+ * broken, and broken in the worst available way — reading a derivation back
+ * through `system.derive` resolves a *module name* in the namespaced form, so
+ * the gating derivation came back `undefined`, the constraint went falsy, and
+ * the chain sat there. No error, no output, nothing to search for.
  *
- * So the second module here is not scenery. It is what forces the namespaced
- * form, and it deliberately declares a `phase` and a `turnPending` of its own —
- * a binding that resolved the wrong namespace would read *those*, and the test
+ * Constraints and effects are handed `derived` now, scoped to the module that
+ * declared it, so there is no reach-back left to get wrong. The second module
+ * here is what keeps that honest rather than scenery: it forces the namespaced
+ * form, and it deliberately declares a `phase` and a `turnPending` of its own.
+ * A read that resolved the wrong namespace would find *those*, and these tests
  * would catch it rather than passing on a coincidence.
  */
 
@@ -43,7 +44,7 @@ const bystander = createModule("bystander", {
   },
   derive: {
     phase: () => "not-the-chain",
-    // False forever. A chain bound to this namespace would never take a turn.
+    // False forever. A chain reading this namespace would never take a turn.
     turnPending: () => false,
   },
 });
@@ -76,7 +77,6 @@ async function runComposed(namespace: "chain"): Promise<ComposedRun> {
     modules: { [namespace]: chain.module, bystander },
   });
 
-  chain.bind(system, namespace);
   system.start();
 
   const finished = new Promise<void>((resolve) => {
@@ -138,65 +138,5 @@ describe("the chain composed into a system it does not own", () => {
 
     const sidecar = documents.get("composed.jsonl") ?? "";
     expect(sidecar.trim().split("\n")).toHaveLength(3);
-  });
-});
-
-describe("binding refuses what it cannot resolve", () => {
-  function build() {
-    const preset = testPreset({ maxIterations: 1 });
-
-    return createHarnessChain({
-      preset,
-      runId: "unbound",
-      transcript: createMemoryTranscriptStore().open({ runId: "unbound" }),
-      agents: createHarnessAgents({
-        preset,
-        runner: createMockRunner({ responses: cannedResponses() }),
-      }),
-      emit: () => {},
-    });
-  }
-
-  it("names the system's modules when the namespace is missing", () => {
-    const chain = build();
-    const system = createSystem({
-      modules: { chain: chain.module, bystander },
-    });
-
-    expect(() => chain.bind(system)).toThrow(/chain, bystander/);
-    system.destroy();
-  });
-
-  it("names the system's modules when the namespace is wrong", () => {
-    const chain = build();
-    const system = createSystem({
-      modules: { chain: chain.module, bystander },
-    });
-
-    expect(() => chain.bind(system, "nope")).toThrow(
-      /"nope", which names no module/,
-    );
-    system.destroy();
-  });
-
-  it("refuses a namespace on a single-module system", () => {
-    const chain = build();
-    const system = createSystem({ module: chain.module });
-
-    expect(() => chain.bind(system, "chain")).toThrow(/has none/);
-    system.destroy();
-  });
-
-  it("says so when a derivation is read before the chain is bound", () => {
-    const chain = build();
-    // The gating constraint, evaluated without a system behind it. The engine
-    // catches what a constraint throws, so the message has to be worth reading
-    // where it lands rather than where it is raised.
-    const when = chain.module.constraints?.runTurn?.when;
-
-    expect(typeof when).toBe("function");
-    expect(() => (when as () => boolean)()).toThrow(
-      /before the chain was bound/,
-    );
   });
 });

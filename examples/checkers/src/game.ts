@@ -468,13 +468,15 @@ export const checkersGame = createModule("checkers", {
   // ============================================================================
 
   effects: {
+    // `run` receives `derived` third, after `facts` and `prev` — read the
+    // redCount / blackCount derivations instead of recounting the board.
     moveLog: {
       deps: ["moveCount"],
-      run: (facts) => {
+      run: (facts, _prev, derived) => {
         if (facts.moveCount > 0) {
-          const { red, black } = countPieces(facts.board);
           console.log(
-            `[Checkers] Move ${facts.moveCount} | Red: ${red}, Black: ${black}`,
+            `[Checkers] Move ${facts.moveCount} | ` +
+              `Red: ${derived.redCount}, Black: ${derived.blackCount}`,
           );
         }
       },
@@ -482,12 +484,12 @@ export const checkersGame = createModule("checkers", {
 
     gameOverLog: {
       deps: ["gameOver"],
-      run: (facts) => {
+      run: (facts, _prev, derived) => {
         if (facts.gameOver) {
-          const { red, black } = countPieces(facts.board);
           console.log(
             `[Checkers] Game Over! Winner: ${facts.winner} | ` +
-              `Moves: ${facts.moveCount} | Red: ${red}, Black: ${black}`,
+              `Moves: ${facts.moveCount} | ` +
+              `Red: ${derived.redCount}, Black: ${derived.blackCount}`,
           );
         }
       },

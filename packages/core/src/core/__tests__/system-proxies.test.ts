@@ -894,12 +894,21 @@ describe("getOwnPropertyDescriptor trap", () => {
 // ============================================================================
 
 describe("ownKeys trap", () => {
-  it("returns empty array for proxies without ownKeys config", () => {
-    // Module derive proxy has `has` but no `ownKeys`
-    const derive: Record<string, unknown> = { "ns::a": 1 };
+  it("yields a module's own derivation names, bare and filtered", () => {
+    // The flat store is keyed `ns::name` across every module in the system.
+    // A module's derive proxy enumerates its own keys, unprefixed, and none of
+    // anybody else's — matching what the facts proxy has always done.
+    const derive: Record<string, unknown> = {
+      "ns::a": 1,
+      "ns::b": 2,
+      "other::c": 3,
+    };
     const proxy = createModuleDeriveProxy(derive, "ns");
 
-    expect(Object.keys(proxy)).toEqual([]);
+    expect(Object.keys(proxy).sort()).toEqual(["a", "b"]);
+    expect({ ...proxy }).toEqual({ a: 1, b: 2 });
+    expect("a" in proxy).toBe(true);
+    expect("c" in proxy).toBe(false);
   });
 
   it("returns module names for namespaced facts proxy", () => {

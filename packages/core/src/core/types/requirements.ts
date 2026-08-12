@@ -99,16 +99,24 @@ export interface ConstraintDef<
   async?: boolean;
   /**
    * Condition the constraint requires. Either:
-   * - a function (sync or async) `(facts) => boolean`, or
+   * - a function (sync or async) `(facts, derived) => boolean`, or
    * - a declarative {@link FactPredicate} spec — serializable, inspectable,
    *   always synchronous; e.g. `{ phase: "red", elapsed: { $gte: 30 } }`.
+   *
+   * `derived` is the same second argument, in the same position, that a
+   * derivation body receives — read it rather than reaching back through
+   * `system.derive`, which is the single-module accessor and resolves a
+   * namespace instead of a value once the module is composed.
    *
    * A data `when` is normalized to a wrapper function at registration; the
    * wrapper still reads through the tracked facts proxy, so auto-tracking
    * captures both fact and derivation deps correctly.
    */
   when:
-    | ((facts: Facts<S>) => boolean | Promise<boolean>)
+    | ((
+        facts: Facts<S>,
+        derived: Record<string, unknown>,
+      ) => boolean | Promise<boolean>)
     | FactPredicate<InferSchema<S>>;
   /**
    * Requirement(s) to produce when condition is met.
@@ -116,8 +124,15 @@ export interface ConstraintDef<
    * - Multiple requirements: `[{ type: "RESTOCK", sku: "ABC" }, { type: "NOTIFY", message: "Low" }]`
    * - Function returning requirements: `(facts) => ({ type: "RESTOCK", sku: facts.sku })`
    * - Function returning null/empty array for conditional no-op: `(facts) => facts.critical ? [...] : null`
+   *
+   * Receives `derived` as its second argument, same as `when`.
    */
-  require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
+  require:
+    | RequirementOutput<R>
+    | ((
+        facts: Facts<S>,
+        derived: Record<string, unknown>,
+      ) => RequirementOutput<R>);
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**

@@ -237,6 +237,35 @@ function prefixPredicateSpec(
 const EMPTY_DEP_SET: ReadonlySet<string> = new Set<string>();
 
 /**
+ * The module's view of the system's derivations.
+ *
+ * A missing `derive` store used to fall back to a frozen empty object, on the
+ * reasoning that nothing-to-offer is the honest answer for a caller that passed
+ * nothing. It is not. Every read then returns `undefined`, so a gate written
+ * `when: (_facts, derived) => derived.ready` reads falsy and the constraint
+ * never fires — indistinguishable from a precondition that is legitimately
+ * unmet, with no error, no warning, and no trace entry. That is the failure
+ * this whole parameter exists to end, reintroduced at its own edge.
+ *
+ * The engine supplies the store on both managers, so this throws only for a
+ * caller invoking a transformed definition directly — an adapter, a harness, a
+ * future engine path that forgets to thread it. Each of those is a wiring bug,
+ * and a wiring bug should say so.
+ */
+function moduleDerive(
+  derive: unknown,
+  namespace: string,
+): Record<string, unknown> {
+  if (derive === undefined || derive === null) {
+    throw new Error(
+      `[Directive] a constraint or effect of module "${namespace}" was invoked without the system's derivations. Every \`derived\` read would return undefined and every gate reading one would go falsy, silently. If you are calling a transformed definition directly, pass the derive store as the last argument.`,
+    );
+  }
+
+  return createModuleDeriveProxy(derive as Record<string, unknown>, namespace);
+}
+
+/**
  * Convert any data-form definition arm in a module to its function-shape
  * equivalent, leaving the namespace prefixing to the existing per-arm
  * prefixers. Returns a shallow-copied module — the caller's input is never
@@ -466,10 +495,7 @@ function prefixDerive(
         hasCrossModuleDeps,
         depNamespaces,
       );
-      const deriveProxy = createModuleDeriveProxy(
-        derive as Record<string, unknown>,
-        namespace,
-      );
+      const deriveProxy = moduleDerive(derive, namespace);
       return (fn as any)(factsProxy, deriveProxy);
     };
 
@@ -561,34 +587,40 @@ function prefixConstraints(
       // it against the flat keyspace. Only function-form `when` needs the
       // module-scoped proxy wrapper.
       when: isWhenFn
-        ? (facts: unknown) => {
+        ? (facts: unknown, derive: unknown) => {
             const factsProxy = createScopedFactsProxy(
               facts as Record<string, unknown>,
               namespace,
               hasCrossModuleDeps,
               depNamespaces,
             );
+            const deriveProxy = moduleDerive(derive, namespace);
 
             return (
               constraintDef.when as (
                 facts: unknown,
+                derived: unknown,
               ) => boolean | Promise<boolean>
-            )(factsProxy);
+            )(factsProxy, deriveProxy);
           }
         : constraintDef.when,
       require:
         typeof constraintDef.require === "function"
-          ? (facts: unknown) => {
+          ? (facts: unknown, derive: unknown) => {
               const factsProxy = createScopedFactsProxy(
                 facts as Record<string, unknown>,
                 namespace,
                 hasCrossModuleDeps,
                 depNamespaces,
               );
+              const deriveProxy = moduleDerive(derive, namespace);
 
-              return (constraintDef.require as (facts: unknown) => unknown)(
-                factsProxy,
-              );
+              return (
+                constraintDef.require as (
+                  facts: unknown,
+                  derived: unknown,
+                ) => unknown
+              )(factsProxy, deriveProxy);
             }
           : constraintDef.require,
     };
@@ -691,13 +723,13 @@ function prefixEffects(
   const result: Record<string, unknown> = {};
   for (const [key, effect] of Object.entries(mod.effects)) {
     const effectDef = effect as {
-      run: (facts: any, prev: any) => void | Promise<void>;
+      run: (facts: any, prev: any, derived: any) => void | Promise<void>;
       deps?: string[];
     };
 
     result[prefixKey(namespace, key)] = {
       ...effectDef,
-      run: (facts: any, prev: any) => {
+      run: (facts: any, prev: any, derive: any) => {
         const factsProxy = createScopedFactsProxy(
           facts as Record<string, unknown>,
           namespace,
@@ -712,8 +744,9 @@ function prefixEffects(
               depNamespaces,
             )
           : undefined;
+        const deriveProxy = moduleDerive(derive, namespace);
 
-        return effectDef.run(factsProxy, prevProxy);
+        return effectDef.run(factsProxy, prevProxy, deriveProxy);
       },
       deps: effectDef.deps?.map((dep) => prefixKey(namespace, dep)),
     };

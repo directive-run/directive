@@ -72,8 +72,6 @@ export {
   chainSchema,
   createHarnessChain,
   type ChainDerived,
-  type ChainHost,
-  type DerivedReader,
   type HarnessChain,
   type HarnessChainDeps,
   type HarnessModule,

@@ -668,7 +668,10 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   priority?: number;
   async?: boolean;
   when:
-    | ((facts: Readonly<InferSchema<M["facts"]>>) => boolean | Promise<boolean>)
+    | ((
+        facts: Readonly<InferSchema<M["facts"]>>,
+        derived: InferDerivations<M>,
+      ) => boolean | Promise<boolean>)
     | FactPredicate<InferSchema<M["facts"]>>;
   require:
     | { type: string; [key: string]: unknown }
@@ -676,6 +679,7 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
     | null
     | ((
         facts: Readonly<InferSchema<M["facts"]>>,
+        derived: InferDerivations<M>,
       ) =>
         | { type: string; [key: string]: unknown }
         | { type: string; [key: string]: unknown }[]
@@ -691,6 +695,7 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
     facts: Readonly<InferSchema<M["facts"]>>,
     prev: InferSchema<M["facts"]> | null,
+    derived: InferDerivations<M>,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
   /**
    * Fact keys **and** derivation IDs, the same as a module-defined effect's.
