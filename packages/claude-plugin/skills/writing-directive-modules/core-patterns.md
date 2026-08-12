@@ -34,6 +34,7 @@ const myModule = createModule("name", {
     derivations: {
       isLoading: t.boolean(),
       displayName: t.string(),
+      needsUser: t.boolean(),
     },
     events: {
       increment: {},
@@ -59,22 +60,27 @@ const myModule = createModule("name", {
 
       return facts.user.name;
     },
+    needsUser: (facts) =>
+      facts.phase === "idle" && facts.count > 0 && facts.user === null,
   },
 
   effects: {
+    // run() receives derived third, after facts and prev
     logPhase: {
-      run: (facts, prev) => {
+      run: (facts, prev, derived) => {
         if (prev?.phase !== facts.phase) {
-          console.log(`Phase: ${facts.phase}`);
+          console.log(`Phase: ${facts.phase} (loading: ${derived.isLoading})`);
         }
       },
     },
   },
 
   constraints: {
+    // when() and require() receive derived second — gate on the derivation
+    // instead of re-computing the same expression by hand
     fetchWhenReady: {
-      when: (facts) => facts.phase === "idle" && facts.count > 0,
-      require: (facts) => ({ type: "FETCH_USER", userId: "user-1" }),
+      when: (_facts, derived) => derived.needsUser,
+      require: { type: "FETCH_USER", userId: "user-1" },
     },
   },
 

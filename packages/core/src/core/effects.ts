@@ -187,10 +187,16 @@ export interface CreateEffectsOptions<S extends Schema> {
    * namespace instead of a value, silently. Passing it in removes the
    * reach-back entirely.
    *
-   * Reads through it track, so a synchronous effect that consults a derivation
-   * is woken when that derivation moves without naming it in `deps`. An async
-   * effect still has to declare — its reads happen past an `await`, where
-   * auto-tracking cannot see them, whichever door they came through.
+   * Reads through it track **on the auto-tracked path only** — a body with no
+   * explicit `deps`, reading before its first `await`. Two cases do not track,
+   * and both are the rule that already applies to facts:
+   *
+   * - `deps` declared: the array is the whole dependency set. A derivation read
+   *   through `derived` but not named there will not re-run the effect.
+   * - A read past an `await`: auto-tracking is a synchronous stack and has
+   *   already closed. Either name it in `deps` **or move the read above the
+   *   first `await`**, which is what the runtime warning tells you and which
+   *   keeps the body auto-tracked.
    *
    * Supplied by the engine; a manager built without derivations gets an empty
    * object, which is what it has.

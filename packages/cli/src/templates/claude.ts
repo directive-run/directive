@@ -130,8 +130,11 @@ Key rules:
 
 ## Constraints
 
-- \`when(facts)\` → boolean. When true, requirement is emitted.
-- \`require(facts)\` → \`{ type: "TYPE", ...data }\` object (never string literal)
+- \`when(facts, derived)\` → boolean. When true, requirement is emitted.
+- \`require(facts, derived)\` → \`{ type: "TYPE", ...data }\` object (never string literal)
+- \`derived\` is this module's OWN derivations — read it instead of closing over
+  \`system.derive\`, which resolves a module name (\`undefined\`) once composed.
+  \`crossModuleDeps\` widens \`facts\`, not \`derived\`.
 - \`priority: number\` — higher evaluated first
 - \`after: ["constraintName"]\` — ordering within same priority
 - Async: \`async: true\` + \`deps: ['factName']\` (deps REQUIRED for async)

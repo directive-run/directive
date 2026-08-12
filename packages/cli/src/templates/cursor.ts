@@ -111,7 +111,9 @@ Chainable: \`.default()\`, \`.validate()\`, \`.transform()\`, \`.brand<>()\`, \`
 ## Key Pattern: Constraint → Requirement → Resolver
 
 When the user wants "do X when Y": create THREE things:
-1. **Constraint**: \`when: (facts) => Y_condition\` → \`require: { type: "DO_X" }\`
+1. **Constraint**: \`when: (facts, derived) => Y_condition\` → \`require: { type: "DO_X" }\`
+   \`derived\` is this module's own derivations (effects get it third, after \`facts\`
+   and \`prev\`). Read it instead of closing over \`system.derive\`.
 2. **Resolver**: handles "DO_X", calls API, sets \`context.facts\`
 3. They are **decoupled**. Constraint declares need, resolver fulfills it.
 `;

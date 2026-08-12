@@ -192,8 +192,14 @@ export interface PollingConstraintOptions<S extends Schema> {
   intervalMs: number;
   /** Key in facts to store last poll time */
   lastPollKey: keyof S;
-  /** Condition for when polling should be active */
-  when?: (facts: Facts<S>) => boolean;
+  /**
+   * Condition for when polling should be active.
+   *
+   * Receives `derived` as its second argument, the same position a
+   * constraint's own `when` gets it — read it rather than reaching back
+   * through `system.derive`.
+   */
+  when?: (facts: Facts<S>, derived: Record<string, unknown>) => boolean;
   /** Action to perform on each poll */
   action: (facts: Facts<S>, signal: AbortSignal) => Promise<void> | void;
   /** Custom clock function for testability (default: Date.now) */
@@ -209,7 +215,7 @@ export interface PollingConstraintOptions<S extends Schema> {
  *   id: "pollStatus",
  *   intervalMs: 5000,
  *   lastPollKey: "lastStatusPoll",
- *   when: (facts) => facts.isOnline,
+ *   when: (facts, derived) => facts.isOnline && !derived.isPaused,
  *   action: async (facts) => {
  *     const status = await fetchStatus();
  *     facts.status = status;
@@ -236,9 +242,9 @@ export function createPollingConstraint<S extends Schema>(
 
   const constraints: ConstraintsDef<S> = {
     [id]: {
-      when: (facts) => {
+      when: (facts, derived) => {
         // Check custom condition
-        if (when && !when(facts)) return false;
+        if (when && !when(facts, derived)) return false;
 
         // Check if enough time has passed
         const lastPoll = getFact(facts, lastPollKey) as number | undefined;
@@ -282,8 +288,14 @@ export interface DebouncedConstraintOptions<S extends Schema> {
   firstChangeKey: keyof S;
   /** Key in facts to store last processed value (prevents re-processing) */
   processedValueKey: keyof S;
-  /** Condition for when debounce should be active (optional) */
-  when?: (facts: Facts<S>) => boolean;
+  /**
+   * Condition for when debounce should be active (optional).
+   *
+   * Receives `derived` as its second argument, the same position a
+   * constraint's own `when` gets it — read it rather than reaching back
+   * through `system.derive`.
+   */
+  when?: (facts: Facts<S>, derived: Record<string, unknown>) => boolean;
   /** Action to perform after debounce period */
   action: (facts: Facts<S>, signal: AbortSignal) => Promise<void> | void;
   /** Custom clock function for testability (default: Date.now) */
@@ -310,6 +322,8 @@ export interface DebouncedConstraintOptions<S extends Schema> {
  *   watchKey: "searchQuery",
  *   firstChangeKey: "searchFirstChange",
  *   processedValueKey: "lastProcessedQuery",
+ *   // derived is this module's derivations, typed Record<string, unknown> here
+ *   when: (_facts, derived) => Boolean(derived.searchEnabled),
  *   action: async (facts) => {
  *     facts.searchResults = await search(facts.searchQuery);
  *   },
@@ -344,9 +358,9 @@ export function createDebouncedConstraint<S extends Schema>(
 
   const constraints: ConstraintsDef<S> = {
     [id]: {
-      when: (facts) => {
+      when: (facts, derived) => {
         // Check custom condition
-        if (when && !when(facts)) return false;
+        if (when && !when(facts, derived)) return false;
 
         // Get current and processed values
         const value = getFact(facts, watchKey);
@@ -524,8 +538,14 @@ export interface ValidationConstraintOptions<S extends Schema> {
   watchKeys: Array<keyof S>;
   /** Validation rules to apply */
   rules: ValidationRule<S>[];
-  /** Only validate when this condition is true (optional) */
-  when?: (facts: Facts<S>) => boolean;
+  /**
+   * Only validate when this condition is true (optional).
+   *
+   * Receives `derived` as its second argument, the same position a
+   * constraint's own `when` gets it — read it rather than reaching back
+   * through `system.derive`.
+   */
+  when?: (facts: Facts<S>, derived: Record<string, unknown>) => boolean;
 }
 
 export interface ValidationError {
@@ -548,6 +568,8 @@ export interface ValidationError {
  *   validKey: "formValid",
  *   hashKey: "formValidationHash", // Tracks what was validated
  *   watchKeys: ["email", "password"], // Only re-validate when these change
+ *   // derived is this module's derivations, typed Record<string, unknown> here
+ *   when: (_facts, derived) => Boolean(derived.formTouched),
  *   rules: [
  *     {
  *       id: "emailRequired",
@@ -584,9 +606,9 @@ export function createValidationConstraint<S extends Schema>(
 
   const constraints: ConstraintsDef<S> = {
     [id]: {
-      when: (facts) => {
+      when: (facts, derived) => {
         // Check custom condition
-        if (when && !when(facts)) return false;
+        if (when && !when(facts, derived)) return false;
 
         // Compute current hash of watched values
         const currentHash = computeHash(facts);

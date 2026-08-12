@@ -441,7 +441,9 @@ export const ${camelName} = createModule("${name}", {
   constraints: {
     needsRun: {
       priority: 100,
-      when: (facts) => facts.status === "thinking",
+      // when() and require() receive \`derived\` second — gate on the
+      // derivation instead of re-computing the same expression here
+      when: (_facts, derived) => derived.isThinking,
       require: (facts) => ({
         type: "RUN_AGENT",
         input: facts.input,

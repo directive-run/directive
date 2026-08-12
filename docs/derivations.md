@@ -141,8 +141,8 @@ schema: {
 
 effects: {
   warnOnLargeCart: {
-    run: (facts, prev) => {
-      if (prev?.items.length !== facts.items.length && facts.items.length > 100) {
+    run: (_facts, prev, derived) => {
+      if (prev?.items.length !== derived.itemCount && derived.itemCount > 100) {
         console.log("over 100");
       }
     },
@@ -166,21 +166,59 @@ resolvers: {
 },
 ```
 
-All three receive the module's derivations. A derivation body is called
-`(facts, derived)`; a constraint's `when()` and `require()` take `derived`
-second as well, and an effect's `run()` takes it third, after `prev` — which is
-how the constraint above gates on `itemCount` instead of recounting the array.
+## Reading derivations from constraints and effects
 
-Read `derived` rather than reaching back through `system.derive`. The parameter
-is scoped to the module that declared it, so it keeps meaning the same thing
-once the module is composed into a `createSystem({ modules })` — `system.derive`
-resolves a module *name* in that shape, and the same read that returned a value
-in a single-module system silently returns `undefined`.
+Your constraint needs to gate on something computed. Your effect needs to
+report a running total. Both get the module's derivations as a parameter:
 
-Reads through it are tracked. A constraint or a synchronous effect that
-consults a derivation is re-evaluated when that derivation moves, without
-naming it in `deps`. An async effect still has to declare its dependencies —
-its reads happen past an `await`, where auto-tracking cannot see them.
+| Body | Signature |
+| --- | --- |
+| derivation | `(facts, derived)` |
+| constraint `when` / `require` | `(facts, derived)` |
+| effect `run` | `(facts, prev, derived)` |
+
+`derived` is third for effects because `prev` already holds second. An effect
+that wants derivations and not `prev` writes `run: (_facts, _prev, derived)`.
+
+**Read `derived` rather than reaching back through `system.derive`.** The
+parameter is scoped to the module that declared the derivation, so it means the
+same thing wherever the module ends up. `system.derive` is the single-module
+accessor: in a `createSystem({ modules })` system it resolves a module *name*,
+so the identical read that returned a value alone returns `undefined` once
+composed — and a gate reading `undefined` is falsy, fires nothing, and says
+nothing about why.
+
+The scoping is strict in both directions: there is no way to reach *another*
+module's derivations through `derived`. That is narrower than facts, where
+`crossModuleDeps` grants cross-module reads.
+
+### When a read is tracked
+
+A read through `derived` records a dependency on the **auto-tracked path** — a
+synchronous body, no explicit `deps`, reading before any `await`. Such a body is
+re-evaluated when the derivation moves without naming it anywhere.
+
+Three cases do not track, and each is the rule that already applies to facts:
+
+- **`deps` is declared.** The array is the whole dependency set; a derivation
+  read but not named there will not wake the body.
+- **`async: true` on a constraint.** The predicate runs outside the tracking
+  context. Declare `deps`.
+- **A read after an `await`.** Auto-tracking is a synchronous stack and has
+  closed. Name it in `deps`, or move the read above the first `await`.
+
+### One consequence worth knowing
+
+An effect with no explicit `deps` that adopts `derived` now also re-runs when
+that derivation goes stale — it has acquired a dependency it did not have
+before. That is the parameter working, and it applies only where you use it.
+
+### Not a performance optimization
+
+`derived.itemCount` is not faster than `facts.items.length`. The read goes
+through a proxy and is roughly break-even against recounting a small array. Use
+the parameter because it is correct under composition and because it puts the
+rule in one place — not for speed.
 
 ## Reading external state (the hard case)
 

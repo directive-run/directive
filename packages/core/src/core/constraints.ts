@@ -218,9 +218,19 @@ export interface CreateConstraintsOptions<S extends Schema> {
    * namespace instead of a value, the constraint goes falsy, and nothing runs
    * with nothing logged. Passing it in removes the reach-back entirely.
    *
-   * Reads through it track, so a constraint that consults a derivation is woken
-   * when that derivation moves. Supplied by the engine; a manager built without
-   * derivations gets an empty object, which is what it has.
+   * Reads through it track **on the auto-tracked path only** — a synchronous
+   * `when()` with no explicit `deps`. Three cases do not track, and each is the
+   * same rule that already applies to facts:
+   *
+   * - `deps` declared: the array is the whole dependency set. A derivation read
+   *   through `derived` but not named there will not wake the constraint.
+   * - `async: true`: the predicate is evaluated outside the tracking context,
+   *   because its reads may happen past an `await` where nothing can see them.
+   *   Declare `deps`.
+   * - A read past an `await` in any body: same reason.
+   *
+   * Supplied by the engine; a manager built without derivations gets an empty
+   * object, which is what it has.
    */
   derived?: Record<string, unknown>;
   /** Custom key functions for requirement deduplication, keyed by requirement type. */

@@ -111,7 +111,38 @@ Both can hold `when` predicates. Different jobs:
 
 The constraint's `when` may reference a derivation; that's the canonical
 pattern (compute the condition cheaply once; multiple constraints share
-it).
+it). The derivation arrives as the second argument, alongside `facts`:
+
+```typescript
+derive: {
+  itemCount: (facts) => facts.items.length,
+},
+
+constraints: {
+  trim: {
+    when: (_facts, derived) => derived.itemCount > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+```
+
+An effect's `run` receives it third, after `facts` and `prev`:
+
+```typescript
+effects: {
+  warn: {
+    run: (_facts, _prev, derived) => {
+      if (derived.itemCount > 100) {
+        console.warn("cart is large");
+      }
+    },
+  },
+},
+```
+
+Read the parameter rather than closing over `system.derive` — that is the
+single-module accessor, and it resolves a module *name* instead of a value
+once the module is composed into `createSystem({ modules })`.
 
 ## Worked example
 

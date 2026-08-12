@@ -41,7 +41,7 @@ Declared via `derive: { name: (facts) => … }`. Read at `system.derive.name`. T
 
 ### `constraints` — when-then declarations
 
-Declared via `constraints: { name: { when: …, require: … } }`. The `when` returns a boolean; the `require` returns a requirement.
+Declared via `constraints: { name: { when: …, require: … } }`. Both bodies are `(facts, derived) => …` — the `when` returns a boolean; the `require` returns a requirement. `derived` is this module's own derivations, in the same position a derivation body receives them; read it rather than reaching back through `system.derive`. Re-evaluated on relevant fact **or derivation** changes.
 
 ### `resolvers` — requirement fulfillment
 
@@ -53,7 +53,7 @@ Tagged union `{ type: "FETCH_USER", … }`. Constraints emit them; the runtime d
 
 ### `effects` — side effects from watched changes
 
-Declared via `effects: { name: { run: (facts, prev) => … } }`. Run on relevant fact changes. The auto-tracking dependency model means no `deps` array unless you specifically need a partial dep set.
+Declared via `effects: { name: { run: (facts, prev, derived) => … } }`. Run on relevant fact **or derivation** changes — `derived` is this module's own derivations, third after `facts` and `prev`. The auto-tracking dependency model means no `deps` array unless you specifically need a partial dep set; declaring `deps` routes past the tracking wrapper, so name there everything the body reads.
 
 ### `sources` — typed external event subscriptions
 

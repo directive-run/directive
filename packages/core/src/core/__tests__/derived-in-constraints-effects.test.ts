@@ -269,3 +269,263 @@ describe("derived in effects", () => {
     system.stop();
   });
 });
+
+/**
+ * The findings from the review of this feature, pinned.
+ *
+ * Two kinds live here. Some are behaviours that were broken and are now fixed —
+ * the object protocol below. The rest are limits that are *staying*: the
+ * tracking carve-outs match what facts already do, and documenting a boundary
+ * without a test that holds it there is how the boundary moves.
+ */
+describe("derived is an object", () => {
+  function probeModule() {
+    return createModule("probe", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { doubled: t.number(), tripled: t.number() },
+      },
+      init: (facts) => {
+        facts.n = 1;
+      },
+      derive: {
+        doubled: (facts) => facts.n * 2,
+        tripled: (facts) => facts.n * 3,
+      },
+    });
+  }
+
+  it("answers `in`, Object.keys, spread, and JSON.stringify", async () => {
+    let probe: unknown;
+
+    const module = createModule("probe", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { doubled: t.number(), tripled: t.number() },
+      },
+      init: (facts) => {
+        facts.n = 1;
+      },
+      derive: {
+        doubled: (facts) => facts.n * 2,
+        tripled: (facts) => facts.n * 3,
+      },
+      effects: {
+        record: {
+          run: (_facts, _prev, derived) => {
+            probe = {
+              has: "doubled" in derived,
+              missing: "nope" in derived,
+              keys: Object.keys(derived).sort(),
+              spread: { ...derived },
+              json: JSON.parse(JSON.stringify(derived)),
+            };
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    expect(probe).toEqual({
+      has: true,
+      missing: false,
+      keys: ["doubled", "tripled"],
+      spread: { doubled: 2, tripled: 3 },
+      json: { doubled: 2, tripled: 3 },
+    });
+
+    system.stop();
+  });
+
+  it("answers the same way once the module is composed", async () => {
+    let keys: string[] = [];
+
+    const watcher = createModule("watcher", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { own: t.number() },
+      },
+      init: (facts) => {
+        facts.n = 1;
+      },
+      derive: { own: (facts) => facts.n },
+      effects: {
+        record: {
+          run: (_facts, _prev, derived) => {
+            keys = Object.keys(derived);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({
+      modules: { watcher, other: probeModule() },
+    });
+    system.start();
+    await system.settle();
+
+    // Its own key, bare — not `watcher::own`, and not the other module's.
+    expect(keys).toEqual(["own"]);
+
+    system.stop();
+  });
+
+  it("keeps the prototype guards through enumeration", async () => {
+    let probe: unknown;
+
+    const module = createModule("guarded", {
+      schema: { facts: { n: t.number() }, derivations: { v: t.number() } },
+      init: (facts) => {
+        facts.n = 1;
+      },
+      derive: { v: (facts) => facts.n },
+      effects: {
+        record: {
+          run: (_facts, _prev, derived) => {
+            probe = {
+              proto: Object.getPrototypeOf(derived),
+              polluted: "__proto__" in derived,
+              ctor: "constructor" in derived,
+            };
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    expect(probe).toEqual({ proto: null, polluted: false, ctor: false });
+
+    system.stop();
+  });
+});
+
+describe("when a derived read is tracked, and when it is not", () => {
+  it("does not wake a body that declared deps without naming the derivation", async () => {
+    const seen: boolean[] = [];
+
+    const module = createModule("declared", {
+      schema: {
+        facts: { n: t.number(), unrelated: t.number() },
+        derivations: { big: t.boolean() },
+        requirements: { NOOP: {} },
+      },
+      init: (facts) => {
+        facts.n = 0;
+        facts.unrelated = 0;
+      },
+      derive: { big: (facts) => facts.n > 2 },
+      constraints: {
+        gate: {
+          // `deps` is the whole dependency set. `big` is read but not named,
+          // so moving it does not bring the constraint back. Same rule as facts.
+          deps: ["unrelated"],
+          when: (_facts, derived) => {
+            seen.push(derived.big);
+
+            return false;
+          },
+          require: { type: "NOOP" },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    const before = seen.length;
+    system.facts.n = 50;
+    await system.settle();
+
+    expect(seen.length).toBe(before);
+
+    system.stop();
+  });
+
+  it("wakes that same body once the derivation is named in deps", async () => {
+    const seen: boolean[] = [];
+
+    const module = createModule("named", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { big: t.boolean() },
+        requirements: { NOOP: {} },
+      },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      derive: { big: (facts) => facts.n > 2 },
+      constraints: {
+        gate: {
+          deps: ["big"],
+          when: (_facts, derived) => {
+            seen.push(derived.big);
+
+            return false;
+          },
+          require: { type: "NOOP" },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    const before = seen.length;
+    system.facts.n = 50;
+    await system.settle();
+
+    expect(seen.length).toBeGreaterThan(before);
+    expect(seen.at(-1)).toBe(true);
+
+    system.stop();
+  });
+});
+
+describe("dynamic registration receives derived", () => {
+  it("hands it to a constraint registered after start", async () => {
+    const module = createModule("dyn", {
+      schema: {
+        facts: { n: t.number(), hits: t.number() },
+        derivations: { big: t.boolean() },
+        requirements: { BUMP: {} },
+      },
+      init: (facts) => {
+        facts.n = 0;
+        facts.hits = 0;
+      },
+      derive: { big: (facts) => facts.n > 2 },
+      resolvers: {
+        bump: {
+          requirement: "BUMP",
+          resolve: async (_req, context) => {
+            context.facts.hits += 1;
+            context.facts.n = 0;
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+
+    system.constraints.register("late", {
+      when: (_facts, derived) => derived.big,
+      require: { type: "BUMP" },
+    });
+
+    system.facts.n = 10;
+    await system.settle();
+
+    expect(system.facts.hits).toBe(1);
+
+    system.stop();
+  });
+});

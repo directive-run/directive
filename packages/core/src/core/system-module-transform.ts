@@ -236,28 +236,33 @@ function prefixPredicateSpec(
 /** Shared empty set used when recursing into a pivot (no nested pivots). */
 const EMPTY_DEP_SET: ReadonlySet<string> = new Set<string>();
 
-/** Stand-in derive store for a caller that supplied none. */
-const EMPTY_DERIVE: Record<string, unknown> = Object.freeze(
-  Object.create(null),
-);
-
 /**
  * The module's view of the system's derivations.
  *
- * The engine always supplies the flat derive store, so the `?? EMPTY_DERIVE`
- * arm is for whoever invokes a transformed definition directly — an adapter, a
- * unit test. Those get a store with nothing in it rather than a thrown
- * TypeError from the proxy cache, which is the honest answer: a caller that
- * passed no derivations has none to offer.
+ * A missing `derive` store used to fall back to a frozen empty object, on the
+ * reasoning that nothing-to-offer is the honest answer for a caller that passed
+ * nothing. It is not. Every read then returns `undefined`, so a gate written
+ * `when: (_facts, derived) => derived.ready` reads falsy and the constraint
+ * never fires — indistinguishable from a precondition that is legitimately
+ * unmet, with no error, no warning, and no trace entry. That is the failure
+ * this whole parameter exists to end, reintroduced at its own edge.
+ *
+ * The engine supplies the store on both managers, so this throws only for a
+ * caller invoking a transformed definition directly — an adapter, a harness, a
+ * future engine path that forgets to thread it. Each of those is a wiring bug,
+ * and a wiring bug should say so.
  */
 function moduleDerive(
   derive: unknown,
   namespace: string,
 ): Record<string, unknown> {
-  return createModuleDeriveProxy(
-    (derive as Record<string, unknown> | undefined) ?? EMPTY_DERIVE,
-    namespace,
-  );
+  if (derive === undefined || derive === null) {
+    throw new Error(
+      `[Directive] a constraint or effect of module "${namespace}" was invoked without the system's derivations. Every \`derived\` read would return undefined and every gate reading one would go falsy, silently. If you are calling a transformed definition directly, pass the derive store as the last argument.`,
+    );
+  }
+
+  return createModuleDeriveProxy(derive as Record<string, unknown>, namespace);
 }
 
 /**

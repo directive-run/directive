@@ -200,6 +200,34 @@ const dataModule = createModule("data", {
 });
 ```
 
+### `derived` is scoped to the own module
+
+`crossModuleDeps` widens `facts` — it does **not** widen `derived`. A constraint's `when` / `require` receive `derived` as their second argument, an effect's `run` as its third, and in every case it holds only the derivations declared by the module reading it. There is no `derived.auth.*`; the read returns `undefined`.
+
+```typescript
+const dataModule = createModule("data", {
+  schema: {
+    facts: { items: t.array(t.string()) },
+    derivations: { isEmpty: t.boolean() },
+  },
+  crossModuleDeps: { auth: authSchema },
+
+  derive: {
+    isEmpty: (facts) => facts.self.items.length === 0,
+  },
+
+  constraints: {
+    fetchWhenAuth: {
+      // facts crosses the boundary; derived does not
+      when: (facts, derived) => facts.auth.isAuthenticated && derived.isEmpty,
+      require: { type: "FETCH_ITEMS" },
+    },
+  },
+});
+```
+
+This is intentional and permanent. A derivation is a module's private computation over its own facts, and two modules are free to declare derivations of the same name from different facts — `derived.total` always means *this* module's `total`, whatever else the system holds. To act on another module's computed value, either declare your own derivation over the cross-module facts you already depend on (`facts.auth.*`), or have the owning module publish the value as a fact.
+
 ## Common Mistakes
 
 ### Using bare `facts.*` instead of `facts.self.*`
