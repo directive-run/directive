@@ -12,6 +12,7 @@ function makeInspection(
   return {
     unmet: [],
     inflight: [],
+    pendingInvalidations: 0,
     facts: [],
     events: [],
     constraints: [],

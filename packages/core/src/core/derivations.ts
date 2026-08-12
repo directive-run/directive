@@ -83,6 +83,20 @@ export interface DerivationsManager<
    * from the announcement, and what it costs.
    */
   collectInvalidated(out: Set<string>): void;
+  /**
+   * How many derivations have moved since the last drain and not yet been
+   * announced.
+   *
+   * Non-zero at the end of a reconcile means the system is about to report
+   * quiescence while still holding something to say. That was reachable: the
+   * drain ran once, before effects, so anything an effect invalidated arrived
+   * after the only reader and sat here until an unrelated write happened by.
+   *
+   * Exposed rather than kept private because "settled, with N undelivered
+   * announcements" is the one number that distinguishes a system that is
+   * finished from one that has merely stopped.
+   */
+  pendingInvalidationCount(): number;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
   /** Override an existing derivation function */
@@ -924,6 +938,23 @@ export function createDerivationsManager<
 
     markObserved(id: string): void {
       observedIds.add(id);
+    },
+
+    pendingInvalidationCount(): number {
+      // Nothing outside the graph is watching, so there is no announcement to
+      // make and the roots are not pending on anyone — the same reasoning
+      // `collectInvalidated` uses to clear them without walking.
+      if (observedIds.size === 0) {
+        return 0;
+      }
+
+      // `allInvalidated` is every watched derivation at once, which is the
+      // largest announcement this manager can owe.
+      if (allInvalidated) {
+        return observedIds.size;
+      }
+
+      return invalidationRoots.size;
     },
 
     collectInvalidated(out: Set<string>): void {
