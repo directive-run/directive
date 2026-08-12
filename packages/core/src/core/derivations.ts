@@ -1006,11 +1006,20 @@ export function createDerivationsManager<
       invalidationRoots.clear();
       const seen = new Set(queue);
 
-      // Every watched derivation the walk can still reach is one it has not
-      // reached yet, so once it has reached all of them there is nothing left
-      // to find. `seen` makes each node arrive once, so this counts nodes, not
-      // arrivals. Turns a graph where the watched derivations sit near the
-      // changed fact into a walk of a few nodes rather than the whole cone.
+      // Once the walk has reached every watched derivation there is nothing
+      // left to find, so it can stop. `seen` makes each node arrive once, so
+      // this counts nodes rather than arrivals.
+      //
+      // Worth being honest about its reach: the bound is the *global* watched
+      // count while the walk starts from roots that are usually local to one
+      // module, so it only fires when a single walk can reach everything being
+      // watched anywhere in the system. In practice that means one observed
+      // derivation, or a system small enough not to care. The bound that would
+      // actually fire is "observed nodes reachable from these roots", which is
+      // not known before walking — computing it is the walk. Left as-is because
+      // a correct-but-rarely-triggered early exit costs one comparison per
+      // visited node, and the alternative is a cache with its own invalidation
+      // problem.
       const watched = observedIds.size;
       let reached = 0;
 
