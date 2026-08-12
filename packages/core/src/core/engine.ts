@@ -1134,6 +1134,21 @@ export function createEngine<S extends Schema>(
       derivationsManager.collectInvalidated(state.changedKeys);
       await effectsManager.runEffects(state.changedKeys);
 
+      // Again, because effects write facts.
+      //
+      // The drain above happens before `runEffects` so an effect gated on a
+      // derivation is woken by it. But an effect that *writes* a fact
+      // invalidates whatever derivations read that fact, and those roots land
+      // after that drain has already run — so without this second call the
+      // announcement misses the constraint pass immediately below, the pass
+      // ends with `changedKeys` cleared, and nothing is scheduled to carry it.
+      // The derivation still reads correctly on pull; only the wakeup is lost,
+      // which is why it survived a snapshot assertion for so long.
+      //
+      // Early-returns on an empty root set, so a reconcile in which no effect
+      // wrote anything pays one `Set.size` check.
+      derivationsManager.collectInvalidated(state.changedKeys);
+
       // Copy changed keys for constraint evaluation before clearing
       const keysForConstraints = new Set(state.changedKeys);
 
@@ -1334,7 +1349,14 @@ export function createEngine<S extends Schema>(
       // to climb toward MAX in long-running systems with continuous changes.
       reconcileDepth = 0;
 
-      if (state.changedKeys.size > 0) {
+      // A changed fact is not the only thing that leaves work undone. A
+      // derivation may have been invalidated by something that touches no fact
+      // key at all — a definition replaced at runtime — which leaves the system
+      // with something to say and no pass in which to say it.
+      if (
+        state.changedKeys.size > 0 ||
+        derivationsManager.pendingInvalidationCount() > 0
+      ) {
         scheduleReconcile();
       }
 
@@ -2246,6 +2268,11 @@ export function createEngine<S extends Schema>(
       return {
         unmet: state.previousRequirements.all(),
         inflight: resolversManager.getInflightInfo(),
+        // Derivations that have moved and not yet been announced. Zero on a
+        // system that has finished; non-zero on one that has merely stopped.
+        // The distinction is invisible from every other field here, and it is
+        // the one that separates a correct settle from a premature one.
+        pendingInvalidations: derivationsManager.pendingInvalidationCount(),
         facts: Object.keys(mergedSchema).map((key) => ({
           key,
           meta: (
@@ -2481,7 +2508,13 @@ export function createEngine<S extends Schema>(
         resolversManager.getInflightCount() === 0 &&
         !state.isReconciling &&
         !state.reconcileScheduled &&
-        !resolversManager.hasPendingBatches();
+        !resolversManager.hasPendingBatches() &&
+        // A derivation that has moved and not been announced is work this
+        // system still owes. Resolving here would report quiescence while
+        // holding something to say — which is how a handler returns
+        // pre-resolution state, and how a durable object hibernates over a
+        // requirement that was never emitted.
+        derivationsManager.pendingInvalidationCount() === 0;
 
       // Flush pending batches and yield once for microtasks
       if (resolversManager.hasPendingBatches()) {
@@ -2817,7 +2850,11 @@ export function createEngine<S extends Schema>(
         resolversManager.getInflightCount() === 0 &&
         !resolversManager.hasPendingBatches() &&
         !state.isReconciling &&
-        !state.reconcileScheduled
+        !state.reconcileScheduled &&
+        // See the matching clause in `settle()`. Both answers to "is this
+        // system finished" have to agree, or the polled one contradicts the
+        // awaited one.
+        derivationsManager.pendingInvalidationCount() === 0
       );
     },
 

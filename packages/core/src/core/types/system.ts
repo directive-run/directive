@@ -276,6 +276,17 @@ export interface TraceEntry {
 export interface SystemInspection {
   unmet: RequirementWithId[];
   inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+  /**
+   * Derivations that have moved since the last announcement and have not been
+   * announced yet.
+   *
+   * Zero on a system that has finished. Non-zero on one that has only stopped —
+   * it still has something to tell its constraints and effects, and no other
+   * field here says so. `settle()` will not resolve while this is above zero,
+   * so seeing it non-zero alongside a settled system means something is wrong
+   * with the engine rather than with your rules.
+   */
+  pendingInvalidations: number;
   /** All fact/schema field keys with optional metadata */
   facts: Array<{ key: string; meta?: DefinitionMeta }>;
   /** All event names with optional metadata */
