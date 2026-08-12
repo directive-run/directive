@@ -13,6 +13,7 @@ import { attributeError, freezeSpec } from "../utils/utils.js";
 import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
 import {
   BLOCKED_PROPS,
+  currentTrackingKind,
   derivationDep,
   derivationDepId,
   describeDep,
@@ -97,6 +98,16 @@ export interface DerivationsManager<
    * finished from one that has merely stopped.
    */
   pendingInvalidationCount(): number;
+  /**
+   * How many derivations something outside the graph is watching.
+   *
+   * This is the bound the per-reconcile invalidation walk is measured against,
+   * so it is the number that explains why that walk costs what it costs. It was
+   * unobservable, which meant the two ways it goes wrong — a reader registering
+   * a node nothing external actually watches, and a set that only ever grows —
+   * were both invisible from outside.
+   */
+  observedCount(): number;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
   /** Override an existing derivation function */
@@ -248,23 +259,6 @@ export function createDerivationsManager<
    * does no work at all.
    */
   const observedIds = new Set<string>();
-
-  /**
-   * How many derivation bodies are on the stack.
-   *
-   * The composition proxy is handed to derivation bodies *and*, since
-   * constraints and effects gained their `derived` parameter, to those too — so
-   * a read through it no longer implies the reader is inside the graph. This
-   * tells the two apart: at depth zero the reader is a constraint or an effect,
-   * which is an outside watcher and has to be recorded as one; deeper, it is
-   * one derivation composing another, which the `derivedToDerivedDeps` graph
-   * already invalidates without help.
-   *
-   * Counted rather than flagged because a derivation body may compute another
-   * derivation while running, and the inner one finishing does not put the
-   * reader back outside.
-   */
-  let computingDepth = 0;
 
   /**
    * Derivations whose own dependency changed since the last drain.
@@ -473,7 +467,6 @@ export function createDerivationsManager<
     }
 
     state.isComputing = true;
-    computingDepth++;
 
     try {
       // Capture old value before recomputation
@@ -483,12 +476,32 @@ export function createDerivationsManager<
       let deps: Set<string>;
 
       if (state.depsStable && state.dependencies.size > 0) {
-        // Fast path: deps are stable — skip withTracking() overhead
-        value = def(facts, derivedProxy);
+        // Fast path: the dep set has not moved in STABLE_THRESHOLD runs, so
+        // there is nothing to learn from tracking this body's reads.
+        //
+        // It still needs a frame. Without one the body's reads land in whatever
+        // frame is above it on the stack — and when a derivation is pulled from
+        // inside a constraint's `when()`, that is the constraint's dependency
+        // set. The constraint silently acquires the derivation's *private* fact
+        // reads, which defeats the point of a derivation being an encapsulated
+        // node, and makes `getDependencies()` and the devtools graph report a
+        // different shape after the threshold trips than before it. Two runs of
+        // the same program, two dependency graphs.
+        //
+        // The frame is pushed as a `"derivation"` so reads through it are
+        // internal edges, and its dep set is discarded — the stable set is the
+        // answer, and recomputing it is the work this path exists to skip.
+        value = withTracking(
+          () => def(facts, derivedProxy),
+          "derivation",
+        ).value;
         deps = state.dependencies;
       } else {
         // Full tracking path
-        const tracked = withTracking(() => def(facts, derivedProxy));
+        const tracked = withTracking(
+          () => def(facts, derivedProxy),
+          "derivation",
+        );
         value = tracked.value;
         deps = tracked.deps;
 
@@ -526,7 +539,6 @@ export function createDerivationsManager<
       throw error;
     } finally {
       state.isComputing = false;
-      computingDepth--;
     }
   }
 
@@ -699,7 +711,7 @@ export function createDerivationsManager<
       // set every reconcile, so this derivation has to be in the set that gets
       // collected. Without it the gate reads the value once and is never woken
       // again — silently, which is the failure this parameter exists to end.
-      if (computingDepth === 0 && isTracking()) {
+      if (currentTrackingKind() === "observer") {
         observedIds.add(prop);
       }
 
@@ -733,7 +745,7 @@ export function createDerivationsManager<
         return false;
       }
       trackAccess(derivationDep(prop));
-      if (computingDepth === 0 && isTracking()) {
+      if (currentTrackingKind() === "observer") {
         observedIds.add(prop);
       }
 
@@ -821,17 +833,17 @@ export function createDerivationsManager<
       // rendering, a test asserting — records nothing and watches nothing
       // through this channel, so it does not mark.
       //
-      // Gated on `computingDepth` for the same reason the composition proxy is:
+      // Gated on the frame kind for the same reason the composition proxy is:
       // a derivation body that happens to read through this door instead of its
       // `derived` parameter is still an internal edge, and marking it observed
       // put a node nothing outside the graph watches into the set that bounds
       // the invalidation walk — inflating the bound and announcing a name no
       // constraint or effect matches. Two doors onto one value; one rule.
-      if (computingDepth === 0 && isTracking()) {
+      if (isTracking()) {
         trackAccess(derivationDep(id as string));
-        observedIds.add(id as string);
-      } else if (isTracking()) {
-        trackAccess(derivationDep(id as string));
+        if (currentTrackingKind() === "observer") {
+          observedIds.add(id as string);
+        }
       }
 
       const state = getState(id as string);
@@ -938,6 +950,10 @@ export function createDerivationsManager<
 
     markObserved(id: string): void {
       observedIds.add(id);
+    },
+
+    observedCount(): number {
+      return observedIds.size;
     },
 
     pendingInvalidationCount(): number {

@@ -5,8 +5,35 @@
  * When a derivation accesses a fact, the tracking context records it.
  */
 
-/** Stack of active dependency sets (bare Sets for zero-allocation hot path) */
-const depStack: Set<string>[] = [];
+/**
+ * What kind of body is on the tracking stack.
+ *
+ * The distinction exists because a derivation read means two different things
+ * depending on who is reading. A derivation body reading another derivation is
+ * an *internal edge* — the derivation graph already knows how to invalidate
+ * along it. A constraint or an effect reading one is an *external observer*,
+ * and the derivations manager has to record that something outside the graph is
+ * watching, or that reader is never woken when the value moves.
+ *
+ * Carried on the frame rather than in a parallel counter. A counter lives in one
+ * module while the stack lives in another, so the two have to be kept in
+ * agreement by hand — and they were not: one of the two doors onto a derivation
+ * consulted the counter and the other did not. This is how the reactive
+ * literature does it too. MobX hangs the current `IDerivation` off global state
+ * and distinguishes `ComputedValue` from `Reaction` by class; Solid's `Listener`
+ * holds a `Computation` with a `pure` flag; Adapton distinguishes edges by the
+ * articulation point that demanded them. In none of them is the answer a
+ * recursion depth.
+ */
+export type TrackingKind = "derivation" | "observer";
+
+interface TrackingFrame {
+  deps: Set<string>;
+  kind: TrackingKind;
+}
+
+/** Stack of active tracking frames. */
+const depStack: TrackingFrame[] = [];
 
 /**
  * Get the current dependency set, or null if not tracking.
@@ -17,7 +44,22 @@ const depStack: Set<string>[] = [];
  */
 export function getCurrentDeps(): Set<string> | null {
   const len = depStack.length;
-  return len === 0 ? null : depStack[len - 1]!;
+  return len === 0 ? null : depStack[len - 1]!.deps;
+}
+
+/**
+ * What kind of body is currently tracking, or `null` if none is.
+ *
+ * `"observer"` is the answer that makes a derivation read register a watcher.
+ * Read it rather than inferring the same thing from a depth or a flag — there
+ * is one stack, and this is the only question worth asking of it.
+ *
+ * @internal
+ */
+export function currentTrackingKind(): TrackingKind | null {
+  const len = depStack.length;
+
+  return len === 0 ? null : depStack[len - 1]!.kind;
 }
 
 /**
@@ -45,9 +87,12 @@ export function isTracking(): boolean {
  *
  * @internal
  */
-export function withTracking<T>(fn: () => T): { value: T; deps: Set<string> } {
+export function withTracking<T>(
+  fn: () => T,
+  kind: TrackingKind = "observer",
+): { value: T; deps: Set<string> } {
   const deps = new Set<string>();
-  depStack.push(deps);
+  depStack.push({ deps, kind });
 
   try {
     const value = fn();
@@ -98,7 +143,7 @@ export function trackAccess(key: string): void {
   if (len === 0) {
     return;
   }
-  depStack[len - 1]!.add(key);
+  depStack[len - 1]!.deps.add(key);
 }
 
 // ============================================================================

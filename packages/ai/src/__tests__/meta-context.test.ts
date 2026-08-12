@@ -13,6 +13,7 @@ function makeInspection(
     unmet: [],
     inflight: [],
     pendingInvalidations: 0,
+    observedDerivations: 0,
     facts: [],
     events: [],
     constraints: [],

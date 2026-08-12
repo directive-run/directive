@@ -287,6 +287,16 @@ export interface SystemInspection {
    * with the engine rather than with your rules.
    */
   pendingInvalidations: number;
+  /**
+   * Derivations something outside the derivation graph is watching — a
+   * constraint's `when()`, an effect's body, a name in an explicit `deps`.
+   *
+   * The invalidation walk each reconcile is bounded against this count, so it
+   * is what explains that walk's cost. A number far larger than the derivations
+   * your constraints and effects actually read means something is registering
+   * watchers that nothing is waiting on.
+   */
+  observedDerivations: number;
   /** All fact/schema field keys with optional metadata */
   facts: Array<{ key: string; meta?: DefinitionMeta }>;
   /** All event names with optional metadata */
