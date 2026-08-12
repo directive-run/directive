@@ -2273,6 +2273,11 @@ export function createEngine<S extends Schema>(
         // The distinction is invisible from every other field here, and it is
         // the one that separates a correct settle from a premature one.
         pendingInvalidations: derivationsManager.pendingInvalidationCount(),
+        // How many derivations something outside the derivation graph watches.
+        // The per-reconcile invalidation walk is bounded against this, so it is
+        // the number that explains that walk's cost — and the number that shows
+        // a reader registering a node nothing external is actually waiting on.
+        observedDerivations: derivationsManager.observedCount(),
         facts: Object.keys(mergedSchema).map((key) => ({
           key,
           meta: (
