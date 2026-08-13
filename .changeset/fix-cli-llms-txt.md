@@ -1,4 +1,4 @@
-﻿---
+---
 "@directive-run/cli": patch
 ---
 

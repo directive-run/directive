@@ -1,4 +1,4 @@
-﻿import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateLlmsTxt } from "../src/templates/llms-txt.js";
