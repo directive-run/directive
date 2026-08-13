@@ -372,7 +372,7 @@
   ```
 - `EffectDefinition` — Effect definition - side effects with optional cleanup.
   ```ts
-  export interface EffectDef<S extends Schema> {
+  export interface EffectDef<
   ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
@@ -603,7 +603,7 @@
   ```
 - `EffectsDefinition` — Map of effect definitions
   ```ts
-  export type EffectsDef<S extends Schema> = Record<string, EffectDef<S>>;
+  export type EffectsDef<
   ```
 - `EventsDefinition` — Events definition - accepts any event handler signature
   ```ts
@@ -1094,6 +1094,10 @@
   ```ts
   function derivedConstraint(derivationId: string, condition: (value: unknown) => boolean, action: {
   ```
+- `describeUnpricedReason` — The one-line explanation for a call priced by estimate, shared so that every
+  ```ts
+  function describeUnpricedReason(reason: UnpricedReason): string
+  ```
 - `detectAndRedactPII` — Detect PII in text and return a result whose `redactedText` is populated.
   ```ts
   function detectAndRedactPII(text: string, options: {
@@ -1205,6 +1209,10 @@
   ```ts
   function isGuardrailError(error: unknown): boolean
   ```
+- `isStreamConsumerError` — Is this error – or anything it was thrown through – a consumer-side throw?
+  ```ts
+  function isStreamConsumerError(error: unknown): boolean
+  ```
 - `mapStream` — Transform stream chunks.
   ```ts
   function mapStream(stream: AsyncIterable<StreamChunk>, fn: (chunk: StreamChunk) => R | Promise<R>): AsyncIterable<R>
@@ -1239,10 +1247,6 @@
   function mergeTaggedStreams(sources: TaggedSource[]): MergedTaggedStreamResult
   ```
 - `parallel` — Create a parallel execution pattern that runs handlers concurrently and merges results.
-- `parseHttpStatus` — Extract HTTP status code from error message or error properties.
-  ```ts
-  function parseHttpStatus(error: Error): number | null
-  ```
 - `parseRetryAfter` — Extract Retry-After value (in ms) from error message.
   ```ts
   function parseRetryAfter(error: Error): number | null
@@ -1286,6 +1290,10 @@
   ```ts
   function predicateToolSpecOpenAI(schema: unknown, opts: PredicateToolSpecOptions = {}): PredicateToolSpecOpenAI
   ```
+- `priceCall` — Price one call: what it cost, and on what basis.
+  ```ts
+  function priceCall(snapshot: UsageSnapshot, pricing: ResolvedPricing, estimate: number): PricedCall
+  ```
 - `race` — Create a race pattern that runs handlers concurrently and returns the first successful result.
   ```ts
   function race(handlers: string[], options?: {
@@ -1297,6 +1305,10 @@
 - `reflect` — Create a reflect pattern that iterates between a producer and evaluator until quality is met.
   ```ts
   function reflect(handler: string, evaluator: string, options?: {
+  ```
+- `requireModelPricing` — Look up one model's rates in a published pricing table, or throw saying why.
+  ```ts
+  function requireModelPricing(table: Record<string, ModelPricing>, model: string): ModelPricing
   ```
 - `runAgentRequirement` — Create a `RUN_AGENT` requirement object for use in constraint `require()` functions.
   ```ts
@@ -1311,6 +1323,14 @@
 - `sequential` — Create a sequential execution pattern that pipes output from one handler to the next.
   ```ts
   function sequential(handlers: string[], options?: {
+  ```
+- `snapshotCallUsage` — Read a call result's token usage exactly once, and resolve it.
+  ```ts
+  function snapshotCallUsage(result: Pick<RunResult, "tokenUsage"> | undefined): UsageSnapshot
+  ```
+- `snapshotTokenPricing` — Validate a caller-supplied pricing object and snapshot its rates into owned
+  ```ts
+  function snapshotTokenPricing(pricing: TokenPricing | undefined, label: string, api: string): ResolvedPricing
   ```
 - `spawnOnCondition` — Create a constraint that auto-runs a single agent when a condition is met.
   ```ts
@@ -1328,7 +1348,7 @@
   ```
 - `toTokenPricingTable` — Widen a table of bare `{ input, output }` rates into {@link ModelPricing},
   ```ts
-  function toTokenPricingTable(table: Record<string, BareTokenRates>): Record<string, ModelPricing>
+  function toTokenPricingTable(table: Record<string, BareTokenRates>, label?: string): Record<string, ModelPricing>
   ```
 - `validateBaseURL` — Validate that a base URL uses the `http:` or `https:` protocol.
   ```ts
@@ -1393,6 +1413,10 @@
   ```ts
   class PredicateFromIntentError
   ```
+- `ProviderHTTPError` — A provider answered with an HTTP failure.
+  ```ts
+  class ProviderHTTPError
+  ```
 - `ReflectionExhaustedError` — Error thrown when reflection iterations are exhausted and onExhausted is "throw"
   ```ts
   class ReflectionExhaustedError
@@ -1405,9 +1429,17 @@
   ```ts
   class Semaphore
   ```
+- `StreamConsumerError` — A consumer-supplied callback threw while consuming a stream.
+  ```ts
+  class StreamConsumerError
+  ```
 - `StructuredOutputError` — Error thrown when structured output parsing fails after all retries.
   ```ts
   class StructuredOutputError
+  ```
+- `UnpricedCallLimitError` — Error thrown when too many recent calls could only be charged at estimate.
+  ```ts
+  class UnpricedCallLimitError
   ```
 
 ### Interfaces
@@ -2096,6 +2128,10 @@
   ```ts
   export interface MultiAgentState {
   ```
+- `MultiAgentStreamCallOptions` — Per-call options for multi-agent runAgentStream/runStream
+  ```ts
+  export interface MultiAgentStreamCallOptions {
+  ```
 - `MultiplexedStreamChunk` — A multiplexed stream chunk tagged with the agent that produced it
   ```ts
   export interface MultiplexedStreamChunk {
@@ -2183,6 +2219,10 @@
 - `ParsedResponse` — Parsed response from an LLM provider
   ```ts
   export interface ParsedResponse {
+  ```
+- `ParseEventStreamOptions` — Options for {@link parseEventStream}.
+  ```ts
+  export interface ParseEventStreamOptions {
   ```
 - `PatternCheckpointBase` — Common fields present on all pattern checkpoint states
   ```ts
@@ -2320,6 +2360,14 @@
   ```ts
   export interface RerouteEvent {
   ```
+- `ResolvedPricing` — A pricing object that has been validated and copied — all four rates
+  ```ts
+  export interface ResolvedPricing {
+  ```
+- `ResolvedUsage` — A provider-reported token usage that has been read once and validated —
+  ```ts
+  export interface ResolvedUsage {
+  ```
 - `ResolverCompleteEvent` — Resolver complete event
   ```ts
   export interface ResolverCompleteEvent extends DebugEventBase {
@@ -2359,6 +2407,10 @@
 - `RunCallOptions` — Per-call options for run()
   ```ts
   export interface RunCallOptions {
+  ```
+- `RunnerStreamingSupport` — Optional streaming support for a runner built with {@link createRunner}.
+  ```ts
+  export interface RunnerStreamingSupport {
   ```
 - `RunOptions` — Run options
   ```ts
@@ -2440,6 +2492,10 @@
   ```ts
   export interface StreamChannelConfig {
   ```
+- `StreamEventResult` — Result from parsing a single streamed event (provider-specific).
+  ```ts
+  export interface StreamEventResult {
+  ```
 - `StreamingGuardrail` — Streaming guardrail that evaluates partial output
   ```ts
   export interface StreamingGuardrail {
@@ -2452,9 +2508,17 @@
   ```ts
   export interface StreamingRunResult<T = unknown> {
   ```
-- `StreamRunOptions` — Streaming run options
+- `StreamRestartChunk` — A new generation started, and everything emitted for the previous one is
+  ```ts
+  export interface StreamRestartChunk {
+  ```
+- `StreamRunOptions` — Options for a {@link StreamRunner} – the function {@link createStreamingRunner}
   ```ts
   export interface StreamRunOptions {
+  ```
+- `StreamTotals` — Accumulated totals from a fully consumed event stream.
+  ```ts
+  export interface StreamTotals {
   ```
 - `Subscription` — Subscription to messages
   ```ts
@@ -2543,7 +2607,7 @@
   ```ts
   export type AgentMessageType =
   ```
-- `AgentRunner` — Run function type
+- `AgentRunner` — Run function type.
   ```ts
   export type AgentRunner = <T = unknown>(
   ```
@@ -2563,6 +2627,10 @@
   ```ts
   export type BudgetRunner = AgentRunner & {
   ```
+- `BudgetWindowName` — Which ceiling a {@link BudgetExceededDetails} is about.
+  ```ts
+  export type BudgetWindowName = "per-call" | "total" | "hour" | "day";
+  ```
 - `CheckpointLocalState` — Union of local state types
   ```ts
   export type CheckpointLocalState =
@@ -2571,7 +2639,7 @@
   ```ts
   type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
   ```
-- `ConstraintRouterRunner` — Helper type for accessing router facts.
+- `ConstraintRouterRunner` — Helper type for accessing router facts and pricing coverage.
   ```ts
   export type ConstraintRouterRunner = AgentRunner & {
   ```
@@ -2683,6 +2751,10 @@
   ```ts
   export type PIIType =
   ```
+- `PricedCall` — What one call costs, and how that number was arrived at.
+  ```ts
+  export type PricedCall =
+  ```
 - `RedactionStyle` — Redaction style
   ```ts
   export type RedactionStyle =
@@ -2719,13 +2791,29 @@
   ```ts
   export type StreamingCallbackRunner = (
   ```
+- `StreamRestartReason` — Why a new generation started – the runner was re-invoked and replays.
+  ```ts
+  export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
+  ```
 - `StreamRunner` — Stream run function type (mirrors OpenAI Agents streaming API)
   ```ts
   export type StreamRunner = <T = unknown>(
   ```
+- `StreamWireFormat` — How a provider frames the events it streams.
+  ```ts
+  export type StreamWireFormat = "sse" | "ndjson";
+  ```
 - `TypedAgentMessage` — Union of all message types
   ```ts
   export type TypedAgentMessage =
+  ```
+- `UnpricedReason` — Why a call was priced by estimate rather than by what the provider reported.
+  ```ts
+  export type UnpricedReason =
+  ```
+- `UsageSnapshot` — A call's token usage, read once at the boundary and resolved.
+  ```ts
+  export type UsageSnapshot =
   ```
 
 ### Constants
