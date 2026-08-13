@@ -496,6 +496,24 @@ export function createEngine<S extends Schema>(
   let invalidateDerivation: (key: string) => void = () => {};
   let invalidateManyDerivations: (keys: string[]) => void = () => {};
 
+  /**
+   * Open while a batch is in flight, so the eager per-write invalidation below
+   * does not announce a half-written batch.
+   *
+   * Invalidation and notification are two things and only the second one has
+   * to wait for the end. Assigned when the outermost batch opens and released
+   * inside `onBatch`, which is where the announcement used to happen anyway —
+   * so listeners still hear about a batch at exactly the same moment, having
+   * become able to read the right values before that moment arrives.
+   */
+  let holdDerivationNotifications: () => () => void = () => () => {};
+  let releaseHold: (() => void) | null = null;
+
+  function releaseDerivationHold(): void {
+    releaseHold?.();
+    releaseHold = null;
+  }
+
   // Forward-declared so onChange/onBatch closures can check isRestoring.
   // Assigned after createHistoryManager() below.
   let historyRef: HistoryManager<S> | null = null;
@@ -546,8 +564,12 @@ export function createEngine<S extends Schema>(
         }
       }
       // Invalidate all affected derivations at once — listeners fire only
-      // after ALL keys are invalidated, so they see consistent state.
+      // after ALL keys are invalidated, so they see consistent state. Most are
+      // already stale by now, marked by `onWrite` as each key was written;
+      // this catches anything the eager pass could not reach and is the point
+      // at which the announcement is released.
       invalidateManyDerivations(keys);
+      releaseDerivationHold();
       // During history restore, skip change tracking and reconciliation.
       if (historyRef?.isRestoring) return;
       // Resolver/effect batches (outside event dispatch) always create snapshots
@@ -558,6 +580,23 @@ export function createEngine<S extends Schema>(
         state.changedKeys.add(change.key);
       }
       scheduleReconcile();
+    },
+    onWrite: (key) => {
+      // Mark stale the moment the fact is written, so a body that writes a
+      // fact and then reads a derivation of it — which an effect can now do
+      // through its `derived` parameter — sees its own write. The fact itself
+      // already reads back immediately; without this, the same function body
+      // has two consistency models depending on which accessor it reaches for.
+      // The announcement stays held until the batch ends.
+      invalidateDerivation(key);
+    },
+    onBatchStart: () => {
+      releaseHold = holdDerivationNotifications();
+    },
+    onBatchEnd: () => {
+      // Normally already released inside `onBatch`. This catches the batch that
+      // wrote nothing, where `onBatch` never runs.
+      releaseDerivationHold();
     },
   });
 
@@ -596,6 +635,7 @@ export function createEngine<S extends Schema>(
   invalidateDerivation = (key: string) => derivationsManager.invalidate(key);
   invalidateManyDerivations = (keys: string[]) =>
     derivationsManager.invalidateMany(keys);
+  holdDerivationNotifications = () => derivationsManager.holdNotifications();
 
   // Create effects manager
   const effectsManager: EffectsManager<S> = createEffectsManager({

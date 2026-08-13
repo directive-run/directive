@@ -122,6 +122,19 @@ export interface DerivationsManager<
   /** Get metadata for a derivation (if provided via object form) */
   getMeta(id: string): DefinitionMeta | undefined;
   /**
+   * Hold listener notifications until the returned function is called.
+   *
+   * Invalidation and notification are two things, and only the second one has
+   * to wait. Marking a derivation stale is cheap, idempotent, and the reason a
+   * later read returns a fresh value; announcing it early is what would let a
+   * listener see a half-written batch. Holding the announcement lets a caller
+   * invalidate as it goes and still notify once, at the end, with the state
+   * whole.
+   *
+   * Idempotent: calling the returned function twice releases once.
+   */
+  holdNotifications(): () => void;
+  /**
    * What a derivation currently reads, split by kind.
    *
    * Computes the derivation first if it has not run — an unrun derivation has
@@ -905,6 +918,20 @@ export function createDerivationsManager<
         invalidationDepth--;
         flushNotifications();
       }
+    },
+
+    holdNotifications(): () => void {
+      invalidationDepth++;
+      let released = false;
+
+      return () => {
+        if (released) {
+          return;
+        }
+        released = true;
+        invalidationDepth--;
+        flushNotifications();
+      };
     },
 
     invalidateAll(): void {

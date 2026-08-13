@@ -255,6 +255,31 @@ function ItemCount({ system }) {
 Adding an item to `facts.items` re-renders `<ItemCount />`. Changing
 `facts.lastUpdatedMs` does not.
 
+## Reading your own writes
+
+Write a fact and read a derivation of it later in the same body, and you get the
+value that follows from the write:
+
+```typescript
+effects: {
+  recalculate: {
+    run: (facts, prev, derived) => {
+      facts.quantity = 5;
+      derived.subtotal;   // reflects quantity === 5
+    },
+  },
+},
+```
+
+An effect body runs inside a batch, so listeners are still notified once, at the
+end, with the batch whole. The derivation is *invalidated* as you write and only
+the announcement waits — which is the half that has to. Marking a derivation
+stale is cheap and idempotent; announcing it early is what would let a subscriber
+render a half-written batch.
+
+The same holds in a constraint's `when()`, which was never batched. One rule
+either way, so moving code between the two does not change what it reads.
+
 ## Tags travel down the graph
 
 A tag on a fact is a claim about the value. A derivation carries the value

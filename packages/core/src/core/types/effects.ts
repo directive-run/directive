@@ -149,6 +149,13 @@ export interface EffectDef<
    * resolves a namespace instead of a value once the module is composed into a
    * `createSystem({ modules })`. Third rather than second because `facts` and
    * `prev` already hold the first two positions.
+   *
+   * It reads your own writes. Write a fact and read a derivation of it later in
+   * the same body and you get the value that follows from the write, the same
+   * way reading the fact back does. The body runs inside a batch, so listeners
+   * are still notified once at the end — the derivation is *invalidated* as you
+   * write and only the announcement waits. Without that, `facts` and `derived`
+   * would answer from two different moments inside one function.
    */
   run(
     facts: Facts<S>,
