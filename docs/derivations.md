@@ -255,6 +255,69 @@ function ItemCount({ system }) {
 Adding an item to `facts.items` re-renders `<ItemCount />`. Changing
 `facts.lastUpdatedMs` does not.
 
+## Tags travel down the graph
+
+A tag on a fact is a claim about the value. A derivation carries the value
+forward, so it carries the claim:
+
+```typescript
+schema: {
+  facts: { email: t.string().meta({ tags: ["pii"] }) },
+  derivations: { domain: t.string() },
+},
+derive: { domain: (facts) => facts.email.split("@")[1] },
+```
+
+```typescript
+system.meta.byTag("pii");
+// [ { type: "fact", id: "email", ... },
+//   { type: "derivation", id: "domain", ..., via: "inherited" } ]
+
+system.meta.derivation("domain")?.inheritedTags; // ["pii"]
+```
+
+`via: "inherited"` separates a claim someone wrote from one the graph inferred,
+so a redactor or an audit filter can act on both and still tell them apart.
+Inheritance is transitive: a derivation reading a derivation reading a tagged
+fact inherits too.
+
+### Saying where the claim stops
+
+Some derivations are the point at which the claim stops holding — a hash, a
+bucket, a count, a redaction. Say so:
+
+```typescript
+derive: {
+  bucket: {
+    compute: (facts) => hash(facts.email) % 16,
+    meta: { inheritsTags: false },
+  },
+},
+```
+
+That is a statement about the value, so it holds downstream too: a derivation
+reading `bucket` is not walked through to `bucket`'s inputs. It is a separate
+key rather than an empty `tags: []` so a derivation can be sanitized *and*
+tagged something unrelated at the same time.
+
+### What it can and cannot tell you
+
+Inheritance follows what a derivation actually read on its last computation,
+which is what makes it work without a `deps` array. It also means a body that
+branches records the branch the current state takes:
+
+```typescript
+derive: { shown: (facts) => (facts.consented ? facts.email : "") },
+```
+
+While `consented` is true, `shown` inherits `pii`. When it flips, `shown` stops
+reading `email` and stops inheriting — which is accurate about the value right
+now, and says nothing about the value in a state the program has not reached.
+
+Read `byTag("pii")` as "every value carrying PII in the state the system is in",
+not "every value that ever could". For the second question you want the source,
+not the runtime.
+
 ## Top-of-funnel placement
 
 Derivation composition is the single most under-documented Directive feature.
