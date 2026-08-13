@@ -50,10 +50,11 @@
   "llms": "./dist/llms.txt",
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsx scripts/generate-llms-txt.ts",
     "test": "cd ../.. && vitest run packages/cli/",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "generate-llms-txt": "tsx scripts/generate-llms-txt.ts"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",
