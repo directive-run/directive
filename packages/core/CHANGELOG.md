@@ -1,5 +1,120 @@
 # @directive-run/core
 
+## 1.27.0
+
+### Minor Changes
+
+- [#120](https://github.com/directive-run/directive/pull/120) [`7eb69c7`](https://github.com/directive-run/directive/commit/7eb69c76857308c31aeb9ab66ce60fb4228c54df) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Tags now travel down the derivation graph, so `byTag("pii")` finds the computed values too.**
+
+  A tag on a fact is a claim about the value. A derivation carries that value forward — often unchanged — but the claim stopped at the fact. Tag `email` as `pii`, add `domain: (facts) => facts.email`, and `system.meta.byTag("pii")` answered with `["fact:email"]` alone. Every tag-driven consumer — the audit ledger, the clobber alerts, any redactor written against the tag — treated a verbatim copy of PII as non-sensitive, by construction. The dependency graph that could answer the question was already being maintained for invalidation; nothing was asking it.
+
+  ```ts
+  system.meta.byTag("pii");
+  // [ { type: "fact",       id: "email"  },
+  //   { type: "derivation", id: "domain", via: "inherited" } ]
+
+  system.meta.derivation("domain")?.inheritedTags; // ["pii"]
+  ```
+
+  `via: "inherited"` separates a claim someone wrote from one the graph inferred, so a consumer can act on both and still tell them apart. Authored tags stay reported as authored — `inheritedTags` is the difference, not the union. Inheritance is transitive through composition.
+
+  **Saying where the claim stops.** Some derivations are the point at which it no longer holds — a hash, a bucket, a count, a redaction. `meta: { inheritsTags: false }` says so, and because that is a statement about the value it holds downstream too: a derivation reading a sanitized one is not walked through to its inputs. A separate key rather than an empty `tags: []`, so a derivation can be sanitized _and_ tagged something unrelated at once.
+
+  **What it can and cannot tell you.** Inheritance follows what a derivation actually read on its last computation — the same tracking that makes derivations work without a `deps` array. So `(facts) => facts.consented ? facts.email : ""` inherits `pii` while `consented` is true and stops when it flips. That is accurate about the value now and silent about the value in a state the program has not reached. Read `byTag("pii")` as "every value carrying PII in the state the system is in", not "every value that ever could".
+
+  Nothing that read `byTag` before changes meaning; the results grow. `meta.derivation(id)` still returns `undefined` for a derivation with no meta and no inherited tags.
+
+### Patch Changes
+
+- [#121](https://github.com/directive-run/directive/pull/121) [`b0dbc08`](https://github.com/directive-run/directive/commit/b0dbc08b4fd6bcea0dcfc1f7f9d6b13fdbf60428) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **An effect now reads its own writes through `derived`, the same way it already did through `facts`.**
+
+  An effect's `run()` executes inside a batch. A write reaches the backing store immediately, so `facts.n` read back the value you just wrote — but derivation invalidation waited for the batch to flush, so `derived.doubled` returned the value from _before_ that same write. A constraint's `when()` is not batched, so the identical two lines worked there. One parameter, two consistency models, decided by which manager the code happened to be inside.
+
+  ```ts
+  run: (facts, prev, derived) => {
+    facts.n = 5;
+    facts.n; // 5
+    derived.doubled; // was 2 — now 10
+  };
+  ```
+
+  Invalidation is now eager per write; only the notification still waits for the end of the batch. That is the half that has to wait: marking a derivation stale is cheap and idempotent, while announcing it early is what would let a subscriber observe a batch half-applied. Listeners fire at exactly the moment they did before, having become able to read the right values before that moment arrives.
+
+  Both halves are pinned by tests — one that the write is visible, one that no listener ever sees a batch half-written.
+
+  The precedent genuinely cuts both ways here: Solid's `batch` also returns pre-batch values, while MobX computeds recompute inside actions. Either is defensible; what was not defensible was having both at once in one system and saying nothing. The choice is now the one that matches `facts` in the same function body, and it is written down in the `run()` docs and in `docs/derivations.md`.
+
+- [#118](https://github.com/directive-run/directive/pull/118) [`de2aae1`](https://github.com/directive-run/directive/commit/de2aae1e433803d0bfd72fe93115d0b9edac4863) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A fact key can no longer impersonate a derivation in the dependency graph.**
+
+  A tracked dependency set is one flat `Set<string>` holding both fact keys and derivation IDs, kept apart by a separator character: a derivation goes in as the separator followed by its ID, a fact as its key verbatim. That namespace exists because a module may legally declare a fact and a derivation with the same name, and before it, writing one invalidated readers of the other.
+
+  It works only while no fact key itself starts with the separator. One that does is byte-for-byte the recorded form of the same-named derivation — so writing that fact wakes every constraint and effect reading the derivation, and a trace renders the fact under a `derive.` prefix. The original collision, moved one character to the right.
+
+  `createModule` now rejects a fact key or derivation ID containing the separator, with a message naming the character and what it collides with. Thrown unconditionally rather than warned in development: a wrong invalidation set produces wrong behavior in production, which is where the warning would be gone.
+
+  The separator is rejected anywhere in the name, not only at the front. Only a leading one collides today, but the character has no legitimate use in an identifier, and a rule that turned on position would leave the next reader to work out why.
+
+  Nothing that compiles today is affected — the check names a character no identifier written in source contains, and the note on the constant that claimed such a name was impossible has been corrected to say it is merely rejected.
+
+- [#117](https://github.com/directive-run/directive/pull/117) [`6e0df93`](https://github.com/directive-run/directive/commit/6e0df93745a9b529e9658714ac9570506c5b4d9b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Reaching for a derivation where a module name belongs now says so, instead of returning `undefined`.**
+
+  `createSystem({ module })` puts a module's derivations directly on `system.derive`. `createSystem({ modules })` puts _module names_ there and the derivations one level down. So `system.derive.total` returns a value in the first shape and `undefined` in the second — the gate goes falsy, the constraint never fires, the effect logs nothing, and no error is raised anywhere.
+
+  Constraints and effects receive `derived` as a parameter now, which removes the reason to reach back at all. But nothing was taken away: every module written before that still contains the read, and upgrading surfaces exactly none of them. Fixing an API does not disarm a trap.
+
+  In development, a read that resolves to no module is now checked against the derivations that do exist, and if it names one, the warning says which module owns it, how to read it from inside a constraint or effect, how to read it from outside one, and what modules the system actually has:
+
+  ```
+  [Directive] system.derive.tooHigh is undefined — "tooHigh" is a derivation of
+  module "counter", not a module. This system was built with createSystem({ modules }),
+  where system.derive holds module names and the derivations are one level down.
+  Inside a constraint or effect, read the `derived` parameter instead:
+  `when: (facts, derived) => derived.tooHigh`. Outside one, use
+  system.derive.counter.tooHigh. This system's modules are: counter, bystander.
+  ```
+
+  Once per name per system — per system rather than per process, because a second system is a second chance to make the same mistake and deserves to hear about it. Silent for names that match nothing, silent for the keys runtimes probe on any object they are handed (`$$typeof`, `toJSON`, `then`, and friends, which React's dev mode walks on every render), and silent in a single-module system where the read is correct.
+
+  Development only, and only on the miss path — a resolved module name never reaches it.
+
+- [#114](https://github.com/directive-run/directive/pull/114) [`a4170d0`](https://github.com/directive-run/directive/commit/a4170d0109a4693b230826f8782a97d401a4012e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **An effect's write now reaches a constraint gated on a derivation, and `settle()` no longer reports quiescence while holding an announcement it has not made.**
+
+  The invalidation drain ran once per reconcile, before the effects phase. An effect that writes a fact invalidates whatever derivations read that fact, and those landed _after_ the only pass that read them — so the announcement missed the constraint evaluation immediately following, the pass ended with its changed-key set cleared, and nothing was scheduled to carry it. The derivation still returned the right value on every read; only the wake-up was lost, which is why this survived snapshot assertions and presented as "it works when I check it by hand."
+
+  `settle()` then resolved. A request handler that settles before responding returned pre-resolution state; a durable object that settles before persisting and hibernates dropped the requirement entirely.
+
+  Two changes. The drain now also runs after the effects phase, so constraints see what effects moved — it early-returns on an empty set, so a reconcile in which no effect wrote pays one size check. And settlement accounts for undelivered announcements, so a system cannot report itself finished while it still has something to say.
+
+  `system.inspect()` gains `pendingInvalidations`. Zero on a system that has finished; non-zero on one that has merely stopped. No other field distinguished those two states, and the difference is exactly what separates a correct settle from a premature one.
+
+  ### One case deliberately left open
+
+  An **effect** gated on a derivation that another effect's write invalidates is still not woken in that reconcile. Constraints are; effects are not.
+
+  Reaching effects means carrying the keys into the following pass, and that is the shape of a fix that was written and withdrawn once already: an effect that writes a fact inside its own dependency set then has no damping — a repeated value is suppressed by identity, but a changing one is not — and the reconcile loop runs away. Re-measured while preparing this change: 2,001 effect runs in 41 ms, bounded only by the probe's own counter.
+
+  Closing it needs a bound on that feedback path, which is its own change. The boundary is now pinned by tests on both sides, so the next attempt starts from a description of the behavior rather than from silence.
+
+  ### If you construct a `SystemInspection`
+
+  `pendingInvalidations` is required, not optional — it is always present in real engine output, and making it optional would force every reader to handle an `undefined` that never occurs. Test doubles and mocks that build the shape by hand need the field added.
+
+- [#116](https://github.com/directive-run/directive/pull/116) [`6fbc101`](https://github.com/directive-run/directive/commit/6fbc101c6403eddc918fb080b122f964365a1a76) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A derivation read is now classified by who is doing the reading, from one place instead of two.**
+
+  A derivation body reading another derivation is an internal edge — the derivation graph invalidates along it already. A constraint or an effect reading one is an outside observer, and the engine has to record that or the reader is never woken when the value moves.
+
+  That distinction lived in a counter in the derivations module while the tracking stack lived in another module: two structures that had to be kept in agreement by hand, and were not. The composition proxy consulted the counter; the `system.derive` accessor did not. So a derivation that composed through the accessor rather than its `derived` parameter registered _itself_ as an external watcher — a node nothing outside the graph was waiting on, added to the set that bounds the per-reconcile invalidation walk and announced on every pass.
+
+  The classification now rides on the tracking frame, which is the one structure that already knows whose body is running. This is also how the reactive literature does it: MobX hangs the current derivation off global state and separates computed from reaction by class, Solid's listener carries a `pure` flag, Adapton distinguishes edges by the articulation point that demanded them. None of them answer the question with a recursion depth.
+
+  `system.inspect()` gains `observedDerivations` — how many derivations something outside the graph is watching. That count is what the invalidation walk is bounded against, so it is the number that explains the walk's cost, and it is what makes over-registration visible instead of merely suspected. A count much larger than the derivations your constraints and effects actually read means something is registering watchers nobody is waiting on.
+
+  Also closed: the memoization fast path, taken once a derivation's dependency set has been stable for several runs, pushed no tracking frame at all — so the body's reads landed in whichever frame was above it on the stack. Nothing in the public surface reaches that today, because a derivation is already fresh by the time a constraint reads it, but it meant a derivation's private reads could be attributed to its consumer and the reported dependency shape could change the moment the threshold tripped.
+
+  ### If you construct a `SystemInspection`
+
+  `observedDerivations` is required, for the same reason `pendingInvalidations` is: it is always present in real output. Hand-built test doubles need the field.
+
 ## 1.26.0
 
 ### Minor Changes
