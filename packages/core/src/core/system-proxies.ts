@@ -499,6 +499,97 @@ export function createModuleDeriveProxy(
  *
  * @internal
  */
+/**
+ * Keys a runtime probes on any object it is handed, which are not user typos.
+ *
+ * React 19's dev mode walks objects looking for these; so do serializers and
+ * promise-detection paths. Warning about them would fire on every render and
+ * teach the reader to ignore the channel.
+ */
+const RUNTIME_PROBE_PROPS: ReadonlySet<string> = Object.freeze(
+  new Set([
+    "$$typeof",
+    "toJSON",
+    "then",
+    "nodeType",
+    "tagName",
+    "hasAttribute",
+    "asymmetricMatch",
+    "Symbol(Symbol.toStringTag)",
+    "@@__IMMUTABLE_ITERABLE__@@",
+    "@@__IMMUTABLE_RECORD__@@",
+  ]),
+);
+
+/**
+ * Names already warned about, per derive store.
+ *
+ * Per store rather than per process: a second system in the same process is a
+ * second chance to make this mistake, and deserves to hear about it. Keyed
+ * weakly so the record dies with the system it describes.
+ */
+const warnedDerivationReads = new WeakMap<object, Set<string>>();
+
+/**
+ * Say something when `system.derive.total` is reached for in a composed system.
+ *
+ * In `createSystem({ module })` the derivations sit directly on `system.derive`.
+ * In `createSystem({ modules })` that same position holds *module names*, and
+ * the derivations are one level down. So the identical read returns `undefined`
+ * once the module is composed — the gate goes falsy, the constraint never fires,
+ * and nothing is written anywhere.
+ *
+ * Constraints and effects receive `derived` as a parameter now, which removes
+ * the reason to reach back at all. But nothing was taken away: every module
+ * written before that still contains the read, and upgrading surfaces exactly
+ * none of them. This is the line that does.
+ *
+ * Only on the miss path, only in development, once per name. The scan is over
+ * the flat derive keys and only runs when a key resolved to no module, which in
+ * a correct program happens for runtime probes and nothing else.
+ */
+function warnDerivationReadAsModule(
+  derive: Record<string, unknown>,
+  requested: string,
+  getModuleNames: () => string[],
+): void {
+  if (RUNTIME_PROBE_PROPS.has(requested) || requested.startsWith("@@")) {
+    return;
+  }
+  let warned = warnedDerivationReads.get(derive);
+  if (warned === undefined) {
+    warned = new Set<string>();
+    warnedDerivationReads.set(derive, warned);
+  }
+  if (warned.has(requested)) {
+    return;
+  }
+
+  const suffix = `${SEPARATOR}${requested}`;
+  const owners: string[] = [];
+  for (const key of Object.keys(derive)) {
+    if (key.endsWith(suffix)) {
+      owners.push(key.slice(0, key.length - suffix.length));
+    }
+  }
+
+  if (owners.length === 0) {
+    return;
+  }
+
+  warned.add(requested);
+
+  const owner = owners[0];
+  const where =
+    owners.length === 1
+      ? `module "${owner}"`
+      : `modules ${owners.map((n) => `"${n}"`).join(", ")}`;
+
+  console.warn(
+    `[Directive] system.derive.${requested} is undefined — "${requested}" is a derivation of ${where}, not a module. This system was built with createSystem({ modules }), where system.derive holds module names and the derivations are one level down. Inside a constraint or effect, read the \`derived\` parameter instead: \`when: (facts, derived) => derived.${requested}\`. Outside one, use system.derive.${owner}.${requested}. This system's modules are: ${getModuleNames().join(", ")}.`,
+  );
+}
+
 export function createNamespacedDeriveProxy(
   derive: Record<string, unknown>,
   modulesMap: ModulesMap,
@@ -513,6 +604,10 @@ export function createNamespacedDeriveProxy(
   const proxy = createHardenedProxy<Record<string, Record<string, unknown>>>({
     get: (namespace) => {
       if (!Object.hasOwn(modulesMap, namespace)) {
+        if (isDevelopment) {
+          warnDerivationReadAsModule(derive, namespace, getModuleNames);
+        }
+
         return undefined;
       }
 
