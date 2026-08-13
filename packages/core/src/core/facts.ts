@@ -58,6 +58,30 @@ export interface CreateFactsStoreOptions<S extends Schema> {
       type: "set" | "delete";
     }>,
   ) => void;
+  /**
+   * Called the moment a key is written inside a batch, before the batch ends.
+   *
+   * `onBatch` reports the whole batch at the end, which is the right time to
+   * *notify* but too late to *invalidate*: a body that writes a fact and then
+   * reads a derivation of it in the same breath would read the value from
+   * before its own write. The fact itself reads back immediately — the backing
+   * map is written at `set()` — so without this the same function body has two
+   * consistency models depending on which accessor it reaches for.
+   *
+   * Only fires while batching. An unbatched write already reaches `onChange`
+   * synchronously.
+   */
+  onWrite?: (key: string) => void;
+  /** Called when the outermost batch opens. */
+  onBatchStart?: () => void;
+  /**
+   * Called after the outermost batch has flushed.
+   *
+   * A backstop for a batch that wrote nothing: `onBatch` is skipped when there
+   * are no changes, so anything paired with `onBatchStart` needs somewhere
+   * unconditional to be undone.
+   */
+  onBatchEnd?: () => void;
 }
 
 /**
@@ -91,7 +115,8 @@ export interface CreateFactsStoreOptions<S extends Schema> {
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { schema, onChange, onBatch } = options;
+  const { schema, onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
+    options;
 
   // Detect if this is a type assertion schema (empty object with no keys)
   const schemaKeys = Object.keys(schema);
@@ -426,6 +451,7 @@ export function createFactsStore<S extends Schema>(
       if (batching > 0) {
         batchChanges.push({ key: key as string, value, prev, type: "set" });
         dirtyKeys.add(key as string);
+        onWrite?.(key as string);
       } else {
         notifyNonBatched(key as string, value, prev);
       }
@@ -445,18 +471,28 @@ export function createFactsStore<S extends Schema>(
           type: "delete",
         });
         dirtyKeys.add(key as string);
+        onWrite?.(key as string);
       } else {
         notifyNonBatched(key as string, undefined, prev);
       }
     },
 
     batch(fn: () => void): void {
+      const outermost = batching === 0;
       batching++;
+      if (outermost) {
+        onBatchStart?.();
+      }
       try {
         fn();
       } finally {
         batching--;
         flush();
+        // After `flush()`, so whatever `onBatch` did during the flush is inside
+        // the scope that opened.
+        if (outermost) {
+          onBatchEnd?.();
+        }
       }
     },
 
