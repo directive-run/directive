@@ -39,6 +39,37 @@ export interface DefinitionMeta {
   color?: string;
   /** Multi-dimensional labels for filtering. Use alongside category for fine-grained grouping. */
   tags?: string[];
+  /**
+   * Whether a derivation picks up the tags of the facts it reads. Defaults to
+   * `true`; only a derivation reads it.
+   *
+   * A tag on a fact is a claim about the value, and a derivation carries that
+   * value forward — often unchanged — so `meta.byTag("pii")` reports a
+   * derivation of a tagged fact as tagged too, and `meta.derivation(id)`
+   * exposes what it picked up under {@link inheritedTags}.
+   *
+   * Set `false` where the derivation is the point at which the claim stops
+   * holding: a hash, a bucket, a count, a redaction. That is a statement about
+   * the value, and inheritance stops there for anything downstream too — a
+   * derivation reading a sanitized one is not walked through to its inputs.
+   *
+   * Opting out is a separate key rather than an empty `tags: []` so that
+   * "sanitized" and "tagged something unrelated" can both be said at once.
+   */
+  inheritsTags?: boolean;
+  /**
+   * Tags this derivation picked up from its inputs — read-only, never authored.
+   *
+   * Present on what `system.meta.derivation(id)` returns when the walk found
+   * anything, and disjoint from {@link tags}: a tag the author wrote is
+   * reported as authored, not as inherited.
+   *
+   * These reflect what the derivation read on its last computation. A body that
+   * branches on a fact records the branch the current state takes, so this is
+   * accurate about the value now and silent about the value in a state the
+   * program has not reached.
+   */
+  readonly inheritedTags?: readonly string[];
   /** Extensible — plugins can read custom keys without core releases. */
   [key: string]: unknown;
 }

@@ -1403,6 +1403,86 @@ export function createEngine<S extends Schema>(
     dispatchEvent: dispatchEventByName,
   });
 
+  /** The tags authored on a fact's schema declaration, if any. */
+  function factTags(key: string): readonly string[] {
+    const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })
+      ?._meta;
+
+    return meta?.tags ?? [];
+  }
+
+  /**
+   * The tags a derivation picks up from the facts it reads.
+   *
+   * A tag on a fact is a claim about the *value*, and a derivation that reads
+   * the fact carries that value forward — sometimes verbatim. Before this,
+   * `meta.byTag("pii")` answered with the tagged fact alone, so a derivation
+   * returning `facts.email` unchanged read as non-sensitive to every
+   * tag-driven consumer: the audit ledger, the clobber alerts, any redactor a
+   * user wrote against the tag. The graph that would have answered the question
+   * was already being maintained for invalidation; nothing was asking it.
+   *
+   * Transitive through composition — a derivation reading a derivation reading
+   * a tagged fact inherits — with a visited set, because the derivation graph
+   * is a DAG only by convention and a cycle here would be an infinite walk
+   * rather than a caught error.
+   *
+   * **What this cannot see.** Dependencies are what the last computation
+   * actually read. A body that branches on a fact records the branch the
+   * current state takes, so `(facts) => facts.consented ? facts.email : ""`
+   * inherits `pii` while `consented` is true and stops when it flips. That is
+   * accurate about the value right now and silent about the value in another
+   * state, which is worth knowing before treating this as an exhaustive audit.
+   * The honest reading of `byTag("pii")` is "every value that carries PII in
+   * the state the system is in", not "every value that ever could".
+   */
+  function inheritedTagsFor(id: string): string[] {
+    const authored = derivationsManager.getMeta(
+      id as keyof DerivationsDef<S>,
+    ) as DefinitionMeta | undefined;
+    if (authored?.inheritsTags === false) {
+      return [];
+    }
+
+    const tags = new Set<string>();
+    const seen = new Set<string>();
+    const queue = [id];
+
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      if (seen.has(current)) {
+        continue;
+      }
+      seen.add(current);
+
+      const edges = derivationsManager.dependencyEdges(current);
+      for (const factKey of edges.facts) {
+        for (const tag of factTags(factKey)) {
+          tags.add(tag);
+        }
+      }
+      for (const upstream of edges.derivations) {
+        // An upstream derivation that opted out is a stated boundary — it
+        // says the value stops being what its inputs were, and walking past
+        // it would overrule the person who said so.
+        const upstreamMeta = derivationsManager.getMeta(
+          upstream as keyof DerivationsDef<S>,
+        ) as DefinitionMeta | undefined;
+        if (upstreamMeta?.inheritsTags === false) {
+          continue;
+        }
+        queue.push(upstream);
+      }
+    }
+
+    // Authored tags are already reported as authored; this is the difference.
+    for (const tag of authored?.tags ?? []) {
+      tags.delete(tag);
+    }
+
+    return [...tags];
+  }
+
   /** Collect all definitions with meta across all types (for byCategory/byTag). */
   function collectAllMeta(): MetaMatch[] {
     const results: MetaMatch[] = [];
@@ -1429,7 +1509,23 @@ export function createEngine<S extends Schema>(
     }
     for (const id of Object.keys(mergedDerive)) {
       const meta = derivationsManager.getMeta(id as keyof DerivationsDef<S>);
-      if (meta) results.push({ type: "derivation", id, meta });
+      if (meta) {
+        results.push({ type: "derivation", id, meta });
+      }
+      // A derivation with no authored meta at all still carries whatever its
+      // inputs are tagged with — that case is the whole point, since nobody
+      // annotates a derivation they think is uninteresting.
+      const inherited = inheritedTagsFor(id);
+      if (inherited.length > 0) {
+        results.push({
+          type: "derivation",
+          id,
+          meta: Object.freeze(
+            Object.assign(Object.create(null), meta, { tags: inherited }),
+          ),
+          via: "inherited",
+        });
+      }
     }
 
     return results;
@@ -1534,7 +1630,19 @@ export function createEngine<S extends Schema>(
           ?.meta;
       },
       derivation(id: string): DefinitionMeta | undefined {
-        return derivationsManager.getMeta(id as keyof DerivationsDef<S>);
+        const authored = derivationsManager.getMeta(
+          id as keyof DerivationsDef<S>,
+        );
+        const inherited = inheritedTagsFor(id);
+        if (inherited.length === 0) {
+          return authored;
+        }
+
+        return Object.freeze(
+          Object.assign(Object.create(null), authored, {
+            inheritedTags: Object.freeze(inherited),
+          }),
+        );
       },
       byCategory(category: string): MetaMatch[] {
         return collectAllMeta().filter((m) => m.meta.category === category);

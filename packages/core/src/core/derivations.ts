@@ -121,6 +121,18 @@ export interface DerivationsManager<
   callOne(id: string): unknown;
   /** Get metadata for a derivation (if provided via object form) */
   getMeta(id: string): DefinitionMeta | undefined;
+  /**
+   * What a derivation currently reads, split by kind.
+   *
+   * Computes the derivation first if it has not run — an unrun derivation has
+   * recorded no dependencies, and that is indistinguishable from one that
+   * genuinely reads nothing.
+   *
+   * These are the edges the tag inheritance in `system.meta` walks. They are
+   * the dependencies of the *last* computation, which for a body that branches
+   * on a fact is the branch the current state takes, not every branch it could.
+   */
+  dependencyEdges(id: string): { facts: string[]; derivations: string[] };
 }
 
 /** Options for creating a derivations manager */
@@ -946,6 +958,34 @@ export function createDerivationsManager<
       }
 
       return described;
+    },
+
+    dependencyEdges(id: string): { facts: string[]; derivations: string[] } {
+      // A name that is not a derivation has no edges. Answering rather than
+      // throwing keeps `meta.derivation(id)` returning `undefined` for an
+      // unknown id, which is what it has always done and what callers check.
+      if (!definitions[id as keyof D]) {
+        return { facts: [], derivations: [] };
+      }
+
+      // A derivation that has never run has recorded nothing, and an empty
+      // dependency set is indistinguishable from a derivation that genuinely
+      // reads no facts. Computing first is what makes the difference legible.
+      // Safe to force: a derivation body is pure by contract, and the result is
+      // cached, so this costs one compute the program was going to do anyway.
+      this.get(id as keyof D);
+
+      const facts: string[] = [];
+      const derivations: string[] = [];
+      for (const dep of getState(id).dependencies) {
+        if (isDerivationDep(dep)) {
+          derivations.push(derivationDepId(dep));
+        } else {
+          facts.push(dep);
+        }
+      }
+
+      return { facts, derivations };
     },
 
     markObserved(id: string): void {

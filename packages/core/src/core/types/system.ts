@@ -781,6 +781,16 @@ export interface MetaMatch {
     | "derivation";
   id: string;
   meta: DefinitionMeta;
+  /**
+   * Whether this match's tags were written on the definition or picked up from
+   * what it reads. Absent means authored, which is every type but `derivation`.
+   *
+   * A derivation of a tagged fact appears as its own match with
+   * `via: "inherited"`, so a consumer acting on the tag — a redactor, an audit
+   * filter — can tell a claim someone made from one the graph inferred, and
+   * still act on both.
+   */
+  via?: "inherited";
 }
 
 /** O(1) accessor for definition metadata. */
