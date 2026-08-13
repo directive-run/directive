@@ -14,6 +14,7 @@ Website: https://directive.run
 - [Core Concepts](https://directive.run/docs/core-concepts)
 - [Choosing Primitives](https://directive.run/docs/choosing-primitives)
 - [Comparison](https://directive.run/docs/comparison)
+- [Changelog](https://directive.run/docs/changelog)
 
 ### Editor Setup
 - [IDE Integration](https://directive.run/docs/ide-integration)

@@ -74,3 +74,11 @@ docs/IDEAS.md
 docs/AE-AUDIT-*.md
 docs/SESSION-HANDOFF-*.md
 docs/SHIP-RECOVERY*.md
+
+# Generated at build time by packages/mcp/scripts/build-package-registry.ts.
+# Tracked until 2026-08-13, where it drifted on every release: the committed
+# copy froze at whatever version was current when someone last ran a build and
+# happened to commit it, so every unrelated pull request either swept the churn
+# in or reverted it by hand. The build regenerates it before tsup and before
+# CI's test/typecheck steps, so nothing reads a version that is not current.
+packages/mcp/src/generated/
