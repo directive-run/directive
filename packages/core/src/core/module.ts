@@ -5,7 +5,7 @@
  */
 
 import isDevelopment from "#is-development";
-import { BLOCKED_PROPS } from "./tracking.js";
+import { BLOCKED_PROPS, DERIVATION_DEP_PREFIX } from "./tracking.js";
 import type {
   CrossModuleConstraintsDef,
   CrossModuleDeps,
@@ -367,6 +367,54 @@ function validateBindKeys<M extends ModuleSchema>(
   }
 }
 
+/**
+ * Reject fact keys and derivation IDs that carry the dependency-set separator.
+ *
+ * A tracked dependency set is one flat `Set<string>` holding both fact keys and
+ * derivation IDs, and {@link DERIVATION_DEP_PREFIX} is what keeps the two apart:
+ * a derivation is recorded as the separator followed by its ID, a fact as its
+ * key verbatim. That namespace is only injective while no fact key begins with
+ * the separator. One that does is byte-identical to the recorded form of the
+ * derivation named by the rest of the key — so writing that fact invalidates
+ * everything that reads the same-named derivation, and a trace renders the fact
+ * as `derive.<name>`. Exactly the collision the separator was introduced to
+ * eliminate, displaced by one character.
+ *
+ * The original comment on that constant argued a control character could not
+ * appear in a property name written in source. It can: a bracketed access with
+ * a unicode escape is ordinary TypeScript, and a schema key can be computed
+ * rather than written. So the property has to be enforced, and this is where.
+ *
+ * The separator is rejected anywhere in the name, not just in front. Only a
+ * leading one collides today, but the character has no legitimate use in an
+ * identifier, and a narrower rule would leave the next reader to work out why
+ * position matters.
+ *
+ * Thrown unconditionally — a wrong invalidation set is not a dev-mode concern,
+ * and the alternative to throwing is the silent mis-invalidation above.
+ */
+function validateDepNamespaceKeys<M extends ModuleSchema>(
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): void {
+  const check = (name: string, what: string): void => {
+    if (!name.includes(DERIVATION_DEP_PREFIX)) {
+      return;
+    }
+
+    throw new Error(
+      `[Directive] module '${id}': ${what} '${JSON.stringify(name)}' contains U+001F (unit separator). That character separates derivation IDs from fact keys inside a dependency set, so a name carrying it makes the two indistinguishable — writing the fact would invalidate readers of a same-named derivation. Rename it to something without control characters.`,
+    );
+  };
+
+  for (const key of Object.keys(config.schema?.facts ?? {})) {
+    check(key, "fact key");
+  }
+  for (const key of Object.keys(config.derive ?? {})) {
+    check(key, "derivation");
+  }
+}
+
 /** Run all dev-mode validations for a module config */
 function validateModuleConfig<M extends ModuleSchema>(
   id: string,
@@ -563,6 +611,11 @@ export function createModule<const M extends ModuleSchema>(
   // `def.bind`) so the symmetry with abortOn is locked in code review
   // before any v2 runtime wires the field.
   validateBindKeys(id, config);
+
+  // The dependency-set separator is only a namespace while nothing else uses
+  // it. Enforced unconditionally — a name that carries it produces a wrong
+  // invalidation set, silently.
+  validateDepNamespaceKeys(id, config);
 
   if (isDevelopment) {
     validateModuleConfig(id, config);

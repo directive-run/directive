@@ -167,9 +167,17 @@ export function trackAccess(key: string): void {
  * `"derive:"`. Fact keys are arbitrary strings — `t.object()` under a key of any
  * shape is valid — so a readable prefix is only *unlikely* to collide, and this
  * whole namespace exists because "unlikely" was not good enough the first time.
- * A control character cannot appear in a property name written in source, and
- * every place a namespaced name reaches a human it is unwrapped first (see
+ * Every place a namespaced name reaches a human it is unwrapped first (see
  * {@link describeDep}).
+ *
+ * A control character is unusual in a property name but not impossible: a
+ * bracketed access with a unicode escape is ordinary TypeScript, and a schema
+ * key can be computed rather than written. A fact key beginning with the
+ * separator is byte-identical to the recorded form of the same-named
+ * derivation, which is the original collision one character to the right. So
+ * the namespace is injective by enforcement rather than by luck —
+ * `createModule` rejects a fact key or derivation ID carrying this character.
+ * See `validateDepNamespaceKeys` in `module.ts`.
  *
  * @internal
  */
