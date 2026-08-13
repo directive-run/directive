@@ -1,8 +1,8 @@
 {
   "$schema": "./size-budgets.schema.json",
-  "_README": "Bundle-size budgets enforced by scripts/size-check.ts. Each entry is a path to a built artifact relative to the repo root plus a `gzBudget` in bytes (gzip default level). Budgets are set with ~25-50% headroom over the current measurements as of 2026-05-30 so small additions don't fail CI, but a serious regression does. Raise a budget only when an intentional new feature lands; otherwise treat a bust as a bug.",
+  "_README": "Bundle-size budgets enforced by scripts/size-check.ts. Each entry is a path to a built entry file relative to the repo root plus a `gzBudget` in bytes (gzip default level). The measured number is the entry AND every emitted file it imports, gzipped together — not the entry file alone. tsup splits shared code into content-hashed `chunk-*.js` siblings, so an entry-only measurement watches whichever slice happened to stay in the entry and misses the rest; before this was fixed, packages/core/dist/index.js measured 12,271 gz against an 18,000 budget while the engine sat in unlisted chunks totalling 61,538 gz. It is a ceiling rather than a prediction — a consumer's bundler tree-shakes what they never call — but it moves when the code moves, which is the whole job of a guard. Budgets carry ~25-50% headroom over the measurements as of 2026-08-12 so small additions don't fail CI while a serious regression does. Raise a budget only when an intentional new feature lands; otherwise treat a bust as a bug. Not yet budgeted: the core subpath entries (plugins, testing, worker, migration, adapter-utils, internals), which ship to npm and are currently unguarded.",
   "budgets": [
-    { "path": "packages/core/dist/index.js", "gzBudget": 18000 },
+    { "path": "packages/core/dist/index.js", "gzBudget": 78000 },
     { "path": "packages/el/dist/index.js", "gzBudget": 1000 },
     { "path": "packages/el/dist/jsx-runtime.js", "gzBudget": 700 },
     { "path": "packages/el/dist/htm.js", "gzBudget": 700 },
