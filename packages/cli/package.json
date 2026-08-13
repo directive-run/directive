@@ -48,9 +48,7 @@
     "./llms.txt": "./dist/llms.txt"
   },
   "llms": "./dist/llms.txt",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup && tsx scripts/generate-llms-txt.ts",
     "test": "cd ../.. && vitest run packages/cli/",

@@ -30,13 +30,13 @@ const contents = generateLlmsTxt();
 // failure one step later, so the size is checked rather than assumed.
 if (contents.length < MINIMUM_PLAUSIBLE_BYTES) {
   throw new Error(
-    `generate-llms-txt: refusing to write ${contents.length} bytes to ${outputPath}. ` +
-      `The knowledge base or examples resolved to nothing, which would ship an export ` +
-      `that exists but says nothing.`,
+    `generate-llms-txt: refusing to write ${contents.length} bytes to ${outputPath}. The knowledge base or examples resolved to nothing, which would ship an export that exists but says nothing.`,
   );
 }
 
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, contents, "utf-8");
 
-console.log(`llms.txt: ${contents.length.toLocaleString()} bytes -> ${outputPath}`);
+console.log(
+  `llms.txt: ${contents.length.toLocaleString()} bytes -> ${outputPath}`,
+);
