@@ -1,5 +1,56 @@
 # @directive-run/core
 
+## 1.28.0
+
+### Minor Changes
+
+- [#128](https://github.com/directive-run/directive/pull/128) [`a7ad568`](https://github.com/directive-run/directive/commit/a7ad568919781912c0586a3027c18dabcfebc77c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Three fixes for changes that took effect but were never announced, plus a new
+  `system.meta.revision()` counter that makes the third fixable at all.
+
+  **`derive.assign` could leave `settle()` waiting forever.** Replacing a
+  derivation definition records an invalidation, but the reconcile tail only
+  scheduled a pass when a _fact_ had changed — and replacing a derivation changes
+  no fact key. The invalidation sat undelivered with no pass in which to deliver
+  it, and `await system.settle()` never returned. Definition changes now schedule
+  a pass when one is owed.
+
+  **The runaway-reconcile guard could never fire.** `MAX_RECONCILE_DEPTH` warns
+  when reconcile passes chain without settling, but the counter was reset at the
+  end of every pass and re-entry is refused at the top, so it reached one and went
+  back to zero, forever. A resolver feeding its own constraint could spin
+  indefinitely with nothing printed. The counter now resets when the system
+  actually reaches quiet, which is the state that distinguishes a circular chain
+  from a busy system — a chain never reaches it, a busy system reaches it between
+  changes.
+
+  **`factPIIGuardrail` stopped screening facts that arrived after it started.** It
+  built its set of pii-tagged fact keys once, on init. A module registered later
+  brought its own tagged facts, and a write to one of them took the same early
+  return an untagged key takes: no scan, no redaction, nothing reported. The set
+  now rebuilds when the system's metadata changes.
+
+  **New: `system.meta.revision()`.** An integer that moves whenever the set
+  `meta.byTag()` and `meta.byCategory()` search can have changed. Both walk every
+  definition in the system, so anything consulting them on a hot path caches the
+  answer — and had no way to learn the answer had gone stale short of re-walking.
+  Compare this number against the one held with your cache and rebuild only when
+  it has moved. Only equality is meaningful: a spurious rebuild is correct, a
+  skipped one is not.
+
+### Patch Changes
+
+- [#126](https://github.com/directive-run/directive/pull/126) [`044822c`](https://github.com/directive-run/directive/commit/044822cc70894b35b5d5f1840e31b19143433d21) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fixes from a review of the 1.27.1 watched-set change, including a correction to what that release claimed.
+
+  **The prune no longer runs when there is nothing to prune.** Rebuilding the watched set costs a walk of every constraint's and every effect's dependency set, and 1.27.1 paid it on every reconcile — including systems where nothing reads a derivation at all, where there is nothing to gain because the invalidation walk already short-circuits on the same emptiness. Measured at 4% to 23% of a reconcile in that shape. It is now guarded.
+
+  **A disabled effect no longer pins what it read.** Disabling a constraint dropped its dependency set; disabling an effect did not, so every derivation that effect had read stayed watched for the life of the system — the same growth 1.27.1 set out to end, surviving in one path. The error boundary's disable strategy reaches this, so an effect that threw once pinned its derivations permanently.
+
+  **A derivation may be named after a member of Object.prototype.** `toString`, `valueOf` and `hasOwnProperty` resolved to the inherited builtin function instead of the derivation's value, so a constraint gated on one was unconditionally truthy, with no error anywhere.
+
+  **`@directive-run/el` now declares the core version it actually needs** — `^1.15.0` rather than `^1.0.0`. It imports two types that did not exist before 1.15.0, so the old range let a consumer install a core whose types cannot satisfy it while the package manager reported the peer as met.
+
+  **Correcting the 1.27.1 note.** That release reported the change as roughly 29 to 18 microseconds per reconcile. That measurement is real but was taken only on the shape where the change wins — a deep derivation chain behind narrow readers. On wide readers it was a 12% to 20% regression, and where nothing is watched it was a 4% to 23% regression for no benefit. The guard above removes the second case; the first remains a real trade and is now stated rather than implied.
+
 ## 1.27.1
 
 ### Patch Changes
