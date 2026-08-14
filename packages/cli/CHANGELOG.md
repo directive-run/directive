@@ -1,5 +1,14 @@
 # @directive-run/cli
 
+## 1.27.1
+
+### Patch Changes
+
+- [#123](https://github.com/directive-run/directive/pull/123) [`ebf89ec`](https://github.com/directive-run/directive/commit/ebf89ecb674f7d17ba5167bdf0deec6193ffe2d6) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Write `llms.txt` into the package during the build. The `./llms.txt` export and the `llms` metadata field both pointed at `dist/llms.txt`, which nothing generated — so an install resolved the export to a file that was not there. The generator runs after the bundler, since the bundler cleans the output directory, and it refuses to write an implausibly small file rather than shipping an export that exists but says nothing.
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.27.1
+
 ## 1.27.0
 
 ### Patch Changes
