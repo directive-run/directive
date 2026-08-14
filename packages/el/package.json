@@ -58,7 +58,9 @@
       "import": "./dist/htm.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -67,7 +69,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^1.0.0",
+    "@directive-run/core": "^1.15.0",
     "htm": ">=3"
   },
   "peerDependenciesMeta": {

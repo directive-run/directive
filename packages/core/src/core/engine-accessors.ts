@@ -63,8 +63,11 @@ export function createDeriveAccessor(
       if (BLOCKED_PROPS.has(prop)) {
         return undefined;
       }
-      // Check for method properties first (register, assign, etc.)
-      if (prop in deriveMethods) {
+      // Own properties only. `prop in deriveMethods` walked Object.prototype,
+      // so a derivation named `toString`, `valueOf` or `hasOwnProperty` resolved
+      // to the builtin function instead of its value — and a constraint gated on
+      // it was unconditionally truthy, with no error anywhere.
+      if (Object.hasOwn(deriveMethods, prop)) {
         return deriveMethods[prop];
       }
       // Return undefined for unknown derivation keys instead of throwing.

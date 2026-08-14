@@ -292,9 +292,11 @@ export interface SystemInspection {
    * constraint's `when()`, an effect's body, a name in an explicit `deps`.
    *
    * The invalidation walk each reconcile is bounded against this count, so it
-   * is what explains that walk's cost. A number far larger than the derivations
-   * your constraints and effects actually read means something is registering
-   * watchers that nothing is waiting on.
+   * is what explains that walk's cost. The number is rebuilt at the end of
+   * every reconcile from what the constraints and effects currently depend on,
+   * so it falls as well as rises — a drop is the set tracking its readers, not
+   * a leak. Read it at a settled point: a framework adapter's tracked read
+   * raises it transiently and the next reconcile lowers it again.
    */
   observedDerivations: number;
   /** All fact/schema field keys with optional metadata */

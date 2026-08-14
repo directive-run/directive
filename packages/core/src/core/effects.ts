@@ -801,6 +801,14 @@ export function createEffectsManager<S extends Schema>(
     disable(id: string): void {
       const state = getState(id);
       state.enabled = false;
+      // Drop the dependency set too, the way `constraints.disable` does. A
+      // disabled effect reads nothing, so leaving its dependencies recorded
+      // kept every derivation it had ever read pinned in the watched set for
+      // the life of the system — the same growth this manager's
+      // `collectObservedDerivations` exists to end, surviving in one path.
+      // The error boundary's "disable" strategy reaches this, so an effect that
+      // threw once used to pin its derivations permanently.
+      state.dependencies = null;
     },
 
     enable(id: string): void {
