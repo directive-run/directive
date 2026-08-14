@@ -39,7 +39,13 @@
 import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
-import { derivationDep, describeDep, withTracking } from "./tracking.js";
+import {
+  derivationDep,
+  derivationDepId,
+  describeDep,
+  isDerivationDep,
+  withTracking,
+} from "./tracking.js";
 import type {
   EffectsDef,
   Facts,
@@ -102,6 +108,17 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * will be invoked immediately rather than stored.
    */
   cleanupAll(): void;
+
+  /**
+   * Add every derivation this manager's effects currently depend on to `into`,
+   * by bare id.
+   *
+   * An effect's dependency set is replaced each time it runs, so this reflects
+   * the last run rather than the whole history. An effect that has never run
+   * carries `null` and contributes nothing — it registers what it reads when it
+   * reads it, so nothing is lost by leaving it out.
+   */
+  collectObservedDerivations(into: Set<string>): void;
   /**
    * Register additional effect definitions at runtime (used for dynamic
    * module registration).
@@ -793,6 +810,19 @@ export function createEffectsManager<S extends Schema>(
 
     isEnabled(id: string): boolean {
       return getState(id).enabled;
+    },
+
+    collectObservedDerivations(into: Set<string>): void {
+      for (const state of states.values()) {
+        if (!state.dependencies) {
+          continue;
+        }
+        for (const dep of state.dependencies) {
+          if (isDerivationDep(dep)) {
+            into.add(derivationDepId(dep));
+          }
+        }
+      }
     },
 
     cleanupAll(): void {

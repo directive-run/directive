@@ -1389,6 +1389,24 @@ export function createEngine<S extends Schema>(
       // to climb toward MAX in long-running systems with continuous changes.
       reconcileDepth = 0;
 
+      // Let the watched set shrink.
+      //
+      // A derivation joins that set the moment a constraint or an effect reads
+      // it, and before this it left only when the derivation was destroyed — so
+      // a gate that opened once was watched for the life of the system. The set
+      // is the bound the invalidation walk is measured against, so a stale entry
+      // makes the walk both broader and less able to stop early.
+      //
+      // Rebuilt rather than reference-counted. Both readers already replace
+      // their dependency set wholesale each time they run, so the union of those
+      // sets is the answer, and no delta has to be tracked. Placed here because
+      // every constraint and effect for this pass has finished, and before the
+      // decision below, which can depend on whether anything is still watching.
+      const liveObserved = new Set<string>();
+      constraintsManager.collectObservedDerivations(liveObserved);
+      effectsManager.collectObservedDerivations(liveObserved);
+      derivationsManager.retainObserved(liveObserved);
+
       // A changed fact is not the only thing that leaves work undone. A
       // derivation may have been invalidated by something that touches no fact
       // key at all — a definition replaced at runtime — which leaves the system
