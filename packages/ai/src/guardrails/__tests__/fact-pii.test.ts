@@ -1352,3 +1352,36 @@ describe("createFactPIIGuardrail — errorMode", () => {
     system.destroy();
   });
 });
+
+describe("a module registered after the guardrail started", () => {
+  it("has its pii-tagged facts screened too", async () => {
+    const system = createSystem({
+      module: makeCustomerModule(),
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+
+    // The guardrail has already built its screened set from the modules the
+    // system was created with. This one arrives afterwards.
+    system.registerModule(
+      createModule("vendor", {
+        schema: {
+          facts: { contact: t.string().meta({ tags: ["pii"] }) },
+        },
+        init: (f) => {
+          f.contact = "";
+        },
+      }),
+    );
+
+    (system.facts as unknown as Record<string, string>).contact =
+      "reach me at 555-12-3456";
+
+    // Before: written through untouched, and reported as nothing, because a key
+    // absent from the screened set takes the same early return as a clean one.
+    const stored = (system.facts as unknown as Record<string, string>).contact;
+    expect(stored).not.toContain("555-12-3456");
+
+    system.stop();
+  });
+});

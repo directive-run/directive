@@ -815,6 +815,20 @@ export interface MetaAccessor {
   byCategory(category: string): MetaMatch[];
   /** Find all definitions matching a tag across all types. */
   byTag(tag: string): MetaMatch[];
+  /**
+   * A counter that moves whenever the set `byTag` and `byCategory` search can
+   * have changed — today, when a module is registered.
+   *
+   * Both of those walk every definition in the system, so anything consulting
+   * them per fact write caches the result. Compare this number against the one
+   * held alongside the cache and rebuild only when it has moved; the comparison
+   * is O(1) where the rebuild is O(definitions).
+   *
+   * Only equality is meaningful. The starting value, the step, and whether it
+   * moves for a change that turns out not to affect a given tag are all
+   * unspecified — a spurious rebuild is correct, a skipped one is not.
+   */
+  revision(): number;
 }
 
 // ============================================================================

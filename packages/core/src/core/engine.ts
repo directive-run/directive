@@ -1384,10 +1384,6 @@ export function createEngine<S extends Schema>(
       // Schedule next reconcile BEFORE notifying settlement change,
       // so listeners never see a brief isSettled=true flash when
       // more changes are pending.
-      // Reset depth counter at the end of each top-level reconcile.
-      // Previously only reset on full settlement, which allowed depth
-      // to climb toward MAX in long-running systems with continuous changes.
-      reconcileDepth = 0;
 
       // Let the watched set shrink.
       //
@@ -1425,6 +1421,26 @@ export function createEngine<S extends Schema>(
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
+      } else {
+        // The system reached quiet, so whatever chain of passes led here has
+        // ended and the runaway counter starts over.
+        //
+        // This is the only place it resets, and that is the whole point. It
+        // used to reset in this `finally` unconditionally, which made the
+        // ceiling above unreachable: re-entry is refused at the top of
+        // `reconcile`, so the counter went to one and back to zero every pass
+        // and never once approached fifty. A resolver feeding its own
+        // constraint span passes forever with no warning — the guard was there,
+        // it just could not fire.
+        //
+        // It reset on full settlement before that, and was moved because a
+        // long-running system under continuous change climbed toward the
+        // ceiling and tripped on legitimate work. Both readings are wrong for
+        // the same reason: neither distinguishes a pass that chained from the
+        // previous one from a pass that started fresh. The branch does. A
+        // circular chain never reaches this line; a busy system reaches it
+        // between changes.
+        reconcileDepth = 0;
       }
 
       notifySettlementChange();
@@ -1549,6 +1565,22 @@ export function createEngine<S extends Schema>(
 
     return [...tags];
   }
+
+  /**
+   * Bumped whenever the set `collectAllMeta` walks can have changed.
+   *
+   * Answering `byTag` means walking every definition in the system, which is
+   * why anything consulting it on a hot path caches the answer. Those caches
+   * had no way to learn they had gone stale short of re-walking — so they were
+   * built once and kept forever, and a fact registered by a later module was
+   * simply never in them. A guardrail screening tagged facts stopped screening
+   * the ones that arrived after it started, and reported nothing, because
+   * "not in the set" and "clean" are the same answer.
+   *
+   * An integer they can compare per read costs nothing and makes the staleness
+   * observable.
+   */
+  let metaRevision = 0;
 
   /** Collect all definitions with meta across all types (for byCategory/byTag). */
   function collectAllMeta(): MetaMatch[] {
@@ -1716,6 +1748,9 @@ export function createEngine<S extends Schema>(
       },
       byTag(tag: string): MetaMatch[] {
         return collectAllMeta().filter((m) => m.meta.tags?.includes(tag));
+      },
+      revision(): number {
+        return metaRevision;
       },
     },
 
@@ -3103,6 +3138,8 @@ export function createEngine<S extends Schema>(
     meta?: DefinitionMeta;
     history?: { snapshotEvents?: string[] };
   }): void {
+    // Every exit below this point either throws or adds to what `collectAllMeta`
+    // walks, so the revision moves once the guard has passed.
     // Guard: cannot register during reconciliation (would corrupt iteration state)
     if (state.isReconciling) {
       throw new Error(
@@ -3279,6 +3316,11 @@ export function createEngine<S extends Schema>(
 
     // Track the new module in config.modules for hooks
     config.modules.push(module as (typeof config.modules)[number]);
+
+    // The module's definitions and its schema are in place, so anything caching
+    // a `byTag` / `byCategory` answer is now looking at a stale one. Bumped
+    // before init and the hooks run, since both can read meta.
+    metaRevision++;
 
     // Run init within a batch
     if (module.init) {

@@ -389,6 +389,8 @@ export interface FactPIIGuardrailOptions {
 interface MetaCapableSystem {
   meta?: {
     byTag?: (tag: string) => Array<{ type?: string; id?: string }>;
+    /** Added in core 1.28. Absent on older cores, which is handled below. */
+    revision?: () => number;
   };
   facts?: {
     $store?: {
@@ -458,14 +460,48 @@ export function createFactPIIGuardrail(
   const MAX_ARRAY_SCAN = 10_000;
   let initialized = false;
   let systemRef: System | null = null;
+  // The meta revision the screened set was built against. `null` means it has
+  // never been built, or was built against a core too old to report one.
+  let screenedAtRevision: number | null = null;
 
-  function initScreenedKeys(system: System): void {
-    if (initialized) return;
+  /**
+   * Rebuild the screened set from the system's pii-tagged facts.
+   *
+   * Built once on init and never again, until this. A module registered after
+   * the plugin started brings its own facts, and a pii tag on one of them was
+   * simply never read — the write then took the same early return as an
+   * untagged key, so the value reached the agent prompt unscreened and nothing
+   * was reported, because a key missing from the set and a key that scanned
+   * clean leave exactly the same trace.
+   *
+   * Cheap to keep current: the walk behind `byTag` is only paid when the
+   * revision has actually moved.
+   */
+  function syncScreenedKeys(system: System): void {
+    const meta = (system as unknown as MetaCapableSystem).meta;
+    const revision = meta?.revision?.();
+
+    if (
+      initialized &&
+      typeof revision === "number" &&
+      revision === screenedAtRevision
+    ) {
+      return;
+    }
+
     initialized = true;
     systemRef = system;
-    const piiTagged = (system as unknown as MetaCapableSystem).meta?.byTag?.(
-      "pii",
-    );
+    screenedAtRevision = typeof revision === "number" ? revision : null;
+
+    // Rebuilt rather than added to, so a fact that loses its tag — or a
+    // module that never registers again — stops being screened. `includeKeys`
+    // is caller-supplied and survives every rebuild.
+    screenedKeys.clear();
+    for (const key of includeKeys) {
+      screenedKeys.add(key);
+    }
+
+    const piiTagged = meta?.byTag?.("pii");
     if (!piiTagged) return;
     for (const entry of piiTagged) {
       // MetaMatch shape: { type: "fact" | "module" | "event" | ..., id: string, meta }.
@@ -783,11 +819,16 @@ export function createFactPIIGuardrail(
     name: "fact-pii-guardrail",
 
     onInit(system) {
-      initScreenedKeys(system);
+      syncScreenedKeys(system);
     },
 
     onFactSet(key, value, _prev) {
       if (!initialized) return;
+      // Cheap: an integer compare unless a module has registered since the last
+      // write. Without it the screened set is whatever the system happened to
+      // hold at init, and a later module's tagged facts are indistinguishable
+      // from untagged ones on the line below.
+      if (systemRef) syncScreenedKeys(systemRef);
       if (!screenedKeys.has(key)) return;
       // Idempotent skip — primitives only. For object
       // references, `value === _prev` is true when a source mutates
@@ -860,6 +901,7 @@ export function createFactPIIGuardrail(
 
     onFactsBatch(changes) {
       if (!initialized) return;
+      if (systemRef) syncScreenedKeys(systemRef);
       for (const change of changes) {
         if (change.type !== "set") continue;
         if (!screenedKeys.has(change.key)) continue;

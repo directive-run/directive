@@ -1042,10 +1042,12 @@ export function createDerivationsManager<
         return 0;
       }
 
-      // Collected first, then deleted. Removing the current entry mid-iteration
-      // is defined behaviour, but this module has been bitten by mutating a set
-      // while walking it, and the cost of being obvious here is one array that
-      // is empty on almost every pass.
+      // Removals only. Installing `live` wholesale would be the more natural
+      // semantics — `live` IS what the readers depend on — and it would fix the
+      // case where a re-registered derivation can never re-enter the set. But
+      // the prune is skipped entirely when nothing is observed, so an install
+      // could never run in exactly the state that needs it. Those two have to be
+      // solved together, at registration rather than here; see the record.
       let stale: string[] | null = null;
       for (const id of observedIds) {
         if (!live.has(id)) {
