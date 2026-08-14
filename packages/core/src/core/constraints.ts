@@ -17,7 +17,12 @@ import {
   walkPredicate,
 } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
-import { normalizeExplicitDeps, withTracking } from "./tracking.js";
+import {
+  derivationDepId,
+  isDerivationDep,
+  normalizeExplicitDeps,
+  withTracking,
+} from "./tracking.js";
 import type {
   ConstraintState,
   ConstraintsDef,
@@ -106,6 +111,21 @@ export interface ConstraintsManager<_S extends Schema> {
    *   printing these directly.
    */
   getDependencies(id: string): Set<string> | undefined;
+
+  /**
+   * Add every derivation this manager's constraints currently depend on to
+   * `into`, by bare id.
+   *
+   * The dependency set of a constraint is replaced wholesale each time it
+   * evaluates, so this is what the constraints read on their last run rather
+   * than what they have ever read. That is the difference that lets the watched
+   * set shrink: a constraint that stopped reading a value stops contributing it.
+   *
+   * A constraint that has never evaluated has no set and contributes nothing.
+   * It cannot lose a wakeup by being missed here, because it registers what it
+   * reads at the moment it reads it.
+   */
+  collectObservedDerivations(into: Set<string>): void;
   /**
    * Record that a constraint's resolver completed successfully, unblocking
    * any constraints that list it in their `after` array.
@@ -1365,6 +1385,16 @@ export function createConstraintsManager<S extends Schema>(
 
     getDependencies(id: string): Set<string> | undefined {
       return constraintDeps.get(id);
+    },
+
+    collectObservedDerivations(into: Set<string>): void {
+      for (const deps of constraintDeps.values()) {
+        for (const dep of deps) {
+          if (isDerivationDep(dep)) {
+            into.add(derivationDepId(dep));
+          }
+        }
+      }
     },
 
     getAllStates(): ConstraintState[] {

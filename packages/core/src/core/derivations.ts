@@ -76,6 +76,22 @@ export interface DerivationsManager<
    * one entry in a Set.
    */
   markObserved(id: string): void;
+
+  /**
+   * Drop any watched derivation that no live reader depends on any more, and
+   * report how many went.
+   *
+   * The set grows on read and, before this, shrank only when a derivation was
+   * destroyed — so one conditional read marked a value watched for the life of
+   * the system. That inflates the bound the invalidation walk is measured
+   * against, which is the only thing the count is for.
+   *
+   * `live` is the union of what the constraints and effects currently depend
+   * on, rebuilt from sets they already keep. There is no counter and no delta:
+   * a wrong answer here is wrong immediately and visibly, rather than drifting
+   * by one and becoming either a silent leak or a silently missed wakeup.
+   */
+  retainObserved(live: ReadonlySet<string>): number;
   /**
    * Drain the derivations that may have moved since the last drain into `out`,
    * under {@link derivationDep} names.
@@ -1017,6 +1033,33 @@ export function createDerivationsManager<
 
     markObserved(id: string): void {
       observedIds.add(id);
+    },
+
+    retainObserved(live: ReadonlySet<string>): number {
+      if (observedIds.size === 0) {
+        return 0;
+      }
+
+      // Collected first, then deleted. Removing the current entry mid-iteration
+      // is defined behaviour, but this module has been bitten by mutating a set
+      // while walking it, and the cost of being obvious here is one array that
+      // is empty on almost every pass.
+      let stale: string[] | null = null;
+      for (const id of observedIds) {
+        if (!live.has(id)) {
+          (stale ??= []).push(id);
+        }
+      }
+
+      if (!stale) {
+        return 0;
+      }
+
+      for (const id of stale) {
+        observedIds.delete(id);
+      }
+
+      return stale.length;
     },
 
     observedCount(): number {
