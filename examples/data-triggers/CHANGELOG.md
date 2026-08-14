@@ -1,5 +1,12 @@
 # @directive-run/example-data-triggers
 
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies [[`044822c`](https://github.com/directive-run/directive/commit/044822cc70894b35b5d5f1840e31b19143433d21), [`a7ad568`](https://github.com/directive-run/directive/commit/a7ad568919781912c0586a3027c18dabcfebc77c)]:
+  - @directive-run/core@1.28.0
+
 ## 0.0.39
 
 ### Patch Changes
