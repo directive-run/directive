@@ -199,6 +199,12 @@ interface TypeDescriptor {
     registerDefinitions(defs: Record<string, unknown>): void;
     assignDefinition(id: string, def: unknown): void;
     unregisterDefinition(id: string): void;
+    /**
+     * Present on the derivations manager only. A definition change that leaves
+     * an announcement owed needs a pass scheduled to drain it, and this is how
+     * {@link scheduleIfWorkOwed} asks whether one is owed.
+     */
+    pendingInvalidationCount?(): number;
   };
   /** Set of dynamically registered IDs */
   dynamicSet: Set<string>;
@@ -347,7 +353,30 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.dynamicSet.add(id);
     pluginManager.emitDefinitionRegister(type, id, def);
 
+    scheduleIfWorkOwed(desc);
+  }
+
+  /**
+   * Schedule a pass if this change left work owed.
+   *
+   * Derivations carry `reconciles: false` because replacing one touches no fact
+   * and there is usually nothing to run. But replacing a *watched* derivation
+   * records an invalidation the system still owes an announcement for, and
+   * `isSettled` counts that — so with nothing scheduled to drain it, `settle()`
+   * never resolved and the swapped-in definition never reached its readers until
+   * unrelated traffic happened along. The engine has a comment describing
+   * exactly this case, but its guard lives in the reconcile tail, so it can only
+   * re-arm a pass that is already running; it cannot start one.
+   */
+  function scheduleIfWorkOwed(desc: TypeDescriptor): void {
     if (desc.reconciles) {
+      scheduleReconcile();
+
+      return;
+    }
+
+    const pending = desc.manager.pendingInvalidationCount?.();
+    if (typeof pending === "number" && pending > 0) {
       scheduleReconcile();
     }
   }
@@ -379,9 +408,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.mergedMap[id] = def;
     pluginManager.emitDefinitionAssign(type, id, def, original);
 
-    if (desc.reconciles) {
-      scheduleReconcile();
-    }
+    scheduleIfWorkOwed(desc);
   }
 
   /** Apply an unregister operation immediately */
@@ -404,9 +431,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.originalsMap.delete(id);
     pluginManager.emitDefinitionUnregister(type, id);
 
-    if (desc.reconciles) {
-      scheduleReconcile();
-    }
+    scheduleIfWorkOwed(desc);
   }
 
   /** Flush deferred registrations after reconcile settles */
