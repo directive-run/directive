@@ -640,9 +640,13 @@ describe("DAG: per-node timeout", () => {
     }>("timeout", "go");
 
     expect(result.statuses.B).toBe("completed");
-    // A completes because the mock runner's delay doesn't respect abort signals —
-    // the node timeout fires but the mock keeps sleeping and returns normally
-    expect(result.statuses.A).toBe("completed");
+
+    // A is slower than its 50ms node timeout, so it is cut off. This used to
+    // assert "completed", with a comment explaining that the double ignored
+    // abort signals and slept through the timeout — the test named for a node
+    // timeout was pinning the absence of one.
+    expect(result.statuses.A).toBe("error");
+    expect(result.errors.A).toBeDefined();
   });
 });
 
@@ -678,10 +682,12 @@ describe("DAG: graph-level timeout", () => {
       "go",
     );
 
-    // Both complete because the mock runner's delay doesn't respect abort signals —
-    // the graph timeout fires but mock nodes keep sleeping and return normally
-    expect(result.A).toBe("completed");
-    expect(result.B).toBe("completed");
+    // Both nodes sleep for 2s behind a 100ms graph timeout, so the timeout
+    // reaches them. This used to assert both "completed", with a comment
+    // explaining that the double slept through the abort — a test named
+    // "aborts all running nodes" that passed when nothing was aborted.
+    expect(result.A).toBe("error");
+    expect(result.B).toBe("error");
   });
 });
 

@@ -47,6 +47,21 @@ function makeOrchestrator(
   return createTestMultiAgentOrchestrator({ agents, mockResponses });
 }
 
+/**
+ * The names of the agents an orchestrator actually called, in order.
+ *
+ * Every resume test below turns on this. Resuming means the work already on
+ * the checkpoint is *not* done again, and the only way to see that is to look
+ * at who ran. Asserting on the return value cannot distinguish a resumed run
+ * from a run that ignored the checkpoint and started over, because both return
+ * a result.
+ */
+function agentsCalled(orchestrator: {
+  getCalls(): Array<{ agent: { name: string } }>;
+}): string[] {
+  return orchestrator.getCalls().map((call) => call.agent.name);
+}
+
 // ============================================================================
 // Sequential Pattern Checkpoint
 // ============================================================================
@@ -111,7 +126,15 @@ describe("Sequential Pattern Checkpoint", () => {
       pattern,
     );
 
-    // Should have completed (ran agents c and d from step 2)
+    // Resuming at step 2 of [a, b, c, d] means c and d run and a and b do not.
+    // `toBeDefined` was the whole assertion here, and a run that ignored the
+    // checkpoint and started from a would have satisfied it.
+    expect(agentsCalled(orchestrator)).toEqual(["c", "d"]);
+
+    // And it picks up where it stopped: c is handed the checkpoint's carried
+    // input, which is b's output, rather than the pattern's original input.
+    expect(orchestrator.getCalls()[0]?.input).toBe("from-b");
+
     expect(result).toBeDefined();
   });
 
@@ -219,6 +242,14 @@ describe("Supervisor Pattern Checkpoint", () => {
       { input: "task" },
     );
 
+    // The checkpoint caught the supervisor mid-delegation: it had already
+    // decided to send work to w1. Resuming carries out that decision. Asking
+    // the supervisor to plan again would mean the checkpoint was ignored, and
+    // would also spend a turn on a decision already made and paid for.
+    const called = agentsCalled(orchestrator);
+    expect(called[0]).toBe("w1");
+    expect(orchestrator.getCalls()[0]?.input).toBe("do work");
+
     expect(result).toBeDefined();
   });
 
@@ -241,6 +272,7 @@ describe("Supervisor Pattern Checkpoint", () => {
 describe("Reflect Pattern Checkpoint", () => {
   it("saves checkpoints at configured intervals", async () => {
     const store = new InMemoryCheckpointStore();
+    let reviewerCalls = 0;
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         writer: { agent: { name: "writer" } },
@@ -248,9 +280,26 @@ describe("Reflect Pattern Checkpoint", () => {
       },
       mockResponses: {
         writer: { output: "draft text", totalTokens: 20 },
+        // The evaluator has to reject once. A reflect run that passes on its
+        // first iteration never reaches a second, and a checkpoint is only
+        // written between iterations — so the version of this test that let
+        // the first draft pass exercised the checkpoint path zero times while
+        // being named for it. It then asserted `length >= 0`, which is true of
+        // an array nothing ever wrote to.
         reviewer: {
-          output: JSON.stringify({ passed: true, score: 0.9 }),
+          output: JSON.stringify({ passed: false, score: 0.4 }),
           totalTokens: 15,
+          generate: (_input, _agent) => {
+            reviewerCalls += 1;
+
+            return {
+              output: JSON.stringify(
+                reviewerCalls === 1
+                  ? { passed: false, score: 0.4, feedback: "needs detail" }
+                  : { passed: true, score: 0.9 },
+              ),
+            };
+          },
         },
       },
       patterns: {
@@ -266,11 +315,14 @@ describe("Reflect Pattern Checkpoint", () => {
 
     await orchestrator.runPattern("ref", "write an essay");
 
-    // Reflect should pass on first iteration, so checkpoint may not save
-    // (only saves after iteration > startIteration, and everyN applies)
+    // Two iterations ran, so the boundary between them was checkpointed.
+    expect(reviewerCalls).toBeGreaterThanOrEqual(2);
+
     const checkpoints = await store.list();
-    // At minimum, the test verifies no errors occur during checkpoint path
-    expect(checkpoints.length).toBeGreaterThanOrEqual(0);
+    expect(checkpoints.length).toBeGreaterThanOrEqual(1);
+    for (const cp of checkpoints) {
+      expect(cp.label).toMatch(/^ref-test:/);
+    }
   });
 
   it("resumes from checkpoint and continues execution", async () => {
@@ -317,6 +369,20 @@ describe("Reflect Pattern Checkpoint", () => {
     const result = await orchestrator.resumeReflect(checkpointState, pattern, {
       input: "write an essay",
     });
+
+    // The producer resumes on the input the checkpoint built — the one
+    // carrying iteration 0's feedback — not on the bare original. A run that
+    // ignored the checkpoint would start from "write an essay" and this line
+    // is what tells the two apart.
+    const producerCalls = orchestrator
+      .getCalls()
+      .filter((call) => call.agent.name === "writer");
+    expect(producerCalls.length).toBeGreaterThan(0);
+    expect(producerCalls[0]?.input).toContain("needs more detail");
+
+    // Iteration 0 is not repeated, so the producer runs at most the two
+    // iterations the pattern has left.
+    expect(producerCalls.length).toBeLessThanOrEqual(2);
 
     expect(result).toBeDefined();
   });
@@ -423,10 +489,21 @@ describe("Debate Pattern Checkpoint", () => {
     });
     const result = await orchestrator.resumeDebate(checkpointState, pattern);
 
-    expect(result).toBeDefined();
     expect(result.winnerId).toBeDefined();
-    // Should have the original round plus new rounds
+    // The original round plus new ones. `> 1` alone was satisfiable by a run
+    // that started over and simply debated twice, so the carried round is
+    // identified by its content rather than counted.
     expect(result.rounds.length).toBeGreaterThan(1);
+    expect(result.rounds[0]?.proposals.map((pr) => pr.output)).toEqual([
+      "round1-arg1",
+      "round1-arg2",
+    ]);
+    expect(result.rounds[0]?.judgement?.feedback).toBe("solid argument");
+
+    // Round 1 is not re-debated, so neither debater is called more than the
+    // two remaining rounds allow.
+    const called = agentsCalled(orchestrator);
+    expect(called.filter((n) => n === "d1").length).toBeLessThanOrEqual(2);
   });
 
   it("rejects invalid checkpoint state", async () => {
@@ -529,8 +606,16 @@ describe("DAG Pattern Checkpoint", () => {
       input: "process this",
     });
 
-    // Should complete without re-running the fetch node
-    expect(result).toBeDefined();
+    // The name of this test is "skips completed nodes", and this is the line
+    // that checks it. `toBeDefined` was the whole assertion, and a run that
+    // re-fetched everything from scratch would have passed it.
+    const called = agentsCalled(orchestrator);
+    expect(called).not.toContain("fetcher");
+    expect(called).toContain("analyzer");
+    expect(called).toContain("summarizer");
+
+    // The completed node's output is carried, not recomputed.
+    expect(result).toBe("summary");
   });
 
   it("rejects invalid checkpoint state", async () => {
