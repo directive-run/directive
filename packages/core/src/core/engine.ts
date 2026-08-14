@@ -1402,10 +1402,19 @@ export function createEngine<S extends Schema>(
       // sets is the answer, and no delta has to be tracked. Placed here because
       // every constraint and effect for this pass has finished, and before the
       // decision below, which can depend on whether anything is still watching.
-      const liveObserved = new Set<string>();
-      constraintsManager.collectObservedDerivations(liveObserved);
-      effectsManager.collectObservedDerivations(liveObserved);
-      derivationsManager.retainObserved(liveObserved);
+      // Guarded, because the union costs a walk of every reader's dependency
+      // set and the answer cannot change when nothing is watched. The first
+      // version of this paid that scan unconditionally: measured at +4% to +23%
+      // of a reconcile in the shape where no constraint or effect reads a
+      // derivation at all, which is both the most common shape and the one where
+      // there is nothing to gain — `collectInvalidated` already short-circuits
+      // on the same emptiness.
+      if (derivationsManager.observedCount() > 0) {
+        const liveObserved = new Set<string>();
+        constraintsManager.collectObservedDerivations(liveObserved);
+        effectsManager.collectObservedDerivations(liveObserved);
+        derivationsManager.retainObserved(liveObserved);
+      }
 
       // A changed fact is not the only thing that leaves work undone. A
       // derivation may have been invalidated by something that touches no fact

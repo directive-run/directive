@@ -70,10 +70,12 @@ export interface DerivationsManager<
    *
    * A derivation read from inside a tracking context marks itself; a derivation
    * named in a hand-written `deps` array cannot, because nothing reads it, so
-   * the engine says so on its behalf. Monotone — a name is never unmarked while
-   * the derivation exists, because a dependency set that stopped naming it may
-   * name it again on the next run and the cost of assuming it still watches is
-   * one entry in a Set.
+   * the engine says so on its behalf.
+   *
+   * Marking is not permanent. {@link retainObserved} runs at the end of each
+   * reconcile and drops anything no live reader still depends on. A reader that
+   * stops naming a value therefore stops watching it, and one that names it
+   * again re-marks on its next read.
    */
   markObserved(id: string): void;
 
