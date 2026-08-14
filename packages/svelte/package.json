@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/svelte",
-  "version": "1.27.0",
+  "version": "1.27.1",
   "imports": {
     "#is-development": {
       "production": "./src/dev-false.ts",

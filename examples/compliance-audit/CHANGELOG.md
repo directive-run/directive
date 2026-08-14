@@ -1,5 +1,13 @@
 # @directive-run/example-compliance-audit
 
+## 0.0.31
+
+### Patch Changes
+
+- Updated dependencies [[`5ab1a18`](https://github.com/directive-run/directive/commit/5ab1a180c8b5d5f3008199d3403db5c44ad3af1d)]:
+  - @directive-run/core@1.27.1
+  - @directive-run/ai@1.27.1
+
 ## 0.0.30
 
 ### Patch Changes
