@@ -175,9 +175,20 @@ describe("expireAfter", () => {
       await system.settle();
       expect(fetcherFn).toHaveBeenCalledTimes(1);
 
-      // Go idle + wait for GC
+      // Go idle, then poll until the expire timer has actually cleared the
+      // cache. This replaces a fixed `wait(200)`, the same shape already fixed
+      // once above: a 100ms margin over `expireAfter: 100` is tight enough
+      // that a loaded runner resolves the sleep before the timer's callback
+      // has run, and the test then re-enables against a cache that is still
+      // warm and sees one fetch instead of two. It blocked a release.
       system.facts.userId = "";
-      await wait(200);
+      await vi.waitFor(
+        () => {
+          const idle = system.read("user") as ResourceState<unknown>;
+          expect(idle.data).toBeNull();
+        },
+        { timeout: 2000, interval: 25 },
+      );
 
       // Re-enable – should fetch fresh
       system.facts.userId = "1";
