@@ -266,8 +266,8 @@ export const debounceSearchModule = createModule("debounce-search", {
   effects: {
     logQueryChange: {
       deps: ["query"],
-      run: (facts, prev) => {
-        if (prev && prev.query !== facts.query && facts.query !== "") {
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.query !== facts.query && facts.query !== "") {
           addLogEntry(facts, "keystroke", `"${facts.query}"`);
         }
       },

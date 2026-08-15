@@ -190,8 +190,8 @@ const dataModule = createModule("data", {
   // Effects also get cross-module facts
   effects: {
     onAuthChange: {
-      run: (facts, prev) => {
-        if (prev && prev.auth.isAuthenticated && !facts.auth.isAuthenticated) {
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.auth.isAuthenticated && !facts.auth.isAuthenticated) {
           console.log("User logged out, clearing data");
         }
       },

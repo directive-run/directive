@@ -65,10 +65,10 @@ const myModule = createModule("name", {
   },
 
   effects: {
-    // run() receives derived third, after facts and prev
+    // run() receives derived third, after facts and prevFacts
     logPhase: {
-      run: (facts, prev, derived) => {
-        if (prev?.phase !== facts.phase) {
+      run: (facts, prevFacts, derived) => {
+        if (prevFacts?.phase !== facts.phase) {
           console.log(`Phase: ${facts.phase} (loading: ${derived.isLoading})`);
         }
       },

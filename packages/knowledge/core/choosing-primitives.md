@@ -126,12 +126,12 @@ constraints: {
 },
 ```
 
-An effect's `run` receives it third, after `facts` and `prev`:
+An effect's `run` receives it third, after `facts` and `prevFacts`:
 
 ```typescript
 effects: {
   warn: {
-    run: (_facts, _prev, derived) => {
+    run: (_facts, _prevFacts, derived) => {
       if (derived.itemCount > 100) {
         console.warn("cart is large");
       }

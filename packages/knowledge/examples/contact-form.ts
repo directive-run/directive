@@ -303,13 +303,13 @@ const contactForm = createModule("contact-form", {
   effects: {
     logSubmission: {
       deps: ["status", "submissionCount"],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
-        if (facts.status !== prev.status) {
-          log(`Status: ${prev.status} → ${facts.status}`);
+        if (facts.status !== prevFacts.status) {
+          log(`Status: ${prevFacts.status} → ${facts.status}`);
         }
       },
     },

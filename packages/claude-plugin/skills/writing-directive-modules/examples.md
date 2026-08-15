@@ -394,13 +394,13 @@ const contactForm = createModule("contact-form", {
   effects: {
     logSubmission: {
       deps: ["status", "submissionCount"],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
-        if (facts.status !== prev.status) {
-          log(`Status: ${prev.status} → ${facts.status}`);
+        if (facts.status !== prevFacts.status) {
+          log(`Status: ${prevFacts.status} → ${facts.status}`);
         }
       },
     },
@@ -613,13 +613,13 @@ const newsletter = createModule("newsletter", {
   effects: {
     logSubscription: {
       deps: ["status"],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
-        if (facts.status !== prev.status) {
-          addLog(`Status: ${prev.status} → ${facts.status}`);
+        if (facts.status !== prevFacts.status) {
+          addLog(`Status: ${prevFacts.status} → ${facts.status}`);
         }
       },
     },
@@ -832,8 +832,8 @@ export const featureFlagsModule = createModule("feature-flags", {
         "voteApiEnabled",
         "maintenanceMode",
       ],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
@@ -850,9 +850,9 @@ export const featureFlagsModule = createModule("feature-flags", {
         ] as const;
 
         for (const flag of flags) {
-          if (facts[flag] !== prev[flag]) {
+          if (facts[flag] !== prevFacts[flag]) {
             console.log(
-              `[feature-flags] ${flag}: ${prev[flag]} → ${facts[flag]}`,
+              `[feature-flags] ${flag}: ${prevFacts[flag]} → ${facts[flag]}`,
             );
           }
         }

@@ -339,13 +339,22 @@ export interface CrossModuleEffectDef<
    * Effect function with cross-module facts access. Return a cleanup function
    * for teardown.
    *
+   * `prevFacts` is the fact snapshot from before this pass — the same shape as
+   * `facts`, or absent on the first run. Named for what it holds: `facts` and
+   * `prevFacts` sat side by side and only one of them said.
+   *
+   * There is deliberately no `prevDerived`. Derivations are computed from
+   * facts, and the runtime keeps a previous snapshot of the facts only, so a
+   * previous derived value would have to be recomputed rather than recalled —
+   * from `prevFacts`, which the caller already has.
+   *
    * `derived` is this module's own derivations — read it rather than reaching
    * back through `system.derive`, which resolves a namespace in a composed
-   * system. Third, because `facts` and `prev` hold the first two positions.
+   * system. Third, because `facts` and `prevFacts` hold the first two positions.
    */
   run: (
     facts: CrossModuleFactsWithSelf<M, Deps>,
-    prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
+    prevFacts: CrossModuleFactsWithSelf<M, Deps> | undefined,
     derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;

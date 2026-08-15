@@ -723,22 +723,22 @@ function prefixEffects(
   const result: Record<string, unknown> = {};
   for (const [key, effect] of Object.entries(mod.effects)) {
     const effectDef = effect as {
-      run: (facts: any, prev: any, derived: any) => void | Promise<void>;
+      run: (facts: any, prevFacts: any, derived: any) => void | Promise<void>;
       deps?: string[];
     };
 
     result[prefixKey(namespace, key)] = {
       ...effectDef,
-      run: (facts: any, prev: any, derive: any) => {
+      run: (facts: any, prevFacts: any, derive: any) => {
         const factsProxy = createScopedFactsProxy(
           facts as Record<string, unknown>,
           namespace,
           hasCrossModuleDeps,
           depNamespaces,
         );
-        const prevProxy = prev
+        const prevProxy = prevFacts
           ? createScopedFactsProxy(
-              prev as Record<string, unknown>,
+              prevFacts as Record<string, unknown>,
               namespace,
               hasCrossModuleDeps,
               depNamespaces,
