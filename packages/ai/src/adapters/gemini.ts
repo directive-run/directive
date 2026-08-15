@@ -49,6 +49,20 @@ import {
 // ============================================================================
 
 /** The single source of Gemini rates. Widened below; never exported raw. */
+/**
+ * The model used when a caller names none.
+ *
+ * This was `gemini-2.0-flash` until that model was shut down on 2026-06-01,
+ * which made the default a call that cannot succeed — and the failure arrived
+ * from the provider rather than from here, so it read as a network problem
+ * rather than a stale default. `gemini-2.5-flash` is the current model closest
+ * to what the old default was chosen for: the inexpensive general-purpose one.
+ *
+ * A default that names a specific model ages by construction. Anything relying
+ * on this should name its own.
+ */
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
 const GEMINI_RATES = {
   // `cacheRead` is Gemini's context-caching rate. Explicit caching also bills
   // storage per token-hour, which a per-token table cannot express, so a
@@ -97,7 +111,7 @@ const GEMINI_RATES = {
  * import { estimateCost, withBudget } from '@directive-run/ai';
  * import { GEMINI_PRICING } from '@directive-run/ai/gemini';
  *
- * const rates = GEMINI_PRICING["gemini-2.0-flash"];
+ * const rates = GEMINI_PRICING["gemini-2.5-flash"];
  *
  * const cost =
  *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
@@ -314,7 +328,7 @@ export interface GeminiRunnerOptions {
  * ```typescript
  * const runner = createGeminiRunner({
  *   apiKey: process.env.GEMINI_API_KEY!,
- *   model: 'gemini-2.0-flash',
+ *   model: 'gemini-2.5-flash',
  * });
  * const orchestrator = createAgentOrchestrator({ runner });
  * const result = await orchestrator.run(agent, input);
@@ -323,7 +337,7 @@ export interface GeminiRunnerOptions {
 export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
   const {
     apiKey,
-    model = "gemini-2.0-flash",
+    model = DEFAULT_GEMINI_MODEL,
     maxOutputTokens,
     baseURL = "https://generativelanguage.googleapis.com/v1beta",
     fetch: fetchFn = globalThis.fetch,
@@ -478,7 +492,7 @@ export function createGeminiStreamingRunner(
 ): StreamingCallbackRunner {
   const {
     apiKey,
-    model = "gemini-2.0-flash",
+    model = DEFAULT_GEMINI_MODEL,
     maxOutputTokens,
     baseURL = "https://generativelanguage.googleapis.com/v1beta",
     fetch: fetchFn = globalThis.fetch,
