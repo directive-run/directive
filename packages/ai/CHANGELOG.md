@@ -1,5 +1,7 @@
 # @directive-run/ai
 
+## 1.29.4
+
 ## 1.29.3
 
 ### Patch Changes
