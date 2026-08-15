@@ -1,5 +1,13 @@
 # @directive-run/example-error-boundaries
 
+## 0.0.68
+
+### Patch Changes
+
+- Updated dependencies [[`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba)]:
+  - @directive-run/core@1.29.1
+  - @directive-run/el@1.1.3
+
 ## 0.0.67
 
 ### Patch Changes
