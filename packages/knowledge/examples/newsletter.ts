@@ -190,7 +190,7 @@ const newsletter = createModule("newsletter", {
   effects: {
     logSubscription: {
       deps: ["status"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }

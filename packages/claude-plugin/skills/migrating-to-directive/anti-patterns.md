@@ -69,7 +69,7 @@ constraints: {
 
 effects: {
   warn: {
-    run: (facts, prev) => {
+    run: (facts, prevFacts) => {
       if (system.derive.itemCount > 100) {
         console.warn("cart is large");
       }

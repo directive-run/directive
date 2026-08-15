@@ -159,7 +159,7 @@ export interface EffectDef<
    */
   run(
     facts: Facts<S>,
-    prev: InferSchema<S> | null,
+    prevFacts: InferSchema<S> | null,
     derived: Derived,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;

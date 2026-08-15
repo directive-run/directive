@@ -214,7 +214,7 @@ const dataModule = createModule("data", {
 
   effects: {
     onAuthChange: {
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev && prev.auth.isAuthenticated && !facts.auth.isAuthenticated) {
           console.log("User logged out");
         }

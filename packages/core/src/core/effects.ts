@@ -283,7 +283,7 @@ export interface CreateEffectsOptions<S extends Schema> {
  * const effects = createEffectsManager({
  *   definitions: {
  *     logPhase: {
- *       run: (facts, prev) => {
+ *       run: (facts, prevFacts) => {
  *         if (prev?.phase !== facts.phase) {
  *           console.log(`Phase changed to ${facts.phase}`);
  *         }
@@ -452,7 +452,9 @@ export function createEffectsManager<S extends Schema>(
       // owning effect so the stack trace points at user config.
       onGates.set(
         id,
-        attributeError("effect", id, (facts, prev) => memoized(facts, prev)),
+        attributeError("effect", id, (facts, prevFacts) =>
+          memoized(facts, prevFacts),
+        ),
       );
     }
 
@@ -534,9 +536,9 @@ export function createEffectsManager<S extends Schema>(
       const gate = onGates.get(id);
       if (gate) {
         const facts = createSnapshot();
-        const prev = previousSnapshot ?? undefined;
+        const prevFacts = previousSnapshot ?? undefined;
 
-        return gate(facts, prev);
+        return gate(facts, prevFacts);
       }
 
       return true;

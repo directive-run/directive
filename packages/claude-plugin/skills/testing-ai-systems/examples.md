@@ -1210,7 +1210,7 @@ export const fraudAnalysisModule = createModule("fraud", {
   effects: {
     logStageChange: {
       deps: ["stage"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev && prev.stage !== facts.stage) {
           addTimeline("stage", `${prev.stage} → ${facts.stage}`);
         }
@@ -1219,7 +1219,7 @@ export const fraudAnalysisModule = createModule("fraud", {
 
     logPiiDetection: {
       deps: ["totalPiiDetections"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev && facts.totalPiiDetections !== prev.totalPiiDetections) {
           addTimeline(
             "pii",
@@ -1231,7 +1231,7 @@ export const fraudAnalysisModule = createModule("fraud", {
 
     logBudgetWarning: {
       deps: ["analysisBudget"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev && prev.analysisBudget > 0 && facts.analysisBudget <= 0) {
           addTimeline("budget", "analysis budget exhausted");
         }

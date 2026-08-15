@@ -303,7 +303,7 @@ const contactForm = createModule("contact-form", {
   effects: {
     logSubmission: {
       deps: ["status", "submissionCount"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }

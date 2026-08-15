@@ -98,7 +98,7 @@ export type SchemasMap = Record<string, ModuleSchema>;
  *
  * effects: {
  *   onAuthChange: {
- *     run: (facts: AllFacts, prev: AllFacts | undefined) => {
+ *     run: (facts: AllFacts, prevFacts: AllFacts | undefined) => {
  *       facts.auth.isAuthenticated // ✅ typed!
  *       facts.data.users           // ✅ typed!
  *     }

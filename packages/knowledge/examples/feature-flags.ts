@@ -190,7 +190,7 @@ export const featureFlagsModule = createModule("feature-flags", {
         "voteApiEnabled",
         "maintenanceMode",
       ],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }

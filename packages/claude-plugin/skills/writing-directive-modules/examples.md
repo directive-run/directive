@@ -394,7 +394,7 @@ const contactForm = createModule("contact-form", {
   effects: {
     logSubmission: {
       deps: ["status", "submissionCount"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }
@@ -613,7 +613,7 @@ const newsletter = createModule("newsletter", {
   effects: {
     logSubscription: {
       deps: ["status"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }
@@ -832,7 +832,7 @@ export const featureFlagsModule = createModule("feature-flags", {
         "voteApiEnabled",
         "maintenanceMode",
       ],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (!prev) {
           return;
         }

@@ -290,7 +290,7 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
   effects: {
     logSyncChange: {
       deps: ["syncingOpId"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev) {
           if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
             addLogEntry(

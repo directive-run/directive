@@ -717,7 +717,7 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
 export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
     facts: Readonly<InferSchema<M["facts"]>>,
-    prev: InferSchema<M["facts"]> | null,
+    prevFacts: InferSchema<M["facts"]> | null,
     derived: InferDerivations<M>,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
   /**

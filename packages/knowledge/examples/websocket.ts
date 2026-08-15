@@ -394,7 +394,7 @@ export const websocketModule = createModule("websocket", {
   effects: {
     logStatusChange: {
       deps: ["status"],
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (prev && prev.status !== facts.status) {
           addLogEntry(facts, "status", `${prev.status} \u2192 ${facts.status}`);
         }
