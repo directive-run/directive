@@ -15,7 +15,11 @@ import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { createHarnessSystem } from "../core/system.js";
-import { type TranscriptStore, createTranscript } from "../core/transcript.js";
+import {
+  type TranscriptStore,
+  createMemoryTranscriptStore,
+  createTranscript,
+} from "../core/transcript.js";
 import {
   type Scratch,
   cannedResponses,
@@ -294,6 +298,53 @@ describe("transcript", () => {
         (event) => event.type === "error" && event.scope === "transcript",
       ),
     ).toBe(true);
+  });
+
+  it("re-sends records the failed write never mirrored", async () => {
+    // The store above rejects every write, so it can show that a run survives
+    // a broken sink but never that it *recovers* from one. This is the case
+    // the mirror's own comment is about: the mirrored-record count advances
+    // only after the sink resolves, so a write that fails leaves its records
+    // pending rather than counting them as written. Nothing checked that,
+    // because the shared double could not fail once and then succeed.
+    const store = createMemoryTranscriptStore({ failWrites: 1 });
+    const transcript = store.open({ runId: "transient" });
+    transcript.setInput("in");
+
+    transcript.beginTurn();
+    transcript.appendToken("first turn");
+    transcript.completeTurn({
+      iteration: 0,
+      persona: "alpha",
+      text: "",
+      costUsd: 0.1,
+      at: 1,
+    });
+
+    await expect(transcript.flush()).rejects.toThrow("rejected on purpose");
+    // Nothing landed, which is the premise rather than the point.
+    expect(store.documents().get("transient.jsonl")).toBeUndefined();
+
+    transcript.beginTurn();
+    transcript.appendToken("second turn");
+    transcript.completeTurn({
+      iteration: 1,
+      persona: "alpha",
+      text: "",
+      costUsd: 0.1,
+      at: 2,
+    });
+
+    await transcript.flush();
+
+    // Both turns are present. Had the count advanced on the failed write, the
+    // first turn would be gone for good and the sidecar would hold one line —
+    // a silent hole in the record of what a run did, with nothing to notice it.
+    const sidecar = store.documents().get("transient.jsonl") ?? "";
+    const lines = sidecar.trim().split("\n").filter(Boolean);
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[0]!).text).toBe("first turn");
+    expect(JSON.parse(lines[1]!).text).toBe("second turn");
   });
 
   it("discards the pending buffer on beginTurn, which is what a replay does", () => {

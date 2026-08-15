@@ -99,6 +99,21 @@ const OPENAI_RATES = {
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://openai.com/pricing
  */
+/**
+ * The date the rates in {@link OPENAI_PRICING} were last checked against
+ * https://openai.com/api/pricing.
+ *
+ * A published table is a snapshot, and a stale one is not an error anywhere: a
+ * rate that moved produces a uniform arithmetic drift in every cost this
+ * package reports, with no exception, no warning, and nothing for a check to
+ * compare against. The date is that comparable thing — it lets a caller decide
+ * whether these numbers are fresh enough to bill against, and it lets a test
+ * refuse a rate change that forgets to move it.
+ *
+ * Never inferred from the clock. It records when a person last looked.
+ */
+export const OPENAI_PRICING_AS_OF = "2026-08-14";
+
 export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OPENAI_RATES,
   "OPENAI_PRICING",

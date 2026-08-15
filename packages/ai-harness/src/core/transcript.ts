@@ -390,8 +390,36 @@ export interface MemoryTranscriptStore extends TranscriptStore {
  * `createFileTranscriptStore` in `../adapters/node/transcript.js`, which the
  * command line supplies.
  */
-export function createMemoryTranscriptStore(): MemoryTranscriptStore {
+/**
+ * Ways to make the in-memory store misbehave.
+ *
+ * A double that can only succeed cannot stand in for a sink that fails, and
+ * the failure path here is load-bearing: {@link createTranscript} advances its
+ * mirrored-record count only after the sink resolves, precisely so a failed
+ * write does not drop records. Without a way to make a write reject, that
+ * reasoning had nothing checking it.
+ */
+export interface MemoryTranscriptStoreOptions {
+  /**
+   * Reject the first N sink writes, then behave normally.
+   *
+   * Transient rather than permanent, because the interesting question is
+   * whether the records survive to the next flush, not whether a permanently
+   * broken sink stays broken.
+   */
+  failWrites?: number;
+  /** Reject every {@link MemoryTranscriptStore.writeDocument} call. */
+  failDocuments?: boolean;
+  /** Delay each sink write, so an ordering or overlap can be provoked. */
+  delayMs?: number;
+}
+
+export function createMemoryTranscriptStore(
+  options: MemoryTranscriptStoreOptions = {},
+): MemoryTranscriptStore {
   const documents = new Map<string, string>();
+  const { failWrites = 0, failDocuments = false, delayMs = 0 } = options;
+  let writesRemainingToFail = failWrites;
 
   return {
     open({ runId, fenceToken }) {
@@ -405,6 +433,21 @@ export function createMemoryTranscriptStore(): MemoryTranscriptStore {
           markdownPath: memoryLocation(markdownName),
           jsonlPath: memoryLocation(jsonlName),
           write: async (markdown, appended) => {
+            if (delayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+
+            // Rejects before writing anything, which is the shape that
+            // matters: a sink that fails halfway would leave the store in a
+            // state a real one never produces.
+            if (writesRemainingToFail > 0) {
+              writesRemainingToFail -= 1;
+
+              throw new Error(
+                `[ai-harness] memory transcript sink: write rejected on purpose (${writesRemainingToFail} more will fail)`,
+              );
+            }
+
             documents.set(markdownName, markdown);
             const lines = appended.map(renderSidecarLine).join("");
             documents.set(jsonlName, (documents.get(jsonlName) ?? "") + lines);
@@ -414,6 +457,12 @@ export function createMemoryTranscriptStore(): MemoryTranscriptStore {
     },
 
     async writeDocument(name, contents) {
+      if (failDocuments) {
+        throw new Error(
+          `[ai-harness] memory transcript store: writeDocument rejected on purpose for "${name}"`,
+        );
+      }
+
       documents.set(name, contents);
 
       return memoryLocation(name);
