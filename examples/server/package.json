@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-server",
-  "version": "1.0.69",
+  "version": "1.0.70",
   "type": "module",
   "private": true,
   "scripts": {
