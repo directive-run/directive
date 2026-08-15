@@ -1,5 +1,14 @@
 # @directive-run/example-eleven-up
 
+## 0.0.67
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.0
+  - @directive-run/react@1.29.0
+  - @directive-run/el@1.1.3
+
 ## 0.0.66
 
 ### Patch Changes
