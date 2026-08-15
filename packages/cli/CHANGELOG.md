@@ -1,5 +1,39 @@
 # @directive-run/cli
 
+## 1.29.4
+
+### Patch Changes
+
+- [#144](https://github.com/directive-run/directive/pull/144) [`1c2355f`](https://github.com/directive-run/directive/commit/1c2355feccba001f2b195d9b2a3aa06865ba6aff) Thanks [@jasoncomes](https://github.com/jasoncomes)! - An effect's second parameter is now called `prevFacts` rather than `prev`.
+
+  It always held the previous facts — the same shape as the first parameter — but
+  only one of the two said so:
+
+  ```ts
+  run: (facts, prev, derived) => { ... }        // prev what? value? state? result?
+  run: (facts, prevFacts, derived) => { ... }
+  ```
+
+  Nothing to change on your side. Parameter names are positional in TypeScript, so
+  callers name their own; this changes hover text, the emitted types, and every
+  example — including the module `directive init` writes, the scaffolded module
+  body, the knowledge files, and the plugin skills.
+
+  One thing constraints do not get is a rename, because they never had the
+  parameter: a constraint `when` has no previous-facts snapshot at all. The
+  `$changed` registration error now says that in those words rather than calling it
+  "no prev snapshot".
+
+  There is deliberately no `prevDerived`. The runtime keeps a snapshot of the
+  previous _facts_ and nothing else, because derivations are computed from facts —
+  a previous derived value would have to be recomputed from `prevFacts`, which the
+  callback already has. The asymmetry in `(facts, prevFacts, derived)` is real, and
+  naming it is better than hiding it behind a word that means nothing in
+  particular.
+
+- Updated dependencies [[`1c2355f`](https://github.com/directive-run/directive/commit/1c2355feccba001f2b195d9b2a3aa06865ba6aff)]:
+  - @directive-run/knowledge@1.29.4
+
 ## 1.29.3
 
 ### Patch Changes
