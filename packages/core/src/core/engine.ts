@@ -1421,27 +1421,37 @@ export function createEngine<S extends Schema>(
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
-      } else {
-        // The system reached quiet, so whatever chain of passes led here has
-        // ended and the runaway counter starts over.
-        //
-        // This is the only place it resets, and that is the whole point. It
-        // used to reset in this `finally` unconditionally, which made the
-        // ceiling above unreachable: re-entry is refused at the top of
-        // `reconcile`, so the counter went to one and back to zero every pass
-        // and never once approached fifty. A resolver feeding its own
-        // constraint span passes forever with no warning — the guard was there,
-        // it just could not fire.
-        //
-        // It reset on full settlement before that, and was moved because a
-        // long-running system under continuous change climbed toward the
-        // ceiling and tripped on legitimate work. Both readings are wrong for
-        // the same reason: neither distinguishes a pass that chained from the
-        // previous one from a pass that started fresh. The branch does. A
-        // circular chain never reaches this line; a busy system reaches it
-        // between changes.
-        reconcileDepth = 0;
       }
+
+      // Reset every pass, which leaves the ceiling above unreachable. That is
+      // deliberate, and it is a retreat from something worse.
+      //
+      // Resetting only on reaching quiet did make the ceiling reachable — and
+      // reachable by the wrong things. Ordinary bounded work chains passes
+      // without going quiet between them: a sixty-item queue drain trips at
+      // fifty-one, and so does cursor pagination, a backoff counter, or any
+      // constraint whose `require` varies with a fact its own resolver writes.
+      // On a trip, the branch above wipes `previousRequirements`, so the next
+      // diff treats every live requirement as new and re-dispatches it —
+      // including requirements that had nothing to do with the chain, whose
+      // resolvers had already completed. Measured: nine charge dispatches for
+      // one order, in production, with no signal, because the warning is
+      // development-only.
+      //
+      // Meanwhile the runaway it was meant to catch stayed invisible.
+      // `context.requeue()` reschedules without dirtying a fact, so every pass
+      // reached quiet and zeroed the counter: five thousand dispatches, no
+      // warning.
+      //
+      // So the reachable version fires on safe work, does damage when it fires,
+      // and still misses the dangerous work. Unreachable is strictly better
+      // until the instrument is right, and depth is the wrong instrument: the
+      // engine already holds every edge needed to name a cycle — requirement to
+      // resolver to written keys to constraint dependencies to constraint — and
+      // repeat-detection on `(constraintId, requirement key)` sees the async
+      // case a depth counter cannot. That is the fix, and it is a design, not
+      // an edit.
+      reconcileDepth = 0;
 
       notifySettlementChange();
     }

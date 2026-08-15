@@ -417,6 +417,76 @@ interface MetaCapableSystem {
  *
  * @returns a `Plugin` instance ready to add to `SystemConfig.plugins`.
  */
+/** Returned when nothing scannable could be recovered from a value. */
+const UNSALVAGEABLE = Symbol("unsalvageable");
+
+/**
+ * A plain copy of everything the structured cloner would not take.
+ *
+ * Reads every own enumerable property exactly once and keeps only values the
+ * scanner can act on — strings, numbers, booleans, null, and plain
+ * objects/arrays of the same. Functions, symbols, and exotic objects are
+ * dropped rather than allowed to abort the scan of their siblings.
+ *
+ * Depth- and width-bounded on the way down, so a hostile payload cannot turn
+ * the salvage path into the CPU sink the clone path is bounded against.
+ * Cycles resolve to `UNSALVAGEABLE` for the offending branch rather than
+ * looping.
+ */
+function salvageForScan(
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object> = new WeakSet(),
+  maxWidth = 10_000,
+): unknown {
+  if (value === null) {
+    return null;
+  }
+
+  const kind = typeof value;
+  if (kind === "string" || kind === "number" || kind === "boolean") {
+    return value;
+  }
+
+  if (kind !== "object" || depth <= 0) {
+    return UNSALVAGEABLE;
+  }
+
+  const object = value as object;
+  if (seen.has(object)) {
+    return UNSALVAGEABLE;
+  }
+  seen.add(object);
+
+  if (Array.isArray(value)) {
+    const width = Math.min(value.length, maxWidth);
+    const out: unknown[] = [];
+    for (let i = 0; i < width; i++) {
+      const salvaged = salvageForScan(value[i], depth - 1, seen, maxWidth);
+      if (salvaged !== UNSALVAGEABLE) {
+        out.push(salvaged);
+      }
+    }
+
+    return out;
+  }
+
+  const out: Record<string, unknown> = Object.create(null);
+  let kept = 0;
+  for (const [key, member] of Object.entries(object)) {
+    if (kept >= maxWidth) {
+      break;
+    }
+    const salvaged = salvageForScan(member, depth - 1, seen, maxWidth);
+    if (salvaged !== UNSALVAGEABLE) {
+      out[key] = salvaged;
+      kept += 1;
+    }
+  }
+
+  return kept > 0 ? out : UNSALVAGEABLE;
+}
+
 export function createFactPIIGuardrail(
   options: FactPIIGuardrailOptions = {},
 ): Plugin {
@@ -489,29 +559,83 @@ export function createFactPIIGuardrail(
       return;
     }
 
-    initialized = true;
     systemRef = system;
-    screenedAtRevision = typeof revision === "number" ? revision : null;
 
-    // Rebuilt rather than added to, so a fact that loses its tag — or a
-    // module that never registers again — stops being screened. `includeKeys`
-    // is caller-supplied and survives every rebuild.
-    screenedKeys.clear();
+    // Built to the side, then swapped in — never edited in place.
+    //
+    // The first version of this cleared the live set and advanced the revision
+    // marker before asking which keys to screen. One throw from that question,
+    // and plugin callbacks swallow throws, left the screen holding nothing with
+    // the marker already moved — so every later write took the early return
+    // above and the screen never rebuilt. A transient fault became permanent,
+    // silent exposure: strictly worse than the staleness it replaced, which at
+    // least only missed modules registered later.
+    //
+    // Nothing below touches `screenedKeys` or `screenedAtRevision` until the
+    // rebuild has finished, so a failure leaves the previous screen in place
+    // with the marker unmoved, and the next write tries again.
+    const rebuilt = new Set<string>();
+    // `includeKeys` is caller-supplied and survives every rebuild.
     for (const key of includeKeys) {
-      screenedKeys.add(key);
+      rebuilt.add(key);
     }
 
-    const piiTagged = meta?.byTag?.("pii");
-    if (!piiTagged) return;
-    for (const entry of piiTagged) {
-      // MetaMatch shape: { type: "fact" | "module" | "event" | ..., id: string, meta }.
-      // We screen FACT-typed matches only — agent prompts read facts, not
-      // event / constraint / derivation metadata.
-      if (entry.type !== "fact") continue;
-      if (entry.id && !excludedSet.has(entry.id)) {
-        screenedKeys.add(entry.id);
+    let piiTagged: Array<{ type?: string; id?: string }> | undefined;
+    try {
+      piiTagged = meta?.byTag?.("pii");
+    } catch (error) {
+      // Keep screening with whatever is already in place, and say so. A screen
+      // running on a stale key set is a different posture from one running on a
+      // current set, and the two must not leave the same trace.
+      console.warn(
+        "[Directive] fact-pii: could not refresh the screened keys",
+        {
+          plugin: "fact-pii-guardrail",
+          error,
+        },
+      );
+
+      return;
+    }
+
+    // An answer that never arrived is not an answer of "nothing is tagged".
+    //
+    // `byTag` returning nothing while the method exists means the lookup did
+    // not answer. Treating that as an empty tag set empties the screen and
+    // advances the marker, which latches exactly as a throw did — the failure
+    // this whole rebuild was restructured to prevent, surviving in the path
+    // that does not throw. An empty *array* is different and is honoured: it
+    // genuinely means nothing carries the tag.
+    if (meta?.byTag && !piiTagged) {
+      console.warn(
+        "[Directive] fact-pii: the screened-key lookup returned nothing",
+        {
+          plugin: "fact-pii-guardrail",
+        },
+      );
+
+      return;
+    }
+
+    if (piiTagged) {
+      for (const entry of piiTagged) {
+        // MetaMatch shape: { type: "fact" | "module" | "event" | ..., id: string, meta }.
+        // We screen FACT-typed matches only — agent prompts read facts, not
+        // event / constraint / derivation metadata.
+        if (entry.type !== "fact") continue;
+        if (entry.id && !excludedSet.has(entry.id)) {
+          rebuilt.add(entry.id);
+        }
       }
     }
+
+    // Swap, then mark. Both only on the success path.
+    screenedKeys.clear();
+    for (const key of rebuilt) {
+      screenedKeys.add(key);
+    }
+    initialized = true;
+    screenedAtRevision = typeof revision === "number" ? revision : null;
   }
 
   /**
@@ -649,16 +773,32 @@ export function createFactPIIGuardrail(
     try {
       safe = structuredClone(cloneInput);
     } catch (err) {
-      // Cyclic input, non-cloneable members (functions, DOM nodes,
-      // class instances with method properties, WeakMap, etc.). The
-      // consumer can wire a `customDetector` for these shapes; we
-      // bail rather than commit raw PII silently.
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[Directive] fact-pii walker: value is not structured-cloneable — leaving it as-is and skipping inspection. Wire a customDetector for shapes containing functions, DOM nodes, cycles, or WeakMaps.",
-        err instanceof Error ? err.message : String(err),
-      );
-      return { matched: false };
+      // Non-cloneable members: functions, DOM nodes, class instances carrying
+      // methods, WeakMaps, getters that throw.
+      //
+      // This used to return "no match" — which the caller cannot tell apart
+      // from "scanned and found nothing". A single function property beside a
+      // social security number therefore committed the number raw, with no
+      // event and no redaction, on a value the schema had tagged as personal.
+      // The comment here claimed the opposite: that it bailed rather than
+      // commit raw data silently. It committed, and it was silent.
+      //
+      // A member the cloner refuses says nothing about its siblings. So the
+      // refused members are dropped and the rest is scanned. Each property is
+      // read exactly once, which is the same guarantee the array snapshot
+      // above exists to provide — a Proxy cannot answer differently the second
+      // time because there is no second time.
+      const salvaged = salvageForScan(value, depth);
+      if (salvaged === UNSALVAGEABLE) {
+        console.warn(
+          "[Directive] fact-pii walker: value could not be scanned — leaving it as-is. Wire a customDetector for shapes containing cycles or exotic members.",
+          err instanceof Error ? err.message : String(err),
+        );
+
+        return { matched: false };
+      }
+
+      return walkClone(salvaged, depth);
     }
     return walkClone(safe, depth);
   }
