@@ -31,16 +31,6 @@ export interface RunResult<T = unknown> {
   messages: Message[];
   toolCalls: ToolCall[];
   totalTokens: number;
-  /**
-   * How many provider calls `withStructuredOutput` paid for, when it was in
-   * the chain.
-   *
-   * A re-prompt after an unparseable answer is invisible from outside that
-   * wrapper — it produces no event and no separate result — so `totalTokens`
-   * alone cannot distinguish two attempts at thirty from one attempt at sixty.
-   * Present only when that wrapper ran; absent means it did not.
-   */
-  structuredOutputAttempts?: number;
   /** Breakdown of input vs output tokens, when available from the provider */
   tokenUsage?: TokenUsage;
   /**

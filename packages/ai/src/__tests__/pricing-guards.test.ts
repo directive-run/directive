@@ -1287,10 +1287,6 @@ describe("pricing surface registry", () => {
       "Publishes an all-zero rate table via toTokenPricingTable — local models bill nothing. No cap, no ledger, no metrics.",
     ],
     [
-      "ai:structured-output.ts",
-      "Sums token counts across the attempts one call makes when a model's answer will not parse, so the caller learns what the whole call cost rather than what its last attempt cost. It holds no rates, keeps no ledger, and charges nothing — a surface downstream prices the total it reports. Reads through normalizeTokenUsage rather than off the object, so the two cache-write spellings are reconciled in the one place that owns that rule.",
-    ],
-    [
       "ai:streaming.ts",
       "Matched on the phrase `result.tokenUsage` in the doc comment that tells callers a chunk ordinal is not a token count. It reads no count and holds no rate: chunks carry text and an ordinal, and the authoritative usage lives on the awaited RunResult the surfaces above already read.",
     ],
