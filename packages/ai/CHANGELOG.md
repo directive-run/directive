@@ -1,5 +1,72 @@
 # @directive-run/ai
 
+## 1.30.0
+
+### Minor Changes
+
+- [#136](https://github.com/directive-run/directive/pull/136) [`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `withStructuredOutput` now reports what the whole call spent, not what its last
+  attempt spent.
+
+  The wrapper re-prompts when a model's answer will not parse, so one call from
+  the caller's side can be several calls to the provider — each one billed. It
+  reported only the attempt that finally succeeded, treating the failed ones as
+  free. On three attempts of thirty tokens it reported thirty against ninety
+  spent, and the under-count is worst exactly when a model is struggling and
+  costing the most. A budget reading that total will authorise spend it has
+  already made.
+
+  Failed attempts leave no trace anywhere else — they happen inside the wrapper,
+  emit no event, and produce no separate result — so this was the only place the
+  number could be recovered.
+
+  **`totalTokens` now sums every attempt**, and `tokenUsage` sums the input,
+  output, and cache breakdown alongside it. Cache writes are read through
+  `normalizeTokenUsage`, so the two spellings a provider may use are reconciled by
+  the one function that owns that rule.
+
+  **New `structuredOutputAttempts` on `RunResult`** — how many provider calls were
+  paid for. Two attempts at thirty tokens is not the same event as one attempt at
+  sixty, and a total alone cannot tell them apart. Present only when this wrapper
+  ran.
+
+  **`StructuredOutputError` now carries `totalTokens` and `attempts`.** A run that
+  exhausts its retries produces nothing a caller can use and still costs money;
+  the error previously carried a single attempt's result and no total at all.
+
+### Patch Changes
+
+- [#136](https://github.com/directive-run/directive/pull/136) [`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Three fixes for defects in 1.28.0 and 1.29.0, two of them silent data exposure
+  and one a duplicate side effect. Upgrade if you use `factPIIGuardrail` or run
+  chains longer than fifty reconcile passes.
+
+  **The personal-data screen could latch open permanently.** 1.28.0 taught it to
+  rebuild its screened-key list when the system's metadata changed. That rebuild
+  emptied the live list and marked itself current _before_ asking which keys to
+  screen — so if the lookup failed, or answered with nothing, the screen was left
+  holding nothing with the marker already advanced, and every later write took the
+  "already current" shortcut. One transient fault, and the screen never looked
+  again. It now builds a new list to the side and swaps it in only on success, so
+  a failure leaves the previous screen in place and the next write retries.
+
+  **A single unscannable member switched the screen off for the whole value.** The
+  walker copies a value before inspecting it, and when that copy was refused — by
+  a function property, a class instance carrying methods, a DOM node — it reported
+  "nothing found", which a caller cannot tell from "scanned and clean". A payload
+  of `{ email, ssn, retry: () => {} }` committed both the address and the number
+  in the clear. A member the copier refuses says nothing about its siblings, so
+  refused members are now dropped and everything else is scanned.
+
+  **A reconcile chain longer than fifty passes could re-run resolvers that had
+  already finished.** 1.28.0 made a long-dormant depth ceiling reachable. It turned
+  out to be reachable by ordinary bounded work — a sixty-item queue drain, cursor
+  pagination, a backoff counter — and tripping it clears the requirement diff, so
+  every live requirement is treated as new and dispatched again, including ones
+  that had nothing to do with the long chain. For a resolver that charges a card
+  or sends a message, that is a duplicate. The ceiling is dormant again while a
+  proper instrument is built: depth cannot see the runaway it was aimed at anyway,
+  because a resolver that reschedules without writing a fact resets the counter
+  every pass.
+
 ## 1.29.0
 
 ### Minor Changes
