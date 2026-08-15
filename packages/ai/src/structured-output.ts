@@ -29,6 +29,7 @@
  */
 
 import { isPrototypeSafe } from "@directive-run/core/internals";
+import { normalizeTokenUsage } from "@directive-run/core/plugins";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 /**
@@ -303,6 +304,22 @@ export function withStructuredOutput<T = unknown>(
     let lastResult: RunResult<unknown> | undefined;
     let lastError: string | undefined;
 
+    // Every attempt is billed, so every attempt is counted.
+    //
+    // A re-prompt is invisible from outside this wrapper: it produces no event,
+    // no separate result, and no other record. Reporting only the attempt that
+    // finally parsed treated the failed ones as free, which under-counts by the
+    // retry rate — highest exactly when a model is struggling and costing the
+    // most. The same reasoning applies on the throwing exit, where the run
+    // produced nothing usable and still has to be paid for.
+    let spentTokens = 0;
+    let spentInput = 0;
+    let spentOutput = 0;
+    let spentCacheRead = 0;
+    let spentCacheWrite = 0;
+    let sawUsageBreakdown = false;
+    let attempts = 0;
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       // On retries, append error feedback as additional input
       const effectiveInput =
@@ -327,6 +344,26 @@ export function withStructuredOutput<T = unknown>(
 
       const result = await runner(structuredAgent, effectiveInput, options);
       lastResult = result;
+      attempts += 1;
+      spentTokens += result.totalTokens ?? 0;
+      if (result.tokenUsage) {
+        sawUsageBreakdown = true;
+        // Read through `normalizeTokenUsage` rather than off the object.
+        //
+        // Cache writes arrive under two spellings, and reconciling them lives
+        // in exactly one function on purpose. A hand-rolled
+        // `cacheWriteTokens ?? cacheCreationTokens` here looks equivalent and
+        // is not: the real rule takes the larger of the two, so the shortcut
+        // under-counts whenever both are present and the older spelling is
+        // bigger. Cache reads are priced separately from ordinary input, so
+        // dropping them would under-count a cached run on exactly the provider
+        // where caching saves the most.
+        const usage = normalizeTokenUsage(result.tokenUsage);
+        spentInput += usage.inputTokens ?? 0;
+        spentOutput += usage.outputTokens ?? 0;
+        spentCacheRead += usage.cacheReadTokens ?? 0;
+        spentCacheWrite += usage.cacheWriteTokens ?? 0;
+      }
 
       // Try to extract and validate JSON
       const outputStr =
@@ -342,6 +379,23 @@ export function withStructuredOutput<T = unknown>(
           return {
             ...result,
             output: parsed.data as _T,
+            totalTokens: spentTokens,
+            ...(sawUsageBreakdown
+              ? {
+                  tokenUsage: {
+                    ...result.tokenUsage,
+                    inputTokens: spentInput,
+                    outputTokens: spentOutput,
+                    ...(spentCacheRead > 0
+                      ? { cacheReadTokens: spentCacheRead }
+                      : {}),
+                    ...(spentCacheWrite > 0
+                      ? { cacheWriteTokens: spentCacheWrite }
+                      : {}),
+                  },
+                }
+              : {}),
+            structuredOutputAttempts: attempts,
           };
         }
 
@@ -351,10 +405,13 @@ export function withStructuredOutput<T = unknown>(
       }
     }
 
-    // All retries exhausted — throw with context
+    // All retries exhausted — throw with context, including the bill. A run
+    // that produced nothing usable still spent, and this is the only place
+    // that number survives.
     throw new StructuredOutputError(
       `[Directive] Failed to get valid structured output after ${maxRetries + 1} attempts: ${lastError}`,
       lastResult,
+      { totalTokens: spentTokens, attempts },
     );
   };
 }
@@ -362,10 +419,27 @@ export function withStructuredOutput<T = unknown>(
 /** Error thrown when structured output parsing fails after all retries. */
 export class StructuredOutputError extends Error {
   readonly lastResult: RunResult<unknown> | undefined;
+  /**
+   * Tokens billed across every attempt, including the ones that failed to
+   * parse.
+   *
+   * `lastResult` carries one attempt. This carries the call. A run that ends
+   * here produced nothing a caller can use and still cost money, so this is
+   * the number a ledger needs and the only place it survives.
+   */
+  readonly totalTokens: number;
+  /** How many times the provider was called before giving up. */
+  readonly attempts: number;
 
-  constructor(message: string, lastResult?: RunResult<unknown>) {
+  constructor(
+    message: string,
+    lastResult?: RunResult<unknown>,
+    spend?: { totalTokens: number; attempts: number },
+  ) {
     super(message);
     this.name = "StructuredOutputError";
     this.lastResult = lastResult;
+    this.totalTokens = spend?.totalTokens ?? lastResult?.totalTokens ?? 0;
+    this.attempts = spend?.attempts ?? (lastResult ? 1 : 0);
   }
 }
