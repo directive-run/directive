@@ -139,6 +139,47 @@ export interface MockAgentRunner {
  * expect(mock.getCalls()).toHaveLength(1);
  * ```
  */
+/**
+ * The rejection an aborted run produces.
+ *
+ * `DOMException` with name `"AbortError"` is what the patterns themselves
+ * throw, so a test asserting on an aborted mock and one asserting on an
+ * aborted real run check the same thing.
+ */
+function abortError(signal: AbortSignal): unknown {
+  return signal.reason instanceof Error || typeof signal.reason === "string"
+    ? signal.reason
+    : new DOMException("Aborted", "AbortError");
+}
+
+/**
+ * Wait, unless the signal fires first.
+ *
+ * The listener is always removed, including on the ordinary path — a mock that
+ * leaked one per call would make an abort in a long test fan out to every
+ * earlier call's dead listener.
+ */
+function delayOrAbort(
+  ms: number,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  if (!signal) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export function createMockAgentRunner(
   options: MockAgentRunnerOptions = {},
 ): MockAgentRunner {
@@ -180,15 +221,51 @@ export function createMockAgentRunner(
       config = { ...config, ...generated };
     }
 
+    // Honour the caller's abort signal.
+    //
+    // This double was signal-blind: it never read `runOptions.signal`, and its
+    // delay was a bare timer nothing could interrupt. Every test of abort
+    // behaviour written against it therefore passed whether or not abort
+    // worked, because the mock always ran to completion and returned a result.
+    // Two tests were named for guarantees this made uncheckable.
+    //
+    // A double that cannot exhibit the failure it is used to test for is worse
+    // than no double, because it reports success.
+    const signal = runOptions?.signal;
+
+    // Deliberately no abort check at entry, and this is a narrower rule than
+    // it should be.
+    //
+    // Rejecting a call that starts on an already-aborted signal is what a real
+    // client does, and adding that check here turned one reflect test red in a
+    // way worth understanding rather than papering over: the producer's second
+    // call arrives with the signal already aborted, before its own callback —
+    // the thing that aborts — has run. Reflect has a documented graceful path
+    // for an abort landing mid-iteration, and that ordering says the path is
+    // reached differently than it reads.
+    //
+    // So the interruptible wait below ships and the entry check does not. It
+    // is half of the rule, with the half that needs an answer left visible
+    // instead of guessed at.
+
     // Handle error case
     if (config.error) {
       throw config.error;
     }
 
-    // Apply delay
+    // Apply delay — interruptible, which is the point. An abort landing during
+    // the delay has to end the call, or "abort stops the agents" is a claim no
+    // test can distinguish from "the agents finished quickly".
     if (config.delay && config.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, config.delay));
+      await delayOrAbort(config.delay, signal);
     }
+
+    // No trailing abort check on purpose. The rule is the one a real HTTP
+    // client follows: aborting before the call starts, or while it is in
+    // flight, rejects — but an answer already in hand is not thrown away
+    // because the signal fired afterwards. Without that distinction a test
+    // that aborts from inside its own `generate` callback, meaning after the
+    // call produced its result, would reject instead of returning it.
 
     // Emit messages
     const messages = config.messages ?? [];

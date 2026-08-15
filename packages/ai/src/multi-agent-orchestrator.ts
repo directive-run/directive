@@ -218,6 +218,24 @@ const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
  * re-invocations it performs itself – the agent-level retry and the
  * self-healing reroute – which no wrapper can see.
  */
+/**
+ * Whether a rejection is this signal's abort rather than a genuine failure.
+ *
+ * Checked by name rather than by instance: a provider SDK may surface its own
+ * abort type, and every one of them uses `AbortError`. The signal is consulted
+ * too, so an unrelated abort elsewhere is not mistaken for this one.
+ */
+function isAbortRejection(error: unknown, signal: AbortSignal): boolean {
+  if (!signal.aborted) {
+    return false;
+  }
+
+  return (
+    (error instanceof DOMException || error instanceof Error) &&
+    error.name === "AbortError"
+  );
+}
+
 function getStreamRestart(
   opts: unknown,
 ): ((reason: StreamRestartReason) => void) | undefined {
@@ -4451,6 +4469,8 @@ export function createMultiAgentOrchestrator(
 
     let patternError: Error | undefined;
     const agentErrors: Record<string, string> = Object.create(null);
+    /** Losers that rejected because this race cut them off. */
+    const abortedIds = new Set<string>();
     const startedAgents = [...pattern.handlers];
 
     try {
@@ -4497,8 +4517,17 @@ export function createMultiAgentOrchestrator(
               }
             })
             .catch((error) => {
-              agentErrors[entry.agentId] =
-                error instanceof Error ? error.message : String(error);
+              // A loser that the race itself cut off is cancelled, not failed.
+              // It rejects like any other failure, and treating the two alike
+              // meant a cancelled agent was filed as an error — which both
+              // suppressed the cancellation event below and reported a
+              // deliberate stop as something going wrong.
+              if (resolved && isAbortRejection(error, controller.signal)) {
+                abortedIds.add(entry.agentId);
+              } else {
+                agentErrors[entry.agentId] =
+                  error instanceof Error ? error.message : String(error);
+              }
               settledCount++;
 
               if (resolved) {
@@ -4549,8 +4578,16 @@ export function createMultiAgentOrchestrator(
       const first = result[0]!;
       const winnerId = first.agentId;
       const successIds = new Set(result.map((r) => r.agentId));
+
+      // A loser counts as cancelled whether it noticed the cancellation or
+      // not. An agent that ignores the signal and finishes anyway lands here
+      // by absence, the way it always did; one that honours the signal and
+      // rejects lands here through `abortedIds`. Before, only the first kind
+      // was counted, so the event announced cancellation exactly when nothing
+      // had been cancelled and stayed silent when something had.
       const cancelledIds = startedAgents.filter(
-        (id) => !successIds.has(id) && !(id in agentErrors),
+        (id) =>
+          !successIds.has(id) && (abortedIds.has(id) || !(id in agentErrors)),
       );
 
       if (timeline) {
