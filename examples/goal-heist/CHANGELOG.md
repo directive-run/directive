@@ -1,5 +1,14 @@
 # @directive-run/example-goal-heist
 
+## 0.0.72
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.5
+  - @directive-run/ai@1.29.5
+  - @directive-run/el@1.1.3
+
 ## 0.0.71
 
 ### Patch Changes
