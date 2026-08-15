@@ -672,3 +672,152 @@ describe("Trace", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Fields the trace records that nothing was reading
+// ============================================================================
+
+/**
+ * Four of the thirteen fields on a trace entry could be blanked with the whole
+ * suite still green: `derivationsRecomputed`, `requirementsRemoved`,
+ * `effectErrors` and `anomalies`. The other nine were checked somewhere. These
+ * close the gap.
+ *
+ * A trace is a debugging surface, so an empty field and a field that was never
+ * populated look identical to the person reading it — which is the failure
+ * being guarded against here more than any crash.
+ */
+describe("Trace fields", () => {
+  it("records which derivations recomputed, with their dependencies", async () => {
+    // The derivation needs a reader. One nothing watches is never recomputed,
+    // so it would be absent from this list for a reason that has nothing to do
+    // with the field being recorded correctly.
+    const mod = createModule("derived", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { doubled: t.number() },
+        requirements: { BIG: {} },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      derive: { doubled: (facts) => facts.count * 2 },
+      constraints: {
+        big: { when: (_facts, d) => d.doubled > 100, require: { type: "BIG" } },
+      },
+      resolvers: { big: { requirement: "BIG", resolve: async () => {} } },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.count = 4;
+    await system.settle();
+
+    const recomputed = system
+      .trace!.flatMap((entry) => entry.derivationsRecomputed)
+      .find((d) => d.id === "doubled" && d.newValue === 8);
+
+    expect(recomputed).toBeDefined();
+    expect(recomputed?.deps).toContain("count");
+
+    system.destroy();
+  });
+
+  it("records a requirement going away, and which constraint it came from", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    // Above the threshold: the constraint is active and emits its requirement.
+    system.facts.count = 10;
+    await system.settle();
+
+    const added = system
+      .trace!.flatMap((entry) => entry.requirementsAdded)
+      .find((r) => r.type === "LOAD_DATA");
+    expect(added).toBeDefined();
+
+    // Back below it: the requirement is no longer wanted.
+    system.facts.count = 0;
+    await system.settle();
+
+    const removed = system
+      .trace!.flatMap((entry) => entry.requirementsRemoved)
+      .find((r) => r.type === "LOAD_DATA");
+
+    expect(removed).toBeDefined();
+    expect(removed?.fromConstraint).toBe("needsData");
+  });
+
+  it("records an effect that threw", async () => {
+    const mod = createModule("boom", {
+      schema: { facts: { n: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      effects: {
+        explode: {
+          deps: ["n"],
+          run: (facts) => {
+            if (facts.n > 0) {
+              throw new Error("effect blew up");
+            }
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.n = 1;
+    await system.settle();
+
+    const errors = system.trace!.flatMap((entry) => entry.effectErrors);
+    const explode = errors.find((e) => e.id === "explode");
+
+    expect(explode).toBeDefined();
+    expect(explode?.error).toContain("effect blew up");
+
+    system.destroy();
+  });
+
+  it("flags a run where a resolver errored", async () => {
+    const mod = createModule("failing", {
+      schema: {
+        facts: { n: t.number() },
+        requirements: { WORK: {} },
+      },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      constraints: {
+        needsWork: { when: (facts) => facts.n > 0, require: { type: "WORK" } },
+      },
+      resolvers: {
+        work: {
+          requirement: "WORK",
+          resolve: async () => {
+            throw new Error("resolver failed");
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.n = 1;
+    await system.settle();
+
+    const flagged = system.trace!.find(
+      (entry) => entry.anomalies && entry.anomalies.length > 0,
+    );
+
+    expect(flagged).toBeDefined();
+    expect(flagged?.anomalies?.join(" ")).toContain("errored");
+
+    system.destroy();
+  });
+});
