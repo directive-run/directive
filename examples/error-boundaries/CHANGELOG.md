@@ -1,5 +1,13 @@
 # @directive-run/example-error-boundaries
 
+## 0.0.69
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.2
+  - @directive-run/el@1.1.3
+
 ## 0.0.68
 
 ### Patch Changes

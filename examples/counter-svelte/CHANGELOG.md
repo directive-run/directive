@@ -1,5 +1,13 @@
 # @directive-run/example-counter-svelte
 
+## 0.0.58
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.2
+  - @directive-run/svelte@1.29.2
+
 ## 0.0.57
 
 ### Patch Changes

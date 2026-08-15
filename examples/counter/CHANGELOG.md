@@ -1,5 +1,13 @@
 # @directive-run/example-counter
 
+## 0.0.58
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.2
+  - @directive-run/el@1.1.3
+
 ## 0.0.57
 
 ### Patch Changes
