@@ -115,10 +115,13 @@ const ANTHROPIC_RATES = {
   // moment it lapses, and a spend guard that reads low is a spend guard that
   // does not gate. Over-estimating is the safe direction here.
   "claude-sonnet-5": {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75,
+    // $2/$10 was announced as introductory pricing through 2026-08-31 and is
+    // now the standard price; the scheduled rise to $3/$15 on 2026-09-01 was
+    // cancelled. This table carried the cancelled figures.
+    input: 2,
+    output: 10,
+    cacheRead: 0.2,
+    cacheWrite: 2.5,
   },
   "claude-sonnet-4-6": {
     input: 3,
@@ -267,7 +270,7 @@ const ANTHROPIC_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const ANTHROPIC_PRICING_AS_OF = "2026-08-14";
+export const ANTHROPIC_PRICING_AS_OF = "2026-08-15";
 
 export const ANTHROPIC_PRICING: Record<string, ModelPricing> =
   toTokenPricingTable(ANTHROPIC_RATES, "ANTHROPIC_PRICING");

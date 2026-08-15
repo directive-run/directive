@@ -50,10 +50,30 @@ import {
 
 /** The single source of Gemini rates. Widened below; never exported raw. */
 const GEMINI_RATES = {
-  "gemini-2.5-pro": { input: 1.25, output: 10 },
-  "gemini-2.5-flash": { input: 0.15, output: 0.6 },
-  "gemini-2.0-flash": { input: 0.1, output: 0.4 },
-  "gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
+  // `cacheRead` is Gemini's context-caching rate. Explicit caching also bills
+  // storage per token-hour, which a per-token table cannot express, so a
+  // consumer using explicit `CachedContent` will under-count by the storage
+  // component.
+  //
+  // Text rates. Audio input is priced higher on several of these models and is
+  // not represented; a per-modality table is a separate change.
+  //
+  // Rates for models with a tier above 200k tokens are the ≤200k figures.
+  "gemini-3.7-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
+  "gemini-3.6-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
+  "gemini-3.5-flash": { input: 1.5, output: 9, cacheRead: 0.15 },
+  "gemini-3.5-flash-lite": { input: 0.3, output: 2.5, cacheRead: 0.03 },
+  "gemini-3.1-flash-lite": { input: 0.25, output: 1.5, cacheRead: 0.025 },
+  "gemini-3.1-pro-preview": { input: 2, output: 12, cacheRead: 0.2 },
+  "gemini-3-flash-preview": { input: 0.5, output: 3, cacheRead: 0.05 },
+  "gemini-2.5-pro": { input: 1.25, output: 10, cacheRead: 0.125 },
+  // Was carried at $0.15/$0.60 — half the published input rate and a sixth of
+  // the output rate, which under-charges rather than over-charges.
+  "gemini-2.5-flash": { input: 0.3, output: 2.5, cacheRead: 0.03 },
+  "gemini-2.5-flash-lite": { input: 0.1, output: 0.4, cacheRead: 0.01 },
+  // gemini-2.0-flash and gemini-2.0-flash-lite were shut down on 2026-06-01 and
+  // are gone rather than repriced. A caller naming one now gets a thrown error
+  // naming the model, which is the visible failure a silently wrong price is not.
 };
 
 /**
@@ -105,7 +125,7 @@ const GEMINI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const GEMINI_PRICING_AS_OF = "2026-08-14";
+export const GEMINI_PRICING_AS_OF = "2026-08-15";
 
 export const GEMINI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   GEMINI_RATES,
