@@ -387,12 +387,13 @@ export function createConstraintsManager<S extends Schema>(
       (def as { deps?: string[] }).deps = undefined;
     }
 
-    // `$changed` is effects-only — constraints have no prev snapshot. Throw
+    // `$changed` is effects-only — constraints have no previous-facts
+    // snapshot. Throw
     // unconditionally at registration so production cannot silently collapse
     // this clause to a defined-check (which would have wrong semantics).
     if (containsChangedOperator(spec)) {
       throw new Error(
-        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no prev snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic prev.`,
+        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
 
@@ -426,7 +427,7 @@ export function createConstraintsManager<S extends Schema>(
   /**
    * Walk a {@link FactPredicate} spec checking for the `$changed` operator.
    * Used to block its use inside a constraint `when`, where there is no
-   * prev-snapshot to compare against.
+   * previous-facts snapshot to compare against.
    *
    * Delegates the depth-guarded, cycle-guarded structural traversal to
    * {@link walkPredicate} — a `$changed` surfaces as an operator clause

@@ -2553,8 +2553,8 @@ export const websocketModule = createModule("websocket", {
     logStatusChange: {
       deps: ["status"],
       run: (facts, prevFacts) => {
-        if (prev && prev.status !== facts.status) {
-          addLogEntry(facts, "status", `${prev.status} \u2192 ${facts.status}`);
+        if (prevFacts && prevFacts.status !== facts.status) {
+          addLogEntry(facts, "status", `${prevFacts.status} \u2192 ${facts.status}`);
         }
       },
     },
@@ -3179,18 +3179,18 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     logSyncChange: {
       deps: ["syncingOpId"],
       run: (facts, prevFacts) => {
-        if (prev) {
-          if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
+        if (prevFacts) {
+          if (prevFacts.syncingOpId === "" && facts.syncingOpId !== "") {
             addLogEntry(
               facts,
               "status",
               `Sync started: op ${facts.syncingOpId}`,
             );
-          } else if (prev.syncingOpId !== "" && facts.syncingOpId === "") {
+          } else if (prevFacts.syncingOpId !== "" && facts.syncingOpId === "") {
             addLogEntry(
               facts,
               "status",
-              `Sync completed: op ${prev.syncingOpId}`,
+              `Sync completed: op ${prevFacts.syncingOpId}`,
             );
           }
         }

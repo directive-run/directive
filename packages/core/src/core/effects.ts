@@ -72,7 +72,7 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @remarks
    * Effects with no recorded dependencies (first run or auto-tracked with no
    * reads) run on any change. After execution, a snapshot of current facts is
-   * stored for the `prev` parameter on the next invocation.
+   * stored for the `prevFacts` parameter on the next invocation.
    *
    * @param changedKeys - Fact keys that changed since the last run.
    */
@@ -196,7 +196,7 @@ export interface CreateEffectsOptions<S extends Schema> {
   store: FactsStore<S>;
   /**
    * The system's derived values, handed to `run()` as its third argument —
-   * after `facts` and `prev`, which already occupy the first two.
+   * after `facts` and `prevFacts`, which already occupy the first two.
    *
    * An effect that reads a derivation used to have to reach back through
    * `system.derive`, which is the single-module accessor: compose that module
@@ -284,7 +284,7 @@ export interface CreateEffectsOptions<S extends Schema> {
  *   definitions: {
  *     logPhase: {
  *       run: (facts, prevFacts) => {
- *         if (prev?.phase !== facts.phase) {
+ *         if (prevFacts?.phase !== facts.phase) {
  *           console.log(`Phase changed to ${facts.phase}`);
  *         }
  *       },
@@ -326,7 +326,10 @@ export function createEffectsManager<S extends Schema>(
   // Compiled predicate gate per effect (only effects with a data `on` field).
   const onGates = new Map<
     string,
-    (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean
+    (
+      facts: Record<string, unknown>,
+      prevFacts?: Record<string, unknown>,
+    ) => boolean
   >();
 
   /**
@@ -480,7 +483,7 @@ export function createEffectsManager<S extends Schema>(
   }
 
   /** Create a plain-object snapshot of current facts.
-   *  Effects receive `prev` through module-scoped proxies (system.ts) that use
+   *  Effects receive `prevFacts` through module-scoped proxies (system.ts) that use
    *  bracket-style property access, so the snapshot must be a plain object —
    *  NOT a FactsSnapshot (which only exposes .get()/.has()). */
   function createSnapshot(): Record<string, unknown> {
@@ -530,8 +533,8 @@ export function createEffectsManager<S extends Schema>(
 
       // For effects with a declarative `on` predicate, also evaluate the
       // predicate after the dep-overlap pre-filter so we only run when the
-      // condition currently holds. `$changed` reads `prev` via the previous
-      // snapshot — on the first run `prev` is null, which the predicate
+      // condition currently holds. `$changed` reads `prevFacts` via the previous
+      // snapshot — on the first run `prevFacts` is null, which the predicate
       // runtime treats as "value present is a change".
       const gate = onGates.get(id);
       if (gate) {

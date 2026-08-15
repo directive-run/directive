@@ -370,7 +370,7 @@ export function framesFromSnapshots(snapshots: unknown): ReplayFrame[] {
  *
  * This is a **predicate backtest**: the engine is not re-run. Each recorded
  * frame is statically re-scored against both specs; the previous frame's
- * facts are threaded as `prev` so a replayed effect-`on` predicate using
+ * facts are threaded as `prevFacts` so a replayed effect-`on` predicate using
  * `$changed` still works (for a constraint `when` it is harmless). The
  * report counts matches under each spec and buckets the disagreements into
  * new matches (original false, proposed true) and lost matches (original

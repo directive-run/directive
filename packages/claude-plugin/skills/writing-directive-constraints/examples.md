@@ -369,8 +369,8 @@ export const authFlowModule = createModule("auth-flow", {
     logStatusChange: {
       deps: ["status"],
       run: (facts, prevFacts) => {
-        if (prev && prev.status !== facts.status) {
-          addLogEntry(facts, "status", `${prev.status} → ${facts.status}`);
+        if (prevFacts && prevFacts.status !== facts.status) {
+          addLogEntry(facts, "status", `${prevFacts.status} → ${facts.status}`);
         }
       },
     },

@@ -304,12 +304,12 @@ const contactForm = createModule("contact-form", {
     logSubmission: {
       deps: ["status", "submissionCount"],
       run: (facts, prevFacts) => {
-        if (!prev) {
+        if (!prevFacts) {
           return;
         }
 
-        if (facts.status !== prev.status) {
-          log(`Status: ${prev.status} → ${facts.status}`);
+        if (facts.status !== prevFacts.status) {
+          log(`Status: ${prevFacts.status} → ${facts.status}`);
         }
       },
     },

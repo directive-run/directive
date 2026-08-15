@@ -71,7 +71,7 @@ const myModule = createModule("name", {
   effects: {            // Fire-and-forget side effects
     logPhase: {
       run: (facts, prevFacts) => {
-        if (prev?.phase !== facts.phase) {
+        if (prevFacts?.phase !== facts.phase) {
           console.log(`Phase: ${facts.phase}`);
         }
       },

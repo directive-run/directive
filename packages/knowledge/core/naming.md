@@ -53,7 +53,7 @@ Tagged union `{ type: "FETCH_USER", … }`. Constraints emit them; the runtime d
 
 ### `effects` — side effects from watched changes
 
-Declared via `effects: { name: { run: (facts, prev, derived) => … } }`. Run on relevant fact **or derivation** changes — `derived` is this module's own derivations, third after `facts` and `prev`. The auto-tracking dependency model means no `deps` array unless you specifically need a partial dep set; declaring `deps` routes past the tracking wrapper, so name there everything the body reads.
+Declared via `effects: { name: { run: (facts, prevFacts, derived) => … } }`. Run on relevant fact **or derivation** changes — `derived` is this module's own derivations, third after `facts` and `prevFacts`. The auto-tracking dependency model means no `deps` array unless you specifically need a partial dep set; declaring `deps` routes past the tracking wrapper, so name there everything the body reads.
 
 ### `sources` — typed external event subscriptions
 

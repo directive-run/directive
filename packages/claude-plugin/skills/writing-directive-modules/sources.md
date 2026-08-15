@@ -45,10 +45,10 @@ let connected: WebSocket | null = null;
 effects: {
   socket: {
     deps: ["shouldConnect"],
-    // `derived` is the third argument to run(), after facts and prev. Read it
+    // `derived` is the third argument to run(), after facts and prevFacts. Read it
     // rather than reaching back through `system.derive` — that is the
     // single-module accessor and resolves a module NAME once composed.
-    run: (_facts, _prev, derived) => {
+    run: (_facts, _prevFacts, derived) => {
       const shouldConnect = derived.shouldConnect;
       if (shouldConnect === (connected !== null)) {
         return; // The value did not move — leave the socket alone.

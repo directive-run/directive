@@ -468,7 +468,7 @@ export const checkersGame = createModule("checkers", {
   // ============================================================================
 
   effects: {
-    // `run` receives `derived` third, after `facts` and `prev` — read the
+    // `run` receives `derived` third, after `facts` and `prevFacts` — read the
     // redCount / blackCount derivations instead of recounting the board.
     moveLog: {
       deps: ["moveCount"],

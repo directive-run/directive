@@ -148,7 +148,7 @@ export interface EffectDef<
    * back through `system.derive`, which is the single-module accessor and
    * resolves a namespace instead of a value once the module is composed into a
    * `createSystem({ modules })`. Third rather than second because `facts` and
-   * `prev` already hold the first two positions.
+   * `prevFacts` already hold the first two positions.
    *
    * It reads your own writes. Write a fact and read a derivation of it later in
    * the same body and you get the value that follows from the write, the same

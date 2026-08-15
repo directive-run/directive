@@ -141,8 +141,8 @@ schema: {
 
 effects: {
   warnOnLargeCart: {
-    run: (_facts, prev, derived) => {
-      if (prev?.items.length !== derived.itemCount && derived.itemCount > 100) {
+    run: (_facts, prevFacts, derived) => {
+      if (prevFacts?.items.length !== derived.itemCount && derived.itemCount > 100) {
         console.log("over 100");
       }
     },
@@ -175,10 +175,10 @@ report a running total. Both get the module's derivations as a parameter:
 | --- | --- |
 | derivation | `(facts, derived)` |
 | constraint `when` / `require` | `(facts, derived)` |
-| effect `run` | `(facts, prev, derived)` |
+| effect `run` | `(facts, prevFacts, derived)` |
 
-`derived` is third for effects because `prev` already holds second. An effect
-that wants derivations and not `prev` writes `run: (_facts, _prev, derived)`.
+`derived` is third for effects because `prevFacts` already holds second. An effect
+that wants derivations and not `prevFacts` writes `run: (_facts, _prevFacts, derived)`.
 
 **Read `derived` rather than reaching back through `system.derive`.** The
 parameter is scoped to the module that declared the derivation, so it means the
@@ -263,7 +263,7 @@ value that follows from the write:
 ```typescript
 effects: {
   recalculate: {
-    run: (facts, prev, derived) => {
+    run: (facts, prevFacts, derived) => {
       facts.quantity = 5;
       derived.subtotal;   // reflects quantity === 5
     },

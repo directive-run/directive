@@ -186,8 +186,8 @@ export const featureFlagsModule = createModule("feature-flags", {
         "voteApiEnabled",
         "maintenanceMode",
       ],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
@@ -204,9 +204,9 @@ export const featureFlagsModule = createModule("feature-flags", {
         ] as const;
 
         for (const flag of flags) {
-          if (facts[flag] !== prev[flag]) {
+          if (facts[flag] !== prevFacts[flag]) {
             console.log(
-              `[feature-flags] ${flag}: ${prev[flag]} → ${facts[flag]}`,
+              `[feature-flags] ${flag}: ${prevFacts[flag]} → ${facts[flag]}`,
             );
           }
         }

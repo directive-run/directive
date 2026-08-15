@@ -341,7 +341,7 @@ export interface CrossModuleEffectDef<
    *
    * `prevFacts` is the fact snapshot from before this pass — the same shape as
    * `facts`, or absent on the first run. Named for what it holds: `facts` and
-   * `prev` sat side by side and only one of them said.
+   * `prevFacts` sat side by side and only one of them said.
    *
    * There is deliberately no `prevDerived`. Derivations are computed from
    * facts, and the runtime keeps a previous snapshot of the facts only, so a

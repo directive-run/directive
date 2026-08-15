@@ -191,7 +191,7 @@ export const featureFlagsModule = createModule("feature-flags", {
         "maintenanceMode",
       ],
       run: (facts, prevFacts) => {
-        if (!prev) {
+        if (!prevFacts) {
           return;
         }
 
@@ -208,9 +208,9 @@ export const featureFlagsModule = createModule("feature-flags", {
         ] as const;
 
         for (const flag of flags) {
-          if (facts[flag] !== prev[flag]) {
+          if (facts[flag] !== prevFacts[flag]) {
             console.log(
-              `[feature-flags] ${flag}: ${prev[flag]} → ${facts[flag]}`,
+              `[feature-flags] ${flag}: ${prevFacts[flag]} → ${facts[flag]}`,
             );
           }
         }

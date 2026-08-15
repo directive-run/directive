@@ -78,7 +78,7 @@ effects: {
 },
 
 // CORRECT – derived is the second argument to when()/require(),
-// and the third to run(), after facts and prev
+// and the third to run(), after facts and prevFacts
 constraints: {
   trim: {
     when: (_facts, derived) => derived.itemCount > 100,
@@ -88,7 +88,7 @@ constraints: {
 
 effects: {
   warn: {
-    run: (facts, prev, derived) => {
+    run: (facts, prevFacts, derived) => {
       if (derived.itemCount > 100) {
         console.warn("cart is large");
       }

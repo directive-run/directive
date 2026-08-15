@@ -610,8 +610,8 @@ export const fraudAnalysisModule = createModule("fraud", {
     logStageChange: {
       deps: ["stage"],
       run: (facts, prevFacts) => {
-        if (prev && prev.stage !== facts.stage) {
-          addTimeline("stage", `${prev.stage} → ${facts.stage}`);
+        if (prevFacts && prevFacts.stage !== facts.stage) {
+          addTimeline("stage", `${prevFacts.stage} → ${facts.stage}`);
         }
       },
     },
@@ -619,7 +619,7 @@ export const fraudAnalysisModule = createModule("fraud", {
     logPiiDetection: {
       deps: ["totalPiiDetections"],
       run: (facts, prevFacts) => {
-        if (prev && facts.totalPiiDetections !== prev.totalPiiDetections) {
+        if (prevFacts && facts.totalPiiDetections !== prevFacts.totalPiiDetections) {
           addTimeline(
             "pii",
             `PII guardrail fired (${facts.totalPiiDetections} total detections)`,
@@ -631,7 +631,7 @@ export const fraudAnalysisModule = createModule("fraud", {
     logBudgetWarning: {
       deps: ["analysisBudget"],
       run: (facts, prevFacts) => {
-        if (prev && prev.analysisBudget > 0 && facts.analysisBudget <= 0) {
+        if (prevFacts && prevFacts.analysisBudget > 0 && facts.analysisBudget <= 0) {
           addTimeline("budget", "analysis budget exhausted");
         }
       },

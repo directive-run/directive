@@ -44,9 +44,9 @@ const cart = createModule("cart", {
 
   effects: {
     warnOnLargeCart: {
-      run: (_facts, prev, derived) => {
+      run: (_facts, prevFacts, derived) => {
         if (
-          prev?.items.length !== derived.itemCount &&
+          prevFacts?.items.length !== derived.itemCount &&
           derived.itemCount > 100
         ) {
           console.log("over 100");
