@@ -618,28 +618,50 @@ export function createFactPIIGuardrail(
       return;
     }
 
+    const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
     const covered: string[] = [];
+    let unanswerable = 0;
+
     for (const key of Object.keys(
       (systemRef as unknown as { facts?: object } | null)?.facts ?? {},
     )) {
-      if (shouldScreen(key)) {
+      if (excludedSet.has(key)) {
+        continue;
+      }
+      if (screenedKeys.has(key)) {
+        covered.push(key);
+        continue;
+      }
+      // Deliberately NOT `shouldScreen` here. That answers "screen this?", and
+      // it says yes when it cannot tell — which is right for a write and wrong
+      // for a report. Counting an unanswerable key as covered would make a
+      // guardrail whose lookup is entirely broken render as total coverage,
+      // which is the inversion this event exists to prevent.
+      const answer = meta?.carriesTag?.("fact", key, "pii");
+      if (answer === undefined) {
+        unanswerable += 1;
+      } else if (answer) {
         covered.push(key);
       }
     }
     covered.sort();
 
+    // Delimited. Hashing the bare concatenation made {"a","bc"} and
+    // {"ab","c"} produce the same digest AND the same count, so a coverage
+    // swap was invisible to the signal meant to catch it.
     let hash = 5381;
     for (const key of covered) {
       for (let i = 0; i < key.length; i++) {
         hash = ((hash << 5) + hash + key.charCodeAt(i)) >>> 0;
       }
+      hash = ((hash << 5) + hash + 0x1f) >>> 0;
     }
 
     sys.notify.guardrailCoverage(
       "fact-pii-guardrail",
       covered.length,
       hash.toString(16),
-      reason,
+      unanswerable > 0 ? "unanswerable" : reason,
     );
   }
 
@@ -964,11 +986,15 @@ export function createFactPIIGuardrail(
     name: "fact-pii-guardrail",
 
     onInit(system) {
-      // Only a backstop. `systemRef` is set when the plugin is constructed, so
-      // the screen works from the first write regardless of where this plugin
-      // sits in the list — `onInit` is awaited per plugin, and anything after
-      // the first runs a microtask late, by which point `start()` has already
-      // applied hydrated and initial facts.
+      // First point at which this plugin can hold a system reference: a plugin
+      // is constructed before the system exists, so there is no earlier one.
+      //
+      // `onInit` is awaited per plugin, so anything after the first in the list
+      // resumes a microtask late — after `start()` has applied hydrated and
+      // initial facts. Writes in that window reach `shouldScreen` with no
+      // system to ask, which answers "could not tell" and screens. The sweep in
+      // `onStart` is what actually covers those facts; this is only the
+      // reference.
       systemRef ??= system;
     },
 
@@ -988,40 +1014,53 @@ export function createFactPIIGuardrail(
      */
     onStart(system) {
       systemRef ??= system;
+      // Armed BEFORE the sweep, and idempotently: `onStart` runs again after
+      // every `stop()`, and the old code overwrote the handle without
+      // unsubscribing, so each cycle leaked a listener and duplicated every
+      // report.
+      unsubscribeMeta?.();
+      unsubscribeMeta = null;
+      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
+      if (meta?.subscribe) {
+        unsubscribeMeta = meta.subscribe(["pii"], () => {
+          reportCoverage("tags-changed");
+        });
+      }
+      reportCoverage("start");
+
       const facts = (systemRef as unknown as MetaCapableSystem | null)?.facts;
       const store = facts?.$store;
       if (!store?.set) {
         return;
       }
 
+      // Per key, because one poisoned value must not end the sweep. A custom
+      // detector can throw, and so can reading a value whose own property
+      // traps throw — and this loop used to be a single unguarded body with
+      // the coverage report and the subscription behind it, so one such value
+      // silently ended the sweep AND left the guardrail with no coverage
+      // channel for the life of the process.
       for (const key of Object.keys(system.facts as object)) {
-        if (!shouldScreen(key)) {
-          continue;
-        }
-        const value = (system.facts as Record<string, unknown>)[key];
-        const result = inspect(value);
-        if (!result.matched || result.redacted === value) {
-          continue;
-        }
-        onBlocked?.(key, result.detected, mode);
-        if (mode === "alert") {
-          continue;
-        }
         try {
+          if (!shouldScreen(key)) {
+            continue;
+          }
+          const value = (system.facts as Record<string, unknown>)[key];
+          const result = inspect(value);
+          if (!result.matched || result.redacted === value) {
+            continue;
+          }
+          onBlocked?.(key, result.detected, mode);
+          if (mode === "alert") {
+            continue;
+          }
           store.set(key, result.redacted);
-        } catch {
-          // Same posture as the per-write path: `onBlocked` already fired, so
-          // the consumer knows a detection happened even if the write did not
-          // land.
+        } catch (error) {
+          console.warn(
+            "[Directive] fact-pii: could not sweep a fact at startup; it is left as written",
+            { key, error },
+          );
         }
-      }
-
-      reportCoverage("start");
-      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
-      if (meta?.subscribe) {
-        unsubscribeMeta = meta.subscribe(["pii"], () => {
-          reportCoverage("tags-changed");
-        });
       }
     },
 

@@ -102,21 +102,16 @@ export function freezeMeta(
 
   const frozen = Object.assign(Object.create(null), meta);
 
-  // `tags` decides whether a value is redacted, so it has to be a plain array
-  // of strings and nothing cleverer. An Array subclass passes `Array.isArray`
-  // while overriding `includes`, which would let the tag answer a different
-  // way on each call — the value would be screened or not depending on when
-  // you asked. Copied into a fresh array so the caller cannot keep a handle
-  // on the one the runtime reads.
+  // `tags` decides whether a value is redacted, so it is read strictly: an
+  // array of strings, copied into a fresh plain array the runtime owns. The
+  // copy is what defeats a subclass overriding `includes` to answer
+  // differently on each call — and copying rather than checking the prototype
+  // is deliberate, because an array from another realm has a different
+  // `Array.prototype` while being perfectly ordinary.
   if (frozen.tags !== undefined) {
     if (!Array.isArray(frozen.tags)) {
       throw new Error(
         "[Directive] meta.tags must be an array of strings, and it decides what gets redacted — so it is read strictly.",
-      );
-    }
-    if (Object.getPrototypeOf(frozen.tags) !== Array.prototype) {
-      throw new Error(
-        "[Directive] meta.tags must be a plain array. A subclass can override `includes` and answer differently on each call, which would make redaction depend on when it was asked.",
       );
     }
     for (const tag of frozen.tags) {
