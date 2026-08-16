@@ -1654,7 +1654,7 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /** Collect all definitions with meta across all types (for byCategory/byTag). */
+  /** Collect all definitions with meta across all types (for byTag). */
   function collectAllMeta(): MetaMatch[] {
     const results: MetaMatch[] = [];
     for (const [id, meta] of moduleMeta) {

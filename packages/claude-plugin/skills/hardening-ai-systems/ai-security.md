@@ -420,7 +420,7 @@ const system = createSystem({
 ```
 
 The plugin scans every write to a `pii`-tagged fact (auto-discovered via
-`meta.byTag("pii")` at `onInit`) and either redacts the value (default —
+`meta.carriesTag("fact", key, "pii")` per write, so a module registered later is covered) and either redacts the value (default —
 rewrites via a follow-up store write so the next read sees the redacted
 form) or alerts (fires `onBlocked` without mutating). Together with the
 input-guardrail chain on `runStream`, this closes the source → fact →

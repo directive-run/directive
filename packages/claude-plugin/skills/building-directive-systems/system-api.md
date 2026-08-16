@@ -251,11 +251,13 @@ system.meta.fact("email")?.tags;             // ["pii"]
 system.meta.module("auth")?.label;           // "Auth Module"
 
 // Bulk queries
-system.meta.byCategory("auth");  // MetaMatch[] — all auth definitions
-system.meta.byTag("pii");        // MetaMatch[] — all PII-tagged fields
+system.meta.byTag("pii");                       // MetaMatch[] — every match
+system.meta.byTag("pii", { kind: "fact" });     // just the facts
+system.meta.carriesTag("fact", "email", "pii"); // boolean | undefined, O(1)
+system.meta.subscribe(["pii"], rebuild, { immediate: true }); // -> unsubscribe
 ```
 
-Meta is frozen at registration (Object.create(null) + Object.freeze). Zero hot-path cost. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
+Meta is frozen at registration (Object.create(null) + Object.freeze). `label`, `description`, `category` and `color` are informational; `tags` and `tagBoundary` are not — they decide what gets redacted, and `carriesTag` is designed to be asked per fact write. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
 
 ## Observation Protocol
 
