@@ -1,5 +1,7 @@
 # @directive-run/knowledge
 
+## 1.30.0
+
 ## 1.29.5
 
 ## 1.29.4
