@@ -395,11 +395,12 @@ interface MetaCapableSystem {
      * `false`: a guardrail that reads "I could not look" as "nothing to
      * redact" is the failure this plugin exists to prevent. It screens.
      */
-    carriesTag?: (
-      kind: string,
-      id: string,
-      tag: string,
-    ) => boolean | undefined;
+    carriesTag?: (kind: string, id: string, tag: string) => boolean | undefined;
+    subscribe?: (
+      tags: readonly string[],
+      listener: () => void,
+      options?: { immediate?: boolean },
+    ) => () => void;
   };
   facts?: {
     $store?: {
@@ -407,6 +408,12 @@ interface MetaCapableSystem {
     };
   };
   notify?: {
+    guardrailCoverage?: (
+      plugin: string,
+      screenedCount: number,
+      screenedDigest: string,
+      reason: "start" | "tags-changed" | "unanswerable",
+    ) => void;
     guardrailBlocked?: (
       plugin: string,
       key: string,
@@ -538,6 +545,7 @@ export function createFactPIIGuardrail(
   // rather than a silent miss.
   const MAX_ARRAY_SCAN = 10_000;
   let systemRef: System | null = null;
+  let unsubscribeMeta: (() => void) | null = null;
 
   /**
    * Should a write to this key be screened?
@@ -584,6 +592,51 @@ export function createFactPIIGuardrail(
   }
 
   const warnedUnanswerable = new Set<string>();
+
+  /**
+   * Say what is being covered, so that covering nothing is distinguishable
+   * from having nothing to report.
+   *
+   * `onBlocked` and `guardrail.blocked` both fire on a match, so a screen that
+   * has stopped working and a screen with a clean stream of writes produce the
+   * same evidence: silence. This fires on start and whenever the tag answers
+   * can have moved.
+   *
+   * The digest is of the key names, not the names — which facts a system holds
+   * under a `pii` tag is part of what is being protected.
+   */
+  function reportCoverage(
+    reason: "start" | "tags-changed" | "unanswerable",
+  ): void {
+    const sys = systemRef as unknown as MetaCapableSystem | null;
+    if (!sys?.notify?.guardrailCoverage) {
+      return;
+    }
+
+    const covered: string[] = [];
+    for (const key of Object.keys(
+      (systemRef as unknown as { facts?: object } | null)?.facts ?? {},
+    )) {
+      if (shouldScreen(key)) {
+        covered.push(key);
+      }
+    }
+    covered.sort();
+
+    let hash = 5381;
+    for (const key of covered) {
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) + hash + key.charCodeAt(i)) >>> 0;
+      }
+    }
+
+    sys.notify.guardrailCoverage(
+      "fact-pii-guardrail",
+      covered.length,
+      hash.toString(16),
+      reason,
+    );
+  }
 
   /**
    * Build a redacted Error from an original Error whose message / cause /
@@ -957,6 +1010,19 @@ export function createFactPIIGuardrail(
           // land.
         }
       }
+
+      reportCoverage("start");
+      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
+      if (meta?.subscribe) {
+        unsubscribeMeta = meta.subscribe(["pii"], () => {
+          reportCoverage("tags-changed");
+        });
+      }
+    },
+
+    onDestroy() {
+      unsubscribeMeta?.();
+      unsubscribeMeta = null;
     },
 
     onFactSet(key, value, _prev) {

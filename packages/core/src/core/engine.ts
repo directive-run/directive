@@ -49,12 +49,12 @@ import {
 } from "./tracking.js";
 import type {
   ConstraintsDef,
+  DefinitionKind,
   DerivationsDef,
   EffectsDef,
   EventsDef,
   FactsSnapshot,
   InferSchema,
-  DefinitionKind,
   MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
@@ -1663,22 +1663,34 @@ export function createEngine<S extends Schema>(
     for (const key of Object.keys(mergedSchema)) {
       const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })
         ?._meta;
-      if (meta) results.push({ kind: "fact", id: key, meta, tagOrigin: "authored" });
+      if (meta)
+        results.push({ kind: "fact", id: key, meta, tagOrigin: "authored" });
     }
     for (const [name, meta] of eventMeta) {
       results.push({ kind: "event", id: name, meta, tagOrigin: "authored" });
     }
     for (const [id, def] of Object.entries(mergedConstraints)) {
       if (def.meta)
-        results.push({ kind: "constraint", id, meta: def.meta, tagOrigin: "authored" });
+        results.push({
+          kind: "constraint",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedResolvers)) {
       if (def.meta)
-        results.push({ kind: "resolver", id, meta: def.meta, tagOrigin: "authored" });
+        results.push({
+          kind: "resolver",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedEffects)) {
       const meta = (def as { meta?: DefinitionMeta }).meta;
-      if (meta) results.push({ kind: "effect", id, meta, tagOrigin: "authored" });
+      if (meta)
+        results.push({ kind: "effect", id, meta, tagOrigin: "authored" });
     }
     for (const id of Object.keys(mergedDerive)) {
       const meta = derivationsManager.getMeta(id as keyof DerivationsDef<S>);
@@ -1883,8 +1895,9 @@ export function createEngine<S extends Schema>(
               : undefined;
           case "effect":
             return Object.hasOwn(mergedEffects, id)
-              ? ((mergedEffects[id] as { meta?: DefinitionMeta } | undefined)
-                  ?.meta?.tags?.includes(tag) ?? false)
+              ? ((
+                  mergedEffects[id] as { meta?: DefinitionMeta } | undefined
+                )?.meta?.tags?.includes(tag) ?? false)
               : undefined;
           default:
             return undefined;
@@ -1977,6 +1990,21 @@ export function createEngine<S extends Schema>(
         } finally {
           guardrailNotifyDepth -= 1;
         }
+      },
+      guardrailCoverage(
+        plugin: string,
+        screenedCount: number,
+        screenedDigest: string,
+        reason: "start" | "tags-changed" | "unanswerable",
+      ): void {
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        pluginManager.emitGuardrailCoverage(
+          plugin,
+          screenedCount,
+          screenedDigest,
+          reason,
+        );
       },
       clobberLoopDetected(event): void {
         if (state.isDestroyed) return;
@@ -2165,6 +2193,19 @@ export function createEngine<S extends Schema>(
             kind,
             count,
             ...(category !== undefined ? { category } : {}),
+          }),
+        onGuardrailCoverage: (
+          plugin: string,
+          screenedCount: number,
+          screenedDigest: string,
+          reason: "start" | "tags-changed" | "unanswerable",
+        ) =>
+          observer({
+            type: "guardrail.coverage",
+            plugin,
+            screenedCount,
+            screenedDigest,
+            reason,
           }),
         onClobberLoopDetected: (
           event: import("./types/system.js").ObservationEvent & {

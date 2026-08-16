@@ -9,9 +9,9 @@
  * blind to exactly the payload most likely to carry a real customer record.
  */
 
-import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import type { Plugin } from "@directive-run/core";
+import { describe, expect, it, vi } from "vitest";
 import { createFactPIIGuardrail } from "../fact-pii";
 
 function moduleWithTaggedFact() {

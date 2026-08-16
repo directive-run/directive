@@ -14,8 +14,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createAuditLedger } from "../audit-ledger/index";
 import { createModule, createSystem, t } from "../../index";
+import { createAuditLedger } from "../audit-ledger/index";
 
 const flushTick = () => new Promise((r) => setTimeout(r, 0));
 

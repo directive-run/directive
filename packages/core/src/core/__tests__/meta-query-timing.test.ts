@@ -83,16 +83,16 @@ let probeSystem: any = null;
 describe("metadata answers reflect the write being announced", () => {
   it("sees the derivation join the tagged set on the write that opens the gate", () => {
     const seen = new Map<string, string[]>();
-    const system = createSystem({ module: gatedModule(), plugins: [probe(seen)] });
+    const system = createSystem({
+      module: gatedModule(),
+      plugins: [probe(seen)],
+    });
     system.start();
 
     // Opening the gate makes `shown` read `email`, so it starts carrying pii.
     system.facts.consented = true;
 
-    expect(seen.get("consented")).toEqual([
-      "derivation:shown",
-      "fact:email",
-    ]);
+    expect(seen.get("consented")).toEqual(["derivation:shown", "fact:email"]);
 
     system.stop();
     probeSystem = null;
@@ -100,17 +100,17 @@ describe("metadata answers reflect the write being announced", () => {
 
   it("agrees with the batched path", () => {
     const seen = new Map<string, string[]>();
-    const system = createSystem({ module: gatedModule(), plugins: [probe(seen)] });
+    const system = createSystem({
+      module: gatedModule(),
+      plugins: [probe(seen)],
+    });
     system.start();
 
     system.batch(() => {
       system.facts.consented = true;
     });
 
-    expect(seen.get("consented")).toEqual([
-      "derivation:shown",
-      "fact:email",
-    ]);
+    expect(seen.get("consented")).toEqual(["derivation:shown", "fact:email"]);
 
     system.stop();
     probeSystem = null;

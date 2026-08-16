@@ -33,9 +33,12 @@ describe("a fact's tags cannot be taken back", () => {
     const system = createSystem({ module: taggedModule() });
     system.start();
 
-    const store = (system.facts as unknown as { $store: Record<string, unknown> })
-      .$store;
-    const registerKeys = store.registerKeys as (s: Record<string, unknown>) => void;
+    const store = (
+      system.facts as unknown as { $store: Record<string, unknown> }
+    ).$store;
+    const registerKeys = store.registerKeys as (
+      s: Record<string, unknown>,
+    ) => void;
 
     expect(() => registerKeys({ email: {} })).toThrow(/email/);
     expect(system.meta.fact("email")?.tags).toEqual(["pii"]);

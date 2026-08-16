@@ -1190,6 +1190,28 @@ export type ObservationEvent =
       count: number;
       category?: string;
     }
+  /**
+   * A guardrail reporting what it is covering, not what it caught.
+   *
+   * `guardrail.blocked` fires on a match, so a guardrail that is screening
+   * nothing and a guardrail that is screening everything cleanly produce
+   * identical evidence: silence. That is the failure this whole area keeps
+   * having — a set built once and never rebuilt reports exactly as a set with
+   * nothing to report.
+   *
+   * Emitted when a guardrail starts and whenever the answer it works from
+   * changes, so a dashboard where this is absent, or where `reason` is
+   * `"unanswerable"`, is a screen that has stopped covering rather than a
+   * quiet one. Carries a digest of the covered keys rather than their names —
+   * key names are the thing being protected.
+   */
+  | {
+      type: "guardrail.coverage";
+      plugin: string;
+      screenedCount: number;
+      screenedDigest: string;
+      reason: "start" | "tags-changed" | "unanswerable";
+    }
   | { type: "reconcile.start" }
   | {
       type: "reconcile.end";
@@ -1274,6 +1296,22 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
       kind: "redact" | "alert" | "detect",
       count: number,
       category?: string,
+    ): void;
+    /**
+     * Report what a guardrail covers, rather than what it caught.
+     *
+     * `guardrailBlocked` fires on a match, which makes a guardrail that is
+     * covering nothing look exactly like one with nothing to report. Call this
+     * when a guardrail starts and whenever the set it works from changes, so
+     * the difference is observable without a per-write metric.
+     *
+     * Pass a digest of the covered keys, not the keys themselves.
+     */
+    guardrailCoverage(
+      plugin: string,
+      screenedCount: number,
+      screenedDigest: string,
+      reason: "start" | "tags-changed" | "unanswerable",
     ): void;
     /**
      * v1.23.0 — plugin authoring surface for emitting the

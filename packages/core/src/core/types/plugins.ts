@@ -444,6 +444,24 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
     category?: string,
   ) => void;
 
+  /**
+   * Called when a guardrail reports what it covers, rather than what it caught.
+   *
+   * `onGuardrailBlocked` fires on a match, so a guardrail covering nothing and
+   * one covering everything cleanly are indistinguishable — both are silent.
+   * This fires when a guardrail starts and whenever the answer it works from
+   * changes, which makes the difference visible without a per-write metric.
+   *
+   * `screenedDigest` is a digest of the covered keys, not the keys: their names
+   * are part of what is being protected.
+   */
+  onGuardrailCoverage?: (
+    plugin: string,
+    screenedCount: number,
+    screenedDigest: string,
+    reason: "start" | "tags-changed" | "unanswerable",
+  ) => void;
+
   // ============================================================================
   // Clobber Loop Hooks (v1.23.0)
   // ============================================================================
