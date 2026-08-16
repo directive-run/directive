@@ -529,9 +529,25 @@ export function createEngine<S extends Schema>(
   const { store, facts } = createFacts<S>({
     schema: mergedSchema,
     onChange: (key, value, prev) => {
-      pluginManager.emitFactSet(key, value, prev);
-      // Invalidate derivations so they recompute on read
-      invalidateDerivation(key);
+      // Invalidate BEFORE announcing, so a plugin asking what a value carries
+      // is told about the write it is being notified of. The batched path
+      // already worked this way — `onWrite` invalidates at write time and the
+      // announcement waits for `onBatch` — so the two paths disagreed: a
+      // redactor got the right answer inside `system.batch()` and an answer
+      // one write stale outside it.
+      //
+      // Held across the announcement because invalidating flushes derivation
+      // listeners, which are `system.subscribe` / `system.watch` callbacks —
+      // consumer code. Without the hold they would run between the commit and
+      // the plugins, and a throw from one would skip `emitFactSet` entirely,
+      // taking the guardrail with it.
+      const release = holdDerivationNotifications();
+      try {
+        invalidateDerivation(key);
+        pluginManager.emitFactSet(key, value, prev);
+      } finally {
+        release();
+      }
       // Track fact changes for trace
       if (traceEnabled) {
         traceManager.recordFactChange(String(key), prev, value);
