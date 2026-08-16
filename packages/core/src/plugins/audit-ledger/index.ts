@@ -225,8 +225,18 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     ).meta;
     if (!meta || typeof meta.carriesTag !== "function") return false;
 
-    const root = factPath.split(".")[0] ?? factPath;
+    // Exact key first. A fact key may itself contain a dot — the schema is a
+    // flat map of arbitrary strings — so resolving straight to the first
+    // segment would look up `user` for a key literally named `user.email` and
+    // answer for the wrong fact. The root fallback is for clause paths, where
+    // the tag lives on the top-level fact.
     try {
+      const exact = meta.carriesTag("fact", factPath, "pii");
+      if (exact !== undefined) {
+        return exact;
+      }
+      const root = factPath.split(".")[0] ?? factPath;
+
       return meta.carriesTag("fact", root, "pii") !== false;
     } catch {
       return true;

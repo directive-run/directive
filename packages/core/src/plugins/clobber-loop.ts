@@ -546,8 +546,16 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
    */
   function carriesPII(factPath: string): boolean {
     if (!systemRef) return false;
-    const root = factPath.split(".")[0] ?? factPath;
+    // Exact key first — a fact key may itself contain a dot, and resolving
+    // straight to the first segment would answer for a different fact. The root
+    // fallback is for clause paths.
     try {
+      const exact = systemRef.meta.carriesTag?.("fact", factPath, "pii");
+      if (exact !== undefined) {
+        return exact;
+      }
+      const root = factPath.split(".")[0] ?? factPath;
+
       return systemRef.meta.carriesTag?.("fact", root, "pii") !== false;
     } catch {
       return true;

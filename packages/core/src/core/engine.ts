@@ -46,6 +46,7 @@ import {
   derivationDepId,
   describeDep,
   isDerivationDep,
+  withoutTracking,
 } from "./tracking.js";
 import type {
   ConstraintsDef,
@@ -216,6 +217,21 @@ interface EngineState<_S extends Schema> {
  *
  * @internal
  */
+/**
+ * A schema type this package built, as opposed to a foreign validator.
+ *
+ * `t.string()` and friends are inert descriptors and safe to freeze. A Zod
+ * schema is also a supported fact type and is not: it mutates itself during
+ * validation, so freezing it breaks the first write it validates.
+ */
+function isOwnSchemaType(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "_typeName" in (value as Record<string, unknown>)
+  );
+}
+
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
@@ -367,7 +383,13 @@ export function createEngine<S extends Schema>(
     // reassign `_meta` on a frozen object.
     if (Object.isFrozen(st)) continue;
     if (st._meta) st._meta = freezeMeta(st._meta)!;
-    Object.freeze(st);
+    // Only the schema types this package builds. A Zod schema is a supported
+    // fact type and mutates itself while validating — v3 caches its shape onto
+    // the instance on first parse, v4 re-defines properties on it — so freezing
+    // one turns the first validated write into a TypeError.
+    if (isOwnSchemaType(st)) {
+      Object.freeze(st);
+    }
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -1656,6 +1678,21 @@ export function createEngine<S extends Schema>(
 
   /** Collect all definitions with meta across all types (for byTag). */
   function collectAllMeta(): MetaMatch[] {
+    // Fenced off the tracking stack. Walking the tag graph forces derivations
+    // to compute, and forcing goes through the same accessor a derivation body
+    // uses — which records a dependency when it runs inside a tracking frame.
+    // A plugin asking a metadata question from inside a constraint's `when` or
+    // an effect's batch would otherwise write every derivation into that
+    // reader's dependency set.
+    //
+    // Defensive: the mechanism is plain in `manager.get`, but six attempts to
+    // observe the symptom measured no growth, so this is inert if the path is
+    // unreachable and correct if it is not. Asking a question about the system
+    // is not reading a value from it either way.
+    return withoutTracking(() => collectAllMetaUnfenced());
+  }
+
+  function collectAllMetaUnfenced(): MetaMatch[] {
     const results: MetaMatch[] = [];
     for (const [id, meta] of moduleMeta) {
       results.push({ kind: "module", id, meta, tagOrigin: "authored" });
@@ -1818,7 +1855,7 @@ export function createEngine<S extends Schema>(
         const authored = derivationsManager.getMeta(
           id as keyof DerivationsDef<S>,
         );
-        const inherited = inheritedTagsFor(id);
+        const inherited = withoutTracking(() => inheritedTagsFor(id));
         if (inherited.length === 0) {
           return authored;
         }
@@ -1868,7 +1905,7 @@ export function createEngine<S extends Schema>(
           // not decide what gets redacted. "Could not answer" is a third state
           // for exactly this.
           try {
-            return inheritedTagsFor(id).includes(tag);
+            return withoutTracking(() => inheritedTagsFor(id).includes(tag));
           } catch {
             return undefined;
           }
@@ -3431,7 +3468,9 @@ export function createEngine<S extends Schema>(
       const st = schemaType as { _meta?: DefinitionMeta };
       if (Object.isFrozen(st)) continue;
       if (st._meta) st._meta = freezeMeta(st._meta)!;
-      Object.freeze(st);
+      if (isOwnSchemaType(st)) {
+        Object.freeze(st);
+      }
     }
     if (module.events) {
       unwrapEventDefinitions(

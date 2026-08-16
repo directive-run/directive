@@ -618,11 +618,29 @@ export function createFactPIIGuardrail(
       return;
     }
 
+    const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
     const covered: string[] = [];
+    let unanswerable = 0;
+
     for (const key of Object.keys(
       (systemRef as unknown as { facts?: object } | null)?.facts ?? {},
     )) {
-      if (shouldScreen(key)) {
+      if (excludedSet.has(key)) {
+        continue;
+      }
+      if (screenedKeys.has(key)) {
+        covered.push(key);
+        continue;
+      }
+      // Deliberately NOT `shouldScreen` here. That answers "screen this?", and
+      // it says yes when it cannot tell — which is right for a write and wrong
+      // for a report. Counting an unanswerable key as covered would make a
+      // guardrail whose lookup is entirely broken render as total coverage,
+      // which is the inversion this event exists to prevent.
+      const answer = meta?.carriesTag?.("fact", key, "pii");
+      if (answer === undefined) {
+        unanswerable += 1;
+      } else if (answer) {
         covered.push(key);
       }
     }
@@ -639,7 +657,7 @@ export function createFactPIIGuardrail(
       "fact-pii-guardrail",
       covered.length,
       hash.toString(16),
-      reason,
+      unanswerable > 0 ? "unanswerable" : reason,
     );
   }
 
@@ -964,11 +982,15 @@ export function createFactPIIGuardrail(
     name: "fact-pii-guardrail",
 
     onInit(system) {
-      // Only a backstop. `systemRef` is set when the plugin is constructed, so
-      // the screen works from the first write regardless of where this plugin
-      // sits in the list — `onInit` is awaited per plugin, and anything after
-      // the first runs a microtask late, by which point `start()` has already
-      // applied hydrated and initial facts.
+      // First point at which this plugin can hold a system reference: a plugin
+      // is constructed before the system exists, so there is no earlier one.
+      //
+      // `onInit` is awaited per plugin, so anything after the first in the list
+      // resumes a microtask late — after `start()` has applied hydrated and
+      // initial facts. Writes in that window reach `shouldScreen` with no
+      // system to ask, which answers "could not tell" and screens. The sweep in
+      // `onStart` is what actually covers those facts; this is only the
+      // reference.
       systemRef ??= system;
     },
 

@@ -102,3 +102,35 @@ describe("the ledger learns about facts tagged after it attached", () => {
     system.stop();
   });
 });
+
+describe("a dotted fact key is not resolved to a different fact", () => {
+  it("redacts a tagged key that contains a dot", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: {
+            user: t.string(),
+            "user.email": t.string().meta({ tags: ["pii"] }),
+          },
+        },
+        init: () => {},
+      }),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+
+    (system.facts as unknown as Record<string, unknown>)["user.email"] =
+      "alice@example.com";
+    await flushTick();
+
+    // Resolving straight to the first segment would look up the untagged
+    // `user` and let the address through into a chain that cannot be edited.
+    expect(JSON.stringify(ledger.forFact("user.email"))).not.toContain(
+      "alice@example.com",
+    );
+
+    system.stop();
+  });
+});

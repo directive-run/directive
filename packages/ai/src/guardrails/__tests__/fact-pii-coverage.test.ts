@@ -87,4 +87,36 @@ describe("a guardrail says what it covers", () => {
     warn.mockRestore();
     system.stop();
   });
+
+  it("reports unanswerable rather than full coverage when the lookup is blind", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const seen: Array<Record<string, unknown>> = [];
+    const system = createSystem({
+      module: moduleWithTaggedFact(),
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.observe((event) => {
+      if (event.type === "guardrail.coverage") {
+        seen.push(event as unknown as Record<string, unknown>);
+      }
+    });
+
+    // A lookup that cannot answer for anything. The guardrail still screens
+    // every write — that is the safe direction — but it must not report that
+    // as coverage, or a broken screen reads as a fully working one.
+    const meta = system.meta as unknown as {
+      carriesTag: (k: string, i: string, t: string) => boolean | undefined;
+    };
+    meta.carriesTag = () => undefined;
+
+    system.start();
+
+    expect(seen.length).toBeGreaterThan(0);
+    const report = seen.at(-1)!;
+    expect(report.reason).toBe("unanswerable");
+    expect(report.screenedCount).toBe(0);
+
+    warn.mockRestore();
+    system.stop();
+  });
 });
