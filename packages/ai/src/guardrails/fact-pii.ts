@@ -424,15 +424,6 @@ interface MetaCapableSystem {
   };
 }
 
-/**
- * Create a Directive plugin that scans pii-tagged fact writes for PII and
- * redacts or rejects them at the manager boundary.
- *
- * Wire it once at `createSystem({ plugins: [...] })`. The plugin caches
- * the pii-tagged key set on `onInit` so per-write hooks are O(1) lookups.
- *
- * @returns a `Plugin` instance ready to add to `SystemConfig.plugins`.
- */
 /** Returned when nothing scannable could be recovered from a value. */
 const UNSALVAGEABLE = Symbol("unsalvageable");
 
@@ -503,6 +494,20 @@ function salvageForScan(
   return kept > 0 ? out : UNSALVAGEABLE;
 }
 
+/**
+ * Create a Directive plugin that scans pii-tagged fact writes for PII and
+ * redacts or rejects them at the manager boundary.
+ *
+ * Wire it once at `createSystem({ plugins: [...] })`. Every write asks
+ * `meta.carriesTag("fact", key, "pii")`, which is O(1) and cannot go stale —
+ * there is no cached key set, so a module registered later is covered and a
+ * failed lookup has nothing to leave empty.
+ *
+ * Screening is not decided by where this sits in the plugin list: facts that
+ * arrive through `initialFacts` or hydration are swept once at start.
+ *
+ * @returns a `Plugin` instance ready to add to `SystemConfig.plugins`.
+ */
 export function createFactPIIGuardrail(
   options: FactPIIGuardrailOptions = {},
 ): Plugin {

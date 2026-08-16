@@ -402,14 +402,6 @@
   ```ts
   export interface HistoryState {
   ```
-- `DefinitionKind` — The seven things a system holds metadata for.
-  ```ts
-  export type DefinitionKind
-  ```
-- `DynamicDefinitionKind` — The four kinds register/assign/unregister/call operate on.
-  ```ts
-  export type DynamicDefinitionKind
-  ```
 - `LeafClause` — A leaf clause extracted from a predicate tree, keyed by its dotted path.
   ```ts
   export interface LeafClause {
@@ -418,7 +410,7 @@
   ```ts
   export interface MetaAccessor {
   ```
-- `MetaMatch` — One definition returned by MetaAccessor.byTag.
+- `MetaMatch` — One definition returned by {@link MetaAccessor.byTag}.
   ```ts
   export interface MetaMatch {
   ```
@@ -605,9 +597,17 @@
   ```ts
   export type CrossModuleEffectsDef<
   ```
+- `DefinitionKind` — The seven things a system holds metadata for — the same seven the lookups on
+  ```ts
+  export type DefinitionKind =
+  ```
 - `DerivationsDefinition` — Map of derivation definitions (internal — always bare functions after unwrap).
   ```ts
   export type DerivationsDef<S extends Schema> = Record<
+  ```
+- `DynamicDefinitionKind` — The four kinds `register` / `assign` / `unregister` / `call` operate on.
+  ```ts
+  export type DynamicDefinitionKind = Extract<
   ```
 - `EffectsDefinition` — Map of effect definitions
   ```ts
