@@ -75,6 +75,18 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   /** Called when the outermost batch opens. */
   onBatchStart?: () => void;
   /**
+   * Called after `registerKeys` adds fact keys, with the key and its schema
+   * type.
+   *
+   * The store is not the only thing that has to know a fact exists. Anything
+   * deciding what a fact carries — and therefore whether writes to it are
+   * redacted — has to learn about it at the same moment, or the two disagree
+   * with nothing saying so.
+   */
+  onKeysRegistered?: (
+    entries: ReadonlyArray<readonly [string, unknown]>,
+  ) => void;
+  /**
    * Called after the outermost batch has flushed.
    *
    * A backstop for a batch that wrote nothing: `onBatch` is skipped when there
@@ -115,8 +127,15 @@ export interface CreateFactsStoreOptions<S extends Schema> {
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { schema, onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
-    options;
+  const {
+    schema,
+    onChange,
+    onBatch,
+    onWrite,
+    onBatchStart,
+    onBatchEnd,
+    onKeysRegistered,
+  } = options;
 
   // Detect if this is a type assertion schema (empty object with no keys)
   const schemaKeys = Object.keys(schema);
@@ -549,6 +568,7 @@ export function createFactsStore<S extends Schema>(
   (store as unknown as Record<string, unknown>).registerKeys = (
     newSchema: Record<string, unknown>,
   ) => {
+    const added: string[] = [];
     for (const key of Object.keys(newSchema)) {
       // Defense-in-depth: skip prototype pollution keys
       if (BLOCKED_PROPS.has(key)) continue;
@@ -570,6 +590,14 @@ export function createFactsStore<S extends Schema>(
       // Add to schema for validation
       (schema as Record<string, unknown>)[key] = newSchema[key];
       knownKeys.add(key);
+      added.push(key);
+    }
+    // Tell the engine, so a key registered through the store is recorded the
+    // same way one registered through a module is. Without this a fact could
+    // be tagged `pii` in every query surface and untagged to the screen that
+    // acts on it — permanently, and with nothing reporting the difference.
+    if (added.length > 0) {
+      onKeysRegistered?.(added.map((k) => [k, newSchema[k]] as const));
     }
   };
 

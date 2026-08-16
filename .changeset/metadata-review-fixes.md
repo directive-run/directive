@@ -35,3 +35,36 @@ forces derivations to compute, and forcing goes through the same accessor a
 derivation body uses. Defensive rather than demonstrated: the mechanism is plain
 in the code and two reviews flagged it, but six attempts to observe the symptom
 measured no dependency growth. The fence is inert if the path is unreachable.
+
+**A fact could be tagged everywhere except where it counted.** `carriesTag`
+answered `false` for a key present in the schema but absent from the recorded
+tag map, which made "carries nothing" and "not recorded yet" the same answer.
+Three ways to reach it: a module's schema became visible one statement before
+its tags were recorded, and a source registered by that same module attaches
+synchronously in between; a key registered through `facts.$store.registerKeys`
+was never recorded at all; and a validation throw part-way through registration
+left earlier keys live and unrecorded. Every fact key is recorded now, tags are
+recorded immediately after the schema merge, and the store tells the engine
+about keys it registers.
+
+**A caller-frozen schema type skipped the validation the freeze exists for.**
+`Object.isFrozen` cannot tell "we prepared this" from "the author froze it
+first", so a pre-frozen type bypassed the `tags` check. Tracked in a `WeakSet`
+instead.
+
+**One bad value could disable the guardrail's startup sweep and its coverage
+channel for the process.** The sweep, the coverage report and the metadata
+subscription were one unguarded block, so a throwing detector or a value with
+hostile property traps ended all three. The sweep now guards per key, and the
+report and subscription are armed before it runs. The subscription is also
+idempotent across `stop()`/`start()`, which previously leaked a listener and
+duplicated every report.
+
+**Cross-realm arrays are accepted.** `tags` was rejected unless its prototype
+was exactly `Array.prototype`, which fails for an array from a `vm` context, a
+worker or an iframe. The runtime copies `tags` into its own array, and that copy
+— not the prototype check — is what defeats a subclass overriding `includes`.
+
+**The coverage digest is delimited.** Hashing the bare concatenation gave
+`{"a","bc"}` and `{"ab","c"}` the same digest and the same count, so a coverage
+swap was invisible to the signal meant to catch it.

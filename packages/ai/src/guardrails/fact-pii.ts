@@ -646,11 +646,15 @@ export function createFactPIIGuardrail(
     }
     covered.sort();
 
+    // Delimited. Hashing the bare concatenation made {"a","bc"} and
+    // {"ab","c"} produce the same digest AND the same count, so a coverage
+    // swap was invisible to the signal meant to catch it.
     let hash = 5381;
     for (const key of covered) {
       for (let i = 0; i < key.length; i++) {
         hash = ((hash << 5) + hash + key.charCodeAt(i)) >>> 0;
       }
+      hash = ((hash << 5) + hash + 0x1f) >>> 0;
     }
 
     sys.notify.guardrailCoverage(
@@ -1010,40 +1014,53 @@ export function createFactPIIGuardrail(
      */
     onStart(system) {
       systemRef ??= system;
+      // Armed BEFORE the sweep, and idempotently: `onStart` runs again after
+      // every `stop()`, and the old code overwrote the handle without
+      // unsubscribing, so each cycle leaked a listener and duplicated every
+      // report.
+      unsubscribeMeta?.();
+      unsubscribeMeta = null;
+      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
+      if (meta?.subscribe) {
+        unsubscribeMeta = meta.subscribe(["pii"], () => {
+          reportCoverage("tags-changed");
+        });
+      }
+      reportCoverage("start");
+
       const facts = (systemRef as unknown as MetaCapableSystem | null)?.facts;
       const store = facts?.$store;
       if (!store?.set) {
         return;
       }
 
+      // Per key, because one poisoned value must not end the sweep. A custom
+      // detector can throw, and so can reading a value whose own property
+      // traps throw — and this loop used to be a single unguarded body with
+      // the coverage report and the subscription behind it, so one such value
+      // silently ended the sweep AND left the guardrail with no coverage
+      // channel for the life of the process.
       for (const key of Object.keys(system.facts as object)) {
-        if (!shouldScreen(key)) {
-          continue;
-        }
-        const value = (system.facts as Record<string, unknown>)[key];
-        const result = inspect(value);
-        if (!result.matched || result.redacted === value) {
-          continue;
-        }
-        onBlocked?.(key, result.detected, mode);
-        if (mode === "alert") {
-          continue;
-        }
         try {
+          if (!shouldScreen(key)) {
+            continue;
+          }
+          const value = (system.facts as Record<string, unknown>)[key];
+          const result = inspect(value);
+          if (!result.matched || result.redacted === value) {
+            continue;
+          }
+          onBlocked?.(key, result.detected, mode);
+          if (mode === "alert") {
+            continue;
+          }
           store.set(key, result.redacted);
-        } catch {
-          // Same posture as the per-write path: `onBlocked` already fired, so
-          // the consumer knows a detection happened even if the write did not
-          // land.
+        } catch (error) {
+          console.warn(
+            "[Directive] fact-pii: could not sweep a fact at startup; it is left as written",
+            { key, error },
+          );
         }
-      }
-
-      reportCoverage("start");
-      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
-      if (meta?.subscribe) {
-        unsubscribeMeta = meta.subscribe(["pii"], () => {
-          reportCoverage("tags-changed");
-        });
       }
     },
 

@@ -68,23 +68,50 @@ describe("a fact's tags cannot be taken back", () => {
     system.stop();
   });
 
-  it("refuses a tags value that is not a plain array", () => {
-    // An Array subclass passes `Array.isArray` and can override `includes`, so
-    // it would decide per call whether a given write is redacted.
+  it("never consults a caller's tags object when deciding what to screen", () => {
+    // An Array subclass passes `Array.isArray` and can override `includes` to
+    // answer differently on each call, which would make redaction depend on
+    // when it was asked. The runtime copies `tags` into a plain array it owns,
+    // so the override is never reached.
+    //
+    // Copying rather than rejecting the prototype is deliberate: an array from
+    // another realm — a `vm` context, a worker, an iframe — has a different
+    // `Array.prototype` while being perfectly ordinary, and rejecting it would
+    // turn that into a startup failure.
+    let consulted = 0;
     class Sometimes extends Array<string> {
       override includes(): boolean {
-        return Math.random() < 0.5;
+        consulted++;
+
+        return false;
       }
     }
     const hostile = Sometimes.from(["pii"]) as string[];
 
+    const system = createSystem({
+      module: createModule("m", {
+        schema: { facts: { email: t.string().meta({ tags: hostile }) } },
+        init: (facts) => {
+          facts.email = "a@b.test";
+        },
+      }),
+    });
+    system.start();
+
+    expect(system.meta.carriesTag("fact", "email", "pii")).toBe(true);
+    expect(consulted).toBe(0);
+
+    system.stop();
+  });
+
+  it("rejects a tags value that is not an array of strings", () => {
     expect(() =>
       createSystem({
         module: createModule("m", {
-          schema: { facts: { email: t.string().meta({ tags: hostile }) } },
-          init: (facts) => {
-            facts.email = "a@b.test";
+          schema: {
+            facts: { email: t.string().meta({ tags: "pii" as never }) },
           },
+          init: () => {},
         }),
       }),
     ).toThrow(/tags/);

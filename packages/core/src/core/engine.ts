@@ -224,6 +224,15 @@ interface EngineState<_S extends Schema> {
  * schema is also a supported fact type and is not: it mutates itself during
  * validation, so freezing it breaks the first write it validates.
  */
+/**
+ * Schema types this engine has already validated and frozen.
+ *
+ * Module-scoped so a module object handed to two systems is prepared once,
+ * without asking `Object.isFrozen` — which answers yes for a type the author
+ * froze themselves, and would then skip the tag validation.
+ */
+const preparedSchemaTypes = new WeakSet<object>();
+
 function isOwnSchemaType(value: unknown): boolean {
   return (
     typeof value === "object" &&
@@ -378,10 +387,11 @@ export function createEngine<S extends Schema>(
   // the door closes here.
   for (const schemaType of Object.values(mergedSchema)) {
     const st = schemaType as { _meta?: DefinitionMeta };
-    // Idempotent: a module object can be handed to more than one system, and
-    // the first one to see it does the freezing. A second pass would try to
-    // reassign `_meta` on a frozen object.
-    if (Object.isFrozen(st)) continue;
+    // Idempotent, but only for types WE froze. `Object.isFrozen` cannot tell
+    // "we prepared this" from "the author froze it first", and skipping on the
+    // second would skip the tag validation this freeze exists to guarantee.
+    if (preparedSchemaTypes.has(st)) continue;
+    preparedSchemaTypes.add(st);
     if (st._meta) st._meta = freezeMeta(st._meta)!;
     // Only the schema types this package builds. A Zod schema is a supported
     // fact type and mutates itself while validating — v3 caches its shape onto
@@ -643,6 +653,14 @@ export function createEngine<S extends Schema>(
     },
     onBatchStart: () => {
       releaseHold = holdDerivationNotifications();
+    },
+    onKeysRegistered: (entries) => {
+      const asSchema: Record<string, unknown> = {};
+      for (const [key, type] of entries) {
+        asSchema[key] = type;
+      }
+      recordFactTags(asSchema);
+      notifyMetaSubscribers();
     },
     onBatchEnd: () => {
       // Normally already released inside `onBatch`. This catches the batch that
@@ -1637,14 +1655,22 @@ export function createEngine<S extends Schema>(
    * come from somewhere the answer can be edited.
    */
   const factTagSets = new Map<string, ReadonlySet<string>>();
+  const EMPTY_TAGS: ReadonlySet<string> = new Set();
 
   function recordFactTags(schema: Record<string, unknown>): void {
     for (const key of Object.keys(schema)) {
       const meta = (schema[key] as { _meta?: DefinitionMeta })?._meta;
       const tags = meta?.tags;
-      if (tags && tags.length > 0) {
-        factTagSets.set(key, new Set(tags));
-      }
+      // EVERY key, including untagged ones. Membership in this map is what
+      // separates "recorded, and carries nothing" from "not recorded yet" —
+      // and only the first of those is an answer. Recording tagged keys alone
+      // made an unrecorded key indistinguishable from an untagged one, so a
+      // key that reached the schema before its tags did read as definitively
+      // clean instead of unknown.
+      factTagSets.set(
+        key,
+        tags && tags.length > 0 ? new Set(tags) : EMPTY_TAGS,
+      );
     }
   }
 
@@ -1667,7 +1693,10 @@ export function createEngine<S extends Schema>(
   const metaSubscribers = new Set<() => void>();
 
   function notifyMetaSubscribers(): void {
-    for (const listener of metaSubscribers) {
+    // Snapshot: a listener that subscribes while being notified would
+    // otherwise be visited in the same pass, and one that does it every time
+    // never terminates.
+    for (const listener of [...metaSubscribers]) {
       try {
         listener();
       } catch (error) {
@@ -1884,11 +1913,14 @@ export function createEngine<S extends Schema>(
         // redacts. Answered from the runtime's own copy, so it costs a map
         // lookup and cannot be edited from outside.
         if (kind === "fact") {
-          if (!Object.hasOwn(mergedSchema, id)) {
-            return undefined;
-          }
+          // Absent from the recorded map means the runtime has no answer,
+          // whether the key is unknown or merely arrived ahead of its tags.
+          // Reporting `false` there is how an untagged key and an
+          // unrecorded one became the same answer, which is the whole class
+          // of defect this accessor exists to avoid.
+          const recorded = factTagSets.get(id);
 
-          return factTagSets.get(id)?.has(tag) ?? false;
+          return recorded === undefined ? undefined : recorded.has(tag);
         }
 
         if (kind === "derivation") {
@@ -2473,6 +2505,7 @@ export function createEngine<S extends Schema>(
       definitions.destroy();
       // Clean up meta Maps
       moduleMeta.clear();
+      metaSubscribers.clear();
       eventMeta.clear();
       // Drop any pending ctx.requeue() requests
       pendingRequeueIds.clear();
@@ -2512,6 +2545,7 @@ export function createEngine<S extends Schema>(
       traceManager.destroy();
       definitions.destroy();
       moduleMeta.clear();
+      metaSubscribers.clear();
       eventMeta.clear();
       pendingRequeueIds.clear();
       pluginManager.emitDestroy(system);
@@ -3461,12 +3495,19 @@ export function createEngine<S extends Schema>(
 
     // Merge into existing engine state
     Object.assign(mergedSchema, module.schema);
+    // Immediately after the merge, never later. A source registered by this
+    // same module attaches synchronously further down and can publish an event
+    // that writes one of these facts — so any statement between the key
+    // becoming visible and its tags being recorded is a window in which the
+    // fact exists and reads as untagged.
+    recordFactTags(module.schema as Record<string, unknown>);
     // Freeze fact/schema field _meta for new module
     for (const schemaType of Object.values(
       module.schema as Record<string, unknown>,
     )) {
       const st = schemaType as { _meta?: DefinitionMeta };
-      if (Object.isFrozen(st)) continue;
+      if (preparedSchemaTypes.has(st)) continue;
+      preparedSchemaTypes.add(st);
       if (st._meta) st._meta = freezeMeta(st._meta)!;
       if (isOwnSchemaType(st)) {
         Object.freeze(st);
@@ -3569,7 +3610,6 @@ export function createEngine<S extends Schema>(
     // The module's definitions and its schema are in place, so anything holding
     // a tag answer is now holding a stale one. Told before init and the hooks
     // run, since both can read meta.
-    recordFactTags(module.schema as Record<string, unknown>);
     notifyMetaSubscribers();
 
     // Run init within a batch
