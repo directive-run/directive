@@ -186,6 +186,12 @@ export interface PluginManager<_S extends Schema = any> {
     count: number,
     category?: string,
   ): void;
+  emitGuardrailCoverage(
+    plugin: string,
+    screenedCount: number,
+    screenedDigest: string,
+    reason: "start" | "tags-changed" | "unanswerable",
+  ): void;
 
   // Clobber loop hooks (v1.23.0)
   emitClobberLoopDetected(
@@ -428,6 +434,7 @@ export function createPluginManager<
 
     // Guardrail hooks (RFC 0010)
     emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
+    emitGuardrailCoverage: broadcast("onGuardrailCoverage"),
 
     // Clobber loop hooks (v1.23.0)
     emitClobberLoopDetected: broadcast("onClobberLoopDetected"),

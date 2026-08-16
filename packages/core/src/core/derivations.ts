@@ -618,13 +618,31 @@ export function createDerivationsManager<
     state.dependencies = newDeps;
   }
 
-  /** Notify all listeners for the given derivation ids */
+  /**
+   * Notify all listeners for the given derivation ids.
+   *
+   * Each listener is isolated, the same way the plugin manager isolates its
+   * hooks. These are `system.subscribe` / `system.watch` callbacks — consumer
+   * code — and this runs inside the store's write path, ahead of the plugin
+   * announcement. An unguarded throw would abort the write mid-flight, taking
+   * every plugin behind it with it, including a guardrail deciding whether the
+   * value just committed needs redacting. One bad subscriber is a bad
+   * subscriber, not a failed write.
+   */
   function notifyListeners(ids: string[]): void {
     for (const id of ids) {
       const fns = listeners.get(id);
-      if (fns) {
-        for (const listener of fns) {
+      if (!fns) {
+        continue;
+      }
+      for (const listener of fns) {
+        try {
           listener();
+        } catch (error) {
+          console.error("[Directive] Derivation subscriber error:", {
+            derivation: id,
+            error,
+          });
         }
       }
     }

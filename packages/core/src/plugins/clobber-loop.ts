@@ -462,7 +462,6 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
   const resolverIdToRequirementType = new Map<string, string>();
   const whenSpecCache = new Map<string, FactPredicate<unknown>>();
   const constraintByRequirementType = new Map<string, string>();
-  const piiTaggedFacts = new Set<string>();
   const factTagsCache = new Map<string, readonly string[]>();
   const resolverModuleCache = new Map<string, string>();
   // Global emission rate limit — token bucket reset every second.
@@ -485,7 +484,7 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
             redactWhenSpec(
               c.whenSpec,
               capturePII,
-              piiTaggedFacts,
+              carriesPII,
             ) as FactPredicate<unknown>,
           );
         }
@@ -536,15 +535,22 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
     }
   }
 
-  function refreshPIITags(): void {
-    piiTaggedFacts.clear();
-    factTagsCache.clear();
-    if (!systemRef) return;
+  /**
+   * Does this path point at something tagged `pii`?
+   *
+   * Asked per lookup. The set this replaces was built when the plugin attached
+   * and refreshed only from a hook `registerModule` does not emit, so a module
+   * registered later was invisible to it. `factPath` may be dotted while tags
+   * are authored on the top-level fact, so the first segment is what carries
+   * the claim. An answer the runtime could not give is treated as tagged.
+   */
+  function carriesPII(factPath: string): boolean {
+    if (!systemRef) return false;
+    const root = factPath.split(".")[0] ?? factPath;
     try {
-      const tagged = systemRef.meta.byTag?.("pii") ?? [];
-      for (const m of tagged) piiTaggedFacts.add(m.id);
+      return systemRef.meta.carriesTag?.("fact", root, "pii") !== false;
     } catch {
-      // No meta accessor — skip.
+      return true;
     }
   }
 
@@ -598,12 +604,15 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
       participantSet.has(r.resolverId),
     );
     const firstAt = rejections[0]?.timestamp ?? nowMs;
+    // `carriesPII` first, and on its own: the previous form tested it inside a
+    // `tags.some(...)` callback that ignored its own argument, so a fact with
+    // no authored tags never escalated no matter what it carried — and no
+    // authored tags is precisely the inherited case this is meant to catch.
     const tags = getFactTags(fact);
-    const severity: "warn" | "error" = tags.some(
-      (t) => piiTaggedFacts.has(fact) || t === "pii" || t === "money",
-    )
-      ? "error"
-      : "warn";
+    const severity: "warn" | "error" =
+      carriesPII(fact) || tags.includes("pii") || tags.includes("money")
+        ? "error"
+        : "warn";
 
     const overlap = buildOverlapForParticipants(sortedParticipants);
 
@@ -785,7 +794,6 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
     onInit(system) {
       systemRef = system;
       secondWindowStart = Date.now();
-      refreshPIITags();
       refreshWhenSpecCache();
     },
     onDestroy() {
@@ -795,14 +803,12 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
       constraintByRequirementType.clear();
       resolverIdToRequirementType.clear();
       resolverModuleCache.clear();
-      piiTaggedFacts.clear();
       factTagsCache.clear();
       emissionsThisSecond = 0;
       suppressedSinceLastEmit = 0;
     },
     onDefinitionRegister(_kind, _id) {
       refreshWhenSpecCache();
-      refreshPIITags();
     },
     onDefinitionAssign(_kind, _id) {
       refreshWhenSpecCache();

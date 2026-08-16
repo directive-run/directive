@@ -923,7 +923,6 @@
   ```ts
   function createEvalSuite(config: EvalSuiteConfig): EvalSuite
   ```
-- `createFactPIIGuardrail` — Create a Directive plugin that scans pii-tagged fact writes for PII and
 - `createHealthMonitor` — Create a health monitor that tracks per-agent metrics.
   ```ts
   function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMonitor

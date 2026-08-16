@@ -295,16 +295,25 @@ derive: { domain: (facts) => facts.email.split("@")[1] },
 
 ```typescript
 system.meta.byTag("pii");
-// [ { type: "fact", id: "email", ... },
-//   { type: "derivation", id: "domain", ..., via: "inherited" } ]
+// [ { kind: "fact", id: "email", ..., tagOrigin: "authored" },
+//   { kind: "derivation", id: "domain", ..., tagOrigin: "inherited" } ]
 
 system.meta.derivation("domain")?.inheritedTags; // ["pii"]
+
+// For one definition, ask directly — O(1) for a fact, no walk.
+system.meta.carriesTag("fact", "email", "pii"); // true
 ```
 
-`via: "inherited"` separates a claim someone wrote from one the graph inferred,
-so a redactor or an audit filter can act on both and still tell them apart.
+`tagOrigin` separates a claim someone wrote from one the graph inferred, so a
+redactor or an audit filter can act on both and still tell them apart. It is
+always present, so you never have to read meaning into a missing field.
 Inheritance is transitive: a derivation reading a derivation reading a tagged
 fact inherits too.
+
+`carriesTag` returns `boolean | undefined`, and the third state is deliberate:
+`undefined` means the runtime could not answer. Treating that as "nothing to
+redact" is the failure this whole surface exists to prevent, so default it to
+the safe side.
 
 ### Saying where the claim stops
 
@@ -315,15 +324,20 @@ bucket, a count, a redaction. Say so:
 derive: {
   bucket: {
     compute: (facts) => hash(facts.email) % 16,
-    meta: { inheritsTags: false },
+    meta: { tagBoundary: true },
   },
 },
 ```
 
-That is a statement about the value, so it holds downstream too: a derivation
-reading `bucket` is not walked through to `bucket`'s inputs. It is a separate
-key rather than an empty `tags: []` so a derivation can be sanitized *and*
-tagged something unrelated at the same time.
+The boundary holds downstream too: a derivation reading `bucket` is not walked
+through to `bucket`'s inputs. It is a separate key rather than an empty
+`tags: []` so a derivation can be a boundary *and* tagged something unrelated at
+the same time.
+
+`tagBoundary` stops tag propagation and nothing else. The runtime does not
+inspect the value and cannot tell whether the claim really stopped holding — it
+takes your word for it. Named for the mechanism for exactly that reason: a name
+promising the value was scrubbed would be a guarantee nothing here makes.
 
 ### What it can and cannot tell you
 

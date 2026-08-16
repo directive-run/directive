@@ -388,9 +388,19 @@ export interface FactPIIGuardrailOptions {
 
 interface MetaCapableSystem {
   meta?: {
-    byTag?: (tag: string) => Array<{ type?: string; id?: string }>;
-    /** Added in core 1.28. Absent on older cores, which is handled below. */
-    revision?: () => number;
+    /**
+     * Asked on every write to a fact this guardrail might screen.
+     *
+     * `undefined` means the runtime could not answer, which is deliberately not
+     * `false`: a guardrail that reads "I could not look" as "nothing to
+     * redact" is the failure this plugin exists to prevent. It screens.
+     */
+    carriesTag?: (kind: string, id: string, tag: string) => boolean | undefined;
+    subscribe?: (
+      tags: readonly string[],
+      listener: () => void,
+      options?: { immediate?: boolean },
+    ) => () => void;
   };
   facts?: {
     $store?: {
@@ -398,6 +408,12 @@ interface MetaCapableSystem {
     };
   };
   notify?: {
+    guardrailCoverage?: (
+      plugin: string,
+      screenedCount: number,
+      screenedDigest: string,
+      reason: "start" | "tags-changed" | "unanswerable",
+    ) => void;
     guardrailBlocked?: (
       plugin: string,
       key: string,
@@ -408,15 +424,6 @@ interface MetaCapableSystem {
   };
 }
 
-/**
- * Create a Directive plugin that scans pii-tagged fact writes for PII and
- * redacts or rejects them at the manager boundary.
- *
- * Wire it once at `createSystem({ plugins: [...] })`. The plugin caches
- * the pii-tagged key set on `onInit` so per-write hooks are O(1) lookups.
- *
- * @returns a `Plugin` instance ready to add to `SystemConfig.plugins`.
- */
 /** Returned when nothing scannable could be recovered from a value. */
 const UNSALVAGEABLE = Symbol("unsalvageable");
 
@@ -487,6 +494,20 @@ function salvageForScan(
   return kept > 0 ? out : UNSALVAGEABLE;
 }
 
+/**
+ * Create a Directive plugin that scans pii-tagged fact writes for PII and
+ * redacts or rejects them at the manager boundary.
+ *
+ * Wire it once at `createSystem({ plugins: [...] })`. Every write asks
+ * `meta.carriesTag("fact", key, "pii")`, which is O(1) and cannot go stale —
+ * there is no cached key set, so a module registered later is covered and a
+ * failed lookup has nothing to leave empty.
+ *
+ * Screening is not decided by where this sits in the plugin list: facts that
+ * arrive through `initialFacts` or hydration are swept once at start.
+ *
+ * @returns a `Plugin` instance ready to add to `SystemConfig.plugins`.
+ */
 export function createFactPIIGuardrail(
   options: FactPIIGuardrailOptions = {},
 ): Plugin {
@@ -528,114 +549,98 @@ export function createFactPIIGuardrail(
   // reported via `console.warn` so consumers see the truncation
   // rather than a silent miss.
   const MAX_ARRAY_SCAN = 10_000;
-  let initialized = false;
   let systemRef: System | null = null;
-  // The meta revision the screened set was built against. `null` means it has
-  // never been built, or was built against a core too old to report one.
-  let screenedAtRevision: number | null = null;
+  let unsubscribeMeta: (() => void) | null = null;
 
   /**
-   * Rebuild the screened set from the system's pii-tagged facts.
+   * Should a write to this key be screened?
    *
-   * Built once on init and never again, until this. A module registered after
-   * the plugin started brings its own facts, and a pii tag on one of them was
-   * simply never read — the write then took the same early return as an
-   * untagged key, so the value reached the agent prompt unscreened and nothing
-   * was reported, because a key missing from the set and a key that scanned
-   * clean leave exactly the same trace.
+   * There is no cache. There used to be: the pii-tagged key set was built once
+   * at init, so a module registered later brought facts the screen never
+   * learned about, and a write to one took the same early return an untagged
+   * key takes — unscreened, unreported, because "not in the set" and "scanned
+   * and clean" leave exactly the same trace. Two releases were spent repairing
+   * that cache before noticing it never needed to exist.
    *
-   * Cheap to keep current: the walk behind `byTag` is only paid when the
-   * revision has actually moved.
+   * A fact's tags are fixed at registration and the runtime keeps its own copy,
+   * so this is a map lookup that cannot go stale. `includeKeys` and
+   * `excludeKeys` are constructor arguments and need no cache either.
+   *
+   * The `undefined` case is the one that matters. It means the runtime could
+   * not answer, and a guardrail that reads that as "nothing to redact" is the
+   * bug this plugin exists to prevent — so it screens, and says so once.
    */
-  function syncScreenedKeys(system: System): void {
-    const meta = (system as unknown as MetaCapableSystem).meta;
-    const revision = meta?.revision?.();
+  function shouldScreen(key: string): boolean {
+    if (excludedSet.has(key)) {
+      return false;
+    }
+    if (screenedKeys.has(key)) {
+      return true;
+    }
 
-    if (
-      initialized &&
-      typeof revision === "number" &&
-      revision === screenedAtRevision
-    ) {
+    const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
+    const answer = meta?.carriesTag?.("fact", key, "pii");
+
+    if (answer === undefined) {
+      if (!warnedUnanswerable.has(key)) {
+        warnedUnanswerable.add(key);
+        console.warn(
+          "[Directive] fact-pii: could not determine whether a fact carries the pii tag, so it is being screened",
+          { key },
+        );
+      }
+
+      return true;
+    }
+
+    return answer;
+  }
+
+  const warnedUnanswerable = new Set<string>();
+
+  /**
+   * Say what is being covered, so that covering nothing is distinguishable
+   * from having nothing to report.
+   *
+   * `onBlocked` and `guardrail.blocked` both fire on a match, so a screen that
+   * has stopped working and a screen with a clean stream of writes produce the
+   * same evidence: silence. This fires on start and whenever the tag answers
+   * can have moved.
+   *
+   * The digest is of the key names, not the names — which facts a system holds
+   * under a `pii` tag is part of what is being protected.
+   */
+  function reportCoverage(
+    reason: "start" | "tags-changed" | "unanswerable",
+  ): void {
+    const sys = systemRef as unknown as MetaCapableSystem | null;
+    if (!sys?.notify?.guardrailCoverage) {
       return;
     }
 
-    systemRef = system;
-
-    // Built to the side, then swapped in — never edited in place.
-    //
-    // The first version of this cleared the live set and advanced the revision
-    // marker before asking which keys to screen. One throw from that question,
-    // and plugin callbacks swallow throws, left the screen holding nothing with
-    // the marker already moved — so every later write took the early return
-    // above and the screen never rebuilt. A transient fault became permanent,
-    // silent exposure: strictly worse than the staleness it replaced, which at
-    // least only missed modules registered later.
-    //
-    // Nothing below touches `screenedKeys` or `screenedAtRevision` until the
-    // rebuild has finished, so a failure leaves the previous screen in place
-    // with the marker unmoved, and the next write tries again.
-    const rebuilt = new Set<string>();
-    // `includeKeys` is caller-supplied and survives every rebuild.
-    for (const key of includeKeys) {
-      rebuilt.add(key);
+    const covered: string[] = [];
+    for (const key of Object.keys(
+      (systemRef as unknown as { facts?: object } | null)?.facts ?? {},
+    )) {
+      if (shouldScreen(key)) {
+        covered.push(key);
+      }
     }
+    covered.sort();
 
-    let piiTagged: Array<{ type?: string; id?: string }> | undefined;
-    try {
-      piiTagged = meta?.byTag?.("pii");
-    } catch (error) {
-      // Keep screening with whatever is already in place, and say so. A screen
-      // running on a stale key set is a different posture from one running on a
-      // current set, and the two must not leave the same trace.
-      console.warn(
-        "[Directive] fact-pii: could not refresh the screened keys",
-        {
-          plugin: "fact-pii-guardrail",
-          error,
-        },
-      );
-
-      return;
-    }
-
-    // An answer that never arrived is not an answer of "nothing is tagged".
-    //
-    // `byTag` returning nothing while the method exists means the lookup did
-    // not answer. Treating that as an empty tag set empties the screen and
-    // advances the marker, which latches exactly as a throw did — the failure
-    // this whole rebuild was restructured to prevent, surviving in the path
-    // that does not throw. An empty *array* is different and is honoured: it
-    // genuinely means nothing carries the tag.
-    if (meta?.byTag && !piiTagged) {
-      console.warn(
-        "[Directive] fact-pii: the screened-key lookup returned nothing",
-        {
-          plugin: "fact-pii-guardrail",
-        },
-      );
-
-      return;
-    }
-
-    if (piiTagged) {
-      for (const entry of piiTagged) {
-        // MetaMatch shape: { type: "fact" | "module" | "event" | ..., id: string, meta }.
-        // We screen FACT-typed matches only — agent prompts read facts, not
-        // event / constraint / derivation metadata.
-        if (entry.type !== "fact") continue;
-        if (entry.id && !excludedSet.has(entry.id)) {
-          rebuilt.add(entry.id);
-        }
+    let hash = 5381;
+    for (const key of covered) {
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) + hash + key.charCodeAt(i)) >>> 0;
       }
     }
 
-    // Swap, then mark. Both only on the success path.
-    screenedKeys.clear();
-    for (const key of rebuilt) {
-      screenedKeys.add(key);
-    }
-    initialized = true;
-    screenedAtRevision = typeof revision === "number" ? revision : null;
+    sys.notify.guardrailCoverage(
+      "fact-pii-guardrail",
+      covered.length,
+      hash.toString(16),
+      reason,
+    );
   }
 
   /**
@@ -959,17 +964,74 @@ export function createFactPIIGuardrail(
     name: "fact-pii-guardrail",
 
     onInit(system) {
-      syncScreenedKeys(system);
+      // Only a backstop. `systemRef` is set when the plugin is constructed, so
+      // the screen works from the first write regardless of where this plugin
+      // sits in the list — `onInit` is awaited per plugin, and anything after
+      // the first runs a microtask late, by which point `start()` has already
+      // applied hydrated and initial facts.
+      systemRef ??= system;
+    },
+
+    /**
+     * Sweep what was already there.
+     *
+     * `onInit` is awaited per plugin, so only the first plugin's runs before
+     * `createSystem` returns; every plugin after it resumes a microtask later.
+     * By then `start()` has synchronously applied `initialFacts` and any
+     * hydrated state, and those writes went out to a guardrail that had no
+     * system reference yet — so where this plugin sat in the list decided
+     * whether a hydrated customer record was screened.
+     *
+     * This runs after the facts land and before anything reads them, and it
+     * asks the same question the per-write path asks. Bounded: one pass over
+     * the keys the system already holds.
+     */
+    onStart(system) {
+      systemRef ??= system;
+      const facts = (systemRef as unknown as MetaCapableSystem | null)?.facts;
+      const store = facts?.$store;
+      if (!store?.set) {
+        return;
+      }
+
+      for (const key of Object.keys(system.facts as object)) {
+        if (!shouldScreen(key)) {
+          continue;
+        }
+        const value = (system.facts as Record<string, unknown>)[key];
+        const result = inspect(value);
+        if (!result.matched || result.redacted === value) {
+          continue;
+        }
+        onBlocked?.(key, result.detected, mode);
+        if (mode === "alert") {
+          continue;
+        }
+        try {
+          store.set(key, result.redacted);
+        } catch {
+          // Same posture as the per-write path: `onBlocked` already fired, so
+          // the consumer knows a detection happened even if the write did not
+          // land.
+        }
+      }
+
+      reportCoverage("start");
+      const meta = (systemRef as unknown as MetaCapableSystem | null)?.meta;
+      if (meta?.subscribe) {
+        unsubscribeMeta = meta.subscribe(["pii"], () => {
+          reportCoverage("tags-changed");
+        });
+      }
+    },
+
+    onDestroy() {
+      unsubscribeMeta?.();
+      unsubscribeMeta = null;
     },
 
     onFactSet(key, value, _prev) {
-      if (!initialized) return;
-      // Cheap: an integer compare unless a module has registered since the last
-      // write. Without it the screened set is whatever the system happened to
-      // hold at init, and a later module's tagged facts are indistinguishable
-      // from untagged ones on the line below.
-      if (systemRef) syncScreenedKeys(systemRef);
-      if (!screenedKeys.has(key)) return;
+      if (!shouldScreen(key)) return;
       // Idempotent skip — primitives only. For object
       // references, `value === _prev` is true when a source mutates
       // a held reference in place and re-publishes; skipping there
@@ -1040,11 +1102,9 @@ export function createFactPIIGuardrail(
     },
 
     onFactsBatch(changes) {
-      if (!initialized) return;
-      if (systemRef) syncScreenedKeys(systemRef);
       for (const change of changes) {
         if (change.type !== "set") continue;
-        if (!screenedKeys.has(change.key)) continue;
+        if (!shouldScreen(change.key)) continue;
         // Primitives-only idempotency gate ; see onFactSet.
         const prev = (change as { prev?: unknown }).prev;
         if (

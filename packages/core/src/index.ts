@@ -55,6 +55,8 @@ export type {
   SystemConfig,
   SystemInspection,
   SystemSnapshot,
+  DefinitionKind,
+  DynamicDefinitionKind,
   MetaAccessor,
   MetaMatch,
   ObservationEvent,

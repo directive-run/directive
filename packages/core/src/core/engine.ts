@@ -49,6 +49,7 @@ import {
 } from "./tracking.js";
 import type {
   ConstraintsDef,
+  DefinitionKind,
   DerivationsDef,
   EffectsDef,
   EventsDef,
@@ -351,10 +352,22 @@ export function createEngine<S extends Schema>(
     const d = def as { meta?: DefinitionMeta };
     if (d.meta) d.meta = freezeMeta(d.meta)!;
   }
-  // Freeze fact/schema field _meta
+  // Freeze fact/schema field _meta, and the schema type holding it.
+  //
+  // Freezing only the meta object left the claim removable: the schema type is
+  // the same reference the module object holds, so `module.schema.facts.email
+  // ._meta = {}` untagged a live fact. Nothing noticed, because every consumer
+  // cached the tagged-key set at startup and the untag arrived too late to
+  // matter. Reading tags per write is the right design and makes that live, so
+  // the door closes here.
   for (const schemaType of Object.values(mergedSchema)) {
     const st = schemaType as { _meta?: DefinitionMeta };
+    // Idempotent: a module object can be handed to more than one system, and
+    // the first one to see it does the freezing. A second pass would try to
+    // reassign `_meta` on a frozen object.
+    if (Object.isFrozen(st)) continue;
     if (st._meta) st._meta = freezeMeta(st._meta)!;
+    Object.freeze(st);
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -529,9 +542,25 @@ export function createEngine<S extends Schema>(
   const { store, facts } = createFacts<S>({
     schema: mergedSchema,
     onChange: (key, value, prev) => {
-      pluginManager.emitFactSet(key, value, prev);
-      // Invalidate derivations so they recompute on read
-      invalidateDerivation(key);
+      // Invalidate BEFORE announcing, so a plugin asking what a value carries
+      // is told about the write it is being notified of. The batched path
+      // already worked this way — `onWrite` invalidates at write time and the
+      // announcement waits for `onBatch` — so the two paths disagreed: a
+      // redactor got the right answer inside `system.batch()` and an answer
+      // one write stale outside it.
+      //
+      // Held across the announcement because invalidating flushes derivation
+      // listeners, which are `system.subscribe` / `system.watch` callbacks —
+      // consumer code. Without the hold they would run between the commit and
+      // the plugins, and a throw from one would skip `emitFactSet` entirely,
+      // taking the guardrail with it.
+      const release = holdDerivationNotifications();
+      try {
+        invalidateDerivation(key);
+        pluginManager.emitFactSet(key, value, prev);
+      } finally {
+        release();
+      }
       // Track fact changes for trace
       if (traceEnabled) {
         traceManager.recordFactChange(String(key), prev, value);
@@ -1071,6 +1100,7 @@ export function createEngine<S extends Schema>(
     getState: () => state,
     scheduleReconcile,
     maxDeferredRegistrations: MAX_DEFERRED_REGISTRATIONS,
+    onDefinitionsChanged: () => notifyMetaSubscribers(),
   });
 
   /** Schedule a reconciliation on the next microtask */
@@ -1533,7 +1563,7 @@ export function createEngine<S extends Schema>(
     const authored = derivationsManager.getMeta(
       id as keyof DerivationsDef<S>,
     ) as DefinitionMeta | undefined;
-    if (authored?.inheritsTags === false) {
+    if (authored?.tagBoundary === true) {
       return [];
     }
 
@@ -1561,7 +1591,7 @@ export function createEngine<S extends Schema>(
         const upstreamMeta = derivationsManager.getMeta(
           upstream as keyof DerivationsDef<S>,
         ) as DefinitionMeta | undefined;
-        if (upstreamMeta?.inheritsTags === false) {
+        if (upstreamMeta?.tagBoundary === true) {
           continue;
         }
         queue.push(upstream);
@@ -1577,49 +1607,95 @@ export function createEngine<S extends Schema>(
   }
 
   /**
-   * Bumped whenever the set `collectAllMeta` walks can have changed.
+   * The runtime's own copy of every fact's tags, built at registration.
+   *
+   * `carriesTag("fact", …)` is asked on every write by anything that redacts,
+   * so it reads from here rather than from the schema object — which a consumer
+   * holds a reference to. Tags decide what gets redacted; the answer should not
+   * come from somewhere the answer can be edited.
+   */
+  const factTagSets = new Map<string, ReadonlySet<string>>();
+
+  function recordFactTags(schema: Record<string, unknown>): void {
+    for (const key of Object.keys(schema)) {
+      const meta = (schema[key] as { _meta?: DefinitionMeta })?._meta;
+      const tags = meta?.tags;
+      if (tags && tags.length > 0) {
+        factTagSets.set(key, new Set(tags));
+      }
+    }
+  }
+
+  recordFactTags(mergedSchema as Record<string, unknown>);
+
+  /**
+   * Told whenever the set `collectAllMeta` walks can have changed.
    *
    * Answering `byTag` means walking every definition in the system, which is
-   * why anything consulting it on a hot path caches the answer. Those caches
-   * had no way to learn they had gone stale short of re-walking — so they were
-   * built once and kept forever, and a fact registered by a later module was
-   * simply never in them. A guardrail screening tagged facts stopped screening
-   * the ones that arrived after it started, and reported nothing, because
-   * "not in the set" and "clean" are the same answer.
+   * why anything consulting it on a hot path used to cache the answer. Those
+   * caches had no way to learn they had gone stale short of re-walking — so
+   * they were built once and kept forever, and a fact registered by a later
+   * module was simply never in them. A guardrail screening tagged facts stopped
+   * screening the ones that arrived after it started, and reported nothing,
+   * because "not in the set" and "clean" are the same answer.
    *
-   * An integer they can compare per read costs nothing and makes the staleness
-   * observable.
+   * Pushing the signal instead of publishing a number to poll removes the whole
+   * shape: there is no marker to advance early, and no cache to leave empty.
    */
-  let metaRevision = 0;
+  const metaSubscribers = new Set<() => void>();
 
-  /** Collect all definitions with meta across all types (for byCategory/byTag). */
+  function notifyMetaSubscribers(): void {
+    for (const listener of metaSubscribers) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("[Directive] Metadata subscriber error:", { error });
+      }
+    }
+  }
+
+  /** Collect all definitions with meta across all types (for byTag). */
   function collectAllMeta(): MetaMatch[] {
     const results: MetaMatch[] = [];
     for (const [id, meta] of moduleMeta) {
-      results.push({ type: "module", id, meta });
+      results.push({ kind: "module", id, meta, tagOrigin: "authored" });
     }
     for (const key of Object.keys(mergedSchema)) {
       const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })
         ?._meta;
-      if (meta) results.push({ type: "fact", id: key, meta });
+      if (meta)
+        results.push({ kind: "fact", id: key, meta, tagOrigin: "authored" });
     }
     for (const [name, meta] of eventMeta) {
-      results.push({ type: "event", id: name, meta });
+      results.push({ kind: "event", id: name, meta, tagOrigin: "authored" });
     }
     for (const [id, def] of Object.entries(mergedConstraints)) {
-      if (def.meta) results.push({ type: "constraint", id, meta: def.meta });
+      if (def.meta)
+        results.push({
+          kind: "constraint",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedResolvers)) {
-      if (def.meta) results.push({ type: "resolver", id, meta: def.meta });
+      if (def.meta)
+        results.push({
+          kind: "resolver",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedEffects)) {
       const meta = (def as { meta?: DefinitionMeta }).meta;
-      if (meta) results.push({ type: "effect", id, meta });
+      if (meta)
+        results.push({ kind: "effect", id, meta, tagOrigin: "authored" });
     }
     for (const id of Object.keys(mergedDerive)) {
       const meta = derivationsManager.getMeta(id as keyof DerivationsDef<S>);
       if (meta) {
-        results.push({ type: "derivation", id, meta });
+        results.push({ kind: "derivation", id, meta, tagOrigin: "authored" });
       }
       // A derivation with no authored meta at all still carries whatever its
       // inputs are tagged with — that case is the whole point, since nobody
@@ -1627,12 +1703,12 @@ export function createEngine<S extends Schema>(
       const inherited = inheritedTagsFor(id);
       if (inherited.length > 0) {
         results.push({
-          type: "derivation",
+          kind: "derivation",
           id,
           meta: Object.freeze(
             Object.assign(Object.create(null), meta, { tags: inherited }),
           ),
-          via: "inherited",
+          tagOrigin: "inherited",
         });
       }
     }
@@ -1753,14 +1829,108 @@ export function createEngine<S extends Schema>(
           }),
         );
       },
-      byCategory(category: string): MetaMatch[] {
-        return collectAllMeta().filter((m) => m.meta.category === category);
+      byTag(tag: string, options?: { kind?: DefinitionKind }): MetaMatch[] {
+        const wanted = options?.kind;
+
+        return collectAllMeta().filter(
+          (m) =>
+            (wanted === undefined || m.kind === wanted) &&
+            m.meta.tags?.includes(tag),
+        );
       },
-      byTag(tag: string): MetaMatch[] {
-        return collectAllMeta().filter((m) => m.meta.tags?.includes(tag));
+      carriesTag(
+        kind: DefinitionKind,
+        id: string,
+        tag: string,
+      ): boolean | undefined {
+        // Facts are the hot-path case: asked on every write by anything that
+        // redacts. Answered from the runtime's own copy, so it costs a map
+        // lookup and cannot be edited from outside.
+        if (kind === "fact") {
+          if (!Object.hasOwn(mergedSchema, id)) {
+            return undefined;
+          }
+
+          return factTagSets.get(id)?.has(tag) ?? false;
+        }
+
+        if (kind === "derivation") {
+          if (!Object.hasOwn(mergedDerive, id)) {
+            return undefined;
+          }
+          const authored = derivationsManager.getMeta(
+            id as keyof DerivationsDef<S>,
+          );
+          if (authored?.tags?.includes(tag)) {
+            return true;
+          }
+          // Walking a derivation means running it, and a body that throws must
+          // not decide what gets redacted. "Could not answer" is a third state
+          // for exactly this.
+          try {
+            return inheritedTagsFor(id).includes(tag);
+          } catch {
+            return undefined;
+          }
+        }
+
+        // A switch rather than an object lookup: `kind` reaching
+        // `Object.prototype` through a literal would answer for the wrong thing.
+        switch (kind) {
+          case "module":
+            return moduleMeta.has(id)
+              ? (moduleMeta.get(id)?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "event":
+            return eventMeta.has(id)
+              ? (eventMeta.get(id)?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "constraint":
+            return Object.hasOwn(mergedConstraints, id)
+              ? (mergedConstraints[id]?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "resolver":
+            return Object.hasOwn(mergedResolvers, id)
+              ? (mergedResolvers[id]?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "effect":
+            return Object.hasOwn(mergedEffects, id)
+              ? ((
+                  mergedEffects[id] as { meta?: DefinitionMeta } | undefined
+                )?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          default:
+            return undefined;
+        }
       },
-      revision(): number {
-        return metaRevision;
+      subscribe(
+        tagsOrListener: readonly string[] | (() => void),
+        listenerOrOptions?: (() => void) | { immediate?: boolean },
+        maybeOptions?: { immediate?: boolean },
+      ): () => void {
+        const listener =
+          typeof tagsOrListener === "function"
+            ? tagsOrListener
+            : (listenerOrOptions as () => void);
+        const options =
+          typeof tagsOrListener === "function"
+            ? (listenerOrOptions as { immediate?: boolean } | undefined)
+            : maybeOptions;
+
+        // The tag list narrows nothing today — every metadata change can move
+        // any tag's answer, and waking a listener that did not need it is the
+        // correct direction to be wrong in. It is accepted so consumers can say
+        // what they hold, and so this can narrow later without a signature
+        // change.
+        metaSubscribers.add(listener);
+
+        if (options?.immediate) {
+          listener();
+        }
+
+        return () => {
+          metaSubscribers.delete(listener);
+        };
       },
     },
 
@@ -1820,6 +1990,21 @@ export function createEngine<S extends Schema>(
         } finally {
           guardrailNotifyDepth -= 1;
         }
+      },
+      guardrailCoverage(
+        plugin: string,
+        screenedCount: number,
+        screenedDigest: string,
+        reason: "start" | "tags-changed" | "unanswerable",
+      ): void {
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        pluginManager.emitGuardrailCoverage(
+          plugin,
+          screenedCount,
+          screenedDigest,
+          reason,
+        );
       },
       clobberLoopDetected(event): void {
         if (state.isDestroyed) return;
@@ -2008,6 +2193,19 @@ export function createEngine<S extends Schema>(
             kind,
             count,
             ...(category !== undefined ? { category } : {}),
+          }),
+        onGuardrailCoverage: (
+          plugin: string,
+          screenedCount: number,
+          screenedDigest: string,
+          reason: "start" | "tags-changed" | "unanswerable",
+        ) =>
+          observer({
+            type: "guardrail.coverage",
+            plugin,
+            screenedCount,
+            screenedDigest,
+            reason,
           }),
         onClobberLoopDetected: (
           event: import("./types/system.js").ObservationEvent & {
@@ -3231,7 +3429,9 @@ export function createEngine<S extends Schema>(
       module.schema as Record<string, unknown>,
     )) {
       const st = schemaType as { _meta?: DefinitionMeta };
+      if (Object.isFrozen(st)) continue;
       if (st._meta) st._meta = freezeMeta(st._meta)!;
+      Object.freeze(st);
     }
     if (module.events) {
       unwrapEventDefinitions(
@@ -3327,10 +3527,11 @@ export function createEngine<S extends Schema>(
     // Track the new module in config.modules for hooks
     config.modules.push(module as (typeof config.modules)[number]);
 
-    // The module's definitions and its schema are in place, so anything caching
-    // a `byTag` / `byCategory` answer is now looking at a stale one. Bumped
-    // before init and the hooks run, since both can read meta.
-    metaRevision++;
+    // The module's definitions and its schema are in place, so anything holding
+    // a tag answer is now holding a stale one. Told before init and the hooks
+    // run, since both can read meta.
+    recordFactTags(module.schema as Record<string, unknown>);
+    notifyMetaSubscribers();
 
     // Run init within a batch
     if (module.init) {
