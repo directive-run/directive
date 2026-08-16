@@ -126,7 +126,6 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   const whenSourceCache = new Map<string, string>();
 
   /** Cache of PII-tagged fact paths. */
-  const piiTaggedFacts = new Set<string>();
 
   function refreshWhenSpecCache(): void {
     whenSpecCache.clear();
@@ -165,7 +164,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
             redactWhenSpec(
               c.whenSpec,
               capturePII,
-              piiTaggedFacts,
+              carriesPII,
             ) as FactPredicate<unknown>,
           );
         } else {
@@ -195,26 +194,48 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     }
   }
 
-  function refreshPIITags(): void {
-    piiTaggedFacts.clear();
-    if (capturePII || !system) return;
-    try {
-      const meta = (
-        system as { meta?: { byTag?: (tag: string) => Array<{ id: string }> } }
-      ).meta;
-      if (!meta || typeof meta.byTag !== "function") return;
-      const tagged = meta.byTag("pii") ?? [];
-      for (const m of tagged) {
-        piiTaggedFacts.add(m.id);
+  /**
+   * Does this path point at something tagged `pii`?
+   *
+   * Asked per lookup rather than cached. The cache it replaces was built when
+   * the ledger attached and refreshed only from a hook `registerModule` does
+   * not emit, so a module registered later put raw values into a hash-chained
+   * sink that cannot be edited afterwards. It also cleared itself before asking
+   * what to refill with, so one throw emptied it for good.
+   *
+   * `factPath` may be dotted — a clause path like `user.email` — while tags are
+   * authored on the top-level fact. The first segment is what carries the
+   * claim.
+   *
+   * Fails toward redaction. An answer the runtime could not give is not an
+   * answer of "nothing to hide", and this sink is permanent.
+   */
+  function carriesPII(factPath: string): boolean {
+    if (capturePII || !system) return false;
+    const meta = (
+      system as {
+        meta?: {
+          carriesTag?: (
+            kind: string,
+            id: string,
+            tag: string,
+          ) => boolean | undefined;
+        };
       }
+    ).meta;
+    if (!meta || typeof meta.carriesTag !== "function") return false;
+
+    const root = factPath.split(".")[0] ?? factPath;
+    try {
+      return meta.carriesTag("fact", root, "pii") !== false;
     } catch {
-      // No meta accessor — skip.
+      return true;
     }
   }
 
   function redactValue(factPath: string, value: unknown): unknown {
     if (capturePII) return value;
-    if (piiTaggedFacts.has(factPath)) return "[redacted]";
+    if (carriesPII(factPath)) return "[redacted]";
 
     return value;
   }
@@ -223,10 +244,10 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     clauses: ClauseResult[] | undefined,
   ): ClauseResult[] | undefined {
     if (!clauses) return clauses;
-    if (capturePII || piiTaggedFacts.size === 0) return clauses;
+    if (capturePII) return clauses;
     let mutated = false;
     const out: ClauseResult[] = clauses.map((c) => {
-      if (piiTaggedFacts.has(c.path)) {
+      if (carriesPII(c.path)) {
         mutated = true;
         return { ...c, actual: "[redacted]" };
       }
@@ -430,7 +451,6 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
 
   function attach(sys: System<ModuleSchema>): void {
     system = sys;
-    refreshPIITags();
     refreshWhenSpecCache();
     unobserve = sys.observe(onEvent);
     // Wire up the truncation marker — fires BEFORE the sink drops the
@@ -460,7 +480,6 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     system = null;
     whenSpecCache.clear();
     whenSourceCache.clear();
-    piiTaggedFacts.clear();
   }
 
   const plugin: Plugin<ModuleSchema> = {
@@ -480,12 +499,9 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       detach();
     },
     onDefinitionRegister(type, id) {
+      // No PII refresh: the tag question is asked per lookup now, so there is
+      // nothing held that could have gone stale.
       if (type === "constraint") refreshWhenSpecCache();
-      if (type === "constraint" || type === "resolver" || type === "effect") {
-        // Re-pull PII tags too — a dynamically-registered fact (rare)
-        // could have brought new meta.
-        refreshPIITags();
-      }
       void id;
     },
     onDefinitionAssign(type, id) {
