@@ -156,6 +156,8 @@ export type {
   // Accessors
   DeriveAccessor,
   EventsAccessor,
+  DefinitionKind,
+  DynamicDefinitionKind,
   MetaAccessor,
   MetaMatch,
   ObservationEvent,

@@ -56,7 +56,7 @@ function probe(seen: Map<string, string[]>): Plugin {
       key,
       system.meta
         .byTag("pii")
-        .map((m: { type: string; id: string }) => `${m.type}:${m.id}`)
+        .map((m: { kind: string; id: string }) => `${m.kind}:${m.id}`)
         .sort(),
     );
   }

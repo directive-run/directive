@@ -50,7 +50,7 @@ describe("a fact's tags cannot be taken back", () => {
 
     const schemaType = (
       module.schema as unknown as { facts: Record<string, { _meta?: unknown }> }
-    ).facts.email;
+    ).facts.email as { _meta?: unknown };
 
     // Frozen, so the assignment is a no-op in sloppy mode and a TypeError in
     // strict. Either way the tag survives; the assertion is on the outcome.

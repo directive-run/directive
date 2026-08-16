@@ -43,8 +43,8 @@ function moduleWithDerivations() {
     },
     derive: {
       a: (facts) => facts.n + 1,
-      b: (facts, derived) => derived.a + 1,
-      c: (facts, derived) => derived.b + 1,
+      b: (_facts, derived) => derived.a + 1,
+      c: (_facts, derived) => derived.b + 1,
       domain: (facts) => facts.email,
     },
   });

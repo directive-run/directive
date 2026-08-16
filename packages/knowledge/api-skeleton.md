@@ -402,15 +402,23 @@
   ```ts
   export interface HistoryState {
   ```
+- `DefinitionKind` — The seven things a system holds metadata for.
+  ```ts
+  export type DefinitionKind
+  ```
+- `DynamicDefinitionKind` — The four kinds register/assign/unregister/call operate on.
+  ```ts
+  export type DynamicDefinitionKind
+  ```
 - `LeafClause` — A leaf clause extracted from a predicate tree, keyed by its dotted path.
   ```ts
   export interface LeafClause {
   ```
-- `MetaAccessor` — O(1) accessor for definition metadata.
+- `MetaAccessor` — Metadata lookups, tag queries, and change notification.
   ```ts
   export interface MetaAccessor {
   ```
-- `MetaMatch` — Result from bulk meta queries (byCategory, byTag).
+- `MetaMatch` — One definition returned by MetaAccessor.byTag.
   ```ts
   export interface MetaMatch {
   ```

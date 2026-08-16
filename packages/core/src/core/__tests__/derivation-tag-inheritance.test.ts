@@ -18,8 +18,8 @@
 import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index";
 
-function ids(matches: Array<{ type: string; id: string }>): string[] {
-  return matches.map((m) => `${m.type}:${m.id}`).sort();
+function ids(matches: Array<{ kind: string; id: string }>): string[] {
+  return matches.map((m) => `${m.kind}:${m.id}`).sort();
 }
 
 describe("tags along the derivation graph", () => {
@@ -44,7 +44,7 @@ describe("tags along the derivation graph", () => {
     ]);
     // And it says which of the two someone actually wrote.
     const derived = system.meta.byTag("pii").find((m) => m.id === "domain");
-    expect(derived?.via).toBe("inherited");
+    expect(derived?.tagOrigin).toBe("inherited");
 
     system.stop();
   });
@@ -124,7 +124,7 @@ describe("tags along the derivation graph", () => {
           bucket: {
             compute: (facts) => facts.email.length,
             // A length is not an email. Saying so stops the walk here...
-            meta: { inheritsTags: false },
+            meta: { tagBoundary: true },
           },
           // ...and for anything reading it, which is the part that matters:
           // overruling a stated boundary from downstream would make the
