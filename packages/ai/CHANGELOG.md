@@ -1,5 +1,134 @@
 # @directive-run/ai
 
+## 1.30.0
+
+### Minor Changes
+
+- [#148](https://github.com/directive-run/directive/pull/148) [`9e9445d`](https://github.com/directive-run/directive/commit/9e9445d343e134b84dd9a6b67af6daa661030905) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **BREAKING:** metadata queries ask per definition, and tell you when the answer moves.
+
+  `system.meta.byTag("pii")` decides what gets redacted before a value reaches a
+  model, a log, or a hash-chained audit ledger. Answering it walks every definition
+  in the system, so all three consumers cached the answer — and every defect this
+  area has had was a cache built once and never rebuilt.
+
+  **New:**
+
+  ```ts
+  // O(1) for a fact. `undefined` means "could not answer" — not "no tag".
+  system.meta.carriesTag("fact", key, "pii");
+
+  // Replaces the polled revision() counter. Fires for dynamic
+  // register/assign/unregister as well as module registration.
+  system.meta.subscribe(["pii"], rebuild, { immediate: true });
+
+  // Narrow the walk when you only want one kind.
+  system.meta.byTag("pii", { kind: "fact" });
+  ```
+
+  **Renamed, with no aliases:**
+
+  | Before                          | After                                                  |
+  | ------------------------------- | ------------------------------------------------------ |
+  | `MetaMatch.type`                | `kind`, typed `DefinitionKind`                         |
+  | `via?: "inherited"`             | `tagOrigin: "authored" \| "inherited"`, always present |
+  | `meta: { inheritsTags: false }` | `meta: { tagBoundary: true }`                          |
+  | `byCategory(...)`               | removed                                                |
+  | `revision()`                    | removed — use `subscribe`                              |
+
+  **Fixed along the way:**
+
+  - Plugins are now told about a write _after_ the graph is invalidated, so a
+    plugin asking what a value carries during `onFactSet` is told about the write
+    it is being notified of. The batched path already worked this way, so the two
+    disagreed with each other.
+  - A throwing `system.subscribe` / `system.watch` callback no longer aborts the
+    write it was notified of, taking every plugin behind it down.
+  - A fact's tags can no longer be taken back. Schema types are frozen,
+    `registerKeys` refuses to re-declare an existing key, and `tags` must be a
+    plain array of strings — an `Array` subclass could override `includes` and
+    answer differently on each call.
+  - The audit ledger and the clobber-loop detector refreshed their pii sets from a
+    hook `registerModule` does not emit, so a module registered after start put raw
+    values into a sink that cannot be edited afterwards. Both now ask per lookup,
+    and both resolve a dotted clause path to the fact that carries the tag.
+  - The fact-PII guardrail screens `initialFacts` and hydrated state regardless of
+    where it sits in the plugin list.
+
+  **New event:** `guardrail.coverage` reports what a guardrail covers rather than
+  what it caught, so a screen that has stopped covering anything is no longer
+  indistinguishable from one with nothing to report.
+
+  See `docs/rfcs/0011-metadata-queries.md` for the measurements and the two
+  rejected designs.
+
+### Patch Changes
+
+- [#150](https://github.com/directive-run/directive/pull/150) [`fedff2a`](https://github.com/directive-run/directive/commit/fedff2aac07e72c2f215a23dd7497a25a4df1580) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Four fixes to the metadata-query change, found by reviewing the implementation
+  rather than the plan.
+
+  **A Zod fact stopped working.** Fact tags decide what gets redacted, so the
+  schema type holding them was frozen — unconditionally. A Zod schema is a
+  supported fact type and mutates itself while validating: v3 caches its shape
+  onto the instance on first parse, v4 re-defines properties on it. Either throws
+  on a frozen object, so the first validated write to a `z.object()` fact threw
+  instead of validating. The freeze now covers only the types this package builds;
+  the tag immutability it exists for is unaffected.
+
+  **A fact key containing a dot was redacted against the wrong fact.** The audit
+  ledger and the loop detector resolve a clause path like `user.email` to the fact
+  that carries the tag, which meant taking the first segment. A key _literally_
+  named `user.email` was then looked up as `user` — so a tagged key could be
+  answered for by an untagged one, and its value went into the hash chain in the
+  clear. Both now try the exact key first and fall back to the root only when the
+  exact key is unknown.
+
+  **The coverage signal read maximum when it was blind.** `guardrail.coverage`
+  counted a key as covered whenever the guardrail would screen it — and it screens
+  when it cannot tell. A guardrail whose tag lookup was completely broken
+  therefore reported full coverage. It now counts only keys it has a definite
+  answer for, and reports `reason: "unanswerable"` when any key could not be
+  answered. That value was declared and never emitted, while two doc comments told
+  operators to watch for it.
+
+  **Metadata queries are fenced off the tracking stack.** Walking the tag graph
+  forces derivations to compute, and forcing goes through the same accessor a
+  derivation body uses. Defensive rather than demonstrated: the mechanism is plain
+  in the code and two reviews flagged it, but six attempts to observe the symptom
+  measured no dependency growth. The fence is inert if the path is unreachable.
+
+  **A fact could be tagged everywhere except where it counted.** `carriesTag`
+  answered `false` for a key present in the schema but absent from the recorded
+  tag map, which made "carries nothing" and "not recorded yet" the same answer.
+  Three ways to reach it: a module's schema became visible one statement before
+  its tags were recorded, and a source registered by that same module attaches
+  synchronously in between; a key registered through `facts.$store.registerKeys`
+  was never recorded at all; and a validation throw part-way through registration
+  left earlier keys live and unrecorded. Every fact key is recorded now, tags are
+  recorded immediately after the schema merge, and the store tells the engine
+  about keys it registers.
+
+  **A caller-frozen schema type skipped the validation the freeze exists for.**
+  `Object.isFrozen` cannot tell "we prepared this" from "the author froze it
+  first", so a pre-frozen type bypassed the `tags` check. Tracked in a `WeakSet`
+  instead.
+
+  **One bad value could disable the guardrail's startup sweep and its coverage
+  channel for the process.** The sweep, the coverage report and the metadata
+  subscription were one unguarded block, so a throwing detector or a value with
+  hostile property traps ended all three. The sweep now guards per key, and the
+  report and subscription are armed before it runs. The subscription is also
+  idempotent across `stop()`/`start()`, which previously leaked a listener and
+  duplicated every report.
+
+  **Cross-realm arrays are accepted.** `tags` was rejected unless its prototype
+  was exactly `Array.prototype`, which fails for an array from a `vm` context, a
+  worker or an iframe. The runtime copies `tags` into its own array, and that copy
+  — not the prototype check — is what defeats a subclass overriding `includes`.
+
+  **The coverage digest is delimited.** Hashing the bare concatenation gave
+  `{"a","bc"}` and `{"ab","c"}` the same digest and the same count, so a coverage
+  swap was invisible to the signal meant to catch it.
+
 ## 1.29.5
 
 ## 1.29.4
