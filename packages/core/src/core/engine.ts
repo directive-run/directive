@@ -351,10 +351,18 @@ export function createEngine<S extends Schema>(
     const d = def as { meta?: DefinitionMeta };
     if (d.meta) d.meta = freezeMeta(d.meta)!;
   }
-  // Freeze fact/schema field _meta
+  // Freeze fact/schema field _meta, and the schema type holding it.
+  //
+  // Freezing only the meta object left the claim removable: the schema type is
+  // the same reference the module object holds, so `module.schema.facts.email
+  // ._meta = {}` untagged a live fact. Nothing noticed, because every consumer
+  // cached the tagged-key set at startup and the untag arrived too late to
+  // matter. Reading tags per write is the right design and makes that live, so
+  // the door closes here.
   for (const schemaType of Object.values(mergedSchema)) {
     const st = schemaType as { _meta?: DefinitionMeta };
     if (st._meta) st._meta = freezeMeta(st._meta)!;
+    Object.freeze(st);
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -3248,6 +3256,7 @@ export function createEngine<S extends Schema>(
     )) {
       const st = schemaType as { _meta?: DefinitionMeta };
       if (st._meta) st._meta = freezeMeta(st._meta)!;
+      Object.freeze(st);
     }
     if (module.events) {
       unwrapEventDefinitions(

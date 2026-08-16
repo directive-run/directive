@@ -552,6 +552,21 @@ export function createFactsStore<S extends Schema>(
     for (const key of Object.keys(newSchema)) {
       // Defense-in-depth: skip prototype pollution keys
       if (BLOCKED_PROPS.has(key)) continue;
+      // Replacing an existing key would swap its declared type and its meta —
+      // including the tags that decide whether writes to it get redacted.
+      // `registerModule` refuses a duplicate fact key before it gets here, and
+      // then hands us the very objects it just merged, so an identical
+      // reference is that no-op and not an overwrite. A DIFFERENT declaration
+      // for a key we already hold is the untag, and it is refused.
+      const existing = (schema as Record<string, unknown>)[key];
+      if (
+        Object.hasOwn(schema as Record<string, unknown>, key) &&
+        existing !== newSchema[key]
+      ) {
+        throw new Error(
+          `[Directive] Cannot re-declare fact "${key}". A fact's type and its tags are fixed once registered — replacing the declaration would silently change what gets redacted.`,
+        );
+      }
       // Add to schema for validation
       (schema as Record<string, unknown>)[key] = newSchema[key];
       knownKeys.add(key);
