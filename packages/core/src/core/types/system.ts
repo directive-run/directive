@@ -406,7 +406,7 @@ export interface SystemInspection {
      * failures).
      */
     lastError: {
-      phase: "attach" | "cleanup" | "runtime";
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       message: string;
       at: number;
     } | null;
@@ -1150,7 +1150,7 @@ export type ObservationEvent =
       type: "source.error";
       id: string;
       moduleId: string;
-      phase: "attach" | "cleanup" | "runtime";
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       error: unknown;
     }
   | { type: "derivation.compute"; id: string; value: unknown }

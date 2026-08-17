@@ -204,7 +204,7 @@ export type AuditEntry =
        * its second argument — distinct from lifecycle `"attach"` /
        * `"cleanup"` failures.
        */
-      phase: "attach" | "cleanup" | "runtime";
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       /**
        * Truncated error message — capped at a fixed length by the source
        * manager before it reaches the ledger. Source authors who embed

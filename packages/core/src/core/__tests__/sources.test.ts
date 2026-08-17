@@ -1935,3 +1935,527 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// RFC 0012 — gated / keyed sources
+// ============================================================================
+
+describe("RFC 0012 — gated/keyed sources", () => {
+  const accept = (): { accepted: true } => ({ accepted: true });
+
+  it("does not attach or publish before the gate first opens (rising edge)", () => {
+    let capturedPublish: SourcePublish | null = null;
+    const attach = vi.fn((publish: SourcePublish) => {
+      capturedPublish = publish;
+      return () => undefined;
+    });
+    const manager = createSourcesManager({
+      s: { key: (f) => (f.on ? "k1" : null), attach },
+    });
+
+    manager.attachAll(accept);
+    // Gated source is skipped by attachAll — it waits for evaluateGated.
+    expect(attach).not.toHaveBeenCalled();
+    expect(manager.attachedCount()).toBe(0);
+
+    manager.evaluateGated({ on: false });
+    expect(attach).not.toHaveBeenCalled();
+    expect(capturedPublish).toBeNull(); // nothing to publish through yet
+
+    manager.evaluateGated({ on: true });
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(1);
+  });
+
+  it("runs unsubscribe when the gate closes (not just at destroy)", () => {
+    const unsubscribe = vi.fn();
+    const manager = createSourcesManager({
+      s: { active: (f) => f.on === true, attach: () => unsubscribe },
+    });
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ on: true });
+    expect(manager.attachedCount()).toBe(1);
+
+    manager.evaluateGated({ on: false });
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(0);
+  });
+
+  it("re-key tears the old subscription down BEFORE attaching the new one", () => {
+    const order: string[] = [];
+    const manager = createSourcesManager({
+      s: {
+        key: (f) => f.id as string,
+        attach: (_publish, _reportError, ctx) => {
+          order.push(`attach:${ctx?.key}`);
+          return () => {
+            order.push(`detach:${ctx?.key}`);
+          };
+        },
+      },
+    });
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ id: "A" });
+    manager.evaluateGated({ id: "B" });
+
+    expect(order).toEqual(["attach:A", "detach:A", "attach:B"]);
+  });
+
+  it("re-key gives the coalesce buffer a fresh start (no stale pending)", async () => {
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
+    const pubs: Record<string, SourcePublish> = {};
+    const manager = createSourcesManager({
+      s: {
+        coalesce: "lastWriteWins",
+        key: (f) => f.id as string,
+        attach: (publish, _reportError, ctx) => {
+          pubs[ctx!.key] = publish;
+          return () => undefined;
+        },
+      },
+    });
+
+    manager.attachAll(dispatch);
+    manager.evaluateGated({ id: "A" });
+    // Queue a publish on A's buffer, then re-key to B before the microtask
+    // flush. A's queued publish must NOT leak into B's fresh buffer.
+    pubs.A?.("EV", { n: 1 });
+    manager.evaluateGated({ id: "B" });
+    pubs.B?.("EV", { n: 2 });
+
+    await Promise.resolve();
+
+    const evCalls = dispatch.mock.calls.filter((c) => c[2] === "EV");
+    expect(evCalls).toHaveLength(1);
+    expect(evCalls[0]?.[3]).toEqual({ n: 2 });
+  });
+
+  it("evictAll skips a detached / never-attached (null-key) source", async () => {
+    const onEvict = vi.fn();
+    const manager = createSourcesManager({
+      s: {
+        active: (f) => f.on === true,
+        onEvict,
+        attach: () => () => undefined,
+      },
+    });
+
+    manager.attachAll(accept);
+
+    // Gate never opened → never attached → not evicted.
+    await manager.evictAll();
+    expect(onEvict).not.toHaveBeenCalled();
+
+    // Opened then closed → detached → not evicted.
+    manager.evaluateGated({ on: true });
+    manager.evaluateGated({ on: false });
+    await manager.evictAll();
+    expect(onEvict).not.toHaveBeenCalled();
+
+    // Open and left attached → evicted.
+    manager.evaluateGated({ on: true });
+    await manager.evictAll();
+    expect(onEvict).toHaveBeenCalledTimes(1);
+  });
+
+  it("keyFn that throws fails closed (detaches, lastError.phase === 'gate')", () => {
+    const onError = vi.fn();
+    const manager = createSourcesManager(
+      {
+        s: {
+          key: (f) => {
+            if (f.boom) throw new Error("gate boom");
+            return "k";
+          },
+          attach: () => () => undefined,
+        },
+      },
+      { s: "mod" },
+      { onError },
+    );
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ boom: false });
+    expect(manager.attachedCount()).toBe(1);
+
+    manager.evaluateGated({ boom: true });
+    // Fail-closed: treated as null → detached.
+    expect(manager.attachedCount()).toBe(0);
+
+    const row = manager.listDefinitions().find((r) => r.id === "s");
+    expect(row?.lastError?.phase).toBe("gate");
+    expect(row?.errorCount).toBe(1);
+    expect(onError).toHaveBeenCalledWith("s", "mod", "gate", expect.any(Error));
+  });
+
+  it("keyFn that returns a non-(string|null) value fails closed with phase 'gate'", () => {
+    const manager = createSourcesManager(
+      {
+        // @ts-expect-error — author error: gate must return string | null
+        s: { key: (f) => (f.on ? 42 : null), attach: () => () => undefined },
+      },
+      { s: "mod" },
+    );
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ on: true });
+    // 42 is not string|null → fail closed → never attaches.
+    expect(manager.attachedCount()).toBe(0);
+    const row = manager.listDefinitions().find((r) => r.id === "s");
+    expect(row?.lastError?.phase).toBe("gate");
+  });
+
+  it("gateLingerMs cancels teardown on a transient falling edge", () => {
+    vi.useFakeTimers();
+    const unsubscribe = vi.fn();
+    const manager = createSourcesManager({
+      s: {
+        active: (f) => f.on === true,
+        gateLingerMs: 100,
+        attach: () => unsubscribe,
+      },
+    });
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ on: true });
+    expect(manager.attachedCount()).toBe(1);
+
+    // Falling edge — teardown is scheduled, not run.
+    manager.evaluateGated({ on: false });
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(manager.attachedCount()).toBe(1);
+
+    // Returns to the prior key inside the window → cancel.
+    vi.advanceTimersByTime(50);
+    manager.evaluateGated({ on: true });
+    vi.advanceTimersByTime(200);
+
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(manager.attachedCount()).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it("gateLingerMs fires teardown on a sustained falling edge", () => {
+    vi.useFakeTimers();
+    const unsubscribe = vi.fn();
+    const manager = createSourcesManager({
+      s: {
+        active: (f) => f.on === true,
+        gateLingerMs: 100,
+        attach: () => unsubscribe,
+      },
+    });
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ on: true });
+    manager.evaluateGated({ on: false });
+
+    expect(unsubscribe).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(100);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("re-key with gateLingerMs defers the teardown+reattach to the end of the window", () => {
+    vi.useFakeTimers();
+    const events: string[] = [];
+    const manager = createSourcesManager({
+      s: {
+        key: (f) => (f.id ? `game:${f.id}` : null),
+        gateLingerMs: 100,
+        attach: (_p, _e, ctx) => {
+          events.push(`attach:${ctx?.key}`);
+          return () => {
+            events.push(`detach:${ctx?.key}`);
+          };
+        },
+      },
+    });
+    manager.attachAll(accept);
+    manager.evaluateGated({ id: "1" }); // attach game:1
+    manager.evaluateGated({ id: "2" }); // re-key → lingers; no swap yet
+    expect(events).toEqual(["attach:game:1"]);
+    vi.advanceTimersByTime(100); // window elapses → teardown old, attach new
+    expect(events).toEqual(["attach:game:1", "detach:game:1", "attach:game:2"]);
+    vi.useRealTimers();
+  });
+
+  it("a key that walks to a THIRD value mid-linger tears the committed channel down immediately (no unbounded open)", () => {
+    vi.useFakeTimers();
+    const events: string[] = [];
+    const manager = createSourcesManager({
+      s: {
+        key: (f) => (f.id ? `game:${f.id}` : null),
+        gateLingerMs: 100,
+        attach: (_p, _e, ctx) => {
+          events.push(`attach:${ctx?.key}`);
+          return () => {
+            events.push(`detach:${ctx?.key}`);
+          };
+        },
+      },
+    });
+    manager.attachAll(accept);
+    manager.evaluateGated({ id: "1" }); // attach game:1
+    manager.evaluateGated({ id: "2" }); // linger toward game:2 (committed still game:1)
+    manager.evaluateGated({ id: "3" }); // target MOVED → immediate teardown of game:1 + attach game:3
+    expect(events).toEqual(["attach:game:1", "detach:game:1", "attach:game:3"]);
+    // The committed channel is NOT left open on a re-armed timer.
+    vi.advanceTimersByTime(500);
+    expect(events).toEqual(["attach:game:1", "detach:game:1", "attach:game:3"]);
+    expect(manager.attachedCount()).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it("`active` returning a truthy non-boolean fails CLOSED (does not attach)", () => {
+    const attach = vi.fn(() => () => undefined);
+    const manager = createSourcesManager({
+      // Returns a number, not a boolean — must NOT open the channel on truthiness.
+      s: { active: (f) => f.n as unknown as boolean, attach },
+    });
+    manager.attachAll(accept);
+    manager.evaluateGated({ n: 5 }); // truthy 5, but not === true
+    expect(attach).not.toHaveBeenCalled();
+    expect(manager.attachedCount()).toBe(0);
+    manager.evaluateGated({ n: true }); // strictly true → attaches
+    expect(attach).toHaveBeenCalledTimes(1);
+  });
+
+  it("in-flight publish after gate-close is dropped with lastDropReason 'gate-closed'", () => {
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
+    let capturedPublish: SourcePublish | null = null;
+    const onDrop = vi.fn();
+    const manager = createSourcesManager(
+      {
+        s: {
+          active: (f) => f.on === true,
+          attach: (publish) => {
+            capturedPublish = publish;
+            return () => undefined;
+          },
+        },
+      },
+      { s: "mod" },
+      { onDrop },
+    );
+
+    manager.attachAll(dispatch);
+    manager.evaluateGated({ on: true });
+    manager.evaluateGated({ on: false }); // gate closed
+
+    // A leaked transport callback fires after the close. (Cast re-widens the union —
+    // TS narrows the closure-assigned `let` to its `null` initializer at this use site.)
+    (capturedPublish as SourcePublish | null)?.("LATE", { x: 1 });
+
+    expect(dispatch).not.toHaveBeenCalled(); // never reaches the engine
+    const row = manager.listDefinitions().find((r) => r.id === "s");
+    expect(row?.dropCount).toBe(1);
+    expect(row?.lastDropReason).toBe("gate-closed");
+    expect(onDrop).toHaveBeenCalledWith("s", "mod", "LATE", "gate-closed");
+  });
+
+  it("`active` sugar is equivalent to the hand-written `key` form", () => {
+    const activeOrder: string[] = [];
+    const keyOrder: string[] = [];
+    const activeManager = createSourcesManager({
+      s: {
+        active: (f) => f.on === true,
+        attach: () => {
+          activeOrder.push("attach");
+          return () => {
+            activeOrder.push("detach");
+          };
+        },
+      },
+    });
+    const keyManager = createSourcesManager({
+      s: {
+        key: (f) => (f.on === true ? "__on__" : null),
+        attach: () => {
+          keyOrder.push("attach");
+          return () => {
+            keyOrder.push("detach");
+          };
+        },
+      },
+    });
+
+    for (const m of [activeManager, keyManager]) {
+      m.attachAll(accept);
+      m.evaluateGated({ on: false });
+      m.evaluateGated({ on: true });
+      m.evaluateGated({ on: true }); // no-op — same key
+      m.evaluateGated({ on: false });
+    }
+
+    expect(activeOrder).toEqual(["attach", "detach"]);
+    expect(keyOrder).toEqual(activeOrder);
+  });
+
+  it("declaring BOTH key and active throws at registration", () => {
+    expect(() =>
+      createSourcesManager({
+        s: {
+          key: () => null,
+          active: () => true,
+          attach: () => () => undefined,
+        },
+      }),
+    ).toThrow(/both/i);
+
+    // Same guard at createSystem time.
+    const module = createModule("dual", {
+      schema: { facts: { on: t.boolean() } },
+      init: (f) => {
+        f.on = false;
+      },
+      sources: {
+        s: {
+          key: () => null,
+          active: () => true,
+          attach: () => () => undefined,
+        },
+      },
+    });
+    expect(() => createSystem({ module })).toThrow(/both/i);
+  });
+
+  it("ungated sources behave exactly as before (backward-compat)", () => {
+    const unsubscribe = vi.fn();
+    const attach = vi.fn(
+      (_publish: SourcePublish, _reportError?: unknown, _ctx?: unknown) => unsubscribe,
+    );
+    const manager = createSourcesManager({ s: { attach } });
+
+    manager.attachAll(accept);
+    // Attaches on attachAll (no gate), receives (publish, reportError) — no ctx.
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(attach.mock.calls[0]?.[2]).toBeUndefined();
+    expect(manager.attachedCount()).toBe(1);
+
+    // evaluateGated is a no-op for ungated sources.
+    manager.evaluateGated({ anything: true });
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(1);
+
+    manager.cleanupAll();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the resolved key to attach via ctx.key", () => {
+    const seen: Array<string | undefined> = [];
+    const manager = createSourcesManager({
+      s: {
+        key: (f) => `game:${f.id}`,
+        attach: (_publish, _reportError, ctx) => {
+          seen.push(ctx?.key);
+          return () => undefined;
+        },
+      },
+    });
+
+    manager.attachAll(accept);
+    manager.evaluateGated({ id: "42" });
+    manager.evaluateGated({ id: "99" }); // re-key
+
+    expect(seen).toEqual(["game:42", "game:99"]);
+  });
+
+  // --------------------------------------------------------------------------
+  // End-to-end with createSystem (engine wiring of evaluateGated)
+  // --------------------------------------------------------------------------
+
+  it("gated source in a system attaches/detaches as a fact drives the gate", async () => {
+    const attach = vi.fn((_key?: string) => () => undefined);
+    const module = createModule("game", {
+      schema: {
+        facts: { gameId: t.string() },
+        events: { JOIN: { id: t.string() }, LEAVE: {} },
+      },
+      init: (f) => {
+        f.gameId = "";
+      },
+      events: {
+        JOIN: (f, p) => {
+          f.gameId = p.id;
+        },
+        LEAVE: (f) => {
+          f.gameId = "";
+        },
+      },
+      sources: {
+        channel: {
+          key: (f) => (f.gameId ? `game:${f.gameId}` : null),
+          attach: (_publish, _reportError, ctx) => {
+            attach(ctx?.key);
+            return () => undefined;
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+    // Gate shut at start (gameId "").
+    expect(attach).not.toHaveBeenCalled();
+    expect(system.inspect().attachedSourceCount).toBe(0);
+
+    system.events.JOIN({ id: "42" });
+    await system.settle();
+    expect(attach).toHaveBeenCalledWith("game:42");
+    expect(system.inspect().attachedSourceCount).toBe(1);
+
+    system.events.LEAVE();
+    await system.settle();
+    expect(system.inspect().attachedSourceCount).toBe(0);
+
+    system.destroy();
+  });
+
+  it("replay/time-travel re-derives the key but does NOT re-attach the transport", async () => {
+    const attach = vi.fn(() => () => undefined);
+    const module = createModule("toggle", {
+      schema: {
+        facts: { on: t.boolean() },
+        events: { ON: {}, OFF: {} },
+      },
+      init: (f) => {
+        f.on = false;
+      },
+      events: {
+        ON: (f) => {
+          f.on = true;
+        },
+        OFF: (f) => {
+          f.on = false;
+        },
+      },
+      sources: {
+        s: { active: (f) => f.on === true, attach: () => attach() },
+      },
+    });
+
+    const system = createSystem({ module, history: { maxSnapshots: 50 } });
+    system.start();
+    await system.settle();
+
+    system.events.ON();
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(1);
+
+    // Time-travel back and forward. Restore short-circuits reconcile, so the
+    // gate is neither re-evaluated nor re-attached.
+    system.history?.goBack();
+    await system.settle();
+    system.history?.goForward();
+    await system.settle();
+
+    expect(attach).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+});

@@ -398,7 +398,7 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onSourceError?: (
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup" | "runtime",
+    phase: "attach" | "cleanup" | "runtime" | "gate",
     error: unknown,
   ) => void;
 
