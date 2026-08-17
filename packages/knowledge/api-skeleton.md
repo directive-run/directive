@@ -406,11 +406,11 @@
   ```ts
   export interface LeafClause {
   ```
-- `MetaAccessor` — O(1) accessor for definition metadata.
+- `MetaAccessor` — Metadata lookups, tag queries, and change notification.
   ```ts
   export interface MetaAccessor {
   ```
-- `MetaMatch` — Result from bulk meta queries (byCategory, byTag).
+- `MetaMatch` — One definition returned by {@link MetaAccessor.byTag}.
   ```ts
   export interface MetaMatch {
   ```
@@ -597,9 +597,17 @@
   ```ts
   export type CrossModuleEffectsDef<
   ```
+- `DefinitionKind` — The seven things a system holds metadata for — the same seven the lookups on
+  ```ts
+  export type DefinitionKind =
+  ```
 - `DerivationsDefinition` — Map of derivation definitions (internal — always bare functions after unwrap).
   ```ts
   export type DerivationsDef<S extends Schema> = Record<
+  ```
+- `DynamicDefinitionKind` — The four kinds `register` / `assign` / `unregister` / `call` operate on.
+  ```ts
+  export type DynamicDefinitionKind = Extract<
   ```
 - `EffectsDefinition` — Map of effect definitions
   ```ts
@@ -923,6 +931,7 @@
   ```ts
   function createEvalSuite(config: EvalSuiteConfig): EvalSuite
   ```
+- `createFactPIIGuardrail` — Create a Directive plugin that scans pii-tagged fact writes for PII and
 - `createHealthMonitor` — Create a health monitor that tracks per-agent metrics.
   ```ts
   function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMonitor

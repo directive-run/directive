@@ -74,12 +74,6 @@ function publicExports(dtsPath: string): string[] {
  */
 const KNOWN_GAPS: Readonly<Record<"core" | "ai", readonly string[]>> = {
   core: [
-    // New in this release. The skeleton is generated from the api-reference.json
-    // the newest release carries, so an export cannot appear in it until a
-    // release has published one that contains it. Remove both lines after the
-    // next release: the stale-entry check below will insist.
-    "DefinitionKind",
-    "DynamicDefinitionKind",
     "AuditEntry",
     "AuditEntryKind",
     "AuditLedger",
@@ -111,14 +105,6 @@ const KNOWN_GAPS: Readonly<Record<"core" | "ai", readonly string[]>> = {
     "doctor",
   ],
   ai: [
-    // Absent from the PUBLISHED api-reference.json since 1.29.1, where a
-    // constant inserted between this factory's doc comment and the function
-    // orphaned the comment — and the extractor emits an entry only for an
-    // exported function it can find documentation for. The comment is
-    // reattached in source, but the skeleton is generated from the asset the
-    // newest release carries, so it stays absent until a release republishes
-    // it. Remove this line then: the stale-entry check below will insist.
-    "createFactPIIGuardrail",
     "BatchQueue",
     "BatchQueueConfig",
     "BudgetConfig",
