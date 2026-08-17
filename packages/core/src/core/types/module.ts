@@ -79,7 +79,7 @@ export interface ModuleHooks<M extends ModuleSchema> {
 type GetDerivationsSchema<M extends ModuleSchema> =
   M["derivations"] extends DerivationsSchema
     ? M["derivations"]
-    : Record<string, never>;
+    : Record<string, unknown>;
 
 /** Helper to get events schema, defaulting to empty */
 type GetEventsSchema<M extends ModuleSchema> = M["events"] extends EventsSchema
