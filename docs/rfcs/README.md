@@ -19,6 +19,7 @@ landed in. Open questions are tracked inline.
 | [0009](./0009-async-stop-and-do-eviction.md) | Async stop + Durable Object eviction | Accepted | shipped 2026-06-07 (v1.18.0); wrapper wiring + adapter `onEvict` shipped 2026-06-09 (v1.19.0 / v1.19.1) |
 | [0010](./0010-guardrail-blocked-event.md) | `guardrail.blocked` `ObservationEvent` + `system.notify` | Accepted | shipped 2026-06-10 (`@directive-run/core` v1.20.0 + `@directive-run/ai` v1.19.7) |
 | [0011](./0011-metadata-queries.md) | `carriesTag` / `meta.subscribe`, `MetaMatch` reshaped, `revision()` removed | Accepted | implemented 2026-08-16 |
+| [0012](./0012-gated-keyed-sources.md) | Gated / keyed sources: `SourceDef.key`/`active`/`gateLingerMs` — a source's subscription lifecycle gated on facts | Accepted | implemented 2026-08-17 |
 
 ## Drafting flow
 
