@@ -2326,7 +2326,8 @@ describe("RFC 0012 — gated/keyed sources", () => {
   it("ungated sources behave exactly as before (backward-compat)", () => {
     const unsubscribe = vi.fn();
     const attach = vi.fn(
-      (_publish: SourcePublish, _reportError?: unknown, _ctx?: unknown) => unsubscribe,
+      (_publish: SourcePublish, _reportError?: unknown, _ctx?: unknown) =>
+        unsubscribe,
     );
     const manager = createSourcesManager({ s: { attach } });
 
