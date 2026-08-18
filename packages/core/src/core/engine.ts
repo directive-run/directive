@@ -1244,6 +1244,15 @@ export function createEngine<S extends Schema>(
       derivationsManager.collectInvalidated(state.changedKeys);
       await effectsManager.runEffects(state.changedKeys);
 
+      // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
+      // plane, immediately after effects, against the committed facts. Sits
+      // behind the SAME guard effects run behind — `reconcile` never runs
+      // during a history restore (the `onChange`/`onBatch` `isRestoring`
+      // short-circuit skips `scheduleReconcile`), so replay / time-travel
+      // re-derives the key value but NEVER re-attaches a transport. The gate
+      // is a pure fact read; the attach act stays a non-replayable input.
+      sourcesManager.evaluateGated(facts as unknown as Record<string, unknown>);
+
       // Again, because effects write facts.
       //
       // The drain above happens before `runEffects` so an effect gated on a
@@ -2245,7 +2254,7 @@ export function createEngine<S extends Schema>(
         onSourceError: (
           id: string,
           moduleId: string,
-          phase: "attach" | "cleanup" | "runtime",
+          phase: "attach" | "cleanup" | "runtime" | "gate",
           error: unknown,
         ) => observer({ type: "source.error", id, moduleId, phase, error }),
         onGuardrailBlocked: (
@@ -2422,6 +2431,14 @@ export function createEngine<S extends Schema>(
         );
         return { accepted: true };
       });
+
+      // RFC 0012: initial gated attach. `attachAll` above attached only the
+      // UNGATED sources; gated/keyed sources evaluate their `key`/`active`
+      // gate against the committed facts here so a source whose gate is
+      // already open at start attaches synchronously (before the first
+      // reconcile), and one whose gate is shut stays detached. Subsequent
+      // re-evaluation happens on the post-commit effects plane.
+      sourcesManager.evaluateGated(facts as unknown as Record<string, unknown>);
 
       // Emit start event
       pluginManager.emitStart(system);

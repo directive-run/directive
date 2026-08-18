@@ -131,7 +131,8 @@ export type SourceDropReason =
   | "post-stop"
   | "blocked-event-name"
   | "invalid-event-name"
-  | "coalesced";
+  | "coalesced"
+  | "gate-closed";
 
 /**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
@@ -184,11 +185,13 @@ export interface SourcePublish {
  *   function returned" (logs an error + skips the source). Do async setup
  *   inside the subscription's own internals; `attach` returns immediately
  *   with the synchronous unsubscribe function.
- * - Sources cannot subscribe to system facts. Use {@link EffectDef effects}
- *   for fact-reactive behavior. If you need to re-subscribe when a fact
- *   changes, use `system.registerModule()` to swap the source's owning
- *   module, OR drive the subscription via an effect that owns its own
- *   channel.
+ * - `attach` cannot read system facts, and a source writes NO facts. For
+ *   fact-reactive OUTPUT use {@link EffectDef effects}. To gate or re-key a
+ *   source's subscription lifecycle ON facts (RFC 0010), declare a pure
+ *   `key` / `active` gate — it reads facts to decide whether, and under what
+ *   identity, the transport is subscribed, then hands the resolved key to
+ *   `attach` via `ctx.key`. The gate is a pure fact read (no writes); the
+ *   attach act + published events remain non-replayable inputs.
  * - The publish callback dispatches events normally — resolvers, fact
  *   handlers, and downstream effects all run. Authors SHOULD throttle /
  *   debounce inside the source if the inbound rate may exceed the system's
@@ -221,22 +224,125 @@ export interface SourcePublish {
  */
 export type SourceReportError = (error: Error) => void;
 
+/**
+ * Context handed to a keyed source's `attach` as its optional 3rd
+ * argument (RFC 0010). Carries the resolved gate key so a keyed source
+ * builds its subscription from it — e.g. `supabase.channel(\`game:${ctx.key}\`)`.
+ *
+ * Only supplied when the source is gated (declares `key` or `active`).
+ * Ungated sources never receive it, so their `attach(publish, reportError)`
+ * signature is untouched.
+ */
+export interface SourceAttachContext {
+  /** The non-null key the source is currently attached under. */
+  readonly key: string;
+}
+
+/**
+ * Read-only fact snapshot handed to a gated source's `key` / `active`
+ * gate (RFC 0010). A gate is a PURE fact read: it may inspect facts to
+ * decide whether — and under what identity — the source should be
+ * subscribed, but it MUST NOT write facts (the gate is a fact-only
+ * derivation; writing would break the determinism invariant that lets
+ * replay re-derive the key without re-attaching the transport).
+ */
+export type SourceGateFacts = Readonly<Record<string, unknown>>;
+
 export interface SourceDef {
   /**
-   * Mount the source against the system. Runs once at `system.start()`.
+   * Mount the source against the system. Runs once at `system.start()`
+   * for ungated sources, or once per rising gate edge for keyed sources.
    *
    * @param publish - dispatch typed events into the system's event queue.
    * @param reportError - report a runtime error from the source's
    *   underlying stream. Fires `source.error` observation events with
-   *   `phase: "runtime"` (distinct from `"attach"` and `"cleanup"`)
-   *   so observers can attribute the failure correctly. Optional —
-   *   sources that never error mid-flight don't need it.
-   * @returns a cleanup function that runs at `system.stop()`.
+   *   `phase: "runtime"` (distinct from `"attach"`, `"cleanup"`, and
+   *   `"gate"`) so observers can attribute the failure correctly.
+   *   Optional — sources that never error mid-flight don't need it.
+   * @param ctx - RFC 0010: for a KEYED source (declares `key`/`active`),
+   *   carries `{ key }` — the resolved gate key this attach is running
+   *   under — so the subscription can be built from it. Undefined for
+   *   ungated sources. `attach` still CANNOT read facts (use `key`/`active`
+   *   for that) and the source still writes NO facts.
+   * @returns a cleanup function that runs at `system.stop()` (or at the
+   *   next falling / re-key gate edge for keyed sources).
    */
   attach: (
     publish: SourcePublish,
     reportError?: SourceReportError,
+    ctx?: SourceAttachContext,
   ) => SourceUnsubscribe;
+  /**
+   * RFC 0010 — gate + identity. A PURE fact read (no writes) that decides
+   * this source's subscription lifecycle from module facts:
+   *
+   * - returns `null` → the source is DETACHED (its transport is torn down
+   *   / never opened).
+   * - returns a non-null string → the source is ATTACHED under that key.
+   *   The key flows to `attach` as `ctx.key`.
+   * - returns a DIFFERENT string than last time → the old subscription is
+   *   torn down (teardown-old-BEFORE-attach-new) and re-attached under the
+   *   new key. This is the "re-key" edge — use it to move a realtime
+   *   channel from `game:A` to `game:B` when a fact changes.
+   *
+   * The gate is evaluated on the post-commit effects plane (after each
+   * reconcile) and once at `system.start()`. It runs behind the same
+   * replay / time-travel guard effects use: time-travel re-derives the key
+   * value but NEVER re-attaches the transport (determinism invariant).
+   *
+   * Mutually exclusive with {@link SourceDef.active} — declaring both throws
+   * a dev error at registration.
+   *
+   * @example Re-keyed realtime channel
+   * ```typescript
+   * sources: {
+   *   gameChannel: {
+   *     key: (facts) => (facts.gameId ? `game:${facts.gameId}` : null),
+   *     attach: (publish, _reportError, ctx) => {
+   *       const channel = supabase.channel(ctx!.key)
+   *         .on('postgres_changes', { ... }, (p) => publish('GAME_UPDATE', p.new))
+   *         .subscribe();
+   *       return () => channel.unsubscribe();
+   *     },
+   *   },
+   * }
+   * ```
+   */
+  key?: (facts: SourceGateFacts) => string | null;
+  /**
+   * RFC 0010 — sugar for a simple on/off gate. `active: f => cond` is
+   * normalized at registration to `key: f => cond ? "__on__" : null`, so
+   * the source attaches while the predicate is true and detaches when it
+   * turns false. Use this when the source has no identity to re-key on —
+   * just a "should it be running right now?" question.
+   *
+   * Mutually exclusive with {@link SourceDef.key} — declaring both throws a
+   * dev error at registration.
+   *
+   * @example Only subscribe while the tab is focused
+   * ```typescript
+   * sources: {
+   *   presence: {
+   *     active: (facts) => facts.tabFocused === true,
+   *     attach: (publish) => { ...; return () => ...; },
+   *   },
+   * }
+   * ```
+   */
+  active?: (facts: SourceGateFacts) => boolean;
+  /**
+   * RFC 0010 — hysteresis (in ms) on a FALLING gate edge (key → null) or a
+   * re-key edge (key A → key B). When set, the manager WAITS this long
+   * before tearing the old subscription down; if the gate returns to the
+   * SAME prior key within the window, the pending teardown is CANCELLED and
+   * the subscription is kept alive untouched. Prevents thrashing a costly
+   * transport on transient fact flaps (a WebSocket that reconnects, a
+   * gameId that briefly clears during navigation).
+   *
+   * Only affects falling / re-key edges. A RISING edge (null → key) always
+   * attaches immediately. Default `0` = tear down immediately, no linger.
+   */
+  gateLingerMs?: number;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
   /**

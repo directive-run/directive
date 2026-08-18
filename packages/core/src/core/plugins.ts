@@ -174,7 +174,7 @@ export interface PluginManager<_S extends Schema = any> {
   emitSourceError(
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup" | "runtime",
+    phase: "attach" | "cleanup" | "runtime" | "gate",
     error: unknown,
   ): void;
 

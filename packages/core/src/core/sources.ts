@@ -44,6 +44,15 @@ interface AttachedSource {
   // mutation rather than smuggling it through `Object.assign`.
   unsubscribe: SourceUnsubscribe;
   detached: boolean;
+  /**
+   * Why this record was detached. Set by `detachOne` / `cleanupAll` at the
+   * moment `detached` flips. Only `"gate-closed"` drives publish accounting
+   * (an in-flight publish after a gate close counts as a drop); `"stop"` and
+   * `"re-register"` keep the historic silent-return behaviour.
+   */
+  detachReason?: "gate-closed" | "re-register" | "stop";
+  /** RFC 0012: resolved gate key this record was attached under (keyed sources). */
+  key?: string;
 }
 
 interface SourceDefinition {
@@ -89,7 +98,7 @@ interface SourceCounters {
   lastDropAt: number | null;
   errorCount: number;
   lastError: {
-    phase: "attach" | "cleanup" | "runtime";
+    phase: "attach" | "cleanup" | "runtime" | "gate";
     message: string;
     at: number;
   } | null;
@@ -263,7 +272,7 @@ export interface SourcesManagerCallbacks {
   readonly onError?: (
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup" | "runtime",
+    phase: "attach" | "cleanup" | "runtime" | "gate",
     error: Error,
   ) => void;
 }
@@ -319,6 +328,26 @@ export interface SourcesManager {
    * `cleanupAllAsync`.
    */
   evictAll(): Promise<void>;
+  /**
+   * RFC 0012 — re-evaluate every GATED source's `key` / `active` gate
+   * against the supplied committed-fact snapshot and reconcile its
+   * subscription lifecycle:
+   *
+   * - `null → key` (rising edge): attach under the new key.
+   * - `key → null` (falling) / `keyA → keyB` (re-key): tear the old
+   *   subscription down BEFORE attaching the new one; honours
+   *   `gateLingerMs` hysteresis on the falling / re-key edge.
+   * - unchanged key: no-op.
+   *
+   * A gate that throws or returns a non-`(string | null)` fails CLOSED
+   * (treated as `null`, reported via `onError` with `phase: "gate"`).
+   *
+   * Called once at `system.start()` (initial gated attach) and thereafter
+   * on the post-commit effects plane after each reconcile. Teardown here is
+   * SYNC fire-and-forget so it never blocks reconcile. Ungated sources are
+   * untouched — they attach via `attachAll` as before.
+   */
+  evaluateGated(facts: Record<string, unknown>): void;
   /** Number of sources currently attached. Used by `system.inspect()`. */
   attachedCount(): number;
   /**
@@ -376,7 +405,7 @@ export interface SourceInspectionRow {
  * output (and downstream into the audit ledger).
  */
 export interface SourceLastError {
-  phase: "attach" | "cleanup" | "runtime";
+  phase: "attach" | "cleanup" | "runtime" | "gate";
   message: string;
   at: number;
 }
@@ -392,8 +421,51 @@ export function createSourcesManager(
   callbacks: SourcesManagerCallbacks = {},
 ): SourcesManager {
   const definitions = new Map<string, SourceDefinition>();
+  // RFC 0012 gated-source state.
+  //   keyFns:       normalized gate function per gated source id (`active`
+  //                 sugar is folded into a `key` fn at registration).
+  //   lastKey:      the key each gated source is CURRENTLY attached under
+  //                 (or null if detached). This is the committed key — during
+  //                 a linger window it stays put until the timer fires.
+  //   lingerTimers: pending falling / re-key teardown timers keyed by source
+  //                 id, each carrying the key it is transitioning toward.
+  const keyFns = new Map<string, (facts: Record<string, unknown>) => unknown>();
+  const lastKey = new Map<string, string | null>();
+  const lingerTimers = new Map<
+    string,
+    { timer: ReturnType<typeof setTimeout>; target: string | null }
+  >();
+
+  /**
+   * Normalize a source definition's gate at registration. Throws a dev
+   * error if both `key` and `active` are declared; folds `active` sugar into
+   * a `key` fn; records the gate fn in `keyFns` for gated sources (leaves
+   * ungated sources absent from the map).
+   */
+  function registerGate(id: string, def: SourceDef): void {
+    const hasKey = typeof def.key === "function";
+    const hasActive = typeof def.active === "function";
+    if (hasKey && hasActive) {
+      throw new Error(
+        `[Directive] Source "${id}" declares both \`key\` and \`active\`. Use ONE: \`key\` for identity-based re-keying (returns a string | null), \`active\` for a simple on/off gate (returns a boolean).`,
+      );
+    }
+    if (hasActive) {
+      const activeFn = def.active as (f: Record<string, unknown>) => boolean;
+      // Strict `=== true` (not truthy): a gate must fail CLOSED. A non-boolean
+      // truthy return (a stray object/number) must NOT open a data channel —
+      // it's treated as detached, same posture as a throwing gate (G4).
+      keyFns.set(id, (facts) => (activeFn(facts) === true ? "__on__" : null));
+    } else if (hasKey) {
+      keyFns.set(id, def.key as (f: Record<string, unknown>) => unknown);
+    } else {
+      keyFns.delete(id);
+    }
+  }
+
   for (const [id, def] of Object.entries(initialDefinitions)) {
     definitions.set(id, { def, moduleId: initialModuleIds[id] ?? "<unknown>" });
+    registerGate(id, def);
   }
   let attached: AttachedSource[] = [];
   let phase: LifecyclePhase = "idle";
@@ -405,7 +477,7 @@ export function createSourcesManager(
 
   function bumpError(
     id: string,
-    pErr: "attach" | "cleanup" | "runtime",
+    pErr: "attach" | "cleanup" | "runtime" | "gate",
     error: Error,
   ): void {
     const c = counters.get(id) ?? emptyCounters();
@@ -421,7 +493,7 @@ export function createSourcesManager(
   function reportError(
     id: string,
     moduleId: string,
-    pErr: "attach" | "cleanup" | "runtime",
+    pErr: "attach" | "cleanup" | "runtime" | "gate",
     error: Error,
   ): void {
     bumpError(id, pErr, error);
@@ -452,6 +524,7 @@ export function createSourcesManager(
     id: string,
     record: SourceDefinition,
     dispatch: SourceDispatch,
+    resolvedKey?: string,
   ): void {
     // Pre-build the AttachedSource record so the per-source publish closure
     // can close over `attachedRecord.detached` instead of a captured-once
@@ -465,6 +538,22 @@ export function createSourcesManager(
       moduleId: record.moduleId,
       unsubscribe: () => undefined,
       detached: false,
+      key: resolvedKey,
+    };
+
+    // RFC 0012: an in-flight publish that arrives AFTER this record was
+    // detached because its gate CLOSED is counted as a `gate-closed` drop
+    // (the historic detached-guard silently returned). Post-stop /
+    // re-register detaches keep the silent return.
+    const accountGateClosedDrop = (eventName: string): void => {
+      if (attachedRecord.detachReason !== "gate-closed") return;
+      const c = counters.get(id);
+      if (c) {
+        c.dropCount += 1;
+        c.lastDropReason = "gate-closed";
+        c.lastDropAt = Date.now();
+      }
+      callbacks.onDrop?.(id, record.moduleId, eventName, "gate-closed");
     };
 
     // Seed the counters entry BEFORE invoking `record.def.attach()` so a
@@ -484,7 +573,10 @@ export function createSourcesManager(
     // the engine accepts the publish — split prevents attackers probing
     // BLOCKED_PROPS / `isRunning` invisibly.
     const innerPublish: SourcePublish = (eventName, payload) => {
-      if (attachedRecord.detached) return;
+      if (attachedRecord.detached) {
+        accountGateClosedDrop(eventName);
+        return;
+      }
       const result = dispatch(id, record.moduleId, eventName, payload);
       const c = counters.get(id);
       if (!c) return; // unreachable; defensive no-op
@@ -514,7 +606,10 @@ export function createSourcesManager(
       const pending = new Map<string, unknown>();
       let flushScheduled = false;
       perSourcePublish = (eventName, payload) => {
-        if (attachedRecord.detached) return;
+        if (attachedRecord.detached) {
+          accountGateClosedDrop(eventName);
+          return;
+        }
         // The manager's coalesce drop fires BEFORE the engine guard so a
         // detected drop is attributed to coalescing, not to the engine
         // rejecting an event name. Operators who see `lastDropReason:
@@ -571,10 +666,15 @@ export function createSourcesManager(
               : new Error(String(runtimeError));
           reportError(id, record.moduleId, "runtime", safeRuntimeError);
         };
-      const unsubscribe = record.def.attach(
-        perSourcePublish,
-        reportRuntimeError,
-      );
+      // RFC 0012: keyed sources receive the resolved key as a 3rd arg so
+      // the subscription can be built from it. Ungated sources get the
+      // historic 2-arg call — `ctx` is undefined and never constructed.
+      const unsubscribe =
+        resolvedKey === undefined
+          ? record.def.attach(perSourcePublish, reportRuntimeError)
+          : record.def.attach(perSourcePublish, reportRuntimeError, {
+              key: resolvedKey,
+            });
       if (typeof unsubscribe !== "function") {
         // Distinguish "returned a thenable" (almost always: author wrote
         // `attach: async (publish) => () => {}`) from "returned non-function"
@@ -617,6 +717,87 @@ export function createSourcesManager(
     }
   }
 
+  /**
+   * Tear a single attached source down and remove it from the live set.
+   * Extracted from the inline re-registration teardown so the gate path
+   * (RFC 0012) and the re-registration path share one code path.
+   *
+   * `detached` flips BEFORE `unsubscribe()` runs so the source's still-
+   * referenced publish closure no-ops (and, for `"gate-closed"`, accounts
+   * the drop). `onDetach` fires before teardown side effects; unsubscribe
+   * failures report `phase: "cleanup"`.
+   */
+  function detachOne(
+    record: AttachedSource,
+    reason: "gate-closed" | "re-register" | "stop",
+  ): void {
+    record.detached = true;
+    record.detachReason = reason;
+    callbacks.onDetach?.(record.id, record.moduleId);
+    const c = counters.get(record.id) ?? emptyCounters();
+    c.detachedAt = Date.now();
+    counters.set(record.id, c);
+    try {
+      record.unsubscribe();
+    } catch (rawError) {
+      const error =
+        rawError instanceof Error ? rawError : new Error(String(rawError));
+      console.error(
+        `[Directive] Module "${record.moduleId}" → Source "${record.id}" unsubscribe threw during ${reason}:`,
+        error,
+      );
+      reportError(record.id, record.moduleId, "cleanup", error);
+    }
+    const idx = attached.indexOf(record);
+    if (idx !== -1) attached.splice(idx, 1);
+    attachedDefinitionIds.delete(record.id);
+  }
+
+  /** Find the live (non-detached) attached record for a source id, if any. */
+  function findAttached(id: string): AttachedSource | undefined {
+    return attached.find((r) => r && !r.detached && r.id === id);
+  }
+
+  /**
+   * RFC 0012: reconcile ONE gated source from its committed key to a newly
+   * computed key `k`. Handles rising / falling / re-key edges + linger
+   * hysteresis. `committed` is the key the source is currently attached
+   * under (from `lastKey`). Never called when `committed === k`.
+   */
+  function transitionGated(
+    id: string,
+    def: SourceDefinition,
+    dispatch: SourceDispatch,
+    committed: string | null,
+    k: string | null,
+  ): void {
+    if (committed === null) {
+      // Rising edge — attach immediately (linger never applies to a rise).
+      attachOne(id, def, dispatch, k ?? undefined);
+      lastKey.set(id, k);
+      return;
+    }
+    // Falling (k === null) or re-key (k !== null): linger may apply.
+    const lingerMs = def.def.gateLingerMs ?? 0;
+    const runTeardownAndReattach = (): void => {
+      const rec = findAttached(id);
+      if (rec) detachOne(rec, "gate-closed");
+      if (k !== null) attachOne(id, def, dispatch, k);
+      lastKey.set(id, k);
+    };
+    if (lingerMs > 0) {
+      const timer = setTimeout(() => {
+        lingerTimers.delete(id);
+        runTeardownAndReattach();
+      }, lingerMs);
+      lingerTimers.set(id, { timer, target: k });
+      // `committed`/`lastKey` stay put until the timer fires so a return to
+      // the prior key inside the window can cancel cleanly.
+      return;
+    }
+    runTeardownAndReattach();
+  }
+
   return {
     registerDefinitions(
       moduleId: string,
@@ -632,51 +813,44 @@ export function createSourcesManager(
         // `attachedDefinitionIds.has(id)` check below would block it). The
         // result is a "ghost subscription + dead definition" leak.
         if (phase === "attached" && attachedDefinitionIds.has(id)) {
-          for (let i = 0; i < attached.length; i++) {
-            const old = attached[i];
-            if (!old || old.detached || old.id !== id) continue;
-            // Flip the per-record `detached` flag BEFORE running unsubscribe.
-            // The old source's `perSourcePublish` closure (still referenced by
-            // the external transport) reads this flag on every publish and
-            // no-ops once it flips — closes the in-flight re-registration
-            // race. Swapping the registry entry alone is not enough: a
-            // publish already in flight holds the old closure directly and
-            // never re-reads the registry, so it would deliver into the
-            // replaced source between the swap and the unsubscribe.
-            old.detached = true;
-            callbacks.onDetach?.(old.id, old.moduleId);
-            const cOld = counters.get(old.id) ?? emptyCounters();
-            cOld.detachedAt = Date.now();
-            counters.set(old.id, cOld);
-            try {
-              old.unsubscribe();
-            } catch (rawError) {
-              const error =
-                rawError instanceof Error
-                  ? rawError
-                  : new Error(String(rawError));
-              console.error(
-                `[Directive] Module "${old.moduleId}" → Source "${old.id}" unsubscribe threw during re-registration:`,
-                error,
-              );
-              reportError(old.id, old.moduleId, "cleanup", error);
-            }
-            attached.splice(i, 1);
-            break;
+          // `detachOne` flips `detached` BEFORE unsubscribe (closing the
+          // in-flight re-registration race — a publish already holding the
+          // old closure no-ops), fires `onDetach`, and removes the record.
+          const old = findAttached(id);
+          if (old) {
+            detachOne(old, "re-register");
+          } else {
+            attachedDefinitionIds.delete(id);
           }
-          attachedDefinitionIds.delete(id);
         }
+        // Reset any pending gate state for a re-registered id so the new
+        // definition re-evaluates from a clean slate.
+        const pendingLinger = lingerTimers.get(id);
+        if (pendingLinger) {
+          clearTimeout(pendingLinger.timer);
+          lingerTimers.delete(id);
+        }
+        lastKey.delete(id);
 
         definitions.set(id, { def, moduleId });
+        registerGate(id, def);
         // If the system is already running, attach the new source
         // immediately using the live dispatcher. `onAttach` fires from
         // inside `attachOne` so the engine emits the plugin event with
         // correct attribution — closes the registerModule observability
         // gap AND the re-registration leak.
+        //
+        // GATED sources are the exception: they do NOT attach here (we have
+        // no fact snapshot in `registerDefinitions`). They attach on the
+        // next `evaluateGated(facts)` call — the engine runs one on the
+        // post-commit effects plane, and `registerModule` triggers a
+        // reconcile — so a gated source registered while running attaches
+        // on the very next pass.
         if (
           phase === "attached" &&
           liveDispatch &&
-          !attachedDefinitionIds.has(id)
+          !attachedDefinitionIds.has(id) &&
+          !keyFns.has(id)
         ) {
           attachOne(id, { def, moduleId }, liveDispatch);
         }
@@ -689,9 +863,19 @@ export function createSourcesManager(
       // Reset counters at every fresh start so a stop → start sequence does
       // not carry "ghost" counts from the previous cycle.
       counters.clear();
+      // RFC 0012: clear gate state so a stop → start cycle re-evaluates every
+      // gate fresh. Pending linger timers from the previous cycle are
+      // abandoned (their target sources are gone with the old `attached`).
+      for (const { timer } of lingerTimers.values()) clearTimeout(timer);
+      lingerTimers.clear();
+      lastKey.clear();
       liveDispatch = dispatch;
       phase = "attached";
       for (const [id, record] of definitions) {
+        // Ungated sources attach exactly as before. GATED sources are left to
+        // the initial `evaluateGated(facts)` call (the engine runs one at
+        // `start()` right after `attachAll`, then on every effects plane).
+        if (keyFns.has(id)) continue;
         attachOne(id, record, dispatch);
       }
     },
@@ -728,6 +912,11 @@ export function createSourcesManager(
       attached = [];
       attachedDefinitionIds = new Set();
       liveDispatch = null;
+      // RFC 0012: clear gate state + any pending linger timers so teardown
+      // leaves nothing scheduled to fire against a stopped system.
+      for (const { timer } of lingerTimers.values()) clearTimeout(timer);
+      lingerTimers.clear();
+      lastKey.clear();
     },
 
     async cleanupAllAsync(): Promise<void> {
@@ -776,6 +965,11 @@ export function createSourcesManager(
       attached = [];
       attachedDefinitionIds = new Set();
       liveDispatch = null;
+      // RFC 0012: clear gate state + any pending linger timers so teardown
+      // leaves nothing scheduled to fire against a stopped system.
+      for (const { timer } of lingerTimers.values()) clearTimeout(timer);
+      lingerTimers.clear();
+      lastKey.clear();
     },
 
     async evictAll(): Promise<void> {
@@ -814,6 +1008,70 @@ export function createSourcesManager(
           );
           reportError(record.id, record.moduleId, "runtime", error);
         }
+      }
+    },
+
+    evaluateGated(facts: Record<string, unknown>): void {
+      if (phase !== "attached" || !liveDispatch) return;
+      const dispatch = liveDispatch;
+      for (const [id, keyFn] of keyFns) {
+        const def = definitions.get(id);
+        if (!def) continue;
+
+        // Compute the key FAIL-CLOSED: a gate that throws or returns a
+        // non-(string | null) is treated as `null` (detach) and reported
+        // via `phase: "gate"`.
+        let k: string | null;
+        try {
+          const raw = keyFn(facts);
+          if (raw === null) {
+            k = null;
+          } else if (typeof raw === "string") {
+            k = raw;
+          } else {
+            throw new Error(
+              `gate returned ${raw === undefined ? "undefined" : typeof raw} — must return string | null`,
+            );
+          }
+        } catch (rawError) {
+          k = null;
+          const error =
+            rawError instanceof Error ? rawError : new Error(String(rawError));
+          reportError(id, def.moduleId, "gate", error);
+        }
+
+        const committed = lastKey.get(id) ?? null;
+        const pending = lingerTimers.get(id);
+
+        if (pending) {
+          // A linger is in flight: committed → pending.target.
+          if (k === committed) {
+            // Returned to the prior key inside the window — cancel teardown.
+            clearTimeout(pending.timer);
+            lingerTimers.delete(id);
+          } else if (k === pending.target) {
+            // Still heading to the same target — leave the timer running.
+          } else {
+            // Target moved to a THIRD distinct key mid-linger. The prior state
+            // is gone, so tear the committed channel down NOW (bounding its
+            // open time to this one window) instead of re-arming another linger
+            // from the same unchanged `committed` key — a key flapping to new
+            // values faster than lingerMs could otherwise re-defer that
+            // teardown indefinitely, leaving the original subscription open
+            // (the post-close exposure the gate exists to prevent). Linger
+            // absorbs a RETURN to the same prior key, not a walk to new ones.
+            clearTimeout(pending.timer);
+            lingerTimers.delete(id);
+            const rec = findAttached(id);
+            if (rec) detachOne(rec, "gate-closed");
+            if (k !== null) attachOne(id, def, dispatch, k);
+            lastKey.set(id, k);
+          }
+          continue;
+        }
+
+        if (k === committed) continue; // no-op
+        transitionGated(id, def, dispatch, committed, k);
       }
     },
 

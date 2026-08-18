@@ -300,6 +300,53 @@ verify the debouncing is firing on the right sources. The strategy
 is per-source (uniform across event names from that source) —
 splitting strategies per event name requires two source declarations.
 
+## Gated / keyed sources — `key` / `active`
+
+A source may gate and re-key its subscription lifecycle on module facts.
+`attach` still cannot read facts and the source still writes none — the
+gate is a separate PURE fact read that decides whether, and under what
+identity, the transport is subscribed.
+
+- `key(facts) => string | null` — `null` detaches; a non-null string
+  attaches under that key; a CHANGED string tears the old subscription
+  down BEFORE attaching the new one (a "re-key"). The resolved key flows
+  to `attach` as its 3rd arg, `ctx.key`.
+- `active(facts) => boolean` — sugar for a simple on/off gate, normalized
+  to `key: f => active(f) ? "__on__" : null`. Declaring BOTH `key` and
+  `active` throws a dev error at registration.
+- `gateLingerMs` — hysteresis on a falling / re-key edge: wait this long
+  before tearing the old subscription down, and cancel if the key returns
+  to its prior value within the window. Default `0` (immediate).
+
+```typescript
+sources: {
+  gameChannel: {
+    key: (facts) => (facts.gameId ? `game:${facts.gameId}` : null),
+    gateLingerMs: 2000, // survive a 2s gameId flap without thrashing the socket
+    attach: (publish, _reportError, ctx) => {
+      const channel = supabase.channel(ctx!.key)
+        .on("postgres_changes", { event: "*", table: "moves" },
+          (p) => publish("MOVE", p.new))
+        .subscribe();
+      return () => channel.unsubscribe();
+    },
+  },
+}
+```
+
+The gate is evaluated on the post-commit effects plane (after each
+reconcile) and once at `system.start()`. It runs behind the same replay /
+time-travel guard effects use: replay re-derives the key value but NEVER
+re-attaches the transport (the attach act + published events remain
+non-replayable inputs). A gate that throws or returns a
+non-`(string | null)` value fails closed — treated as `null`, reported via
+`source.error` with `phase: "gate"`, and surfaced on
+`inspect().sources[i].lastError`. An in-flight publish that lands after a
+gate closes is counted as a drop with `lastDropReason: "gate-closed"`.
+
+This replaces the old "re-subscribe when a fact changes → tear the module
+down and re-register it" workaround: declare a `key` instead.
+
 ## Async-aware teardown — `system.stopAsync()` + DO `onEvict`
 
 Per RFC 0009, sources with async unsubscribes (Supabase realtime's
