@@ -1,5 +1,13 @@
 # @directive-run/example-counter
 
+## 0.0.63
+
+### Patch Changes
+
+- Updated dependencies [[`c943307`](https://github.com/directive-run/directive/commit/c943307630366ef1c5a36d2854629345d6a2ff6b), [`b37fc2e`](https://github.com/directive-run/directive/commit/b37fc2e0b0f807e0257fe0b20684e68989a76f9e)]:
+  - @directive-run/core@1.31.0
+  - @directive-run/el@1.1.3
+
 ## 0.0.62
 
 ### Patch Changes

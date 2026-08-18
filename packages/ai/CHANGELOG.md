@@ -1,5 +1,7 @@
 # @directive-run/ai
 
+## 1.31.0
+
 ## 1.30.0
 
 ### Minor Changes
