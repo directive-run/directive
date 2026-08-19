@@ -1,5 +1,41 @@
 # @directive-run/core
 
+## 1.31.2
+
+### Patch Changes
+
+- [#161](https://github.com/directive-run/directive/pull/161) [`7accf96`](https://github.com/directive-run/directive/commit/7accf96337f8235f10f623a6ea724331c57ed5d6) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A plugin that writes in response to a batch no longer silences every derivation
+  notification, or causes a batch to be announced twice.
+
+  `onFactsBatch` is broadcast to plugins before the batch's derivation hold is
+  released, so a plugin that writes there opens a nested batch from inside that
+  window. The engine kept a single release closure, so the nested hold overwrote
+  the outer one and the outer release was lost — the hold count never returned to
+  zero, and from that point `watch`, `subscribe`, and every framework hook built
+  on them stopped firing for the life of the process. Derived values still read
+  correctly on demand and nothing threw, so the symptom looks like a bug in
+  whatever renders.
+
+  Holds are now tracked per batch: released once when the batch's derivations have
+  been invalidated, and unwound to the depth the batch opened at when it ends —
+  including when it throws. A nested batch can no longer release the hold of the
+  batch it is running inside, which was announcing that outer batch early and then
+  again when it finished.
+
+  A batch announces once, on the nested path as well as the plain one.
+
+- [#159](https://github.com/directive-run/directive/pull/159) [`3845d7f`](https://github.com/directive-run/directive/commit/3845d7ffcbb5b0e0d767ad3441c78ac159f570c4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A listener that opens a batch during a flush no longer causes the batch it is
+  reacting to be reported twice.
+
+  `flush()` cleared its buffer after the notify phase rather than before, so a
+  listener that opened a nested batch saw the outer batch's changes still sitting
+  there and reported them again. Anything reconstructing state from `onFactsBatch`
+  — a replica, a persistence layer, an audit trail — received duplicates carrying
+  pre-write values.
+
+  Nothing is lost by clearing early: a write made during the notify phase lands in
+  the now-empty buffer and is reported by its own flush.
+
 ## 1.31.1
 
 ### Patch Changes
