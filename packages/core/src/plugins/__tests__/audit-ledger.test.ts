@@ -1340,3 +1340,135 @@ describe("createAuditLedger — erase() 0-match guard", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Batched writes reach the ledger (item 9)
+// ============================================================================
+
+describe("batched fact writes are recorded", () => {
+  it("records the facts a module writes in init", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+
+    const keys = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change")
+      .map((e: AuditEntry) => (e as { key: string }).key);
+
+    // init writes three facts inside a batch. Before this fix the ledger held
+    // no record of any of them: the observation bridge implemented the
+    // single-write hook and not the batch one, so the system's entire opening
+    // state was absent from its own audit trail.
+    expect(keys).toEqual(
+      expect.arrayContaining(["cartTotal", "region", "active"]),
+    );
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("records writes made inside an explicit batch", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+    const before = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change").length;
+
+    system.batch(() => {
+      system.facts.cartTotal = 120;
+      system.facts.region = "EU";
+    });
+    await flushTick();
+
+    const after = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change");
+    expect(after.length).toBe(before + 2);
+    expect(after.map((e: AuditEntry) => (e as { key: string }).key)).toEqual(
+      expect.arrayContaining(["cartTotal", "region"]),
+    );
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("redacts a tagged fact written inside a batch, not just outside one", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("acct", {
+      schema: {
+        facts: {
+          email: t.string().meta({ tags: ["pii"] }),
+          plan: t.string(),
+        },
+      },
+      init: (facts) => {
+        // Batched: init is the path this fix opened to the ledger. If the
+        // redactor only covered the unbatched path, widening the stream would
+        // have started writing raw personal data into a durable, hash-chained
+        // record — the fix opening what the ledger exists to close.
+        facts.email = "victim@example.com";
+        facts.plan = "free";
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+
+    const entries = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change");
+    const emailEntry = entries.find(
+      (e: AuditEntry) => (e as { key: string }).key === "email",
+    );
+    const planEntry = entries.find(
+      (e: AuditEntry) => (e as { key: string }).key === "plan",
+    );
+
+    expect(emailEntry).toBeDefined();
+    expect((emailEntry as { next: unknown }).next).toBe("[redacted]");
+    // The untagged fact beside it is recorded in the clear, so the redaction
+    // is selective rather than a blanket that hides the hole.
+    expect((planEntry as { next: unknown }).next).toBe("free");
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("does not double-record an unbatched write", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+
+    system.facts.cartTotal = 75;
+    await flushTick();
+
+    const forKey = ledger
+      .query()
+      .filter(
+        (e: AuditEntry) =>
+          e.kind === "fact.change" &&
+          (e as { key: string }).key === "cartTotal" &&
+          (e as { next?: unknown }).next === 75,
+      );
+    // One write, one entry — the batch hook must not duplicate what the
+    // single-write hook already reported.
+    expect(forKey.length).toBe(1);
+
+    system.destroy();
+    ledger.destroy();
+  });
+});

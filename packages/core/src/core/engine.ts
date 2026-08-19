@@ -2135,6 +2135,26 @@ export function createEngine<S extends Schema>(
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
           observer({ type: "fact.change", key, prev, next: value }),
+        // A batch reports its writes here and nowhere else — the store defers
+        // notifications inside `batch()` and reports the whole set at the end,
+        // so `onFactSet` never fires for them. Without this arm, every write
+        // made in a batch was absent from the observation stream and therefore
+        // from the audit ledger: a module's `init`, hydration, an effect's
+        // writes, and anything a resolver writes before its first await. The
+        // system's entire opening state was missing from its own trail.
+        onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
+          for (const change of changes) {
+            observer({
+              type: "fact.change",
+              key: change.key,
+              prev: change.prev,
+              // A delete has no next value. `undefined` is the honest report;
+              // the alternative — omitting the event — is the hole this arm
+              // exists to close.
+              next: change.type === "delete" ? undefined : change.value,
+            });
+          }
+        },
         onConstraintEvaluate: (
           id: string,
           active: boolean,
