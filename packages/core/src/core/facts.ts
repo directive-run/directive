@@ -415,16 +415,33 @@ export function createFactsStore<S extends Schema>(
       return;
     }
 
+    // Take the batch and CLEAR IT before anything downstream runs.
+    //
+    // Consumer code runs during the notify phase below, and a listener is
+    // allowed to open a nested batch. While this state stayed populated until
+    // after that phase, the nested flush saw the outer batch's changes still
+    // sitting in the buffer and reported them a second time. Three writes
+    // produced five records, the duplicates carried pre-write values, and the
+    // last recorded value for a key was the one it held BEFORE the batch — so
+    // anything reconstructing state from that stream got it wrong.
+    //
+    // Nothing is lost by clearing early: a write made during the notify phase
+    // lands in the now-empty buffer and is reported by its own flush.
+    const changes = batchChanges.length > 0 ? [...batchChanges] : null;
+    const keys = dirtyKeys.size > 0 ? [...dirtyKeys] : null;
+    batchChanges.length = 0;
+    dirtyKeys.clear();
+
     // Notify batch callback
-    if (onBatch && batchChanges.length > 0) {
-      onBatch([...batchChanges]);
+    if (onBatch && changes) {
+      onBatch(changes);
     }
 
     // Notify key-specific listeners (within coalescing guard)
-    if (dirtyKeys.size > 0) {
+    if (keys) {
       isNotifying = true;
       try {
-        for (const key of dirtyKeys) {
+        for (const key of keys) {
           notifyKey(key);
         }
         notifyAll();
@@ -433,10 +450,6 @@ export function createFactsStore<S extends Schema>(
         isNotifying = false;
       }
     }
-
-    // Clear batch state
-    batchChanges.length = 0;
-    dirtyKeys.clear();
   }
 
   const store: FactsStore<S> = {
