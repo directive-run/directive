@@ -2417,6 +2417,162 @@ describe("RFC 0012 — gated/keyed sources", () => {
     system.destroy();
   });
 
+  it("a gate that opens onto a throwing attach retries on a later reconcile", async () => {
+    let failures = 2;
+    const attach = vi.fn(() => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new Error("transport unavailable");
+      }
+
+      return () => undefined;
+    });
+    const module = createModule("flaky", {
+      schema: {
+        facts: { on: t.boolean(), tick: t.number() },
+        events: { ON: {}, TICK: {} },
+      },
+      init: (f) => {
+        f.on = false;
+        f.tick = 0;
+      },
+      events: {
+        ON: (f) => {
+          f.on = true;
+        },
+        TICK: (f) => {
+          f.tick = f.tick + 1;
+        },
+      },
+      sources: {
+        s: { active: (f) => f.on === true, attach: () => attach() },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    // Gate opens; the transport is down, so nothing attaches.
+    system.events.ON();
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(system.inspect().attachedSourceCount).toBe(0);
+
+    // Before the fix the key was committed anyway, so every later reconcile
+    // saw "no change" and the source stayed dark for good. Step the clock past
+    // the backoff and reconcile again with the gate value UNCHANGED.
+    const realNow = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(realNow + 1_000);
+    system.events.TICK();
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(2);
+    expect(system.inspect().attachedSourceCount).toBe(0);
+
+    // Third attempt succeeds and the source is finally live.
+    clock.mockReturnValue(realNow + 10_000);
+    system.events.TICK();
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(3);
+    expect(system.inspect().attachedSourceCount).toBe(1);
+
+    clock.mockRestore();
+    system.destroy();
+  });
+
+  it("a failing attach backs off instead of retrying on every reconcile", async () => {
+    const attach = vi.fn(() => {
+      throw new Error("still down");
+    });
+    const module = createModule("down", {
+      schema: {
+        facts: { on: t.boolean(), tick: t.number() },
+        events: { ON: {}, TICK: {} },
+      },
+      init: (f) => {
+        f.on = false;
+        f.tick = 0;
+      },
+      events: {
+        ON: (f) => {
+          f.on = true;
+        },
+        TICK: (f) => {
+          f.tick = f.tick + 1;
+        },
+      },
+      sources: {
+        s: { active: (f) => f.on === true, attach: () => attach() },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    system.events.ON();
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(1);
+
+    // Ten reconciles inside the first backoff window must not become ten
+    // attach attempts — a transport that is down should not be hammered at
+    // the rate a busy system happens to reconcile.
+    for (let i = 0; i < 10; i++) {
+      system.events.TICK();
+      await system.settle();
+    }
+    expect(attach).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+
+  it("a key that moves while an attach is failing drops the old retry", async () => {
+    const attach = vi.fn((key?: string) => {
+      if (key === "game:1") {
+        throw new Error("down");
+      }
+
+      return () => undefined;
+    });
+    const module = createModule("moving", {
+      schema: {
+        facts: { gameId: t.string() },
+        events: { JOIN: { id: t.string() } },
+      },
+      init: (f) => {
+        f.gameId = "";
+      },
+      events: {
+        JOIN: (f, p) => {
+          f.gameId = p.id;
+        },
+      },
+      sources: {
+        channel: {
+          key: (f) => (f.gameId ? `game:${f.gameId}` : null),
+          attach: (_publish, _reportError, ctx) => attach(ctx?.key),
+        },
+      },
+    });
+
+    const system = createSystem({ module });
+    system.start();
+    await system.settle();
+
+    system.events.JOIN({ id: "1" });
+    await system.settle();
+    expect(system.inspect().attachedSourceCount).toBe(0);
+
+    // A new identity is a fresh subscription, not a continuation of the failed
+    // one: it attaches immediately rather than waiting out the old backoff.
+    system.events.JOIN({ id: "2" });
+    await system.settle();
+    expect(attach).toHaveBeenLastCalledWith("game:2");
+    expect(system.inspect().attachedSourceCount).toBe(1);
+
+    system.destroy();
+  });
+
   it("replay/time-travel re-derives the key but does NOT re-attach the transport", async () => {
     const attach = vi.fn(() => () => undefined);
     const module = createModule("toggle", {
