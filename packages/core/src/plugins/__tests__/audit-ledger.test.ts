@@ -1444,6 +1444,230 @@ describe("batched fact writes are recorded", () => {
     ledger.destroy();
   });
 
+  it("a history restore does not write entries the application never made", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("hist", {
+      schema: { facts: { n: t.number() }, events: { SET: { v: t.number() } } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      events: {
+        SET: (facts, p) => {
+          facts.n = p.v;
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [ledger.plugin],
+      history: { maxSnapshots: 20 },
+    });
+    system.start();
+    await flushTick();
+    system.events.SET({ v: 1 });
+    await system.settle();
+    system.events.SET({ v: 2 });
+    await system.settle();
+
+    const before = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change").length;
+    system.history?.goBack();
+    await flushTick();
+    const after = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change").length;
+
+    // Rewinding is not a write. Recording it as one puts changes the
+    // application never made into an append-only, hash-chained record — the
+    // record whose entire job is to be trusted about what happened. Restore
+    // has its own marker; this must not be a second one.
+    expect(after).toBe(before);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("captures the opening state wherever the ledger sits in the plugin array", async () => {
+    const mod = () =>
+      createModule("order", {
+        schema: {
+          facts: {
+            ssn: t.string().meta({ tags: ["pii"] }),
+            plan: t.string(),
+          },
+        },
+        init: (facts) => {
+          facts.ssn = "123-45-6789";
+          facts.plan = "free";
+        },
+      });
+
+    async function kindsFor(ledgerFirst: boolean): Promise<string[]> {
+      const ledger = createAuditLedger();
+      const others = [{ name: "noop" }];
+      const system = createSystem({
+        module: mod(),
+        plugins: ledgerFirst
+          ? [ledger.plugin, ...others]
+          : [...others, ledger.plugin],
+      });
+      system.start();
+      await flushTick();
+      const kinds = ledger
+        .query()
+        .map((e: AuditEntry) => e.kind)
+        .sort();
+      system.destroy();
+      ledger.destroy();
+
+      return kinds;
+    }
+
+    // `emitInit` used to await every plugin, putting a microtask boundary
+    // between them even when each `onInit` was synchronous. A ledger listed
+    // second therefore subscribed after a synchronous `start()` had already
+    // run init — and recorded only `system.init`. The opening state, including
+    // a fact tagged `pii`, was simply absent, and which it was depended on
+    // array position.
+    //
+    // The original tests for batched capture all used the one arrangement in
+    // which it worked, so none of them could have caught this.
+    expect(await kindsFor(false)).toEqual(await kindsFor(true));
+    expect(await kindsFor(false)).toContain("fact.change");
+  });
+
+  it("a listener that writes during a flush does not duplicate the batch it is reacting to", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("nested", {
+      schema: { facts: { a: t.number(), b: t.number(), c: t.number() } },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+        facts.c = 0;
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+
+    let fired = false;
+    system.subscribe(["a"], () => {
+      if (fired) {
+        return;
+      }
+      fired = true;
+      system.batch(() => {
+        system.facts.c = 99;
+      });
+    });
+
+    system.batch(() => {
+      system.facts.a = 1;
+      system.facts.b = 2;
+    });
+    await system.settle();
+
+    const perKey: Record<string, number> = {};
+    for (const entry of ledger.query()) {
+      if (entry.kind !== "fact.change") {
+        continue;
+      }
+      const key = (entry as { key: string }).key;
+      perKey[key] = (perKey[key] ?? 0) + 1;
+    }
+
+    // Two writes per key: one from init, one from the batch. The nested batch
+    // opened by the listener used to re-report the outer batch's changes,
+    // because the buffer was not cleared until after the notify phase — so
+    // `a` and `b` landed in the append-only record three times each.
+    expect(perKey).toEqual({ a: 2, b: 2, c: 2 });
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("an observer still sees a restore, marked, even though the ledger drops it", async () => {
+    const ledger = createAuditLedger();
+    const seen: Array<{ key: string; origin?: string }> = [];
+    const mod = createModule("marked", {
+      schema: { facts: { n: t.number() }, events: { SET: { v: t.number() } } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      events: {
+        SET: (facts, p) => {
+          facts.n = p.v;
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [ledger.plugin],
+      history: { maxSnapshots: 20 },
+    });
+    system.start();
+    await flushTick();
+    system.observe((e) => {
+      if (e.type === "fact.change") {
+        seen.push({ key: e.key, origin: e.origin });
+      }
+    });
+    system.events.SET({ v: 1 });
+    await system.settle();
+    seen.length = 0;
+
+    system.history?.goBack();
+    await flushTick();
+
+    // Suppressing the event entirely would leave a plain observer watching
+    // state move with nothing to explain it — the same blindness this arm was
+    // added to remove, one path over. Marking lets a durable sink drop it and
+    // a debug timeline still show it.
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((s) => s.origin === "restore")).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("one throwing observer loses its own event, not the rest of the batch", async () => {
+    const ledger = createAuditLedger();
+    const seen: string[] = [];
+    const mod = createModule("iso", {
+      schema: {
+        facts: { a: t.number(), b: t.number(), c: t.number() },
+      },
+      init: (facts) => {
+        facts.a = 1;
+        facts.b = 2;
+        facts.c = 3;
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+
+    // A second observer that throws on the middle change. The plugin manager
+    // guards the whole hook, so without per-change isolation this throw would
+    // take every later change in the batch with it — and the ledger's hash
+    // chain would still verify, because a missing entry leaves no hole.
+    system.observe((e) => {
+      if (e.type === "fact.change") {
+        seen.push(e.key);
+        if (e.key === "b") {
+          throw new Error("observer blew up");
+        }
+      }
+    });
+
+    system.start();
+    await flushTick();
+
+    expect(seen).toEqual(expect.arrayContaining(["a", "b", "c"]));
+
+    system.destroy();
+    ledger.destroy();
+  });
+
   it("does not double-record an unbatched write", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({

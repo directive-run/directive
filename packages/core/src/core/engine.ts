@@ -2143,16 +2143,43 @@ export function createEngine<S extends Schema>(
         // writes, and anything a resolver writes before its first await. The
         // system's entire opening state was missing from its own trail.
         onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
+          // A history restore replays state through `store.batch()`, so the
+          // store reports it here like any other batch — and the batch hook
+          // runs before the engine's own `isRestoring` guard further down
+          // `onBatch`, so the distinction has to be drawn here.
+          //
+          // Marked rather than suppressed. Suppressing it would keep invented
+          // changes out of a durable record, but `ObservationEvent` has no
+          // history variant, so a plain observer would then watch state move
+          // with no event explaining it — the exact hole this arm was added to
+          // close, moved one path over. Marking lets a durable sink drop it and
+          // a timeline still show it.
+          const origin = historyRef?.isRestoring
+            ? ({ origin: "restore" } as const)
+            : undefined;
           for (const change of changes) {
-            observer({
-              type: "fact.change",
-              key: change.key,
-              prev: change.prev,
-              // A delete has no next value. `undefined` is the honest report;
-              // the alternative — omitting the event — is the hole this arm
-              // exists to close.
-              next: change.type === "delete" ? undefined : change.value,
-            });
+            // Isolated per change, not per batch. The plugin manager wraps the
+            // whole hook in one guard, so a throw on the third change would
+            // take the rest of the batch with it — and the sink this feeds
+            // exists to be complete. One bad observer callback loses its own
+            // event and nothing else.
+            try {
+              observer({
+                type: "fact.change",
+                key: change.key,
+                prev: change.prev,
+                // A delete has no next value. `undefined` is the honest report;
+                // the alternative — omitting the event — is the hole this arm
+                // exists to close.
+                next: change.type === "delete" ? undefined : change.value,
+                ...origin,
+              });
+            } catch (error) {
+              console.error(
+                `[Directive] observer threw handling a batched change to "${change.key}":`,
+                error,
+              );
+            }
           }
         },
         onConstraintEvaluate: (

@@ -335,6 +335,13 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         break;
       }
       case "fact.change":
+        // Replaying history moves state, and an observer should hear about it —
+        // but this record is append-only and hash-chained, and a rewind is not
+        // something the application did. Filing it beside real writes would
+        // invent history inside the one place whose job is to be trusted about
+        // history. `system.history.navigate` already marks that a rewind
+        // happened.
+        if (event.origin === "restore") break;
         emit({
           kind: "fact.change",
           key: event.key,

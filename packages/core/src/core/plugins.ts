@@ -268,6 +268,34 @@ export function createPluginManager<
   }
 
   /** Safe async call */
+  /** Like `safeCall`, but hands back what the hook returned so the caller can
+   *  tell a synchronous hook from one that returned a promise. */
+  function safeCallSync(
+    fn: () => unknown,
+    pluginName?: string,
+    hook?: string,
+  ): unknown {
+    try {
+      return fn();
+    } catch (error) {
+      console.error("[Directive] Plugin error:", {
+        plugin: pluginName,
+        hook,
+        error,
+      });
+
+      return undefined;
+    }
+  }
+
+  function isThenable(value: unknown): value is PromiseLike<unknown> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as { then?: unknown }).then === "function"
+    );
+  }
+
   async function safeCallAsync<T>(
     fn: (() => Promise<T>) | undefined,
     pluginName?: string,
@@ -365,12 +393,32 @@ export function createPluginManager<
           // non-trivial to keep dev console noise low.
           const startedAt =
             typeof performance !== "undefined" ? performance.now() : Date.now();
-          await safeCallAsync(
-            () =>
-              (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,
+          // Only suspend for a plugin that actually returns a promise.
+          //
+          // This used to wrap every `onInit` in `Promise.resolve()` and await
+          // it, which put a microtask boundary between plugins even when each
+          // one was synchronous. A plugin that subscribes in `onInit` — an
+          // audit ledger, say — therefore missed everything a synchronous
+          // `start()` did before its turn came round: the module's `init`
+          // writes, hydration, and `system.start` itself. Whether the trail
+          // held the system's opening state depended on the plugin's position
+          // in the array, which is not something anyone would think to check.
+          //
+          // A synchronous `onInit` now completes before the next plugin runs.
+          // An async one still suspends, and the plugins after it still wait,
+          // exactly as before.
+          const initResult = safeCallSync(
+            () => plugin.onInit?.(system),
             plugin.name,
             "onInit",
           );
+          if (isThenable(initResult)) {
+            await safeCallAsync(
+              () => initResult as Promise<void>,
+              plugin.name,
+              "onInit",
+            );
+          }
           const elapsedMs =
             (typeof performance !== "undefined"
               ? performance.now()
