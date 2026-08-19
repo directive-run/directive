@@ -1,5 +1,23 @@
 # @directive-run/core
 
+## 1.31.1
+
+### Patch Changes
+
+- [#156](https://github.com/directive-run/directive/pull/156) [`7a408e0`](https://github.com/directive-run/directive/commit/7a408e0d6f9b71b9e93c837972cd94d676a2c1ed) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A gated source whose `attach` fails now retries instead of staying dark.
+
+  When a gate opened and `attach` threw — a transport briefly unavailable at the
+  moment a fact changed — the key was recorded as attached even though nothing
+  was. The next evaluation saw no change and did nothing, so the source stayed
+  detached until the key happened to move again.
+
+  `lastKey` now records what is attached rather than what was intended, so a
+  failed attach leaves the gate open and the next reconcile tries again. Retries
+  back off (250ms doubling to a 30s ceiling) so a transport that is simply down is
+  not re-attached on every reconcile of a busy system. A gate that moves to a new
+  key starts a fresh subscription immediately rather than waiting out the old
+  backoff.
+
 ## 1.31.0
 
 ### Minor Changes
