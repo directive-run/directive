@@ -519,11 +519,17 @@ export function createFactsStore<S extends Schema>(
         fn();
       } finally {
         batching--;
-        flush();
-        // After `flush()`, so whatever `onBatch` did during the flush is inside
-        // the scope that opened.
-        if (outermost) {
-          onBatchEnd?.();
+        // `onBatchEnd` pairs with `onBatchStart` on every exit, including a
+        // throw out of the flush. Anything scoped to the batch — the engine's
+        // derivation hold, for one — is given back rather than stranded.
+        try {
+          flush();
+        } finally {
+          // After `flush()`, so whatever `onBatch` did during the flush is
+          // inside the scope that opened.
+          if (outermost) {
+            onBatchEnd?.();
+          }
         }
       }
     },

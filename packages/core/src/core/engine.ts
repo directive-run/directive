@@ -552,11 +552,66 @@ export function createEngine<S extends Schema>(
    * become able to read the right values before that moment arrives.
    */
   let holdDerivationNotifications: () => () => void = () => () => {};
-  let releaseHold: (() => void) | null = null;
 
+  /**
+   * Outstanding derivation-notification holds, innermost last.
+   *
+   * This was a single slot, which is wrong as soon as a batch can begin while
+   * another is still open — and one can: `onFactsBatch` is broadcast to plugins
+   * *before* the outer hold is released, so a plugin that writes in response to
+   * a batch opens a nested one from inside that window. The nested hold
+   * overwrote the outer one in the slot, the outer release closure was dropped
+   * on the floor, and the manager's depth counter never returned to zero. From
+   * then on every derivation notification was held forever: `watch`,
+   * `subscribe` and any framework hook built on them went silent for the life
+   * of the process, while the values themselves still read correctly on demand.
+   * Nothing threw, and the symptom looks like a bug in whatever renders.
+   *
+   * The manager already counts holds properly and its release is idempotent;
+   * only this side needed to stop forgetting them.
+   */
+  const derivationHolds: Array<{ release: () => void; released: boolean }> = [];
+
+  /**
+   * How deep the stack was when each batch opened, so a batch can only ever
+   * unwind what it pushed.
+   */
+  const derivationHoldBase: number[] = [];
+
+  /**
+   * Release the innermost hold, once. Called from `onBatch`, which is after the
+   * batch's derivations have been invalidated and therefore the right moment to
+   * announce.
+   *
+   * It releases without popping. A batch that wrote something reaches here AND
+   * `onBatchEnd`; popping in both places meant one pop landed on whatever was
+   * underneath, so a batch nested inside another's flush released its parent's
+   * hold — announcing the parent early and then again when the parent finished.
+   */
   function releaseDerivationHold(): void {
-    releaseHold?.();
-    releaseHold = null;
+    const top = derivationHolds[derivationHolds.length - 1];
+    if (top && !top.released) {
+      top.released = true;
+      top.release();
+    }
+  }
+
+  /**
+   * Unwind to where this batch started, releasing anything still held.
+   *
+   * Called from `onBatchEnd`, which `store.batch` runs in a `finally`, so a
+   * throw anywhere in the batch still gives the hold back. Anything already
+   * released by `releaseDerivationHold` is skipped rather than released twice.
+   */
+  function unwindDerivationHolds(): void {
+    const base = derivationHoldBase.pop() ?? 0;
+    while (derivationHolds.length > base) {
+      const frame = derivationHolds.pop();
+      if (frame && !frame.released) {
+        frame.released = true;
+        frame.release();
+      }
+    }
   }
 
   // Forward-declared so onChange/onBatch closures can check isRestoring.
@@ -652,7 +707,11 @@ export function createEngine<S extends Schema>(
       invalidateDerivation(key);
     },
     onBatchStart: () => {
-      releaseHold = holdDerivationNotifications();
+      derivationHoldBase.push(derivationHolds.length);
+      derivationHolds.push({
+        release: holdDerivationNotifications(),
+        released: false,
+      });
     },
     onKeysRegistered: (entries) => {
       const asSchema: Record<string, unknown> = {};
@@ -663,9 +722,10 @@ export function createEngine<S extends Schema>(
       notifyMetaSubscribers();
     },
     onBatchEnd: () => {
-      // Normally already released inside `onBatch`. This catches the batch that
-      // wrote nothing, where `onBatch` never runs.
-      releaseDerivationHold();
+      // Normally the hold was already released inside `onBatch`. This unwinds
+      // the frame either way, and covers the batch that wrote nothing — where
+      // `onBatch` never runs — and the batch that threw.
+      unwindDerivationHolds();
     },
   });
 
