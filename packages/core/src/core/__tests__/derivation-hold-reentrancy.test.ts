@@ -49,7 +49,7 @@ describe("derivation hold re-entrancy", () => {
     const writer: Plugin = {
       name: "writer",
       onInit: (system) => {
-        host = system as ReturnType<typeof createSystem>;
+        host = system as unknown as ReturnType<typeof createSystem>;
       },
       onFactsBatch: () => {
         if (written || !host) {
@@ -105,6 +105,127 @@ describe("derivation hold re-entrancy", () => {
     // The point of the hold is that a batch announces once, not per write.
     // Making it re-entrant must not turn one announcement into two.
     expect(fired).toBe(1);
+
+    system.destroy();
+  });
+});
+
+describe("a nested batch cannot release its parent's hold", () => {
+  it("announces once per batch even when a plugin batches inside the broadcast", async () => {
+    let host: ReturnType<typeof createSystem> | undefined;
+    let nested = 0;
+    const writer: Plugin = {
+      name: "writer",
+      onInit: (system) => {
+        host = system as unknown as ReturnType<typeof createSystem>;
+      },
+      onFactsBatch: () => {
+        // Writes on EVERY batch it is told about, including the ones its own
+        // write causes — a mirror or an outbox behaves exactly like this. The
+        // cap only stops the test running forever; it is not the guard that
+        // makes the defect appear. Writing once per outer batch does NOT
+        // reproduce it, which is why the first version of this test passed
+        // against the broken code.
+        if (nested >= 8 || !host) {
+          return;
+        }
+        nested += 1;
+        host.batch(() => {
+          (host as { facts: Record<string, unknown> }).facts.log = nested;
+        });
+      },
+    };
+
+    const system = createSystem({ module: makeModule(), plugins: [writer] });
+    system.start();
+    await system.settle();
+
+    // Counted through `subscribe`, deliberately, not `watch`. `watch` compares
+    // the new value with `Object.is` and swallows a repeat — so a second
+    // announcement carrying the same value is invisible to it, which is
+    // exactly the extra announcement this test exists to catch.
+    let announced = 0;
+    system.subscribe(["doubled"], () => {
+      announced += 1;
+      void system.derive.doubled;
+    });
+
+    for (let i = 0; i < 4; i += 1) {
+      nested = 0;
+      system.events.BUMP();
+      await system.settle();
+    }
+
+    expect(announced).toBe(4);
+
+    system.destroy();
+  });
+
+  it("does not let a listener observe a value before every plugin has seen it", async () => {
+    // The ordering a redaction plugin depends on: every plugin sees a batch
+    // before any listener runs, so a guardrail registered after a plugin that
+    // writes still redacts before consumer code can read.
+    //
+    // A guard, not a reproduction. A review reached this with the real PII
+    // guardrail across two packages and saw an unredacted value observed one
+    // tick early; this in-package version passes with or without the fix, so it
+    // pins the invariant rather than proving the bug. Said plainly because a
+    // test that cannot fail is worth less than it looks, and this file already
+    // shipped one of those.
+    const order: string[] = [];
+    let host: ReturnType<typeof createSystem> | undefined;
+    let nested = 0;
+
+    const batcher: Plugin = {
+      name: "batcher",
+      onInit: (system) => {
+        host = system as unknown as ReturnType<typeof createSystem>;
+      },
+      onFactsBatch: () => {
+        order.push("batcher");
+        // Every batch, for the same reason as the test above: writing once per
+        // outer batch does not reach the path where the enclosing hold is
+        // released early.
+        if (nested >= 8 || !host) {
+          return;
+        }
+        nested += 1;
+        host.batch(() => {
+          (host as { facts: Record<string, unknown> }).facts.log = 1;
+        });
+      },
+    };
+    const later: Plugin = {
+      name: "later",
+      onFactsBatch: () => {
+        order.push("later");
+      },
+    };
+
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [batcher, later],
+    });
+    system.start();
+    await system.settle();
+
+    system.subscribe(["doubled"], () => {
+      order.push("listener");
+    });
+
+    order.length = 0;
+    system.batch(() => {
+      system.facts.n = 5;
+    });
+    await system.settle();
+
+    // Every plugin sees the batch before any listener runs.
+    const firstListener = order.indexOf("listener");
+    const lastPlugin = Math.max(
+      order.lastIndexOf("batcher"),
+      order.lastIndexOf("later"),
+    );
+    expect(firstListener).toBeGreaterThan(lastPlugin);
 
     system.destroy();
   });
