@@ -435,6 +435,17 @@ export function createSourcesManager(
     string,
     { timer: ReturnType<typeof setTimeout>; target: string | null }
   >();
+  //   attachRetries: gated sources whose gate is OPEN but whose `attach` threw
+  //                  (or returned something that is not an unsubscribe). The
+  //                  gate says the subscription should exist and it does not,
+  //                  which is unreconciled state — so the next evaluation
+  //                  tries again rather than waiting for the key to move.
+  //                  Backoff keeps a transport that is simply down from
+  //                  re-attaching on every reconcile of a busy system.
+  const attachRetries = new Map<
+    string,
+    { key: string; attempts: number; nextAt: number }
+  >();
 
   /**
    * Normalize a source definition's gate at registration. Throws a dev
@@ -525,7 +536,7 @@ export function createSourcesManager(
     record: SourceDefinition,
     dispatch: SourceDispatch,
     resolvedKey?: string,
-  ): void {
+  ): boolean {
     // Pre-build the AttachedSource record so the per-source publish closure
     // can close over `attachedRecord.detached` instead of a captured-once
     // boolean. Without this, an OLD source's external transport that fires
@@ -690,7 +701,8 @@ export function createSourcesManager(
         );
         console.error(err);
         reportError(id, record.moduleId, "attach", err);
-        return;
+
+        return false;
       }
       // Late-bind the real unsubscribe + push the live record.
       attachedRecord.unsubscribe = unsubscribe;
@@ -706,6 +718,8 @@ export function createSourcesManager(
       // Emit AFTER successful attach so observers cannot see attach for a
       // source that failed or returned a non-function unsubscribe.
       callbacks.onAttach?.(id, record.moduleId);
+
+      return true;
     } catch (rawError) {
       const error =
         rawError instanceof Error ? rawError : new Error(String(rawError));
@@ -714,6 +728,8 @@ export function createSourcesManager(
         error,
       );
       reportError(id, record.moduleId, "attach", error);
+
+      return false;
     }
   }
 
@@ -764,6 +780,61 @@ export function createSourcesManager(
    * hysteresis. `committed` is the key the source is currently attached
    * under (from `lastKey`). Never called when `committed === k`.
    */
+  /**
+   * Delay before a failed gated attach is retried: 250ms doubling to a 30s
+   * ceiling. It never gives up — the gate is open, so the subscription is
+   * still owed; a source that stops retrying would be exactly the silent
+   * dark state this retry exists to remove.
+   */
+  function retryDelayMs(attempts: number): number {
+    return Math.min(250 * 2 ** (attempts - 1), 30_000);
+  }
+
+  /**
+   * Attach under `k` (or detach, when `k` is null) and record the result.
+   *
+   * `lastKey` records what is ATTACHED, never what was merely intended. An
+   * attach that throws used to be committed anyway, so the next evaluation saw
+   * no change and did nothing: the gate read open, the inspect row read
+   * detached, and the source stayed dark until the key happened to move. Now a
+   * failure leaves the key uncommitted and schedules a retry, so the next
+   * evaluation sees a rising edge again.
+   */
+  function commitAttach(
+    id: string,
+    def: SourceDefinition,
+    dispatch: SourceDispatch,
+    k: string | null,
+  ): void {
+    if (k === null) {
+      lastKey.set(id, null);
+      attachRetries.delete(id);
+      return;
+    }
+    // A failed attach leaves the key uncommitted, so the next evaluation sees
+    // a rising edge and lands back here. That is the retry — and without a
+    // brake it would fire on every reconcile of a busy system against a
+    // transport that is simply down. Hold off until the backoff has elapsed.
+    // A retry recorded against a DIFFERENT key is a different subscription and
+    // never delays this one.
+    const pending = attachRetries.get(id);
+    if (pending && pending.key === k && Date.now() < pending.nextAt) return;
+
+    if (attachOne(id, def, dispatch, k)) {
+      lastKey.set(id, k);
+      attachRetries.delete(id);
+      return;
+    }
+    // Failed. Leave `lastKey` where it was (detached) and arm the backoff.
+    const prior = attachRetries.get(id);
+    const attempts = prior && prior.key === k ? prior.attempts + 1 : 1;
+    attachRetries.set(id, {
+      key: k,
+      attempts,
+      nextAt: Date.now() + retryDelayMs(attempts),
+    });
+  }
+
   function transitionGated(
     id: string,
     def: SourceDefinition,
@@ -773,8 +844,7 @@ export function createSourcesManager(
   ): void {
     if (committed === null) {
       // Rising edge — attach immediately (linger never applies to a rise).
-      attachOne(id, def, dispatch, k ?? undefined);
-      lastKey.set(id, k);
+      commitAttach(id, def, dispatch, k);
       return;
     }
     // Falling (k === null) or re-key (k !== null): linger may apply.
@@ -782,8 +852,7 @@ export function createSourcesManager(
     const runTeardownAndReattach = (): void => {
       const rec = findAttached(id);
       if (rec) detachOne(rec, "gate-closed");
-      if (k !== null) attachOne(id, def, dispatch, k);
-      lastKey.set(id, k);
+      commitAttach(id, def, dispatch, k);
     };
     if (lingerMs > 0) {
       const timer = setTimeout(() => {
@@ -831,6 +900,7 @@ export function createSourcesManager(
           lingerTimers.delete(id);
         }
         lastKey.delete(id);
+        attachRetries.delete(id);
 
         definitions.set(id, { def, moduleId });
         registerGate(id, def);
@@ -868,6 +938,7 @@ export function createSourcesManager(
       // abandoned (their target sources are gone with the old `attached`).
       for (const { timer } of lingerTimers.values()) clearTimeout(timer);
       lingerTimers.clear();
+      attachRetries.clear();
       lastKey.clear();
       liveDispatch = dispatch;
       phase = "attached";
@@ -916,6 +987,7 @@ export function createSourcesManager(
       // leaves nothing scheduled to fire against a stopped system.
       for (const { timer } of lingerTimers.values()) clearTimeout(timer);
       lingerTimers.clear();
+      attachRetries.clear();
       lastKey.clear();
     },
 
@@ -969,6 +1041,7 @@ export function createSourcesManager(
       // leaves nothing scheduled to fire against a stopped system.
       for (const { timer } of lingerTimers.values()) clearTimeout(timer);
       lingerTimers.clear();
+      attachRetries.clear();
       lastKey.clear();
     },
 
@@ -1064,13 +1137,21 @@ export function createSourcesManager(
             lingerTimers.delete(id);
             const rec = findAttached(id);
             if (rec) detachOne(rec, "gate-closed");
-            if (k !== null) attachOne(id, def, dispatch, k);
-            lastKey.set(id, k);
+            commitAttach(id, def, dispatch, k);
           }
           continue;
         }
 
-        if (k === committed) continue; // no-op
+        if (k === committed) {
+          // Unchanged key. Normally a no-op — unless a previous attach failed,
+          // in which case the gate is open with nothing attached and this
+          // reconcile is the moment to try again. Backoff keeps a transport
+          // that is simply down from re-attaching on every reconcile.
+          if (attachRetries.has(id) && k !== null) {
+            commitAttach(id, def, dispatch, k);
+          }
+          continue;
+        }
         transitionGated(id, def, dispatch, committed, k);
       }
     },
