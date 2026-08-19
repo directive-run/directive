@@ -552,11 +552,28 @@ export function createEngine<S extends Schema>(
    * become able to read the right values before that moment arrives.
    */
   let holdDerivationNotifications: () => () => void = () => () => {};
-  let releaseHold: (() => void) | null = null;
+
+  /**
+   * Outstanding derivation-notification holds, innermost last.
+   *
+   * This was a single slot, which is wrong as soon as a batch can begin while
+   * another is still open — and one can: `onFactsBatch` is broadcast to plugins
+   * *before* the outer hold is released, so a plugin that writes in response to
+   * a batch opens a nested one from inside that window. The nested hold
+   * overwrote the outer one in the slot, the outer release closure was dropped
+   * on the floor, and the manager's depth counter never returned to zero. From
+   * then on every derivation notification was held forever: `watch`,
+   * `subscribe` and any framework hook built on them went silent for the life
+   * of the process, while the values themselves still read correctly on demand.
+   * Nothing threw, and the symptom looks like a bug in whatever renders.
+   *
+   * The manager already counts holds properly and its release is idempotent;
+   * only this side needed to stop forgetting them.
+   */
+  const derivationHolds: Array<() => void> = [];
 
   function releaseDerivationHold(): void {
-    releaseHold?.();
-    releaseHold = null;
+    derivationHolds.pop()?.();
   }
 
   // Forward-declared so onChange/onBatch closures can check isRestoring.
@@ -652,7 +669,7 @@ export function createEngine<S extends Schema>(
       invalidateDerivation(key);
     },
     onBatchStart: () => {
-      releaseHold = holdDerivationNotifications();
+      derivationHolds.push(holdDerivationNotifications());
     },
     onKeysRegistered: (entries) => {
       const asSchema: Record<string, unknown> = {};
