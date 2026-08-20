@@ -1340,3 +1340,262 @@ describe("createAuditLedger — erase() 0-match guard", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Batched writes reach the ledger
+// ============================================================================
+
+describe("batched fact writes are recorded", () => {
+  function factKeys(ledger: ReturnType<typeof createAuditLedger>): string[] {
+    return ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change")
+      .map((e: AuditEntry) => (e as { key: string }).key);
+  }
+
+  it("records the facts a module writes in init", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+
+    // `init` writes inside a batch. Before this the ledger held no record of
+    // any of it — the system's entire opening state was missing from its own
+    // trail, while the trail reported itself complete.
+    expect(factKeys(ledger)).toEqual(
+      expect.arrayContaining(["cartTotal", "region", "active"]),
+    );
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("records writes an event handler makes", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+    const before = factKeys(ledger).length;
+
+    system.batch(() => {
+      system.facts.cartTotal = 120;
+      system.facts.region = "EU";
+    });
+    await flushTick();
+
+    // Handler writes are batched, which is why this is the common case rather
+    // than an edge one: it is how most applications change state at all.
+    expect(factKeys(ledger).length).toBe(before + 2);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("does not double-record an unbatched write", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await flushTick();
+
+    system.facts.cartTotal = 75;
+    await flushTick();
+
+    const forKey = ledger
+      .query()
+      .filter(
+        (e: AuditEntry) =>
+          e.kind === "fact.change" &&
+          (e as { key: string }).key === "cartTotal" &&
+          (e as { next?: unknown }).next === 75,
+      );
+    expect(forKey.length).toBe(1);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("redacts a tagged fact written inside a batch", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("acct", {
+      schema: {
+        facts: {
+          email: t.string().meta({ tags: ["pii"] }),
+          plan: t.string(),
+        },
+      },
+      init: (facts) => {
+        facts.email = "victim@example.com";
+        facts.plan = "free";
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+
+    const entries = ledger
+      .query()
+      .filter((e: AuditEntry) => e.kind === "fact.change");
+    const email = entries.find(
+      (e: AuditEntry) => (e as { key: string }).key === "email",
+    );
+    const plan = entries.find(
+      (e: AuditEntry) => (e as { key: string }).key === "plan",
+    );
+
+    // Opening this path means init and hydrated values reach a durable,
+    // hash-chained record for the first time, so redaction had to be proven on
+    // it rather than assumed.
+    expect((email as { next: unknown }).next).toBe("[redacted]");
+    // Selective, not a blanket that would hide the hole.
+    expect((plan as { next: unknown }).next).toBe("free");
+
+    system.destroy();
+    ledger.destroy();
+  });
+});
+
+describe("a rewind is labelled at the write, not guessed at later", () => {
+  function historySystem() {
+    const ledger = createAuditLedger();
+    const mod = createModule("hist", {
+      schema: {
+        facts: { n: t.number(), note: t.string() },
+        events: { SET: { v: t.number() } },
+      },
+      init: (facts) => {
+        facts.n = 0;
+        facts.note = "";
+      },
+      events: {
+        SET: (facts, p) => {
+          facts.n = p.v;
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [ledger.plugin],
+      history: { maxSnapshots: 20 },
+    });
+
+    return { ledger, system };
+  }
+
+  const factRows = (ledger: ReturnType<typeof createAuditLedger>) =>
+    ledger.query().filter((e: AuditEntry) => e.kind === "fact.change");
+
+  it("keeps a plain rewind out of the record", async () => {
+    const { ledger, system } = historySystem();
+    system.start();
+    await flushTick();
+    system.events.SET({ v: 1 });
+    await system.settle();
+    system.events.SET({ v: 2 });
+    await system.settle();
+
+    const before = factRows(ledger).length;
+    system.history?.goBack();
+    await flushTick();
+
+    expect(factRows(ledger).length).toBe(before);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("keeps a rewind out of the record even when it happens inside a batch", async () => {
+    const { ledger, system } = historySystem();
+    system.start();
+    await flushTick();
+    system.events.SET({ v: 1 });
+    await system.settle();
+    system.events.SET({ v: 2 });
+    await system.settle();
+
+    const before = factRows(ledger).length;
+    // The attack on the previous attempt. It read a global "am I rewinding?"
+    // flag when the batch was reported — and a rewind nested inside another
+    // batch is reported after that flag has cleared, so the invented values
+    // were filed as writes the application had made.
+    system.batch(() => {
+      system.history?.goBack();
+    });
+    await flushTick();
+
+    expect(factRows(ledger).length).toBe(before);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("still records a real write made while a rewind is settling", async () => {
+    const { ledger, system } = historySystem();
+    system.start();
+    await flushTick();
+    system.events.SET({ v: 1 });
+    await system.settle();
+    system.events.SET({ v: 2 });
+    await system.settle();
+
+    let wrote = false;
+    system.subscribe(["n"], () => {
+      if (wrote) {
+        return;
+      }
+      wrote = true;
+      system.batch(() => {
+        system.facts.note = "written during a rewind";
+      });
+    });
+
+    const before = factRows(ledger).length;
+    system.history?.goBack();
+    await flushTick();
+
+    // The mirror of the attack above: under a flag-read-later scheme this
+    // write gained the rewind label and vanished from the record. A way to
+    // write data the audit refuses to keep is worse than a noisy audit.
+    const added = factRows(ledger).slice(0, factRows(ledger).length - before);
+    expect(factRows(ledger).length).toBe(before + 1);
+    expect(added.some((e) => (e as { key: string }).key === "note")).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("still tells an observer that a rewind happened", async () => {
+    const { ledger, system } = historySystem();
+    system.start();
+    await flushTick();
+    system.events.SET({ v: 1 });
+    await system.settle();
+
+    const seen: Array<string | undefined> = [];
+    system.observe((e) => {
+      if (e.type === "fact.change") {
+        seen.push(e.origin);
+      }
+    });
+
+    system.history?.goBack();
+    await flushTick();
+
+    // Dropping the event outright would leave a timeline watching state move
+    // with nothing to explain it — the same blindness this arm removes, one
+    // path over. Labelled, not silenced.
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((origin) => origin === "restore")).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+  });
+});

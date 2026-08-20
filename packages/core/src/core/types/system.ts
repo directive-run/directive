@@ -955,7 +955,20 @@ export type PredicateOverlapProof =
 
 /** Typed events emitted by system.observe(). */
 export type ObservationEvent =
-  | { type: "fact.change"; key: string; prev: unknown; next: unknown }
+  | {
+      type: "fact.change";
+      key: string;
+      prev: unknown;
+      next: unknown;
+      /**
+       * Present when the change came from replaying history rather than from
+       * the application writing. A rewind moves state, so an observer still
+       * needs to hear about it — a timeline that went silent across a restore
+       * would be lying by omission. But a durable record must not file it
+       * beside changes the application actually made.
+       */
+      origin?: "restore";
+    }
   | {
       type: "constraint.evaluate";
       id: string;

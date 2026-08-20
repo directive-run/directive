@@ -2195,6 +2195,38 @@ export function createEngine<S extends Schema>(
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
           observer({ type: "fact.change", key, prev, next: value }),
+        // Writes made inside a batch report here and nowhere else — the store
+        // defers notification for the duration of a batch and hands over the
+        // whole set at the end, so `onFactSet` never fires for them. Without
+        // this arm every such write was absent from the observation stream, and
+        // therefore from anything built on it: a module's `init`, hydrated
+        // state, an effect's writes, whatever a resolver writes before its
+        // first await — and every write an event handler makes, which is how
+        // most applications change state at all. An audit ledger on a running
+        // application recorded almost nothing.
+        onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
+          for (const change of changes) {
+            // Isolated per change. The plugin manager guards the hook as a
+            // whole, so a throw on the third change would take the rest of the
+            // batch with it — and the sinks this feeds exist to be complete.
+            try {
+              observer({
+                type: "fact.change",
+                key: change.key,
+                prev: change.prev,
+                // A delete has no next value. Reporting `undefined` is honest;
+                // omitting the event is the hole this arm exists to close.
+                next: change.type === "delete" ? undefined : change.value,
+                ...(change.origin ? { origin: change.origin } : {}),
+              });
+            } catch (error) {
+              console.error(
+                `[Directive] observer threw handling a batched change to "${change.key}":`,
+                error,
+              );
+            }
+          }
+        },
         onConstraintEvaluate: (
           id: string,
           active: boolean,

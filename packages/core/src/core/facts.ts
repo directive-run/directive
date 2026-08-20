@@ -153,6 +153,12 @@ export function createFactsStore<S extends Schema>(
   const allListeners = new Set<() => void>();
 
   let batching = 0;
+  /**
+   * Set for the duration of a batch that declares one, so every change it
+   * records carries it. Saved and restored around each batch, so a batch
+   * opened inside another keeps its own answer.
+   */
+  let batchOrigin: "restore" | undefined;
   const batchChanges: Array<{
     key: string;
     value: unknown;
@@ -481,7 +487,13 @@ export function createFactsStore<S extends Schema>(
 
       // Record change
       if (batching > 0) {
-        batchChanges.push({ key: key as string, value, prev, type: "set" });
+        batchChanges.push({
+          key: key as string,
+          value,
+          prev,
+          type: "set",
+          ...(batchOrigin ? { origin: batchOrigin } : {}),
+        });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);
       } else {
@@ -501,6 +513,7 @@ export function createFactsStore<S extends Schema>(
           value: undefined,
           prev,
           type: "delete",
+          ...(batchOrigin ? { origin: batchOrigin } : {}),
         });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);
@@ -509,8 +522,12 @@ export function createFactsStore<S extends Schema>(
       }
     },
 
-    batch(fn: () => void): void {
+    batch(fn: () => void, options?: { origin?: "restore" }): void {
       const outermost = batching === 0;
+      const previousOrigin = batchOrigin;
+      if (options?.origin) {
+        batchOrigin = options.origin;
+      }
       batching++;
       if (outermost) {
         onBatchStart?.();
@@ -522,6 +539,7 @@ export function createFactsStore<S extends Schema>(
         // `onBatchEnd` pairs with `onBatchStart` on every exit, including a
         // throw out of the flush. Anything scoped to the batch — the engine's
         // derivation hold, for one — is given back rather than stranded.
+        batchOrigin = previousOrigin;
         try {
           flush();
         } finally {

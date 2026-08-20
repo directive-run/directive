@@ -197,22 +197,27 @@ export function createHistoryManager<S extends Schema>(
       return;
     }
 
-    store.batch(() => {
-      for (const [key, value] of Object.entries(serialized)) {
-        // Prototype pollution protection (redundant but defensive)
-        if (
-          key === "__proto__" ||
-          key === "constructor" ||
-          key === "prototype"
-        ) {
-          console.warn(
-            `[Directive] Skipping dangerous key "${key}" during fact restoration`,
-          );
-          continue;
+    // Declared at the write, so every change this replay records is labelled
+    // whatever else happens to be in flight around it.
+    store.batch(
+      () => {
+        for (const [key, value] of Object.entries(serialized)) {
+          // Prototype pollution protection (redundant but defensive)
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            console.warn(
+              `[Directive] Skipping dangerous key "${key}" during fact restoration`,
+            );
+            continue;
+          }
+          (facts as Record<string, unknown>)[key] = value;
         }
-        (facts as Record<string, unknown>)[key] = value;
-      }
-    });
+      },
+      { origin: "restore" },
+    );
   }
 
   const manager: HistoryManager<S> = {
