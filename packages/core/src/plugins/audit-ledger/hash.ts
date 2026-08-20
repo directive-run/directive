@@ -37,22 +37,56 @@ export const LEDGER_INTERNAL_TOKEN: unique symbol = Symbol(
 );
 
 /**
- * Depth-2 freeze: freeze the entry, freeze each top-level value, and
- * freeze each clause in `whenExplain`. Cycle-safe + cheap; prevents
- * in-process payload mutation that would forge the chain.
+ * Take the entry's own copy of anything it holds a reference to, then freeze
+ * that copy.
+ *
+ * The freeze exists so a consumer cannot mutate a payload in place and forge
+ * the chain. It used to freeze whatever it was handed — and what it was handed
+ * was the application's own fact value. Recording a change therefore froze
+ * application state: reading a nested property afterwards threw a proxy
+ * invariant error, so installing the audit plugin broke the system it was
+ * auditing.
+ *
+ * Copying gives the same guarantee and a stronger one. A value mutated after
+ * it was recorded no longer changes what the record says, because the record
+ * is not holding the caller's object at all.
+ *
+ * A value that cannot be copied — one carrying a function, or a shape the
+ * structured clone algorithm refuses — is kept as-is and left unfrozen. Better
+ * a payload that could in principle be mutated than an audit control that
+ * mutates the system. The chain still covers it; only the in-process
+ * immutability is weaker, and only for values that were never serialisable.
  */
+function ownCopy(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  try {
+    return structuredClone(value);
+  } catch {
+    return value;
+  }
+}
+
 export function freezeEntry(entry: AuditEntry): AuditEntry {
+  const record = entry as unknown as Record<string, unknown>;
   for (const key of Object.keys(entry)) {
-    const v = (entry as unknown as Record<string, unknown>)[key];
+    const v = record[key];
     if (v !== null && typeof v === "object") {
-      if (Array.isArray(v) && key === "whenExplain") {
-        for (const clause of v) {
-          if (clause !== null && typeof clause === "object") {
-            Object.freeze(clause);
+      const copy = ownCopy(v);
+      record[key] = copy;
+      if (copy !== v) {
+        // Only freeze what this entry owns. An object we failed to copy is
+        // still the caller's.
+        if (Array.isArray(copy) && key === "whenExplain") {
+          for (const clause of copy) {
+            if (clause !== null && typeof clause === "object") {
+              Object.freeze(clause);
+            }
           }
         }
+        Object.freeze(copy);
       }
-      Object.freeze(v);
     }
   }
   Object.freeze(entry);
