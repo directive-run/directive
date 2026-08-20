@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/ai",
-  "version": "1.31.2",
+  "version": "1.31.3",
   "description": "AI guardrails and orchestration for Directive. Prompt injection, PII detection, cost tracking, multi-agent patterns.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
