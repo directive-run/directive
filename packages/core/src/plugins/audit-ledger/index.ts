@@ -288,8 +288,26 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    * mutate payloads in place and forge the chain.
    */
   function emit(partial: Record<string, unknown>): AuditEntry {
+    // Drop keys whose value is `undefined` before the entry is built.
+    //
+    // The chain is hashed over a stable stringification that encodes a
+    // present-but-undefined key; `JSON.stringify` drops it. So an entry
+    // carrying one — the first write of any fact has no prior value — hashed
+    // one way live and another way after export, and an auditor who exported
+    // the trail was told it had been altered. By the tool whose entire job is
+    // to answer that question.
+    //
+    // A key that is absent means the same thing to both, so the entry is
+    // hashed over what an export can actually carry.
+    const defined: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(partial)) {
+      if (value !== undefined) {
+        defined[key] = value;
+      }
+    }
+
     const entry = {
-      ...partial,
+      ...defined,
       seq: seq++,
       ts: Date.now(),
       prevHash: lastHashCache,

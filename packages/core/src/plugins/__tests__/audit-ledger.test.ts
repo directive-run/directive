@@ -1340,3 +1340,110 @@ describe("createAuditLedger — erase() 0-match guard", () => {
     system.destroy();
   });
 });
+
+describe("the ledger does not alter the system it audits", () => {
+  it("leaves a fact's own object untouched", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("obj", {
+      schema: { facts: { user: t.object<{ profile: { email: string } }>() } },
+      init: (facts) => {
+        facts.user = { profile: { email: "a@b.c" } };
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    // Written outside a batch, which is the path the ledger sees today.
+    system.facts.user = { profile: { email: "c@d.e" } };
+    await flushTick();
+
+    // Recording a value must not change it. `freezeEntry` froze whatever it
+    // was handed, and what it was handed was the application's own object — so
+    // installing the audit plugin froze application state, and reading a
+    // nested property then threw a proxy invariant error. An audit control
+    // that breaks the system it audits is not deployable.
+    expect(Object.isFrozen(system.facts.user)).toBe(false);
+    expect(
+      () => (system.facts.user as { profile: { email: string } }).profile,
+    ).not.toThrow();
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("keeps the value it recorded even if the caller mutates theirs afterwards", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("mut", {
+      schema: { facts: { payload: t.object<{ amount: number }>() } },
+      init: (facts) => {
+        facts.payload = { amount: 10 };
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    system.facts.payload = { amount: 10 };
+    await flushTick();
+
+    const held = system.facts.payload as { amount: number };
+    held.amount = 999;
+
+    // The freeze existed to stop exactly this — a value mutated after it was
+    // recorded, changing what the record says. Holding a copy gives that
+    // guarantee without reaching into the caller's object to get it.
+    const row = ledger
+      .query()
+      .find(
+        (e: AuditEntry) =>
+          e.kind === "fact.change" && (e as { key: string }).key === "payload",
+      );
+    expect((row as { next: { amount: number } }).next.amount).toBe(10);
+
+    system.destroy();
+    ledger.destroy();
+  });
+});
+
+describe("an exported ledger verifies", () => {
+  it("survives a JSON round trip", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("export", {
+      schema: { facts: { seen: t.number(), unset: t.string() } },
+      init: (facts) => {
+        facts.seen = 0;
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    // `unset` was never written, so this write's `prior` is `undefined` — the
+    // shape that does not survive `JSON.stringify`.
+    system.facts.unset = "first";
+    await flushTick();
+    system.facts.seen = 50;
+    await flushTick();
+
+    expect(ledger.verify().valid).toBe(true);
+
+    // The chain is hashed over a stable stringification that encodes a
+    // present-but-undefined key; `JSON.stringify` drops it. The first write of
+    // any fact carries `prior: undefined`, so every export re-hashed
+    // differently from the live entry — an auditor exporting the trail was
+    // told it had been altered, by the tool whose whole job is to answer that
+    // question.
+    const exported = JSON.parse(JSON.stringify(ledger.toJSON())) as {
+      entries: AuditEntry[];
+    };
+    const reloaded = memorySink();
+    for (const entry of exported.entries) {
+      reloaded.write(entry);
+    }
+    const replay = createAuditLedger({ sink: reloaded });
+
+    expect(replay.verify().valid).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+    replay.destroy();
+  });
+});
