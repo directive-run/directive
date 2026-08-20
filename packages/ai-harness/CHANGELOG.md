@@ -1,5 +1,13 @@
 # @sizls/ai-harness
 
+## 0.1.17
+
+### Patch Changes
+
+- Updated dependencies [[`c46845c`](https://github.com/directive-run/directive/commit/c46845cabe6fabae56dab68c0112f4a0824109b4)]:
+  - @directive-run/core@1.31.3
+  - @directive-run/ai@1.31.3
+
 ## 0.1.16
 
 ### Patch Changes

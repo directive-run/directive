@@ -1,5 +1,14 @@
 # @directive-run/example-server
 
+## 1.0.77
+
+### Patch Changes
+
+- Updated dependencies [[`c46845c`](https://github.com/directive-run/directive/commit/c46845cabe6fabae56dab68c0112f4a0824109b4)]:
+  - @directive-run/core@1.31.3
+  - @directive-run/ai@1.31.3
+  - @directive-run/el@1.1.3
+
 ## 1.0.76
 
 ### Patch Changes

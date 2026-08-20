@@ -1,5 +1,15 @@
 # @directive-run/example-cloudflare-directive-ai
 
+## 0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`c46845c`](https://github.com/directive-run/directive/commit/c46845cabe6fabae56dab68c0112f4a0824109b4)]:
+  - @directive-run/core@1.31.3
+  - @directive-run/ai@1.31.3
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
 ## 0.1.19
 
 ### Patch Changes
