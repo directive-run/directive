@@ -262,31 +262,73 @@ describe("the record under forgery", () => {
     ledger.destroy();
   });
 
-  it("treats a cleared ledger as live, not as a copy", () => {
-    // `clear()` empties the sink without making the ledger any less live. The
-    // mint check asked the entries rather than the ledger, so a forged
-    // tombstone written afterwards sat among no marks at all and was read as
-    // an unverifiable copy.
+  it("does not call a ledger's own erasure a forgery when the sink returns copies", () => {
+    // The mark that says "the runtime wrote this" is held in memory, keyed by
+    // the entry object. A sink that persists anything hands back equal values
+    // rather than the same objects, so there are no marks to find.
+    //
+    // Asking the ledger whether it had ever minted, instead of asking the
+    // entries, looked stronger — it closed a window where `clear()` left a
+    // live ledger with nothing marked. But it made a live ledger over a
+    // copying sink accuse its own erasures of forgery, which is every sink
+    // that is not the in-memory one. Between missing a forgery and
+    // manufacturing one, this reports what it can see.
+    const real = memorySink();
+    const copying: typeof real = {
+      ...real,
+      query: (f) => real.query(f).map((e) => ({ ...e })),
+      recent: (n) => real.recent(n).map((e) => ({ ...e })),
+      forFact: (p, o) => real.forFact(p, o).map((e) => ({ ...e })),
+      forConstraint: (i, o) => real.forConstraint(i, o).map((e) => ({ ...e })),
+      write: real.write.bind(real),
+      clear: real.clear.bind(real),
+      destroy: real.destroy.bind(real),
+      erase: real.erase?.bind(real),
+      onTruncate: real.onTruncate?.bind(real),
+      toJSON: () => {
+        const out = real.toJSON();
+
+        return { ...out, entries: out.entries.map((e) => ({ ...e })) };
+      },
+    };
+    const ledger = createAuditLedger({ sink: copying });
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+    system.facts.n = 2;
+    ledger.erase({ factPath: "n" });
+
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(true);
+    if (verdict.valid) {
+      // Nothing could be checked, and it says so rather than pretending.
+      expect(verdict.marksChecked).toBe(false);
+    }
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("still catches a forged tombstone where the marks are visible", () => {
     const sink = memorySink();
     const ledger = createAuditLedger({ sink });
     const system = makeSystem(ledger);
     system.start();
     system.facts.n = 1;
+    system.facts.n = 2;
 
-    ledger.clear();
     sink.write({
       kind: "system.entry-erased",
       originalKind: "fact.change",
       erasedAt: 0,
-      seq: 0,
+      seq: 99,
       ts: 0,
       prevHash: "deadbeef",
       hashAlgo: "djb2-1",
       schemaVersion: 2,
     } as unknown as AuditEntry);
 
-    const verdict = ledger.verify();
-    expect(verdict.valid).toBe(false);
+    expect(ledger.verify().valid).toBe(false);
 
     system.destroy();
     ledger.destroy();

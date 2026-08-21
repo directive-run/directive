@@ -136,39 +136,98 @@ export function freezeEntry(entry: AuditEntry): AuditEntry {
 // djb2 only.
 
 /**
- * Drop every key whose value is `undefined`, at every depth.
+ * The value as an export can carry it.
  *
- * The canonical stringifier renders a present-but-undefined key; JSON drops
- * it. So an entry carrying one hashed differently live than after an export,
- * and anyone checking an exported trail was told it had been altered — by the
- * tool whose whole job is to answer that question.
+ * The record's whole point is that it can be handed to someone else and still
+ * check out. So an entry holds what JSON can hold, decided once when the entry
+ * is written rather than papered over at hashing time. Live and round-tripped
+ * hashes then agree because they are hashes of the same data.
  *
- * That has now been true of three separate fields: the first write of a fact
- * having no prior, a marker's provenance stamp, and the shape recorded for an
- * erasure filter, which nests. It kept coming back because each fix removed
- * one field rather than the disagreement, so this normalises what is hashed
- * to what an export can carry, once, for everything.
+ * This was learned the hard way, four times. The canonical stringifier renders
+ * a present-but-undefined key and JSON drops it, so an entry holding one
+ * hashed differently after an export and anyone checking an exported trail was
+ * told it had been altered — by the tool whose only job is answering that
+ * question. It happened to a fact's missing prior value, to a marker's
+ * provenance stamp, and to the nested shape recorded for an erasure filter.
+ * Each fix removed one field rather than the disagreement.
+ *
+ * An earlier attempt normalised at hashing time instead, and rebuilt every
+ * object through `Object.entries` on the way. That erased the stringifier's
+ * typed-value handling: a `Date`, a `Map`, a `Set` and a `{}` all hashed
+ * alike, so a recorded value could be edited in place and still verify.
+ * Projecting at write time keeps the content — a `Date` becomes its timestamp
+ * string, a `Map` becomes its entries — so nothing is silently lost and
+ * nothing collapses together.
+ *
+ * What changes shape, and why: a `Date` and a `RegExp` become strings; a `Map`
+ * and a `Set` become arrays, which is more than JSON would keep of them on its
+ * own; `NaN` and the infinities become `null`, as `JSON.stringify` writes
+ * them; a hole or an `undefined` in an array becomes `null`; a key whose value
+ * is `undefined`, a function, or a symbol is dropped.
  */
-function asExported(value: unknown, seen = new WeakSet<object>()): unknown {
-  if (value === null || typeof value !== "object") return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    return value.map((item) => asExported(item, seen));
-  }
-  const out: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (item === undefined) continue;
-    out[key] = asExported(item, seen);
-  }
+const MAX_PROJECT_DEPTH = 100;
 
-  return out;
+export function asRecorded(
+  value: unknown,
+  depth = 0,
+  path?: Set<object>,
+): unknown {
+  if (depth > MAX_PROJECT_DEPTH) return "[max-depth]";
+  if (value === null) return null;
+  const type = typeof value;
+  if (type === "number") {
+    return Number.isFinite(value as number) ? value : null;
+  }
+  if (type === "bigint") return (value as bigint).toString();
+  if (type === "string" || type === "boolean") return value;
+  if (type !== "object") return undefined;
+
+  const object = value as object;
+  // Tracked along the current path rather than across the whole walk. A set
+  // that never forgets treats the second sighting of a shared — but perfectly
+  // acyclic — object as a cycle, and returns it unprojected.
+  const seen = path ?? new Set<object>();
+  if (seen.has(object)) return "[circular]";
+  seen.add(object);
+  try {
+    if (object instanceof Date) {
+      return Number.isFinite(object.getTime()) ? object.toISOString() : null;
+    }
+    if (object instanceof RegExp) return String(object);
+    if (object instanceof Map) {
+      return [...object.entries()].map(([k, v]) => [
+        asRecorded(k, depth + 1, seen),
+        asRecorded(v, depth + 1, seen),
+      ]);
+    }
+    if (object instanceof Set) {
+      return [...object].map((item) => asRecorded(item, depth + 1, seen));
+    }
+    if (Array.isArray(object)) {
+      return object.map((item) => {
+        const projected = asRecorded(item, depth + 1, seen);
+
+        return projected === undefined ? null : projected;
+      });
+    }
+
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(object)) {
+      const projected = asRecorded(item, depth + 1, seen);
+      if (projected === undefined) continue;
+      out[key] = projected;
+    }
+
+    return out;
+  } finally {
+    seen.delete(object);
+  }
 }
 
 function syncHash(entry: AuditEntry): string {
   // stableStringify guarantees same hash across runtimes regardless of
   // key insertion order (architecture review #11, security review C1).
-  return hashObject(asExported(entry));
+  return hashObject(entry);
 }
 
 /**

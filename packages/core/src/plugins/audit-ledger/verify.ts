@@ -26,7 +26,6 @@ import type { AuditEntry, AuditLedgerSink, VerifyResult } from "./types.js";
 export function verify(
   sink: AuditLedgerSink,
   opts?: { strong?: boolean },
-  ledgerHasMinted?: boolean,
 ): VerifyResult {
   // v1 ships sync djb2 only. Strong (SHA-256) verify is
   // reserved for v2 and must NOT silently no-op — the previous
@@ -43,7 +42,7 @@ export function verify(
     return {
       valid: true,
       entryCount: 0,
-      marksChecked: ledgerHasMinted === true,
+      marksChecked: false,
     };
   }
 
@@ -72,19 +71,19 @@ export function verify(
   // tombstones forged on that basis would report every exported ledger as
   // tampered, which is what an export is for.
   //
-  // So the question is whether THIS ledger has written anything, not whether
-  // these entries bear marks. A ledger that has minted entries checks them; a
-  // reader built over a reloaded export has minted none and reports that it
-  // could not check.
+  // Asked of the entries in hand, not of the ledger that produced them.
   //
-  // Asking the entries instead had a hole: `clear()` empties the sink without
-  // making the ledger any less live, so a forged tombstone written afterwards
-  // sat among no marks at all and was read as a copy. That is a real limit of
-  // an unkeyed scheme rather than a gap in the implementation — an attacker
-  // can always present a forgery as a copy — but it should take more than
-  // calling a public method.
-  const marksAreMeaningful =
-    ledgerHasMinted ?? entries.some((e) => isInternal(e));
+  // Asking the ledger looked stronger — it closed a hole where `clear()`
+  // empties a sink without making the ledger any less live, so a forgery
+  // written afterwards sat among no marks and read as a copy. But a live
+  // ledger over a sink that returns copies of what it was handed also has no
+  // marks to find, and that is every sink which persists anything. It answered
+  // by calling the ledger's own erasures forgeries.
+  //
+  // Between missing a forgery and manufacturing one, this reports what it can
+  // actually see. An unkeyed scheme cannot do better: an attacker can always
+  // present a forgery as a copy, and a copy is what most real sinks hand back.
+  const marksAreMeaningful = entries.some((e) => isInternal(e));
 
   // Seqs that are not here and that nothing accounts for.
   //
