@@ -30,6 +30,7 @@
  */
 
 import type {
+  FactOrigin,
   ModuleSchema,
   ObservationEvent,
   Plugin,
@@ -41,6 +42,30 @@ import type {
 } from "../../core/types/predicate.js";
 import { hashObject } from "../../utils/utils.js";
 import { LEDGER_INTERNAL_TOKEN, freezeEntry, hashForEntry } from "./hash.js";
+
+/** The values `origin` can hold. Anything else did not come from the runtime. */
+const ORIGINS: readonly FactOrigin[] = ["authored", "restore", "hydrate"];
+
+/**
+ * Keep only recognised origins from a caller-supplied filter.
+ *
+ * Returns `undefined` when nothing survives, which reads as "the filter did
+ * not scope by origin" — the same thing an absent field says.
+ */
+function knownOrigins(
+  value: FactOrigin | readonly FactOrigin[] | undefined,
+): FactOrigin | readonly FactOrigin[] | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    const kept = value.filter((v) => ORIGINS.includes(v as FactOrigin));
+
+    return kept.length > 0 ? (kept as readonly FactOrigin[]) : undefined;
+  }
+
+  return ORIGINS.includes(value as FactOrigin)
+    ? (value as FactOrigin)
+    : undefined;
+}
 import { redactWhenSpec } from "./predicate-redact.js";
 import { memorySink } from "./sink.js";
 import type {
@@ -288,6 +313,22 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    * values + whenExplain clauses) so that downstream consumers cannot
    * mutate payloads in place and forge the chain.
    */
+  /**
+   * What to do when the sink refuses an entry.
+   *
+   * A durable record that quietly loses writes is the failure this whole
+   * subsystem exists to prevent, and the loss was reaching a console line
+   * inside a plugin-manager catch that nothing reads.
+   */
+  const onWriteError =
+    opts.onWriteError ??
+    ((error: unknown, entry: AuditEntry) => {
+      console.error(
+        `[Directive] audit-ledger: the sink refused entry #${entry.seq} (${entry.kind}). It is not in the record.`,
+        error,
+      );
+    });
+
   function emit(partial: Record<string, unknown>): AuditEntry {
     // Drop keys whose value is `undefined` before the entry is built.
     //
@@ -330,8 +371,28 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     // rotated ledger then failed verification at its second entry — which is
     // the answer least worth giving, because an operator who sees routine
     // rotation reported as tamper stops believing the control entirely.
-    lastHashCache = hashForEntry(finalEntry);
-    sink.write(finalEntry);
+    const myHash = hashForEntry(finalEntry);
+    const priorHash = lastHashCache;
+    lastHashCache = myHash;
+    try {
+      sink.write(finalEntry);
+    } catch (error) {
+      // The entry never landed, so nothing should chain to it. Left advanced,
+      // one failed write pointed the next entry at a hash no stored entry
+      // carries, and the ledger reported itself tampered from then on — the
+      // verdict least worth giving, and one an attacker who can force a single
+      // sink failure gets for free, since `verify()` stops at the first break
+      // and never examines anything after it.
+      //
+      // Rolled back only if nothing chained off this entry in the meantime. A
+      // bounded sink emits its truncation marker from inside `write()`, and
+      // that marker legitimately takes this entry's hash — if the pointer has
+      // moved on, the entry did land and the failure came later.
+      if (lastHashCache === myHash) {
+        lastHashCache = priorHash;
+      }
+      onWriteError(error, finalEntry);
+    }
 
     return finalEntry;
   }
@@ -517,6 +578,11 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           kind: "system.truncated",
           droppedSeq,
           droppedCount,
+          // Sentinelled like a tombstone. `verify()` lets a truncation marker
+          // account for a missing prefix, so a marker anyone can mint is a way
+          // to make a hand-trimmed ledger read as routine rotation. The token
+          // lives in this folder's closure and is not re-exported.
+          __internal: LEDGER_INTERNAL_TOKEN,
         });
       } finally {
         emittingTruncate = false;
@@ -696,12 +762,12 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         factPath: filter.factPath !== undefined,
         constraintId: filter.constraintId !== undefined,
         kind: filter.kind,
-        // Recorded by value, not as a boolean. `origin` names no subject and
-        // carries nothing that could identify one, and an erasure scoped to
-        // replayed writes is a materially different act from one scoped to
-        // the program's own — an auditor reading the marker should be able to
-        // see which was performed.
-        origin: filter.origin,
+        // Recorded by value, but only after being checked against the values
+        // the field can hold. A filter can arrive from an untrusted request
+        // body on an erasure endpoint, and this entry is frozen and permanent:
+        // copied verbatim it took whatever the caller sent, which is how a
+        // subject's own data ends up in the record that erased it.
+        origin: knownOrigins(filter.origin),
         changedBetween:
           filter.changedBetween !== undefined
             ? ("[range]" as const)

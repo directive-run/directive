@@ -422,6 +422,20 @@ export interface AuditLedgerSink {
 // ============================================================================
 
 export interface AuditLedgerOptions {
+  /**
+   * Called when the sink refuses an entry, with the error and the entry that
+   * did not land.
+   *
+   * A sink can fail — a quota, a disk, a remote that returns 500. When it
+   * does, that entry is not in the record and nothing downstream will say so:
+   * the failure happens inside a plugin hook whose errors are caught and
+   * logged by the plugin manager, so the application never sees it. Handle
+   * this if a gap in the record is something you need to know about.
+   *
+   * Defaults to a `console.error` naming the entry's seq and kind.
+   */
+  onWriteError?: (error: unknown, entry: AuditEntry) => void;
+
   /** Sink to write entries to. Default: in-memory ring buffer (capacity 10k). */
   sink?: AuditLedgerSink;
   /**

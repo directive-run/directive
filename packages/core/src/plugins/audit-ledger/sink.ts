@@ -61,13 +61,20 @@ export function matchesFilter(entry: AuditEntry, filter: QueryFilter): boolean {
     const origins = Array.isArray(filter.origin)
       ? filter.origin
       : [filter.origin];
-    // An entry written before `origin` existed has none. Treated as
-    // `"authored"` rather than matching nothing: replayed and hydrated writes
-    // were not recorded at all under that schema, so every `fact.change` in
-    // such a ledger is a write the program made. Excluding them would drop
-    // real rows from a query for exactly the rows they are — the
-    // absence-as-predicate failure this field exists to avoid.
-    if (!origins.includes(entry.origin ?? "authored")) return false;
+    // An entry written under schema 1 has no `origin`, and under that schema
+    // replayed and hydrated writes were not recorded at all — so every
+    // `fact.change` in such a ledger is a write the program made, and reading
+    // the absent field as `"authored"` is correct rather than merely
+    // convenient. Excluding them would drop real rows from a query for
+    // exactly the rows they are.
+    //
+    // Only for schema 1. An entry claiming schema 2 with no origin did not
+    // come from this runtime, and letting it answer to `"authored"` would let
+    // an appended row hide among the program's own writes.
+    const origin =
+      entry.origin ?? (entry.schemaVersion === 1 ? "authored" : undefined);
+    if (origin === undefined) return false;
+    if (!origins.includes(origin)) return false;
   }
   if (filter.constraintId !== undefined) {
     if (entry.kind !== "constraint.evaluate") return false;

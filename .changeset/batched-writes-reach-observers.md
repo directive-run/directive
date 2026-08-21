@@ -66,6 +66,22 @@ the failure this field exists to prevent. `@directive-run/timeline` keeps it
 optional on its serialized wire format, so timelines recorded before this
 release still load.
 
+**The ledger holds up better under someone trying to make it lie.** A sink that
+refuses an entry no longer breaks the chain behind it — the entry never landed,
+so nothing chains to it, and a new `onWriteError` option says which entry was
+lost instead of leaving it to a console line inside a plugin-manager catch.
+Truncation markers carry the same in-module sentinel tombstones do, so an
+appended marker cannot make a hand-trimmed prefix read as routine rotation. An
+entry claiming the current schema with no `origin` answers no origin query,
+rather than passing as one the program made. And an `erase()` filter is checked
+against the values `origin` can hold before any of it is copied into the
+permanent, frozen marker — a filter can arrive from a request body, and that
+marker is the record of the erasure.
+
+None of this makes the in-memory sink evidentiary. The chain is unkeyed, so
+anyone who can reach the buffer can recompute it; it detects accident and
+in-process mutation, not an adversary holding your storage.
+
 **A rotated ledger no longer reports itself tampered.** Once a bounded sink
 fills, it drops its oldest entries — ordinary operation — but `verify()` began
 every walk at the genesis hash, so the first link failed the moment the head

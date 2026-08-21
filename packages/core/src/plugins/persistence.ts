@@ -2,10 +2,7 @@
  * Persistence Plugin - Save/restore facts to storage
  */
 
-import {
-  HYDRATION_SCOPE,
-  type HydrationScopeCarrier,
-} from "../core/internal-scopes.js";
+import { hydrationScopeFor } from "../core/internal-scopes.js";
 import type { ModuleSchema, Plugin, System } from "../core/types.js";
 import { isPrototypeSafe } from "../utils/utils.js";
 
@@ -171,7 +168,7 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
         // the program; filed as first-party writes they are indistinguishable
         // from what the program decided this time, and their source is a store
         // anything sharing the origin can write to.
-        const hydrationScope = (sys as HydrationScopeCarrier)[HYDRATION_SCOPE];
+        const hydrationScope = hydrationScopeFor(sys);
         const restore = () => {
           for (const [factKey, value] of Object.entries(data)) {
             if (shouldPersist(factKey)) {
@@ -183,9 +180,20 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
         system.facts.$store.batch(() => {
           if (hydrationScope) {
             hydrationScope(restore);
-          } else {
-            restore();
+
+            return;
           }
+          // Every system this package builds has the scope, so reaching here
+          // means a system it did not build — a test double, in practice.
+          // Restore anyway rather than lose the user's state, but say so: the
+          // values will be recorded as writes the program made this time,
+          // which is exactly what marking them was for. Silence here is what
+          // hid the case where the scope was installed too late to reach the
+          // first plugin.
+          console.error(
+            "[Directive] persistence: no hydration scope on this system, so restored values are recorded as first-party writes rather than as hydration.",
+          );
+          restore();
         });
         onRestore?.(data);
       }

@@ -36,7 +36,7 @@ import {
   createErrorBoundaryManager,
 } from "./errors.js";
 import { createFacts, isRunawayError } from "./facts.js";
-import { HYDRATION_SCOPE } from "./internal-scopes.js";
+import { installHydrationScope } from "./internal-scopes.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
@@ -651,6 +651,41 @@ export function createEngine<S extends Schema>(
   }
 
   /**
+   * Non-zero for the whole of a history navigation, including the flush at the
+   * end where consumer code runs.
+   *
+   * Distinct from `restoreDepth`, which covers only the writes the manager
+   * makes. A write a listener makes while rewinding is the program's own — it
+   * is labelled `authored` and it reconciles — but the pass it schedules must
+   * not do two of the things an ordinary pass does. Taking a snapshot splices
+   * away every forward snapshot, so an undo followed by a reactive write kills
+   * redo. Re-evaluating gated sources opens a real transport, and replaying a
+   * timeline is not supposed to re-perform the acts in it.
+   *
+   * Read at the write, not at the reconcile: the pass runs in a microtask, by
+   * which time the navigation is over and the question can no longer be asked.
+   */
+  let navigationDepth = 0;
+  let reconcileFollowsNavigation = false;
+
+  function withNavigation(fn: () => void): void {
+    navigationDepth++;
+    try {
+      fn();
+    } finally {
+      navigationDepth--;
+    }
+  }
+
+  /** Records, at write time, that the pass this write schedules follows a navigation. */
+  function noteWriteDuringNavigation(): boolean {
+    if (navigationDepth === 0) return false;
+    reconcileFollowsNavigation = true;
+
+    return true;
+  }
+
+  /**
    * Asked at each write where that write came from.
    *
    * Read per write, never per batch. A restore nested inside a wider batch has
@@ -724,7 +759,9 @@ export function createEngine<S extends Schema>(
       // reaction is the program's own work.
       if (currentFactOrigin() === "restore") return;
       // Direct fact mutations (outside event dispatch) always create snapshots
-      if (dispatchDepth === 0) {
+      // — unless a navigation is in flight, where a new snapshot would splice
+      // away everything ahead of the point being rewound to.
+      if (dispatchDepth === 0 && !noteWriteDuringNavigation()) {
         shouldTakeSnapshot = true;
       }
       state.changedKeys.add(key);
@@ -768,7 +805,7 @@ export function createEngine<S extends Schema>(
       const authored = changes.filter((change) => change.origin !== "restore");
       if (authored.length === 0) return;
       // Resolver/effect batches (outside event dispatch) always create snapshots
-      if (dispatchDepth === 0) {
+      if (dispatchDepth === 0 && !noteWriteDuringNavigation()) {
         shouldTakeSnapshot = true;
       }
       for (const change of authored) {
@@ -1225,6 +1262,7 @@ export function createEngine<S extends Schema>(
         facts,
         store,
         withRestoreOrigin,
+        withNavigation,
         onSnapshot: (snapshot) => {
           pluginManager.emitSnapshot(snapshot);
           notifyHistoryChange();
@@ -1344,10 +1382,24 @@ export function createEngine<S extends Schema>(
       }
     }
 
+    // Taken once for this pass. Set by writes made while a navigation was in
+    // flight; those writes reconcile like any other, but this pass must not
+    // snapshot over the redo stack or re-open a transport.
+    const followsNavigation = reconcileFollowsNavigation;
+    reconcileFollowsNavigation = false;
+
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
       if (state.changedKeys.size > 0) {
-        if (snapshotEventNames === null || shouldTakeSnapshot) {
+        // `followsNavigation` overrides both arms. Snapshotting here splices
+        // away every snapshot ahead of the point just rewound to, so a single
+        // reactive write during an undo destroys redo — and the default arm
+        // (`snapshotEventNames === null`) takes one unconditionally, so
+        // clearing the flag alone did not stop it.
+        if (
+          !followsNavigation &&
+          (snapshotEventNames === null || shouldTakeSnapshot)
+        ) {
           const keys = state.changedKeys;
           const label =
             keys.size <= 5
@@ -1386,12 +1438,24 @@ export function createEngine<S extends Schema>(
 
       // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
       // plane, immediately after effects, against the committed facts. Sits
-      // behind the SAME guard effects run behind — `reconcile` never runs
-      // during a history restore (the `onChange`/`onBatch` `isRestoring`
-      // short-circuit skips `scheduleReconcile`), so replay / time-travel
-      // re-derives the key value but NEVER re-attaches a transport. The gate
-      // is a pure fact read; the attach act stays a non-replayable input.
-      sourcesManager.evaluateGated(facts as unknown as Record<string, unknown>);
+      // behind the same condition effects run behind, and additionally not at
+      // all when this pass was scheduled by a write made during a history
+      // navigation. Replay and time travel re-derive the key value but never
+      // re-attach a transport. The gate is a pure fact read; the attach act
+      // stays a non-replayable input.
+      //
+      // The restore's own writes do not reconcile at all. What reaches here is
+      // a write a listener made in reaction to one, which is the program's own
+      // work and does reconcile — so the exclusion has to be carried from the
+      // write rather than read from a flag that is down by now.
+      // Skipped when this pass was scheduled by a write made during a history
+      // navigation. Attaching is a real act against the outside world and a
+      // replay is not supposed to re-perform it.
+      if (!followsNavigation) {
+        sourcesManager.evaluateGated(
+          facts as unknown as Record<string, unknown>,
+        );
+      }
 
       // Again, because effects write facts.
       //
@@ -3895,6 +3959,15 @@ export function createEngine<S extends Schema>(
   (system as unknown as Record<string, unknown>).registerModule =
     registerModule;
 
+  // Hand first-party plugins the ability to mark their writes as hydration.
+  //
+  // Installed BEFORE `emitInit`, which runs the first plugin's `onInit`
+  // synchronously up to its first await. Installed after, the plugin at index
+  // zero saw nothing — and `plugins: [persistencePlugin()]` is the documented
+  // single-plugin shape, so the common arrangement was the broken one and the
+  // provenance of every restored value depended on array position.
+  installHydrationScope(system, withHydrationOrigin);
+
   // Initialize plugins.
   //
   // `emitInit` returns a Promise (the loop-until-quiet awaits each plugin's
@@ -3906,17 +3979,6 @@ export function createEngine<S extends Schema>(
   // manager and won't reach this catch in normal operation.
   void pluginManager.emitInit(system).catch((error: unknown) => {
     console.error("[Directive] Plugin emitInit failure", { error });
-  });
-
-  // Hand first-party plugins the ability to mark their writes as hydration.
-  // Symbol-keyed and not re-exported, so a consumer cannot reach it — the
-  // whole value of filing a write by where it came from is that the answer is
-  // not something the writer chooses.
-  Object.defineProperty(system, HYDRATION_SCOPE, {
-    value: withHydrationOrigin,
-    enumerable: false,
-    writable: false,
-    configurable: false,
   });
 
   // Call module init hooks

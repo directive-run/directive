@@ -83,12 +83,23 @@ export function verify(
   // already in the buffer — a sink that rotated wrote `system.truncated`
   // markers as it went, and one that was trimmed by hand did not.
   //
+  // The marker has to bear the in-module sentinel, for the same reason a
+  // tombstone does. A `system.truncated` entry is otherwise an ordinary row
+  // anyone holding the sink can append, so an unsentinelled one lets a trimmed
+  // prefix present itself as routine rotation — which is exactly the claim
+  // this field exists to make.
+  //
   // Reported rather than made fatal. A quiet system can outlive its own
   // markers, so their absence is grounds for a question, not a verdict.
   const truncationExplained =
     windowStartSeq === undefined
       ? undefined
-      : entries.some((e) => e.kind === "system.truncated");
+      : entries.some(
+          (e) =>
+            e.kind === "system.truncated" &&
+            (e as AuditEntry & { __internal?: unknown }).__internal ===
+              LEDGER_INTERNAL_TOKEN,
+        );
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]!;
     if (entry.prevHash !== prevHash) {

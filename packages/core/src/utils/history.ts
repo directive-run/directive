@@ -92,6 +92,15 @@ export interface CreateHistoryOptions<S extends Schema> {
    * standalone manager still works.
    */
   withRestoreOrigin?: (fn: () => void) => void;
+  /**
+   * Runs a whole navigation in whatever scope marks it as one — wider than
+   * {@link withRestoreOrigin}, which covers only the manager's own writes.
+   *
+   * A listener that writes while rewinding is doing the program's own work and
+   * its write reconciles like any other, but the pass it schedules must not
+   * take a snapshot over the redo stack or re-open a gated transport.
+   */
+  withNavigation?: (fn: () => void) => void;
 }
 
 /**
@@ -143,6 +152,7 @@ export function createHistoryManager<S extends Schema>(
     onSnapshot,
     onHistoryChange,
     withRestoreOrigin = (fn: () => void) => fn(),
+    withNavigation = (fn: () => void) => fn(),
   } = options;
 
   const {
@@ -301,7 +311,11 @@ export function createHistoryManager<S extends Schema>(
       restoring = true;
 
       try {
-        deserializeFacts(snapshot.facts);
+        // The whole navigation, flush included. Reactions to a restore run in
+        // that flush, and what they schedule has to know it followed one.
+        withNavigation(() => {
+          deserializeFacts(snapshot.facts);
+        });
       } finally {
         paused = false;
         restoring = false;
