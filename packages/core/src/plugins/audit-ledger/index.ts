@@ -358,6 +358,9 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           key: event.key,
           prior: redactValue(event.key, event.prev),
           next: redactValue(event.key, event.next),
+          // `emit` omits undefined-valued keys, so an ordinary write carries
+          // no `origin` and still hashes the same as it always did.
+          origin: event.origin,
         });
         break;
       case "resolver.write.rejected":

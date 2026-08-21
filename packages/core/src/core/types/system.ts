@@ -955,7 +955,25 @@ export type PredicateOverlapProof =
 
 /** Typed events emitted by system.observe(). */
 export type ObservationEvent =
-  | { type: "fact.change"; key: string; prev: unknown; next: unknown }
+  | {
+      type: "fact.change";
+      key: string;
+      prev: unknown;
+      next: unknown;
+      /**
+       * Where the write came from, when it was not an ordinary one.
+       *
+       * Absent for a write a program made. `"restore"` for a write a history
+       * navigation replayed — `restore`, `goBack`, `goForward`, `goTo`,
+       * `replay` and `import` all land here.
+       *
+       * A replayed write is recorded rather than dropped, so this decides how
+       * an entry is filed and never whether it exists. A durable sink that
+       * dropped replays would make the label worth forging; one that files
+       * them separately does not.
+       */
+      origin?: "restore";
+    }
   | {
       type: "constraint.evaluate";
       id: string;

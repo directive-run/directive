@@ -2195,6 +2195,49 @@ export function createEngine<S extends Schema>(
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
           observer({ type: "fact.change", key, prev, next: value }),
+        onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
+          // Without this arm a write inside `system.batch()` reached no
+          // observer at all, while the identical write outside one was
+          // reported. Event handlers, effects, resolvers before their first
+          // await, `initialFacts`, `hydrate` and every history restore write
+          // through a batch — so a durable sink behind `observe()` was blind
+          // to most of the writes in a running system, and suppressing an
+          // entry took nothing more privileged than wrapping the write.
+          //
+          // Coalesced per key, because a batch is one transition and a body
+          // that writes a key in a loop should not produce an entry per
+          // iteration. Measured: a hundred thousand writes to one key in a
+          // single batch produced a hundred thousand events and blocked for
+          // 491ms, while the listener side — which already coalesces — saw
+          // one. First `prev` and last value are kept, so the pair still
+          // describes the transition the batch actually made.
+          //
+          // A key written and written back keeps its entry. The net pair is
+          // `prev === next`, which reads as noise, but dropping it would be
+          // one more way for a batch to leave no trace — which is the whole
+          // defect this closes.
+          const net = new Map<string, { prev: unknown; next: unknown }>();
+          for (const change of changes) {
+            const next = change.type === "delete" ? undefined : change.value;
+            const seen = net.get(change.key);
+            if (seen) {
+              seen.next = next;
+            } else {
+              net.set(change.key, { prev: change.prev, next });
+            }
+          }
+          // `isRestoring` is engine-internal and derived from the history
+          // manager's own state, so the label cannot be set by a caller —
+          // reaching it means actually replaying a snapshot.
+          const restoring = historyRef?.isRestoring === true;
+          for (const [key, { prev, next }] of net) {
+            observer(
+              restoring
+                ? { type: "fact.change", key, prev, next, origin: "restore" }
+                : { type: "fact.change", key, prev, next },
+            );
+          }
+        },
         onConstraintEvaluate: (
           id: string,
           active: boolean,

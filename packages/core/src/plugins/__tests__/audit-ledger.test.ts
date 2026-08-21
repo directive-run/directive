@@ -301,8 +301,18 @@ describe("createAuditLedger — hash chain integrity", () => {
     // Now tell the sink wrapper to mutate entry[1].kind on the next
     // toJSON() call. verify() pulls entries via toJSON, so this models
     // persisted-bytes tampering visible to the verifier.
+    // Derive the tampered value from the one that is there, so the swap is
+    // always a real edit. This wrote a literal `"fact.change"` and went inert
+    // the day entry[1] became a `fact.change` of its own accord — the test
+    // then passed by tampering with nothing, which is the failure mode a
+    // tamper-detection test can least afford.
     swap = (entries) => {
-      if (entries[1]) (entries[1] as { kind: string }).kind = "fact.change";
+      const target = entries[1] as { kind: string } | undefined;
+      if (!target) throw new Error("fixture: no entry at index 1 to tamper");
+      const before = target.kind;
+      target.kind =
+        before === "fact.change" ? "constraint.evaluate" : "fact.change";
+      expect(target.kind).not.toBe(before);
     };
 
     const after = ledger.verify();

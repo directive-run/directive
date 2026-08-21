@@ -108,7 +108,7 @@ Filter shape:
 | Kind | Payload includes |
 | --- | --- |
 | `constraint.evaluate` | `constraintId`, `active`, `whenSpec` (PII operands redacted) or `whenSource` (function-form `sourceHash`), `whenExplain` |
-| `fact.change` | `key`, `prior`, `next` |
+| `fact.change` | `key`, `prior`, `next`, `origin` (only when replayed) |
 | `resolver.write.rejected` | `resolverId`, `fact`, `expected`, `actual` (rejection) or `dropped` (summary) |
 | `resolver.complete` | `resolverId`, `requirementId`, `duration` |
 | `resolver.error` | `resolverId`, `requirementId`, `error` |
@@ -118,6 +118,26 @@ Filter shape:
 | `system.truncated` | `droppedSeq`, `droppedCount` (ring-buffer overflow marker; emitted BEFORE the oldest entry is dropped) |
 | `system.entry-erased` | `originalKind`, `erasedAt` (per-entry tombstone, replaces an erased entry in place) |
 | `system.subject-erased` | `filterHash`, `filterShape`, `erased` (chained marker; raw filter values never land in the ledger – see [Erasure](#erasure-gdpr-art-17-stub)) |
+
+### Batched writes
+
+A write made inside `system.batch()` produces the same entry as one made outside it. That covers more than an explicit `batch()` call: event handlers, effects, resolvers before their first `await`, `initialFacts`, `hydrate` and every history navigation write through a batch, so most of the writes a running system makes arrive this way.
+
+Each key gets **one entry per batch**, carrying the value it held before the batch and the value it holds after. A batch is a single transition, and a body that writes the same key in a loop should not produce an entry per iteration – one measurement had a hundred thousand writes to a single key in one batch, which coalesce to a single entry.
+
+A key written and then written back keeps its entry, with `prior` and `next` equal. It reads as noise, but a batch that leaves no trace at all is worse.
+
+### Replayed writes – `origin`
+
+A write a history navigation replayed – `restore`, `goBack`, `goForward`, `goTo`, `replay`, `import` – is recorded with `origin: "restore"`. A write your program made carries no `origin` at all.
+
+```ts
+ledger
+  .query({ kind: "fact.change", factPath: "cartTotal" })
+  .filter((entry) => entry.origin === undefined); // authored writes only
+```
+
+Replays are **filed, never dropped**. A ledger that dropped them would put a label in charge of whether an entry exists, and a label worth that much is worth forging. Filing them puts it in charge of nothing more than which rows an auditor reads together. `origin` is set from the history manager's own state, so reaching it means actually replaying a snapshot.
 
 ### Function-form constraints – `whenSource` is informational only
 

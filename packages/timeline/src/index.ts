@@ -374,8 +374,14 @@ function formatEventDetail(
     useColor ? `${ANSI[color]}${s}${ANSI.reset}` : s;
 
   switch (event.type) {
-    case "fact.change":
-      return `${c("bold", event.key)}: ${preview(event.prev, previewLen)} → ${preview(event.next, previewLen)}`;
+    case "fact.change": {
+      // A replayed write is marked. Rendered the same as an authored one it
+      // reads as something the program just did, which is the wrong thing to
+      // believe while debugging a timeline that contains an undo.
+      const replayed = event.origin === "restore" ? c("dim", " (restored)") : "";
+
+      return `${c("bold", event.key)}: ${preview(event.prev, previewLen)} → ${preview(event.next, previewLen)}${replayed}`;
+    }
     case "constraint.evaluate":
       return `${event.id} active=${event.active}`;
     case "constraint.error":

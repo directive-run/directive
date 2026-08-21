@@ -176,6 +176,16 @@ export type AuditEntry =
       key: string;
       prior: unknown;
       next: unknown;
+      /**
+       * Present only when the write was replayed rather than authored —
+       * a history navigation, an `import`, a `replay`. Absent otherwise.
+       *
+       * A replayed write is filed, never dropped. Dropping it would put a
+       * label in charge of whether an entry exists at all, which is worth
+       * forging; filing it puts the label in charge of nothing more than
+       * which rows an auditor reads together.
+       */
+      origin?: "restore";
     })
   | (AuditEntryBase & {
       kind: "resolver.complete";
