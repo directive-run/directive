@@ -309,7 +309,7 @@ describe("the record under forgery", () => {
     ledger.destroy();
   });
 
-  it("still catches a forged tombstone where the marks are visible", () => {
+  it("names a tombstone it did not write, where the marks are visible", () => {
     const sink = memorySink();
     const ledger = createAuditLedger({ sink });
     const system = makeSystem(ledger);
@@ -328,7 +328,14 @@ describe("the record under forgery", () => {
       schemaVersion: 2,
     } as unknown as AuditEntry);
 
-    expect(ledger.verify().valid).toBe(false);
+    const verdict = ledger.verify();
+    // Reported, not fatal. Deciding the verdict on this was tried in both
+    // directions and each accused an honest ledger — once every sink that
+    // persists anything, once every restart from an export.
+    expect(verdict.valid).toBe(true);
+    if (verdict.valid) {
+      expect(verdict.unmarkedTombstoneSeqs).toContain(99);
+    }
 
     system.destroy();
     ledger.destroy();

@@ -422,6 +422,23 @@ export type VerifyResult =
        * in it should not decide how much memory the check allocates.
        */
       missingSeqCount?: number;
+      /**
+       * Erasure tombstones that this runtime did not write, among entries
+       * where it wrote others.
+       *
+       * Reported rather than fatal. The mark that says "the runtime wrote
+       * this" is held in memory against the entry object, so it does not
+       * survive being stored or exported — which means "written by the
+       * runtime" and "appended by someone" are indistinguishable in any record
+       * that has been anywhere. Making it decide the verdict was tried in both
+       * directions and each accused an honest ledger: once every sink that
+       * persists anything, once every restart from an export.
+       *
+       * A non-empty list is worth a question, not a conclusion. Real tampering
+       * with an entry's contents still breaks the chain and returns
+       * `valid: false`.
+       */
+      unmarkedTombstoneSeqs?: number[];
     }
   | {
       valid: false;

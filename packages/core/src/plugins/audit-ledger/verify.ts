@@ -96,6 +96,7 @@ export function verify(
   let missingSeqCount = 0;
 
   const erasedSeqsSet = new Set<number>();
+  const unmarkedTombstoneSeqs = new Set<number>();
 
   // A bounded sink drops its oldest entries once it is full, so the entry the
   // walk starts from is not necessarily the genesis entry — its `prevHash`
@@ -168,30 +169,36 @@ export function verify(
       const prevIsTombstone = prevEntry?.kind === "system.entry-erased";
 
       if (entryIsTombstone || prevIsTombstone) {
-        // Verify the SENTINEL on whichever entry(ies) claim
-        // tombstone status. Missing sentinel ⇒ forgery ⇒ tamper.
+        // A tombstone that this runtime did not write is reported, not
+        // rejected.
+        //
+        // This decided the verdict twice, in both directions, and both were
+        // wrong in ordinary use. Asking the entries meant a live ledger over a
+        // sink that returns copies — every sink that persists anything — had
+        // its own erasures called forgeries. Asking whether the ledger had
+        // ever written anything meant a ledger resumed from an export accused
+        // its own imported tombstones the moment it made a single write of its
+        // own, which is every restart.
+        //
+        // The distinction cannot be drawn reliably: the mark is held in memory
+        // against the entry object and does not survive being stored, so
+        // "written by the runtime" and "appended by someone" look identical in
+        // any record that has been anywhere. An unkeyed chain cannot close
+        // that, and a control that manufactures a forgery is worse than one
+        // that reports what it could not check — the seqs are named, and an
+        // auditor with a reason to care can look.
         const candidates: AuditEntry[] = [];
         if (entryIsTombstone) candidates.push(entry);
         if (prevIsTombstone && prevEntry !== null) {
           candidates.push(prevEntry);
         }
-        const forged = candidates.find(
-          (e) => marksAreMeaningful && !isInternal(e),
-        );
-        if (forged) {
-          return {
-            valid: false,
-            brokenAt: i,
-            expectedHash: prevHash ?? "<genesis>",
-            actualHash: entry.prevHash ?? "<genesis>",
-            entry: forged,
-            reason:
-              "tombstone forgery detected — missing internal sentinel. A 'system.entry-erased' entry was written via sink.write() rather than ledger.erase(); rejected as tamper.",
-          };
+        for (const candidate of candidates) {
+          if (marksAreMeaningful && !isInternal(candidate)) {
+            unmarkedTombstoneSeqs.add(candidate.seq);
+          }
         }
-        // Legitimate erasure — record the tombstone's seq and
-        // resync the walk by hashing this entry as our new pointer
-        // for the next iteration.
+        // Record the tombstone's seq and resync the walk by hashing this
+        // entry as our new pointer for the next iteration.
         const tombstoneEntry = entryIsTombstone ? entry : prevEntry!;
         erasedSeqsSet.add(tombstoneEntry.seq);
         prevHash = hashForEntry(entry);
@@ -207,7 +214,23 @@ export function verify(
         entry,
       };
     }
-    prevHash = hashForEntry(entry);
+    try {
+      prevHash = hashForEntry(entry);
+    } catch (error) {
+      // An entry written under an algorithm this version does not know. The
+      // walk cannot continue past it, and an auditor asking whether the record
+      // is intact should get an answer rather than an exception.
+      return {
+        valid: false,
+        brokenAt: i,
+        expectedHash: prevHash ?? "<genesis>",
+        actualHash: entry.prevHash ?? "<genesis>",
+        entry,
+        reason: `cannot verify entry seq ${entry.seq}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
   }
 
   const result: {
@@ -219,6 +242,7 @@ export function verify(
     marksChecked: boolean;
     missingSeqs?: number[];
     missingSeqCount?: number;
+    unmarkedTombstoneSeqs?: number[];
   } = {
     valid: true,
     entryCount: entries.length,
@@ -226,6 +250,11 @@ export function verify(
   };
   if (erasedSeqsSet.size > 0) {
     result.erasedSeqs = [...erasedSeqsSet].sort((a, b) => a - b);
+  }
+  if (unmarkedTombstoneSeqs.size > 0) {
+    result.unmarkedTombstoneSeqs = [...unmarkedTombstoneSeqs].sort(
+      (a, b) => a - b,
+    );
   }
   if (missingSeqCount > 0) {
     result.missingSeqs = missingSeqs;

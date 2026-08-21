@@ -89,6 +89,22 @@ sink that does not hand back the same object it was given. It is always present
 rather than optional, because a caller checking `valid` alone should not be able
 to miss it.
 
+**Two changes to what `verify()` returns.** An erasure tombstone the runtime did
+not write is now named in `unmarkedTombstoneSeqs` rather than returning
+`valid: false`. The mark that distinguishes one is held in memory against the
+entry object, so it does not survive being stored — which means an honest record
+that has been anywhere looks identical to a forged one. Deciding a verdict on it
+was tried in both directions and each accused an honest ledger: once every sink
+that persists anything, once every restart from an export. Tampering with an
+entry's contents still breaks the chain and still returns `valid: false`. And an
+entry written under an unknown `hashAlgo` returns an invalid verdict naming it,
+instead of throwing — an auditor asking whether a record is intact should get an
+answer.
+
+**A ledger built over a sink that already holds entries continues them.** It
+used to begin its numbering and its chain from nothing, so a process restarting
+onto its own store broke the record at exactly the point it came back up.
+
 None of this makes the in-memory sink evidentiary. The chain is unkeyed, so
 anyone who can reach the buffer can recompute it; it detects accident and
 in-process mutation, not an adversary holding your storage. `system.restore()`

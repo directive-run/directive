@@ -165,12 +165,32 @@ export function freezeEntry(entry: AuditEntry): AuditEntry {
  * them; a hole or an `undefined` in an array becomes `null`; a key whose value
  * is `undefined`, a function, or a symbol is dropped.
  */
-const MAX_PROJECT_DEPTH = 100;
+/**
+ * Kept below the depth the canonical stringifier walks.
+ *
+ * The stringifier stops at fifty and writes a marker in place of whatever is
+ * below, so anything an entry held down there was in the record and outside
+ * the hash — writable in place, and identical to any other payload differing
+ * only past that line. Projecting no deeper than the hash reaches means
+ * nothing is recorded that is not covered, and content past it is dropped
+ * visibly, at the moment of writing.
+ */
+const MAX_PROJECT_DEPTH = 45;
+
+/**
+ * How many values one entry's payload may contribute to the record.
+ *
+ * Not a size limit for its own sake — it is what keeps the cost of hashing an
+ * entry proportional to the entry. Past it the rest is dropped as
+ * `"[too-large]"`, visibly, at the moment of writing.
+ */
+const MAX_PROJECTED_NODES = 10_000;
 
 export function asRecorded(
   value: unknown,
   depth = 0,
   path?: Set<object>,
+  memo?: { left: number },
 ): unknown {
   if (depth > MAX_PROJECT_DEPTH) return "[max-depth]";
   if (value === null) return null;
@@ -183,10 +203,27 @@ export function asRecorded(
   if (type !== "object") return undefined;
 
   const object = value as object;
-  // Tracked along the current path rather than across the whole walk. A set
-  // that never forgets treats the second sighting of a shared — but perfectly
-  // acyclic — object as a cycle, and returns it unprojected.
+  // Two structures, doing different jobs.
+  //
+  // The path set answers "am I inside this object right now?", which is what a
+  // cycle is. Tracking it across the whole walk instead — which an earlier
+  // version did — treats the second sighting of a shared but perfectly acyclic
+  // object as a cycle and returns it unprojected.
+  //
+  // The budget bounds the whole projection. A graph whose nodes are each
+  // referenced twice is a tree of two-to-the-depth when walked, and it is
+  // walked twice — once here and once by the canonical stringifier, which does
+  // its own path-scoped traversal and cannot be told about sharing. Reusing a
+  // projected sub-result makes this pass cheap and leaves the stringifier
+  // exponential, so the only thing that bounds both is a limit on how much is
+  // produced. Measured before it: twenty-two shared nodes took 4.3 seconds and
+  // produced a 37MB entry, and a little deeper took the process with it. One
+  // fact value must not be able to do that, least of all through the plugin
+  // that is meant to be watching.
   const seen = path ?? new Set<object>();
+  const budget = memo ?? { left: MAX_PROJECTED_NODES };
+  if (budget.left <= 0) return "[too-large]";
+  budget.left--;
   if (seen.has(object)) return "[circular]";
   seen.add(object);
   try {
@@ -196,16 +233,18 @@ export function asRecorded(
     if (object instanceof RegExp) return String(object);
     if (object instanceof Map) {
       return [...object.entries()].map(([k, v]) => [
-        asRecorded(k, depth + 1, seen),
-        asRecorded(v, depth + 1, seen),
+        asRecorded(k, depth + 1, seen, budget),
+        asRecorded(v, depth + 1, seen, budget),
       ]);
     }
     if (object instanceof Set) {
-      return [...object].map((item) => asRecorded(item, depth + 1, seen));
+      return [...object].map((item) =>
+        asRecorded(item, depth + 1, seen, budget),
+      );
     }
     if (Array.isArray(object)) {
       return object.map((item) => {
-        const projected = asRecorded(item, depth + 1, seen);
+        const projected = asRecorded(item, depth + 1, seen, budget);
 
         return projected === undefined ? null : projected;
       });
@@ -213,11 +252,10 @@ export function asRecorded(
 
     const out: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(object)) {
-      const projected = asRecorded(item, depth + 1, seen);
+      const projected = asRecorded(item, depth + 1, seen, budget);
       if (projected === undefined) continue;
       out[key] = projected;
     }
-
     return out;
   } finally {
     seen.delete(object);

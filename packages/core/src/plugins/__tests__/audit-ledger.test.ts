@@ -839,7 +839,7 @@ describe("createAuditLedger — per-subject erase()", () => {
     system.destroy();
   });
 
-  it("verify() throws on unknown hashAlgo discriminator", () => {
+  it("verify() reports an unknown hashAlgo rather than throwing", () => {
     const sink = memorySink();
     // Genesis entry with a bogus hashAlgo.
     sink.write({
@@ -854,7 +854,14 @@ describe("createAuditLedger — per-subject erase()", () => {
     } as AuditEntry);
 
     const ledger = createAuditLedger({ sink });
-    expect(() => ledger.verify()).toThrow(/unknown hashAlgo/i);
+    // It used to throw. An auditor asking whether a record is intact should
+    // get an answer — and one row written under an algorithm this version does
+    // not know is a reason to say no, not a reason to say nothing.
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(false);
+    if (!verdict.valid) {
+      expect(verdict.reason).toMatch(/unknown hashAlgo/i);
+    }
   });
 
   it("erase marker uses filterHash + filterShape — no raw PII", async () => {
@@ -1231,16 +1238,25 @@ describe("createAuditLedger — N7 tombstone forgery detection", () => {
       schemaVersion: 1,
       originalKind: "fact.change",
       erasedAt: Date.now(),
-      // NOTE: no `__internal` sentinel — sink consumers cannot reach
-      // the in-module symbol.
+      // NOTE: not written through `ledger.erase()`, so the runtime has no
+      // record of having minted it.
     } as unknown as AuditEntry);
 
     const after = ledger.verify();
-    expect(after.valid).toBe(false);
-    if (!after.valid) {
-      expect(after.reason).toBeDefined();
-      expect(after.reason).toMatch(/tombstone forgery/i);
-      expect(after.reason).toMatch(/sentinel/i);
+    // Named rather than rejected. This used to return `valid: false`, and
+    // that was changed deliberately: the mark saying "the runtime wrote this"
+    // lives in memory against the entry object and does not survive being
+    // stored, so an honest ledger looks identical to a forged one as soon as
+    // its entries have been anywhere. Deciding the verdict on it accused a
+    // live ledger over any persisting sink of forging its own erasures, and
+    // accused a ledger resumed from an export the moment it wrote anything.
+    //
+    // Tampering with an entry's contents still breaks the chain and still
+    // returns `valid: false`. This is the narrower claim that an appended
+    // tombstone cannot be told apart from a recorded one.
+    expect(after.valid).toBe(true);
+    if (after.valid) {
+      expect(after.unmarkedTombstoneSeqs).toContain(99);
     }
 
     system.destroy();

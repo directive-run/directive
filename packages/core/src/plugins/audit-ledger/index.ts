@@ -145,8 +145,34 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   const capturePII = opts.capturePII ?? false;
   const userRedact = opts.redact;
 
-  let seq = 0;
-  let lastHashCache: string | null = null; // Cache hash of last-written entry payload
+  // Resumed from whatever the sink already holds.
+  //
+  // A ledger built over a sink with entries in it — a process restarting onto
+  // its own durable store, or a trail reloaded from an export — used to begin
+  // its numbering and its chain from nothing. Its first write then carried
+  // sequence zero and no previous hash, next to entries that had both, so the
+  // record broke at exactly the point the system came back up. Reading the tip
+  // costs one query at construction and makes a restart continue the record
+  // rather than start a second one on top of it.
+  const existing = sink.recent(1);
+  const tip = existing.length > 0 ? existing[existing.length - 1] : undefined;
+  let seq = tip !== undefined ? tip.seq + 1 : 0;
+  // Cache hash of last-written entry payload.
+  let lastHashCache: string | null = null;
+  if (tip !== undefined) {
+    try {
+      lastHashCache = hashForEntry(tip);
+    } catch (error) {
+      // An entry written under an algorithm this version does not know. The
+      // chain cannot be continued from it, so it is left unseeded and the
+      // break shows up in `verify()` — which is the honest outcome. Throwing
+      // here would take construction down instead.
+      console.error(
+        `[Directive] audit-ledger: could not continue the chain from the entry already in this sink (seq ${tip.seq}). New entries will not link to it.`,
+        error,
+      );
+    }
+  }
   /** True only while this ledger is inside its own `sink.write` call. */
   let writingToSink = false;
 
@@ -427,14 +453,29 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
 
     // Projected to what an export can carry, at the point of recording, so
     // that the live entry and its exported form are the same data.
-    for (const [key, value] of Object.entries(finalEntry)) {
-      if (value !== null && typeof value === "object") {
-        (finalEntry as unknown as Record<string, unknown>)[key] =
-          asRecorded(value);
-      } else if (typeof value === "number" && !Number.isFinite(value)) {
-        (finalEntry as unknown as Record<string, unknown>)[key] = null;
+    //
+    // Every value, not only the objects. Handling those and non-finite numbers
+    // left a top-level function or symbol untouched: the canonical
+    // stringifier renders both and JSON drops the key, which is the fifth
+    // outing for the one defect this file keeps having. A function value also
+    // defeats the structured copy, so the entry ended up holding the caller's
+    // live function — and its closure — unfrozen and forever.
+    const record = finalEntry as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(record)) {
+      const projected = asRecorded(value);
+      if (projected === undefined) {
+        delete record[key];
+        continue;
       }
+      record[key] = projected;
     }
+    // Written back after the projection, since these are the fields `verify()`
+    // reasons over and none of them may be dropped by it.
+    record.kind = entry.kind;
+    record.seq = entry.seq;
+    record.prevHash = entry.prevHash;
+    record.hashAlgo = entry.hashAlgo;
+    record.schemaVersion = entry.schemaVersion;
     freezeEntry(finalEntry);
 
     // Sync hash of this entry — stashed as the next entry's prevHash.
