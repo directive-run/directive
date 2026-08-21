@@ -50,6 +50,7 @@ import type {
   VerifyResult,
 } from "./types.js";
 import { HASH_ALGO, SCHEMA_VERSION } from "./types.js";
+import type { AuditSchemaVersion } from "./types.js";
 import { verify as verifyChain } from "./verify.js";
 
 // Re-export the public surface. `LEDGER_INTERNAL_TOKEN` is intentionally
@@ -645,7 +646,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
             prevHash: e.prevHash,
             hashAlgo: e.hashAlgo,
             schemaVersion:
-              (e as AuditEntry & { schemaVersion?: typeof SCHEMA_VERSION })
+              (e as AuditEntry & { schemaVersion?: AuditSchemaVersion })
                 .schemaVersion ?? SCHEMA_VERSION,
             originalKind: e.kind,
             erasedAt,

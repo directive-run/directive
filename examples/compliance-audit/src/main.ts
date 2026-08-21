@@ -291,7 +291,7 @@ function renderLedgerEntry(e: AuditEntry): string {
         <span class="ts">${ts}</span>
         <span class="seq">#${e.seq}</span>
         <span class="kind">fact</span>
-        <span>${escapeHtml(e.key)}: ${escapeHtml(JSON.stringify(e.prior))} → ${escapeHtml(JSON.stringify(e.next))}</span>
+        <span>${escapeHtml(e.key)}: ${escapeHtml(JSON.stringify(e.prior))} → ${escapeHtml(JSON.stringify(e.next))}${e.origin === "authored" ? "" : ` <em>(${escapeHtml(e.origin)})</em>`}</span>
       </div>`;
     case "resolver.complete":
       return `<div class="entry">
@@ -423,11 +423,17 @@ function onTamper(): void {
   const idx = Math.floor(cloned.entries.length / 2);
   const target = cloned.entries[idx] as { kind: string; seq: number };
   const originalKind = target.kind;
-  target.kind = "fact.change"; // wrong kind
+  // Derived from the kind that is there, so the swap is always a real edit.
+  // Writing a literal "fact.change" went inert whenever the chosen entry was
+  // already one — and most entries are, now that batched writes are recorded.
+  // The demo would then report "tampered" while having changed nothing, and
+  // VERIFY would correctly say the chain was intact.
+  target.kind =
+    originalKind === "fact.change" ? "constraint.evaluate" : "fact.change";
   tamperedClone = cloned;
   setVerifyStatus(
     "warn",
-    `Tamper simulated on a CLONE of entry #${target.seq} (was kind=${originalKind}, now kind=fact.change). The live ledger is untouched — entries are frozen at write time. Click VERIFY to see what an auditor would see if the persisted bytes had been swapped.`,
+    `Tamper simulated on a CLONE of entry #${target.seq} (was kind=${originalKind}, now kind=${target.kind}). The live ledger is untouched — entries are frozen at write time. Click VERIFY to see what an auditor would see if the persisted bytes had been swapped.`,
   );
   renderLedger();
 }

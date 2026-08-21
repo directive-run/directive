@@ -32,7 +32,13 @@ export type {
 export type { RequirementsSchema } from "./requirements.js";
 
 // Facts types
-export type { Facts, FactsSnapshot, FactsStore, FactChange } from "./facts.js";
+export type {
+  Facts,
+  FactsSnapshot,
+  FactsStore,
+  FactChange,
+  FactOrigin,
+} from "./facts.js";
 
 // Meta types
 export type { DefinitionMeta } from "./meta.js";

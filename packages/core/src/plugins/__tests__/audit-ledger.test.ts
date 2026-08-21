@@ -1144,7 +1144,7 @@ describe("createAuditLedger — hashAlgo canonicalization tag", () => {
 // ============================================================================
 
 describe("createAuditLedger — schemaVersion", () => {
-  it("stamps schemaVersion: 1 on every entry", async () => {
+  it("stamps the current schemaVersion on every entry", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -1158,7 +1158,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const entries = ledger.query();
     expect(entries.length).toBeGreaterThan(0);
     for (const e of entries) {
-      expect((e as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((e as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();
@@ -1180,7 +1180,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const tombstones = ledger.query({ kind: "system.entry-erased" });
     expect(tombstones.length).toBeGreaterThan(0);
     for (const t of tombstones) {
-      expect((t as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((t as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();

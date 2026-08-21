@@ -4,37 +4,50 @@
 ---
 
 **A write made inside `system.batch()` now reaches `system.observe()`.** It did
-not before. The bridge behind `observe()` implemented the single-write hook and
-not the batched one, so the audit ledger — and anything else observing — saw an
-unwrapped write and missed the identical wrapped one.
+not before. The bridge behind `observe()` implemented the single-write plugin
+hook and not the batched one, so the audit ledger — and anything else observing
+— recorded an unwrapped write and missed the identical wrapped one.
 
 That is not a corner of the API. Event handlers, effects, resolvers before their
 first `await`, `initialFacts`, `hydrate` and every history navigation write
 through a batch, so most of the writes a running system makes were arriving on
-the path that recorded nothing. Suppressing an entry needed no privileged handle
-and no forged label: wrapping the write was enough, while the plain write beside
-it was recorded in full.
+the path that recorded nothing. Wrapping a write in a batch was enough to keep
+it out of the record entirely, while the plain write beside it was captured in
+full.
 
 **Each key gets one entry per batch**, carrying the value it held before the
-batch and the value it holds after. A batch is a single transition, and a body
-that writes one key in a loop should not produce an entry per iteration — a
-hundred thousand writes to a single key in one batch coalesce to one entry. A
-key written and then written back keeps its entry with `prior` and `next` equal;
-that reads as noise, but a batch that leaves no trace at all is worse.
+batch and the value it holds after — not one entry per write. A body that writes
+one key in a loop produces one entry: a hundred thousand writes to a single key
+in one batch coalesce to a single row. The cost, which matters if you are
+auditing rather than debugging, is that a value a fact held *only inside* a
+batch is not recorded. Write a value and overwrite it before the batch closes
+and the entry describes the first-to-last transition with nothing in between. If
+you need every intermediate value, do not batch those writes.
 
-**Replayed writes are filed, not dropped.** A write a history navigation
-replayed — `restore`, `goBack`, `goForward`, `goTo`, `replay`, `import` — now
-carries `origin: "restore"` on the `fact.change` event and on the ledger entry.
-A write your program made carries no `origin` at all. Dropping replays instead
-would put a label in charge of whether an entry exists, and a label worth that
-much is worth forging; filing them puts it in charge of nothing more than which
-rows an auditor reads together. The label is set from the history manager's own
-state, so reaching it means actually replaying a snapshot. `@directive-run/timeline`
-marks a restored write rather than rendering it as something the program just did.
+**Every `fact.change` now carries an `origin`**: `"authored"` when your program
+made the write, `"restore"` when a history navigation replayed it, `"hydrate"`
+when stored state was loaded in through `hydrate`, `initialFacts` or
+`system.restore`. It is stamped against each write as it is made rather than
+read from a flag when the batch is reported — a batch can hold writes of more
+than one origin, and one label taken at the end describes neither. Select on it
+in the query (`ledger.query({ kind: "fact.change", origin: "authored" })`)
+rather than filtering the result, because `query()` stops at `limit` before your
+filter runs.
 
-**Expect more events.** On a workload of a hundred event dispatches touching
-three facts each, the observation stream goes from 99 events to 399 — the
-difference is the writes that were previously invisible. A system's starting
-state now appears in the trail too, because `init` writes through a batch. If
-you are on the default in-memory sink, it holds 10,000 entries and will rotate
-sooner.
+`origin` says how a write arrived, not whether to trust it. `"authored"` means
+only that the write did not come through a replay or hydration door.
+
+**`@directive-run/timeline`** marks non-authored frames in rendered output and
+no longer re-dispatches them during `replayTimeline` — a timeline containing an
+undo used to replay as two mutations where the user made one. `toMutate` counts
+authored frames only. Timelines recorded before this release replay unchanged.
+Its peer range on core moves to `^1.32.0`, since it now reads `origin`.
+
+**Migration.** Expect more entries: on a workload of a hundred event dispatches
+touching three facts each, the observation stream goes from 99 events to 399,
+and a system's opening state now appears because `init` writes through a batch.
+On the default in-memory sink — 10,000 entries — that rotates roughly four times
+sooner, so size your sink for your write rate. Anything asserting ledger row
+counts in tests or dashboards will see different numbers. Ledger entries now
+stamp `schemaVersion: 2`; entries written under 1 still verify, because the
+version is part of what each entry is hashed over.

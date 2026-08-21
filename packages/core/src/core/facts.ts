@@ -18,6 +18,8 @@ import {
   withoutTracking,
 } from "./tracking.js";
 import type {
+  FactChange,
+  FactOrigin,
   Facts,
   FactsSnapshot,
   FactsStore,
@@ -50,14 +52,7 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   /** Callback when facts change (for plugin hooks) */
   onChange?: (key: string, value: unknown, prev: unknown) => void;
   /** Callback for batch changes */
-  onBatch?: (
-    changes: Array<{
-      key: string;
-      value: unknown;
-      prev: unknown;
-      type: "set" | "delete";
-    }>,
-  ) => void;
+  onBatch?: (changes: FactChange[]) => void;
   /**
    * Called the moment a key is written inside a batch, before the batch ends.
    *
@@ -94,6 +89,18 @@ export interface CreateFactsStoreOptions<S extends Schema> {
    * unconditional to be undone.
    */
   onBatchEnd?: () => void;
+  /**
+   * Asked, at the moment of each write, where that write came from.
+   *
+   * Called per write rather than per batch, and that is the whole point. The
+   * batch is reported when it ends; a flag read at that moment describes
+   * whatever is in effect then, which for a restore nested inside a wider
+   * batch is already over. Reading it here records what was true when the
+   * value actually changed.
+   *
+   * Defaults to `"authored"` when not supplied.
+   */
+  originOf?: () => FactOrigin;
 }
 
 /**
@@ -134,6 +141,7 @@ export function createFactsStore<S extends Schema>(
     onWrite,
     onBatchStart,
     onBatchEnd,
+    originOf,
     onKeysRegistered,
   } = options;
 
@@ -158,6 +166,7 @@ export function createFactsStore<S extends Schema>(
     value: unknown;
     prev: unknown;
     type: "set" | "delete";
+    origin: FactOrigin;
   }> = [];
   const dirtyKeys = new Set<string>();
 
@@ -481,7 +490,13 @@ export function createFactsStore<S extends Schema>(
 
       // Record change
       if (batching > 0) {
-        batchChanges.push({ key: key as string, value, prev, type: "set" });
+        batchChanges.push({
+          key: key as string,
+          value,
+          prev,
+          type: "set",
+          origin: originOf?.() ?? "authored",
+        });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);
       } else {
@@ -501,6 +516,7 @@ export function createFactsStore<S extends Schema>(
           value: undefined,
           prev,
           type: "delete",
+          origin: originOf?.() ?? "authored",
         });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);

@@ -56,6 +56,13 @@ export function matchesFilter(entry: AuditEntry, filter: QueryFilter): boolean {
       return false;
     }
   }
+  if (filter.origin !== undefined) {
+    if (entry.kind !== "fact.change") return false;
+    const origins = Array.isArray(filter.origin)
+      ? filter.origin
+      : [filter.origin];
+    if (!origins.includes(entry.origin)) return false;
+  }
   if (filter.constraintId !== undefined) {
     if (entry.kind !== "constraint.evaluate") return false;
     if (entry.constraintId !== filter.constraintId) return false;

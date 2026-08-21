@@ -143,7 +143,7 @@ describe("observe() and batched writes", () => {
     });
   });
 
-  it("labels an ordinary write with no origin", async () => {
+  it("labels an ordinary write as authored", async () => {
     const system = makeSystem();
     await system.start();
 
@@ -158,7 +158,7 @@ describe("observe() and batched writes", () => {
     await system.stop();
 
     const [change] = factChanges(events);
-    expect(change && "origin" in change).toBe(false);
+    expect(change).toMatchObject({ origin: "authored" });
   });
 
   it("records a delete the same way batched or not", async () => {

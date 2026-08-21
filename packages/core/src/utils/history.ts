@@ -86,6 +86,12 @@ export interface CreateHistoryOptions<S extends Schema> {
   onSnapshot?: (snapshot: Snapshot) => void;
   /** Callback when history navigation occurs */
   onHistoryChange?: (from: number, to: number) => void;
+  /**
+   * Runs the manager's own fact assignments in whatever scope marks a write as
+   * replayed. Supplied by the engine; defaults to running `fn` unchanged so a
+   * standalone manager still works.
+   */
+  withRestoreOrigin?: (fn: () => void) => void;
 }
 
 /**
@@ -130,7 +136,14 @@ function resolveHistoryOption(option: HistoryOption): {
 export function createHistoryManager<S extends Schema>(
   options: CreateHistoryOptions<S>,
 ): HistoryManager<S> {
-  const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
+  const {
+    historyOption,
+    facts,
+    store,
+    onSnapshot,
+    onHistoryChange,
+    withRestoreOrigin = (fn: () => void) => fn(),
+  } = options;
 
   const {
     enabled: isEnabled,
@@ -198,6 +211,15 @@ export function createHistoryManager<S extends Schema>(
     }
 
     store.batch(() => {
+      // Scoped to the assignment loop, deliberately not to the batch.
+      //
+      // The batch flushes when it closes, and consumer code runs during that
+      // flush — an observer is free to write a value of its own. Those writes
+      // are the program's, not the replay's, and a scope that covered the
+      // flush would hand them this label. Narrowing it to the assignments
+      // separates the two exactly: the replay's writes happen inside, the
+      // reactions to them happen after.
+      withRestoreOrigin(() => {
       for (const [key, value] of Object.entries(serialized)) {
         // Prototype pollution protection (redundant but defensive)
         if (
@@ -212,6 +234,7 @@ export function createHistoryManager<S extends Schema>(
         }
         (facts as Record<string, unknown>)[key] = value;
       }
+      });
     });
   }
 

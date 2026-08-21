@@ -132,10 +132,10 @@ describe("audit ledger and batched writes", () => {
     expect(replayed).toHaveLength(1);
     expect(replayed[0]).toMatchObject({ prior: 120, next: 75 });
 
-    // The authored writes carry no origin at all — the label files an entry,
-    // it never decides whether one exists.
-    // Two authored writes plus `init`'s.
-    expect(changes.filter((c) => c.origin === undefined).length).toBe(3);
+    // The program's own writes are labelled as such rather than left blank —
+    // a query for them names them instead of testing for a missing field, which
+    // would silently reclassify every row the day another origin is added.
+    expect(changes.filter((c) => c.origin === "authored").length).toBe(3);
   });
 
   it("redacts a tagged fact on the paths this made visible", async () => {
@@ -169,6 +169,38 @@ describe("audit ledger and batched writes", () => {
 
     sys.destroy();
     led.destroy();
+  });
+
+  it("selects by origin in the sink, not after the page is chosen", async () => {
+    // `query()` walks newest-first and stops at `limit`. A caller filtering the
+    // result is filtering a page that was already picked, so a fact whose
+    // recent history is mostly replayed writes can fill the page and leave the
+    // authored ones behind — the query returns nothing and looks like an
+    // answer.
+    system.start();
+    await flushTick();
+    system.facts.cartTotal = 1;
+    await system.settle();
+    system.facts.cartTotal = 2;
+    await system.settle();
+    system.history.goBack();
+    await flushTick();
+
+    const authored = ledger.query({
+      kind: "fact.change",
+      factPath: "cartTotal",
+      origin: "authored",
+      limit: 1,
+    });
+    expect(authored).toHaveLength(1);
+    expect(authored[0]).toMatchObject({ origin: "authored" });
+
+    const replayed = ledger.query({
+      kind: "fact.change",
+      origin: "restore",
+    });
+    expect(replayed.length).toBeGreaterThan(0);
+    expect(replayed.every((e) => e.kind === "fact.change")).toBe(true);
   });
 
   it("keeps the chain verifiable once batched writes are in it", async () => {

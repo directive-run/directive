@@ -436,8 +436,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "count", value: undefined, prev: undefined },
-        { type: "delete", key: "label", value: undefined, prev: undefined },
+        { type: "set", key: "count", value: undefined, prev: undefined , origin: "authored" },
+        { type: "delete", key: "label", value: undefined, prev: undefined , origin: "authored" },
       ]);
 
       vi.advanceTimersByTime(100);
@@ -457,8 +457,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "temp1", value: undefined, prev: undefined },
-        { type: "set", key: "temp2", value: undefined, prev: undefined },
+        { type: "set", key: "temp1", value: undefined, prev: undefined , origin: "authored" },
+        { type: "set", key: "temp2", value: undefined, prev: undefined , origin: "authored" },
       ]);
 
       vi.advanceTimersByTime(200);
@@ -478,8 +478,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "temp", value: undefined, prev: undefined },
-        { type: "set", key: "count", value: undefined, prev: undefined },
+        { type: "set", key: "temp", value: undefined, prev: undefined , origin: "authored" },
+        { type: "set", key: "count", value: undefined, prev: undefined , origin: "authored" },
       ]);
 
       vi.advanceTimersByTime(100);

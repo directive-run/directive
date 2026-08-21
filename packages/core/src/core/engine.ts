@@ -618,6 +618,58 @@ export function createEngine<S extends Schema>(
   // Assigned after createHistoryManager() below.
   let historyRef: HistoryManager<S> | null = null;
 
+  /**
+   * Non-zero while stored state is being loaded into the system rather than
+   * written by the program — `initialFacts`, `hydrate`, and a snapshot applied
+   * through `system.restore`.
+   *
+   * A counter rather than a flag because these paths nest.
+   */
+  let hydrationDepth = 0;
+  let restoreDepth = 0;
+
+  function withHydrationOrigin<T>(fn: () => T): T {
+    hydrationDepth++;
+    try {
+      return fn();
+    } finally {
+      hydrationDepth--;
+    }
+  }
+
+  function withRestoreOrigin(fn: () => void): void {
+    restoreDepth++;
+    try {
+      fn();
+    } finally {
+      restoreDepth--;
+    }
+  }
+
+  /**
+   * Asked at each write where that write came from.
+   *
+   * Read per write, never per batch. A restore nested inside a wider batch has
+   * already put its flag down by the time that batch reports, so a label taken
+   * at report time describes the wrong thing in both directions: the replayed
+   * writes lose the mark, and any program write made while a restore was in
+   * flight gains it.
+   */
+  function currentFactOrigin(): import("./types/facts.js").FactOrigin {
+    // Deliberately not `historyRef.isRestoring`. That flag is up for the whole
+    // navigation, including the flush at the end where consumer code runs, so
+    // it would hand this label to writes a listener or an observer made of its
+    // own accord. The scope below covers only the manager's own assignments.
+    if (restoreDepth > 0) {
+      return "restore";
+    }
+    if (hydrationDepth > 0) {
+      return "hydrate";
+    }
+
+    return "authored";
+  }
+
   // Trace management (per-run reconciliation changelog, gated by config.trace)
   const traceManager = createTraceManager({
     traceConfig: config.trace,
@@ -686,13 +738,25 @@ export function createEngine<S extends Schema>(
       // at which the announcement is released.
       invalidateManyDerivations(keys);
       releaseDerivationHold();
-      // During history restore, skip change tracking and reconciliation.
-      if (historyRef?.isRestoring) return;
+
+      // A replayed write needs no reconciliation — the state it restores was
+      // already reconciled when it was captured, and re-reconciling it makes
+      // spurious snapshots that break undo and redo.
+      //
+      // Decided per change rather than by asking whether a restore is in
+      // flight. A listener or observer can write its own value while one is,
+      // and that write is the program's: gated on the flag it was committed to
+      // the store and then never reconciled, so a rule that had become true
+      // stayed unsatisfied for the life of the process with nothing reporting
+      // it. Observers only reach this path at all because batched writes now
+      // announce, so the gap arrived with that arm.
+      const authored = changes.filter((change) => change.origin !== "restore");
+      if (authored.length === 0) return;
       // Resolver/effect batches (outside event dispatch) always create snapshots
       if (dispatchDepth === 0) {
         shouldTakeSnapshot = true;
       }
-      for (const change of changes) {
+      for (const change of authored) {
         state.changedKeys.add(change.key);
       }
       scheduleReconcile();
@@ -721,6 +785,7 @@ export function createEngine<S extends Schema>(
       recordFactTags(asSchema);
       notifyMetaSubscribers();
     },
+    originOf: currentFactOrigin,
     onBatchEnd: () => {
       // Normally the hold was already released inside `onBatch`. This unwinds
       // the frame either way, and covers the batch that wrote nothing — where
@@ -1144,6 +1209,7 @@ export function createEngine<S extends Schema>(
         historyOption: config.history,
         facts,
         store,
+        withRestoreOrigin,
         onSnapshot: (snapshot) => {
           pluginManager.emitSnapshot(snapshot);
           notifyHistoryChange();
@@ -2194,7 +2260,15 @@ export function createEngine<S extends Schema>(
         onStop: () => observer({ type: "system.stop" }),
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
-          observer({ type: "fact.change", key, prev, next: value }),
+          // Unbatched writes announce synchronously inside `set()`, so reading
+          // the origin here *is* reading it at the write.
+          observer({
+            type: "fact.change",
+            key,
+            prev,
+            next: value,
+            origin: currentFactOrigin(),
+          }),
         onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
           // Without this arm a write inside `system.batch()` reached no
           // observer at all, while the identical write outside one was
@@ -2204,38 +2278,62 @@ export function createEngine<S extends Schema>(
           // to most of the writes in a running system, and suppressing an
           // entry took nothing more privileged than wrapping the write.
           //
-          // Coalesced per key, because a batch is one transition and a body
-          // that writes a key in a loop should not produce an entry per
-          // iteration. Measured: a hundred thousand writes to one key in a
-          // single batch produced a hundred thousand events and blocked for
-          // 491ms, while the listener side — which already coalesces — saw
-          // one. First `prev` and last value are kept, so the pair still
-          // describes the transition the batch actually made.
+          // Coalesced per key AND per origin, because a batch is one
+          // transition and a body that writes a key in a loop should not
+          // produce an entry per iteration. Measured: a hundred thousand
+          // writes to one key in a single batch produced a hundred thousand
+          // events and blocked for 491ms, while the listener side — which
+          // already coalesces — saw one. First `prev` and last value are kept,
+          // so the pair still describes the transition the batch made.
+          //
+          // Splitting on origin as well as key is what keeps that pair honest.
+          // A batch that writes a fact and then rewinds history touches the
+          // same key twice from two different places; folded together, the
+          // resulting pair describes neither, and whichever origin came last
+          // would speak for both.
           //
           // A key written and written back keeps its entry. The net pair is
           // `prev === next`, which reads as noise, but dropping it would be
           // one more way for a batch to leave no trace — which is the whole
           // defect this closes.
-          const net = new Map<string, { prev: unknown; next: unknown }>();
+          const net = new Map<
+            string,
+            {
+              key: string;
+              prev: unknown;
+              next: unknown;
+              origin: import("./types/facts.js").FactOrigin;
+            }
+          >();
           for (const change of changes) {
             const next = change.type === "delete" ? undefined : change.value;
-            const seen = net.get(change.key);
+            const id = `${change.origin}\u0000${change.key}`;
+            const seen = net.get(id);
             if (seen) {
               seen.next = next;
             } else {
-              net.set(change.key, { prev: change.prev, next });
+              net.set(id, {
+                key: change.key,
+                prev: change.prev,
+                next,
+                origin: change.origin,
+              });
             }
           }
-          // `isRestoring` is engine-internal and derived from the history
-          // manager's own state, so the label cannot be set by a caller —
-          // reaching it means actually replaying a snapshot.
-          const restoring = historyRef?.isRestoring === true;
-          for (const [key, { prev, next }] of net) {
-            observer(
-              restoring
-                ? { type: "fact.change", key, prev, next, origin: "restore" }
-                : { type: "fact.change", key, prev, next },
-            );
+          for (const { key, prev, next, origin } of net.values()) {
+            // Guarded per key. The whole hook runs inside one try/catch in the
+            // plugin manager, so without this a throw on one key discarded
+            // every key after it — turning a one-row gap in a durable record
+            // into a whole-transaction gap, silently. The unbatched path is
+            // per-write isolated already; this makes the two agree.
+            try {
+              observer({ type: "fact.change", key, prev, next, origin });
+            } catch (error) {
+              console.error(
+                `[Directive] Observer threw on fact "${key}"; remaining keys in this batch are unaffected.`,
+                error,
+              );
+            }
           }
         },
         onConstraintEvaluate: (
@@ -2437,9 +2535,16 @@ export function createEngine<S extends Schema>(
 
       // Apply initialFacts/hydrate via callback
       // This ensures initialFacts are applied AFTER module init but BEFORE reconcile
+      //
+      // Marked as hydration rather than authored: these values were produced by
+      // an earlier run of the program, not by this one. Filed as first-party
+      // writes they are indistinguishable from what the program decided this
+      // time, which is the question anyone reading the record is asking.
       if (config.onAfterModuleInit) {
         store.batch(() => {
-          config.onAfterModuleInit!();
+          withHydrationOrigin(() => {
+            config.onAfterModuleInit!();
+          });
         });
       }
 
@@ -3429,15 +3534,21 @@ export function createEngine<S extends Schema>(
         );
       }
 
+      // Restoring a serialized snapshot is hydration, not authorship — the
+      // same reasoning as `initialFacts`. Note this is `system.restore`, which
+      // is a different door from `history.restore`; the two used to disagree
+      // about what a restored write looked like in the record.
       store.batch(() => {
-        for (const [key, value] of Object.entries(snapshot.facts)) {
-          // Skip dangerous keys (defense in depth)
-          if (BLOCKED_PROPS.has(key)) continue;
-          store.set(
-            key as keyof InferSchema<S>,
-            value as InferSchema<S>[keyof InferSchema<S>],
-          );
-        }
+        withHydrationOrigin(() => {
+          for (const [key, value] of Object.entries(snapshot.facts)) {
+            // Skip dangerous keys (defense in depth)
+            if (BLOCKED_PROPS.has(key)) continue;
+            store.set(
+              key as keyof InferSchema<S>,
+              value as InferSchema<S>[keyof InferSchema<S>],
+            );
+          }
+        });
       });
     },
 

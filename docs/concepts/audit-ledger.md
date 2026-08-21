@@ -51,10 +51,12 @@ record. Read this before deploying it as evidence:
   shape (`seq`, `ts`, `kind`, `prevHash`, `hashAlgo`, `schemaVersion`,
   …payload) is canonicalized via key-sorted JSON, then djb2-hashed to
   a 32-bit hex string. Each entry carries `hashAlgo: "djb2-1"` and
-  `schemaVersion: 1` – any future change to the canonicalization,
-  hash function, or entry shape bumps the matching tag, so existing
-  exports remain verifiable against the algorithm and schema they were
-  written under.
+  `schemaVersion: 2` – any change to the canonicalization, hash
+  function, or entry shape bumps the matching tag, so existing exports
+  remain verifiable against the algorithm and schema they were written
+  under. Version 2 is where `fact.change` gained its `origin` field;
+  entries written under 1 still verify, because the version is part of
+  what each entry is hashed over.
 
 ## Setup
 
@@ -72,7 +74,7 @@ const system = createSystem({
 system.start();
 ```
 
-The ledger subscribes to every observation event the system emits – constraint evaluations, fact changes, resolver writes – and records them, in order, with the rule that was in effect at the time and the per-clause `whenExplain` payload.
+The ledger records the events listed under [Captured events](#captured-events) – constraint evaluations, fact changes, resolver outcomes and lifecycle markers – in order, with the rule that was in effect at the time and the per-clause `whenExplain` payload. It does not record everything `system.observe()` emits: derivation computes, requirement lifecycle, effect runs, reconcile boundaries and source publishes are deliberately left out, because they describe how the runtime reached a decision rather than what it decided. Subscribe with `system.observe()` directly if you need those.
 
 ## Query
 
@@ -108,7 +110,7 @@ Filter shape:
 | Kind | Payload includes |
 | --- | --- |
 | `constraint.evaluate` | `constraintId`, `active`, `whenSpec` (PII operands redacted) or `whenSource` (function-form `sourceHash`), `whenExplain` |
-| `fact.change` | `key`, `prior`, `next`, `origin` (only when replayed) |
+| `fact.change` | `key`, `prior`, `next`, `origin` (see [below](#where-a-write-came-from--origin)). `prior` is **omitted** on the first write of a key, and `next` is omitted when a key is deleted – keys with no value are dropped before the entry is hashed, so an export carries the same bytes the live entry was hashed over |
 | `resolver.write.rejected` | `resolverId`, `fact`, `expected`, `actual` (rejection) or `dropped` (summary) |
 | `resolver.complete` | `resolverId`, `requirementId`, `duration` |
 | `resolver.error` | `resolverId`, `requirementId`, `error` |
@@ -121,23 +123,40 @@ Filter shape:
 
 ### Batched writes
 
-A write made inside `system.batch()` produces the same entry as one made outside it. That covers more than an explicit `batch()` call: event handlers, effects, resolvers before their first `await`, `initialFacts`, `hydrate` and every history navigation write through a batch, so most of the writes a running system makes arrive this way.
+A write made inside `system.batch()` is recorded. It previously was not, and that covers more than an explicit `batch()` call: event handlers, effects, resolvers before their first `await`, `initialFacts`, `hydrate` and every history navigation write through a batch, so most of the writes a running system makes arrive this way.
 
-Each key gets **one entry per batch**, carrying the value it held before the batch and the value it holds after. A batch is a single transition, and a body that writes the same key in a loop should not produce an entry per iteration – one measurement had a hundred thousand writes to a single key in one batch, which coalesce to a single entry.
+Each key gets **one entry per batch**, carrying the value it held before the batch and the value it holds after – not one entry per write. Two consequences, and the second is the one that matters for an audit:
+
+- A body that writes the same key in a loop produces one entry, not one per iteration. A hundred thousand writes to a single key in one batch coalesce to a single entry.
+- **A value a fact held only inside a batch is not recorded.** Write a value and overwrite it before the batch closes and the entry reads as the transition from the first value to the last, with nothing about what sat in between. If you need every intermediate value, do not batch the writes.
 
 A key written and then written back keeps its entry, with `prior` and `next` equal. It reads as noise, but a batch that leaves no trace at all is worse.
 
-### Replayed writes – `origin`
+**This is more entries than before.** On a workload of a hundred event dispatches touching three facts each, the ledger goes from 99 entries to 399. A system's opening state now appears too, because `init` writes through a batch. If you are on the default in-memory sink it holds 10,000 entries and will rotate roughly four times sooner than it used to – see [Sinks](#sinks) and size it for your write rate. Anything counting ledger rows in a test or a dashboard should expect different numbers.
 
-A write a history navigation replayed – `restore`, `goBack`, `goForward`, `goTo`, `replay`, `import` – is recorded with `origin: "restore"`. A write your program made carries no `origin` at all.
+### Where a write came from – `origin`
+
+Every `fact.change` entry carries an `origin`:
+
+| `origin` | Means |
+| --- | --- |
+| `authored` | Your program made this write. |
+| `restore` | A history navigation replayed it – `restore`, `goBack`, `goForward`, `goTo`, `replay`, `import`. |
+| `hydrate` | Stored state was loaded in – `hydrate`, `initialFacts`, or a snapshot applied through `system.restore`. |
+
+Select on it in the query rather than filtering the result, because `query()` walks newest-first and stops at `limit`:
 
 ```ts
-ledger
-  .query({ kind: "fact.change", factPath: "cartTotal" })
-  .filter((entry) => entry.origin === undefined); // authored writes only
+ledger.query({ kind: "fact.change", factPath: "cartTotal", origin: "authored" });
 ```
 
-Replays are **filed, never dropped**. A ledger that dropped them would put a label in charge of whether an entry exists, and a label worth that much is worth forging. Filing them puts it in charge of nothing more than which rows an auditor reads together. `origin` is set from the history manager's own state, so reaching it means actually replaying a snapshot.
+`origin` is stamped against each write as it is made, never read from a flag when the batch is reported. A batch can hold writes of more than one origin – a program that writes a fact and then rewinds history in the same batch makes both – and a single label taken at the end would describe neither.
+
+**`origin` is not an authenticity signal.** `authored` means the write did not arrive through a replay or a hydration door. It says nothing about who or what made it, and any code holding a system handle can make an authored write. Do not use it to decide whether a change is legitimate.
+
+Replays are **filed, never dropped**. A ledger that dropped them would put a label in charge of whether an entry exists, and a label worth that much is worth forging. Filing them puts it in charge of nothing more than which rows an auditor reads together.
+
+A history navigation also emits a `system.history.navigate` marker carrying the snapshot indexes it moved between. Neither replaces the other: the marker has no keys or values, the `fact.change` rows have no indexes.
 
 ### Function-form constraints – `whenSource` is informational only
 
@@ -199,7 +218,7 @@ See [Threat model](#threat-model) above for what this catches and what it doesn'
 
 ## PII redaction (default ON)
 
-Fact values flow into the ledger via `whenExplain.actual` and `fact.change.{prior,next}`. By default, the ledger reads `system.meta.byTag("pii")` at start and *redacts* values for those facts to `"[redacted]"`:
+Fact values flow into the ledger via `whenExplain.actual` and `fact.change.{prior,next}`. By default, the ledger asks `system.meta` per lookup whether a fact carries the tag, and *redacts* values for those facts to `"[redacted]"`:
 
 ```ts
 const checkoutModule = createModule("checkout", {

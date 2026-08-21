@@ -8,7 +8,11 @@
  * types from here without a cycle.
  */
 
-import type { ModuleSchema, Plugin } from "../../core/types.js";
+import type {
+  FactOrigin,
+  ModuleSchema,
+  Plugin,
+} from "../../core/types.js";
 import type {
   ClauseResult,
   FactPredicate,
@@ -26,7 +30,19 @@ export const HASH_ALGO = "djb2-1" as const;
  * a way that breaks back-compat parsers. Persisted on every entry so
  * exports remain self-describing across library upgrades.
  */
-export const SCHEMA_VERSION = 1 as const;
+/**
+ * Schema versions an entry can carry. A reader may hold entries written by an
+ * older version — an export re-loaded for verification, most obviously — so
+ * this is the union rather than the current constant.
+ */
+export type AuditSchemaVersion = 1 | 2;
+
+/**
+ * Bumped to 2 when `fact.change` gained its required `origin` field. Entries
+ * written under 1 stay verifiable: the version is part of what each entry is
+ * hashed over, so the chain is checked against the schema it was written under.
+ */
+export const SCHEMA_VERSION: AuditSchemaVersion = 2;
 
 // ============================================================================
 // AuditEntry types
@@ -86,7 +102,7 @@ interface AuditEntryBase {
    * changes in a way that breaks back-compat. Pair with `hashAlgo`
    * when migrating older exports.
    */
-  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly schemaVersion: AuditSchemaVersion;
   /**
    * Private sentinel — present (and equal to the in-module token) only
    * on legitimate tombstones minted by `ledger.erase()`. Filtered out
@@ -177,15 +193,22 @@ export type AuditEntry =
       prior: unknown;
       next: unknown;
       /**
-       * Present only when the write was replayed rather than authored —
-       * a history navigation, an `import`, a `replay`. Absent otherwise.
+       * Where the write came from — `"authored"`, `"restore"` or `"hydrate"`.
+       *
+       * Always present, so a query for program writes names them instead of
+       * testing for the absence of a label. Stamped against the write as it is
+       * made, not read from a flag when the batch is reported.
        *
        * A replayed write is filed, never dropped. Dropping it would put a
        * label in charge of whether an entry exists at all, which is worth
        * forging; filing it puts the label in charge of nothing more than
        * which rows an auditor reads together.
+       *
+       * It is not an authenticity signal. `"authored"` means the write did not
+       * arrive through a replay or a hydration door — it says nothing about
+       * who or what made it.
        */
-      origin?: "restore";
+      origin: FactOrigin;
     })
   | (AuditEntryBase & {
       kind: "resolver.complete";
@@ -275,6 +298,16 @@ export type AuditEntry =
 export interface QueryFilter {
   /** Exact-match fact path. */
   factPath?: string;
+  /**
+   * Filter `fact.change` entries by where the write came from.
+   *
+   * Applied by the sink while it walks, which is the reason this exists rather
+   * than leaving callers to filter the result. `query()` walks newest-first and
+   * stops once it has `limit` rows, so a caller filtering afterwards is
+   * filtering a page that was already chosen — a fact whose recent history is
+   * mostly replayed writes can fill the page and leave nothing behind.
+   */
+  origin?: FactOrigin | readonly FactOrigin[];
   /** Filter by constraint id. */
   constraintId?: string;
   /** Filter by entry kind. */

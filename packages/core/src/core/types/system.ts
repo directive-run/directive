@@ -961,18 +961,22 @@ export type ObservationEvent =
       prev: unknown;
       next: unknown;
       /**
-       * Where the write came from, when it was not an ordinary one.
+       * Where the write came from — `"authored"`, `"restore"` or `"hydrate"`.
+       * See {@link FactOrigin}.
        *
-       * Absent for a write a program made. `"restore"` for a write a history
-       * navigation replayed — `restore`, `goBack`, `goForward`, `goTo`,
-       * `replay` and `import` all land here.
+       * Always present. `"authored"` is spelled out rather than left as the
+       * absence of a value, because a predicate written as "no origin means
+       * the program did it" silently reclassifies every row the day another
+       * origin is added.
+       *
+       * Stamped against each write as it is made, not read from a flag when
+       * the batch is reported — a batch can hold writes of more than one
+       * origin, and a single label taken at the end describes none of them.
        *
        * A replayed write is recorded rather than dropped, so this decides how
-       * an entry is filed and never whether it exists. A durable sink that
-       * dropped replays would make the label worth forging; one that files
-       * them separately does not.
+       * an entry is filed and never whether it exists.
        */
-      origin?: "restore";
+      origin: import("./facts.js").FactOrigin;
     }
   | {
       type: "constraint.evaluate";
