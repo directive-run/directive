@@ -186,6 +186,18 @@ const MAX_PROJECT_DEPTH = 45;
  */
 const MAX_PROJECTED_NODES = 10_000;
 
+/**
+ * A value in a position JSON writes `null` for rather than omitting.
+ *
+ * Dropping a key whose value is `undefined` is what an object does; inside an
+ * array — and inside the pair arrays a map projects to — there is no key to
+ * drop, so the slot has to hold something, and `null` is what an export puts
+ * there.
+ */
+function orNull(value: unknown): unknown {
+  return value === undefined ? null : value;
+}
+
 export function asRecorded(
   value: unknown,
   depth = 0,
@@ -243,21 +255,23 @@ export function asRecorded(
       // stringifier walks to — recorded, outside the hash, and editable in
       // place. The depth cap has to count what comes out, not what goes in.
       return [...object.entries()].map(([k, v]) => [
-        asRecorded(k, depth + 2, seen, budget),
-        asRecorded(v, depth + 2, seen, budget),
+        orNull(asRecorded(k, depth + 2, seen, budget)),
+        orNull(asRecorded(v, depth + 2, seen, budget)),
       ]);
     }
     if (object instanceof Set) {
       return [...object].map((item) =>
-        asRecorded(item, depth + 1, seen, budget),
+        orNull(asRecorded(item, depth + 1, seen, budget)),
       );
     }
     if (Array.isArray(object)) {
-      return object.map((item) => {
-        const projected = asRecorded(item, depth + 1, seen, budget);
-
-        return projected === undefined ? null : projected;
-      });
+      // `Array.from`, not `map`. `map` preserves holes, so a sparse array
+      // stayed sparse: the canonical stringifier writes nothing for a hole and
+      // JSON writes `null`, which is the same live-versus-export disagreement
+      // this file keeps having, reached by a shape nobody thinks to type.
+      return Array.from(object, (item) =>
+        orNull(asRecorded(item, depth + 1, seen, budget)),
+      );
     }
 
     const out: Record<string, unknown> = {};
