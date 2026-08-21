@@ -44,13 +44,27 @@ authored frames only. Timelines recorded before this release replay unchanged.
 Its peer range on core moves to `^1.32.0`, since it now reads `origin`.
 
 **Migration.** Expect more entries: on a workload of a hundred event dispatches
-touching three facts each, the observation stream goes from 99 events to 399,
-and a system's opening state now appears because `init` writes through a batch.
+touching three facts each, ledger entries go from 102 to 405, and a system's
+opening state now appears because `init` writes through a batch.
 On the default in-memory sink — 10,000 entries — that rotates roughly four times
-sooner, so size your sink for your write rate. Anything asserting ledger row
+sooner, so size your sink for your write rate. Truncation markers share that
+capacity: a steadily overflowing sink writes one marker per real entry, so ask
+for about twice what you intend to keep. Anything asserting ledger row
 counts in tests or dashboards will see different numbers. Ledger entries now
 stamp `schemaVersion: 2`; entries written under 1 still verify, because the
-version is part of what each entry is hashed over.
+version is part of what each entry is hashed over, and they answer
+`origin: "authored"` to a query, since replayed writes could not be recorded
+under that schema.
+
+**One type-level break.** `origin` is required on `FactChange` and on the
+`fact.change` member of `ObservationEvent`. Reading either is unaffected —
+every event the runtime emits carries the field — but code that *constructs*
+one in TypeScript, which in practice means plugin test fixtures and synthetic
+timelines, needs the property added. It is required rather than optional
+deliberately: a predicate that reads a missing field as "the program did it" is
+the failure this field exists to prevent. `@directive-run/timeline` keeps it
+optional on its serialized wire format, so timelines recorded before this
+release still load.
 
 **A rotated ledger no longer reports itself tampered.** Once a bounded sink
 fills, it drops its oldest entries — ordinary operation — but `verify()` began

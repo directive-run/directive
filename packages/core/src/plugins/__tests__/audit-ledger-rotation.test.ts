@@ -52,6 +52,9 @@ describe("a rotated ledger", () => {
     expect(result.valid).toBe(true);
     if (result.valid) {
       expect(result.windowStartSeq).toBeGreaterThan(0);
+      // The window carries the markers the sink wrote as it rotated, so the
+      // missing prefix has an account of itself.
+      expect(result.truncationExplained).toBe(true);
     }
 
     system.destroy();
@@ -195,6 +198,45 @@ describe("a rotated ledger", () => {
     const inversions = seqs.filter((s, i) => i > 0 && s < seqs[i - 1]!).length;
     expect(inversions).toBe(0);
 
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("says so when entries are missing and nothing explains why", () => {
+    // Seeding the walk from the surviving window is what stops rotation
+    // reading as tamper — but on its own it also accepts a prefix someone
+    // deleted, because the first entry ends up checked against its own
+    // recorded hash. A rotated window carries the markers its sink wrote; a
+    // hand-trimmed one does not.
+    const sink = memorySink({ capacity: 1000 });
+    const ledger = createAuditLedger({ sink });
+    const system = makeSystem(ledger);
+    system.start();
+    for (let i = 1; i <= 20; i++) {
+      system.facts.n = i;
+    }
+
+    const full = ledger.verify();
+    expect(full.valid).toBe(true);
+    if (full.valid) expect(full.windowStartSeq).toBeUndefined();
+
+    const exported = JSON.parse(JSON.stringify(ledger.toJSON())) as {
+      entries: AuditEntry[];
+    };
+    const trimmed = memorySink();
+    for (const entry of exported.entries.slice(5)) {
+      trimmed.write(entry);
+    }
+    const reader = createAuditLedger({ sink: trimmed });
+    const verdict = reader.verify();
+
+    expect(verdict.valid).toBe(true);
+    if (verdict.valid) {
+      expect(verdict.windowStartSeq).toBe(5);
+      expect(verdict.truncationExplained).toBe(false);
+    }
+
+    reader.destroy();
     system.destroy();
     ledger.destroy();
   });

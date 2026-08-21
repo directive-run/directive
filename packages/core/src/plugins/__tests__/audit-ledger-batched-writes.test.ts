@@ -34,7 +34,6 @@ function makeModule() {
 
 describe("audit ledger and batched writes", () => {
   let ledger: ReturnType<typeof createAuditLedger>;
-  // biome-ignore lint/suspicious/noExplicitAny: test harness
   let system: any;
 
   beforeEach(() => {

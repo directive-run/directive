@@ -73,6 +73,22 @@ export function verify(
   const windowStartSeq = first.seq > 0 ? first.seq : undefined;
   let prevHash: string | null =
     windowStartSeq === undefined ? null : first.prevHash;
+
+  // Whether anything explains the missing prefix.
+  //
+  // Seeding the walk from the surviving window stops routine rotation reading
+  // as tamper, but on its own it also accepts a prefix someone simply deleted:
+  // the first entry ends up validated against its own recorded `prevHash`,
+  // which is exactly the entry an attacker rewrites. The corroboration is
+  // already in the buffer — a sink that rotated wrote `system.truncated`
+  // markers as it went, and one that was trimmed by hand did not.
+  //
+  // Reported rather than made fatal. A quiet system can outlive its own
+  // markers, so their absence is grounds for a question, not a verdict.
+  const truncationExplained =
+    windowStartSeq === undefined
+      ? undefined
+      : entries.some((e) => e.kind === "system.truncated");
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]!;
     if (entry.prevHash !== prevHash) {
@@ -134,6 +150,7 @@ export function verify(
     entryCount: number;
     erasedSeqs?: number[];
     windowStartSeq?: number;
+    truncationExplained?: boolean;
   } = {
     valid: true,
     entryCount: entries.length,
@@ -143,6 +160,7 @@ export function verify(
   }
   if (windowStartSeq !== undefined) {
     result.windowStartSeq = windowStartSeq;
+    result.truncationExplained = truncationExplained === true;
   }
 
   return result;

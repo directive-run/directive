@@ -8,11 +8,7 @@
  * types from here without a cycle.
  */
 
-import type {
-  FactOrigin,
-  ModuleSchema,
-  Plugin,
-} from "../../core/types.js";
+import type { FactOrigin, ModuleSchema, Plugin } from "../../core/types.js";
 import type {
   ClauseResult,
   FactPredicate,
@@ -287,6 +283,12 @@ export type AuditEntry =
         constraintId: boolean;
         kind: AuditEntryKind | readonly AuditEntryKind[] | undefined;
         changedBetween: "[range]" | undefined;
+        /**
+         * Carried by value, unlike the fields above. `origin` names no
+         * subject, and an erasure scoped to replayed writes is a different
+         * act from one scoped to the program's own.
+         */
+        origin?: FactOrigin | readonly FactOrigin[];
       };
       erased: number;
     });
@@ -354,6 +356,17 @@ export type VerifyResult =
        * said about the ones that rotated out.
        */
       windowStartSeq?: number;
+      /**
+       * Present with {@link windowStartSeq}. True when the surviving entries
+       * contain `system.truncated` markers, which is what a sink writes as it
+       * rotates — so the missing prefix has an account of itself.
+       *
+       * False means entries are missing and nothing in the record explains
+       * why. That is not proof of tampering: a system that has been quiet for
+       * a long time can outlive its own markers. It is the difference between
+       * a gap with a receipt and a gap without one, and it is worth a question.
+       */
+      truncationExplained?: boolean;
     }
   | {
       valid: false;

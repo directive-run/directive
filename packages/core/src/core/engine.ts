@@ -35,7 +35,8 @@ import {
   type ErrorBoundaryManager,
   createErrorBoundaryManager,
 } from "./errors.js";
-import { createFacts } from "./facts.js";
+import { createFacts, isRunawayError } from "./facts.js";
+import { HYDRATION_SCOPE } from "./internal-scopes.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
@@ -614,9 +615,12 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  // Forward-declared so onChange/onBatch closures can check isRestoring.
-  // Assigned after createHistoryManager() below.
-  let historyRef: HistoryManager<S> | null = null;
+  // Nothing forward-declares the history manager any more. Both fact paths
+  // used to ask it "are you rewinding?" — a single flag held up for the whole
+  // navigation, including the flush at the end where consumer code runs. Two
+  // sources of truth for one question, and the answer was wrong for every
+  // write that was not the manager's own. The scopes below are the only source
+  // now.
 
   /**
    * Non-zero while stored state is being loaded into the system rather than
@@ -656,10 +660,9 @@ export function createEngine<S extends Schema>(
    * flight gains it.
    */
   function currentFactOrigin(): import("./types/facts.js").FactOrigin {
-    // Deliberately not `historyRef.isRestoring`. That flag is up for the whole
-    // navigation, including the flush at the end where consumer code runs, so
-    // it would hand this label to writes a listener or an observer made of its
-    // own accord. The scope below covers only the manager's own assignments.
+    // Scoped to the manager's own assignments. A flag covering the whole
+    // navigation would hand this label to writes a listener or an observer
+    // made of its own accord during the flush.
     if (restoreDepth > 0) {
       return "restore";
     }
@@ -704,10 +707,22 @@ export function createEngine<S extends Schema>(
       if (traceEnabled) {
         traceManager.recordFactChange(String(key), prev, value);
       }
-      // During history restore, skip change tracking and reconciliation.
-      // The restored state is already reconciled; re-reconciling would create
-      // spurious snapshots that break undo/redo.
-      if (historyRef?.isRestoring) return;
+      // Decided by where this write came from, not by whether a restore is in
+      // flight somewhere. The two are different questions and the second gives
+      // the wrong answer for the writes that actually arrive here.
+      //
+      // `store.batch()` drops its depth counter before it flushes, so every
+      // listener that runs during a restore's flush writes on THIS path while
+      // the history manager still holds its flag up. Asking about the flag
+      // committed those writes and then dropped them from reconciliation: a
+      // constraint stopped enforcing for the life of the process, with the
+      // fact reading back correctly and no later write recovering it, because
+      // the key never reached the changed set.
+      //
+      // The restore's own writes are batched, so they are gated on the other
+      // path; what reaches here during a restore is a reaction to it, and a
+      // reaction is the program's own work.
+      if (currentFactOrigin() === "restore") return;
       // Direct fact mutations (outside event dispatch) always create snapshots
       if (dispatchDepth === 0) {
         shouldTakeSnapshot = true;
@@ -1220,7 +1235,6 @@ export function createEngine<S extends Schema>(
         },
       })
     : createDisabledHistory();
-  historyRef = historyManager;
 
   // Settlement listeners — notified when isSettled may have changed
   const settlementListeners = new Set<() => void>();
@@ -2278,59 +2292,77 @@ export function createEngine<S extends Schema>(
           // to most of the writes in a running system, and suppressing an
           // entry took nothing more privileged than wrapping the write.
           //
-          // Coalesced per key AND per origin, because a batch is one
-          // transition and a body that writes a key in a loop should not
-          // produce an entry per iteration. Measured: a hundred thousand
-          // writes to one key in a single batch produced a hundred thousand
-          // events and blocked for 491ms, while the listener side — which
-          // already coalesces — saw one. First `prev` and last value are kept,
-          // so the pair still describes the transition the batch made.
+          // Runs are coalesced, not grouped. Consecutive writes to a key from
+          // the same origin fold into one event carrying the first `prev` and
+          // the last value, so a body that writes a key in a loop produces one
+          // event rather than ten thousand. A change of origin cuts the run
+          // and starts a new event.
           //
-          // Splitting on origin as well as key is what keeps that pair honest.
-          // A batch that writes a fact and then rewinds history touches the
-          // same key twice from two different places; folded together, the
-          // resulting pair describes neither, and whichever origin came last
-          // would speak for both.
+          // Cut rather than grouped because replaying the events has to land
+          // on the value the facts actually hold — which is what a durable
+          // record is for, and what the timeline package does literally.
+          // Grouping by origin emitted one event per origin in first-touch
+          // order, so a batch that wrote a fact, rewound history, then wrote
+          // it again replayed the older value last and reconstructed a value
+          // the system never held.
           //
-          // A key written and written back keeps its entry. The net pair is
-          // `prev === next`, which reads as noise, but dropping it would be
-          // one more way for a batch to leave no trace — which is the whole
-          // defect this closes.
-          const net = new Map<
-            string,
-            {
-              key: string;
-              prev: unknown;
-              next: unknown;
-              origin: import("./types/facts.js").FactOrigin;
-            }
-          >();
+          // A key written and written back keeps its event. The pair reads
+          // `prev === next`, which looks like noise, but dropping it would be
+          // one more way for a batch to leave no trace.
+          type Emitted = {
+            key: string;
+            prev: unknown;
+            next: unknown;
+            origin: import("./types/facts.js").FactOrigin;
+          };
+          const emitted: Emitted[] = [];
+          const openForKey = new Map<string, Emitted>();
           for (const change of changes) {
             const next = change.type === "delete" ? undefined : change.value;
-            const id = `${change.origin}\u0000${change.key}`;
-            const seen = net.get(id);
-            if (seen) {
-              seen.next = next;
-            } else {
-              net.set(id, {
-                key: change.key,
-                prev: change.prev,
-                next,
-                origin: change.origin,
-              });
+            const open = openForKey.get(change.key);
+            if (open !== undefined && open.origin === change.origin) {
+              open.next = next;
+              continue;
             }
+            // `change.prev` is the value the key held immediately before this
+            // write, which is the previous event's `next`. So the events chain
+            // and an auditor reading them in order never sees a value appear
+            // from nowhere.
+            const entry: Emitted = {
+              key: change.key,
+              prev: change.prev,
+              next,
+              origin: change.origin,
+            };
+            emitted.push(entry);
+            openForKey.set(change.key, entry);
           }
-          for (const { key, prev, next, origin } of net.values()) {
-            // Guarded per key. The whole hook runs inside one try/catch in the
-            // plugin manager, so without this a throw on one key discarded
-            // every key after it — turning a one-row gap in a durable record
-            // into a whole-transaction gap, silently. The unbatched path is
-            // per-write isolated already; this makes the two agree.
+
+          // One try block for the batch, re-entered only after a throw.
+          //
+          // The whole hook runs inside a single try/catch in the plugin
+          // manager, so an unguarded loop lost every key after a throw — a
+          // one-row gap in a durable record became a whole-transaction gap.
+          // Guarding each call individually fixed that and cost 94% more wall
+          // clock at a hundred observers, because the guard is per call. The
+          // cursor gives the same isolation and pays for it only when
+          // something actually throws.
+          let index = 0;
+          while (index < emitted.length) {
             try {
-              observer({ type: "fact.change", key, prev, next, origin });
+              for (; index < emitted.length; index++) {
+                const { key, prev, next, origin } = emitted[index]!;
+                observer({ type: "fact.change", key, prev, next, origin });
+              }
             } catch (error) {
+              // A guard the runtime raised to stop a runaway is not a
+              // consumer's throw. Logging it here would disarm the guard, and
+              // doing so per key would re-arm it once per key.
+              if (isRunawayError(error)) throw error;
+              const failedKey = emitted[index]?.key;
+              index++;
               console.error(
-                `[Directive] Observer threw on fact "${key}"; remaining keys in this batch are unaffected.`,
+                `[Directive] Observer threw on fact "${failedKey}"; the remaining keys in this batch were still delivered.`,
                 error,
               );
             }
@@ -3874,6 +3906,17 @@ export function createEngine<S extends Schema>(
   // manager and won't reach this catch in normal operation.
   void pluginManager.emitInit(system).catch((error: unknown) => {
     console.error("[Directive] Plugin emitInit failure", { error });
+  });
+
+  // Hand first-party plugins the ability to mark their writes as hydration.
+  // Symbol-keyed and not re-exported, so a consumer cannot reach it — the
+  // whole value of filing a write by where it came from is that the answer is
+  // not something the writer chooses.
+  Object.defineProperty(system, HYDRATION_SCOPE, {
+    value: withHydrationOrigin,
+    enumerable: false,
+    writable: false,
+    configurable: false,
   });
 
   // Call module init hooks

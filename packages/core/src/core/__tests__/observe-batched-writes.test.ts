@@ -110,10 +110,9 @@ describe("observe() and batched writes", () => {
     await system.stop();
 
     const changes = factChanges(events);
-    expect(changes.map((c) => (c.type === "fact.change" ? c.key : null))).toEqual([
-      "b",
-      "a",
-    ]);
+    expect(
+      changes.map((c) => (c.type === "fact.change" ? c.key : null)),
+    ).toEqual(["b", "a"]);
     expect(changes[0]).toMatchObject({ prev: "start", next: "third" });
   });
 

@@ -365,10 +365,20 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         emit({
           kind: "fact.change",
           key: event.key,
-          prior: redactValue(event.key, event.prev),
-          next: redactValue(event.key, event.next),
-          // `emit` omits undefined-valued keys, so an ordinary write carries
-          // no `origin` and still hashes the same as it always did.
+          // A value that is not there is left alone rather than redacted. The
+          // first write of a key has no prior, and a delete has no next;
+          // running those through the redactor turned "there was nothing here"
+          // into `"[redacted]"`, which asserts a previous state the fact never
+          // held. `emit` then drops the absent key, so the entry says what
+          // happened.
+          prior:
+            event.prev === undefined
+              ? undefined
+              : redactValue(event.key, event.prev),
+          next:
+            event.next === undefined
+              ? undefined
+              : redactValue(event.key, event.next),
           origin: event.origin,
         });
         break;
@@ -686,6 +696,12 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         factPath: filter.factPath !== undefined,
         constraintId: filter.constraintId !== undefined,
         kind: filter.kind,
+        // Recorded by value, not as a boolean. `origin` names no subject and
+        // carries nothing that could identify one, and an erasure scoped to
+        // replayed writes is a materially different act from one scoped to
+        // the program's own — an auditor reading the marker should be able to
+        // see which was performed.
+        origin: filter.origin,
         changedBetween:
           filter.changedBetween !== undefined
             ? ("[range]" as const)

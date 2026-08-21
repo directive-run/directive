@@ -456,6 +456,12 @@ function verifyClone(clone: {
   // the clone.
   const entries = clone.entries;
   if (entries.length === 0) return { valid: true, entryCount: 0 };
+  // Start from the surviving window, as core's verify() does. A bounded sink
+  // drops its oldest entries once full, so the first entry here is not
+  // necessarily the first entry ever written and its prevHash points at
+  // something that is gone. Walking from the genesis hash regardless makes a
+  // healthy rotated ledger report itself tampered.
+  const windowStart = entries[0]!.seq > 0 ? entries[0]!.prevHash : null;
   // Minimal djb2 reimpl over stable-stringify-shaped JSON — matches the
   // core implementation closely enough for the demo verdict.
   const stableStringify = (v: unknown): string => {
@@ -472,7 +478,7 @@ function verifyClone(clone: {
     }
     return (h >>> 0).toString(16).padStart(8, "0");
   };
-  let prevHash: string | null = null;
+  let prevHash: string | null = windowStart;
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]!;
     if (e.prevHash !== prevHash) {

@@ -110,7 +110,7 @@ Filter shape:
 | Kind | Payload includes |
 | --- | --- |
 | `constraint.evaluate` | `constraintId`, `active`, `whenSpec` (PII operands redacted) or `whenSource` (function-form `sourceHash`), `whenExplain` |
-| `fact.change` | `key`, `prior`, `next`, `origin` (see [below](#where-a-write-came-from--origin)). `prior` is **omitted** on the first write of a key, and `next` is omitted when a key is deleted – keys with no value are dropped before the entry is hashed, so an export carries the same bytes the live entry was hashed over |
+| `fact.change` | `key`, `prior`, `next`, `origin` (see [below](#where-a-write-came-from--origin)). `prior` is **omitted** on the first write of a key, and `next` is omitted when a key is deleted – a value that was never there is not redacted into existence, and keys with no value are dropped before the entry is hashed, so an export carries the same bytes the live entry was hashed over |
 | `resolver.write.rejected` | `resolverId`, `fact`, `expected`, `actual` (rejection) or `dropped` (summary) |
 | `resolver.complete` | `resolverId`, `requirementId`, `duration` |
 | `resolver.error` | `resolverId`, `requirementId`, `error` |
@@ -125,14 +125,14 @@ Filter shape:
 
 A write made inside `system.batch()` is recorded. It previously was not, and that covers more than an explicit `batch()` call: event handlers, effects, resolvers before their first `await`, `initialFacts`, `hydrate` and every history navigation write through a batch, so most of the writes a running system makes arrive this way.
 
-Each key gets **one entry per batch**, carrying the value it held before the batch and the value it holds after – not one entry per write. Two consequences, and the second is the one that matters for an audit:
+Consecutive writes to a key from the same origin fold into **one entry**, carrying the value the key held before that run and the value it holds after – not one entry per write. A change of [origin](#where-a-write-came-from--origin) cuts the run, so a batch that writes a fact and then rewinds history produces two entries for that key, in the order the writes happened. Two consequences, and the second is the one that matters for an audit:
 
 - A body that writes the same key in a loop produces one entry, not one per iteration. A hundred thousand writes to a single key in one batch coalesce to a single entry.
 - **A value a fact held only inside a batch is not recorded.** Write a value and overwrite it before the batch closes and the entry reads as the transition from the first value to the last, with nothing about what sat in between. If you need every intermediate value, do not batch the writes.
 
 A key written and then written back keeps its entry, with `prior` and `next` equal. It reads as noise, but a batch that leaves no trace at all is worse.
 
-**This is more entries than before.** On a workload of a hundred event dispatches touching three facts each, the ledger goes from 99 entries to 399. A system's opening state now appears too, because `init` writes through a batch. If you are on the default in-memory sink it holds 10,000 entries and will rotate roughly four times sooner than it used to – see [Sinks](#sinks) and size it for your write rate. Anything counting ledger rows in a test or a dashboard should expect different numbers.
+**This is more entries than before.** On a workload of a hundred event dispatches touching three facts each, the ledger goes from 99 entries to 399. A system's opening state now appears too, because `init` writes through a batch. If you are on the default in-memory sink it holds 10,000 entries and will rotate roughly four times sooner than it used to – see [Sinks](#sinks) and size it for your write rate. Note that **truncation markers share that capacity**: once a sink is overflowing steadily it writes one `system.truncated` marker per real entry, so a buffer sized N holds roughly N/2 of your own entries. Ask for twice what you intend to keep. Anything counting ledger rows in a test or a dashboard should expect different numbers.
 
 ### Where a write came from – `origin`
 

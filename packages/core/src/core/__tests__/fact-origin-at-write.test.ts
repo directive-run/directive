@@ -124,7 +124,9 @@ describe("fact origin is stamped at the write", () => {
     const forA = factChanges(events).filter(
       (c) => c.type === "fact.change" && c.key === "a",
     );
-    const origins = forA.map((c) => (c.type === "fact.change" ? c.origin : null));
+    const origins = forA.map((c) =>
+      c.type === "fact.change" ? c.origin : null,
+    );
     expect(origins).toContain("authored");
     expect(origins).toContain("restore");
   });

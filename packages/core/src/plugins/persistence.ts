@@ -2,6 +2,10 @@
  * Persistence Plugin - Save/restore facts to storage
  */
 
+import {
+  HYDRATION_SCOPE,
+  type HydrationScopeCarrier,
+} from "../core/internal-scopes.js";
 import type { ModuleSchema, Plugin, System } from "../core/types.js";
 import { isPrototypeSafe } from "../utils/utils.js";
 
@@ -163,12 +167,24 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       // Restore state from storage
       const data = load();
       if (data) {
-        system.facts.$store.batch(() => {
+        // Marked as hydration. These values were produced by an earlier run of
+        // the program; filed as first-party writes they are indistinguishable
+        // from what the program decided this time, and their source is a store
+        // anything sharing the origin can write to.
+        const hydrationScope = (sys as HydrationScopeCarrier)[HYDRATION_SCOPE];
+        const restore = () => {
           for (const [factKey, value] of Object.entries(data)) {
             if (shouldPersist(factKey)) {
               (system!.facts as Record<string, unknown>)[factKey] = value;
               trackedKeys.add(factKey);
             }
+          }
+        };
+        system.facts.$store.batch(() => {
+          if (hydrationScope) {
+            hydrationScope(restore);
+          } else {
+            restore();
           }
         });
         onRestore?.(data);

@@ -10,6 +10,23 @@
  */
 
 import isDevelopment from "#is-development";
+
+/**
+ * Marks an error the runtime raised to stop a runaway, as opposed to one a
+ * consumer threw. Guards that isolate consumer callbacks rethrow these instead
+ * of logging them — a loop guard that is caught and swallowed has been
+ * disarmed, and doing it per item re-arms it once per item.
+ */
+export const RUNAWAY: unique symbol = Symbol("directive.runaway");
+
+/** True when `error` was raised by a runtime guard rather than consumer code. */
+export function isRunawayError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as Record<symbol, unknown>)[RUNAWAY] === true
+  );
+}
 import {
   BLOCKED_PROPS,
   detectNonJsonValueType,
@@ -402,9 +419,15 @@ export function createFactsStore<S extends Schema>(
     while (pendingNonBatchedChanges.length > 0) {
       if (++iterations > MAX_NOTIFY_ITERATIONS) {
         pendingNonBatchedChanges.length = 0;
-        throw new Error(
+        const runaway = new Error(
           `[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations${context}.`,
         );
+        // Marked so the guards that isolate consumer code can tell this apart
+        // from a consumer's own throw and let it through. A runaway that is
+        // caught and logged per key is a runaway that has been re-armed once
+        // per key, which is the opposite of what a loop guard is for.
+        (runaway as Error & { [RUNAWAY]?: true })[RUNAWAY] = true;
+        throw runaway;
       }
 
       const deferred = [...pendingNonBatchedChanges];

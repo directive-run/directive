@@ -450,12 +450,22 @@ describe("createAuditLedger — PII redaction", () => {
 
     const emailEntries = ledger.forFact("email");
     expect(emailEntries.length).toBeGreaterThan(0);
+    let sawAPrior = false;
     for (const e of emailEntries) {
-      if (e.kind === "fact.change") {
-        expect(e.next).toBe("[redacted]");
+      if (e.kind !== "fact.change") continue;
+      expect(e.next).toBe("[redacted]");
+      // A value that was never there is not redacted into existence. The
+      // first write of a key has no prior at all, and recording
+      // `"[redacted]"` for it asserted a previous value the fact never held.
+      if ("prior" in e && e.prior !== undefined) {
         expect(e.prior).toBe("[redacted]");
+        sawAPrior = true;
       }
     }
+    expect(sawAPrior).toBe(true);
+    const firstWrite = emailEntries.at(-1);
+    expect(firstWrite?.kind).toBe("fact.change");
+    expect((firstWrite as { prior?: unknown }).prior).toBeUndefined();
 
     // Non-PII facts NOT redacted
     const publicEntries = ledger.forFact("public");

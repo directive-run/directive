@@ -220,20 +220,20 @@ export function createHistoryManager<S extends Schema>(
       // separates the two exactly: the replay's writes happen inside, the
       // reactions to them happen after.
       withRestoreOrigin(() => {
-      for (const [key, value] of Object.entries(serialized)) {
-        // Prototype pollution protection (redundant but defensive)
-        if (
-          key === "__proto__" ||
-          key === "constructor" ||
-          key === "prototype"
-        ) {
-          console.warn(
-            `[Directive] Skipping dangerous key "${key}" during fact restoration`,
-          );
-          continue;
+        for (const [key, value] of Object.entries(serialized)) {
+          // Prototype pollution protection (redundant but defensive)
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            console.warn(
+              `[Directive] Skipping dangerous key "${key}" during fact restoration`,
+            );
+            continue;
+          }
+          (facts as Record<string, unknown>)[key] = value;
         }
-        (facts as Record<string, unknown>)[key] = value;
-      }
       });
     });
   }
