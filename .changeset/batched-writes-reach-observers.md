@@ -51,3 +51,16 @@ sooner, so size your sink for your write rate. Anything asserting ledger row
 counts in tests or dashboards will see different numbers. Ledger entries now
 stamp `schemaVersion: 2`; entries written under 1 still verify, because the
 version is part of what each entry is hashed over.
+
+**A rotated ledger no longer reports itself tampered.** Once a bounded sink
+fills, it drops its oldest entries — ordinary operation — but `verify()` began
+every walk at the genesis hash, so the first link failed the moment the head
+rotated out and a healthy ledger returned `valid: false` for the rest of its
+life. It now starts from the surviving window and reports `windowStartSeq` on
+the valid arm; a gap after that point is still a break. Two defects underneath
+it are fixed too: an entry's hash is recorded before it is written, so a
+truncation marker emitted from inside the write no longer shares a `prevHash`
+with the entry that caused it, and drop counts now include the entry displaced
+by the marker itself — the count was short by half. This is pre-existing, and it
+is in this release because recording batched writes makes rotation roughly four
+times more frequent.

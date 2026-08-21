@@ -318,12 +318,20 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
 
     const finalEntry = userRedact ? userRedact(entry) : entry;
     freezeEntry(finalEntry);
-    sink.write(finalEntry);
 
     // Sync hash of this entry — stashed as the next entry's prevHash.
     // Whole entry is hashed (including its own prevHash field) so
     // verify() can rebuild the chain deterministically.
+    //
+    // Recorded BEFORE the write. A bounded sink can emit a truncation marker
+    // from inside `write()`, and that marker is an entry of its own: stashing
+    // afterwards meant it read the hash of the entry *before* the one being
+    // written, so the two shared a `prevHash` and the chain forked. Every
+    // rotated ledger then failed verification at its second entry — which is
+    // the answer least worth giving, because an operator who sees routine
+    // rotation reported as tamper stops believing the control entirely.
     lastHashCache = hashForEntry(finalEntry);
+    sink.write(finalEntry);
 
     return finalEntry;
   }
@@ -485,10 +493,12 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     system = sys;
     refreshWhenSpecCache();
     unobserve = sys.observe(onEvent);
-    // Wire up the truncation marker — fires BEFORE the sink drops the
-    // oldest entry, so the dropped seq is still known. The guard
-    // prevents the marker's own write from recursing back through the
-    // capacity overflow path.
+    // Wire up the truncation marker — fires after the entry that caused the
+    // overflow has landed, carrying the seq of the oldest dropped entry and
+    // how many were dropped since the last marker. The guard prevents the
+    // marker's own write from recursing back through the overflow path; the
+    // sink accumulates anything dropped to make room for the marker itself and
+    // reports it with the next one, so no drop goes uncounted.
     sink.onTruncate?.((droppedSeq, droppedCount) => {
       if (emittingTruncate) return;
       emittingTruncate = true;

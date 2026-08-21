@@ -117,7 +117,7 @@ Filter shape:
 | `system.init/start/stop/destroy` | (lifecycle markers) |
 | `system.snapshot` | `snapshotId`, `trigger` (history snapshot marker) |
 | `system.history.navigate` | `from`, `to` (time-travel navigation marker) |
-| `system.truncated` | `droppedSeq`, `droppedCount` (ring-buffer overflow marker; emitted BEFORE the oldest entry is dropped) |
+| `system.truncated` | `droppedSeq` (oldest entry dropped since the last marker), `droppedCount` (how many). Written after the entry whose arrival caused the overflow, so the marker follows its own cause |
 | `system.entry-erased` | `originalKind`, `erasedAt` (per-entry tombstone, replaces an erased entry in place) |
 | `system.subject-erased` | `filterHash`, `filterShape`, `erased` (chained marker; raw filter values never land in the ledger – see [Erasure](#erasure-gdpr-art-17-stub)) |
 
@@ -198,6 +198,17 @@ if (!result.valid) {
 ```
 
 v1 ships sync djb2 32-bit only. `verify({ strong: true })` is reserved for v2 (SHA-256 chain) and **THROWS** today – there is no silent fallback. Call `verify()` (no args) for tamper detection.
+
+**A rotated buffer is not a broken chain.** Once a bounded sink is full it drops its oldest entries, so the entries you hold are a window into a longer chain and the first one's `prevHash` points at something no longer present. `verify()` starts the walk from that entry and reports `windowStartSeq` – the seq the window begins at – on the valid arm:
+
+```ts
+const result = ledger.verify();
+if (result.valid && result.windowStartSeq !== undefined) {
+  console.log(`intact from seq ${result.windowStartSeq}; older entries rotated out`);
+}
+```
+
+A verified window is a narrower claim than a verified chain: the entries present are intact and in order, and nothing is claimed about the ones that rotated out. Use the `system.truncated` markers to see what went. A gap anywhere *after* the window start still reports as a break – nothing legitimate removes an entry from between two that are still here without leaving a tombstone.
 
 **Erased entries appear as legitimate chain breaks.** When you call `ledger.erase()`, matching entries are replaced with `system.entry-erased` tombstones whose payloads differ from the original – the next entry's `prevHash` no longer matches. `verify()` recognises this pattern and reports the erased seqs on the valid arm:
 

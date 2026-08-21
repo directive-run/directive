@@ -53,7 +53,26 @@ export function verify(
   // entry, once when the next iteration sees its predecessor was
   // also a tombstone).
   const erasedSeqsSet = new Set<number>();
-  let prevHash: string | null = null;
+
+  // A bounded sink drops its oldest entries once it is full, so the entry the
+  // walk starts from is not necessarily the genesis entry — its `prevHash`
+  // points at something that is no longer here. Starting the walk at `null`
+  // regardless meant the first link always failed on a rotated buffer, and a
+  // healthy, untampered ledger reported itself altered for the rest of its
+  // life. Worse than useless: an operator who learns that routine rotation
+  // reads as tamper learns to ignore the one control that would tell them
+  // about real tamper.
+  //
+  // A first entry whose `seq` is not 0 is a window into a longer chain, so the
+  // walk begins from that entry's own recorded `prevHash` and the result says
+  // which seq the surviving window starts at. A gap anywhere *after* the head
+  // is a different matter and still reports as a break — the entries either
+  // side of it are both here, and nothing legitimate removes one from between
+  // them without leaving a tombstone.
+  const first = entries[0]!;
+  const windowStartSeq = first.seq > 0 ? first.seq : undefined;
+  let prevHash: string | null =
+    windowStartSeq === undefined ? null : first.prevHash;
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]!;
     if (entry.prevHash !== prevHash) {
@@ -114,12 +133,16 @@ export function verify(
     valid: true;
     entryCount: number;
     erasedSeqs?: number[];
+    windowStartSeq?: number;
   } = {
     valid: true,
     entryCount: entries.length,
   };
   if (erasedSeqsSet.size > 0) {
     result.erasedSeqs = [...erasedSeqsSet].sort((a, b) => a - b);
+  }
+  if (windowStartSeq !== undefined) {
+    result.windowStartSeq = windowStartSeq;
   }
 
   return result;

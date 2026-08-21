@@ -89,23 +89,52 @@ export function memorySink(opts: { capacity?: number } = {}): AuditLedgerSink {
     | ((droppedSeq: number, droppedCount: number) => void)
     | null = null;
 
+  // Drops that have happened but have not yet been reported by a marker.
+  //
+  // Accumulated rather than reported inline, because the marker is itself a
+  // write: reporting during a drop meant the marker's own write evicted a
+  // second entry that no marker ever mentioned. The buffer lost two entries
+  // per overflow and said it had lost one — an undercount in the one number an
+  // operator has for how much history is gone.
+  let unreportedDrops = 0;
+  let firstUnreportedSeq: number | null = null;
+  let notifyingTruncation = false;
+
+  function dropOldest(): void {
+    const dropped = entries.shift();
+    if (!dropped) return;
+    if (firstUnreportedSeq === null) {
+      firstUnreportedSeq = dropped.seq;
+    }
+    unreportedDrops++;
+  }
+
   const sink: AuditLedgerSink = {
     write(entry) {
-      if (entries.length >= capacity) {
-        // About to overflow — notify the owner BEFORE the shift
-        // so the dropped seq is still known. The handler may push an
-        // entry of its own (a truncation marker), which will itself
-        // push us over capacity; we shift one for one until we're back
-        // at capacity (handlers must be O(1) writers — typically one).
-        const dropped = entries[0]!;
-        truncateHandler?.(dropped.seq, 1);
-        entries.shift();
+      while (entries.length >= capacity) {
+        dropOldest();
       }
       entries.push(entry);
-      // If the handler wrote a marker (entries.length now > capacity),
-      // drop one more from the head to keep us at capacity exactly.
-      while (entries.length > capacity) {
-        entries.shift();
+
+      // Reported AFTER the entry lands, so the marker follows the entry that
+      // caused it and carries a higher seq than it. Emitting first put the
+      // marker ahead of its own cause and left seq running backwards through
+      // the buffer, which is not a shape a reader can walk.
+      if (
+        unreportedDrops > 0 &&
+        !notifyingTruncation &&
+        truncateHandler !== null
+      ) {
+        const seq = firstUnreportedSeq ?? entry.seq;
+        const count = unreportedDrops;
+        unreportedDrops = 0;
+        firstUnreportedSeq = null;
+        notifyingTruncation = true;
+        try {
+          truncateHandler(seq, count);
+        } finally {
+          notifyingTruncation = false;
+        }
       }
     },
     query(filter) {

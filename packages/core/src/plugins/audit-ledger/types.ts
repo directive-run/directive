@@ -342,6 +342,18 @@ export type VerifyResult =
        * (renamed from `erasedAt`)
        */
       erasedSeqs?: number[];
+      /**
+       * Set when the surviving entries are a window into a longer chain —
+       * the sink dropped older entries to stay within capacity, so the walk
+       * began partway in. The value is the `seq` the window starts at;
+       * everything below it is gone.
+       *
+       * Its absence means the chain still reaches back to its first entry.
+       * A verified window is not the same claim as a verified chain: the
+       * entries that are here are intact and in order, and nothing can be
+       * said about the ones that rotated out.
+       */
+      windowStartSeq?: number;
     }
   | {
       valid: false;
