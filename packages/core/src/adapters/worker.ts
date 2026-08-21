@@ -692,13 +692,31 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
     // from had — two numbers on screen that contradict each other, both
     // delivered by a healthy-looking channel.
     onFactsBatch: (changes: FactChange[]) => {
+      // Coalesced per run of consecutive writes to a key, the same way the
+      // observation stream does it, because this is the same problem and two
+      // policies for one stream is how the original defect happened.
+      //
+      // Every message here is a structured clone across a thread boundary and
+      // a render on the other side. A handler writing one key a thousand times
+      // in a batch would post a thousand of them carrying nine hundred and
+      // ninety-nine values the main thread can never observe — it only ever
+      // sees the last. Cut at a change of key so the pairs still chain.
+      let open: { key: string; value: unknown; prev: unknown } | null = null;
+      const flushOpen = () => {
+        if (open === null) return;
+        mirrorFactChange(open.key, open.value, open.prev);
+        open = null;
+      };
       for (const change of changes) {
-        mirrorFactChange(
-          change.key,
-          change.type === "delete" ? undefined : change.value,
-          change.prev,
-        );
+        const value = change.type === "delete" ? undefined : change.value;
+        if (open !== null && open.key === change.key) {
+          open.value = value;
+          continue;
+        }
+        flushOpen();
+        open = { key: change.key, value, prev: change.prev };
       }
+      flushOpen();
     },
     onDerivationCompute: (id: string, value: unknown) => {
       postMessage({

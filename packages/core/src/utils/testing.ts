@@ -614,6 +614,17 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
   };
   /** Additional plugins (tracking plugin is added automatically) */
   plugins?: any[];
+  /**
+   * How many fact changes to keep (default 10,000).
+   *
+   * The log holds a reference to the value before and after every change, so
+   * it pins every intermediate object a test produces. Now that batched writes
+   * are recorded that is nearly every write, and a handler writing in a loop
+   * can retain a lot: twenty thousand writes measured at fourteen megabytes.
+   * Oldest are dropped first, with a warning — a silently truncated log would
+   * fail an exact-count assertion for a reason nothing explains.
+   */
+  maxFactsHistory?: number;
 }
 
 /**
@@ -631,6 +642,17 @@ export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
   };
   /** Additional plugins (tracking plugin is added automatically) */
   plugins?: any[];
+  /**
+   * How many fact changes to keep (default 10,000).
+   *
+   * The log holds a reference to the value before and after every change, so
+   * it pins every intermediate object a test produces. Now that batched writes
+   * are recorded that is nearly every write, and a handler writing in a loop
+   * can retain a lot: twenty thousand writes measured at fourteen megabytes.
+   * Oldest are dropped first, with a warning — a silently truncated log would
+   * fail an exact-count assertion for a reason nothing explains.
+   */
+  maxFactsHistory?: number;
 }
 
 /**
@@ -661,6 +683,28 @@ export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
  *
  * @public
  */
+/** Default number of fact changes a test system keeps. */
+const DEFAULT_MAX_FACTS_HISTORY = 10_000;
+
+/**
+ * Drop the oldest records once the log is over its cap, saying so once.
+ *
+ * A test that asserts an exact count against a silently truncated log fails
+ * for a reason nothing on screen explains, so the truncation announces itself.
+ */
+function capFactsHistory(history: FactChangeRecord[], max: number): void {
+  if (history.length <= max) return;
+  if (!warnedAboutFactsHistory.has(history)) {
+    warnedAboutFactsHistory.add(history);
+    console.warn(
+      `[Directive] createTestSystem: kept the most recent ${max} fact changes and dropped older ones. Counts from assertFactChanges() and getFactsHistory() are truncated. Raise \`maxFactsHistory\` if the whole run matters.`,
+    );
+  }
+  history.splice(0, history.length - max);
+}
+
+const warnedAboutFactsHistory = new WeakSet<object>();
+
 export function createTestSystem<S extends ModuleSchema>(
   options: CreateTestSystemOptionsSingle<S>,
 ): TestSystemSingle<S>;
@@ -688,6 +732,7 @@ function createTestSystemSingle<S extends ModuleSchema>(
   const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
   const resolverCalls = new Map<string, Requirement[]>();
   const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
   const factsHistory: FactChangeRecord[] = [];
 
   // Create mock resolvers
@@ -723,6 +768,7 @@ function createTestSystemSingle<S extends ModuleSchema>(
       newValue: value,
       timestamp: Date.now(),
     });
+    capFactsHistory(factsHistory, maxFactsHistory);
   };
 
   const trackingPlugin = {
@@ -867,6 +913,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
   const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
   const resolverCalls = new Map<string, Requirement[]>();
   const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
   const factsHistory: FactChangeRecord[] = [];
 
   // Create mock resolvers
@@ -926,7 +973,20 @@ function createTestSystemNamed<Modules extends ModulesMap>(
       newValue: value,
       timestamp: Date.now(),
     });
+    capFactsHistory(factsHistory, maxFactsHistory);
   };
+
+  /**
+   * Records for a key, by its short name or its namespaced one.
+   *
+   * Matching only the short name meant two modules with a fact of the same
+   * name shared a count, and the namespaced name that would have told them
+   * apart matched nothing at all. It began failing the moment every module's
+   * own opening write started being recorded: a two-module system reported a
+   * fact as having changed twice before anything ran.
+   */
+  const matching = (key: string) =>
+    factsHistory.filter((c) => c.key === key || c.fullKey === key);
 
   const trackingPlugin = {
     name: "__test-tracking__",
@@ -1032,7 +1092,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
     },
 
     assertFactSet(key: string, value?: unknown): void {
-      const changes = factsHistory.filter((c) => c.key === key);
+      const changes = matching(key);
       if (changes.length === 0) {
         throw new Error(
           `[Directive] Expected fact "${key}" to be set but it was not`,
@@ -1052,7 +1112,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
     },
 
     assertFactChanges(key: string, times: number): void {
-      const changes = factsHistory.filter((c) => c.key === key);
+      const changes = matching(key);
       if (changes.length !== times) {
         throw new Error(
           `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,

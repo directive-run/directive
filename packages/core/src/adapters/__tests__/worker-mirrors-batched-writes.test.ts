@@ -110,4 +110,40 @@ describe("the worker adapter and batched writes", () => {
     expect(factAt).toBeLessThan(derivedAt);
     expect(posted[factAt]).toMatchObject({ key: "counter::n", value: 0 });
   });
+
+  it("posts one message per run of writes to a key, not one per write", async () => {
+    // Every message here is a structured clone across a thread boundary and a
+    // render on the other side. A handler writing one key a thousand times in
+    // a batch posted a thousand of them, carrying values the main thread can
+    // never observe — it only ever sees the last.
+    registerWorkerModule("looper", loopModule());
+    await send({ type: "INIT", config: { moduleNames: ["looper"] } });
+    await send({ type: "START" });
+    posted.length = 0;
+
+    await send({ type: "DISPATCH", event: { type: "looper::LOOP" } });
+
+    const factMessages = posted.filter((m) => m.type === "FACT_CHANGED");
+    expect(factMessages).toHaveLength(1);
+    expect(factMessages[0]).toMatchObject({ key: "looper::n", value: 500 });
+  });
 });
+
+function loopModule() {
+  return createModule("looper", {
+    schema: {
+      facts: { n: t.number() },
+      events: { LOOP: {} },
+    },
+    init: (facts) => {
+      facts.n = 0;
+    },
+    events: {
+      LOOP: (facts) => {
+        for (let i = 1; i <= 500; i++) {
+          facts.n = i;
+        }
+      },
+    },
+  });
+}

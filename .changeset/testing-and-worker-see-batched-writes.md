@@ -24,3 +24,21 @@ values were not gated the same way, so the mirror could be told a computed value
 had changed while never being told the fact it is computed from had: two numbers
 on screen contradicting each other, both delivered by a channel that looked
 healthy.
+
+**Three things that came with recording those writes**, each of which the
+codebase had already solved once elsewhere:
+
+- The worker posts one message per *run* of writes to a key rather than one per
+  write, matching how the observation stream coalesces. A handler writing one
+  key five hundred times in a batch sends one message, not five hundred — each
+  of which is a structured clone across a thread boundary and a render on the
+  other side, carrying values the main thread can never observe.
+- A test system keeps the most recent 10,000 fact changes, configurable with
+  `maxFactsHistory`, and says so when it drops any. The log holds the value
+  before and after every change, so it pins every intermediate object a test
+  produces, and that is now nearly every write.
+- `assertFactChanges` and `assertFactSet` on a namespaced system accept either
+  the short name or the namespaced one. They matched the short name only, so two
+  modules with a same-named fact shared a count while the name that would have
+  told them apart matched nothing — which began failing as soon as each module's
+  opening write was recorded.
