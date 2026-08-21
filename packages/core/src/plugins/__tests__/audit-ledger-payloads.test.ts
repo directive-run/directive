@@ -197,4 +197,126 @@ describe("a fact value reaching the record", () => {
     system.destroy();
     ledger.destroy();
   });
+
+  it("records nothing the hash cannot reach, through a map as well", () => {
+    // A map is projected as an array of pairs, which is two levels of output
+    // for one level walked. Charging it one let content sit at twice the depth
+    // the cap thought it was allowing — back below the line the canonical
+    // stringifier walks to, so it was in the record, outside the hash, and
+    // editable in place.
+    const ledger = createAuditLedger();
+    const system = makeSystem(ledger);
+    system.start();
+
+    let nested: unknown = { secret: "111-11-1111" };
+    for (let i = 0; i < 30; i++) {
+      nested = new Map([["k", nested]]);
+    }
+    system.facts.v = nested;
+    system.facts.n = 1;
+
+    const row = JSON.stringify(
+      ledger.query({ kind: "fact.change", factPath: "v" })[0],
+    );
+    // Whatever the record kept is inside what the hash covers, so the value
+    // beyond the cap is not there to be edited.
+    expect(row).not.toContain("111-11-1111");
+    expect(row).toContain("[max-depth]");
+    expect(ledger.verify().valid).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("bounds what a payload produces, not just what it walks", () => {
+    // The budget was charged per object visited, so leaves were free: one
+    // object with a few thousand string keys, reached down a shared graph,
+    // produced ninety-three megabytes from about two thousand inputs.
+    const ledger = createAuditLedger();
+    const system = makeSystem(ledger);
+    system.start();
+
+    const leaf: Record<string, unknown> = {};
+    for (let i = 0; i < 2000; i++) {
+      leaf[`k${i}`] = "v";
+    }
+    let level: unknown = leaf;
+    for (let i = 0; i < 12; i++) {
+      level = { a: level, b: level };
+    }
+
+    const startedAt = Date.now();
+    system.facts.v = level;
+    const elapsed = Date.now() - startedAt;
+
+    const row = JSON.stringify(
+      ledger.query({ kind: "fact.change", factPath: "v" })[0],
+    );
+    expect(elapsed).toBeLessThan(1000);
+    expect(row.length).toBeLessThan(2_000_000);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("starts a fresh chain rather than failing to construct", () => {
+    // The resume reads the sink at construction. A sink is supplied by the
+    // caller and may be a network or a disk, so letting it throw there made
+    // the availability of the audit store the availability of the system.
+    const hostile = {
+      ...memorySink(),
+      recent: () => {
+        throw new Error("store unreachable");
+      },
+    } as ReturnType<typeof memorySink>;
+
+    const errors: unknown[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    const ledger = createAuditLedger({ sink: hostile });
+    console.error = original;
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(() => ledger.verify()).not.toThrow();
+
+    ledger.destroy();
+  });
+
+  it("does not continue from an entry whose sequence number is unusable", () => {
+    const sink = memorySink();
+    sink.write({
+      kind: "system.start",
+      seq: Number.POSITIVE_INFINITY,
+      ts: 0,
+      prevHash: null,
+      hashAlgo: "djb2-1",
+      schemaVersion: 2,
+    } as unknown as AuditEntry);
+
+    const original = console.error;
+    console.error = () => {};
+    const ledger = createAuditLedger({ sink });
+    console.error = original;
+
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+
+    // Counting up from a non-finite number produces entries whose sequence is
+    // not a number, and those hash differently once written out than they do
+    // in memory. The unusable entry is still in the sink — it was put there
+    // directly — but nothing the ledger writes inherits it.
+    const own = ledger
+      .toJSON()
+      .entries.filter((entry) => entry.seq !== Number.POSITIVE_INFINITY);
+    expect(own.length).toBeGreaterThan(0);
+    for (const entry of own) {
+      expect(Number.isSafeInteger(entry.seq)).toBe(true);
+    }
+
+    system.destroy();
+    ledger.destroy();
+  });
 });

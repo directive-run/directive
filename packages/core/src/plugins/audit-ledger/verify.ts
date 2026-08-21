@@ -201,7 +201,25 @@ export function verify(
         // entry as our new pointer for the next iteration.
         const tombstoneEntry = entryIsTombstone ? entry : prevEntry!;
         erasedSeqsSet.add(tombstoneEntry.seq);
-        prevHash = hashForEntry(entry);
+        try {
+          prevHash = hashForEntry(entry);
+        } catch (error) {
+          // The same guard as the main walk below. Fixing one call site and
+          // not its sibling left the forensics entry point throwing for any
+          // trail that contains both an erasure and a row this version cannot
+          // hash — and an auditor asking whether a record is intact should
+          // get an answer either way.
+          return {
+            valid: false,
+            brokenAt: i,
+            expectedHash: prevHash ?? "<genesis>",
+            actualHash: entry.prevHash ?? "<genesis>",
+            entry,
+            reason: `cannot verify entry seq ${entry.seq}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          };
+        }
 
         continue;
       }

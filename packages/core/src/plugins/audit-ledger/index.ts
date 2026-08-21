@@ -154,21 +154,41 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   // record broke at exactly the point the system came back up. Reading the tip
   // costs one query at construction and makes a restart continue the record
   // rather than start a second one on top of it.
-  const existing = sink.recent(1);
-  const tip = existing.length > 0 ? existing[existing.length - 1] : undefined;
-  let seq = tip !== undefined ? tip.seq + 1 : 0;
+  let seq = 0;
   // Cache hash of last-written entry payload.
   let lastHashCache: string | null = null;
-  if (tip !== undefined) {
+  {
+    let tip: AuditEntry | undefined;
     try {
-      lastHashCache = hashForEntry(tip);
+      // Inside the guard with everything else that reads the sink. A sink is
+      // supplied by the caller and may be a network or a disk; letting it
+      // throw here made the availability of the audit store the availability
+      // of the system, three lines below a comment saying the record must not
+      // take down the thing it records.
+      const existing = sink.recent(1);
+      tip = existing.length > 0 ? existing[existing.length - 1] : undefined;
+      // A sequence number that is not a whole number cannot be continued from.
+      // Left unchecked, a string counted up as text and a non-finite one
+      // hashed differently once written out than it did in memory — the same
+      // live-versus-export disagreement this file has now had five times.
+      if (tip !== undefined) {
+        if (!Number.isSafeInteger(tip.seq) || tip.seq < 0) {
+          throw new Error(
+            `the entry already in this sink has an unusable sequence number (${String(tip.seq)})`,
+          );
+        }
+        seq = tip.seq + 1;
+        lastHashCache = hashForEntry(tip);
+      }
     } catch (error) {
       // An entry written under an algorithm this version does not know. The
       // chain cannot be continued from it, so it is left unseeded and the
       // break shows up in `verify()` — which is the honest outcome. Throwing
       // here would take construction down instead.
+      seq = 0;
+      lastHashCache = null;
       console.error(
-        `[Directive] audit-ledger: could not continue the chain from the entry already in this sink (seq ${tip.seq}). New entries will not link to it.`,
+        "[Directive] audit-ledger: could not continue from what this sink already holds. New entries start a fresh chain and will not link to it.",
         error,
       );
     }
@@ -812,6 +832,22 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       // Replace matching entries with tombstones IN PLACE, keeping
       // seq + prevHash + hashAlgo so verify() can resync the chain.
       const erasedAt = Date.now();
+      // Hashed before anything is erased.
+      //
+      // A filter can arrive from a request body, and hashing walks it — a
+      // shared reference graph in one costs exponentially. Doing it after the
+      // tombstones were written meant a filter that blew up left the entries
+      // replaced and no marker to say why: the erasure happened and the record
+      // of it did not. An erasure is not reversible, so the order matters.
+      let filterHash: string;
+      try {
+        filterHash = hashObject(asRecorded(filter));
+      } catch (error) {
+        throw new Error(
+          "[Directive] audit-ledger: erase() could not record this filter, so nothing was erased. Simplify the filter and try again.",
+          { cause: error },
+        );
+      }
       let count = 0;
       if (typeof sink.erase === "function") {
         // Which entries this erasure is entitled to replace, decided here
@@ -896,7 +932,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       // AFTER the erasure so auditors see what was removed and why.
       const markerEntry = emit({
         kind: "system.subject-erased",
-        filterHash: hashObject(filter),
+        filterHash,
         filterShape,
         erased: count,
       });

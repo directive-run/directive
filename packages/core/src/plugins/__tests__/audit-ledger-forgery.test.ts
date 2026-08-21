@@ -373,4 +373,40 @@ describe("the record under forgery", () => {
 
     reader.destroy();
   });
+
+  it("never erases without recording why", () => {
+    // The filter is hashed for the marker that accounts for the erasure, and
+    // hashing walks it — a filter arriving from a request body can be a shared
+    // reference graph that costs exponentially. Hashed after the tombstones
+    // were written, a filter that blew up left the entries replaced and no
+    // marker to say why. It is hashed first now, through the same projection
+    // that bounds a fact payload, so the cost is bounded and the record of the
+    // erasure is certain before any of it happens.
+    const ledger = createAuditLedger();
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+    system.facts.n = 2;
+
+    let node: Record<string, unknown> = { leaf: 1 };
+    for (let i = 0; i < 30; i++) {
+      node = { a: node, b: node };
+    }
+
+    const startedAt = Date.now();
+    ledger.erase({
+      factPath: "n",
+      ...(node as unknown as Record<string, never>),
+    });
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+
+    // Tombstones and the marker that accounts for them travel together.
+    const entries = ledger.toJSON().entries;
+    const tombstones = entries.filter((e) => e.kind === "system.entry-erased");
+    const markers = entries.filter((e) => e.kind === "system.subject-erased");
+    expect(tombstones.length > 0).toBe(markers.length > 0);
+
+    system.destroy();
+    ledger.destroy();
+  });
 });

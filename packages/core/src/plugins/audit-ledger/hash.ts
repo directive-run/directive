@@ -193,6 +193,14 @@ export function asRecorded(
   memo?: { left: number },
 ): unknown {
   if (depth > MAX_PROJECT_DEPTH) return "[max-depth]";
+  // Charged for every value produced, not only for the objects walked into.
+  // Counting objects alone left the leaves free, so a single object with a few
+  // thousand string keys, reached down a shared graph, produced ninety-three
+  // megabytes from about two thousand inputs — a bound on the traversal, not
+  // on the output, which is the thing that has to be bounded.
+  const budget = memo ?? { left: MAX_PROJECTED_NODES };
+  if (budget.left <= 0) return "[too-large]";
+  budget.left--;
   if (value === null) return null;
   const type = typeof value;
   if (type === "number") {
@@ -221,9 +229,6 @@ export function asRecorded(
   // fact value must not be able to do that, least of all through the plugin
   // that is meant to be watching.
   const seen = path ?? new Set<object>();
-  const budget = memo ?? { left: MAX_PROJECTED_NODES };
-  if (budget.left <= 0) return "[too-large]";
-  budget.left--;
   if (seen.has(object)) return "[circular]";
   seen.add(object);
   try {
@@ -232,9 +237,14 @@ export function asRecorded(
     }
     if (object instanceof RegExp) return String(object);
     if (object instanceof Map) {
+      // Two levels, because that is what this produces: an array of pairs.
+      // Charging one let content sit at twice the depth the budget thought it
+      // was allowing, which put it back below the line the canonical
+      // stringifier walks to — recorded, outside the hash, and editable in
+      // place. The depth cap has to count what comes out, not what goes in.
       return [...object.entries()].map(([k, v]) => [
-        asRecorded(k, depth + 1, seen, budget),
-        asRecorded(v, depth + 1, seen, budget),
+        asRecorded(k, depth + 2, seen, budget),
+        asRecorded(v, depth + 2, seen, budget),
       ]);
     }
     if (object instanceof Set) {
