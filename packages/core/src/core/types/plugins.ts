@@ -81,7 +81,14 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   // ============================================================================
 
   /**
-   * Called when a single fact is set (not during batch).
+   * Called when a single fact is set **outside** a batch.
+   *
+   * Not a complete view of writes on its own, and the gap is larger than it
+   * sounds: event handlers, effects, resolvers before their first `await`,
+   * `initialFacts` and `hydrate` all write through a batch, so a plugin
+   * implementing only this hook misses most of what a running system does.
+   * Implement {@link Plugin.onFactsBatch} alongside it.
+   *
    * @param key - The fact key that changed
    * @param value - The new value
    * @param prev - The previous value (undefined if new)
@@ -97,7 +104,12 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
 
   /**
    * Called after a batch of fact changes completes.
-   * Use this instead of onFactSet for batched operations.
+   *
+   * Use this **in addition to** `onFactSet`, not instead of it — between them
+   * they cover every write. Each change carries an `origin` saying whether the
+   * program made it, a history navigation replayed it, or stored state was
+   * hydrated in.
+   *
    * @param changes - Array of all changes in the batch
    */
   onFactsBatch?: (changes: FactChange[]) => void;

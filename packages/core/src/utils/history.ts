@@ -45,7 +45,7 @@ export interface Changeset {
  * @remarks
  * - `takeSnapshot(trigger)` records the current facts into the ring buffer.
  * - `restore(snapshot)` deserializes a snapshot back into the facts store,
- *   setting `isRestoring = true` so the engine skips reconciliation.
+ *   marking itself as restoring for the duration.
  * - `pause()` / `resume()` temporarily suspend snapshot recording (e.g.,
  *   during bulk imports or programmatic state resets).
  * - `beginChangeset(label)` / `endChangeset()` group consecutive snapshots
@@ -63,7 +63,17 @@ export interface HistoryManager<_S extends Schema> extends HistoryAPI {
   restore(snapshot: Snapshot): void;
   /** Check if history is enabled */
   readonly isEnabled: boolean;
-  /** True while restoring a snapshot (engine should skip reconciliation) */
+  /**
+   * True while a snapshot is being restored.
+   *
+   * Informational. The engine does not read it: whether a write reconciles,
+   * and whether the pass it schedules is safe to snapshot or to re-evaluate
+   * gated sources with, are decided per write from the scope the manager runs
+   * its own assignments in. A flag covering the whole navigation answered for
+   * writes that were not the manager's — a listener reacting to a rewind is
+   * doing the program's own work — and it was still up during the flush where
+   * those reactions run.
+   */
   readonly isRestoring: boolean;
   /** Pause snapshot taking */
   pause(): void;
@@ -86,6 +96,21 @@ export interface CreateHistoryOptions<S extends Schema> {
   onSnapshot?: (snapshot: Snapshot) => void;
   /** Callback when history navigation occurs */
   onHistoryChange?: (from: number, to: number) => void;
+  /**
+   * Runs the manager's own fact assignments in whatever scope marks a write as
+   * replayed. Supplied by the engine; defaults to running `fn` unchanged so a
+   * standalone manager still works.
+   */
+  withRestoreOrigin?: (fn: () => void) => void;
+  /**
+   * Runs a whole navigation in whatever scope marks it as one — wider than
+   * {@link withRestoreOrigin}, which covers only the manager's own writes.
+   *
+   * A listener that writes while rewinding is doing the program's own work and
+   * its write reconciles like any other, but the pass it schedules must not
+   * take a snapshot over the redo stack or re-open a gated transport.
+   */
+  withNavigation?: (fn: () => void) => void;
 }
 
 /**
@@ -130,7 +155,15 @@ function resolveHistoryOption(option: HistoryOption): {
 export function createHistoryManager<S extends Schema>(
   options: CreateHistoryOptions<S>,
 ): HistoryManager<S> {
-  const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
+  const {
+    historyOption,
+    facts,
+    store,
+    onSnapshot,
+    onHistoryChange,
+    withRestoreOrigin = (fn: () => void) => fn(),
+    withNavigation = (fn: () => void) => fn(),
+  } = options;
 
   const {
     enabled: isEnabled,
@@ -198,20 +231,30 @@ export function createHistoryManager<S extends Schema>(
     }
 
     store.batch(() => {
-      for (const [key, value] of Object.entries(serialized)) {
-        // Prototype pollution protection (redundant but defensive)
-        if (
-          key === "__proto__" ||
-          key === "constructor" ||
-          key === "prototype"
-        ) {
-          console.warn(
-            `[Directive] Skipping dangerous key "${key}" during fact restoration`,
-          );
-          continue;
+      // Scoped to the assignment loop, deliberately not to the batch.
+      //
+      // The batch flushes when it closes, and consumer code runs during that
+      // flush — an observer is free to write a value of its own. Those writes
+      // are the program's, not the replay's, and a scope that covered the
+      // flush would hand them this label. Narrowing it to the assignments
+      // separates the two exactly: the replay's writes happen inside, the
+      // reactions to them happen after.
+      withRestoreOrigin(() => {
+        for (const [key, value] of Object.entries(serialized)) {
+          // Prototype pollution protection (redundant but defensive)
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            console.warn(
+              `[Directive] Skipping dangerous key "${key}" during fact restoration`,
+            );
+            continue;
+          }
+          (facts as Record<string, unknown>)[key] = value;
         }
-        (facts as Record<string, unknown>)[key] = value;
-      }
+      });
     });
   }
 
@@ -278,7 +321,11 @@ export function createHistoryManager<S extends Schema>(
       restoring = true;
 
       try {
-        deserializeFacts(snapshot.facts);
+        // The whole navigation, flush included. Reactions to a restore run in
+        // that flush, and what they schedule has to know it followed one.
+        withNavigation(() => {
+          deserializeFacts(snapshot.facts);
+        });
       } finally {
         paused = false;
         restoring = false;

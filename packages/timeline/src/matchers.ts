@@ -235,6 +235,10 @@ function toMutate(
   let count = 0;
   for (const f of fs) {
     if (f.event.type !== "fact.change") continue;
+    // Counts dispatches, so it counts writes the program made. A restored or
+    // hydrated frame carries the shape of a mutation without one having been
+    // dispatched — counting it reports a mutation nobody performed.
+    if ((f.event.origin ?? "authored") !== "authored") continue;
     if (f.event.key !== "pendingMutation") continue;
     const next = f.event.next as Record<string, unknown> | null;
     if (next === null) continue;

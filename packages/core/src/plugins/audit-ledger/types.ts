@@ -8,7 +8,7 @@
  * types from here without a cycle.
  */
 
-import type { ModuleSchema, Plugin } from "../../core/types.js";
+import type { FactOrigin, ModuleSchema, Plugin } from "../../core/types.js";
 import type {
   ClauseResult,
   FactPredicate,
@@ -26,7 +26,19 @@ export const HASH_ALGO = "djb2-1" as const;
  * a way that breaks back-compat parsers. Persisted on every entry so
  * exports remain self-describing across library upgrades.
  */
-export const SCHEMA_VERSION = 1 as const;
+/**
+ * Schema versions an entry can carry. A reader may hold entries written by an
+ * older version — an export re-loaded for verification, most obviously — so
+ * this is the union rather than the current constant.
+ */
+export type AuditSchemaVersion = 1 | 2;
+
+/**
+ * Bumped to 2 when `fact.change` gained its required `origin` field. Entries
+ * written under 1 stay verifiable: the version is part of what each entry is
+ * hashed over, so the chain is checked against the schema it was written under.
+ */
+export const SCHEMA_VERSION: AuditSchemaVersion = 2;
 
 // ============================================================================
 // AuditEntry types
@@ -54,17 +66,33 @@ export type AuditEntryKind =
   | "system.subject-erased";
 
 /**
- * Internal sentinel symbol type. The actual symbol VALUE lives in
- * `hash.ts` and is never exported from this folder's public surface —
- * but the TYPE must be referenceable here so `AuditEntryBase` can
- * declare the optional `__internal` field.
+ * Every value {@link AuditEntryKind} can take, at runtime.
  *
- * We use `symbol` rather than `typeof LEDGER_INTERNAL_TOKEN` because
- * importing the symbol value into types.ts would either re-export it
- * (defeating the defense) or create a circular import. The runtime
- * check in `verify()` compares against the actual symbol reference.
+ * A filter can arrive from a request body, and the erasure marker that records
+ * it is frozen and permanent — so what goes into it is checked against this
+ * rather than copied across.
  */
-type LedgerInternalSentinel = symbol;
+export const AUDIT_ENTRY_KINDS: readonly AuditEntryKind[] = [
+  "constraint.evaluate",
+  "resolver.write.rejected",
+  "resolver.clobber.loop.detected",
+  "resolver.clobber.loop.resolved",
+  "fact.change",
+  "resolver.complete",
+  "resolver.error",
+  "source.attach",
+  "source.detach",
+  "source.error",
+  "system.init",
+  "system.start",
+  "system.stop",
+  "system.destroy",
+  "system.snapshot",
+  "system.history.navigate",
+  "system.truncated",
+  "system.entry-erased",
+  "system.subject-erased",
+];
 
 interface AuditEntryBase {
   /** Monotonic sequence number, starting at 0. */
@@ -86,7 +114,7 @@ interface AuditEntryBase {
    * changes in a way that breaks back-compat. Pair with `hashAlgo`
    * when migrating older exports.
    */
-  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly schemaVersion: AuditSchemaVersion;
   /**
    * Private sentinel — present (and equal to the in-module token) only
    * on legitimate tombstones minted by `ledger.erase()`. Filtered out
@@ -99,7 +127,6 @@ interface AuditEntryBase {
    *
    * @internal
    */
-  readonly __internal?: LedgerInternalSentinel;
 }
 
 export type AuditEntry =
@@ -176,6 +203,23 @@ export type AuditEntry =
       key: string;
       prior: unknown;
       next: unknown;
+      /**
+       * Where the write came from — `"authored"`, `"restore"` or `"hydrate"`.
+       *
+       * Always present, so a query for program writes names them instead of
+       * testing for the absence of a label. Stamped against the write as it is
+       * made, not read from a flag when the batch is reported.
+       *
+       * A replayed write is filed, never dropped. Dropping it would put a
+       * label in charge of whether an entry exists at all, which is worth
+       * forging; filing it puts the label in charge of nothing more than
+       * which rows an auditor reads together.
+       *
+       * It is not an authenticity signal. `"authored"` means the write did not
+       * arrive through a replay or a hydration door — it says nothing about
+       * who or what made it.
+       */
+      origin: FactOrigin;
     })
   | (AuditEntryBase & {
       kind: "resolver.complete";
@@ -254,6 +298,12 @@ export type AuditEntry =
         constraintId: boolean;
         kind: AuditEntryKind | readonly AuditEntryKind[] | undefined;
         changedBetween: "[range]" | undefined;
+        /**
+         * Carried by value, unlike the fields above. `origin` names no
+         * subject, and an erasure scoped to replayed writes is a different
+         * act from one scoped to the program's own.
+         */
+        origin?: FactOrigin | readonly FactOrigin[];
       };
       erased: number;
     });
@@ -265,6 +315,16 @@ export type AuditEntry =
 export interface QueryFilter {
   /** Exact-match fact path. */
   factPath?: string;
+  /**
+   * Filter `fact.change` entries by where the write came from.
+   *
+   * Applied by the sink while it walks, which is the reason this exists rather
+   * than leaving callers to filter the result. `query()` walks newest-first and
+   * stops once it has `limit` rows, so a caller filtering afterwards is
+   * filtering a page that was already chosen — a fact whose recent history is
+   * mostly replayed writes can fill the page and leave nothing behind.
+   */
+  origin?: FactOrigin | readonly FactOrigin[];
   /** Filter by constraint id. */
   constraintId?: string;
   /** Filter by entry kind. */
@@ -299,6 +359,86 @@ export type VerifyResult =
        * (renamed from `erasedAt`)
        */
       erasedSeqs?: number[];
+      /**
+       * Set when the surviving entries are a window into a longer chain —
+       * the sink dropped older entries to stay within capacity, so the walk
+       * began partway in. The value is the `seq` the window starts at;
+       * everything below it is gone.
+       *
+       * Its absence means the chain still reaches back to its first entry.
+       * A verified window is not the same claim as a verified chain: the
+       * entries that are here are intact and in order, and nothing can be
+       * said about the ones that rotated out.
+       */
+      windowStartSeq?: number;
+      /**
+       * Present with {@link windowStartSeq}. True when the surviving entries
+       * contain `system.truncated` markers, which is what a sink writes as it
+       * rotates — so the missing prefix has an account of itself.
+       *
+       * False means entries are missing and nothing in the record explains
+       * why. That is not proof of tampering: a system that has been quiet for
+       * a long time can outlive its own markers. It is the difference between
+       * a gap with a receipt and a gap without one, and it is worth a question.
+       */
+      truncationExplained?: boolean;
+      /**
+       * Whether the provenance of erasure tombstones and truncation markers
+       * could be checked.
+       *
+       * The runtime records which entries it wrote, in memory and off the
+       * entries themselves — so the record does not survive serialisation. A
+       * ledger reloaded from an export reports `false`, and so does any sink
+       * that does not hand back the same object it was given, which includes
+       * most durable ones.
+       *
+       * `false` does not mean tampering. The chain is still checked; what is
+       * not is whether those two kinds — the two `verify()` treats as
+       * legitimate chain breaks — came from the runtime or were appended.
+       *
+       * Always present, because a caller checking `valid` alone should not be
+       * able to miss it. An unkeyed chain cannot do better than reporting
+       * this: an attacker can always present a forgery as a copy.
+       */
+      marksChecked: boolean;
+      /**
+       * Seq numbers that are absent from the middle of the chain and that
+       * nothing accounts for — an entry the sink refused, most likely.
+       *
+       * Not a break. The chain closes over a refused entry deliberately, so
+       * that one failed write does not report the whole record as tampered.
+       * But an entry that is simply gone is worth surfacing rather than
+       * passing over in silence, which is what closing over it would otherwise
+       * do. Pair with `onWriteError` to catch them as they happen.
+       *
+       * Entries dropped from the *head* by a bounded sink are not listed here;
+       * see `windowStartSeq`.
+       */
+      missingSeqs?: number[];
+      /**
+       * How many seq numbers are missing in total. Always exact.
+       * {@link missingSeqs} lists at most the first hundred of them — the
+       * input to a verification is often a file from elsewhere, and a number
+       * in it should not decide how much memory the check allocates.
+       */
+      missingSeqCount?: number;
+      /**
+       * Erasure tombstones that this runtime did not write, among entries
+       * where it wrote others.
+       *
+       * Reported rather than fatal. The mark that says "the runtime wrote
+       * this" is held in memory against the entry object, so it does not
+       * survive being stored or exported — which means "written by the
+       * runtime" and "appended by someone" are indistinguishable in any record
+       * that has been anywhere. Making it decide the verdict was tried in both
+       * directions and each accused an honest ledger: once every sink that
+       * persists anything, once every restart from an export.
+       *
+       * A non-empty list is worth a question, not a conclusion. Real tampering
+       * with an entry's contents still breaks the chain and returns
+       * `valid: false`.
+       */
+      unmarkedTombstoneSeqs?: number[];
     }
   | {
       valid: false;
@@ -354,6 +494,20 @@ export interface AuditLedgerSink {
 // ============================================================================
 
 export interface AuditLedgerOptions {
+  /**
+   * Called when the sink refuses an entry, with the error and the entry that
+   * did not land.
+   *
+   * A sink can fail — a quota, a disk, a remote that returns 500. When it
+   * does, that entry is not in the record and nothing downstream will say so:
+   * the failure happens inside a plugin hook whose errors are caught and
+   * logged by the plugin manager, so the application never sees it. Handle
+   * this if a gap in the record is something you need to know about.
+   *
+   * Defaults to a `console.error` naming the entry's seq and kind.
+   */
+  onWriteError?: (error: unknown, entry: AuditEntry) => void;
+
   /** Sink to write entries to. Default: in-memory ring buffer (capacity 10k). */
   sink?: AuditLedgerSink;
   /**

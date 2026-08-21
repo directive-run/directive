@@ -30,6 +30,7 @@
  */
 
 import type {
+  FactOrigin,
   ModuleSchema,
   ObservationEvent,
   Plugin,
@@ -40,16 +41,63 @@ import type {
   FactPredicate,
 } from "../../core/types/predicate.js";
 import { hashObject } from "../../utils/utils.js";
-import { LEDGER_INTERNAL_TOKEN, freezeEntry, hashForEntry } from "./hash.js";
+import { asRecorded, freezeEntry, hashForEntry, markInternal } from "./hash.js";
+
+/**
+ * Keep only recognised entry kinds from a caller-supplied filter, for the same
+ * reason as {@link knownOrigins}.
+ */
+function knownKinds(
+  value: AuditEntryKind | readonly AuditEntryKind[] | undefined,
+): AuditEntryKind | readonly AuditEntryKind[] | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    const kept = value.filter((v) =>
+      AUDIT_ENTRY_KINDS.includes(v as AuditEntryKind),
+    );
+
+    return kept.length > 0 ? (kept as readonly AuditEntryKind[]) : undefined;
+  }
+
+  return AUDIT_ENTRY_KINDS.includes(value as AuditEntryKind)
+    ? (value as AuditEntryKind)
+    : undefined;
+}
+
+/** The values `origin` can hold. Anything else did not come from the runtime. */
+const ORIGINS: readonly FactOrigin[] = ["authored", "restore", "hydrate"];
+
+/**
+ * Keep only recognised origins from a caller-supplied filter.
+ *
+ * Returns `undefined` when nothing survives, which reads as "the filter did
+ * not scope by origin" — the same thing an absent field says.
+ */
+function knownOrigins(
+  value: FactOrigin | readonly FactOrigin[] | undefined,
+): FactOrigin | readonly FactOrigin[] | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    const kept = value.filter((v) => ORIGINS.includes(v as FactOrigin));
+
+    return kept.length > 0 ? (kept as readonly FactOrigin[]) : undefined;
+  }
+
+  return ORIGINS.includes(value as FactOrigin)
+    ? (value as FactOrigin)
+    : undefined;
+}
 import { redactWhenSpec } from "./predicate-redact.js";
 import { memorySink } from "./sink.js";
 import type {
   AuditEntry,
+  AuditEntryKind,
   AuditLedger,
   AuditLedgerOptions,
   VerifyResult,
 } from "./types.js";
-import { HASH_ALGO, SCHEMA_VERSION } from "./types.js";
+import { AUDIT_ENTRY_KINDS, HASH_ALGO, SCHEMA_VERSION } from "./types.js";
+import type { AuditSchemaVersion } from "./types.js";
 import { verify as verifyChain } from "./verify.js";
 
 // Re-export the public surface. `LEDGER_INTERNAL_TOKEN` is intentionally
@@ -97,8 +145,56 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   const capturePII = opts.capturePII ?? false;
   const userRedact = opts.redact;
 
+  // Resumed from whatever the sink already holds.
+  //
+  // A ledger built over a sink with entries in it — a process restarting onto
+  // its own durable store, or a trail reloaded from an export — used to begin
+  // its numbering and its chain from nothing. Its first write then carried
+  // sequence zero and no previous hash, next to entries that had both, so the
+  // record broke at exactly the point the system came back up. Reading the tip
+  // costs one query at construction and makes a restart continue the record
+  // rather than start a second one on top of it.
   let seq = 0;
-  let lastHashCache: string | null = null; // Cache hash of last-written entry payload
+  // Cache hash of last-written entry payload.
+  let lastHashCache: string | null = null;
+  {
+    let tip: AuditEntry | undefined;
+    try {
+      // Inside the guard with everything else that reads the sink. A sink is
+      // supplied by the caller and may be a network or a disk; letting it
+      // throw here made the availability of the audit store the availability
+      // of the system, three lines below a comment saying the record must not
+      // take down the thing it records.
+      const existing = sink.recent(1);
+      tip = existing.length > 0 ? existing[existing.length - 1] : undefined;
+      // A sequence number that is not a whole number cannot be continued from.
+      // Left unchecked, a string counted up as text and a non-finite one
+      // hashed differently once written out than it did in memory — the same
+      // live-versus-export disagreement this file has now had five times.
+      if (tip !== undefined) {
+        if (!Number.isSafeInteger(tip.seq) || tip.seq < 0) {
+          throw new Error(
+            `the entry already in this sink has an unusable sequence number (${String(tip.seq)})`,
+          );
+        }
+        seq = tip.seq + 1;
+        lastHashCache = hashForEntry(tip);
+      }
+    } catch (error) {
+      // An entry written under an algorithm this version does not know. The
+      // chain cannot be continued from it, so it is left unseeded and the
+      // break shows up in `verify()` — which is the honest outcome. Throwing
+      // here would take construction down instead.
+      seq = 0;
+      lastHashCache = null;
+      console.error(
+        "[Directive] audit-ledger: could not continue from what this sink already holds. New entries start a fresh chain and will not link to it.",
+        error,
+      );
+    }
+  }
+  /** True only while this ledger is inside its own `sink.write` call. */
+  let writingToSink = false;
 
   let system: System<ModuleSchema> | null = null;
   let unobserve: (() => void) | null = null;
@@ -287,7 +383,44 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    * values + whenExplain clauses) so that downstream consumers cannot
    * mutate payloads in place and forge the chain.
    */
+  /**
+   * What to do when the sink refuses an entry.
+   *
+   * A durable record that quietly loses writes is the failure this whole
+   * subsystem exists to prevent, and the loss was reaching a console line
+   * inside a plugin-manager catch that nothing reads.
+   */
+  const onWriteError =
+    opts.onWriteError ??
+    ((error: unknown, entry: AuditEntry) => {
+      console.error(
+        `[Directive] audit-ledger: the sink refused entry #${entry.seq} (${entry.kind}). It is not in the record.`,
+        error,
+      );
+    });
+
   function emit(partial: Record<string, unknown>): AuditEntry {
+    // Everything from here to the write is inside the reporting path.
+    //
+    // `onWriteError` covered the write and nothing else, but the steps before
+    // it can fail too — a redactor that freezes its return, a payload deep
+    // enough to exhaust the stack — and those threw into the plugin manager's
+    // catch, which is the console line nothing reads that this option exists
+    // to replace. A redactor that froze its return produced a completely empty
+    // ledger that reported itself valid.
+    try {
+      return buildAndWrite(partial);
+    } catch (error) {
+      onWriteError(error, {
+        kind: String(partial.kind ?? "unknown"),
+        seq,
+      } as unknown as AuditEntry);
+
+      return { kind: partial.kind, seq } as unknown as AuditEntry;
+    }
+  }
+
+  function buildAndWrite(partial: Record<string, unknown>): AuditEntry {
     // Drop keys whose value is `undefined` before the entry is built.
     //
     // The chain is hashed over a stable stringification that encodes a
@@ -315,14 +448,102 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       schemaVersion: SCHEMA_VERSION,
     } as AuditEntry;
 
-    const finalEntry = userRedact ? userRedact(entry) : entry;
+    // Built here, from what the redactor returned, rather than written onto
+    // it. A redactor scrubs values; it does not get to say what kind of entry
+    // this is, where it sits in the chain, or which schema it claims — those
+    // are the fields `verify()` reasons over, and a hook that could set them
+    // could turn an ordinary record into an erasure tombstone and have the
+    // ledger vouch for it.
+    //
+    // Assigning the identity back onto the redactor's own object was not
+    // enough: returning the argument unchanged skipped the restore entirely,
+    // and an accessor could swallow the write and keep answering with the
+    // forged value. Spreading into a fresh plain object evaluates any getter
+    // once and discards it, and the identity is written last.
+    const redacted = userRedact ? userRedact(entry) : entry;
+    const finalEntry = {
+      ...(redacted as unknown as Record<string, unknown>),
+      kind: entry.kind,
+      seq: entry.seq,
+      ts: entry.ts,
+      prevHash: entry.prevHash,
+      hashAlgo: entry.hashAlgo,
+      schemaVersion: entry.schemaVersion,
+    } as AuditEntry;
+
+    // Projected to what an export can carry, at the point of recording, so
+    // that the live entry and its exported form are the same data.
+    //
+    // Every value, not only the objects. Handling those and non-finite numbers
+    // left a top-level function or symbol untouched: the canonical
+    // stringifier renders both and JSON drops the key, which is the fifth
+    // outing for the one defect this file keeps having. A function value also
+    // defeats the structured copy, so the entry ended up holding the caller's
+    // live function — and its closure — unfrozen and forever.
+    const record = finalEntry as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(record)) {
+      const projected = asRecorded(value);
+      if (projected === undefined) {
+        delete record[key];
+        continue;
+      }
+      record[key] = projected;
+    }
+    // Written back after the projection, since these are the fields `verify()`
+    // reasons over and none of them may be dropped by it.
+    record.kind = entry.kind;
+    record.seq = entry.seq;
+    record.prevHash = entry.prevHash;
+    record.hashAlgo = entry.hashAlgo;
+    record.schemaVersion = entry.schemaVersion;
     freezeEntry(finalEntry);
-    sink.write(finalEntry);
 
     // Sync hash of this entry — stashed as the next entry's prevHash.
     // Whole entry is hashed (including its own prevHash field) so
     // verify() can rebuild the chain deterministically.
-    lastHashCache = hashForEntry(finalEntry);
+    //
+    // Recorded BEFORE the write. A bounded sink can emit a truncation marker
+    // from inside `write()`, and that marker is an entry of its own: stashing
+    // afterwards meant it read the hash of the entry *before* the one being
+    // written, so the two shared a `prevHash` and the chain forked. Every
+    // rotated ledger then failed verification at its second entry — which is
+    // the answer least worth giving, because an operator who sees routine
+    // rotation reported as tamper stops believing the control entirely.
+    // Every entry this ledger writes is recorded as its own, not only the two
+    // kinds `verify()` treats as legitimate chain breaks.
+    //
+    // Marking only those made the check comparative in the wrong way: a live
+    // ledger holding a single forged tombstone and no genuine one had nothing
+    // marked, so it looked like a reloaded copy and the forgery passed.
+    // Marking everything means a live ledger always has marks, and an unmarked
+    // tombstone sitting among marked entries is exactly what a forgery is.
+    markInternal(finalEntry);
+
+    const myHash = hashForEntry(finalEntry);
+    const priorHash = lastHashCache;
+    lastHashCache = myHash;
+    try {
+      writingToSink = true;
+      sink.write(finalEntry);
+    } catch (error) {
+      // The entry never landed, so nothing should chain to it. Left advanced,
+      // one failed write pointed the next entry at a hash no stored entry
+      // carries, and the ledger reported itself tampered from then on — the
+      // verdict least worth giving, and one an attacker who can force a single
+      // sink failure gets for free, since `verify()` stops at the first break
+      // and never examines anything after it.
+      //
+      // Rolled back only if nothing chained off this entry in the meantime. A
+      // bounded sink emits its truncation marker from inside `write()`, and
+      // that marker legitimately takes this entry's hash — if the pointer has
+      // moved on, the entry did land and the failure came later.
+      if (lastHashCache === myHash) {
+        lastHashCache = priorHash;
+      }
+      onWriteError(error, finalEntry);
+    } finally {
+      writingToSink = false;
+    }
 
     return finalEntry;
   }
@@ -356,8 +577,21 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         emit({
           kind: "fact.change",
           key: event.key,
-          prior: redactValue(event.key, event.prev),
-          next: redactValue(event.key, event.next),
+          // A value that is not there is left alone rather than redacted. The
+          // first write of a key has no prior, and a delete has no next;
+          // running those through the redactor turned "there was nothing here"
+          // into `"[redacted]"`, which asserts a previous state the fact never
+          // held. `emit` then drops the absent key, so the entry says what
+          // happened.
+          prior:
+            event.prev === undefined
+              ? undefined
+              : redactValue(event.key, event.prev),
+          next:
+            event.next === undefined
+              ? undefined
+              : redactValue(event.key, event.next),
+          origin: event.origin,
         });
         break;
       case "resolver.write.rejected":
@@ -481,14 +715,24 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     system = sys;
     refreshWhenSpecCache();
     unobserve = sys.observe(onEvent);
-    // Wire up the truncation marker — fires BEFORE the sink drops the
-    // oldest entry, so the dropped seq is still known. The guard
-    // prevents the marker's own write from recursing back through the
-    // capacity overflow path.
+    // Wire up the truncation marker — fires after the entry that caused the
+    // overflow has landed, carrying the seq of the oldest dropped entry and
+    // how many were dropped since the last marker. The guard prevents the
+    // marker's own write from recursing back through the overflow path; the
+    // sink accumulates anything dropped to make room for the marker itself and
+    // reports it with the next one, so no drop goes uncounted.
     sink.onTruncate?.((droppedSeq, droppedCount) => {
+      // Only from inside this ledger's own write. The sink is supplied by the
+      // caller and keeps this callback, so without the check it can be called
+      // at any time to mint a marker the runtime vouches for — and `verify()`
+      // lets a marker account for a missing prefix.
+      if (!writingToSink) return;
       if (emittingTruncate) return;
       emittingTruncate = true;
       try {
+        // `verify()` lets a truncation marker account for a missing prefix, so
+        // one anyone can mint is a way to make a hand-trimmed ledger read as
+        // routine rotation. `emit` records it as this ledger's own.
         emit({
           kind: "system.truncated",
           droppedSeq,
@@ -562,57 +806,22 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     },
   };
 
-  /**
-   * Strip the internal sentinel from an entry before it reaches a
-   * public read path. Returns a shallow clone with `__internal`
-   * removed — keeps the (frozen) live entry intact for verify() while
-   * making sure consumers never see the symbol.
-   */
-  function stripInternal(entry: AuditEntry): AuditEntry {
-    if (
-      (entry as AuditEntry & { __internal?: unknown }).__internal === undefined
-    ) {
-      return entry;
-    }
-    const clone = { ...entry } as AuditEntry & { __internal?: unknown };
-    clone.__internal = undefined;
-
-    return clone as AuditEntry;
-  }
-
-  function stripInternalAll(
-    entries: readonly AuditEntry[],
-  ): readonly AuditEntry[] {
-    // Avoid allocating a new array unless at least one entry carries
-    // the sentinel — the common case (no tombstones) is a no-op.
-    let needsClone = false;
-    for (const e of entries) {
-      if (
-        (e as AuditEntry & { __internal?: unknown }).__internal !== undefined
-      ) {
-        needsClone = true;
-        break;
-      }
-    }
-    if (!needsClone) {
-      return entries;
-    }
-
-    return entries.map(stripInternal);
-  }
+  // Entries used to carry the mint marker as a field, so every public read
+  // path cloned each one to strip it. The marker lives outside the entry now,
+  // so reads hand back what the sink holds — the entries are frozen, and one
+  // fewer copy on the way out is one fewer place for them to diverge.
 
   return {
     plugin,
-    query: (filter = {}) => stripInternalAll(sink.query(filter)),
-    recent: (n) => stripInternalAll(sink.recent(n)),
-    forFact: (path, opts2) => stripInternalAll(sink.forFact(path, opts2)),
-    forConstraint: (id, opts2) =>
-      stripInternalAll(sink.forConstraint(id, opts2)),
+    query: (filter = {}) => sink.query(filter),
+    recent: (n) => sink.recent(n),
+    forFact: (path, opts2) => sink.forFact(path, opts2),
+    forConstraint: (id, opts2) => sink.forConstraint(id, opts2),
     toJSON: () => {
       const snap = sink.toJSON();
 
       return {
-        entries: stripInternalAll(snap.entries),
+        entries: snap.entries,
         capturedAt: snap.capturedAt,
       };
     },
@@ -623,18 +832,54 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       // Replace matching entries with tombstones IN PLACE, keeping
       // seq + prevHash + hashAlgo so verify() can resync the chain.
       const erasedAt = Date.now();
+      // Hashed before anything is erased.
+      //
+      // A filter can arrive from a request body, and hashing walks it — a
+      // shared reference graph in one costs exponentially. Doing it after the
+      // tombstones were written meant a filter that blew up left the entries
+      // replaced and no marker to say why: the erasure happened and the record
+      // of it did not. An erasure is not reversible, so the order matters.
+      let filterHash: string;
+      try {
+        filterHash = hashObject(asRecorded(filter));
+      } catch (error) {
+        throw new Error(
+          "[Directive] audit-ledger: erase() could not record this filter, so nothing was erased. Simplify the filter and try again.",
+          { cause: error },
+        );
+      }
       let count = 0;
       if (typeof sink.erase === "function") {
+        // Which entries this erasure is entitled to replace, decided here
+        // rather than by whatever the sink chooses to hand back. The sink is
+        // supplied by the caller and the callback below mints marked
+        // tombstones at a chosen seq and prevHash, so without this the sink
+        // could ask for one over any entry it liked — or over entries that do
+        // not exist.
+        // By seq, not by object identity. A sink that reconstructs its
+        // entries — which is every sink that persists anything — hands back
+        // equal values rather than the same objects, so an identity check
+        // refused every erasure on exactly the sinks erasure exists for.
+        const erasable = new Set<number>(
+          sink
+            .query({ ...filter, limit: Number.MAX_SAFE_INTEGER })
+            .map((e) => e.seq),
+        );
         count = sink.erase(filter, (e) => {
+          if (!erasable.has(e.seq)) {
+            throw new Error(
+              "[Directive] audit-ledger: erase() was asked to replace an entry that does not match the filter it was given.",
+            );
+          }
           // Build a tombstone preserving the immutable chain fields.
           // Carry SCHEMA_VERSION from the original so a fresh tombstone
           // doesn't claim to be at a newer schema than the entry it
           // replaced.
           //
-          // Stamp the in-module sentinel so `verify()` can tell
-          // this tombstone apart from a forgery written via
-          // `sink.write({ kind: "system.entry-erased", … })`. The
-          // sentinel is stripped from every public read path.
+          // Recorded as minted here so `verify()` can tell this tombstone
+          // apart from a forgery written via
+          // `sink.write({ kind: "system.entry-erased", … })`. The record is
+          // kept off the entry — see `hash.ts`.
           const tombstone = {
             seq: e.seq,
             ts: e.ts,
@@ -642,12 +887,12 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
             prevHash: e.prevHash,
             hashAlgo: e.hashAlgo,
             schemaVersion:
-              (e as AuditEntry & { schemaVersion?: typeof SCHEMA_VERSION })
+              (e as AuditEntry & { schemaVersion?: AuditSchemaVersion })
                 .schemaVersion ?? SCHEMA_VERSION,
             originalKind: e.kind,
             erasedAt,
-            __internal: LEDGER_INTERNAL_TOKEN,
           } as AuditEntry;
+          markInternal(tombstone);
           // CAUTION: replacing the payload changes the entry's hash —
           // which means the NEXT entry's prevHash will no longer match.
           // verify() recognises `system.entry-erased` as a legitimate
@@ -671,7 +916,13 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       const filterShape = {
         factPath: filter.factPath !== undefined,
         constraintId: filter.constraintId !== undefined,
-        kind: filter.kind,
+        kind: knownKinds(filter.kind),
+        // Recorded by value, but only after being checked against the values
+        // the field can hold. A filter can arrive from an untrusted request
+        // body on an erasure endpoint, and this entry is frozen and permanent:
+        // copied verbatim it took whatever the caller sent, which is how a
+        // subject's own data ends up in the record that erased it.
+        origin: knownOrigins(filter.origin),
         changedBetween:
           filter.changedBetween !== undefined
             ? ("[range]" as const)
@@ -681,7 +932,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       // AFTER the erasure so auditors see what was removed and why.
       const markerEntry = emit({
         kind: "system.subject-erased",
-        filterHash: hashObject(filter),
+        filterHash,
         filterShape,
         erased: count,
       });

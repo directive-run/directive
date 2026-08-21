@@ -236,10 +236,15 @@ const myPlugin: Plugin<ModuleSchema> = {
 
   // Fact tracking
   onFactSet: (key, value, prev) => {
-    // Called when a single fact is set
+    // Called for a single UNBATCHED write only. It does NOT fire for a write
+    // made inside system.batch() — and event handlers, effects, resolvers
+    // before their first await, initialFacts and hydrate all write through a
+    // batch. A plugin that implements only this hook misses most of the writes
+    // a running system makes.
   },
   onFactsBatch: (changes) => {
-    // Called after a batch of fact changes completes
+    // Called after a batch of fact changes completes. Implement this ALONGSIDE
+    // onFactSet to see every write. Each change carries an `origin`.
   },
 
   // Requirement pipeline

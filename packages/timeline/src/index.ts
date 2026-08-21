@@ -374,8 +374,19 @@ function formatEventDetail(
     useColor ? `${ANSI[color]}${s}${ANSI.reset}` : s;
 
   switch (event.type) {
-    case "fact.change":
-      return `${c("bold", event.key)}: ${preview(event.prev, previewLen)} → ${preview(event.next, previewLen)}`;
+    case "fact.change": {
+      // A replayed write is marked. Rendered the same as an authored one it
+      // reads as something the program just did, which is the wrong thing to
+      // believe while debugging a timeline that contains an undo.
+      const replayed =
+        event.origin === "restore"
+          ? c("dim", " (restored)")
+          : event.origin === "hydrate"
+            ? c("dim", " (hydrated)")
+            : "";
+
+      return `${c("bold", event.key)}: ${preview(event.prev, previewLen)} → ${preview(event.next, previewLen)}${replayed}`;
+    }
     case "constraint.evaluate":
       return `${event.id} active=${event.active}`;
     case "constraint.error":
@@ -488,6 +499,26 @@ export function _getRegistry(): ReadonlyMap<string, Timeline> {
  * CLI. Frame `event` objects are already JSON-safe per the
  * `ObservationEvent` contract.
  */
+/**
+ * A frame as it appears on the wire.
+ *
+ * Identical to {@link TimelineFrame} except that `fact.change` carries an
+ * optional `origin`. A file written before that field existed has none, and
+ * every write recorded then was authored — replayed and hydrated writes
+ * reached no observer at all — so a reader treats its absence as `"authored"`
+ * rather than refusing the file.
+ */
+export interface SerializedFrame {
+  /** Monotonic ms since timeline start. */
+  ts: number;
+  /** The raw observation event, as written. */
+  event:
+    | Exclude<ObservationEvent, { type: "fact.change" }>
+    | (Omit<Extract<ObservationEvent, { type: "fact.change" }>, "origin"> & {
+        origin?: Extract<ObservationEvent, { type: "fact.change" }>["origin"];
+      });
+}
+
 export interface SerializedTimeline {
   /** Schema version. Bumped on incompatible changes to the wire format. */
   version: 1;
@@ -496,7 +527,7 @@ export interface SerializedTimeline {
   /** Wall-clock ms when recording started. */
   startedAtMs: number;
   /** Captured frames — `event.type` carries the discriminator. */
-  frames: TimelineFrame[];
+  frames: SerializedFrame[];
 }
 
 /**
@@ -748,8 +779,18 @@ export async function replayTimeline(
  * carrying `kind`/`payload`/`status`). The set will expand once core
  * adds first-class `event.dispatch` recording.
  */
-function isDispatchable(event: ObservationEvent): boolean {
+function isDispatchable(event: SerializedFrame["event"]): boolean {
   if (event.type !== "fact.change") return false;
+  // Only a write the program authored can be re-dispatched. A replayed or
+  // hydrated frame is the *result* of an action, not the action — dispatching
+  // it applies the mutation a second time, and a timeline containing an undo
+  // then replays as two mutations where the user made one. Restored writes
+  // reached no observer before core recorded batched writes, so this shape
+  // could not be recorded and the filter was not needed.
+  // `?? "authored"` for a timeline recorded before the field existed. Nothing
+  // replayed or hydrated could be recorded then — those writes reached no
+  // observer — so every frame in such a file is authored by construction.
+  if ((event.origin ?? "authored") !== "authored") return false;
   if (event.key !== "pendingMutation") return false;
   const next = event.next;
   if (next === null || typeof next !== "object") return false;
@@ -765,9 +806,10 @@ function isDispatchable(event: ObservationEvent): boolean {
  * caller's loop skips it.
  */
 function reconstructDispatch(
-  event: ObservationEvent,
+  event: SerializedFrame["event"],
 ): { type: string; [key: string]: unknown } | null {
   if (event.type !== "fact.change") return null;
+  if ((event.origin ?? "authored") !== "authored") return null;
   if (event.key !== "pendingMutation") return null;
   const next = event.next as Record<string, unknown> | null;
   if (next === null) return null;
@@ -929,7 +971,7 @@ export interface BisectResult {
    * for convenience so callers don't have to re-index. Set when
    * `kind === 'found'`; undefined otherwise.
    */
-  firstFailingFrame?: TimelineFrame;
+  firstFailingFrame?: SerializedFrame;
   /**
    * Number of midpoints evaluated. O(log N) where N = frame count.
    */
@@ -1229,7 +1271,7 @@ export interface TimelineDiff {
  * that secondary key.
  */
 function eventBucketKey(
-  ev: ObservationEvent,
+  ev: SerializedFrame["event"],
 ):
   | { kind: "constraint"; id: string }
   | { kind: "mutation"; mutationKind: string }
@@ -1302,7 +1344,7 @@ interface BucketedCounts {
 
 function bucketCounts(
   side: "a" | "b",
-  frames: TimelineFrame[],
+  frames: SerializedFrame[],
 ): BucketedCounts {
   const out: BucketedCounts = {
     constraintFires: new Map(),

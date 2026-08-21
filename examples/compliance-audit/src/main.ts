@@ -291,7 +291,7 @@ function renderLedgerEntry(e: AuditEntry): string {
         <span class="ts">${ts}</span>
         <span class="seq">#${e.seq}</span>
         <span class="kind">fact</span>
-        <span>${escapeHtml(e.key)}: ${escapeHtml(JSON.stringify(e.prior))} → ${escapeHtml(JSON.stringify(e.next))}</span>
+        <span>${escapeHtml(e.key)}: ${escapeHtml(JSON.stringify(e.prior))} → ${escapeHtml(JSON.stringify(e.next))}${e.origin === "authored" ? "" : ` <em>(${escapeHtml(e.origin)})</em>`}</span>
       </div>`;
     case "resolver.complete":
       return `<div class="entry">
@@ -423,11 +423,17 @@ function onTamper(): void {
   const idx = Math.floor(cloned.entries.length / 2);
   const target = cloned.entries[idx] as { kind: string; seq: number };
   const originalKind = target.kind;
-  target.kind = "fact.change"; // wrong kind
+  // Derived from the kind that is there, so the swap is always a real edit.
+  // Writing a literal "fact.change" went inert whenever the chosen entry was
+  // already one — and most entries are, now that batched writes are recorded.
+  // The demo would then report "tampered" while having changed nothing, and
+  // VERIFY would correctly say the chain was intact.
+  target.kind =
+    originalKind === "fact.change" ? "constraint.evaluate" : "fact.change";
   tamperedClone = cloned;
   setVerifyStatus(
     "warn",
-    `Tamper simulated on a CLONE of entry #${target.seq} (was kind=${originalKind}, now kind=fact.change). The live ledger is untouched — entries are frozen at write time. Click VERIFY to see what an auditor would see if the persisted bytes had been swapped.`,
+    `Tamper simulated on a CLONE of entry #${target.seq} (was kind=${originalKind}, now kind=${target.kind}). The live ledger is untouched — entries are frozen at write time. Click VERIFY to see what an auditor would see if the persisted bytes had been swapped.`,
   );
   renderLedger();
 }
@@ -450,6 +456,12 @@ function verifyClone(clone: {
   // the clone.
   const entries = clone.entries;
   if (entries.length === 0) return { valid: true, entryCount: 0 };
+  // Start from the surviving window, as core's verify() does. A bounded sink
+  // drops its oldest entries once full, so the first entry here is not
+  // necessarily the first entry ever written and its prevHash points at
+  // something that is gone. Walking from the genesis hash regardless makes a
+  // healthy rotated ledger report itself tampered.
+  const windowStart = entries[0]!.seq > 0 ? entries[0]!.prevHash : null;
   // Minimal djb2 reimpl over stable-stringify-shaped JSON — matches the
   // core implementation closely enough for the demo verdict.
   const stableStringify = (v: unknown): string => {
@@ -466,7 +478,7 @@ function verifyClone(clone: {
     }
     return (h >>> 0).toString(16).padStart(8, "0");
   };
-  let prevHash: string | null = null;
+  let prevHash: string | null = windowStart;
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]!;
     if (e.prevHash !== prevHash) {

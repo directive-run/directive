@@ -272,6 +272,18 @@ const unsub = system.observe((event: ObservationEvent) => {
   if (event.type === "fact.change") console.log(event.key, event.prev, "→", event.next);
 });
 
+// Every fact.change carries an `origin`: "authored" (your program made the
+// write), "restore" (a history navigation replayed it) or "hydrate"
+// (initialFacts / hydrate / system.restore loaded stored state). It is stamped
+// at the write, so a batch holding writes of more than one origin reports each
+// correctly. It is NOT an authenticity signal — "authored" only means the write
+// did not arrive through a replay or hydration door.
+system.observe((event) => {
+  if (event.type === "fact.change" && event.origin === "authored") {
+    console.log("the program wrote", event.key);
+  }
+});
+
 // 23 event types: fact.change, constraint.evaluate/error,
 // requirement.created/met/canceled, resolver.start/complete/error/write.rejected,
 // effect.run/error, derivation.compute,

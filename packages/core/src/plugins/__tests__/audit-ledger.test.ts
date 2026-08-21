@@ -301,8 +301,18 @@ describe("createAuditLedger — hash chain integrity", () => {
     // Now tell the sink wrapper to mutate entry[1].kind on the next
     // toJSON() call. verify() pulls entries via toJSON, so this models
     // persisted-bytes tampering visible to the verifier.
+    // Derive the tampered value from the one that is there, so the swap is
+    // always a real edit. This wrote a literal `"fact.change"` and went inert
+    // the day entry[1] became a `fact.change` of its own accord — the test
+    // then passed by tampering with nothing, which is the failure mode a
+    // tamper-detection test can least afford.
     swap = (entries) => {
-      if (entries[1]) (entries[1] as { kind: string }).kind = "fact.change";
+      const target = entries[1] as { kind: string } | undefined;
+      if (!target) throw new Error("fixture: no entry at index 1 to tamper");
+      const before = target.kind;
+      target.kind =
+        before === "fact.change" ? "constraint.evaluate" : "fact.change";
+      expect(target.kind).not.toBe(before);
     };
 
     const after = ledger.verify();
@@ -440,12 +450,22 @@ describe("createAuditLedger — PII redaction", () => {
 
     const emailEntries = ledger.forFact("email");
     expect(emailEntries.length).toBeGreaterThan(0);
+    let sawAPrior = false;
     for (const e of emailEntries) {
-      if (e.kind === "fact.change") {
-        expect(e.next).toBe("[redacted]");
+      if (e.kind !== "fact.change") continue;
+      expect(e.next).toBe("[redacted]");
+      // A value that was never there is not redacted into existence. The
+      // first write of a key has no prior at all, and recording
+      // `"[redacted]"` for it asserted a previous value the fact never held.
+      if ("prior" in e && e.prior !== undefined) {
         expect(e.prior).toBe("[redacted]");
+        sawAPrior = true;
       }
     }
+    expect(sawAPrior).toBe(true);
+    const firstWrite = emailEntries.at(-1);
+    expect(firstWrite?.kind).toBe("fact.change");
+    expect((firstWrite as { prior?: unknown }).prior).toBeUndefined();
 
     // Non-PII facts NOT redacted
     const publicEntries = ledger.forFact("public");
@@ -819,7 +839,7 @@ describe("createAuditLedger — per-subject erase()", () => {
     system.destroy();
   });
 
-  it("verify() throws on unknown hashAlgo discriminator", () => {
+  it("verify() reports an unknown hashAlgo rather than throwing", () => {
     const sink = memorySink();
     // Genesis entry with a bogus hashAlgo.
     sink.write({
@@ -834,7 +854,14 @@ describe("createAuditLedger — per-subject erase()", () => {
     } as AuditEntry);
 
     const ledger = createAuditLedger({ sink });
-    expect(() => ledger.verify()).toThrow(/unknown hashAlgo/i);
+    // It used to throw. An auditor asking whether a record is intact should
+    // get an answer — and one row written under an algorithm this version does
+    // not know is a reason to say no, not a reason to say nothing.
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(false);
+    if (!verdict.valid) {
+      expect(verdict.reason).toMatch(/unknown hashAlgo/i);
+    }
   });
 
   it("erase marker uses filterHash + filterShape — no raw PII", async () => {
@@ -1134,7 +1161,7 @@ describe("createAuditLedger — hashAlgo canonicalization tag", () => {
 // ============================================================================
 
 describe("createAuditLedger — schemaVersion", () => {
-  it("stamps schemaVersion: 1 on every entry", async () => {
+  it("stamps the current schemaVersion on every entry", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -1148,7 +1175,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const entries = ledger.query();
     expect(entries.length).toBeGreaterThan(0);
     for (const e of entries) {
-      expect((e as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((e as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();
@@ -1170,7 +1197,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const tombstones = ledger.query({ kind: "system.entry-erased" });
     expect(tombstones.length).toBeGreaterThan(0);
     for (const t of tombstones) {
-      expect((t as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((t as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();
@@ -1211,16 +1238,25 @@ describe("createAuditLedger — N7 tombstone forgery detection", () => {
       schemaVersion: 1,
       originalKind: "fact.change",
       erasedAt: Date.now(),
-      // NOTE: no `__internal` sentinel — sink consumers cannot reach
-      // the in-module symbol.
+      // NOTE: not written through `ledger.erase()`, so the runtime has no
+      // record of having minted it.
     } as unknown as AuditEntry);
 
     const after = ledger.verify();
-    expect(after.valid).toBe(false);
-    if (!after.valid) {
-      expect(after.reason).toBeDefined();
-      expect(after.reason).toMatch(/tombstone forgery/i);
-      expect(after.reason).toMatch(/sentinel/i);
+    // Named rather than rejected. This used to return `valid: false`, and
+    // that was changed deliberately: the mark saying "the runtime wrote this"
+    // lives in memory against the entry object and does not survive being
+    // stored, so an honest ledger looks identical to a forged one as soon as
+    // its entries have been anywhere. Deciding the verdict on it accused a
+    // live ledger over any persisting sink of forging its own erasures, and
+    // accused a ledger resumed from an export the moment it wrote anything.
+    //
+    // Tampering with an entry's contents still breaks the chain and still
+    // returns `valid: false`. This is the narrower claim that an appended
+    // tombstone cannot be told apart from a recorded one.
+    expect(after.valid).toBe(true);
+    if (after.valid) {
+      expect(after.unmarkedTombstoneSeqs).toContain(99);
     }
 
     system.destroy();
