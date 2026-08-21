@@ -11,6 +11,7 @@
 import type {
   DistributableSnapshot,
   DistributableSnapshotOptions,
+  FactChange,
   ModuleSchema,
   Requirement,
   SystemInspection,
@@ -668,15 +669,36 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
   }
 
   // Create tracking plugin to notify main thread
+  const mirrorFactChange = (key: string, value: unknown, prev: unknown) => {
+    postMessage({
+      type: "FACT_CHANGED",
+      key,
+      value,
+      prev,
+    } satisfies WorkerOutboundMessage);
+  };
+
   const trackingPlugin = {
     name: "__worker-tracking__",
-    onFactSet: (key: string, value: unknown, prev: unknown) => {
-      postMessage({
-        type: "FACT_CHANGED",
-        key,
-        value,
-        prev,
-      } satisfies WorkerOutboundMessage);
+    onFactSet: mirrorFactChange,
+    // Batched writes reach a different hook, and this message is the only path
+    // a fact value has across the boundary — there is no wholesale sync behind
+    // it. Watching only the unbatched hook meant the main thread missed every
+    // write an event handler made, which is most of them, and its view drifted
+    // from the worker's with nothing reporting it.
+    //
+    // Derived values are not gated the same way, so the mirror could be told a
+    // computed value changed while never being told the fact it is computed
+    // from had — two numbers on screen that contradict each other, both
+    // delivered by a healthy-looking channel.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        mirrorFactChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
     },
     onDerivationCompute: (id: string, value: unknown) => {
       postMessage({

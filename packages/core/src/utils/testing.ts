@@ -13,6 +13,7 @@ import { createSystem } from "../core/system.js";
 import type {
   CreateSystemOptionsNamed,
   CreateSystemOptionsSingle,
+  FactChange,
   ModuleDef,
   ModuleSchema,
   ModulesMap,
@@ -709,17 +710,39 @@ function createTestSystemSingle<S extends ModuleSchema>(
   };
 
   // Create tracking plugin
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    factsHistory.push({
+      key: fullKey,
+      fullKey,
+      namespace: undefined,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+  };
+
   const trackingPlugin = {
     name: "__test-tracking__",
-    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-      factsHistory.push({
-        key: fullKey,
-        fullKey,
-        namespace: undefined,
-        previousValue,
-        newValue: value,
-        timestamp: Date.now(),
-      });
+    onFactSet: recordChange,
+    // Batched writes reach a different hook, and nearly every write is batched:
+    // event handlers, effects, resolvers before their first `await`, the
+    // opening state and every history navigation. Watching only the unbatched
+    // hook meant a fact that changed four times was reported as having changed
+    // once, so `assertFactChanges(key, 1)` passed for it — an assertion that a
+    // value did not change, passing for a value that did, inside the tooling
+    // written to catch exactly that.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
     },
     onRequirementCreated: (requirement: RequirementWithId) => {
       allRequirements.push(requirement);
@@ -872,35 +895,53 @@ function createTestSystemNamed<Modules extends ModulesMap>(
   const moduleNamespaces = new Set(Object.keys(options.modules));
 
   // Create tracking plugin
-  const trackingPlugin = {
-    name: "__test-tracking__",
-    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-      // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
-      const SEPARATOR = "::";
-      const sepIndex = fullKey.indexOf(SEPARATOR);
-      let namespace: string | undefined;
-      let key: string;
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
+    const SEPARATOR = "::";
+    const sepIndex = fullKey.indexOf(SEPARATOR);
+    let namespace: string | undefined;
+    let key: string;
 
-      if (sepIndex > 0) {
-        const possibleNamespace = fullKey.substring(0, sepIndex);
-        if (moduleNamespaces.has(possibleNamespace)) {
-          namespace = possibleNamespace;
-          key = fullKey.substring(sepIndex + SEPARATOR.length);
-        } else {
-          key = fullKey;
-        }
+    if (sepIndex > 0) {
+      const possibleNamespace = fullKey.substring(0, sepIndex);
+      if (moduleNamespaces.has(possibleNamespace)) {
+        namespace = possibleNamespace;
+        key = fullKey.substring(sepIndex + SEPARATOR.length);
       } else {
         key = fullKey;
       }
+    } else {
+      key = fullKey;
+    }
 
-      factsHistory.push({
-        key,
-        fullKey,
-        namespace,
-        previousValue,
-        newValue: value,
-        timestamp: Date.now(),
-      });
+    factsHistory.push({
+      key,
+      fullKey,
+      namespace,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+  };
+
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: recordChange,
+    // See the single-module tracker above: nearly every write is batched, and
+    // watching only the unbatched hook under-reports how many times a fact
+    // changed.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
     },
     onRequirementCreated: (requirement: RequirementWithId) => {
       allRequirements.push(requirement);
