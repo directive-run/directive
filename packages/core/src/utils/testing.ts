@@ -13,6 +13,7 @@ import { createSystem } from "../core/system.js";
 import type {
   CreateSystemOptionsNamed,
   CreateSystemOptionsSingle,
+  FactChange,
   ModuleDef,
   ModuleSchema,
   ModulesMap,
@@ -613,6 +614,17 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
   };
   /** Additional plugins (tracking plugin is added automatically) */
   plugins?: any[];
+  /**
+   * How many fact changes to keep (default 10,000).
+   *
+   * The log holds a reference to the value before and after every change, so
+   * it pins every intermediate object a test produces. Now that batched writes
+   * are recorded that is nearly every write, and a handler writing in a loop
+   * can retain a lot: twenty thousand writes measured at fourteen megabytes.
+   * Oldest are dropped first, with a warning — a silently truncated log would
+   * fail an exact-count assertion for a reason nothing explains.
+   */
+  maxFactsHistory?: number;
 }
 
 /**
@@ -630,6 +642,17 @@ export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
   };
   /** Additional plugins (tracking plugin is added automatically) */
   plugins?: any[];
+  /**
+   * How many fact changes to keep (default 10,000).
+   *
+   * The log holds a reference to the value before and after every change, so
+   * it pins every intermediate object a test produces. Now that batched writes
+   * are recorded that is nearly every write, and a handler writing in a loop
+   * can retain a lot: twenty thousand writes measured at fourteen megabytes.
+   * Oldest are dropped first, with a warning — a silently truncated log would
+   * fail an exact-count assertion for a reason nothing explains.
+   */
+  maxFactsHistory?: number;
 }
 
 /**
@@ -660,6 +683,28 @@ export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
  *
  * @public
  */
+/** Default number of fact changes a test system keeps. */
+const DEFAULT_MAX_FACTS_HISTORY = 10_000;
+
+/**
+ * Drop the oldest records once the log is over its cap, saying so once.
+ *
+ * A test that asserts an exact count against a silently truncated log fails
+ * for a reason nothing on screen explains, so the truncation announces itself.
+ */
+function capFactsHistory(history: FactChangeRecord[], max: number): void {
+  if (history.length <= max) return;
+  if (!warnedAboutFactsHistory.has(history)) {
+    warnedAboutFactsHistory.add(history);
+    console.warn(
+      `[Directive] createTestSystem: kept the most recent ${max} fact changes and dropped older ones. Counts from assertFactChanges() and getFactsHistory() are truncated. Raise \`maxFactsHistory\` if the whole run matters.`,
+    );
+  }
+  history.splice(0, history.length - max);
+}
+
+const warnedAboutFactsHistory = new WeakSet<object>();
+
 export function createTestSystem<S extends ModuleSchema>(
   options: CreateTestSystemOptionsSingle<S>,
 ): TestSystemSingle<S>;
@@ -687,6 +732,7 @@ function createTestSystemSingle<S extends ModuleSchema>(
   const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
   const resolverCalls = new Map<string, Requirement[]>();
   const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
   const factsHistory: FactChangeRecord[] = [];
 
   // Create mock resolvers
@@ -709,17 +755,40 @@ function createTestSystemSingle<S extends ModuleSchema>(
   };
 
   // Create tracking plugin
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    factsHistory.push({
+      key: fullKey,
+      fullKey,
+      namespace: undefined,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+    capFactsHistory(factsHistory, maxFactsHistory);
+  };
+
   const trackingPlugin = {
     name: "__test-tracking__",
-    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-      factsHistory.push({
-        key: fullKey,
-        fullKey,
-        namespace: undefined,
-        previousValue,
-        newValue: value,
-        timestamp: Date.now(),
-      });
+    onFactSet: recordChange,
+    // Batched writes reach a different hook, and nearly every write is batched:
+    // event handlers, effects, resolvers before their first `await`, the
+    // opening state and every history navigation. Watching only the unbatched
+    // hook meant a fact that changed four times was reported as having changed
+    // once, so `assertFactChanges(key, 1)` passed for it — an assertion that a
+    // value did not change, passing for a value that did, inside the tooling
+    // written to catch exactly that.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
     },
     onRequirementCreated: (requirement: RequirementWithId) => {
       allRequirements.push(requirement);
@@ -844,6 +913,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
   const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
   const resolverCalls = new Map<string, Requirement[]>();
   const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
   const factsHistory: FactChangeRecord[] = [];
 
   // Create mock resolvers
@@ -872,35 +942,66 @@ function createTestSystemNamed<Modules extends ModulesMap>(
   const moduleNamespaces = new Set(Object.keys(options.modules));
 
   // Create tracking plugin
-  const trackingPlugin = {
-    name: "__test-tracking__",
-    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-      // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
-      const SEPARATOR = "::";
-      const sepIndex = fullKey.indexOf(SEPARATOR);
-      let namespace: string | undefined;
-      let key: string;
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
+    const SEPARATOR = "::";
+    const sepIndex = fullKey.indexOf(SEPARATOR);
+    let namespace: string | undefined;
+    let key: string;
 
-      if (sepIndex > 0) {
-        const possibleNamespace = fullKey.substring(0, sepIndex);
-        if (moduleNamespaces.has(possibleNamespace)) {
-          namespace = possibleNamespace;
-          key = fullKey.substring(sepIndex + SEPARATOR.length);
-        } else {
-          key = fullKey;
-        }
+    if (sepIndex > 0) {
+      const possibleNamespace = fullKey.substring(0, sepIndex);
+      if (moduleNamespaces.has(possibleNamespace)) {
+        namespace = possibleNamespace;
+        key = fullKey.substring(sepIndex + SEPARATOR.length);
       } else {
         key = fullKey;
       }
+    } else {
+      key = fullKey;
+    }
 
-      factsHistory.push({
-        key,
-        fullKey,
-        namespace,
-        previousValue,
-        newValue: value,
-        timestamp: Date.now(),
-      });
+    factsHistory.push({
+      key,
+      fullKey,
+      namespace,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+    capFactsHistory(factsHistory, maxFactsHistory);
+  };
+
+  /**
+   * Records for a key, by its short name or its namespaced one.
+   *
+   * Matching only the short name meant two modules with a fact of the same
+   * name shared a count, and the namespaced name that would have told them
+   * apart matched nothing at all. It began failing the moment every module's
+   * own opening write started being recorded: a two-module system reported a
+   * fact as having changed twice before anything ran.
+   */
+  const matching = (key: string) =>
+    factsHistory.filter((c) => c.key === key || c.fullKey === key);
+
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: recordChange,
+    // See the single-module tracker above: nearly every write is batched, and
+    // watching only the unbatched hook under-reports how many times a fact
+    // changed.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
     },
     onRequirementCreated: (requirement: RequirementWithId) => {
       allRequirements.push(requirement);
@@ -991,7 +1092,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
     },
 
     assertFactSet(key: string, value?: unknown): void {
-      const changes = factsHistory.filter((c) => c.key === key);
+      const changes = matching(key);
       if (changes.length === 0) {
         throw new Error(
           `[Directive] Expected fact "${key}" to be set but it was not`,
@@ -1011,7 +1112,7 @@ function createTestSystemNamed<Modules extends ModulesMap>(
     },
 
     assertFactChanges(key: string, times: number): void {
-      const changes = factsHistory.filter((c) => c.key === key);
+      const changes = matching(key);
       if (changes.length !== times) {
         throw new Error(
           `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,

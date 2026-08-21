@@ -11,6 +11,7 @@
 import type {
   DistributableSnapshot,
   DistributableSnapshotOptions,
+  FactChange,
   ModuleSchema,
   Requirement,
   SystemInspection,
@@ -668,15 +669,54 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
   }
 
   // Create tracking plugin to notify main thread
+  const mirrorFactChange = (key: string, value: unknown, prev: unknown) => {
+    postMessage({
+      type: "FACT_CHANGED",
+      key,
+      value,
+      prev,
+    } satisfies WorkerOutboundMessage);
+  };
+
   const trackingPlugin = {
     name: "__worker-tracking__",
-    onFactSet: (key: string, value: unknown, prev: unknown) => {
-      postMessage({
-        type: "FACT_CHANGED",
-        key,
-        value,
-        prev,
-      } satisfies WorkerOutboundMessage);
+    onFactSet: mirrorFactChange,
+    // Batched writes reach a different hook, and this message is the only path
+    // a fact value has across the boundary — there is no wholesale sync behind
+    // it. Watching only the unbatched hook meant the main thread missed every
+    // write an event handler made, which is most of them, and its view drifted
+    // from the worker's with nothing reporting it.
+    //
+    // Derived values are not gated the same way, so the mirror could be told a
+    // computed value changed while never being told the fact it is computed
+    // from had — two numbers on screen that contradict each other, both
+    // delivered by a healthy-looking channel.
+    onFactsBatch: (changes: FactChange[]) => {
+      // Coalesced per run of consecutive writes to a key, the same way the
+      // observation stream does it, because this is the same problem and two
+      // policies for one stream is how the original defect happened.
+      //
+      // Every message here is a structured clone across a thread boundary and
+      // a render on the other side. A handler writing one key a thousand times
+      // in a batch would post a thousand of them carrying nine hundred and
+      // ninety-nine values the main thread can never observe — it only ever
+      // sees the last. Cut at a change of key so the pairs still chain.
+      let open: { key: string; value: unknown; prev: unknown } | null = null;
+      const flushOpen = () => {
+        if (open === null) return;
+        mirrorFactChange(open.key, open.value, open.prev);
+        open = null;
+      };
+      for (const change of changes) {
+        const value = change.type === "delete" ? undefined : change.value;
+        if (open !== null && open.key === change.key) {
+          open.value = value;
+          continue;
+        }
+        flushOpen();
+        open = { key: change.key, value, prev: change.prev };
+      }
+      flushOpen();
     },
     onDerivationCompute: (id: string, value: unknown) => {
       postMessage({
