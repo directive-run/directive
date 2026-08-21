@@ -135,10 +135,40 @@ export function freezeEntry(entry: AuditEntry): AuditEntry {
 // Crypto). It throws today — there is no silent fallback. v1 ships sync
 // djb2 only.
 
+/**
+ * Drop every key whose value is `undefined`, at every depth.
+ *
+ * The canonical stringifier renders a present-but-undefined key; JSON drops
+ * it. So an entry carrying one hashed differently live than after an export,
+ * and anyone checking an exported trail was told it had been altered — by the
+ * tool whose whole job is to answer that question.
+ *
+ * That has now been true of three separate fields: the first write of a fact
+ * having no prior, a marker's provenance stamp, and the shape recorded for an
+ * erasure filter, which nests. It kept coming back because each fix removed
+ * one field rather than the disagreement, so this normalises what is hashed
+ * to what an export can carry, once, for everything.
+ */
+function asExported(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return value;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => asExported(item, seen));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item === undefined) continue;
+    out[key] = asExported(item, seen);
+  }
+
+  return out;
+}
+
 function syncHash(entry: AuditEntry): string {
   // stableStringify guarantees same hash across runtimes regardless of
   // key insertion order (architecture review #11, security review C1).
-  return hashObject(entry);
+  return hashObject(asExported(entry));
 }
 
 /**

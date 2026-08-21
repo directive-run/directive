@@ -78,11 +78,16 @@ against the values `origin` can hold before any of it is copied into the
 permanent, frozen marker — a filter can arrive from a request body, and that
 marker is the record of the erasure.
 
-`verify()` also reports two things it used to pass over in silence:
-`missingSeqs`, for an entry the sink refused — the chain closes over it so one
-failure does not condemn the whole record, but the gap is named — and
-`marksChecked: false` on a ledger reloaded from an export, whose tombstones and
-truncation markers cannot have their provenance checked at all.
+`verify()` also reports two things it used to pass over in silence.
+`missingSeqCount` and `missingSeqs` name a gap left by an entry the sink
+refused — the chain closes over one so a single failure does not condemn the
+whole record, but the gap is no longer silent. And `marksChecked` says whether
+the provenance of erasure tombstones and truncation markers could be checked at
+all: the runtime records which entries it wrote in memory, off the entries
+themselves, so a ledger reloaded from an export reports `false`, as does any
+sink that does not hand back the same object it was given. It is always present
+rather than optional, because a caller checking `valid` alone should not be able
+to miss it.
 
 None of this makes the in-memory sink evidentiary. The chain is unkeyed, so
 anyone who can reach the buffer can recompute it; it detects accident and

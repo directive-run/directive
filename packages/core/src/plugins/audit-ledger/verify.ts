@@ -13,11 +13,20 @@
  */
 
 import { hashForEntry, isInternal } from "./hash.js";
+
+/**
+ * How many absent seq numbers `verify()` will name individually. The count is
+ * always exact; the list is a sample, because the input to a verification is
+ * often a file from somewhere else and a number in it should not decide how
+ * much memory this allocates.
+ */
+const MAX_LISTED_MISSING_SEQS = 100;
 import type { AuditEntry, AuditLedgerSink, VerifyResult } from "./types.js";
 
 export function verify(
   sink: AuditLedgerSink,
   opts?: { strong?: boolean },
+  ledgerHasMinted?: boolean,
 ): VerifyResult {
   // v1 ships sync djb2 only. Strong (SHA-256) verify is
   // reserved for v2 and must NOT silently no-op — the previous
@@ -31,7 +40,11 @@ export function verify(
 
   const { entries } = sink.toJSON();
   if (entries.length === 0) {
-    return { valid: true, entryCount: 0 };
+    return {
+      valid: true,
+      entryCount: 0,
+      marksChecked: ledgerHasMinted === true,
+    };
   }
 
   // Sync walk — catches anything the djb2 chain would see.
@@ -59,13 +72,19 @@ export function verify(
   // tombstones forged on that basis would report every exported ledger as
   // tampered, which is what an export is for.
   //
-  // So the rule is comparative: if anything here bears a mark, this is a live
-  // ledger and an unmarked tombstone among marked ones is a forgery. If
-  // nothing does, this is a copy, and their provenance cannot be checked at
-  // all. That is a real limit of an unkeyed scheme rather than a gap in the
-  // implementation — an attacker can always present a forgery as a copy —
-  // and `verify()` says so through `marksChecked` rather than guessing.
-  const marksAreMeaningful = entries.some((e) => isInternal(e));
+  // So the question is whether THIS ledger has written anything, not whether
+  // these entries bear marks. A ledger that has minted entries checks them; a
+  // reader built over a reloaded export has minted none and reports that it
+  // could not check.
+  //
+  // Asking the entries instead had a hole: `clear()` empties the sink without
+  // making the ledger any less live, so a forged tombstone written afterwards
+  // sat among no marks at all and was read as a copy. That is a real limit of
+  // an unkeyed scheme rather than a gap in the implementation — an attacker
+  // can always present a forgery as a copy — but it should take more than
+  // calling a public method.
+  const marksAreMeaningful =
+    ledgerHasMinted ?? entries.some((e) => isInternal(e));
 
   // Seqs that are not here and that nothing accounts for.
   //
@@ -75,6 +94,7 @@ export function verify(
   // the verdict says nothing. The gap is reported rather than made fatal —
   // it is a lost write, not evidence of tampering.
   const missingSeqs: number[] = [];
+  let missingSeqCount = 0;
 
   const erasedSeqsSet = new Set<number>();
 
@@ -123,7 +143,19 @@ export function verify(
     const entry = entries[i]!;
     const previous = i > 0 ? entries[i - 1] : undefined;
     if (previous !== undefined && entry.seq > previous.seq + 1) {
-      for (let gap = previous.seq + 1; gap < entry.seq; gap++) {
+      // Counted in full, listed up to a bound.
+      //
+      // `verify()` is the forensics path, and its input is routinely a file
+      // someone handed you. Enumerating every absent seq meant one row
+      // claiming a large one allocated an entry per number: at 2^31 the
+      // verifier threw `RangeError` instead of returning a verdict, which
+      // hands an attacker a way to stop the check running at all.
+      missingSeqCount += entry.seq - previous.seq - 1;
+      for (
+        let gap = previous.seq + 1;
+        gap < entry.seq && missingSeqs.length < MAX_LISTED_MISSING_SEQS;
+        gap++
+      ) {
         missingSeqs.push(gap);
       }
     }
@@ -185,21 +217,22 @@ export function verify(
     erasedSeqs?: number[];
     windowStartSeq?: number;
     truncationExplained?: boolean;
-    marksChecked?: boolean;
+    marksChecked: boolean;
     missingSeqs?: number[];
+    missingSeqCount?: number;
   } = {
     valid: true,
     entryCount: entries.length,
+    marksChecked: marksAreMeaningful,
   };
   if (erasedSeqsSet.size > 0) {
     result.erasedSeqs = [...erasedSeqsSet].sort((a, b) => a - b);
   }
-  if (missingSeqs.length > 0) {
+  if (missingSeqCount > 0) {
     result.missingSeqs = missingSeqs;
+    result.missingSeqCount = missingSeqCount;
   }
-  if (!marksAreMeaningful) {
-    result.marksChecked = false;
-  }
+
   if (windowStartSeq !== undefined) {
     result.windowStartSeq = windowStartSeq;
     result.truncationExplained = truncationExplained === true;

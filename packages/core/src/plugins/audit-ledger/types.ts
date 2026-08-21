@@ -383,19 +383,24 @@ export type VerifyResult =
        */
       truncationExplained?: boolean;
       /**
-       * Present, and `false`, when none of these entries bear the runtime's
-       * mint mark — which is what a ledger reloaded from an export looks like,
-       * because the mark is held in memory and does not serialise.
+       * Whether the provenance of erasure tombstones and truncation markers
+       * could be checked.
        *
-       * The chain itself was still checked. What could not be checked is
-       * whether the erasure tombstones and truncation markers in it were
-       * written by the runtime or appended by someone. On a live ledger this
-       * field is absent and those are checked.
+       * The runtime records which entries it wrote, in memory and off the
+       * entries themselves — so the record does not survive serialisation. A
+       * ledger reloaded from an export reports `false`, and so does any sink
+       * that does not hand back the same object it was given, which includes
+       * most durable ones.
        *
-       * Absent on a live ledger. An unkeyed chain cannot do better: an
-       * attacker can always present a forgery as a copy.
+       * `false` does not mean tampering. The chain is still checked; what is
+       * not is whether those two kinds — the two `verify()` treats as
+       * legitimate chain breaks — came from the runtime or were appended.
+       *
+       * Always present, because a caller checking `valid` alone should not be
+       * able to miss it. An unkeyed chain cannot do better than reporting
+       * this: an attacker can always present a forgery as a copy.
        */
-      marksChecked?: boolean;
+      marksChecked: boolean;
       /**
        * Seq numbers that are absent from the middle of the chain and that
        * nothing accounts for — an entry the sink refused, most likely.
@@ -410,6 +415,13 @@ export type VerifyResult =
        * see `windowStartSeq`.
        */
       missingSeqs?: number[];
+      /**
+       * How many seq numbers are missing in total. Always exact.
+       * {@link missingSeqs} lists at most the first hundred of them — the
+       * input to a verification is often a file from elsewhere, and a number
+       * in it should not decide how much memory the check allocates.
+       */
+      missingSeqCount?: number;
     }
   | {
       valid: false;

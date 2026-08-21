@@ -45,7 +45,7 @@ export interface Changeset {
  * @remarks
  * - `takeSnapshot(trigger)` records the current facts into the ring buffer.
  * - `restore(snapshot)` deserializes a snapshot back into the facts store,
- *   setting `isRestoring = true` so the engine skips reconciliation.
+ *   marking itself as restoring for the duration.
  * - `pause()` / `resume()` temporarily suspend snapshot recording (e.g.,
  *   during bulk imports or programmatic state resets).
  * - `beginChangeset(label)` / `endChangeset()` group consecutive snapshots
@@ -63,7 +63,17 @@ export interface HistoryManager<_S extends Schema> extends HistoryAPI {
   restore(snapshot: Snapshot): void;
   /** Check if history is enabled */
   readonly isEnabled: boolean;
-  /** True while restoring a snapshot (engine should skip reconciliation) */
+  /**
+   * True while a snapshot is being restored.
+   *
+   * Informational. The engine does not read it: whether a write reconciles,
+   * and whether the pass it schedules is safe to snapshot or to re-evaluate
+   * gated sources with, are decided per write from the scope the manager runs
+   * its own assignments in. A flag covering the whole navigation answered for
+   * writes that were not the manager's — a listener reacting to a rewind is
+   * doing the program's own work — and it was still up during the flush where
+   * those reactions run.
+   */
   readonly isRestoring: boolean;
   /** Pause snapshot taking */
   pause(): void;

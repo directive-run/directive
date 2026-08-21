@@ -668,18 +668,33 @@ export function createEngine<S extends Schema>(
   let navigationDepth = 0;
 
   /**
-   * The keys written while a navigation was in flight, awaiting their pass.
+   * Writes made since the last pass, counted by where they came from.
    *
-   * Per key rather than a flag for the pass, because writes coalesce: an
-   * ordinary write landing in the same microtask as a navigation reaction was
-   * losing its snapshot and its gate evaluation along with it, permanently. A
-   * flag also had no owner — set when no pass was scheduled, it survived to be
-   * consumed by an unrelated later one, which is how a gate closing on a
-   * downgrade could be skipped and stay open.
+   * Counted rather than recorded by key. The first version kept a set of keys,
+   * and a key is not what needs identity here — a write is. Two writes to the
+   * same key in one pass, one from a navigation reaction and one ordinary,
+   * collapsed to a single entry in that set and the pass took whichever
+   * answer the set happened to hold. Both orders were wrong: a permission
+   * revoked on a key a rewind had touched kept its transport open, and an
+   * ordinary write sharing a key with a rewind lost its snapshot.
    *
-   * Cleared with `changedKeys`, so the two always describe the same pass.
+   * A pass suppresses the navigation-unsafe work only when every write in it
+   * came from a navigation. One ordinary write is enough to require a snapshot
+   * and a gate evaluation, because failing to do either cannot be undone: the
+   * snapshot is simply not taken, and a quiescent system may never schedule
+   * another pass to attach the transport.
+   *
+   * Reset with `changedKeys`, and on stop and start — a navigation performed
+   * while the system is not running records writes that no pass will consume,
+   * and they would otherwise be counted against an unrelated later one.
    */
-  const navigationWrittenKeys = new Set<string>();
+  let navigationWrites = 0;
+  let ordinaryWrites = 0;
+
+  function resetNavigationRecord(): void {
+    navigationWrites = 0;
+    ordinaryWrites = 0;
+  }
 
   function withNavigation(fn: () => void): void {
     navigationDepth++;
@@ -694,9 +709,13 @@ export function createEngine<S extends Schema>(
    * Records, at write time, that this key was written during a navigation.
    * Returns whether it was.
    */
-  function noteWriteDuringNavigation(key: string): boolean {
-    if (navigationDepth === 0) return false;
-    navigationWrittenKeys.add(key);
+  function noteWrite(): boolean {
+    if (navigationDepth === 0) {
+      ordinaryWrites++;
+
+      return false;
+    }
+    navigationWrites++;
 
     return true;
   }
@@ -710,12 +729,7 @@ export function createEngine<S extends Schema>(
    * system may never schedule another pass to attach the transport.
    */
   function passIsEntirelyNavigation(): boolean {
-    if (state.changedKeys.size === 0) return false;
-    for (const key of state.changedKeys) {
-      if (!navigationWrittenKeys.has(key)) return false;
-    }
-
-    return true;
+    return navigationWrites > 0 && ordinaryWrites === 0;
   }
 
   /**
@@ -796,7 +810,7 @@ export function createEngine<S extends Schema>(
       // its pass went on to snapshot and re-attach — the two things a replay
       // must not do, reachable through `subscribe` calling `dispatch`, which
       // is as ordinary as this codebase gets.
-      const duringNavigation = noteWriteDuringNavigation(key as string);
+      const duringNavigation = noteWrite();
       // Direct fact mutations (outside event dispatch) always create snapshots
       // — unless a navigation is in flight, where a new snapshot would splice
       // away everything ahead of the point being rewound to.
@@ -844,8 +858,8 @@ export function createEngine<S extends Schema>(
       const authored = changes.filter((change) => change.origin !== "restore");
       if (authored.length === 0) return;
       let duringNavigation = false;
-      for (const change of authored) {
-        if (noteWriteDuringNavigation(change.key)) {
+      for (const _change of authored) {
+        if (noteWrite()) {
           duringNavigation = true;
         }
       }
@@ -1524,7 +1538,7 @@ export function createEngine<S extends Schema>(
       state.changedKeys.clear();
       // Same lifetime, so the record can never be consumed by a later pass
       // that has nothing to do with the navigation that set it.
-      navigationWrittenKeys.clear();
+      resetNavigationRecord();
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
       const currentRequirements =
@@ -2744,6 +2758,10 @@ export function createEngine<S extends Schema>(
       }
 
       state.isRunning = true;
+      // A navigation performed while the system was not running recorded
+      // writes that no pass ever consumed; they would otherwise be counted
+      // against the first unrelated pass after this.
+      resetNavigationRecord();
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -2831,6 +2849,7 @@ export function createEngine<S extends Schema>(
     stop(): void {
       if (!state.isRunning) return;
       state.isRunning = false;
+      resetNavigationRecord();
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -2894,6 +2913,7 @@ export function createEngine<S extends Schema>(
       // actually complete before the caller continues.
       if (!state.isRunning) return;
       state.isRunning = false;
+      resetNavigationRecord();
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;

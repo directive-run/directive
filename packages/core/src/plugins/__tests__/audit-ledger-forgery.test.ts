@@ -234,4 +234,94 @@ describe("the record under forgery", () => {
     system.destroy();
     ledger.destroy();
   });
+
+  it("does not let a redactor mint an entry kind of its choosing", () => {
+    // `redact` is documented as a place to scrub values. It ran on the way to
+    // being marked as this ledger's own, so a hook that rewrote `kind` could
+    // turn an ordinary record into an erasure tombstone and have the ledger
+    // vouch for it — `verify()` treats a tombstone as a legitimate chain
+    // break.
+    const ledger = createAuditLedger({
+      redact: (entry) =>
+        ({
+          ...entry,
+          kind: "system.entry-erased",
+          prevHash: "0000dead",
+        }) as AuditEntry,
+    });
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+    system.facts.n = 2;
+
+    const kinds = new Set(ledger.toJSON().entries.map((e) => e.kind));
+    expect(kinds.has("system.entry-erased")).toBe(false);
+    expect(ledger.verify().valid).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("treats a cleared ledger as live, not as a copy", () => {
+    // `clear()` empties the sink without making the ledger any less live. The
+    // mint check asked the entries rather than the ledger, so a forged
+    // tombstone written afterwards sat among no marks at all and was read as
+    // an unverifiable copy.
+    const sink = memorySink();
+    const ledger = createAuditLedger({ sink });
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+
+    ledger.clear();
+    sink.write({
+      kind: "system.entry-erased",
+      originalKind: "fact.change",
+      erasedAt: 0,
+      seq: 0,
+      ts: 0,
+      prevHash: "deadbeef",
+      hashAlgo: "djb2-1",
+      schemaVersion: 2,
+    } as unknown as AuditEntry);
+
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(false);
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("counts every missing seq but does not enumerate an unbounded range", () => {
+    // `verify()` is the forensics path and its input is routinely a file from
+    // elsewhere. Enumerating every absent seq meant one row claiming a large
+    // one allocated an entry per number — at 2^31 the verifier threw instead
+    // of returning a verdict, which is a way to stop the check running at all.
+    const sink = memorySink();
+    const reader = createAuditLedger({ sink });
+    sink.write({
+      kind: "system.start",
+      seq: 0,
+      ts: 0,
+      prevHash: null,
+      hashAlgo: "djb2-1",
+      schemaVersion: 2,
+    } as unknown as AuditEntry);
+    sink.write({
+      kind: "system.stop",
+      seq: 2 ** 31,
+      ts: 0,
+      prevHash: null,
+      hashAlgo: "djb2-1",
+      schemaVersion: 2,
+    } as unknown as AuditEntry);
+
+    const verdict = reader.verify();
+    if (verdict.valid) {
+      expect(verdict.missingSeqCount).toBe(2 ** 31 - 1);
+      expect(verdict.missingSeqs?.length).toBeLessThanOrEqual(100);
+    }
+
+    reader.destroy();
+  });
 });

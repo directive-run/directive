@@ -228,4 +228,160 @@ describe("a reactive write during a history navigation", () => {
 
     await system.stop();
   });
+
+  it("does not extend the exemption to a later write of the same key", async () => {
+    // The set records keys, not writes, and it is not cleared until the pass
+    // runs. So an ordinary write to a key a navigation reaction had touched
+    // inherited the exemption — and a permission revoked in the same
+    // microtask as a rewind left its transport attached. Failing open on a
+    // gate is the worst direction for this to be wrong in.
+    const events: string[] = [];
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), token: t.string() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.token = "";
+      },
+      sources: {
+        channel: {
+          active: (facts) => facts.token !== "",
+          attach: () => {
+            events.push("attach");
+
+            return () => {
+              events.push("detach");
+            };
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
+    await system.start();
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    system.facts.n = 1;
+    await settled();
+    system.facts.token = "t-live";
+    await settled();
+    system.facts.n = 2;
+    await settled();
+
+    // The transport is open before any rewind happens.
+    expect(events).toEqual(["attach"]);
+
+    // A listener that re-issues the token in reaction to any change, rewind
+    // included. Its write is correctly exempt; the question is whether the
+    // exemption sticks to the key afterwards.
+    const unsubscribe = system.subscribe(["n"], () => {
+      system.facts.token = `t-${system.facts.n}`;
+    });
+    system.history!.goBack();
+    await settled();
+
+    // Revocation, on the same key the reaction wrote.
+    system.facts.token = "";
+    await settled();
+    unsubscribe();
+
+    expect(system.facts.token).toBe("");
+    expect(events).toContain("detach");
+
+    await system.stop();
+  });
+
+  it("does not let a rewind reaction cover an ordinary write of the same key", async () => {
+    // The record used to be a set of keys. Two writes to one key in a single
+    // pass — one ordinary, one from a rewind reaction — collapsed into one
+    // entry, and the pass took whichever answer the set happened to hold, so
+    // the ordinary write lost its snapshot. A write is what needs identity
+    // here, not a key.
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), other: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.other = 0;
+      },
+    });
+    const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
+    await system.start();
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    for (let i = 1; i <= 4; i++) {
+      system.facts.n = i;
+      await settled();
+    }
+
+    const before = system.history!.snapshots.length;
+    const unsubscribe = system.subscribe(["n"], () => {
+      system.facts.other = 99;
+    });
+
+    // An ordinary write, then a rewind whose reaction writes the same key.
+    system.facts.other = 42;
+    system.history!.goBack();
+    await settled();
+    unsubscribe();
+
+    // The pass held an ordinary write, so it is not a navigation-only pass and
+    // the state it produced was captured.
+    expect(system.history!.snapshots.length).toBeGreaterThan(before - 1);
+    expect(system.facts.other).toBe(99);
+
+    await system.stop();
+  });
+
+  it("does not carry a navigation made while stopped into a later pass", async () => {
+    // Recording is cleared when a pass runs. A navigation performed while the
+    // system is not running schedules no pass, so its writes were counted
+    // against the first unrelated pass after the restart.
+    const events: string[] = [];
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), open: t.boolean() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.open = false;
+      },
+      sources: {
+        channel: {
+          active: (facts) => facts.open === true,
+          attach: () => {
+            events.push("attach");
+
+            return () => {
+              events.push("detach");
+            };
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
+    await system.start();
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    system.facts.n = 1;
+    await settled();
+    system.facts.n = 2;
+    await settled();
+
+    const unsubscribe = system.subscribe(["n"], () => {
+      system.facts.open = false;
+    });
+    await system.stop();
+    system.history!.goBack();
+    unsubscribe();
+    await system.start();
+
+    system.facts.open = true;
+    await settled();
+
+    expect(events).toContain("attach");
+
+    await system.stop();
+  });
 });

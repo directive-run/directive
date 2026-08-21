@@ -208,7 +208,11 @@ if (result.valid && result.windowStartSeq !== undefined) {
 }
 ```
 
-A verified window is a narrower claim than a verified chain: the entries present are intact and in order, and nothing is claimed about the ones that rotated out. Use the `system.truncated` markers to see what went. A gap anywhere *after* the window start still reports as a break – nothing legitimate removes an entry from between two that are still here without leaving a tombstone.
+A verified window is a narrower claim than a verified chain: the entries present are intact and in order, and nothing is claimed about the ones that rotated out. Use the `system.truncated` markers to see what went.
+
+A gap *after* the window start is reported rather than treated as a break – `missingSeqs` names up to a hundred of the absent seq numbers and `missingSeqCount` gives the exact total. The usual cause is a sink that refused an entry; the chain deliberately closes over one so a single failure does not condemn the whole record. Check `missingSeqCount` as well as `valid`, and set `onWriteError` if a lost entry is something you need to know about as it happens.
+
+`marksChecked` says whether the provenance of erasure tombstones and truncation markers could be checked at all. The runtime records which entries it wrote in memory, so a ledger reloaded from an export – and any sink that does not hand back the same object it was given – reports `false`. The chain is still checked; what is not is whether those two kinds were written by the runtime or appended by someone.
 
 **Erased entries appear as legitimate chain breaks.** When you call `ledger.erase()`, matching entries are replaced with `system.entry-erased` tombstones whose payloads differ from the original – the next entry's `prevHash` no longer matches. `verify()` recognises this pattern and reports the erased seqs on the valid arm:
 

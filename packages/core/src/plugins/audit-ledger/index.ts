@@ -147,6 +147,17 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
 
   let seq = 0;
   let lastHashCache: string | null = null; // Cache hash of last-written entry payload
+  /**
+   * Whether this ledger has written an entry of its own.
+   *
+   * `verify()` uses it to decide whether the mint marks mean anything: a
+   * ledger that has minted checks them, a reader built over a reloaded export
+   * reports that it could not. Asking the entries instead meant `clear()` gave
+   * a live ledger a copy's verdict.
+   */
+  let hasMinted = false;
+  /** True only while this ledger is inside its own `sink.write` call. */
+  let writingToSink = false;
 
   let system: System<ModuleSchema> | null = null;
   let unobserve: (() => void) | null = null;
@@ -380,6 +391,20 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     } as AuditEntry;
 
     const finalEntry = userRedact ? userRedact(entry) : entry;
+    if (finalEntry !== entry) {
+      // A redactor scrubs values. It does not get to say what kind of entry
+      // this is, where it sits in the chain, or which schema it claims —
+      // those are the fields `verify()` reasons over, and a hook that could
+      // rewrite them could turn an ordinary record into a tombstone and have
+      // the ledger vouch for it. Restored from the entry this module built.
+      Object.assign(finalEntry, {
+        kind: entry.kind,
+        seq: entry.seq,
+        prevHash: entry.prevHash,
+        hashAlgo: entry.hashAlgo,
+        schemaVersion: entry.schemaVersion,
+      });
+    }
     freezeEntry(finalEntry);
 
     // Sync hash of this entry — stashed as the next entry's prevHash.
@@ -402,11 +427,13 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     // Marking everything means a live ledger always has marks, and an unmarked
     // tombstone sitting among marked entries is exactly what a forgery is.
     markInternal(finalEntry);
+    hasMinted = true;
 
     const myHash = hashForEntry(finalEntry);
     const priorHash = lastHashCache;
     lastHashCache = myHash;
     try {
+      writingToSink = true;
       sink.write(finalEntry);
     } catch (error) {
       // The entry never landed, so nothing should chain to it. Left advanced,
@@ -424,6 +451,8 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
         lastHashCache = priorHash;
       }
       onWriteError(error, finalEntry);
+    } finally {
+      writingToSink = false;
     }
 
     return finalEntry;
@@ -603,6 +632,11 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     // sink accumulates anything dropped to make room for the marker itself and
     // reports it with the next one, so no drop goes uncounted.
     sink.onTruncate?.((droppedSeq, droppedCount) => {
+      // Only from inside this ledger's own write. The sink is supplied by the
+      // caller and keeps this callback, so without the check it can be called
+      // at any time to mint a marker the runtime vouches for — and `verify()`
+      // lets a marker account for a missing prefix.
+      if (!writingToSink) return;
       if (emittingTruncate) return;
       emittingTruncate = true;
       try {
@@ -702,7 +736,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       };
     },
     verify(opts?: { strong?: boolean }): VerifyResult {
-      return verifyChain(sink, opts);
+      return verifyChain(sink, opts, hasMinted);
     },
     erase(filter) {
       // Replace matching entries with tombstones IN PLACE, keeping
@@ -710,7 +744,21 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       const erasedAt = Date.now();
       let count = 0;
       if (typeof sink.erase === "function") {
+        // Which entries this erasure is entitled to replace, decided here
+        // rather than by whatever the sink chooses to hand back. The sink is
+        // supplied by the caller and the callback below mints marked
+        // tombstones at a chosen seq and prevHash, so without this the sink
+        // could ask for one over any entry it liked — or over entries that do
+        // not exist.
+        const erasable = new Set<AuditEntry>(
+          sink.query({ ...filter, limit: Number.MAX_SAFE_INTEGER }),
+        );
         count = sink.erase(filter, (e) => {
+          if (!erasable.has(e)) {
+            throw new Error(
+              "[Directive] audit-ledger: erase() was asked to replace an entry that does not match the filter it was given.",
+            );
+          }
           // Build a tombstone preserving the immutable chain fields.
           // Carry SCHEMA_VERSION from the original so a fresh tombstone
           // doesn't claim to be at a newer schema than the entry it
@@ -733,6 +781,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
             erasedAt,
           } as AuditEntry;
           markInternal(tombstone);
+          hasMinted = true;
           // CAUTION: replacing the payload changes the entry's hash —
           // which means the NEXT entry's prevHash will no longer match.
           // verify() recognises `system.entry-erased` as a legitimate
