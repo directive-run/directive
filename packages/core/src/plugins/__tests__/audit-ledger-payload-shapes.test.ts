@@ -19,22 +19,39 @@ import { asRecorded } from "../audit-ledger/hash.js";
  * negotiable.
  */
 
-/** Deterministic, so a failure names a seed rather than a mood. */
+/**
+ * Deterministic, so a failure names a seed rather than a mood.
+ *
+ * Warmed up before the first value is taken. Without it, the first output for
+ * a small seed lands in a narrow band, so seven hundred and fifty seeds only
+ * ever produced three of the eleven shapes — which is why properties that
+ * looked thorough could not fail. A generator has to be checked for what it
+ * actually generates, not for what its arms say it might.
+ */
 function makeRandom(seed: number) {
-  let state = seed >>> 0;
-
-  return () => {
+  let state = (seed * 2654435761) >>> 0;
+  const next = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
 
     return state / 0x100000000;
   };
+  next();
+  next();
+  next();
+
+  return next;
 }
 
 type Shape = { value: unknown; label: string };
 
 function generate(random: () => number, depth = 0): Shape {
   const roll = random();
-  if (depth > 12 || roll < 0.18) {
+  // Past the projection's own depth cap, so the shapes reach the line the
+  // properties are about. Capped at twelve, the deepest thing generated
+  // reached level twenty-one against a limit of fifty — the depth property
+  // could not fail, and reverting the fix that put it there did not break a
+  // single seed.
+  if (depth > 70 || roll < 0.18) {
     const leaves: Shape[] = [
       { value: "s", label: "string" },
       { value: 42, label: "number" },
@@ -81,16 +98,87 @@ function generate(random: () => number, depth = 0): Shape {
       label: `shared(${shared.label})`,
     };
   }
-  if (roll < 0.8) {
-    // A wide leaf, which is how the node budget was escaped.
+  if (roll < 0.72) {
+    // Wide, past the node budget. At four hundred keys the budget was barely
+    // reached, so the bounding property could not fail.
+    const width = 400 + Math.floor(random() * 30_000);
     const wide: Record<string, unknown> = {};
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < width; i++) {
       wide[`k${i}`] = "v";
     }
 
-    return { value: wide, label: "wide" };
+    return { value: wide, label: `wide(${width})` };
   }
-  if (roll < 0.86) {
+  if (roll < 0.76) {
+    // Large and flat, in each collection shape. A million-element array is an
+    // ordinary fact value.
+    const size = 5_000 + Math.floor(random() * 50_000);
+    const pick = random();
+    if (pick < 0.35) {
+      return {
+        value: Array.from({ length: size }, (_, i) => i),
+        label: `array(${size})`,
+      };
+    }
+    if (pick < 0.6) {
+      const sparse = new Array(size);
+      sparse[0] = 1;
+      sparse[size - 1] = 2;
+
+      return { value: sparse, label: `sparse(${size})` };
+    }
+    if (pick < 0.8) {
+      // Small and sparse, so the holes are the only thing under test rather
+      // than the budget.
+      const holes: unknown[] = [1];
+      holes[4] = 2;
+      holes[9] = 3;
+
+      return { value: holes, label: "sparse(small)" };
+    }
+
+    return {
+      value: new Map(Array.from({ length: size }, (_, i) => [`k${i}`, i])),
+      label: `bigMap(${size})`,
+    };
+  }
+  if (roll < 0.8) {
+    // Keys that mean something to the language. `__proto__` reaches a setter
+    // on the object prototype, so recording it by assignment dropped the value
+    // — and anything parsed from external JSON can carry that key.
+    const hostile: Record<string, unknown> = {};
+    [
+      "__proto__",
+      "constructor",
+      "prototype",
+      "toString",
+      "valueOf",
+      "",
+      "0",
+      "length",
+    ].forEach((key, index) => {
+      Object.defineProperty(hostile, key, {
+        // A distinct value per key, so one going missing is one fewer.
+        value: `v${index}`,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    return { value: hostile, label: "hostile-keys" };
+  }
+  if (roll < 0.84) {
+    // A spine of maps, which produce two levels for each one walked.
+    let spine: unknown = { leaf: "deep" };
+    const links = 20 + Math.floor(random() * 20);
+    for (let i = 0; i < links; i++) {
+      spine = new Map([["k", spine]]);
+    }
+
+    return { value: spine, label: `mapSpine(${links})` };
+  }
+  if (roll < 0.9) {
     // A cycle.
     const cyclic: Record<string, unknown> = { self: null };
     cyclic.self = cyclic;
@@ -111,6 +199,9 @@ function generate(random: () => number, depth = 0): Shape {
  * holds below this is in the record and outside the hash.
  */
 const STRINGIFIER_MAX_DEPTH = 50;
+
+/** The budget the projection declares, mirrored so the bound can be asserted. */
+const MAX_PROJECTED_NODES = 10_000;
 
 function deepestLevel(value: unknown, depth = 0, seen = new Set<object>()) {
   if (value === null || typeof value !== "object") return depth;
@@ -161,20 +252,121 @@ describe("a projected payload, over generated shapes", () => {
   });
 
   it("produces a bounded amount from an unbounded input", () => {
+    // Counted in values produced, against the budget the projection declares.
+    // Asserted in bytes and milliseconds instead, this could not fail: the
+    // widest shape generated came to a hundred kilobytes against a four
+    // megabyte ceiling, so reverting the fix that bounds fan-out broke nothing.
     for (const seed of seeds) {
       const shape = generate(makeRandom(seed));
-      const startedAt = Date.now();
       const projected = asRecorded(shape.value);
-      const elapsed = Date.now() - startedAt;
-      const size = (JSON.stringify(projected) ?? "").length;
+      const produced = countRecorded(projected);
       expect(
-        elapsed,
-        `seed ${seed} (${shape.label}) took ${elapsed}ms`,
-      ).toBeLessThan(500);
+        produced,
+        `seed ${seed} (${shape.label}) produced ${produced} values`,
+        // Twice the budget: each truncated collection ends with a marker, and
+        // collections are themselves charged, so the markers cannot outnumber
+        // the budget either. What matters is that the bound is a constant and
+        // not a function of what was handed in.
+      ).toBeLessThanOrEqual(MAX_PROJECTED_NODES * 2);
+    }
+  });
+
+  it("keeps every value an export could have carried", () => {
+    // The three properties above are all about what the projection produces
+    // compared with itself, so total content loss satisfies all of them: an
+    // empty object hashes the same live as exported, sits at no depth, and is
+    // very well bounded.
+    //
+    // That is not hypothetical. A key of `__proto__` reaches a setter on the
+    // object prototype, so recording it by assignment dropped the value and
+    // two materially different payloads produced byte-identical entries that
+    // verified clean. Nothing generated could have caught it, because nothing
+    // asked whether anything went missing.
+    for (const seed of seeds) {
+      const shape = generate(makeRandom(seed));
+      const projected = asRecorded(shape.value);
+      const recorded = JSON.stringify(projected) ?? "";
+      const expected = countExportable(shape.value);
+      // `[too-large]` and `[max-depth]` are deliberate stops, and say so where
+      // they stop, so a shape that reaches one is exempt from the count.
+      if (
+        recorded.includes("[too-large]") ||
+        recorded.includes("[max-depth]")
+      ) {
+        continue;
+      }
+      const kept = countRecorded(projected);
       expect(
-        size,
-        `seed ${seed} (${shape.label}) produced ${size} bytes`,
-      ).toBeLessThan(4_000_000);
+        kept,
+        `seed ${seed} (${shape.label}) kept ${kept} of ${expected} values`,
+      ).toBeGreaterThanOrEqual(expected);
     }
   });
 });
+
+/** How many values `JSON.stringify` would have carried out of this. */
+function countExportable(value: unknown, seen = new Set<object>()): number {
+  if (value === null) return 1;
+  const type = typeof value;
+  if (type === "function" || type === "symbol" || type === "undefined") {
+    return 0;
+  }
+  if (type !== "object") return 1;
+  const object = value as object;
+  if (seen.has(object)) return 0;
+  seen.add(object);
+  try {
+    if (object instanceof Date || object instanceof RegExp) return 1;
+    if (object instanceof Map) {
+      let total = 0;
+      for (const [k, v] of object) {
+        total += countExportable(k, seen) + countExportable(v, seen);
+      }
+
+      return total;
+    }
+    if (object instanceof Set) {
+      let total = 0;
+      for (const item of object) total += countExportable(item, seen);
+
+      return total;
+    }
+    if (Array.isArray(object)) {
+      let total = 0;
+      for (let i = 0; i < object.length; i++) {
+        total += countExportable(object[i], seen);
+      }
+
+      return total;
+    }
+    let total = 0;
+    for (const item of Object.values(object as Record<string, unknown>)) {
+      total += countExportable(item, seen);
+    }
+
+    return total;
+  } finally {
+    seen.delete(object);
+  }
+}
+
+/** How many values the projection actually kept. */
+function countRecorded(value: unknown, seen = new Set<object>()): number {
+  if (value === null) return 1;
+  if (typeof value !== "object") return 1;
+  const object = value as object;
+  if (seen.has(object)) return 0;
+  seen.add(object);
+  try {
+    let total = 0;
+    for (const item of Array.isArray(object)
+      ? object
+      : Object.values(object as Record<string, unknown>)) {
+      total += countRecorded(item, seen);
+    }
+
+    return total;
+  } finally {
+    seen.delete(object);
+  }
+}

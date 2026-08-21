@@ -198,6 +198,27 @@ function orNull(value: unknown): unknown {
   return value === undefined ? null : value;
 }
 
+/**
+ * Record a key as this object's own, whatever the key is called.
+ *
+ * Plain assignment goes through any setter the prototype chain offers, and
+ * `__proto__` has one. So a payload carrying that key — which is anything
+ * parsed from external JSON — had the value silently swallowed rather than
+ * recorded.
+ */
+function defineOwn(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
 export function asRecorded(
   value: unknown,
   depth = 0,
@@ -248,38 +269,79 @@ export function asRecorded(
       return Number.isFinite(object.getTime()) ? object.toISOString() : null;
     }
     if (object instanceof RegExp) return String(object);
+    // Every collection stops iterating once the budget is out, rather than
+    // producing a marker per remaining slot.
+    //
+    // The budget bounded the recursion and not the breadth, so a large flat
+    // collection still materialised every position: a million-element array is
+    // free without this plugin and cost 246ms and a 13.9MB entry with it. The
+    // point of the bound is that a fact value cannot decide how much the
+    // record does.
     if (object instanceof Map) {
       // Two levels, because that is what this produces: an array of pairs.
       // Charging one let content sit at twice the depth the budget thought it
       // was allowing, which put it back below the line the canonical
       // stringifier walks to — recorded, outside the hash, and editable in
       // place. The depth cap has to count what comes out, not what goes in.
-      return [...object.entries()].map(([k, v]) => [
-        orNull(asRecorded(k, depth + 2, seen, budget)),
-        orNull(asRecorded(v, depth + 2, seen, budget)),
-      ]);
+      const pairs: unknown[] = [];
+      for (const [k, v] of object) {
+        if (budget.left <= 0) {
+          pairs.push("[too-large]");
+          break;
+        }
+        pairs.push([
+          orNull(asRecorded(k, depth + 2, seen, budget)),
+          orNull(asRecorded(v, depth + 2, seen, budget)),
+        ]);
+      }
+
+      return pairs;
     }
     if (object instanceof Set) {
-      return [...object].map((item) =>
-        orNull(asRecorded(item, depth + 1, seen, budget)),
-      );
+      const items: unknown[] = [];
+      for (const item of object) {
+        if (budget.left <= 0) {
+          items.push("[too-large]");
+          break;
+        }
+        items.push(orNull(asRecorded(item, depth + 1, seen, budget)));
+      }
+
+      return items;
     }
     if (Array.isArray(object)) {
-      // `Array.from`, not `map`. `map` preserves holes, so a sparse array
+      // Indexed rather than mapped. `map` preserves holes, so a sparse array
       // stayed sparse: the canonical stringifier writes nothing for a hole and
       // JSON writes `null`, which is the same live-versus-export disagreement
       // this file keeps having, reached by a shape nobody thinks to type.
-      return Array.from(object, (item) =>
-        orNull(asRecorded(item, depth + 1, seen, budget)),
-      );
+      const items: unknown[] = [];
+      for (let index = 0; index < object.length; index++) {
+        if (budget.left <= 0) {
+          items.push("[too-large]");
+          break;
+        }
+        items.push(orNull(asRecorded(object[index], depth + 1, seen, budget)));
+      }
+
+      return items;
     }
 
     const out: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(object)) {
+      if (budget.left <= 0) {
+        defineOwn(out, "[too-large]", true);
+        break;
+      }
       const projected = asRecorded(item, depth + 1, seen, budget);
       if (projected === undefined) continue;
-      out[key] = projected;
+      // Defined, not assigned. A key of `__proto__` reaches a setter on the
+      // object prototype, so assigning it set this object's prototype instead
+      // of recording anything — the content vanished from the entry, and two
+      // materially different writes produced byte-identical records that
+      // verified clean. `JSON.parse` of anything external can carry that key.
+      defineOwn(out, key, projected);
     }
+
     return out;
   } finally {
     seen.delete(object);
