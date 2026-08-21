@@ -1,5 +1,13 @@
 # @directive-run/example-theme-locale
 
+## 0.0.78
+
+### Patch Changes
+
+- Updated dependencies [[`5aa8e67`](https://github.com/directive-run/directive/commit/5aa8e67613754d764fbc60eff326ac5040488fb3)]:
+  - @directive-run/core@1.32.0
+  - @directive-run/el@1.1.3
+
 ## 0.0.77
 
 ### Patch Changes
