@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-optimistic-updates",
-  "version": "0.0.77",
+  "version": "0.0.78",
   "private": true,
   "type": "module",
   "scripts": {
