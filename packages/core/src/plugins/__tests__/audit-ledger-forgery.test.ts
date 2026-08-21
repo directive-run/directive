@@ -175,7 +175,9 @@ describe("the record under forgery", () => {
     // and permanent, so anything copied into it verbatim stays there.
     const injected = "ssn=123-45-6789" as never;
     const result = ledger.erase({
-      kind: "fact.change",
+      // `kind` takes a caller's values the same way `origin` does, and reaches
+      // the same frozen marker.
+      kind: ["fact.change", injected],
       origin: ["authored", injected],
     });
     errorSpy.mockRestore();
@@ -184,6 +186,49 @@ describe("the record under forgery", () => {
     if (marker && marker.kind === "system.subject-erased") {
       expect(JSON.stringify(marker.filterShape)).not.toContain("123-45-6789");
       expect(marker.filterShape.origin).toEqual(["authored"]);
+      expect(marker.filterShape.kind).toEqual(["fact.change"]);
+    }
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("reports a gap left by a refused entry rather than passing over it", () => {
+    // Closing the chain over a refused entry is what stops one failed write
+    // reporting the whole record as tampered. Done silently it trades a loud
+    // wrong answer for a quiet one, so the gap is named.
+    const real = memorySink();
+    let failNext = false;
+    const sink: typeof real = {
+      ...real,
+      query: real.query.bind(real),
+      recent: real.recent.bind(real),
+      forFact: real.forFact.bind(real),
+      forConstraint: real.forConstraint.bind(real),
+      clear: real.clear.bind(real),
+      destroy: real.destroy.bind(real),
+      toJSON: real.toJSON.bind(real),
+      onTruncate: real.onTruncate?.bind(real),
+      write: (entry) => {
+        if (failNext) {
+          failNext = false;
+          throw new Error("sink is full");
+        }
+        real.write(entry);
+      },
+    };
+    const ledger = createAuditLedger({ sink, onWriteError: () => {} });
+    const system = makeSystem(ledger);
+    system.start();
+    system.facts.n = 1;
+    failNext = true;
+    system.facts.n = 2;
+    system.facts.n = 3;
+
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(true);
+    if (verdict.valid) {
+      expect(verdict.missingSeqs?.length).toBe(1);
     }
 
     system.destroy();

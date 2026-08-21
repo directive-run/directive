@@ -78,9 +78,18 @@ against the values `origin` can hold before any of it is copied into the
 permanent, frozen marker — a filter can arrive from a request body, and that
 marker is the record of the erasure.
 
+`verify()` also reports two things it used to pass over in silence:
+`missingSeqs`, for an entry the sink refused — the chain closes over it so one
+failure does not condemn the whole record, but the gap is named — and
+`marksChecked: false` on a ledger reloaded from an export, whose tombstones and
+truncation markers cannot have their provenance checked at all.
+
 None of this makes the in-memory sink evidentiary. The chain is unkeyed, so
 anyone who can reach the buffer can recompute it; it detects accident and
-in-process mutation, not an adversary holding your storage.
+in-process mutation, not an adversary holding your storage. `system.restore()`
+is public and files its writes as `hydrate`, so a caller can choose that label
+for their own writes — which is why `origin` says how a write arrived and never
+whether to trust it.
 
 **A rotated ledger no longer reports itself tampered.** Once a bounded sink
 fills, it drops its oldest entries — ordinary operation — but `verify()` began

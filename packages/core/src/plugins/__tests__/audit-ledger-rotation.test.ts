@@ -240,4 +240,47 @@ describe("a rotated ledger", () => {
     system.destroy();
     ledger.destroy();
   });
+
+  it("still verifies after an export round-trip", async () => {
+    // The mark that says "this ledger wrote this entry" was briefly a string
+    // key holding a symbol value. The canonical stringifier renders such a
+    // value, so it entered the hash; `JSON.stringify` drops it, so it did not
+    // enter the export. Every rotated ledger then failed verification the
+    // moment it was exported — the case `toJSON()` exists to serve, and the
+    // exact defect this subsystem shipped once before in a different field.
+    const ledger = createAuditLedger({ sink: memorySink({ capacity: 20 }) });
+    const system = makeSystem(ledger);
+    system.start();
+    await flushTick();
+    for (let i = 1; i <= 80; i++) {
+      system.batch(() => {
+        system.facts.n = i;
+      });
+    }
+    await flushTick();
+
+    const live = ledger.verify();
+    expect(live.valid).toBe(true);
+
+    const exported = JSON.parse(JSON.stringify(ledger.toJSON())) as {
+      entries: AuditEntry[];
+    };
+    const reloaded = memorySink({ capacity: 1000 });
+    for (const entry of exported.entries) {
+      reloaded.write(entry);
+    }
+    const reader = createAuditLedger({ sink: reloaded });
+    const verdict = reader.verify();
+
+    expect(verdict.valid).toBe(true);
+    if (verdict.valid) {
+      // A copy carries no marks, so the provenance of its tombstones and
+      // truncation markers cannot be checked. The chain still was.
+      expect(verdict.marksChecked).toBe(false);
+    }
+
+    reader.destroy();
+    system.destroy();
+    ledger.destroy();
+  });
 });

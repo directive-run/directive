@@ -2,11 +2,11 @@
  * Hash chain primitives — canonicalization, djb2 dispatch, depth-2
  * freeze, and the in-module tombstone sentinel.
  *
- * `LEDGER_INTERNAL_TOKEN` is the heart of the tombstone-forgery defense.
- * It MUST live in this single file and MUST NOT be re-exported
- * from the folder's public surface (`./index.ts`). The only external
- * surface that touches it is `verify()` and the tombstone factory in
- * `index.ts`, both of which import it directly from this module.
+ * The minted-here set is the heart of the tombstone-forgery defense. It MUST
+ * live in this single file and MUST NOT be re-exported from the folder's
+ * public surface (`./index.ts`). The only surfaces that touch it are
+ * `verify()` and the tombstone and truncation-marker factories in `index.ts`,
+ * all of which import from this module directly.
  *
  * Hash chain: each entry stores `prevHash` — the djb2 (`hashObject`)
  * hash of the previous entry's stable-stringified payload. Tampering
@@ -19,22 +19,42 @@ import { hashObject } from "../../utils/utils.js";
 import type { AuditEntry } from "./types.js";
 
 /**
- * Private sentinel stamped onto tombstone entries by {@link createAuditLedger.erase}.
- * Never exported from the folder's barrel, never serialized — `verify()`
- * checks for it before accepting a `system.entry-erased` entry as a
- * legitimate chain break.
+ * The entries this ledger minted, held off the entries themselves.
  *
- * Without this, a caller holding a raw `AuditLedgerSink` reference
- * could write `{ kind: "system.entry-erased", … }` directly into the
- * sink to mask real tampering as legitimate erasure. The sentinel
- * raises the bar so only the in-process ledger plugin (which lives in
- * this folder's closure) can mint a valid tombstone.
+ * `verify()` treats two kinds as legitimate chain breaks — an erasure
+ * tombstone, and a truncation marker accounting for a rotated prefix. Both are
+ * therefore worth forging: a caller holding a raw sink reference who can write
+ * one can present tampering as erasure, or a hand-trimmed prefix as routine
+ * rotation. Membership here is what separates the ones this module made.
  *
- * @internal — DO NOT re-export from `./index.ts` or `./types.ts`.
+ * Kept in a module-private `WeakSet` rather than as a field on the entry,
+ * because every version of "a field on the entry" fails somewhere:
+ *
+ *  - a string key holding a symbol value is rendered by the canonical
+ *    stringifier and dropped by `JSON.stringify`, so it entered the hash but
+ *    not the export, and every exported ledger carrying one failed
+ *    verification — the same defect this subsystem shipped once before, in a
+ *    different field;
+ *  - a symbol key is skipped by both, but `Object.getOwnPropertySymbols` on
+ *    any genuine entry hands the symbol to a consumer, who can then stamp it
+ *    on a forged one.
+ *
+ * Nothing on the entry means nothing to hash, nothing to serialise, and
+ * nothing to steal. The cost is that the mark does not survive export — see
+ * `verify()`, which reports that rather than calling an imported ledger's
+ * tombstones forged.
  */
-export const LEDGER_INTERNAL_TOKEN: unique symbol = Symbol(
-  "directive.audit-ledger.internal",
-);
+const mintedHere = new WeakSet<object>();
+
+/** Record that this module minted `entry`. */
+export function markInternal(entry: AuditEntry): void {
+  mintedHere.add(entry);
+}
+
+/** Whether this module minted `entry`, in this process. */
+export function isInternal(entry: AuditEntry): boolean {
+  return mintedHere.has(entry);
+}
 
 /**
  * Take the entry's own copy of anything it holds a reference to, then freeze

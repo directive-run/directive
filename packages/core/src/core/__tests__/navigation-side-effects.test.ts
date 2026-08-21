@@ -82,24 +82,149 @@ describe("a reactive write during a history navigation", () => {
     const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
     await system.start();
 
+    // A warm-up write, and a macrotask after each one.
+    //
+    // `settle()` resolving does not mean the pass has run, and the first write
+    // after `start()` has its pass swallowed entirely — so without these, no
+    // snapshot ever captures the gate open, the rewind changes nothing, the
+    // subscriber never fires, and the assertion below passes whether or not
+    // the fix exists. That is how this test shipped vacuous the first time.
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    system.facts.seen = 1;
+    await settled();
     system.facts.open = true;
-    await system.settle();
+    await settled();
     system.facts.open = false;
-    await system.settle();
+    await settled();
 
     const before = [...attaches];
+    expect(before).toEqual(["attach", "detach"]);
 
     // A subscriber that writes in reaction to the rewind. Without carrying the
     // navigation context to its reconcile, this pass re-opened the transport.
+    let reactions = 0;
     const unsubscribe = system.subscribe(["open"], () => {
+      reactions++;
       system.facts.seen = system.facts.seen + 1;
     });
 
     system.history!.goBack();
-    await system.settle();
+    await settled();
     unsubscribe();
 
+    // The assertion below is only worth anything if the rewind actually put
+    // the gate back into its open state and the subscriber actually ran. This
+    // test shipped once without these two lines and passed whether or not the
+    // fix was present, because neither happened.
+    expect(reactions).toBeGreaterThan(0);
+    expect(system.facts.open).toBe(true);
     expect(attaches).toEqual(before);
+
+    await system.stop();
+  });
+
+  it("holds when the reaction goes through an event dispatch", async () => {
+    // The check sat behind `dispatchDepth === 0`, so a navigation reaction
+    // that dispatched an event recorded nothing and its pass went on to do
+    // both forbidden things. `subscribe` calling `dispatch` is as ordinary as
+    // this codebase gets.
+    const attaches: string[] = [];
+    const mod = createModule("m", {
+      schema: {
+        facts: { open: t.boolean(), seen: t.number() },
+        events: { BUMP: {} },
+      },
+      init: (facts) => {
+        facts.open = false;
+        facts.seen = 0;
+      },
+      events: {
+        BUMP: (facts) => {
+          facts.seen = facts.seen + 1;
+        },
+      },
+      sources: {
+        channel: {
+          active: (facts) => facts.open === true,
+          attach: () => {
+            attaches.push("attach");
+
+            return () => {
+              attaches.push("detach");
+            };
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
+    await system.start();
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    system.facts.seen = 1;
+    await settled();
+    system.facts.open = true;
+    await settled();
+    system.facts.open = false;
+    await settled();
+
+    const before = [...attaches];
+    expect(before).toEqual(["attach", "detach"]);
+
+    let reactions = 0;
+    const unsubscribe = system.subscribe(["open"], () => {
+      reactions++;
+      system.events.BUMP();
+    });
+
+    system.history!.goBack();
+    await settled();
+    unsubscribe();
+
+    expect(reactions).toBeGreaterThan(0);
+    expect(system.facts.open).toBe(true);
+    expect(attaches).toEqual(before);
+
+    await system.stop();
+  });
+
+  it("does not suppress an ordinary write that shares the pass", async () => {
+    // The record used to be one flag for the whole pass, so an unrelated write
+    // landing in the same microtask as a navigation reaction lost its snapshot
+    // — and the loss is permanent, because the snapshot is simply not taken.
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), other: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.other = 0;
+      },
+    });
+    const system = createSystem({ module: mod, history: { maxSnapshots: 50 } });
+    await system.start();
+    const settled = async () => {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    for (let i = 1; i <= 4; i++) {
+      system.facts.n = i;
+      await settled();
+    }
+
+    system.history!.goBack();
+    system.facts.other = 42;
+    await settled();
+
+    expect(system.facts.other).toBe(42);
+
+    // The unrelated write was snapshotted, so rewinding forward does not
+    // discard it.
+    system.history!.goForward();
+    await settled();
+    expect(system.facts.other).toBe(42);
 
     await system.stop();
   });

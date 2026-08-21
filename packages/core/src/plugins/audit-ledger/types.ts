@@ -66,17 +66,33 @@ export type AuditEntryKind =
   | "system.subject-erased";
 
 /**
- * Internal sentinel symbol type. The actual symbol VALUE lives in
- * `hash.ts` and is never exported from this folder's public surface —
- * but the TYPE must be referenceable here so `AuditEntryBase` can
- * declare the optional `__internal` field.
+ * Every value {@link AuditEntryKind} can take, at runtime.
  *
- * We use `symbol` rather than `typeof LEDGER_INTERNAL_TOKEN` because
- * importing the symbol value into types.ts would either re-export it
- * (defeating the defense) or create a circular import. The runtime
- * check in `verify()` compares against the actual symbol reference.
+ * A filter can arrive from a request body, and the erasure marker that records
+ * it is frozen and permanent — so what goes into it is checked against this
+ * rather than copied across.
  */
-type LedgerInternalSentinel = symbol;
+export const AUDIT_ENTRY_KINDS: readonly AuditEntryKind[] = [
+  "constraint.evaluate",
+  "resolver.write.rejected",
+  "resolver.clobber.loop.detected",
+  "resolver.clobber.loop.resolved",
+  "fact.change",
+  "resolver.complete",
+  "resolver.error",
+  "source.attach",
+  "source.detach",
+  "source.error",
+  "system.init",
+  "system.start",
+  "system.stop",
+  "system.destroy",
+  "system.snapshot",
+  "system.history.navigate",
+  "system.truncated",
+  "system.entry-erased",
+  "system.subject-erased",
+];
 
 interface AuditEntryBase {
   /** Monotonic sequence number, starting at 0. */
@@ -111,7 +127,6 @@ interface AuditEntryBase {
    *
    * @internal
    */
-  readonly __internal?: LedgerInternalSentinel;
 }
 
 export type AuditEntry =
@@ -367,6 +382,34 @@ export type VerifyResult =
        * a gap with a receipt and a gap without one, and it is worth a question.
        */
       truncationExplained?: boolean;
+      /**
+       * Present, and `false`, when none of these entries bear the runtime's
+       * mint mark — which is what a ledger reloaded from an export looks like,
+       * because the mark is held in memory and does not serialise.
+       *
+       * The chain itself was still checked. What could not be checked is
+       * whether the erasure tombstones and truncation markers in it were
+       * written by the runtime or appended by someone. On a live ledger this
+       * field is absent and those are checked.
+       *
+       * Absent on a live ledger. An unkeyed chain cannot do better: an
+       * attacker can always present a forgery as a copy.
+       */
+      marksChecked?: boolean;
+      /**
+       * Seq numbers that are absent from the middle of the chain and that
+       * nothing accounts for — an entry the sink refused, most likely.
+       *
+       * Not a break. The chain closes over a refused entry deliberately, so
+       * that one failed write does not report the whole record as tampered.
+       * But an entry that is simply gone is worth surfacing rather than
+       * passing over in silence, which is what closing over it would otherwise
+       * do. Pair with `onWriteError` to catch them as they happen.
+       *
+       * Entries dropped from the *head* by a bounded sink are not listed here;
+       * see `windowStartSeq`.
+       */
+      missingSeqs?: number[];
     }
   | {
       valid: false;

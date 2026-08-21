@@ -666,7 +666,20 @@ export function createEngine<S extends Schema>(
    * which time the navigation is over and the question can no longer be asked.
    */
   let navigationDepth = 0;
-  let reconcileFollowsNavigation = false;
+
+  /**
+   * The keys written while a navigation was in flight, awaiting their pass.
+   *
+   * Per key rather than a flag for the pass, because writes coalesce: an
+   * ordinary write landing in the same microtask as a navigation reaction was
+   * losing its snapshot and its gate evaluation along with it, permanently. A
+   * flag also had no owner — set when no pass was scheduled, it survived to be
+   * consumed by an unrelated later one, which is how a gate closing on a
+   * downgrade could be skipped and stay open.
+   *
+   * Cleared with `changedKeys`, so the two always describe the same pass.
+   */
+  const navigationWrittenKeys = new Set<string>();
 
   function withNavigation(fn: () => void): void {
     navigationDepth++;
@@ -677,10 +690,30 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /** Records, at write time, that the pass this write schedules follows a navigation. */
-  function noteWriteDuringNavigation(): boolean {
+  /**
+   * Records, at write time, that this key was written during a navigation.
+   * Returns whether it was.
+   */
+  function noteWriteDuringNavigation(key: string): boolean {
     if (navigationDepth === 0) return false;
-    reconcileFollowsNavigation = true;
+    navigationWrittenKeys.add(key);
+
+    return true;
+  }
+
+  /**
+   * True when every key this pass is about was written during a navigation.
+   *
+   * The pass does the union of what its writes need: one ordinary write among
+   * them is enough to require a snapshot and a gate evaluation, because
+   * suppressing those is unrecoverable — the snapshot is gone and a quiescent
+   * system may never schedule another pass to attach the transport.
+   */
+  function passIsEntirelyNavigation(): boolean {
+    if (state.changedKeys.size === 0) return false;
+    for (const key of state.changedKeys) {
+      if (!navigationWrittenKeys.has(key)) return false;
+    }
 
     return true;
   }
@@ -758,10 +791,16 @@ export function createEngine<S extends Schema>(
       // path; what reaches here during a restore is a reaction to it, and a
       // reaction is the program's own work.
       if (currentFactOrigin() === "restore") return;
+      // Asked unconditionally, and before the dispatch check. Behind it, a
+      // navigation driven from inside an event handler recorded nothing and
+      // its pass went on to snapshot and re-attach — the two things a replay
+      // must not do, reachable through `subscribe` calling `dispatch`, which
+      // is as ordinary as this codebase gets.
+      const duringNavigation = noteWriteDuringNavigation(key as string);
       // Direct fact mutations (outside event dispatch) always create snapshots
       // — unless a navigation is in flight, where a new snapshot would splice
       // away everything ahead of the point being rewound to.
-      if (dispatchDepth === 0 && !noteWriteDuringNavigation()) {
+      if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
       state.changedKeys.add(key);
@@ -804,8 +843,14 @@ export function createEngine<S extends Schema>(
       // announce, so the gap arrived with that arm.
       const authored = changes.filter((change) => change.origin !== "restore");
       if (authored.length === 0) return;
+      let duringNavigation = false;
+      for (const change of authored) {
+        if (noteWriteDuringNavigation(change.key)) {
+          duringNavigation = true;
+        }
+      }
       // Resolver/effect batches (outside event dispatch) always create snapshots
-      if (dispatchDepth === 0 && !noteWriteDuringNavigation()) {
+      if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
       for (const change of authored) {
@@ -1382,11 +1427,11 @@ export function createEngine<S extends Schema>(
       }
     }
 
-    // Taken once for this pass. Set by writes made while a navigation was in
-    // flight; those writes reconcile like any other, but this pass must not
-    // snapshot over the redo stack or re-open a transport.
-    const followsNavigation = reconcileFollowsNavigation;
-    reconcileFollowsNavigation = false;
+    // Asked once for this pass, of the keys the pass is actually about.
+    // Writes made during a navigation reconcile like any other, but a pass
+    // made up entirely of them must not snapshot over the redo stack or
+    // re-open a transport.
+    const followsNavigation = passIsEntirelyNavigation();
 
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
@@ -1477,6 +1522,9 @@ export function createEngine<S extends Schema>(
 
       // Clear changed keys
       state.changedKeys.clear();
+      // Same lifetime, so the record can never be consumed by a later pass
+      // that has nothing to do with the navigation that set it.
+      navigationWrittenKeys.clear();
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
       const currentRequirements =
@@ -1748,7 +1796,13 @@ export function createEngine<S extends Schema>(
     const handler = mergedEvents[eventName];
     if (handler) {
       dispatchDepth++;
-      if (snapshotEventNames === null || snapshotEventNames.has(eventName)) {
+      // Not while rewinding. A handler dispatched from a listener reacting to
+      // a navigation would otherwise ask for a snapshot here, and taking one
+      // splices away everything ahead of the point being rewound to.
+      if (
+        navigationDepth === 0 &&
+        (snapshotEventNames === null || snapshotEventNames.has(eventName))
+      ) {
         shouldTakeSnapshot = true;
       }
       try {

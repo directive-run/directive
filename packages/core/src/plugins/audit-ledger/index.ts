@@ -41,7 +41,28 @@ import type {
   FactPredicate,
 } from "../../core/types/predicate.js";
 import { hashObject } from "../../utils/utils.js";
-import { LEDGER_INTERNAL_TOKEN, freezeEntry, hashForEntry } from "./hash.js";
+import { freezeEntry, hashForEntry, markInternal } from "./hash.js";
+
+/**
+ * Keep only recognised entry kinds from a caller-supplied filter, for the same
+ * reason as {@link knownOrigins}.
+ */
+function knownKinds(
+  value: AuditEntryKind | readonly AuditEntryKind[] | undefined,
+): AuditEntryKind | readonly AuditEntryKind[] | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    const kept = value.filter((v) =>
+      AUDIT_ENTRY_KINDS.includes(v as AuditEntryKind),
+    );
+
+    return kept.length > 0 ? (kept as readonly AuditEntryKind[]) : undefined;
+  }
+
+  return AUDIT_ENTRY_KINDS.includes(value as AuditEntryKind)
+    ? (value as AuditEntryKind)
+    : undefined;
+}
 
 /** The values `origin` can hold. Anything else did not come from the runtime. */
 const ORIGINS: readonly FactOrigin[] = ["authored", "restore", "hydrate"];
@@ -70,11 +91,12 @@ import { redactWhenSpec } from "./predicate-redact.js";
 import { memorySink } from "./sink.js";
 import type {
   AuditEntry,
+  AuditEntryKind,
   AuditLedger,
   AuditLedgerOptions,
   VerifyResult,
 } from "./types.js";
-import { HASH_ALGO, SCHEMA_VERSION } from "./types.js";
+import { AUDIT_ENTRY_KINDS, HASH_ALGO, SCHEMA_VERSION } from "./types.js";
 import type { AuditSchemaVersion } from "./types.js";
 import { verify as verifyChain } from "./verify.js";
 
@@ -371,6 +393,16 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     // rotated ledger then failed verification at its second entry — which is
     // the answer least worth giving, because an operator who sees routine
     // rotation reported as tamper stops believing the control entirely.
+    // Every entry this ledger writes is recorded as its own, not only the two
+    // kinds `verify()` treats as legitimate chain breaks.
+    //
+    // Marking only those made the check comparative in the wrong way: a live
+    // ledger holding a single forged tombstone and no genuine one had nothing
+    // marked, so it looked like a reloaded copy and the forgery passed.
+    // Marking everything means a live ledger always has marks, and an unmarked
+    // tombstone sitting among marked entries is exactly what a forgery is.
+    markInternal(finalEntry);
+
     const myHash = hashForEntry(finalEntry);
     const priorHash = lastHashCache;
     lastHashCache = myHash;
@@ -574,15 +606,13 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       if (emittingTruncate) return;
       emittingTruncate = true;
       try {
+        // `verify()` lets a truncation marker account for a missing prefix, so
+        // one anyone can mint is a way to make a hand-trimmed ledger read as
+        // routine rotation. `emit` records it as this ledger's own.
         emit({
           kind: "system.truncated",
           droppedSeq,
           droppedCount,
-          // Sentinelled like a tombstone. `verify()` lets a truncation marker
-          // account for a missing prefix, so a marker anyone can mint is a way
-          // to make a hand-trimmed ledger read as routine rotation. The token
-          // lives in this folder's closure and is not re-exported.
-          __internal: LEDGER_INTERNAL_TOKEN,
         });
       } finally {
         emittingTruncate = false;
@@ -652,57 +682,22 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     },
   };
 
-  /**
-   * Strip the internal sentinel from an entry before it reaches a
-   * public read path. Returns a shallow clone with `__internal`
-   * removed — keeps the (frozen) live entry intact for verify() while
-   * making sure consumers never see the symbol.
-   */
-  function stripInternal(entry: AuditEntry): AuditEntry {
-    if (
-      (entry as AuditEntry & { __internal?: unknown }).__internal === undefined
-    ) {
-      return entry;
-    }
-    const clone = { ...entry } as AuditEntry & { __internal?: unknown };
-    clone.__internal = undefined;
-
-    return clone as AuditEntry;
-  }
-
-  function stripInternalAll(
-    entries: readonly AuditEntry[],
-  ): readonly AuditEntry[] {
-    // Avoid allocating a new array unless at least one entry carries
-    // the sentinel — the common case (no tombstones) is a no-op.
-    let needsClone = false;
-    for (const e of entries) {
-      if (
-        (e as AuditEntry & { __internal?: unknown }).__internal !== undefined
-      ) {
-        needsClone = true;
-        break;
-      }
-    }
-    if (!needsClone) {
-      return entries;
-    }
-
-    return entries.map(stripInternal);
-  }
+  // Entries used to carry the mint marker as a field, so every public read
+  // path cloned each one to strip it. The marker lives outside the entry now,
+  // so reads hand back what the sink holds — the entries are frozen, and one
+  // fewer copy on the way out is one fewer place for them to diverge.
 
   return {
     plugin,
-    query: (filter = {}) => stripInternalAll(sink.query(filter)),
-    recent: (n) => stripInternalAll(sink.recent(n)),
-    forFact: (path, opts2) => stripInternalAll(sink.forFact(path, opts2)),
-    forConstraint: (id, opts2) =>
-      stripInternalAll(sink.forConstraint(id, opts2)),
+    query: (filter = {}) => sink.query(filter),
+    recent: (n) => sink.recent(n),
+    forFact: (path, opts2) => sink.forFact(path, opts2),
+    forConstraint: (id, opts2) => sink.forConstraint(id, opts2),
     toJSON: () => {
       const snap = sink.toJSON();
 
       return {
-        entries: stripInternalAll(snap.entries),
+        entries: snap.entries,
         capturedAt: snap.capturedAt,
       };
     },
@@ -721,10 +716,10 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           // doesn't claim to be at a newer schema than the entry it
           // replaced.
           //
-          // Stamp the in-module sentinel so `verify()` can tell
-          // this tombstone apart from a forgery written via
-          // `sink.write({ kind: "system.entry-erased", … })`. The
-          // sentinel is stripped from every public read path.
+          // Recorded as minted here so `verify()` can tell this tombstone
+          // apart from a forgery written via
+          // `sink.write({ kind: "system.entry-erased", … })`. The record is
+          // kept off the entry — see `hash.ts`.
           const tombstone = {
             seq: e.seq,
             ts: e.ts,
@@ -736,8 +731,8 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
                 .schemaVersion ?? SCHEMA_VERSION,
             originalKind: e.kind,
             erasedAt,
-            __internal: LEDGER_INTERNAL_TOKEN,
           } as AuditEntry;
+          markInternal(tombstone);
           // CAUTION: replacing the payload changes the entry's hash —
           // which means the NEXT entry's prevHash will no longer match.
           // verify() recognises `system.entry-erased` as a legitimate
@@ -761,7 +756,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       const filterShape = {
         factPath: filter.factPath !== undefined,
         constraintId: filter.constraintId !== undefined,
-        kind: filter.kind,
+        kind: knownKinds(filter.kind),
         // Recorded by value, but only after being checked against the values
         // the field can hold. A filter can arrive from an untrusted request
         // body on an erasure endpoint, and this entry is frozen and permanent:

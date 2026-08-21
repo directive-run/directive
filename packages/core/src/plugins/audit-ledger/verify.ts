@@ -12,7 +12,7 @@
  * reported as `valid: false` with a `reason` describing the forgery.
  */
 
-import { LEDGER_INTERNAL_TOKEN, hashForEntry } from "./hash.js";
+import { hashForEntry, isInternal } from "./hash.js";
 import type { AuditEntry, AuditLedgerSink, VerifyResult } from "./types.js";
 
 export function verify(
@@ -52,6 +52,30 @@ export function verify(
   // recorded twice (once when the tombstone itself is the broken
   // entry, once when the next iteration sees its predecessor was
   // also a tombstone).
+  // Whether the mint marks mean anything for this set of entries.
+  //
+  // The marks are held off the entries, in this process, so they do not
+  // survive an export. A ledger reloaded from JSON has none — and calling its
+  // tombstones forged on that basis would report every exported ledger as
+  // tampered, which is what an export is for.
+  //
+  // So the rule is comparative: if anything here bears a mark, this is a live
+  // ledger and an unmarked tombstone among marked ones is a forgery. If
+  // nothing does, this is a copy, and their provenance cannot be checked at
+  // all. That is a real limit of an unkeyed scheme rather than a gap in the
+  // implementation — an attacker can always present a forgery as a copy —
+  // and `verify()` says so through `marksChecked` rather than guessing.
+  const marksAreMeaningful = entries.some((e) => isInternal(e));
+
+  // Seqs that are not here and that nothing accounts for.
+  //
+  // The chain closes over an entry the sink refused, which is what stops one
+  // failed write reporting the whole ledger as tampered. But closing over it
+  // silently trades a loud wrong answer for a quiet one: the entry is gone and
+  // the verdict says nothing. The gap is reported rather than made fatal —
+  // it is a lost write, not evidence of tampering.
+  const missingSeqs: number[] = [];
+
   const erasedSeqsSet = new Set<number>();
 
   // A bounded sink drops its oldest entries once it is full, so the entry the
@@ -94,14 +118,15 @@ export function verify(
   const truncationExplained =
     windowStartSeq === undefined
       ? undefined
-      : entries.some(
-          (e) =>
-            e.kind === "system.truncated" &&
-            (e as AuditEntry & { __internal?: unknown }).__internal ===
-              LEDGER_INTERNAL_TOKEN,
-        );
+      : entries.some((e) => e.kind === "system.truncated" && isInternal(e));
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]!;
+    const previous = i > 0 ? entries[i - 1] : undefined;
+    if (previous !== undefined && entry.seq > previous.seq + 1) {
+      for (let gap = previous.seq + 1; gap < entry.seq; gap++) {
+        missingSeqs.push(gap);
+      }
+    }
     if (entry.prevHash !== prevHash) {
       // Legitimate break? Either:
       //   (a) the entry itself is the tombstone, or
@@ -120,9 +145,7 @@ export function verify(
           candidates.push(prevEntry);
         }
         const forged = candidates.find(
-          (e) =>
-            (e as AuditEntry & { __internal?: unknown }).__internal !==
-            LEDGER_INTERNAL_TOKEN,
+          (e) => marksAreMeaningful && !isInternal(e),
         );
         if (forged) {
           return {
@@ -162,12 +185,20 @@ export function verify(
     erasedSeqs?: number[];
     windowStartSeq?: number;
     truncationExplained?: boolean;
+    marksChecked?: boolean;
+    missingSeqs?: number[];
   } = {
     valid: true,
     entryCount: entries.length,
   };
   if (erasedSeqsSet.size > 0) {
     result.erasedSeqs = [...erasedSeqsSet].sort((a, b) => a - b);
+  }
+  if (missingSeqs.length > 0) {
+    result.missingSeqs = missingSeqs;
+  }
+  if (!marksAreMeaningful) {
+    result.marksChecked = false;
   }
   if (windowStartSeq !== undefined) {
     result.windowStartSeq = windowStartSeq;
