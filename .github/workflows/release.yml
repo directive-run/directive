@@ -103,16 +103,30 @@ jobs:
           # previous form silently exited 0 even when every package
           # 404'd; the 2026-06-02 release of claude-plugin@1.16.0 and
           # knowledge-mcp@0.1.0 shipped green CI but never reached npm.
+          # Retried, because the registry does not serve a package the instant
+          # `publish` returns. Without this the check failed on propagation lag
+          # — the 1.32.0 release went red on a package that was on npm a minute
+          # later — and a check that cries wolf is a check people learn to
+          # ignore, which costs more than the silent failure it was added for.
           fail=0
           while read -r pkg; do
             name=$(echo "$pkg" | jq -r '.name')
             version=$(echo "$pkg" | jq -r '.version')
             url="https://registry.npmjs.org/${name}/${version}"
-            echo "Verify: $url"
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            status=000
+            for attempt in 1 2 3 4 5 6; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo 000)
+              if [ "$status" = "200" ]; then
+                break
+              fi
+              echo "Verify: $url — HTTP ${status}, attempt ${attempt}/6"
+              sleep 10
+            done
             if [ "$status" != "200" ]; then
-              echo "::error title=Publish verification failed::${name}@${version} returned HTTP ${status} from npm registry. Token likely lacks 'create new package' permission for @directive-run/* scope."
+              echo "::error title=Publish verification failed::${name}@${version} still returned HTTP ${status} after 6 attempts over a minute. Not propagation lag — the package is not on the registry. Token likely lacks 'create new package' permission for @directive-run/* scope."
               fail=1
+            else
+              echo "Verify: $url — ok"
             fi
           done < <(echo "$published" | jq -c '.[]')
           exit $fail
