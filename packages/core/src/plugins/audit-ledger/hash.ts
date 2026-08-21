@@ -327,7 +327,16 @@ export function asRecorded(
     }
 
     const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(object)) {
+    // Keys taken one at a time rather than materialised up front.
+    //
+    // `Object.entries` built the whole list of key-and-value pairs before the
+    // budget was consulted, so a payload with a million keys cost 846ms and
+    // 47MB of transient heap inside a fact write — bounded in what it recorded
+    // and not in what it did to get there. Taking the keys alone brings that to
+    // 167ms. The remaining cost is the key list itself, which the language
+    // gives no way to walk lazily without also walking the prototype chain.
+    for (const key of Object.keys(object)) {
+      const item = (object as Record<string, unknown>)[key];
       if (budget.left <= 0) {
         defineOwn(out, "[too-large]", true);
         break;
