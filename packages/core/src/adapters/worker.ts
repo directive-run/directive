@@ -650,6 +650,46 @@ export function handleWorkerMessages(): void {
 /**
  * Internal: Create a system inside the worker.
  */
+/** The separator between a module name and a fact name. */
+const NAMESPACE_SEPARATOR = "::";
+
+/**
+ * Write one fact into a worker system, through the module that owns it.
+ *
+ * A worker always builds a namespaced system, whose top-level facts object
+ * exposes a namespace per module and refuses a flat `module::fact` assignment —
+ * correctly, since that name belongs to a module rather than to the system. It
+ * was being assigned flat anyway, so the proxy rejected it and every write into
+ * a worker failed, for every worker, with no test covering either message.
+ *
+ * A key naming no module says so rather than being dropped: these arrive from
+ * the other side of a thread boundary, where a typo has nothing else to
+ * announce it.
+ */
+function writeFact(
+  system: { facts: unknown },
+  key: string,
+  value: unknown,
+): void {
+  const separatorAt = key.indexOf(NAMESPACE_SEPARATOR);
+  if (separatorAt <= 0) {
+    throw new Error(
+      `[Directive] worker: fact key "${key}" names no module. Use "<module>${NAMESPACE_SEPARATOR}<fact>".`,
+    );
+  }
+  const moduleName = key.slice(0, separatorAt);
+  const factName = key.slice(separatorAt + NAMESPACE_SEPARATOR.length);
+  const owner = (system.facts as Record<string, unknown>)[moduleName] as
+    | Record<string, unknown>
+    | undefined;
+  if (owner === undefined || typeof owner !== "object") {
+    throw new Error(
+      `[Directive] worker: no module named "${moduleName}" in this system, so "${key}" was not written.`,
+    );
+  }
+  owner[factName] = value;
+}
+
 async function createWorkerSystem(config: WorkerSystemConfig) {
   // Dynamically import createSystem to avoid circular dependencies
   const { createSystem } = await import("../core/system.js");
@@ -751,22 +791,17 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
     stop: () => system.stop(),
     destroy: () => system.destroy(),
     setFact: (key: string, value: unknown) => {
-      (system.facts as any)[key] = value;
+      writeFact(system, key, value);
     },
     setFacts: (facts: Record<string, unknown>) => {
-      const factsProxy = system.facts as any;
-      if (factsProxy.$store?.batch) {
-        factsProxy.$store.batch(() => {
-          for (const [key, value] of Object.entries(facts)) {
-            factsProxy[key] = value;
-          }
-        });
-      } else {
-        // Fallback: set facts one by one
+      // One batch, so a set of facts that belong together arrive together —
+      // the reconcile sees them as one transition rather than as several, and
+      // the mirror coalesces them into one message per key.
+      system.batch(() => {
         for (const [key, value] of Object.entries(facts)) {
-          factsProxy[key] = value;
+          writeFact(system, key, value);
         }
-      }
+      });
     },
     dispatch: (event: { type: string }) => {
       (system as any).dispatch(event);
