@@ -1,5 +1,13 @@
 # @directive-run/example-permissions
 
+## 0.0.80
+
+### Patch Changes
+
+- Updated dependencies [[`80f0f20`](https://github.com/directive-run/directive/commit/80f0f20f31a9d435f75da0d271b06aba67f9f282)]:
+  - @directive-run/core@1.33.1
+  - @directive-run/el@1.1.3
+
 ## 0.0.79
 
 ### Patch Changes
