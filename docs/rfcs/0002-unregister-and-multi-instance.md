@@ -1,6 +1,10 @@
 # RFC 0002 – `unregisterModule()` + multi-instance modules
 
-- **Status:** Draft (2026-04-29)
+- **Status:** Shipped (2026-08-26) — `unregisterModule()` implemented with Option C cancellation.
+  Multi-instance spawning needs no new API: `createModuleFactory` plus `registerModule` under
+  distinct names already covers it, and `unregisterModule` is what let instances retire.
+  Cross-module deps to dynamic instances and replay factory registries remain future work.
+- **Superseded status:** Draft (2026-04-29)
 - **Author:** Jason Comes
 - **MIGRATION_FEEDBACK ref:** Item 26
 - **Related:** RFC 0001 (timer/clock – uses `defaultClock` per system)
@@ -12,7 +16,11 @@ Two related additions to Directive's composition API:
 1. **`system.unregisterModule(name)`** – runtime removal of a module from a live system, with defined cancellation semantics for in-flight resolvers.
 2. **Multi-instance module spawning** – register N copies of the same module under distinct names (`atomFamily`-style), produced from a single module factory.
 
-Both surface the same underlying primitive: dynamic mutation of a system's module set after `start()`. Today the set is frozen at `createSystem` time.
+Both surface the same underlying primitive: dynamic mutation of a system's module set after `start()`.
+
+> **Note (2026-08-26):** this line originally read "Today the set is frozen at `createSystem` time."
+> That stopped being true when `registerModule` shipped — the set could grow but never shrink, which
+> is the narrower and stranger gap this RFC actually closed.
 
 ## Motivation
 

@@ -1130,6 +1130,13 @@ export type ObservationEvent =
    * system was already running). Carries the source id + the module that
    * declared it so plugins can attribute per-module sources.
    */
+  /**
+   * RFC 0002: a module joined or left a live system. Replay reconstructs the
+   * dynamic topology from these, so they carry the module boundary that a
+   * stream of individual definition events cannot express.
+   */
+  | { type: "module.registered"; id: string }
+  | { type: "module.unregistered"; id: string }
   | { type: "source.attach"; id: string; moduleId: string }
   /**
    * A source published an event into the system's event queue. Fires

@@ -223,6 +223,9 @@ export interface PluginManager<_S extends Schema = any> {
   ): void;
   emitDefinitionUnregister(type: string, id: string): void;
   emitDefinitionCall(type: string, id: string, props?: unknown): void;
+  /** RFC 0002: module-level topology change, for replay reconstruction. */
+  emitModuleRegistered(id: string): void;
+  emitModuleUnregistered(id: string): void;
 
   // Trace hooks
   emitTraceComplete(run: TraceEntry): void;
@@ -453,6 +456,8 @@ export function createPluginManager<
     emitDefinitionAssign: broadcast("onDefinitionAssign"),
     emitDefinitionUnregister: broadcast("onDefinitionUnregister"),
     emitDefinitionCall: broadcast("onDefinitionCall"),
+    emitModuleRegistered: broadcast("onModuleRegistered"),
+    emitModuleUnregistered: broadcast("onModuleUnregistered"),
 
     // Trace hooks
     emitTraceComplete: broadcast("onTraceComplete"),

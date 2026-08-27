@@ -72,12 +72,16 @@ function makeOptions(
 
 describe("prefixModuleDefinition", () => {
   describe("return shape", () => {
-    it("returns id from the module", () => {
+    it("identifies the flattened module by its namespace, not the definition's id", () => {
+      // One definition can be registered under several namespaces, so the
+      // definition's id is not unique inside a flattened system. Every key the
+      // module contributes is namespace-prefixed, so the namespace is the
+      // identity that actually distinguishes instances.
       const result = prefixModuleDefinition(
         makeOptions({ mod: makeModule({ id: "my-module" }) }),
       );
 
-      expect(result.id).toBe("my-module");
+      expect(result.id).toBe("auth");
     });
 
     it("returns hooks from the module unchanged", () => {
@@ -1429,8 +1433,8 @@ describe("prefixModuleDefinition", () => {
       // History
       expect(result.history.snapshotEvents).toEqual(["app::increment"]);
 
-      // ID
-      expect(result.id).toBe("full");
+      // ID — the namespace, which is what identifies an instance
+      expect(result.id).toBe("app");
     });
   });
 });

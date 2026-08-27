@@ -801,7 +801,15 @@ export function prefixModuleDefinition(
     : [];
 
   return {
-    id: mod.id,
+    // The NAMESPACE, not `mod.id`. Every key this module contributes is
+    // already namespace-prefixed, so the namespace is what actually identifies
+    // it inside a flattened system — and it is unique by construction, which
+    // `mod.id` is not. One factory-built definition registered under several
+    // names produced several modules sharing an id, and everything downstream
+    // that keys on module identity (source ownership, module meta, teardown)
+    // then acted on whichever it found first. Retiring one instance detached a
+    // sibling's live subscription, permanently and with nothing reported.
+    id: namespace,
     schema: prefixSchema(mod, namespace),
     requirements: mod.schema.requirements ?? {},
     init: prefixInit(mod, namespace),

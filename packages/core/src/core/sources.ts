@@ -50,7 +50,7 @@ interface AttachedSource {
    * (an in-flight publish after a gate close counts as a drop); `"stop"` and
    * `"re-register"` keep the historic silent-return behaviour.
    */
-  detachReason?: "gate-closed" | "re-register" | "stop";
+  detachReason?: "gate-closed" | "re-register" | "stop" | "unregister";
   /** RFC 0012: resolved gate key this record was attached under (keyed sources). */
   key?: string;
 }
@@ -308,6 +308,16 @@ export interface SourcesManager {
    * the broker drops the subscription).
    */
   cleanupAll(): void;
+  /**
+   * RFC 0002: detach and forget every source owned by one module, leaving
+   * every other module's sources attached and the manager's phase untouched.
+   *
+   * Distinct from {@link cleanupAll}, which stops the whole manager. A module
+   * being unregistered is not the system stopping, so the phase must not move
+   * — sources belonging to modules that are still running have to keep
+   * publishing straight through.
+   */
+  cleanupModule(moduleId: string): void;
   /**
    * RFC 0009: async-aware cleanup. Awaits each source's unsubscribe in
    * reverse-registration order. Errors are caught + reported as
@@ -745,7 +755,7 @@ export function createSourcesManager(
    */
   function detachOne(
     record: AttachedSource,
-    reason: "gate-closed" | "re-register" | "stop",
+    reason: "gate-closed" | "re-register" | "stop" | "unregister",
   ): void {
     record.detached = true;
     record.detachReason = reason;
@@ -948,6 +958,38 @@ export function createSourcesManager(
         // `start()` right after `attachAll`, then on every effects plane).
         if (keyFns.has(id)) continue;
         attachOne(id, record, dispatch);
+      }
+    },
+
+    cleanupModule(moduleId: string): void {
+      // Reverse order, matching cleanupAll's LIFO teardown. Iterating a copy
+      // because detachOne splices the live array as it goes.
+      for (let i = attached.length - 1; i >= 0; i--) {
+        const record = attached[i];
+        if (!record || record.detached) continue;
+        if (record.moduleId !== moduleId) continue;
+        detachOne(record, "unregister");
+      }
+      // Drop the definitions too, so the ids are free for a module registered
+      // again under the same name and so `inspect().sources` stops listing a
+      // source nothing can ever publish to.
+      for (const [id, entry] of definitions) {
+        if (entry.moduleId !== moduleId) continue;
+        definitions.delete(id);
+        counters.delete(id);
+        // Gate state, all of it. A pending linger timer is the dangerous one:
+        // its closure holds the old definition and calls back into attach, so
+        // a source detached here re-attached itself milliseconds later as a
+        // subscription that no inspection surface could see and no teardown
+        // would ever reach.
+        const pendingLinger = lingerTimers.get(id);
+        if (pendingLinger) {
+          clearTimeout(pendingLinger.timer);
+          lingerTimers.delete(id);
+        }
+        keyFns.delete(id);
+        lastKey.delete(id);
+        attachRetries.delete(id);
       }
     },
 

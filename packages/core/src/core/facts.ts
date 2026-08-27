@@ -175,6 +175,16 @@ export function createFactsStore<S extends Schema>(
   const map = new Map<string, unknown>();
   const knownKeys = new Set<string>(); // Track all keys that have been set
   const keyListeners = new Map<string, Set<() => void>>();
+  /**
+   * Keys whose module was unregistered (RFC 0002).
+   *
+   * A resolver that ignores its abort signal keeps running after teardown, and
+   * its writes are documented as landing nowhere. Without this set they landed
+   * somewhere: `set` would re-add the key to `map` and `knownKeys`, resurrecting
+   * a fact with no schema entry and no tags — so it was invisible to redaction
+   * and grew without bound across a rotation.
+   */
+  const unregisteredKeys = new Set<string>();
   const allListeners = new Set<() => void>();
 
   let batching = 0;
@@ -501,6 +511,15 @@ export function createFactsStore<S extends Schema>(
       key: K,
       value: InferSchema<S>[K],
     ): void {
+      // Checked BEFORE validation, deliberately. A write to a key whose module
+      // was unregistered lands nowhere, which is what the API promises for a
+      // resolver that ignored its abort signal — and validation would instead
+      // throw "unknown fact key", because the schema entry is exactly what
+      // unregistering removes. Behind validation this guard was unreachable in
+      // development, so the documented behaviour held only in production, and
+      // an orphaned timer or stream callback raised in user code.
+      if (unregisteredKeys.has(key as string)) return;
+
       if (isDevelopment) validateValue(key as string, value);
 
       const prev = map.get(key as string);
@@ -648,6 +667,10 @@ export function createFactsStore<S extends Schema>(
       // Add to schema for validation
       (schema as Record<string, unknown>)[key] = newSchema[key];
       knownKeys.add(key);
+      // A name coming back is live again. Leaving it marked would make the
+      // replacement instance silently unwritable — the rotation would appear to
+      // work and then hold its opening values forever.
+      unregisteredKeys.delete(key);
       added.push(key);
     }
     // Tell the engine, so a key registered through the store is recorded the
@@ -657,6 +680,51 @@ export function createFactsStore<S extends Schema>(
     if (added.length > 0) {
       onKeysRegistered?.(added.map((k) => [k, newSchema[k]] as const));
     }
+  };
+
+  // Internal: drop schema keys when a module is unregistered (RFC 0002).
+  // Not part of the public FactsStore interface — used by engine.unregisterModule().
+  //
+  // The declaration is removed, not merely the value. `registerKeys` refuses to
+  // re-declare a key it already holds, because swapping a declaration would
+  // swap the tags that decide what gets redacted. A module registered again
+  // under the same name brings freshly-built schema objects, so leaving the old
+  // declaration behind would make re-registration throw — the one thing this
+  // whole API exists to allow.
+  (store as unknown as Record<string, unknown>).unregisterKeys = (
+    keys: readonly string[],
+  ) => {
+    // One batch for the whole module, not one notification per fact. Notifying
+    // per key published every torn intermediate state — a watcher on a
+    // three-fact module saw the first key gone while the other two remained,
+    // then the second, then the third. Three renders of states that never
+    // existed, scaling with the module's fact count.
+    store.batch(() => {
+      for (const key of keys) {
+        const prev = map.get(key);
+        map.delete(key);
+        knownKeys.delete(key);
+        delete (schema as Record<string, unknown>)[key];
+        unregisteredKeys.add(key);
+        // Announced, not silent. Invalidation walks the dependency index only
+        // when a change is reported, so removing values quietly left a
+        // derivation in another module holding its cached value forever —
+        // a number for something that no longer existed.
+        batchChanges.push({
+          key,
+          value: undefined,
+          prev,
+          type: "delete",
+          origin: originOf?.() ?? "authored",
+        });
+        dirtyKeys.add(key);
+        onWrite?.(key);
+      }
+    });
+    // Listeners are deliberately NOT dropped. A key coming back under the same
+    // name is the headline use case, not an edge case, and a subscriber that
+    // survived the rotation must keep working. Dropping them silently killed
+    // every `useFact` and `system.subscribe` across a re-register.
   };
 
   return store;

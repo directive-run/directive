@@ -570,6 +570,22 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * @param id - The definition ID
    */
   onDefinitionUnregister?: (type: string, id: string) => void;
+  /**
+   * RFC 0002: a module was added to, or removed from, a live system.
+   *
+   * Distinct from the per-definition hooks above, which fire once per
+   * constraint, resolver, effect and so on. Replay needs the module-level
+   * boundary: a stream of individual definition events cannot say where one
+   * instance ended and the next began.
+   *
+   * These cover **dynamic** topology only. Modules a system was created with
+   * do not emit `onModuleRegistered` — they are part of the system's
+   * construction and a replay already has them from the `createSystem` config.
+   * The id is the module's namespace in a namespaced system, so instances
+   * built from one factory remain distinguishable.
+   */
+  onModuleRegistered?: (id: string) => void;
+  onModuleUnregistered?: (id: string) => void;
 
   /**
    * Called when a definition is manually invoked via `call()`.
