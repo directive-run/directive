@@ -1,5 +1,13 @@
 # @directive-run/example-time-machine
 
+## 0.0.81
+
+### Patch Changes
+
+- Updated dependencies [[`1ab02c2`](https://github.com/directive-run/directive/commit/1ab02c2aa712c7c56083ce8823b7475d1bcc9a55), [`49e5de5`](https://github.com/directive-run/directive/commit/49e5de5b462200c9e88d80b64c9ee4096dc76039), [`20fe678`](https://github.com/directive-run/directive/commit/20fe678433aaaf8dcc5e9b9d3b3744a3380f1eb7)]:
+  - @directive-run/core@1.34.0
+  - @directive-run/el@1.1.3
+
 ## 0.0.80
 
 ### Patch Changes

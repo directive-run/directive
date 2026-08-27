@@ -1,5 +1,14 @@
 # @directive-run/mcp
 
+## 0.6.27
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.34.0
+  - @directive-run/sandbox@0.4.26
+  - @directive-run/claude-plugin@1.34.0
+
 ## 0.6.26
 
 ### Patch Changes

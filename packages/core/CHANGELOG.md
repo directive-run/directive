@@ -1,5 +1,151 @@
 # @directive-run/core
 
+## 1.34.0
+
+### Minor Changes
+
+- [`49e5de5`](https://github.com/directive-run/directive/commit/49e5de5b462200c9e88d80b64c9ee4096dc76039) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Modules can now be removed from a running system with `system.unregisterModule(name)`
+
+  A system's module set could grow at runtime but never shrink. `registerModule` shipped a while
+  back; there was no way to undo it, so every module registered was permanent for the life of the
+  system. That made a whole family of patterns unbuildable — anything where instances come and go.
+  A representative unit repeated N times, a per-match or per-turn module opened and closed as play
+  moves on, a detailed submodel swapped in while you look at something closely and dropped when you
+  look away. Each of those needs instances to retire, and the only workaround was a registry of
+  manually disabled modules shadowing the real one, which is a second source of truth by another name.
+
+  ```ts
+  await system.unregisterModule("turn:42");
+  system.registerModule("turn:43", createTurnModule({ id: 43 }));
+  ```
+
+  Teardown runs in the reverse order of registration, and the order matters. Sources detach first so
+  nothing new arrives mid-teardown. Resolvers go next, because an in-flight one holds a facts proxy
+  over keys that are about to stop existing. Constraints come before derivations so nothing recomputes
+  a value on its way out. Facts go last.
+
+  In-flight resolvers are aborted through `context.signal`. A resolver that watches the signal stops
+  promptly; one that ignores it runs to completion and its writes land nowhere, since the facts are
+  gone. The returned promise settles once that work has genuinely finished rather than merely been
+  told to stop — those are different moments, and the later one is what a caller registering a
+  replacement under the same name actually needs.
+
+  Batched resolvers are included in both halves of that: an in-flight batch is aborted and waited for,
+  not skipped. The wait is bounded at ten seconds — a resolver that ignores its signal and never
+  settles would otherwise hang the call forever, and detaching has already happened by then, so giving
+  up on the wait costs nothing but the orphaned work. A write from a resolver that outlived its module
+  is dropped rather than applied, so it cannot resurrect a fact with no schema entry and no tags, and
+  cannot reach whatever instance took the name next.
+
+  A module's `hooks.onStop` throwing is reported and does not abort the unregister. It runs after
+  teardown, so letting it escape would leave a namespace that could be neither unregistered again nor
+  registered again.
+
+  Two smaller additions come with it. `system.observe()` gains `module.registered` and
+  `module.unregistered` events, which carry the module boundary that a stream of individual definition
+  events cannot express — replay needs to know where one instance ended and the next began. And
+  plugins gain matching `onModuleRegistered` / `onModuleUnregistered` hooks.
+
+  Registering a module again under a name that was previously unregistered works, including with a
+  freshly built schema. The declaration is removed on unregister rather than merely the values,
+  because a fact's type and its tags are fixed once registered and leaving a stale declaration behind
+  would make re-registration throw — the one thing this API exists to allow.
+
+### Patch Changes
+
+- [`1ab02c2`](https://github.com/directive-run/directive/commit/1ab02c2aa712c7c56083ce8823b7475d1bcc9a55) Thanks [@jasoncomes](https://github.com/jasoncomes)! - History snapshots no longer alias live state, and no longer drop facts they can capture
+
+  Snapshot serialization degraded through three tiers in silence — `structuredClone`,
+  then `JSON.parse(JSON.stringify(…))`, then a shallow spread — with both fallbacks
+  behind bare `catch` blocks.
+
+  The last tier was the problem. A shallow copy aliases every nested object, so
+  mutating a fact after a snapshot had been taken rewrote the snapshot too. Time
+  travel then showed a past that never happened, which is worse than refusing to
+  record one: an operator comparing two points in history was handed a difference
+  manufactured by the act of reading it.
+
+  Reaching that tier needed two hostile values at once — something `structuredClone`
+  rejects, such as a function, and something `JSON.stringify` rejects, such as a
+  bigint — which is why it went unnoticed.
+
+  The snapshot is now built one fact at a time, so a value that refuses to clone
+  costs only itself, and there is no shallow-copy tier at all.
+
+  **A development-only defect surfaced while fixing it, and mattered more.** In dev
+  every object-valued fact is read through a Proxy that warns about nested mutation.
+  The immutable update the docs recommend — `facts.doc = { ...facts.doc, title }` —
+  reads each nested value through that Proxy and spreads the results, so the wrappers
+  end up _stored_. `structuredClone` refuses a Proxy, so an ordinary fact holding a
+  string and a `Date` became uncapturable, was omitted from every snapshot, and was
+  never restored: `goBack` rewound some facts and not others. Snapshots now unwrap
+  those wrappers before cloning, on the fallback path only, so it costs nothing when
+  cloning already works.
+
+  A fact that genuinely cannot be cloned is left out and reported once, naming it:
+
+  ```
+  [Directive] These facts cannot be captured in history and are omitted from
+  snapshots: connection. Restoring leaves them at their current values.
+  ```
+
+  Two limits worth stating plainly. The report covers a value that fails to clone
+  whole; loss _inside_ a value — a nested function dropped by the JSON tier, a
+  nested `Map` flattened to `{}` — is still silent. And class instances are not
+  affected by any of this: they clone successfully into prototype-stripped plain
+  objects, so they never reach this path. The engine already warns about
+  class-instance facts where they are written, which is the right place for it.
+
+- [`20fe678`](https://github.com/directive-run/directive/commit/20fe678433aaaf8dcc5e9b9d3b3744a3380f1eb7) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Effects no longer copy every fact on every pass when nothing reads `prevFacts`
+
+  An effect's second parameter, `prevFacts`, was built by copying the entire fact
+  store once per reconciliation pass — whether or not a single effect took a second
+  parameter. Most effects only read `facts`, and they paid for the copy anyway.
+
+  The cost scaled with the size of the whole system rather than with the effects in
+  it, which made it the dominant per-pass cost at scale and put a ceiling on how
+  many facts a system could hold before reconciliation stopped fitting in a frame.
+
+  Measured, per pass, comparing an effect declared `(facts)` against the same effect
+  declared `(facts, prevFacts)`:
+
+  | facts  | reads prevFacts | does not | saved per pass |
+  | ------ | --------------- | -------- | -------------- |
+  | 500    | 0.045 ms        | 0.014 ms | 0.03 ms        |
+  | 5,000  | 0.311 ms        | 0.009 ms | 0.30 ms        |
+  | 20,000 | 1.502 ms        | 0.015 ms | 1.49 ms        |
+  | 50,000 | 5.344 ms        | 0.007 ms | 5.34 ms        |
+
+  The saving is quoted rather than a ratio on purpose: the second column is small
+  enough that a ratio would be reporting measurement noise as precision. What
+  matters is its shape, not its size — it is flat. Effects that do not read
+  `prevFacts` now cost the same per pass whether the system holds five hundred
+  facts or fifty thousand, so the per-pass cost stops scaling with the size of the
+  system and starts scaling with the effects in it.
+
+  This applies to composed systems as well as single-module ones. The namespace
+  transform wraps every effect in a three-parameter function, so the wrapper now
+  records whether the effect inside it reads `prevFacts` — otherwise every
+  namespaced effect would look like a reader, and systems built from several
+  modules, which hold the most facts, would have been the ones to get nothing.
+
+  Nothing changes for effects that do read it. Detection is deliberately pessimistic
+  because arity alone cannot answer the question — `Function.length` stops counting
+  at the first default or rest parameter, so it reports one for
+  `(facts, prevFacts = null) => …` and zero for `(...args) => …`, and both read
+  `prevFacts`. When arity is inconclusive the parameter list is read from the
+  function source, and any answer that cannot be reached confidently is "yes". A
+  snapshot nobody reads costs time; a skipped snapshot somebody reads is a wrong
+  value in a place that looks like a comparison against history, and those are not
+  symmetric.
+
+  An effect using a data `on` gate always gets a real snapshot, since the runtime
+  hands the gate `prevFacts` itself. An effect registered after the system is
+  running also gets one immediately rather than on its second pass — for a gate
+  that matters more than a wrong value, because the predicate runtime reads an
+  absent previous state as "everything changed", which would fire a `$changed`
+  gate on a fact that had not changed.
+
 ## 1.33.1
 
 ### Patch Changes

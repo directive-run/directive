@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-cloudflare-directive-ai",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "scripts": {
