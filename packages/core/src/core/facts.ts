@@ -737,6 +737,60 @@ export function createFactsStore<S extends Schema>(
 const nestedProxyCache = new WeakMap<object, object>();
 
 /**
+ * Reads the object a dev warning Proxy wraps, or `undefined` for anything else.
+ *
+ * The wrapper is a development aid, but it does not stay on the read path: the
+ * documented immutable update `facts.doc = { ...facts.doc, title }` reads every
+ * nested value THROUGH the wrapper and spreads the results into a new object,
+ * so the wrappers are stored. From then on the fact holds Proxies where the
+ * author put a `Date` or a `Map`.
+ *
+ * That matters because `structuredClone` refuses a Proxy, and cloning is how
+ * state crosses every boundary in this codebase — history snapshots, optimistic
+ * rollback, worker `postMessage`, distributable snapshots. A dev-only aid was
+ * making dev-mode state uncloneable.
+ */
+export const DEV_PROXY_TARGET: unique symbol = Symbol.for(
+  "directive.devProxyTarget",
+);
+
+/**
+ * Recursively replace dev warning Proxies with the objects they wrap.
+ *
+ * Returns the input untouched when there is nothing to unwrap, so callers can
+ * use the result unconditionally. Only reachable in development: production
+ * builds never create the wrappers.
+ */
+export function unwrapDevProxies<T>(value: T, seen = new WeakSet()): T {
+  if (typeof value !== "object" || value === null) return value;
+
+  const target = (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET];
+  const source = (target ?? value) as object;
+
+  // Cycles are legal in facts and `structuredClone` handles them, so the walk
+  // has to as well rather than recursing forever.
+  if (seen.has(source)) return source as T;
+  seen.add(source);
+
+  if (Array.isArray(source)) {
+    return source.map((item) => unwrapDevProxies(item, seen)) as T;
+  }
+  // Anything with internal slots — Date, Map, Set, TypedArray, RegExp — is
+  // returned whole. Walking its properties would produce a plain object and
+  // lose exactly what makes it that type.
+  if (Object.getPrototypeOf(source) !== Object.prototype) {
+    return source as T;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    out[key] = unwrapDevProxies(item, seen);
+  }
+
+  return out as T;
+}
+
+/**
  * Wrap an object in a Proxy that warns when properties are set.
  * Catches `facts.user.name = "John"` which silently skips reactivity.
  * Only used in dev mode — tree-shaken in production builds.
@@ -756,6 +810,12 @@ function wrapWithNestedWarning(
       // pretty-format) render the underlying object directly rather
       // than the warning-wrapped Proxy. `Symbol.toPrimitive` is left
       // alone — the protocol requires a primitive return.
+      // Unwrap hatch. Cloning refuses a Proxy, and these wrappers end up
+      // stored, so anything that has to serialize state needs a way back to
+      // the real object.
+      if (prop === DEV_PROXY_TARGET) {
+        return target;
+      }
       if (prop === Symbol.for("nodejs.util.inspect.custom")) {
         return () => target;
       }
