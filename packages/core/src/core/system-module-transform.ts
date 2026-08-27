@@ -10,6 +10,7 @@
 
 import isDevelopment from "#is-development";
 import { freezeSpec } from "../utils/utils.js";
+import { PREV_FACTS_READ, declaresPrevFacts } from "./effects.js";
 import {
   applyPatch,
   evaluateTemplate,
@@ -727,27 +728,39 @@ function prefixEffects(
       deps?: string[];
     };
 
+    // Whether the AUTHOR's effect reads `prevFacts`, recorded before wrapping.
+    // The wrapper below always takes three parameters, so its own arity says
+    // nothing about the effect inside it — and reading the wrapper instead
+    // meant every namespaced effect looked like a reader, which silently opted
+    // composed systems out of skipping the full-store copy entirely. Those are
+    // the systems holding the most facts.
+    const readsPrevFacts = declaresPrevFacts(effectDef.run);
+
+    const wrappedRun = (facts: any, prevFacts: any, derive: any) => {
+      const factsProxy = createScopedFactsProxy(
+        facts as Record<string, unknown>,
+        namespace,
+        hasCrossModuleDeps,
+        depNamespaces,
+      );
+      const prevProxy = prevFacts
+        ? createScopedFactsProxy(
+            prevFacts as Record<string, unknown>,
+            namespace,
+            hasCrossModuleDeps,
+            depNamespaces,
+          )
+        : undefined;
+      const deriveProxy = moduleDerive(derive, namespace);
+
+      return effectDef.run(factsProxy, prevProxy, deriveProxy);
+    };
+    (wrappedRun as { [PREV_FACTS_READ]?: boolean })[PREV_FACTS_READ] =
+      readsPrevFacts;
+
     result[prefixKey(namespace, key)] = {
       ...effectDef,
-      run: (facts: any, prevFacts: any, derive: any) => {
-        const factsProxy = createScopedFactsProxy(
-          facts as Record<string, unknown>,
-          namespace,
-          hasCrossModuleDeps,
-          depNamespaces,
-        );
-        const prevProxy = prevFacts
-          ? createScopedFactsProxy(
-              prevFacts as Record<string, unknown>,
-              namespace,
-              hasCrossModuleDeps,
-              depNamespaces,
-            )
-          : undefined;
-        const deriveProxy = moduleDerive(derive, namespace);
-
-        return effectDef.run(factsProxy, prevProxy, deriveProxy);
-      },
+      run: wrappedRun,
       deps: effectDef.deps?.map((dep) => prefixKey(namespace, dep)),
     };
   }
@@ -801,7 +814,15 @@ export function prefixModuleDefinition(
     : [];
 
   return {
-    id: mod.id,
+    // The NAMESPACE, not `mod.id`. Every key this module contributes is
+    // already namespace-prefixed, so the namespace is what actually identifies
+    // it inside a flattened system — and it is unique by construction, which
+    // `mod.id` is not. One factory-built definition registered under several
+    // names produced several modules sharing an id, and everything downstream
+    // that keys on module identity (source ownership, module meta, teardown)
+    // then acted on whichever it found first. Retiring one instance detached a
+    // sibling's live subscription, permanently and with nothing reported.
+    id: namespace,
     schema: prefixSchema(mod, namespace),
     requirements: mod.schema.requirements ?? {},
     init: prefixInit(mod, namespace),

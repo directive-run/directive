@@ -2604,6 +2604,10 @@ export function createEngine<S extends Schema>(
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
+        onModuleRegistered: (id: string) =>
+          observer({ type: "module.registered", id }),
+        onModuleUnregistered: (id: string) =>
+          observer({ type: "module.unregistered", id }),
         onSourceAttach: (id: string, moduleId: string) =>
           observer({ type: "source.attach", id, moduleId }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
@@ -4020,6 +4024,8 @@ export function createEngine<S extends Schema>(
       });
     }
 
+    pluginManager.emitModuleRegistered(module.id);
+
     // Call lifecycle hooks
     module.hooks?.onInit?.(system);
     if (state.isRunning) {
@@ -4029,9 +4035,244 @@ export function createEngine<S extends Schema>(
     }
   }
 
+  /**
+   * RFC 0002: remove a module from a live system.
+   *
+   * Teardown order is the reverse of registration and it is load-bearing.
+   * Sources go first so nothing new can arrive mid-teardown; resolvers next,
+   * because an in-flight one holds a facts proxy over keys that are about to
+   * stop existing; constraints before derivations so nothing re-derives a
+   * value on its way out; facts last.
+   *
+   * Cancellation is RFC 0002's Option C. Unregistering aborts in-flight
+   * resolvers AND detaches them, so a resolver watching `context.signal` stops
+   * promptly and one ignoring it merely writes nowhere. The returned promise
+   * settles once that work has actually finished, not merely once it was told
+   * to stop — those are different moments, and a caller registering a
+   * replacement instance under the same name needs the later one.
+   */
+  async function unregisterModule(
+    // A string only identifies a module when ids are unique, which is true in
+    // single-module mode and false in namespaced mode: `prefixModuleDefinition`
+    // keeps `mod.id`, so one module definition registered under two namespaces
+    // yields two entries with the same id. Passing the exact object removes the
+    // ambiguity — and tearing down the wrong module is not a failure anyone
+    // would catch quickly.
+    target: string | object,
+  ): Promise<void> {
+    const label =
+      typeof target === "string"
+        ? target
+        : ((target as { id?: string }).id ?? "<module>");
+
+    if (state.isDestroyed) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}" on a destroyed system.`,
+      );
+    }
+    if (state.isReconciling) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}" during reconciliation. Wait for the current reconciliation cycle to complete.`,
+      );
+    }
+
+    const found =
+      typeof target === "string"
+        ? config.modules.find((m) => (m as { id: string }).id === target)
+        : config.modules.find((m) => (m as object) === target);
+    if (!found) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}": no such module is registered.`,
+      );
+    }
+    // Re-entrancy: two concurrent calls for the same module would both pass the
+    // lookup and both run the whole teardown, firing `onStop` twice and
+    // splicing twice. The second caller awaits the first instead.
+    const alreadyRunning = unregisterInFlight.get(found);
+    if (alreadyRunning) {
+      await alreadyRunning;
+
+      return;
+    }
+
+    const run = unregisterModuleInner(found, label);
+    unregisterInFlight.set(found, run);
+    try {
+      await run;
+    } finally {
+      unregisterInFlight.delete(found);
+    }
+  }
+
+  /** In-flight unregisters, keyed by the exact module object. */
+  const unregisterInFlight = new Map<object, Promise<void>>();
+
+  async function unregisterModuleInner(
+    found: object,
+    moduleId: string,
+  ): Promise<void> {
+    const module = found as unknown as {
+      id: string;
+      schema: Record<string, unknown>;
+      derive?: Record<string, unknown>;
+      events?: Record<string, unknown>;
+      effects?: Record<string, unknown>;
+      sources?: Record<string, unknown>;
+      constraints?: Record<string, unknown>;
+      resolvers?: Record<string, unknown>;
+      hooks?: { onStop?: (s: unknown) => void };
+    };
+
+    // 1. Sources — stop new input before anything it feeds is dismantled.
+    if (module.sources) {
+      sourcesManager.cleanupModule(moduleId);
+      for (const sourceId of Object.keys(module.sources)) {
+        delete mergedSources[sourceId];
+        delete sourceModuleIds[sourceId];
+        pluginManager.emitDefinitionUnregister("source", sourceId);
+      }
+    }
+
+    // 2. Resolvers — abort, then wait for the work to genuinely stop.
+    const resolverIds = module.resolvers ? Object.keys(module.resolvers) : [];
+    for (const resolverId of resolverIds) {
+      // `syncResolverKeys` published this resolver's `key` function as the
+      // dedupe identity for its requirement type. Left behind, a retired
+      // module's closure keeps deciding requirement identity for whatever
+      // registers that type next — including resolvers that declared no key
+      // of their own. Symmetric with the single-definition path.
+      const def = (module.resolvers as Record<string, unknown>)[resolverId] as {
+        key?: unknown;
+        requirement?: unknown;
+      };
+      if (def?.key && typeof def.requirement === "string") {
+        // Only when no surviving resolver still declares a key for this
+        // requirement type. `setRequirementKey` is last-write-wins across
+        // modules, so removing unconditionally stripped the dedupe identity
+        // from a module that was never touched — silently changing whether its
+        // requirements coalesce or run in parallel.
+        const stillOwned = Object.entries(
+          mergedResolvers as Record<string, unknown>,
+        ).some(([otherId, otherDef]) => {
+          if (otherId === resolverId) return false;
+          const other = otherDef as { key?: unknown; requirement?: unknown };
+
+          return Boolean(other?.key) && other.requirement === def.requirement;
+        });
+        if (!stillOwned) {
+          constraintsManager.removeRequirementKey(def.requirement);
+        }
+      }
+      resolversManager.unregisterDefinition(resolverId);
+      delete (mergedResolvers as Record<string, unknown>)[resolverId];
+      resolverIdToModule.delete(resolverId);
+      pluginManager.emitDefinitionUnregister("resolver", resolverId);
+    }
+    if (resolverIds.length > 0) {
+      await resolversManager.drainResolvers(resolverIds);
+    }
+
+    // 3. Constraints, effects, derivations.
+    if (module.constraints) {
+      for (const id of Object.keys(module.constraints)) {
+        constraintsManager.unregisterDefinition(id);
+        delete (mergedConstraints as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("constraint", id);
+      }
+    }
+    if (module.effects) {
+      for (const id of Object.keys(module.effects)) {
+        effectsManager.unregisterDefinition(id);
+        delete (mergedEffects as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("effect", id);
+      }
+    }
+    if (module.derive) {
+      for (const id of Object.keys(module.derive)) {
+        derivationsManager.unregisterDefinition(id);
+        delete (mergedDerive as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("derivation", id);
+      }
+    }
+
+    // 4. Events.
+    if (module.events) {
+      for (const name of Object.keys(module.events)) {
+        delete (mergedEvents as Record<string, unknown>)[name];
+        snapshotEventNames?.delete(name);
+        // Same untag hazard the fact tags carry, one step over: a retired
+        // event's meta answering `carriesTag("event", …)` would let an event
+        // registered later under the same name inherit tags it never declared.
+        eventMeta.delete(name);
+      }
+    }
+
+    // 5. Facts last — everything above could still have read them.
+    const factKeys = Object.keys(module.schema);
+    const factsStore = store as unknown as {
+      unregisterKeys(keys: readonly string[]): void;
+    };
+    factsStore.unregisterKeys(factKeys);
+    for (const key of factKeys) {
+      delete (mergedSchema as Record<string, unknown>)[key];
+      // Drop the tag record too. Leaving it behind would let a key registered
+      // again later inherit tags from the instance that retired — which is the
+      // untag hazard `recordFactTags` exists to prevent, running backwards.
+      factTagSets.delete(key);
+    }
+
+    moduleMeta.delete(moduleId);
+    // Re-found here, never captured before the awaits above. An index taken
+    // earlier goes stale the moment a concurrent unregister splices the array,
+    // and the result is that a live module gets removed while the intended one
+    // stays — silently, and with `onStop` firing on the wrong module.
+    const index = config.modules.indexOf(
+      found as (typeof config.modules)[number],
+    );
+    if (index !== -1) {
+      config.modules.splice(index, 1);
+    }
+
+    // Anything holding a tag answer is now holding a stale one.
+    notifyMetaSubscribers();
+
+    // Caught, not propagated. `onStop` runs after the module has already been
+    // torn down, so letting it throw would abandon the remaining bookkeeping
+    // and leave the name both un-unregisterable and un-re-registerable — a
+    // permanently dead namespace, caused by a hook that is only an observer.
+    try {
+      module.hooks?.onStop?.(system);
+    } catch (rawError) {
+      const error =
+        rawError instanceof Error ? rawError : new Error(String(rawError));
+      console.error(
+        `[Directive] Module "${moduleId}" hooks.onStop threw during unregister:`,
+        error,
+      );
+      // Reported, deliberately not routed through the error boundary: a
+      // configured `throw` strategy there would put the exception straight back
+      // on the path this catch exists to protect, and the teardown has already
+      // happened. `onStop` is an observer, so its failure is news rather than a
+      // reason to abandon the rest of the unregister.
+    }
+    pluginManager.emitDefinitionUnregister("module", moduleId);
+    pluginManager.emitModuleUnregistered(moduleId);
+
+    if (state.isRunning && !state.isReconciling) {
+      // Awaited, not scheduled. `registerModule` refuses to run during
+      // reconciliation, and a caller that immediately registers a replacement
+      // instance — the rotation this whole API exists for — would otherwise
+      // collide with a pass this very call had queued. Awaiting means that when
+      // the promise settles the name is genuinely free.
+      await reconcile();
+    }
+  }
+
   // Attach registerModule to system
   (system as unknown as Record<string, unknown>).registerModule =
     registerModule;
+  (system as unknown as Record<string, unknown>).unregisterModule =
+    unregisterModule;
 
   // Hand first-party plugins the ability to mark their writes as hydration.
   //

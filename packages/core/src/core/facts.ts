@@ -175,6 +175,16 @@ export function createFactsStore<S extends Schema>(
   const map = new Map<string, unknown>();
   const knownKeys = new Set<string>(); // Track all keys that have been set
   const keyListeners = new Map<string, Set<() => void>>();
+  /**
+   * Keys whose module was unregistered (RFC 0002).
+   *
+   * A resolver that ignores its abort signal keeps running after teardown, and
+   * its writes are documented as landing nowhere. Without this set they landed
+   * somewhere: `set` would re-add the key to `map` and `knownKeys`, resurrecting
+   * a fact with no schema entry and no tags — so it was invisible to redaction
+   * and grew without bound across a rotation.
+   */
+  const unregisteredKeys = new Set<string>();
   const allListeners = new Set<() => void>();
 
   let batching = 0;
@@ -501,6 +511,15 @@ export function createFactsStore<S extends Schema>(
       key: K,
       value: InferSchema<S>[K],
     ): void {
+      // Checked BEFORE validation, deliberately. A write to a key whose module
+      // was unregistered lands nowhere, which is what the API promises for a
+      // resolver that ignored its abort signal — and validation would instead
+      // throw "unknown fact key", because the schema entry is exactly what
+      // unregistering removes. Behind validation this guard was unreachable in
+      // development, so the documented behaviour held only in production, and
+      // an orphaned timer or stream callback raised in user code.
+      if (unregisteredKeys.has(key as string)) return;
+
       if (isDevelopment) validateValue(key as string, value);
 
       const prev = map.get(key as string);
@@ -648,6 +667,10 @@ export function createFactsStore<S extends Schema>(
       // Add to schema for validation
       (schema as Record<string, unknown>)[key] = newSchema[key];
       knownKeys.add(key);
+      // A name coming back is live again. Leaving it marked would make the
+      // replacement instance silently unwritable — the rotation would appear to
+      // work and then hold its opening values forever.
+      unregisteredKeys.delete(key);
       added.push(key);
     }
     // Tell the engine, so a key registered through the store is recorded the
@@ -659,6 +682,51 @@ export function createFactsStore<S extends Schema>(
     }
   };
 
+  // Internal: drop schema keys when a module is unregistered (RFC 0002).
+  // Not part of the public FactsStore interface — used by engine.unregisterModule().
+  //
+  // The declaration is removed, not merely the value. `registerKeys` refuses to
+  // re-declare a key it already holds, because swapping a declaration would
+  // swap the tags that decide what gets redacted. A module registered again
+  // under the same name brings freshly-built schema objects, so leaving the old
+  // declaration behind would make re-registration throw — the one thing this
+  // whole API exists to allow.
+  (store as unknown as Record<string, unknown>).unregisterKeys = (
+    keys: readonly string[],
+  ) => {
+    // One batch for the whole module, not one notification per fact. Notifying
+    // per key published every torn intermediate state — a watcher on a
+    // three-fact module saw the first key gone while the other two remained,
+    // then the second, then the third. Three renders of states that never
+    // existed, scaling with the module's fact count.
+    store.batch(() => {
+      for (const key of keys) {
+        const prev = map.get(key);
+        map.delete(key);
+        knownKeys.delete(key);
+        delete (schema as Record<string, unknown>)[key];
+        unregisteredKeys.add(key);
+        // Announced, not silent. Invalidation walks the dependency index only
+        // when a change is reported, so removing values quietly left a
+        // derivation in another module holding its cached value forever —
+        // a number for something that no longer existed.
+        batchChanges.push({
+          key,
+          value: undefined,
+          prev,
+          type: "delete",
+          origin: originOf?.() ?? "authored",
+        });
+        dirtyKeys.add(key);
+        onWrite?.(key);
+      }
+    });
+    // Listeners are deliberately NOT dropped. A key coming back under the same
+    // name is the headline use case, not an edge case, and a subscriber that
+    // survived the rotation must keep working. Dropping them silently killed
+    // every `useFact` and `system.subscribe` across a re-register.
+  };
+
   return store;
 }
 
@@ -667,6 +735,60 @@ export function createFactsStore<S extends Schema>(
 // ============================================================================
 
 const nestedProxyCache = new WeakMap<object, object>();
+
+/**
+ * Reads the object a dev warning Proxy wraps, or `undefined` for anything else.
+ *
+ * The wrapper is a development aid, but it does not stay on the read path: the
+ * documented immutable update `facts.doc = { ...facts.doc, title }` reads every
+ * nested value THROUGH the wrapper and spreads the results into a new object,
+ * so the wrappers are stored. From then on the fact holds Proxies where the
+ * author put a `Date` or a `Map`.
+ *
+ * That matters because `structuredClone` refuses a Proxy, and cloning is how
+ * state crosses every boundary in this codebase — history snapshots, optimistic
+ * rollback, worker `postMessage`, distributable snapshots. A dev-only aid was
+ * making dev-mode state uncloneable.
+ */
+export const DEV_PROXY_TARGET: unique symbol = Symbol.for(
+  "directive.devProxyTarget",
+);
+
+/**
+ * Recursively replace dev warning Proxies with the objects they wrap.
+ *
+ * Returns the input untouched when there is nothing to unwrap, so callers can
+ * use the result unconditionally. Only reachable in development: production
+ * builds never create the wrappers.
+ */
+export function unwrapDevProxies<T>(value: T, seen = new WeakSet()): T {
+  if (typeof value !== "object" || value === null) return value;
+
+  const target = (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET];
+  const source = (target ?? value) as object;
+
+  // Cycles are legal in facts and `structuredClone` handles them, so the walk
+  // has to as well rather than recursing forever.
+  if (seen.has(source)) return source as T;
+  seen.add(source);
+
+  if (Array.isArray(source)) {
+    return source.map((item) => unwrapDevProxies(item, seen)) as T;
+  }
+  // Anything with internal slots — Date, Map, Set, TypedArray, RegExp — is
+  // returned whole. Walking its properties would produce a plain object and
+  // lose exactly what makes it that type.
+  if (Object.getPrototypeOf(source) !== Object.prototype) {
+    return source as T;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    out[key] = unwrapDevProxies(item, seen);
+  }
+
+  return out as T;
+}
 
 /**
  * Wrap an object in a Proxy that warns when properties are set.
@@ -688,6 +810,12 @@ function wrapWithNestedWarning(
       // pretty-format) render the underlying object directly rather
       // than the warning-wrapped Proxy. `Symbol.toPrimitive` is left
       // alone — the protocol requires a primitive return.
+      // Unwrap hatch. Cloning refuses a Proxy, and these wrappers end up
+      // stored, so anything that has to serialize state needs a way back to
+      // the real object.
+      if (prop === DEV_PROXY_TARGET) {
+        return target;
+      }
       if (prop === Symbol.for("nodejs.util.inspect.custom")) {
         return () => target;
       }

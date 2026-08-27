@@ -299,6 +299,95 @@ export interface CreateEffectsOptions<S extends Schema> {
  *
  * @internal
  */
+/**
+ * Set by a wrapper that forwards to a user effect, recording whether the
+ * wrapped function reads `prevFacts`. A wrapper's own arity describes the
+ * wrapper, so without this every namespaced effect looks like a reader.
+ */
+export const PREV_FACTS_READ: unique symbol = Symbol.for(
+  "directive.effect.readsPrevFacts",
+);
+
+/**
+ * Whether an effect's `run` could read its second parameter, `prevFacts`.
+ *
+ * Arity alone cannot answer this. `Function.length` stops counting at the first
+ * default or rest parameter, so it reports 1 for `(facts, prevFacts = null) =>`
+ * and 0 for `(...args) =>` — both of which read `prevFacts`. The parameter list
+ * is therefore read from the source when arity is inconclusive.
+ *
+ * Every uncertain answer is "yes". Building a snapshot nobody reads costs time;
+ * skipping one somebody reads hands them a wrong value, silently, in a place
+ * that looks like a comparison against history. Those are not symmetric.
+ */
+export function declaresPrevFacts(run: unknown): boolean {
+  if (typeof run !== "function") return true;
+
+  // A wrapper built by the namespace transform reports the arity of the
+  // wrapper, not of the effect the author wrote. It records the real answer
+  // here so composed systems are not permanently opted out.
+  const declared = (run as { [PREV_FACTS_READ]?: boolean })[PREV_FACTS_READ];
+  if (typeof declared === "boolean") return declared;
+
+  const cached = prevFactsCache.get(run);
+  if (cached !== undefined) return cached;
+
+  const answer = computeDeclaresPrevFacts(run);
+  prevFactsCache.set(run, answer);
+
+  return answer;
+}
+
+/**
+ * Memoized because a definition's `run` is a stable reference, and the answer
+ * is a property of the source text. Without this, registering N effects one at
+ * a time reparsed every previously-registered effect on each call.
+ */
+const prevFactsCache = new WeakMap<object, boolean>();
+
+function computeDeclaresPrevFacts(run: Function): boolean {
+  // Rest parameters report zero, and so does a body reaching for `arguments`
+  // with no parameters at all.
+  if (run.length === 0) return true;
+  if (run.length >= 2) return true;
+
+  let source: string;
+  try {
+    source = Function.prototype.toString.call(run);
+  } catch {
+    return true;
+  }
+
+  // `arguments` reaches past the parameter list entirely, so a one-parameter
+  // function can still read the second argument. Bound and native functions
+  // stringify to a stub whose parameter list says nothing about the target.
+  if (source.includes("arguments") || source.includes("[native code]")) {
+    return true;
+  }
+
+  const open = source.indexOf("(");
+  // A bare single-parameter arrow — `facts => …` — has no parameter list.
+  if (open === -1) return false;
+
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+    } else if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+      // Closed the parameter list without meeting a top-level comma, so the
+      // one parameter arity reported is the only one declared.
+      if (depth === 0) return false;
+    } else if (ch === "," && depth === 1) {
+      return true;
+    }
+  }
+
+  // Unbalanced — the source could not be read confidently.
+  return true;
+}
+
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
@@ -318,6 +407,40 @@ export function createEffectsManager<S extends Schema>(
 
   // Previous facts snapshot for comparison (plain object for bracket-style proxy access)
   let previousSnapshot: Record<string, unknown> | null = null;
+
+  /**
+   * Whether anything in this manager can actually read `prevFacts`.
+   *
+   * Building the snapshot copies every fact in the system, and it ran once per
+   * reconciliation pass regardless of whether a single effect took a second
+   * parameter. The cost therefore scaled with the size of the whole system
+   * rather than with the effects — the dominant per-pass cost at scale, and
+   * paid most heavily by systems whose effects only ever read `facts`.
+   *
+   * Recomputed whenever the definition set changes, never per pass.
+   */
+  let prevFactsObserved = true;
+
+  function recomputePrevFactsObserved(): void {
+    const wasObserved = prevFactsObserved;
+
+    // A data `on` gate is handed `prevFacts` by the runtime, so its presence
+    // settles the question before any effect body is considered.
+    prevFactsObserved =
+      onGates.size > 0 ||
+      Object.values(definitions as Record<string, unknown>).some((def) =>
+        declaresPrevFacts((def as { run?: unknown })?.run),
+      );
+
+    // Backfill the moment the answer turns true. The snapshot is only refilled
+    // at the END of a pass, so an effect registered mid-life would have read
+    // `null` on its first run — and for a data gate that is worse than a wrong
+    // value, because the predicate runtime reads an absent previous state as
+    // "everything changed" and fires a `$changed` gate on a fact that did not.
+    if (!wasObserved && prevFactsObserved && previousSnapshot === null) {
+      previousSnapshot = createSnapshot();
+    }
+  }
 
   // Track whether cleanupAll has been called (system stopped/destroyed).
   // If an async effect resolves after stop, its cleanup is invoked immediately.
@@ -765,6 +888,7 @@ export function createEffectsManager<S extends Schema>(
   for (const id of Object.keys(definitions)) {
     initState(id);
   }
+  recomputePrevFactsObserved();
 
   const manager: EffectsManager<S> = {
     async runEffects(changedKeys: Set<string>): Promise<void> {
@@ -779,8 +903,8 @@ export function createEffectsManager<S extends Schema>(
       // Run effects in parallel (they're independent)
       await Promise.all(effectsToRun.map(runEffect));
 
-      // Update previous snapshot
-      previousSnapshot = createSnapshot();
+      // Update previous snapshot, but only when something can read it.
+      previousSnapshot = prevFactsObserved ? createSnapshot() : null;
     },
 
     async runAll(): Promise<void> {
@@ -799,8 +923,8 @@ export function createEffectsManager<S extends Schema>(
         }),
       );
 
-      // Update previous snapshot
-      previousSnapshot = createSnapshot();
+      // Update previous snapshot, but only when something can read it.
+      previousSnapshot = prevFactsObserved ? createSnapshot() : null;
     },
 
     disable(id: string): void {
@@ -850,6 +974,7 @@ export function createEffectsManager<S extends Schema>(
         (definitions as Record<string, unknown>)[key] = def;
         initState(key);
       }
+      recomputePrevFactsObserved();
     },
 
     assignDefinition(id: string, def: EffectsDef<Schema>[string]): void {
@@ -868,6 +993,7 @@ export function createEffectsManager<S extends Schema>(
       // Replace definition and re-init state
       (definitions as Record<string, unknown>)[id] = def;
       initState(id);
+      recomputePrevFactsObserved();
     },
 
     unregisterDefinition(id: string): void {
@@ -885,6 +1011,7 @@ export function createEffectsManager<S extends Schema>(
       delete (definitions as Record<string, unknown>)[id];
       states.delete(id);
       onGates.delete(id);
+      recomputePrevFactsObserved();
     },
 
     async callOne(id: string): Promise<void> {

@@ -8,6 +8,7 @@
  * - Export/import state history
  */
 
+import { unwrapDevProxies } from "../core/facts.js";
 import type {
   Facts,
   FactsStore,
@@ -21,6 +22,15 @@ import { isPrototypeSafe } from "./utils.js";
 // ============================================================================
 // History Manager
 // ============================================================================
+
+/**
+ * Fact keys already reported as uncapturable.
+ *
+ * Module scope on purpose — the same fact shape warns identically in every
+ * system built from it, so a per-manager set would repeat the message once per
+ * system, which for a server creating one per request is forever.
+ */
+const uncapturableReported = new Set<string>();
 
 /**
  * A changeset groups multiple snapshots into a single undo/redo unit.
@@ -207,17 +217,81 @@ export function createHistoryManager<S extends Schema>(
       }
     }
 
-    // Deep clone to prevent mutation
+    // Deep clone to prevent mutation. The fast path is one call for the whole
+    // object; only a fact that refuses to clone drops to the per-key path.
     try {
       return structuredClone(factsObj);
     } catch {
-      // Fallback for non-cloneable values (functions, DOM nodes, etc.)
+      return serializePerKey(factsObj);
+    }
+  }
+
+  // Reported keys live at module scope, not per manager: the same fact shape
+  // produces the same warning in every system built from it, and a server
+  // creating one system per request would otherwise repeat it forever.
+
+  /**
+   * Clone one fact at a time, so a single uncloneable value costs only itself.
+   *
+   * There is deliberately no shallow-copy tier. A shallow copy aliases every
+   * nested object, which means mutating a fact after a snapshot was taken
+   * silently rewrites the snapshot — and then time travel shows a past that
+   * never happened. That is worse than not recording one at all: an operator
+   * comparing two points in history is handed a difference manufactured by the
+   * act of reading. A fact that cannot be captured is left out and said out
+   * loud instead.
+   */
+  function serializePerKey(
+    factsObj: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    const uncapturable: string[] = [];
+
+    for (const [key, value] of Object.entries(factsObj)) {
       try {
-        return JSON.parse(JSON.stringify(factsObj));
+        out[key] = structuredClone(value);
+        continue;
       } catch {
-        return { ...factsObj };
+        // Fall through.
+      }
+      // In development, an object fact updated the documented way holds the
+      // nested warning Proxies its own reads produced, and `structuredClone`
+      // refuses a Proxy. That is a dev aid making dev state uncloneable, not a
+      // fact the author cannot serialize — so unwrap and try again before
+      // concluding anything. Done here rather than on the fast path because it
+      // is a walk, and it should cost nothing when cloning already works.
+      try {
+        out[key] = structuredClone(unwrapDevProxies(value));
+        continue;
+      } catch {
+        // Fall through to the JSON attempt.
+      }
+      try {
+        // Lossy for Date, Map and Set, but never aliased — and this tier only
+        // runs for a value structuredClone already refused.
+        out[key] = JSON.parse(JSON.stringify(value));
+      } catch {
+        uncapturable.push(key);
       }
     }
+
+    const unreported = uncapturable.filter(
+      (key) => !uncapturableReported.has(key),
+    );
+    if (unreported.length > 0) {
+      for (const key of unreported) {
+        uncapturableReported.add(key);
+      }
+      // Deliberately not naming class instances. They clone — into prototype-
+      // stripped plain objects — so they never reach this path, and listing
+      // them here sent people looking for the wrong cause. The engine already
+      // warns about class-instance facts where they are written.
+      console.warn(
+        `[Directive] These facts cannot be captured in history and are omitted from snapshots: ${unreported.join(", ")}. Restoring leaves them at their current values. A fact holding a function, a live handle, or another value that cannot be cloned cannot take part in time travel.`,
+      );
+    }
+
+    return out;
   }
 
   /** Deserialize and restore facts from a snapshot */
