@@ -795,6 +795,13 @@ export function unwrapDevProxies<T>(value: T, seen = new WeakSet()): T {
  * Catches `facts.user.name = "John"` which silently skips reactivity.
  * Only used in dev mode — tree-shaken in production builds.
  */
+/** Is this value one of the development-mode warning wrappers? */
+function isDevProxy(value: unknown): boolean {
+  return (
+    (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET] !== undefined
+  );
+}
+
 function wrapWithNestedWarning(
   obj: object,
   rootKey: string,
@@ -828,6 +835,17 @@ function wrapWithNestedWarning(
         return value;
       }
 
+      // Already one of ours — hand it back rather than wrapping it again.
+      //
+      // These wrappers get *stored*: the ordinary way to update an object fact is
+      // `facts.map = { ...facts.map, k: v }`, which copies whatever the store just
+      // handed back into the new object. Without this check every such update adds
+      // a layer, so read cost grows with the number of writes and the whole chain
+      // stays live. Silent, and compounding — an eight-key map measured 38 ms for
+      // 5,000 reads after 8 writes and 8,164 ms after 108.
+      if (isDevProxy(value)) {
+        return value;
+      }
       if (nestedProxyCache.has(value as object)) {
         return nestedProxyCache.get(value as object);
       }
@@ -931,6 +949,13 @@ export function createFactsProxy<S extends Schema>(
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
       if (isDevelopment && value !== null && typeof value === "object") {
+        // A wrapper written straight back in is already wrapped — see the note in
+        // `wrapWithNestedWarning`. Re-wrapping it here is the same accumulation
+        // one level up.
+        if (isDevProxy(value)) {
+          return value;
+        }
+
         return wrapWithNestedWarning(value as object, prop);
       }
 
