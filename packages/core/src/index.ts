@@ -310,7 +310,11 @@ export {
   t,
   type Branded,
   type ExtendedSchemaType,
+  type ChainableArrayType,
+  type ChainableNumberType,
+  type ChainableObjectType,
   type ChainableSchemaType,
+  type ChainableStringType,
 } from "./core/schema-builders.js";
 
 // ============================================================================

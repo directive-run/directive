@@ -278,9 +278,25 @@
   ```ts
   export interface BatchConfig {
   ```
+- `ChainableArrayType` — What `t.array<T>()` returns, with its chained refinements
+  ```ts
+  export interface ChainableArrayType<T> extends ChainableSchemaType<T[]> {
+  ```
+- `ChainableNumberType` — What `t.number()` returns, with its chained refinements
+  ```ts
+  export interface ChainableNumberType extends ChainableSchemaType<number> {
+  ```
+- `ChainableObjectType` — What `t.object<T>()` returns, with its chained refinements
+  ```ts
+  export interface ChainableObjectType<T> extends ChainableSchemaType<T> {
+  ```
 - `ChainableSchemaType` — Chainable schema type with all common methods
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
+  ```
+- `ChainableStringType` — What `t.string<T>()` returns, with its chained refinements
+  ```ts
+  export interface ChainableStringType<T extends string> extends ChainableSchemaType<T> {
   ```
 - `Change` — A single change between two predicates at a specific path.
   ```ts

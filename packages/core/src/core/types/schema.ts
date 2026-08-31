@@ -46,8 +46,18 @@ export type InferSchema<S extends Schema> = {
  * Event payload schema - maps property names to their types.
  * Empty object `{}` means no payload.
  * Supports both `t.*()` builders and plain types.
+ *
+ * Constrained to `object` rather than `Record<string, unknown>`, and the
+ * difference matters. The value type was already `unknown`, so the record bought
+ * nothing but its index signature — and TypeScript grants an implicit index
+ * signature to an object *type alias* and never to an *interface*. A payload
+ * declared as an interface therefore failed the constraint, `createModule` fell
+ * through to the overload where the schema widens to its base type, and inference
+ * for the entire module collapsed: every fact `unknown`, every event possibly
+ * undefined, no error at the payload declaration and a pile of them in consumer
+ * files describing symptoms.
  */
-export type EventPayloadSchema = Record<string, SchemaType<unknown> | unknown>;
+export type EventPayloadSchema = object;
 
 /**
  * Events schema - maps event names to their payload schemas.
@@ -66,11 +76,11 @@ export type DerivationsSchema = Record<string, SchemaType<unknown> | unknown>;
 /**
  * Requirement payload schema - maps property names to their types.
  * Supports both `t.*()` builders and plain types.
+ *
+ * `object` for the same reason as {@link EventPayloadSchema} — an interface used
+ * as a requirement payload otherwise voids the module's whole schema silently.
  */
-export type RequirementPayloadSchema = Record<
-  string,
-  SchemaType<unknown> | unknown
->;
+export type RequirementPayloadSchema = object;
 
 /**
  * Requirements schema - maps requirement type names to their payload schemas.
