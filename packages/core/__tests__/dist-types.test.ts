@@ -44,6 +44,13 @@ async function diagnose(source: string): Promise<string> {
       [
         join(repoRoot, "node_modules", "typescript", "bin", "tsc"),
         "--noEmit",
+        // Declaration emit is checked even though nothing is written. A type a
+        // consumer's own `.d.ts` has to name must be reachable from the package
+        // entry point, and a type that is exported from its module but not from
+        // the index compiles fine until someone builds a library on it. Hoisting
+        // the chainable builder types broke exactly that, and only an example with
+        // `declaration: true` noticed.
+        "--declaration",
         "--strict",
         "--target",
         "ES2022",
@@ -89,6 +96,67 @@ beforeAll(() => {
 
 afterAll(() => {
   rmSync(workDir, { recursive: true, force: true });
+});
+
+describe("declaration emit", () => {
+  it("lets a consumer export a schema built with chained builders", async () => {
+    // TS4023/TS4058: a type a consumer's own `.d.ts` has to name must be reachable
+    // from the package entry point. A type exported from its own module but not
+    // from the index compiles fine until somebody builds a library on it and turns
+    // on `declaration`, and then the error names an internal file path and reads
+    // as a bug in their config.
+    //
+    // Exporting the schema is what forces the naming. Assigning it to a local
+    // does not, which is why the first version of this test passed against the
+    // broken build.
+    const source = `
+import { t } from ${JSON.stringify(distTypes.replace(/\.d\.ts$/, ".js"))};
+export const schema = {
+  count: t.number().min(0),
+  name: t.string().minLength(1),
+  tags: t.array<string>().nonEmpty(),
+  config: t.object<{ a: number }>().hasKeys("a"),
+};
+`;
+    const output = await diagnose(source);
+    expect(output).toBe("");
+  });
+});
+
+describe("payload schemas", () => {
+  it("accepts an interface as an event payload", async () => {
+    // TypeScript grants an implicit index signature to an object *type alias* and
+    // never to an *interface*, so an interface used as a payload fails the schema
+    // constraint. `createModule` then falls through to the overload where the
+    // schema widens to its base type, and inference for the whole module
+    // collapses: every fact becomes `unknown`, with no error at the payload
+    // declaration and a pile of them in consumer files.
+    //
+    // Interfaces are how most codebases declare object shapes, and reusing an
+    // existing domain interface as a payload is the obvious first thing to try.
+    const source = `
+import { createModule, createSystem, t } from ${JSON.stringify(distTypes.replace(/\.d\.ts$/, ".js"))};
+interface Payload { id: string }
+const system = createSystem({
+  module: createModule("m", {
+    schema: {
+      facts: { value: t.number() },
+      events: { go: {} as Payload },
+    },
+    init: (facts) => { facts.value = 0; },
+    events: { go: (facts, payload: Payload) => { facts.value = payload.id.length; } },
+  }),
+});
+const wrong: string = system.facts.value;
+export { wrong };
+`;
+    const output = await diagnose(source);
+    // The only complaint may be the deliberate one on the last line. Anything else
+    // means the schema was rejected and inference collapsed.
+    expect(output).toMatch(/is not assignable to type 'string'/);
+    expect(output).not.toMatch(/No overload matches this call/);
+    expect(output).not.toMatch(/possibly 'undefined'/);
+  });
 });
 
 describe("published declarations", () => {
