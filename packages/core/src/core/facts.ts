@@ -846,6 +846,20 @@ function wrapWithNestedWarning(
       if (isDevProxy(value)) {
         return value;
       }
+
+      // A frozen container's properties are non-configurable and non-writable,
+      // and a Proxy is required to return the target's own value for those. A
+      // wrapper here is not a warning, it is a TypeError on the read — so
+      // `Object.freeze`, the ordinary way to make a stored value immutable,
+      // makes the value unreadable in development and works in production,
+      // where this wrapper is tree-shaken away.
+      //
+      // Returning the raw value loses nothing: a frozen property cannot be
+      // mutated, so there is no nested mutation left to warn about.
+      const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+      if (descriptor && !descriptor.configurable && !descriptor.writable) {
+        return value;
+      }
       if (nestedProxyCache.has(value as object)) {
         return nestedProxyCache.get(value as object);
       }
