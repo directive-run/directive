@@ -196,9 +196,10 @@ const wrong: symbol = system.facts.value;
 export { wrong };
 `;
       const output = await diagnose(source);
-      expect(output, `${schema} lost its type in the published declarations`).toContain(
-        expected,
-      );
+      expect(
+        output,
+        `${schema} lost its type in the published declarations`,
+      ).toContain(expected);
     }
   }, 60_000);
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createModule } from "../module.js";
-import { createSystem } from "../system.js";
-import { t } from "../schema-builders.js";
 import { DEV_PROXY_TARGET } from "../facts.js";
+import { createModule } from "../module.js";
+import { t } from "../schema-builders.js";
+import { createSystem } from "../system.js";
 
 /**
  * Read-modify-write on an object fact must not accumulate proxy layers.
@@ -74,7 +74,10 @@ describe("nested fact proxies", () => {
     }
 
     for (const key of Object.keys(system.facts.map)) {
-      expect(depth(system.facts.map[key]), `${key} is layered`).toBeLessThanOrEqual(1);
+      expect(
+        depth(system.facts.map[key]),
+        `${key} is layered`,
+      ).toBeLessThanOrEqual(1);
     }
     system.destroy();
   });
