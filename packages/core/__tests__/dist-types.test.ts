@@ -120,7 +120,7 @@ export const schema = {
 `;
     const output = await diagnose(source);
     expect(output).toBe("");
-  });
+  }, 60_000);
 });
 
 describe("payload schemas", () => {
@@ -156,23 +156,27 @@ export { wrong };
     expect(output).toMatch(/is not assignable to type 'string'/);
     expect(output).not.toMatch(/No overload matches this call/);
     expect(output).not.toMatch(/possibly 'undefined'/);
-  });
+  }, 60_000);
 });
 
+// Every test here shells out to a real `tsc`, which is slower than vitest's
+// five-second default on a cold CI runner — the suite passed locally and timed
+// out in the release. The timeout is per test rather than global so that a test
+// that genuinely hangs still fails.
 describe("published declarations", () => {
   it("types a plain fact", async () => {
     // The control. If this ever stops reporting an error, the test below proves
     // nothing and the fixture itself is broken.
     const output = await diagnose(fixture("t.number()"));
     expect(output).toMatch(/is not assignable to type 'string'/);
-  });
+  }, 60_000);
 
   it("keeps the fact's type when a validator is chained onto it", async () => {
     // The defect. A consumer who writes `.min(0)` must not lose the type they
     // were tightening.
     const output = await diagnose(fixture("t.number().min(0)"));
     expect(output).toMatch(/is not assignable to type 'string'/);
-  });
+  }, 60_000);
 
   it("keeps the type through every chainable builder", async () => {
     // `number` was where this was found; all four builders declare their
@@ -196,5 +200,5 @@ export { wrong };
         expected,
       );
     }
-  });
+  }, 60_000);
 });

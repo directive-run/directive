@@ -278,25 +278,9 @@
   ```ts
   export interface BatchConfig {
   ```
-- `ChainableArrayType` — What `t.array<T>()` returns, with its chained refinements
-  ```ts
-  export interface ChainableArrayType<T> extends ChainableSchemaType<T[]> {
-  ```
-- `ChainableNumberType` — What `t.number()` returns, with its chained refinements
-  ```ts
-  export interface ChainableNumberType extends ChainableSchemaType<number> {
-  ```
-- `ChainableObjectType` — What `t.object<T>()` returns, with its chained refinements
-  ```ts
-  export interface ChainableObjectType<T> extends ChainableSchemaType<T> {
-  ```
 - `ChainableSchemaType` — Chainable schema type with all common methods
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
-  ```
-- `ChainableStringType` — What `t.string<T>()` returns, with its chained refinements
-  ```ts
-  export interface ChainableStringType<T extends string> extends ChainableSchemaType<T> {
   ```
 - `Change` — A single change between two predicates at a specific path.
   ```ts
@@ -821,6 +805,46 @@
   export const t = {
   ```
 
+
+### Not yet in the published reference
+
+Exported by this build and absent from `api-reference.json`, which is fetched
+from the previous release. Descriptions arrive with the next one.
+
+- `AuditEntry`
+- `AuditEntryKind`
+- `AuditLedger`
+- `AuditLedgerOptions`
+- `AuditLedgerSink`
+- `ChainableArrayType`
+- `ChainableNumberType`
+- `ChainableObjectType`
+- `ChainableStringType`
+- `CheckAgainstResult`
+- `ConstraintDiff`
+- `Contradiction`
+- `ContradictionType`
+- `DiffRulesOptions`
+- `PredicateToMongoOptions`
+- `PredicateToPostgrestOptions`
+- `PredicateToSqlOptions`
+- `PredicateToSqlResult`
+- `PredictMissingChange`
+- `PredictResult`
+- `QueryFilter`
+- `ReplayUnderOptions`
+- `RulesDiffReport`
+- `SchemaValidationError`
+- `SchemaValidationOptions`
+- `SchemaValidationResult`
+- `SourceDef`
+- `SourceDefinition`
+- `SweepReport`
+- `SweepUnderOptions`
+- `System`
+- `TimerFactOpts`
+- `TypedDerivationsDefinition`
+- `doctor`
 
 ## @directive-run/ai
 
@@ -2859,3 +2883,39 @@
   export const STRICT_INJECTION_PATTERNS: InjectionPattern[] = [
   ```
 
+
+### Not yet in the published reference
+
+Exported by this build and absent from `api-reference.json`, which is fetched
+from the previous release. Descriptions arrive with the next one.
+
+- `BatchQueue`
+- `BatchQueueConfig`
+- `BudgetConfig`
+- `BudgetExceededDetails`
+- `ConstraintRouterConfig`
+- `FactPIIGuardrailOptions`
+- `FallbackConfig`
+- `GoalCheckpointConfig`
+- `JSONFileStoreOptions`
+- `MermaidDirection`
+- `MermaidNodeShapes`
+- `MermaidOptions`
+- `PredicateFromIntentDiagnostics`
+- `PredicateFromIntentOptions`
+- `PredicateFromIntentProvenance`
+- `PredicateFromIntentWithProvenanceResult`
+- `PredicateToolSpec`
+- `PredicateToolSpecOptions`
+- `ProviderStats`
+- `RAGEnrichOptions`
+- `RAGEnricher`
+- `RAGEnricherConfig`
+- `SSEEvent`
+- `SSETransport`
+- `SSETransportConfig`
+- `SafeParseResult`
+- `SourcesOtelOptions`
+- `StructuredOutputConfig`
+- `parseHttpStatus`
+- `predicateToolSpec`
