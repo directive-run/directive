@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# Sizls secret guardrail shim. This repo sets its own core.hooksPath, which would
-# otherwise silently defeat the global hook. Delegates to the shared implementation.
-exec "/Users/jasonwcomes/Desktop/Sizls/scripts/git-hooks/pre-commit" "$@"
