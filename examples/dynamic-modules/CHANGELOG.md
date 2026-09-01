@@ -1,5 +1,13 @@
 # @directive-run/example-dynamic-modules
 
+## 0.0.81
+
+### Patch Changes
+
+- Updated dependencies [[`1448b68`](https://github.com/directive-run/directive/commit/1448b6816da5d79ff35534c8d3ba68ce7f51218e), [`4c2289b`](https://github.com/directive-run/directive/commit/4c2289b62e61bdc62365206376b16daf2755b2b4), [`cce0b99`](https://github.com/directive-run/directive/commit/cce0b99858773172fc36e98a6cf3b1a308deb036), [`b44e6e2`](https://github.com/directive-run/directive/commit/b44e6e2fddfb123bd7cd604f787e9815ac1cea29), [`c528613`](https://github.com/directive-run/directive/commit/c5286133a59c3ccf2d3bf117a612cd4f266043fa)]:
+  - @directive-run/core@1.34.1
+  - @directive-run/el@1.1.3
+
 ## 0.0.80
 
 ### Patch Changes

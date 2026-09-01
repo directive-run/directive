@@ -1,5 +1,73 @@
 # @directive-run/core
 
+## 1.34.1
+
+### Patch Changes
+
+- [`1448b68`](https://github.com/directive-run/directive/commit/1448b6816da5d79ff35534c8d3ba68ce7f51218e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Chaining a validator no longer erases the fact's type
+
+  `t.number().min(0)`, `t.string().minLength(1)`, `t.array<T>().nonEmpty()` and
+  `t.object<T>().hasKeys(...)` returned `any` in the published declarations, so
+  tightening a fact with a validator silently removed static checking from that fact
+  and from every derivation, constraint and resolver reading it.
+
+  The chainable types are recursive and were declared inside their builder
+  functions, where the declaration emitter has no name to reference — it emitted the
+  recursive return as an intersection with `any`. They are now module-scope
+  interfaces. The runtime never changed; only the emitted types were wrong, which is
+  why the source type-checked and every existing test passed.
+
+  Adds `packages/core/__tests__/dist-types.test.ts`, which type-checks a fixture
+  against the built `dist/index.d.ts` the way a consumer does. Tests that run
+  against `src/` cannot see this class of defect.
+
+- [`4c2289b`](https://github.com/directive-run/directive/commit/4c2289b62e61bdc62365206376b16daf2755b2b4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A `Map`, `Set`, `Date` or class instance stored in a fact stays usable in
+  development mode. The nested mutation warning proxy wrapped every nested object,
+  and a method called on a wrapped `Set` throws "called on incompatible receiver"
+  because its contents live in an internal slot rather than in properties — so the
+  wrapper bought no warning and cost the object's own API. Only plain objects and
+  arrays are wrapped now; the warning is unchanged for them.
+
+- [`cce0b99`](https://github.com/directive-run/directive/commit/cce0b99858773172fc36e98a6cf3b1a308deb036) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A frozen value stored in a fact can be read back in development mode. The nested
+  mutation warning proxy returned a wrapper for every nested object, which a Proxy
+  may not do for a non-configurable, non-writable property — so reading anything
+  under an `Object.freeze` threw a TypeError in development and worked in
+  production, where the wrapper is tree-shaken away.
+
+- [`b44e6e2`](https://github.com/directive-run/directive/commit/b44e6e2fddfb123bd7cd604f787e9815ac1cea29) Thanks [@jasoncomes](https://github.com/jasoncomes)! - An interface can now be used as an event or requirement payload
+
+  `events: { go: {} as Payload }` silently voided a module's entire schema when
+  `Payload` was declared as an `interface` rather than a type alias — every fact
+  became `unknown`, every event possibly undefined, with no error at the payload
+  declaration and a pile of them in consumer files describing symptoms.
+
+  TypeScript grants an implicit index signature to an object type alias and never to
+  an interface, so an interface failed the `Record<string, unknown>` constraint and
+  `createModule` fell through to the overload where the schema widens to its base
+  type. The value type in that constraint was already `unknown`, so the record bought
+  nothing but the index signature; `EventPayloadSchema` and `RequirementPayloadSchema`
+  are now `object`.
+
+  Also exports `ChainableStringType`, `ChainableNumberType`, `ChainableArrayType` and
+  `ChainableObjectType` from the package entry. They became nameable types in a
+  consumer's own declaration output in the previous patch, and a consumer building
+  with `declaration: true` could not name them.
+
+- [`c528613`](https://github.com/directive-run/directive/commit/c5286133a59c3ccf2d3bf117a612cd4f266043fa) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Read cost of an object fact no longer grows with the number of writes
+
+  Updating an object fact the ordinary way — `facts.map = { ...facts.map, k: v }` —
+  copies the development-mode warning wrapper the store just handed back into the
+  new object. Reading it again wrapped the wrapper, so every update added a Proxy
+  layer: read cost grew with the number of writes and the whole chain stayed live.
+
+  An eight-key map measured 38 ms for 5,000 full reads after 8 writes, 1,400 ms
+  after 48, and 8,164 ms after 108. After the fix, 13 ms at every point.
+
+  Both wrap sites now return a value that is already wrapped instead of wrapping it
+  again. Production builds were never affected — the wrapper only exists in
+  development — but development is where the slowdown looked like a bug in the
+  consumer's own code.
+
 ## 1.34.0
 
 ### Minor Changes
