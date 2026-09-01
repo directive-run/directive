@@ -847,6 +847,28 @@ function wrapWithNestedWarning(
         return value;
       }
 
+      // Only plain objects and arrays are wrapped.
+      //
+      // The warning this wrapper exists for is about *properties* —
+      // `facts.user.name = "x"` skipping reactivity. A Map's or a Set's contents
+      // are not properties; they live in an internal slot no proxy can reach. So
+      // wrapping one buys no warning and costs the object's own methods, because
+      // `Set.prototype.has` called on a Proxy throws "called on incompatible
+      // receiver". Same for `Map`, `Date`, typed arrays and any class instance
+      // whose state is not enumerable own properties.
+      //
+      // Dev-only, which is the worst part: the wrapper is tree-shaken out of
+      // production, so a `Map` in a fact works in the shipped bundle and throws
+      // in the test suite.
+      const valuePrototype = Object.getPrototypeOf(value);
+      if (
+        valuePrototype !== Object.prototype &&
+        valuePrototype !== null &&
+        !Array.isArray(value)
+      ) {
+        return value;
+      }
+
       // A frozen container's properties are non-configurable and non-writable,
       // and a Proxy is required to return the target's own value for those. A
       // wrapper here is not a warning, it is a TypeError on the read — so
