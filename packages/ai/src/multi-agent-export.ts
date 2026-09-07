@@ -134,6 +134,14 @@ export {
   type InMemoryCheckpointStoreOptions,
 } from "./checkpoint.js";
 
+/** A checkpoint store that survives the process — see `checkpoint-kv.ts`.
+ * Structural `CheckpointKv`, so no platform SDK enters this package. */
+export {
+  KvCheckpointStore,
+  type CheckpointKv,
+  type KvCheckpointStoreOptions,
+} from "./checkpoint-kv.js";
+
 // Breakpoints
 export {
   matchBreakpoint,
