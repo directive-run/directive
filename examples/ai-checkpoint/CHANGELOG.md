@@ -1,5 +1,14 @@
 # @directive-run/example-ai-checkpoint
 
+## 0.0.83
+
+### Patch Changes
+
+- Updated dependencies [[`a37f57b`](https://github.com/directive-run/directive/commit/a37f57b008b98d6df929114741edbfcbb07f41e9)]:
+  - @directive-run/ai@1.35.0
+  - @directive-run/core@1.35.0
+  - @directive-run/el@1.1.3
+
 ## 0.0.82
 
 ### Patch Changes
