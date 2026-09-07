@@ -1,5 +1,7 @@
 # @directive-run/core
 
+## 1.35.0
+
 ## 1.34.1
 
 ### Patch Changes
