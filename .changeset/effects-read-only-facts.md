@@ -1,6 +1,5 @@
 ---
 "@directive-run/core": minor
-"@directive-run/query": patch
 "@directive-run/lint": patch
 "@directive-run/knowledge": patch
 "@directive-run/claude-plugin": patch
@@ -24,9 +23,9 @@ effects never did. Now:
 - Nested values are the stored values themselves, in every build, so
   `structuredClone`, `postMessage` and identity checks behave the same in
   development and production (inside an effect, `structuredClone(facts.obj)`
-  now works in development too). Development records a copy of each object or
-  array an effect reads, and after the run reports the first path changed in
-  place (`facts.pos.x = 7`, `facts.list.push(1)`, `Object.freeze(facts.obj)`).
+  now works in development too). Development records a copy of each object,
+  array, Map, Set or Date an effect reads, and after the run reports the
+  first path changed in place (`facts.pos.x = 7`, `facts.list.push(1)`, `Object.freeze(facts.obj)`).
   The same check covers `prevFacts` and `derived`, whose values are live too.
 - Every refused write is reported in every build through the new plugin hook
   `onEffectWriteBlocked(id, key)` and the `effect.write-blocked` observation
@@ -70,8 +69,7 @@ chain keeps writing, never another write made meanwhile.
 **Fixed: the `retry` error strategy for effects** never re-ran anything. It now
 re-runs the failed effect on the next pass, up to three times in a row.
 
-`@directive-run/query` keeps its stream, polling, focus, reconnect and cache
-expiry effects writing through an internal capability while they move to
-sources, and marks them `onNavigate: "skip"` so a rewind does not re-subscribe
-a stream or re-arm a timer. `@sizls/ai-harness` closes its composition from a
-constraint and resolver instead of an effect.
+`@directive-run/query` no longer writes facts from effects: its focus,
+reconnect, polling, cache-expiry and stream handling are sources (see its own
+changeset). `@sizls/ai-harness` closes its composition from a constraint and
+resolver instead of an effect.
