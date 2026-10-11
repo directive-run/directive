@@ -330,7 +330,9 @@ export function createErrorBoundaryManager(
       }
     }
 
-    const message = error instanceof Error ? error.message : String(error);
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    // The sentence below adds its own full stop.
+    const message = rawMessage.replace(/[.!?]+\s*$/, "");
     const requirementType =
       source === "resolver" &&
       context &&

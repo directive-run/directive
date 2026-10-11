@@ -11,10 +11,13 @@ import type {
   CrossModuleDeps,
   CrossModuleDerivationsDef,
   CrossModuleEffectsDef,
+  CrossModuleFactsWithSelf,
+  CrossModuleResolversDef,
   DefinitionMeta,
   EffectsDef,
   Facts,
   InferDerivations,
+  InferFacts,
   ModuleDef,
   ModuleHooks,
   ModuleSchema,
@@ -61,7 +64,7 @@ export interface ModuleConfig<M extends ModuleSchema> {
    * any inbound external event the module needs to map into its own event
    * dispatch surface.
    */
-  sources?: SourcesDef;
+  sources?: SourcesDef<Readonly<InferFacts<M>>>;
   constraints?: TypedConstraintsDef<M>;
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;
@@ -123,7 +126,9 @@ export interface ModuleConfigWithDeps<
    *
    * **Access patterns by context:**
    * - `derive`, `effects`, `constraints`: Use `facts.self.*` for own module, `facts.{dep}.*` for cross-module
-   * - `init`, `events`, `resolvers`: Use flat access (`facts.myFact`) - no cross-module access
+   * - `init`, `events`: Use flat access (`facts.myFact`) - no cross-module access
+   * - `resolvers`: flat `ctx.facts.myFact` for own facts, read-only `ctx.deps.{dep}.*` for dependencies
+   * - `sources` gates (`key` / `active`): same as constraints, read-only
    *
    * This separation ensures initialization and event handling stay scoped to own module,
    * while observers (derive/effects/constraints) can see across modules.
@@ -150,11 +155,16 @@ export interface ModuleConfigWithDeps<
    * events. A `key` / `active` gate reads facts like a constraint does:
    * `facts.self.*` for own facts, `facts.{dep}.*` for declared deps.
    */
-  sources?: SourcesDef;
+  sources?: SourcesDef<Readonly<CrossModuleFactsWithSelf<M, Deps>>>;
   /** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
   constraints?: CrossModuleConstraintsDef<M, Deps>;
-  /** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
-  resolvers?: TypedResolversDef<M>;
+  /**
+   * Resolvers. `ctx.facts` is flat access to the module's own facts
+   * (`ctx.facts.myFact`); declared dependencies are read through read-only
+   * `ctx.deps.{dep}.*`. To change another module's state, emit a requirement
+   * or dispatch an event that module owns.
+   */
+  resolvers?: CrossModuleResolversDef<M, Deps>;
   hooks?: ModuleHooks<M>;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
@@ -635,9 +645,10 @@ export function createModule<const M extends ModuleSchema>(
     effects: config.effects as
       | EffectsDef<M["facts"], keyof M["derivations"] & string>
       | undefined,
+    // Gate and ctx typing differs by overload; the runtime shapes match.
     sources: (config as { sources?: SourcesDef }).sources,
     constraints: config.constraints as TypedConstraintsDef<M> | undefined,
-    resolvers: config.resolvers,
+    resolvers: config.resolvers as TypedResolversDef<M> | undefined,
     hooks: config.hooks,
     meta: config.meta,
     history: config.history,

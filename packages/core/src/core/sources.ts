@@ -378,8 +378,18 @@ export interface SourcesManager {
  * when writing helpers over the inspect output.
  */
 export interface SourceInspectionRow {
+  /**
+   * The source's id in the system. In a namespaced system this is
+   * prefixed with the module's namespace (`loop::boot`).
+   */
   id: string;
   moduleId: string;
+  /**
+   * The id as the module declared it (`boot`), without the namespace. Equal
+   * to `id` in a single-module system. Use it with `moduleId` for labels:
+   * `${row.moduleId}/${row.localId}`.
+   */
+  localId: string;
   meta?: unknown;
   attached: boolean;
   publishCount: number;
@@ -419,6 +429,18 @@ export interface SourceLastError {
   phase: "attach" | "cleanup" | "runtime" | "gate";
   message: string;
   at: number;
+}
+
+/**
+ * The id a module declared for a source, without the namespace prefix the
+ * module transform adds in namespaced systems (`loop::boot` → `boot`).
+ *
+ * @internal
+ */
+export function localSourceId(id: string, moduleId: string): string {
+  const prefix = `${moduleId}::`;
+
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
 }
 
 /**
@@ -1210,6 +1232,7 @@ export function createSourcesManager(
         out.push({
           id,
           moduleId: record.moduleId,
+          localId: localSourceId(id, record.moduleId),
           meta: record.def.meta,
           attached: attachedDefinitionIds.has(id),
           publishCount: c.publishCount,

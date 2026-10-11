@@ -39,8 +39,10 @@
  * Spans emitted:
  *
  * - `directive.source.attach` — short-duration (start → end same tick)
- *   span with attributes `source.id`, `source.module_id`, plus
- *   `attached_at` timestamp.
+ *   span with attributes `source.id`, `source.module_id`,
+ *   `source.local_id`, plus `attached_at` timestamp. In a namespaced
+ *   system `source.id` is the prefixed id (`loop::boot`) and
+ *   `source.local_id` the id the module declared (`boot`).
  * - `directive.source.publish` — short-duration counter span (NOT a
  *   per-publish full span; events of this kind are emitted as
  *   span EVENTS on a long-lived per-source "active" span so cardinality
@@ -68,14 +70,21 @@ interface ObservableLike {
 // System<...> so the helper works regardless of the system's generic
 // schema shape.
 type ObservationEventCompat =
-  | { type: "source.attach"; id: string; moduleId: string }
-  | { type: "source.publish"; id: string; moduleId: string; eventName: string }
-  | { type: "source.detach"; id: string; moduleId: string }
+  | { type: "source.attach"; id: string; moduleId: string; localId?: string }
+  | {
+      type: "source.publish";
+      id: string;
+      moduleId: string;
+      localId?: string;
+      eventName: string;
+    }
+  | { type: "source.detach"; id: string; moduleId: string; localId?: string }
   | {
       type: "source.error";
       id: string;
       moduleId: string;
-      phase: "attach" | "cleanup" | "runtime";
+      localId?: string;
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       error: unknown;
     }
   | { type: string; [key: string]: unknown };
@@ -121,18 +130,24 @@ export function attachSourcesToOtel(
 
   const activeByKey = new Map<string, ActiveSpan>();
 
+  // A source id is unique within a system (namespaced systems prefix it),
+  // so the module id only matters for single-module systems.
   function keyOf(id: string, moduleId: string): string {
-    return `${moduleId}::${id}`;
+    return `${moduleId}|${id}`;
   }
 
   function commonAttrs(
-    id: string,
-    moduleId: string,
+    event: ObservationEventCompat,
   ): Record<string, string | number | boolean> {
+    const fields = event as Record<string, unknown>;
+    const id = fields.id as string;
+
     return {
       "service.name": serviceName,
       "source.id": id,
-      "source.module_id": moduleId,
+      "source.module_id": fields.moduleId as string,
+      "source.local_id":
+        typeof fields.localId === "string" ? fields.localId : id,
     };
   }
 
@@ -143,7 +158,7 @@ export function attachSourcesToOtel(
         const moduleId = event.moduleId as string;
         const span = tracer.startSpan(`${spanPrefix}.attached`, {
           attributes: {
-            ...commonAttrs(id, moduleId),
+            ...commonAttrs(event),
             "directive.attached": true,
           },
         });
@@ -191,7 +206,7 @@ export function attachSourcesToOtel(
               : String(errVal);
         const errorSpan = tracer.startSpan(`${spanPrefix}.error`, {
           attributes: {
-            ...commonAttrs(id, moduleId),
+            ...commonAttrs(event),
             "directive.phase": phase,
             "error.message": message,
           },

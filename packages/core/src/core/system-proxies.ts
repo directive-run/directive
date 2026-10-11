@@ -358,6 +358,20 @@ export function createNamespacedFactsProxy(
 // ============================================================================
 
 /**
+ * The role a cross-module facts proxy is serving. Only changes the advice a
+ * rejected write prints – every role reads the same way.
+ *
+ * @internal
+ */
+export type CrossModuleProxyRole = "derive" | "constraint" | "effect";
+
+const ROLE_NOUN: Record<CrossModuleProxyRole, [string, string]> = {
+  derive: ["a derivation", "Derivations"],
+  constraint: ["a constraint", "Constraints"],
+  effect: ["an effect", "Effects"],
+};
+
+/**
  * Create a proxy for cross-module facts access with "self" for own module.
  * `facts.self.users` → reads own module's facts
  * `facts.auth.token` → reads dependency module's facts
@@ -375,17 +389,18 @@ export function createCrossModuleFactsProxy(
   facts: Record<string, unknown>,
   selfNamespace: string,
   depNamespaces: string[],
+  role: CrossModuleProxyRole = "constraint",
 ): Record<string, Record<string, unknown>> {
   // depNamespaces comes from Object.keys() which has stable order per module,
   // so join is sufficient (no need to sort)
-  const cacheKey = `${selfNamespace}|${depNamespaces.join(",")}`;
+  const cacheKey = `${selfNamespace}|${depNamespaces.join(",")}|${role}`;
 
   // Check cache first
   let namespaceCache = crossModuleFactsProxyCache.get(facts);
   if (namespaceCache) {
-    const cached = namespaceCache.get(cacheKey);
-    if (cached) {
-      return cached;
+    const cachedProxy = namespaceCache.get(cacheKey);
+    if (cachedProxy) {
+      return cachedProxy;
     }
   } else {
     namespaceCache = new Map();
@@ -394,6 +409,7 @@ export function createCrossModuleFactsProxy(
 
   const depNamesSet = new Set(depNamespaces);
   const allKeys = ["self", ...depNamespaces];
+  const [roleSingular, rolePlural] = ROLE_NOUN[role];
 
   const proxy = createHardenedProxy<Record<string, Record<string, unknown>>>({
     get: (key) => {
@@ -417,15 +433,15 @@ export function createCrossModuleFactsProxy(
 
       return undefined;
     },
-    // Writes through this proxy always fail – it only maps namespaces. Say
-    // which spelling would have worked instead of leaving a bare TypeError.
+    // The top level only maps namespaces, so a write here always fails. Say
+    // why, once per system, instead of leaving a bare TypeError.
     set: (key) => {
-      if (isDevelopment) {
-        console.warn(
-          `[Directive] Module "${selfNamespace}" wrote "${key}" through the cross-module facts proxy, which is read-only at the top level. ` +
-            `Use "facts.self.${key}" to write your own module's fact.`,
-        );
-      }
+      warnOncePerSystem(
+        facts,
+        `cross-module-set|${selfNamespace}|${role}|${key}`,
+        () =>
+          `[Directive] Module "${selfNamespace}": ${roleSingular} tried to write "${key}". ${rolePlural} read facts and never write them – change "${key}" from an event handler or a resolver.`,
+      );
 
       return false;
     },
@@ -439,34 +455,233 @@ export function createCrossModuleFactsProxy(
 }
 
 // ============================================================================
-// Resolver Facts Proxy
+// Per-system dev warnings
 // ============================================================================
 
 /**
- * WeakMap to cache resolver facts proxies.
- * Keyed by facts store, then by "selfNamespace|depKeys" string.
+ * Warning keys already printed, per system. Keyed weakly by the system's
+ * fact store so a second system in the same process hears about the same
+ * mistake, and the record dies with the system it describes.
  */
-const resolverFactsProxyCache = new WeakMap<
+const warnedOnceBySystem = new WeakMap<object, Set<string>>();
+
+/** Cap per system so a stream of distinct keys can't grow the set forever. */
+const MAX_WARNED_KEYS_PER_SYSTEM = 1000;
+
+/**
+ * The object that identifies a system from any facts view handed to a
+ * callback. Resolvers can receive a per-call bound view, so the view itself
+ * is not stable – the store behind it is.
+ */
+function systemKeyOf(facts: Record<string, unknown>): object {
+  try {
+    const store = facts.$store;
+    if (store && typeof store === "object") {
+      return store;
+    }
+  } catch {
+    // Fall back to the view itself.
+  }
+
+  return facts;
+}
+
+/**
+ * Print a development warning once per system for a given key.
+ *
+ * @internal
+ */
+export function warnOncePerSystem(
+  facts: Record<string, unknown>,
+  key: string,
+  message: () => string,
+): void {
+  if (!isDevelopment) {
+    return;
+  }
+  const systemKey = systemKeyOf(facts);
+  let warned = warnedOnceBySystem.get(systemKey);
+  if (warned === undefined) {
+    warned = new Set<string>();
+    warnedOnceBySystem.set(systemKey, warned);
+  }
+  if (warned.has(key)) {
+    return;
+  }
+  warned.add(key);
+  if (warned.size > MAX_WARNED_KEYS_PER_SYSTEM) {
+    const oldest = warned.values().next().value;
+    if (oldest !== undefined) {
+      warned.delete(oldest);
+    }
+  }
+  console.warn(message());
+}
+
+// ============================================================================
+// Read-only module views (resolver deps, source gates)
+// ============================================================================
+
+type ProxyCache = WeakMap<
   Record<string, unknown>,
   Map<string, Record<string, unknown>>
->();
+>;
 
-/** Legacy resolver spellings already reported, keyed `module|pivot`. */
-const warnedResolverPivots = new Set<string>();
+/** Cache of read-only module views, per facts store then `kind|owner|ns`. */
+const readonlyViewCache: ProxyCache = new WeakMap();
+
+/** Look up or build a cached proxy in a per-facts-store map. */
+function cachedProxy(
+  cache: ProxyCache,
+  facts: Record<string, unknown>,
+  key: string,
+  build: () => Record<string, unknown>,
+): Record<string, unknown> {
+  let byKey = cache.get(facts);
+  if (byKey === undefined) {
+    byKey = new Map();
+    cache.set(facts, byKey);
+  }
+  let proxy = byKey.get(key);
+  if (proxy === undefined) {
+    proxy = build();
+    byKey.set(key, proxy);
+  }
+
+  return proxy;
+}
+
+/**
+ * A read-only view of one module's facts with bare keys. `onWrite` decides
+ * what a write does – it returns the trap result, or throws.
+ */
+function createReadonlyModuleFactsView(
+  facts: Record<string, unknown>,
+  namespace: string,
+  cacheKey: string,
+  onWrite: (key: string) => boolean,
+): Record<string, unknown> {
+  return cachedProxy(readonlyViewCache, facts, cacheKey, () => {
+    const prefix = `${namespace}${SEPARATOR}`;
+
+    return createHardenedProxy<Record<string, unknown>>({
+      get: (prop) => facts[`${prefix}${prop}`],
+      set: (prop) => onWrite(prop),
+      delete: (prop) => onWrite(prop),
+      has: (prop) => `${prefix}${prop}` in facts,
+      ownKeys: () => {
+        const keys: string[] = [];
+        for (const key of Object.keys(facts)) {
+          if (key.startsWith(prefix)) {
+            keys.push(key.slice(prefix.length));
+          }
+        }
+
+        return keys;
+      },
+    });
+  });
+}
+
+// ============================================================================
+// Resolver Facts Proxy
+// ============================================================================
+
+/** Cache of resolver facts / deps proxies, per facts store then `kind|self|deps`. */
+const resolverProxyCache: ProxyCache = new WeakMap();
+
+/**
+ * A resolver's read-only view of a dependency module. Another module's facts
+ * belong to that module: a write throws in development and is ignored in
+ * production, so a resolver can never change state it doesn't own.
+ */
+function resolverDepView(
+  facts: Record<string, unknown>,
+  selfNamespace: string,
+  depNamespace: string,
+): Record<string, unknown> {
+  return createReadonlyModuleFactsView(
+    facts,
+    depNamespace,
+    `resolver|${selfNamespace}|${depNamespace}`,
+    (key) => {
+      if (isDevelopment) {
+        throw new Error(
+          `[Directive] Module "${selfNamespace}": a resolver wrote "${depNamespace}.${key}". Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${depNamespace}" owns instead.`,
+        );
+      }
+
+      return true;
+    },
+  );
+}
+
+/**
+ * Create the `ctx.deps` a resolver receives in a module with
+ * `crossModuleDeps`: one read-only view per declared dependency
+ * (`ctx.deps.auth.token`).
+ *
+ * @internal
+ */
+export function createResolverDepsProxy(
+  facts: Record<string, unknown>,
+  selfNamespace: string,
+  depNamespaces: string[],
+): Record<string, unknown> {
+  return cachedProxy(
+    resolverProxyCache,
+    facts,
+    `deps|${selfNamespace}|${depNamespaces.join(",")}`,
+    () => {
+      const depNamesSet = new Set(depNamespaces);
+
+      return createHardenedProxy<Record<string, unknown>>({
+        get: (prop) => {
+          if (depNamesSet.has(prop)) {
+            return resolverDepView(facts, selfNamespace, prop);
+          }
+          if (!RUNTIME_PROBE_PROPS.has(prop)) {
+            warnOncePerSystem(
+              facts,
+              `resolver-deps|${selfNamespace}|${prop}`,
+              () =>
+                `[Directive] Module "${selfNamespace}": a resolver read ctx.deps.${prop}, but "${prop}" is not in crossModuleDeps. Declared: ${depNamespaces.join(", ")}.`,
+            );
+          }
+
+          return undefined;
+        },
+        set: (prop) => {
+          if (isDevelopment) {
+            throw new Error(
+              `[Directive] Module "${selfNamespace}": ctx.deps is read-only (tried to set "${prop}").`,
+            );
+          }
+
+          return true;
+        },
+        has: (prop) => depNamesSet.has(prop),
+        ownKeys: () => [...depNamespaces],
+      });
+    },
+  );
+}
 
 /**
  * Create the facts proxy a resolver receives in a module with
  * `crossModuleDeps`.
  *
- * Resolvers use flat, own-module access (`ctx.facts.draft`) – that is what
- * their types declare, and it matches event handlers. Before 1.35 the runtime
- * handed resolvers the cross-module proxy instead, so a typed write threw and
- * the error was swallowed. Code written against that runtime spelled it
- * `ctx.facts.self.draft` / `ctx.facts.auth.token`; both keep working here
- * and warn once in development.
+ * Resolvers use flat, own-module access (`ctx.facts.draft`) – what their
+ * types declare, and what event handlers get – and read dependencies through
+ * `ctx.deps.<ns>`. Before 1.35 the runtime handed resolvers the cross-module
+ * proxy instead, so a typed write threw and the error was swallowed. Code
+ * written against that runtime spelled it `ctx.facts.self.draft` /
+ * `ctx.facts.auth.token`; both keep working here and warn once per system in
+ * development. The dependency pivot is read-only, like `ctx.deps`.
  *
- * `self` and dep namespace names are reserved fact keys (the module transform
- * rejects them), so the pivots can never shadow a real fact.
+ * `self` and dep namespace names are reserved fact keys (createModule
+ * rejects them), so the pivots can never shadow a real fact. They answer
+ * `in` but are not enumerated: `Object.keys(ctx.facts)` lists own facts.
  *
  * @internal
  */
@@ -475,109 +690,69 @@ export function createResolverFactsProxy(
   selfNamespace: string,
   depNamespaces: string[],
 ): Record<string, unknown> {
-  const cacheKey = `${selfNamespace}|${depNamespaces.join(",")}`;
+  return cachedProxy(
+    resolverProxyCache,
+    facts,
+    `facts|${selfNamespace}|${depNamespaces.join(",")}`,
+    () => {
+      const own = createModuleFactsProxy(facts, selfNamespace);
+      const depNamesSet = new Set(depNamespaces);
 
-  let namespaceCache = resolverFactsProxyCache.get(facts);
-  if (namespaceCache) {
-    const cached = namespaceCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-  } else {
-    namespaceCache = new Map();
-    resolverFactsProxyCache.set(facts, namespaceCache);
-  }
+      function warnLegacy(pivot: string): void {
+        warnOncePerSystem(
+          facts,
+          `resolver-pivot|${selfNamespace}|${pivot}`,
+          () => {
+            const hint =
+              pivot === "self"
+                ? 'write "ctx.facts.x" instead of "ctx.facts.self.x"'
+                : `read "ctx.deps.${pivot}.x" instead of "ctx.facts.${pivot}.x"`;
 
-  const own = createModuleFactsProxy(facts, selfNamespace);
-  const depNamesSet = new Set(depNamespaces);
-
-  function warnLegacy(pivot: string): void {
-    if (!isDevelopment) {
-      return;
-    }
-    const onceKey = `${selfNamespace}|${pivot}`;
-    if (warnedResolverPivots.has(onceKey)) {
-      return;
-    }
-    warnedResolverPivots.add(onceKey);
-    const hint =
-      pivot === "self"
-        ? 'write "ctx.facts.x" instead of "ctx.facts.self.x"'
-        : `"ctx.facts.${pivot}.x" reaches into another module; prefer carrying what the resolver needs on the requirement`;
-    console.warn(
-      `[Directive] Module "${selfNamespace}": resolvers use flat access to their own module's facts. ` +
-        `Found "${pivot}" – it still works, but ${hint}.`,
-    );
-  }
-
-  const proxy = createHardenedProxy<Record<string, unknown>>({
-    get: (prop) => {
-      if (prop === "self") {
-        warnLegacy("self");
-
-        return own;
-      }
-      if (depNamesSet.has(prop)) {
-        warnLegacy(prop);
-
-        return createModuleFactsProxy(facts, prop);
+            return `[Directive] Module "${selfNamespace}": resolvers read their own facts flat from ctx.facts and other modules from ctx.deps. Found "ctx.facts.${pivot}" – it still works, but ${hint}.`;
+          },
+        );
       }
 
-      return own[prop];
+      return createHardenedProxy<Record<string, unknown>>({
+        get: (prop) => {
+          if (prop === "self") {
+            warnLegacy("self");
+
+            return own;
+          }
+          if (depNamesSet.has(prop)) {
+            warnLegacy(prop);
+
+            return resolverDepView(facts, selfNamespace, prop);
+          }
+
+          return own[prop];
+        },
+        set: (prop, value) => {
+          own[prop] = value;
+
+          return true;
+        },
+        has: (prop) => prop === "self" || depNamesSet.has(prop) || prop in own,
+        delete: (prop) => Reflect.deleteProperty(own, prop),
+        ownKeys: () => Object.keys(own),
+      });
     },
-    set: (prop, value) => {
-      own[prop] = value;
-
-      return true;
-    },
-    has: (prop) => prop in own,
-    delete: (prop) => Reflect.deleteProperty(own, prop),
-    ownKeys: () => Object.keys(own),
-  });
-
-  namespaceCache.set(cacheKey, proxy);
-
-  return proxy;
+  );
 }
 
 // ============================================================================
 // Source Gate Facts Proxy
 // ============================================================================
 
-/** Legacy flat gate reads already reported, keyed `module|key`. */
-const warnedFlatGateReads = new Set<string>();
+/** Cache of source gate proxies, per facts store then `self|deps`. */
+const gateProxyCache: ProxyCache = new WeakMap();
 
 /** Throw for any write – a source gate is a pure read of facts. */
 function rejectGateWrite(selfNamespace: string, key: string): never {
   throw new Error(
     `[Directive] Module "${selfNamespace}": a source's key/active gate wrote "${key}". Gates are pure reads of facts; change facts from an event handler or resolver.`,
   );
-}
-
-/** A read-only view of one module's facts, with bare keys. */
-function createReadonlyModuleFactsView(
-  facts: Record<string, unknown>,
-  namespace: string,
-  ownerNamespace: string,
-): Record<string, unknown> {
-  const prefix = `${namespace}${SEPARATOR}`;
-
-  return createHardenedProxy<Record<string, unknown>>({
-    get: (prop) => facts[`${prefix}${prop}`],
-    set: (prop) => rejectGateWrite(ownerNamespace, prop),
-    delete: (prop) => rejectGateWrite(ownerNamespace, prop),
-    has: (prop) => `${prefix}${prop}` in facts,
-    ownKeys: () => {
-      const keys: string[] = [];
-      for (const key of Object.keys(facts)) {
-        if (key.startsWith(prefix)) {
-          keys.push(key.slice(prefix.length));
-        }
-      }
-
-      return keys;
-    },
-  });
 }
 
 /**
@@ -590,7 +765,10 @@ function createReadonlyModuleFactsView(
  *
  * Before 1.35 gates received the whole flat store (`facts["loop::running"]`),
  * so that spelling keeps working here – reads of a key containing `::` fall
- * through to the flat store and warn once in development.
+ * through to the flat store and warn once per system in development.
+ *
+ * Proxies are cached per facts store, so evaluating gates on every
+ * reconcile allocates nothing after the first pass.
  *
  * @internal
  */
@@ -599,31 +777,41 @@ export function createSourceGateFactsProxy(
   selfNamespace: string,
   depNamespaces: string[] | null,
 ): Record<string, unknown> {
-  const own = createReadonlyModuleFactsView(
+  return cachedProxy(
+    gateProxyCache,
     facts,
-    selfNamespace,
-    selfNamespace,
+    `${selfNamespace}|${depNamespaces ? depNamespaces.join(",") : "-"}`,
+    () => buildSourceGateFactsProxy(facts, selfNamespace, depNamespaces),
   );
+}
+
+function buildSourceGateFactsProxy(
+  facts: Record<string, unknown>,
+  selfNamespace: string,
+  depNamespaces: string[] | null,
+): Record<string, unknown> {
+  const gateView = (namespace: string) =>
+    createReadonlyModuleFactsView(
+      facts,
+      namespace,
+      `gate|${selfNamespace}|${namespace}`,
+      (key) => rejectGateWrite(selfNamespace, key),
+    );
+  const own = gateView(selfNamespace);
   const depNamesSet = depNamespaces ? new Set(depNamespaces) : null;
 
   function readFlat(prop: string): unknown {
-    if (isDevelopment) {
-      const onceKey = `${selfNamespace}|${prop}`;
-      if (!warnedFlatGateReads.has(onceKey)) {
-        warnedFlatGateReads.add(onceKey);
-        const bare = prop.slice(prop.indexOf(SEPARATOR) + SEPARATOR.length);
-        const isOwn = prop.startsWith(`${selfNamespace}${SEPARATOR}`);
-        const spelling = isOwn
-          ? depNamesSet
-            ? `facts.self.${bare}`
-            : `facts.${bare}`
-          : `facts.${prop.slice(0, prop.indexOf(SEPARATOR))}.${bare} (declare it in crossModuleDeps)`;
-        console.warn(
-          `[Directive] Module "${selfNamespace}": a source gate read "${prop}" from the flat store. ` +
-            `Gates now receive the module's own facts; use ${spelling}. The flat form still works.`,
-        );
-      }
-    }
+    warnOncePerSystem(facts, `gate-flat|${selfNamespace}|${prop}`, () => {
+      const bare = prop.slice(prop.indexOf(SEPARATOR) + SEPARATOR.length);
+      const isOwn = prop.startsWith(`${selfNamespace}${SEPARATOR}`);
+      const spelling = isOwn
+        ? depNamesSet
+          ? `facts.self.${bare}`
+          : `facts.${bare}`
+        : `facts.${prop.slice(0, prop.indexOf(SEPARATOR))}.${bare} (declare it in crossModuleDeps)`;
+
+      return `[Directive] Module "${selfNamespace}": a source gate read "${prop}" from the flat store. Gates receive the module's own facts; use ${spelling}. The flat form still works.`;
+    });
 
     return facts[prop];
   }
@@ -646,10 +834,20 @@ export function createSourceGateFactsProxy(
         return own;
       }
       if (depNamesSet.has(prop)) {
-        return createReadonlyModuleFactsView(facts, prop, selfNamespace);
+        return gateView(prop);
       }
       if (prop.includes(SEPARATOR)) {
         return readFlat(prop);
+      }
+      // Same advice the constraint proxy gives: with crossModuleDeps the
+      // module's own facts live under `self`.
+      if (!RUNTIME_PROBE_PROPS.has(prop)) {
+        warnOncePerSystem(
+          facts,
+          `gate-undeclared|${selfNamespace}|${prop}`,
+          () =>
+            `[Directive] Module "${selfNamespace}" read undeclared property "${prop}" in a source gate. This module declares crossModuleDeps, so gate facts are namespaced: use "facts.self.${prop}" for its own fact, or add the module to crossModuleDeps.`,
+        );
       }
 
       return undefined;

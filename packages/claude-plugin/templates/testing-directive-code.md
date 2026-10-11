@@ -100,8 +100,10 @@ const system = createTestSystemFromModules(
   {
     mockResolvers: [
       mockResolver("AUTHENTICATE", async (req, context) => {
-        context.facts.auth.token = "test-token";
-        context.facts.auth.isAuthenticated = true;
+        // Resolvers write their own module's facts flat; other modules
+        // are read-only through context.deps.
+        context.facts.token = "test-token";
+        context.facts.isAuthenticated = true;
       }),
     ],
   },

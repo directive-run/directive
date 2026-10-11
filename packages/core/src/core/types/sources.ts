@@ -258,7 +258,7 @@ export interface SourceAttachContext {
  */
 export type SourceGateFacts = Readonly<Record<string, unknown>>;
 
-export interface SourceDef {
+export interface SourceDef<F = SourceGateFacts> {
   /**
    * Mount the source against the system. Runs once at `system.start()`
    * for ungated sources, or once per rising gate edge for keyed sources.
@@ -318,7 +318,7 @@ export interface SourceDef {
    * }
    * ```
    */
-  key?: (facts: SourceGateFacts) => string | null;
+  key?: (facts: F) => string | null;
   /**
    * RFC 0010 — sugar for a simple on/off gate. `active: f => cond` is
    * normalized at registration to `key: f => cond ? "__on__" : null`, so
@@ -339,7 +339,7 @@ export interface SourceDef {
    * }
    * ```
    */
-  active?: (facts: SourceGateFacts) => boolean;
+  active?: (facts: F) => boolean;
   /**
    * RFC 0010 — hysteresis (in ms) on a FALLING gate edge (key → null) or a
    * re-key edge (key A → key B). When set, the manager WAITS this long
@@ -429,8 +429,12 @@ export interface SourceDef {
 }
 
 /**
- * Map of source definitions, keyed by source name. Collision rules match
- * effects/events/constraints: a source name must be unique across all
- * modules in a system.
+ * Map of source definitions, keyed by source name. A name must be unique
+ * within its module; in a namespaced system ids are prefixed (`ns::name`),
+ * so two modules may use the same name.
+ *
+ * `F` types what a `key` / `active` gate reads. `createModule` fills it from
+ * the module schema: own facts by name, or `self` plus each dependency when
+ * the module declares `crossModuleDeps`.
  */
-export type SourcesDef = Record<string, SourceDef>;
+export type SourcesDef<F = SourceGateFacts> = Record<string, SourceDef<F>>;

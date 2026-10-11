@@ -459,6 +459,27 @@ export interface TypedResolverContext<M extends ModuleSchema> {
 }
 
 /**
+ * Read-only view of each declared dependency's facts, as a resolver in a
+ * module with `crossModuleDeps` receives it on `ctx.deps`.
+ */
+export type ResolverDeps<Deps extends CrossModuleDeps> = {
+  readonly [K in keyof Deps]: Readonly<InferFacts<Deps[K]>>;
+};
+
+/**
+ * Resolver context for a module with `crossModuleDeps`. `facts` stays flat
+ * and writable for the module's own facts; other modules are read through
+ * `deps`, which is read-only – change another module's state by emitting a
+ * requirement or dispatching an event that module owns.
+ */
+export interface CrossModuleResolverContext<
+  M extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> extends TypedResolverContext<M> {
+  readonly deps: ResolverDeps<Deps>;
+}
+
+/**
  * Helper to extract a specific requirement type from the schema.
  */
 type ExtractRequirement<
@@ -474,6 +495,7 @@ type ExtractRequirement<
 export interface TypedResolverDef<
   M extends ModuleSchema,
   T extends keyof GetRequirementsSchema<M> & string,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
 > {
   /** Requirement type to handle */
   requirement: T;
@@ -492,19 +514,13 @@ export interface TypedResolverDef<
   /** Batch configuration */
   batch?: BatchConfig;
   /** Resolve function for single requirement */
-  resolve?: (
-    req: ExtractRequirement<M, T>,
-    ctx: TypedResolverContext<M>,
-  ) => Promise<void>;
+  resolve?: (req: ExtractRequirement<M, T>, ctx: Ctx) => Promise<void>;
   /** Resolve batched requirements as a group (all-or-nothing). Receives the full array collected during the batch window. If this throws, all items in the batch are considered failed. */
-  resolveBatch?: (
-    reqs: ExtractRequirement<M, T>[],
-    ctx: TypedResolverContext<M>,
-  ) => Promise<void>;
+  resolveBatch?: (reqs: ExtractRequirement<M, T>[], ctx: Ctx) => Promise<void>;
   /** Resolve batched requirements with per-item success/failure results. Return a `BatchResolveResults` array in the same order as the input. Failed items can be individually retried. */
   resolveBatchWithResults?: (
     reqs: ExtractRequirement<M, T>[],
-    ctx: TypedResolverContext<M>,
+    ctx: Ctx,
   ) => Promise<BatchResolveResults>;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
@@ -513,17 +529,29 @@ export interface TypedResolverDef<
 /**
  * Union of all typed resolver definitions for all requirement types.
  */
-type AnyTypedResolverDef<M extends ModuleSchema> = {
-  [T in keyof GetRequirementsSchema<M> & string]: TypedResolverDef<M, T>;
+type AnyTypedResolverDef<
+  M extends ModuleSchema,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
+> = {
+  [T in keyof GetRequirementsSchema<M> & string]: TypedResolverDef<M, T, Ctx>;
 }[keyof GetRequirementsSchema<M> & string];
 
 /**
  * Typed resolvers definition using the module schema.
  */
-export type TypedResolversDef<M extends ModuleSchema> = Record<
-  string,
-  AnyTypedResolverDef<M>
->;
+export type TypedResolversDef<
+  M extends ModuleSchema,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
+> = Record<string, AnyTypedResolverDef<M, Ctx>>;
+
+/**
+ * Resolvers for a module with `crossModuleDeps`: same as
+ * {@link TypedResolversDef}, plus read-only `ctx.deps.<ns>`.
+ */
+export type CrossModuleResolversDef<
+  M extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = TypedResolversDef<M, CrossModuleResolverContext<M, Deps>>;
 
 // ============================================================================
 // Module Definition

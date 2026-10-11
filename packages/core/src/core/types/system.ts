@@ -362,8 +362,11 @@ export interface SystemInspection {
    * rows; both must stay in lockstep.
    */
   sources: Array<{
+    /** Source id in the system (`ns::name` in a namespaced system). */
     id: string;
     moduleId: string;
+    /** The id the module declared (`name`), without the namespace. */
+    localId: string;
     meta?: DefinitionMeta;
     /** True while the source's attach succeeded and its unsubscribe is held. */
     attached: boolean;
@@ -1137,7 +1140,14 @@ export type ObservationEvent =
    */
   | { type: "module.registered"; id: string }
   | { type: "module.unregistered"; id: string }
-  | { type: "source.attach"; id: string; moduleId: string }
+  | {
+      type: "source.attach";
+      /** Source id in the system (`ns::name` in a namespaced system). */
+      id: string;
+      moduleId: string;
+      /** The id the module declared (`name`), without the namespace. */
+      localId: string;
+    }
   /**
    * A source published an event into the system's event queue. Fires
    * BEFORE the event handler runs; pair with `fact.change` events to
@@ -1147,6 +1157,8 @@ export type ObservationEvent =
       type: "source.publish";
       id: string;
       moduleId: string;
+      localId: string;
+      /** The dispatched event name – `ns::EVENT` in a namespaced system. */
       eventName: string;
     }
   /**
@@ -1157,16 +1169,19 @@ export type ObservationEvent =
    * - `"post-destroy"` / `"post-stop"` — leaked transport firing after teardown
    * - `"blocked-event-name"` / `"invalid-event-name"` — engine guard probe
    * - `"coalesced"` — manager debounced a same-event publish within one microtask
+   * - `"gate-closed"` — the source's gate closed before the publish landed
+   * - `"unknown-event"` — no handler is registered for the event name
    */
   | {
       type: "source.drop";
       id: string;
       moduleId: string;
+      localId: string;
       eventName: string;
       reason: import("./sources.js").SourceDropReason;
     }
   /** Source detached at `system.stop()` (reverse-registration order). */
-  | { type: "source.detach"; id: string; moduleId: string }
+  | { type: "source.detach"; id: string; moduleId: string; localId: string }
   /**
    * Source `attach` / unsubscribe threw, OR the source called the
    * `reportError` callback that `attach` received as its second
@@ -1179,6 +1194,7 @@ export type ObservationEvent =
       type: "source.error";
       id: string;
       moduleId: string;
+      localId: string;
       phase: "attach" | "cleanup" | "runtime" | "gate";
       error: unknown;
     }

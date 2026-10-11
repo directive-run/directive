@@ -19,10 +19,12 @@ import {
   memoizePredicate,
 } from "./predicate.js";
 import {
+  type CrossModuleProxyRole,
   SEPARATOR,
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
   createModuleFactsProxy,
+  createResolverDepsProxy,
   createResolverFactsProxy,
   createSourceGateFactsProxy,
 } from "./system-proxies.js";
@@ -82,10 +84,47 @@ function createScopedFactsProxy(
   namespace: string,
   hasCrossModuleDeps: boolean,
   depNamespaces: string[],
+  role: CrossModuleProxyRole,
 ): Record<string, unknown> {
   return hasCrossModuleDeps
-    ? createCrossModuleFactsProxy(facts, namespace, depNamespaces)
+    ? createCrossModuleFactsProxy(facts, namespace, depNamespaces, role)
     : createModuleFactsProxy(facts, namespace);
+}
+
+/**
+ * Reject prototype-walking keys (`__proto__`, `constructor`, `prototype`) in
+ * every section of a module, before prefixing.
+ *
+ * The engine runs the same check in single-module mode, but in a namespaced
+ * system it only ever sees prefixed keys (`m::constructor`), which can never
+ * match – so without this the check silently never ran for composed systems.
+ * Same sections and message as the engine, so both modes reject alike.
+ */
+function assertNoBlockedKeys(
+  mod: ModuleDef<ModuleSchema>,
+  namespace: string,
+): void {
+  const sections: [string, object | undefined][] = [
+    ["schema", mod.schema?.facts],
+    ["events", mod.events],
+    ["derive", mod.derive],
+    ["effects", mod.effects],
+    ["sources", (mod as { sources?: object }).sources],
+    ["constraints", mod.constraints],
+    ["resolvers", mod.resolvers],
+  ];
+  for (const [section, obj] of sections) {
+    if (!obj) {
+      continue;
+    }
+    for (const key of Object.keys(obj)) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${namespace}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
+        );
+      }
+    }
+  }
 }
 
 /** Prefix a key with the namespace separator */
@@ -498,6 +537,7 @@ function prefixDerive(
         namespace,
         hasCrossModuleDeps,
         depNamespaces,
+        "derive",
       );
       const deriveProxy = moduleDerive(derive, namespace);
       return (fn as any)(factsProxy, deriveProxy);
@@ -597,6 +637,7 @@ function prefixConstraints(
               namespace,
               hasCrossModuleDeps,
               depNamespaces,
+              "constraint",
             );
             const deriveProxy = moduleDerive(derive, namespace);
 
@@ -616,6 +657,7 @@ function prefixConstraints(
                 namespace,
                 hasCrossModuleDeps,
                 depNamespaces,
+                "constraint",
               );
               const deriveProxy = moduleDerive(derive, namespace);
 
@@ -666,10 +708,12 @@ function prefixResolvers(
     };
 
     /**
-     * Wrap resolver ctx.facts with flat, own-module access – the shape the
-     * resolver types declare, same as event handlers. Modules with
-     * crossModuleDeps get a proxy that also answers the legacy
-     * `self` / dep-namespace spellings.
+     * Wrap the resolver ctx: `facts` is flat, own-module access – the shape
+     * the resolver types declare, same as event handlers. Modules with
+     * crossModuleDeps also get read-only `ctx.deps.<ns>`, and their `facts`
+     * still answers the legacy `self` / dep-namespace spellings. Every other
+     * ctx member (`snapshot`, `requeue`, …) passes through – dropping them
+     * here left namespaced resolvers without `ctx.requeue()`.
      */
     function wrapCtx(ctx: { facts: unknown; signal: AbortSignal }): {
       facts: unknown;
@@ -677,12 +721,15 @@ function prefixResolvers(
     } {
       const facts = ctx.facts as Record<string, unknown>;
 
+      if (!hasCrossModuleDeps) {
+        return { ...ctx, facts: createModuleFactsProxy(facts, namespace) };
+      }
+
       return {
-        facts: hasCrossModuleDeps
-          ? createResolverFactsProxy(facts, namespace, depNamespaces)
-          : createModuleFactsProxy(facts, namespace),
-        signal: ctx.signal,
-      };
+        ...ctx,
+        facts: createResolverFactsProxy(facts, namespace, depNamespaces),
+        deps: createResolverDepsProxy(facts, namespace, depNamespaces),
+      } as { facts: unknown; signal: AbortSignal };
     }
 
     result[prefixKey(namespace, key)] = {
@@ -749,6 +796,7 @@ function prefixEffects(
         namespace,
         hasCrossModuleDeps,
         depNamespaces,
+        "effect",
       );
       const prevProxy = prevFacts
         ? createScopedFactsProxy(
@@ -756,6 +804,7 @@ function prefixEffects(
             namespace,
             hasCrossModuleDeps,
             depNamespaces,
+            "effect",
           )
         : undefined;
       const deriveProxy = moduleDerive(derive, namespace);
@@ -811,40 +860,59 @@ function prefixSources(
 
   const result: Record<string, unknown> = {};
   for (const [id, raw] of Object.entries(sources)) {
-    // The engine's key check runs on the prefixed id, which can never be a
-    // blocked name, so check the author's id before prefixing hides it.
-    if (BLOCKED_PROPS.has(id)) {
-      throw new Error(
-        `[Directive] Security: Module "${namespace}" has dangerous key "${id}" in sources.`,
-      );
-    }
     const def = raw as {
       attach: (publish: unknown, ...rest: unknown[]) => unknown;
       key?: unknown;
       active?: unknown;
     };
 
-    result[prefixKey(namespace, id)] = {
-      ...def,
-      ...(def.key !== undefined && { key: wrapGate(def.key) }),
-      ...(def.active !== undefined && { active: wrapGate(def.active) }),
-      attach: (
-        publish: (event: string, payload?: unknown) => void,
-        ...rest: unknown[]
-      ) =>
-        def.attach(
-          (event: string, payload?: unknown) =>
-            publish(
-              typeof event === "string" &&
-                event.length > 0 &&
-                !isAlreadyPrefixed(event)
-                ? prefixKey(namespace, event)
-                : event,
-              payload,
-            ),
-          ...rest,
-        ),
-    };
+    // Scope the publish callback to this module. A blocked name passes
+    // through untouched so the engine's guard still sees it and reports
+    // `blocked-event-name` – prefixing would turn it into a harmless-looking
+    // `ns::__proto__` and hide the probe.
+    const attach = (
+      publish: (event: string, payload?: unknown) => void,
+      ...rest: unknown[]
+    ) =>
+      def.attach(
+        (event: string, payload?: unknown) =>
+          publish(
+            typeof event === "string" &&
+              event.length > 0 &&
+              !BLOCKED_PROPS.has(event) &&
+              !isAlreadyPrefixed(event)
+              ? prefixKey(namespace, event)
+              : event,
+            payload,
+          ),
+        ...rest,
+      );
+
+    // Copy the definition with its prototype and property descriptors, then
+    // override only the wrapped members. A spread would flatten a class-based
+    // source (methods and getters live on the prototype) and drop
+    // non-enumerable fields such as `meta`.
+    const wrapped = Object.create(Object.getPrototypeOf(def)) as Record<
+      string,
+      unknown
+    >;
+    Object.defineProperties(wrapped, Object.getOwnPropertyDescriptors(def));
+    const override = (name: string, value: unknown) =>
+      Object.defineProperty(wrapped, name, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    override("attach", attach);
+    if (typeof def.key === "function") {
+      override("key", wrapGate(def.key));
+    }
+    if (typeof def.active === "function") {
+      override("active", wrapGate(def.active));
+    }
+
+    result[prefixKey(namespace, id)] = wrapped;
   }
 
   return nonEmpty(result);
@@ -880,6 +948,9 @@ export function prefixModuleDefinition(
   options: PrefixModuleOptions,
 ): FlatModuleDefinition {
   const { mod: rawMod, namespace, snapshotModulesSet } = options;
+
+  // A security boundary, not a dev convenience – runs in every environment.
+  assertNoBlockedKeys(rawMod, namespace);
 
   // Normalize data-form definition arms before namespace prefixing so the
   // per-arm prefixers can assume function-shaped definitions (where they

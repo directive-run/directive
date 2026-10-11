@@ -54,7 +54,7 @@ describe("default error boundary warns in dev", () => {
         save: {
           requirement: "SAVE",
           resolve: async () => {
-            throw new Error("disk full");
+            throw new Error("disk full.");
           },
         },
       },
@@ -69,7 +69,8 @@ describe("default error boundary warns in dev", () => {
 
     const hits = warnings(spy).filter((w) => w.includes('resolver "save"'));
     expect(hits).toHaveLength(1);
-    expect(hits[0]).toContain("disk full");
+    expect(hits[0]).toContain("disk full. Requirement");
+    expect(hits[0]).not.toContain("full..");
     expect(hits[0]).toContain("SAVE");
     expect(hits[0]).toContain("onResolverError");
     system.destroy();
@@ -280,7 +281,7 @@ describe("resolvers in a module with crossModuleDeps", () => {
     system.destroy();
   });
 
-  it("keeps the legacy facts.self and facts.<dep> spellings working, warning once", async () => {
+  it("keeps the legacy facts.self and facts.<dep> spellings working, warning once per system", async () => {
     const spy = warnSpy();
     const seen: string[] = [];
     const mod = notesModule(({ facts }) => {
@@ -289,35 +290,230 @@ describe("resolvers in a module with crossModuleDeps", () => {
       facts.self.draft = "";
     });
 
+    async function run(): Promise<void> {
+      const system = createSystem({
+        modules: { auth: authModule(), notes: mod },
+      });
+      system.start();
+      system.events.notes.submit({ text: "one" });
+      await system.settle();
+      system.events.notes.submit({ text: "two" });
+      await system.settle();
+
+      expect(system.facts.notes.saved).toBe("two");
+      expect(system.inspect().unmet).toEqual([]);
+      system.destroy();
+    }
+
+    await run();
+    const first = warnings(spy).filter((w) => w.includes('Found "ctx.facts.'));
+    // Once for "self", once for "auth" – pointing at ctx.facts and ctx.deps.
+    expect(first).toHaveLength(2);
+    expect(first.join("\n")).toContain("ctx.deps.auth.x");
+
+    // A second system is a second chance to make the mistake.
+    await run();
+    expect(
+      warnings(spy).filter((w) => w.includes('Found "ctx.facts.')),
+    ).toHaveLength(4);
+    expect(seen).toEqual(["tok", "tok", "tok", "tok"]);
+  });
+
+  it("reads dependencies through typed, read-only ctx.deps", async () => {
+    const seen: string[] = [];
+    const mod = createModule("notes", {
+      schema: {
+        facts: { draft: t.string() },
+        events: { submit: { text: t.string() } },
+        requirements: { SAVE: {} },
+      },
+      crossModuleDeps: { auth: authSchema },
+      init: (f) => {
+        f.draft = "";
+      },
+      events: {
+        submit: (f, e) => {
+          f.draft = e.text;
+        },
+      },
+      constraints: {
+        save: {
+          when: (f) => f.self.draft !== "",
+          require: { type: "SAVE" },
+        },
+      },
+      resolvers: {
+        save: {
+          requirement: "SAVE",
+          resolve: async (_req, context) => {
+            expectTypeOf(context.deps.auth.token).toEqualTypeOf<string>();
+            // @ts-expect-error – another module's facts are read-only
+            context.deps.auth.token = "x";
+            seen.push(context.deps.auth.token);
+            context.facts.draft = "";
+          },
+        },
+      },
+    });
+    // The write above throws in development, so the resolver errors; read
+    // the dep and prove the fact was not changed.
+    const errSpy = warnSpy();
     const system = createSystem({
       modules: { auth: authModule(), notes: mod },
     });
     system.start();
-    system.events.notes.submit({ text: "one" });
-    await system.settle();
-    system.events.notes.submit({ text: "two" });
+    system.events.notes.submit({ text: "hi" });
     await system.settle();
 
-    expect(seen).toEqual(["tok", "tok"]);
-    expect(system.facts.notes.saved).toBe("two");
-    expect(system.inspect().unmet).toEqual([]);
-    const legacy = warnings(spy).filter((w) =>
-      w.includes("resolvers use flat access"),
+    expect(system.facts.auth.token).toBe("tok");
+    expect(seen).toEqual([]);
+    expect(warnings(errSpy).join("\n")).toContain(
+      'a resolver wrote "auth.token"',
     );
-    expect(legacy).toHaveLength(2); // once for "self", once for "auth"
+    system.destroy();
+  });
+
+  it("ctx.deps reads the dependency's current facts", async () => {
+    const seen: string[] = [];
+    const mod = createModule("notes", {
+      schema: {
+        facts: { draft: t.string() },
+        events: { submit: { text: t.string() } },
+        requirements: { SAVE: {} },
+      },
+      crossModuleDeps: { auth: authSchema },
+      init: (f) => {
+        f.draft = "";
+      },
+      events: {
+        submit: (f, e) => {
+          f.draft = e.text;
+        },
+      },
+      constraints: {
+        save: {
+          when: (f) => f.self.draft !== "",
+          require: { type: "SAVE" },
+        },
+      },
+      resolvers: {
+        save: {
+          requirement: "SAVE",
+          resolve: async (_req, context) => {
+            seen.push(context.deps.auth.token);
+            expect(Object.keys(context.deps)).toEqual(["auth"]);
+            context.facts.draft = "";
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+
+    expect(seen).toEqual(["tok"]);
+    expect(system.inspect().unmet).toEqual([]);
+    system.destroy();
+  });
+
+  it("a legacy ctx.facts.<dep> write is rejected like ctx.deps", async () => {
+    const spy = warnSpy();
+    const mod = notesModule(({ facts }) => {
+      facts.auth.token = "stolen";
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+
+    expect(system.facts.auth.token).toBe("tok");
+    expect(warnings(spy).join("\n")).toContain(
+      'emit a requirement or dispatch an event that module "auth" owns',
+    );
+    system.destroy();
+  });
+
+  it("answers `in` for the pivots but enumerates only own facts", async () => {
+    const result: { keys?: string[]; pivots?: boolean[] } = {};
+    const mod = notesModule(({ facts }) => {
+      result.keys = Object.keys(facts).sort();
+      result.pivots = ["self" in facts, "auth" in facts, "draft" in facts];
+      facts.draft = "";
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+
+    expect(result.keys).toEqual(["draft", "saved"]);
+    expect(result.pivots).toEqual([true, true, true]);
+    system.destroy();
+  });
+
+  it("keeps ctx.requeue and ctx.snapshot in namespaced resolvers", async () => {
+    const seen: string[] = [];
+    const mod = notesModule((context) => {
+      const ctx = context as unknown as {
+        requeue?: unknown;
+        snapshot?: unknown;
+        facts: { draft: string };
+      };
+      seen.push(typeof ctx.requeue, typeof ctx.snapshot);
+      ctx.facts.draft = "";
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+
+    expect(seen).toEqual(["function", "function"]);
     system.destroy();
   });
 });
 
 describe("cross-module facts proxy", () => {
-  it("warns in dev with the right spelling when written to", () => {
+  it("rejects a top-level write with advice for its role, once per system", () => {
     const spy = warnSpy();
-    const proxy = createCrossModuleFactsProxy({ "notes::draft": "" }, "notes", [
-      "auth",
-    ]);
+    const facts = { "notes::draft": "" };
+    const proxy = createCrossModuleFactsProxy(
+      facts,
+      "notes",
+      ["auth"],
+      "derive",
+    );
 
     expect(Reflect.set(proxy, "draft", "x")).toBe(false);
-    expect(warnings(spy).join("\n")).toContain("facts.self.draft");
+    expect(Reflect.set(proxy, "draft", "y")).toBe(false);
+    const first = warnings(spy);
+    expect(first).toHaveLength(1);
+    expect(first[0]).toContain("a derivation tried to write");
+    expect(first[0]).toContain("from an event handler or a resolver");
+    expect(first[0]).not.toContain("facts.self.draft");
+
+    // A different system (fact store) hears about it again.
+    const other = createCrossModuleFactsProxy(
+      { "notes::draft": "" },
+      "notes",
+      ["auth"],
+      "derive",
+    );
+    Reflect.set(other, "draft", "z");
+    expect(warnings(spy)).toHaveLength(2);
+
+    const constraintProxy = createCrossModuleFactsProxy(facts, "notes", [
+      "auth",
+    ]);
+    Reflect.set(constraintProxy, "draft", "x");
+    expect(warnings(spy)[2]).toContain("a constraint tried to write");
   });
 });
 
@@ -583,4 +779,263 @@ describe("sources in a namespaced system", () => {
     ).toEqual(["a::boot", "b::boot"]);
     system.destroy();
   });
+});
+
+// ============================================================================
+// Round 2: sources
+// ============================================================================
+
+describe("sources in a namespaced system – round 2", () => {
+  it("passes a blocked publish name through so the engine reports it", async () => {
+    const capture = { publish: null as SourcePublish | null };
+    const system = createSystem({
+      modules: { loop: loopModule({ capture }), other: otherModule() },
+    });
+    system.start();
+    capture.publish!("__proto__");
+    await system.settle();
+
+    const row = system.inspect().sources.find((s) => s.id === "loop::boot")!;
+    expect(row.dropCount).toBe(1);
+    expect(row.lastDropReason).toBe("blocked-event-name");
+    system.destroy();
+  });
+
+  it("reports prefixed event names and the local id to plugins and observers", async () => {
+    const capture = { publish: null as SourcePublish | null };
+    const onSourcePublish = vi.fn();
+    const system = createSystem({
+      modules: { loop: loopModule({ capture }), other: otherModule() },
+      plugins: [{ name: "spy", onSourcePublish }],
+    });
+    const observed: Record<string, unknown>[] = [];
+    system.observe((event) => {
+      if (event.type === "source.publish") {
+        observed.push(event as unknown as Record<string, unknown>);
+      }
+    });
+    system.start();
+    capture.publish!("START");
+    await system.settle();
+
+    expect(onSourcePublish).toHaveBeenCalledWith(
+      "loop::boot",
+      "loop",
+      "loop::START",
+    );
+    expect(observed).toEqual([
+      expect.objectContaining({
+        id: "loop::boot",
+        moduleId: "loop",
+        localId: "boot",
+        eventName: "loop::START",
+      }),
+    ]);
+    const row = system.inspect().sources.find((s) => s.id === "loop::boot")!;
+    expect(row.localId).toBe("boot");
+    expect(row.moduleId).toBe("loop");
+    system.destroy();
+  });
+
+  it("localId equals id in a single-module system", () => {
+    const system = createSystem({ module: loopModule({}) });
+    system.start();
+    const row = system.inspect().sources[0]!;
+    expect(row.id).toBe("boot");
+    expect(row.localId).toBe("boot");
+    system.destroy();
+  });
+
+  it("hands the gate the same cached proxy on every evaluation", async () => {
+    const seen = new Set<unknown>();
+    const capture = { publish: null as SourcePublish | null };
+    const system = createSystem({
+      modules: {
+        loop: loopModule({
+          capture,
+          gate: (f) => {
+            seen.add(f);
+
+            return f.ticks > 100;
+          },
+        }),
+        other: otherModule(),
+      },
+    });
+    system.start();
+    for (let i = 0; i < 5; i++) {
+      capture.publish!("TICK");
+      await system.settle();
+    }
+
+    expect(system.facts.loop.ticks).toBe(5);
+    expect(seen.size).toBe(1);
+    system.destroy();
+  });
+
+  it("warns once when a gate in a module with crossModuleDeps reads a bare fact", async () => {
+    const spy = warnSpy();
+    const mod = createModule("watch", {
+      schema: { facts: { on: t.boolean() } },
+      crossModuleDeps: { other: { facts: { n: t.number() } } },
+      init: (f) => {
+        f.on = true;
+      },
+      sources: {
+        s: {
+          // @ts-expect-error – own facts live under `self` with crossModuleDeps
+          active: (f) => f.on === true,
+          attach: () => () => undefined,
+        },
+      },
+    });
+    const system = createSystem({
+      modules: { other: otherModule(), watch: mod },
+    });
+    system.start();
+    await system.settle();
+
+    const hits = warnings(spy).filter((w) =>
+      w.includes('read undeclared property "on" in a source gate'),
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain("facts.self.on");
+    system.destroy();
+  });
+
+  it("types gate facts from the module schema in both modes", () => {
+    createModule("typed", {
+      schema: { facts: { running: t.boolean(), room: t.string() } },
+      sources: {
+        a: {
+          active: (f) => {
+            expectTypeOf(f.running).toEqualTypeOf<boolean>();
+            // @ts-expect-error – gates are read-only
+            f.running = false;
+
+            return f.running;
+          },
+          attach: () => () => undefined,
+        },
+        b: {
+          key: (f) => {
+            expectTypeOf(f.room).toEqualTypeOf<string>();
+
+            return f.room;
+          },
+          attach: () => () => undefined,
+        },
+      },
+    });
+    createModule("typedDeps", {
+      schema: { facts: { on: t.boolean() } },
+      crossModuleDeps: { other: { facts: { n: t.number() } } },
+      sources: {
+        s: {
+          active: (f) => {
+            expectTypeOf(f.self.on).toEqualTypeOf<boolean>();
+            expectTypeOf(f.other.n).toEqualTypeOf<number>();
+
+            return f.self.on && f.other.n > 0;
+          },
+          attach: () => () => undefined,
+        },
+      },
+    });
+  });
+
+  it("keeps a class-based source's prototype and non-enumerable meta", async () => {
+    class TickSource {
+      attached = 0;
+      get label(): string {
+        return "ticker";
+      }
+      attach(publish: SourcePublish) {
+        this.attached += 1;
+        publish(this.label === "ticker" ? "TICK" : "NOPE");
+
+        return () => undefined;
+      }
+    }
+    const source = new TickSource();
+    Object.defineProperty(source, "meta", {
+      value: { label: "Ticker" },
+      enumerable: false,
+    });
+
+    const mod = createModule("loop", {
+      schema: {
+        facts: { ticks: t.number() },
+        events: { TICK: {} },
+      },
+      init: (f) => {
+        f.ticks = 0;
+      },
+      events: {
+        TICK: (f) => {
+          f.ticks += 1;
+        },
+      },
+      sources: { ticker: source },
+    });
+    const system = createSystem({ modules: { loop: mod } });
+    system.start();
+    await system.settle();
+
+    expect(source.attached).toBe(1);
+    expect(system.facts.loop.ticks).toBe(1);
+    const row = system.inspect().sources.find((s) => s.id === "loop::ticker")!;
+    expect((row.meta as { label?: string } | undefined)?.label).toBe("Ticker");
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// Round 2: blocked keys are rejected in both modes
+// ============================================================================
+
+const BLOCKED_KEYS = ["__proto__", "constructor", "prototype"] as const;
+
+const SECTIONS: Record<string, (key: string) => Record<string, unknown>> = {
+  schema: (key) => ({
+    schema: { facts: { [key]: t.number() }, requirements: {} },
+  }),
+  events: (key) => ({ events: { [key]: () => undefined } }),
+  derive: (key) => ({ derive: { [key]: () => 1 } }),
+  effects: (key) => ({ effects: { [key]: { run: () => undefined } } }),
+  sources: (key) => ({
+    sources: { [key]: { attach: () => () => undefined } },
+  }),
+  constraints: (key) => ({
+    constraints: { [key]: { when: () => false, require: { type: "X" } } },
+  }),
+  resolvers: (key) => ({
+    resolvers: { [key]: { requirement: "X", resolve: async () => undefined } },
+  }),
+};
+
+function rawModule(section: string, key: string): any {
+  return {
+    id: "m",
+    schema: { facts: { ok: t.number() }, requirements: { X: {} } },
+    ...SECTIONS[section]!(key),
+  };
+}
+
+describe("blocked keys", () => {
+  for (const section of Object.keys(SECTIONS)) {
+    for (const key of BLOCKED_KEYS) {
+      it(`rejects "${key}" in ${section} – single-module and namespaced`, () => {
+        warnSpy();
+        const pattern = new RegExp(`dangerous key "${key}" in ${section}`);
+
+        expect(() =>
+          createSystem({ module: rawModule(section, key) }),
+        ).toThrowError(pattern);
+        expect(() =>
+          createSystem({ modules: { m: rawModule(section, key) } }),
+        ).toThrowError(pattern);
+      });
+    }
+  }
 });

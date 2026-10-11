@@ -41,7 +41,11 @@ import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
-import { type SourcesManager, createSourcesManager } from "./sources.js";
+import {
+  type SourcesManager,
+  createSourcesManager,
+  localSourceId,
+} from "./sources.js";
 import {
   BLOCKED_PROPS,
   derivationDepId,
@@ -2618,23 +2622,55 @@ export function createEngine<S extends Schema>(
         onModuleUnregistered: (id: string) =>
           observer({ type: "module.unregistered", id }),
         onSourceAttach: (id: string, moduleId: string) =>
-          observer({ type: "source.attach", id, moduleId }),
+          observer({
+            type: "source.attach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
-          observer({ type: "source.publish", id, moduleId, eventName }),
+          observer({
+            type: "source.publish",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+          }),
         onSourceDrop: (
           id: string,
           moduleId: string,
           eventName: string,
           reason: import("./types/sources.js").SourceDropReason,
-        ) => observer({ type: "source.drop", id, moduleId, eventName, reason }),
+        ) =>
+          observer({
+            type: "source.drop",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+            reason,
+          }),
         onSourceDetach: (id: string, moduleId: string) =>
-          observer({ type: "source.detach", id, moduleId }),
+          observer({
+            type: "source.detach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourceError: (
           id: string,
           moduleId: string,
           phase: "attach" | "cleanup" | "runtime" | "gate",
           error: unknown,
-        ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        ) =>
+          observer({
+            type: "source.error",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            phase,
+            error,
+          }),
         onGuardrailBlocked: (
           plugin: string,
           key: string,
@@ -3235,6 +3271,7 @@ export function createEngine<S extends Schema>(
         sources: sourcesManager.listDefinitions().map((row) => ({
           id: row.id,
           moduleId: row.moduleId,
+          localId: row.localId,
           meta: row.meta as DefinitionMeta | undefined,
           attached: row.attached,
           attachedAt: row.attachedAt,
