@@ -315,6 +315,14 @@ export interface CreateConstraintsOptions<S extends Schema> {
 /** Default async constraint timeout (5 seconds) */
 const DEFAULT_TIMEOUT = 5000;
 
+/** Carries what a throwing `require()` read, so its deps are not lost. */
+class RequireError {
+  constructor(
+    readonly original: unknown,
+    readonly deps: Set<string>,
+  ) {}
+}
+
 /** Shared empty answer for `evaluateUnaffected`, so a quiet pass allocates nothing. */
 const NO_REQUIREMENTS = Object.freeze([]) as unknown as RequirementWithId[];
 
@@ -1023,10 +1031,23 @@ export function createConstraintsManager<S extends Schema>(
 
     const requireDef = def.require;
     if (typeof requireDef === "function") {
-      // Track dependencies when require is a function
-      const { value: output, deps } = withTracking(() =>
-        requireDef(facts, derived),
-      );
+      // Track dependencies when require is a function. Kept when it throws,
+      // like `when`: a later write to what it read can fix it.
+      let threw = false;
+      let thrown: unknown;
+      const { value: output, deps } = withTracking(() => {
+        try {
+          return requireDef(facts, derived);
+        } catch (error) {
+          threw = true;
+          thrown = error;
+
+          return [];
+        }
+      });
+      if (threw) {
+        throw new RequireError(thrown, deps);
+      }
       const requirements = normalizeRequirements(
         output as RequirementOutput,
         id,
@@ -1236,7 +1257,17 @@ export function createConstraintsManager<S extends Schema>(
       reqs = result.requirements;
       requireDeps = result.deps;
     } catch (error) {
-      onError?.(id, error);
+      const original = error instanceof RequireError ? error.original : error;
+      onError?.(id, original);
+      if (error instanceof RequireError) {
+        // What `when` and `require` read, so the write that fixes either
+        // wakes it.
+        updateConstraintDeps(id, whenDeps, error.deps);
+        noFireConstraints.add(id);
+        lastRequirements.set(id, []);
+
+        return;
+      }
       handleInactiveConstraint(id);
 
       return;

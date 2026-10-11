@@ -202,7 +202,7 @@ describe("resolver outcomes", () => {
     system.destroy();
   });
 
-  it("a satisfied run that times out reports one error, not unmet, and its late write is dropped", async () => {
+  it("a satisfied run that times out reports one error, not unmet, and its late write still lands", async () => {
     const { log, plugin } = tracker();
     const warnings: string[] = [];
     const warn = console.warn;
@@ -248,7 +248,8 @@ describe("resolver outcomes", () => {
       await sleep(150);
       expect(log).toEqual({ completed: 0, canceled: 0, errors: 1 });
       expect(signal!.aborted).toBe(true);
-      expect(system.facts.result).toBe("");
+      // Like a cancel (RFC 0003): the signal aborts, the write lands.
+      expect(system.facts.result).toBe("late");
       expect(warnings.some((w) => w.includes("stays unmet"))).toBe(false);
     } finally {
       console.warn = warn;

@@ -543,9 +543,50 @@ export function createEngine<S extends Schema>(
   const errorBoundary: ErrorBoundaryManager = createErrorBoundaryManager({
     config: config.errorBoundary,
     onError: (error) => pluginManager.emitError(error),
-    onRecovery: (error, strategy) =>
-      pluginManager.emitErrorRecovery(error, strategy),
+    onRecovery: (error, strategy) => {
+      if (strategy === "retry-later") {
+        ensureRetryLaterTimer();
+      }
+      pluginManager.emitErrorRecovery(error, strategy);
+    },
   });
+
+  /**
+   * Poll for due retry-later entries. Started when `retryLater` is
+   * configured, and otherwise the first time a retry-later strategy is
+   * chosen, so a strategy returned by a callback (or set without
+   * `retryLater`) still retries. Default delay 1000 ms, polled at most
+   * every 500 ms.
+   */
+  function ensureRetryLaterTimer(): void {
+    if (retryLaterTimer || !state.isRunning) {
+      return;
+    }
+    const intervalMs = Math.max(
+      config.errorBoundary?.retryLater?.delayMs ?? 1000,
+      250,
+    );
+    retryLaterTimer = setInterval(
+      () => {
+        const dueRetries = errorBoundary.processDueRetries();
+
+        for (const entry of dueRetries) {
+          if (entry.callback) {
+            entry.callback();
+          } else {
+            // A constraint that threw is re-evaluated by name: a pass with
+            // no changed keys would otherwise carry its last answer forward
+            // and never ask it again.
+            if (entry.source === "constraint") {
+              constraintsManager.markDirty(entry.sourceId);
+            }
+            scheduleReconcile();
+          }
+        }
+      },
+      Math.min(intervalMs, 500),
+    );
+  }
 
   // Retry-later polling timer
   let retryLaterTimer: ReturnType<typeof setInterval> | null = null;
@@ -1761,11 +1802,14 @@ export function createEngine<S extends Schema>(
     spareChangedKeys.clear();
     state.changedKeys = spareChangedKeys;
     spareChangedKeys = passKeys;
+    // Run attribution bookkeeping, only while a resolver run could write.
     const passCounts = writeCounts;
-    spareWriteCounts.clear();
-    writeCounts = spareWriteCounts;
-    spareWriteCounts = passCounts;
-    resolversManager.beginPass();
+    if (writeCounts.size > 0 || resolversManager.hasLiveRuns()) {
+      spareWriteCounts.clear();
+      writeCounts = spareWriteCounts;
+      spareWriteCounts = passCounts;
+      resolversManager.beginPass();
+    }
     if (passFromEffects) {
       previousChainKeys = new Set(passKeys);
     }
@@ -3214,10 +3258,6 @@ export function createEngine<S extends Schema>(
     },
 
     start(): void {
-      // Anything outside the facts may have changed while stopped, and a
-      // `when` should not depend on it, but re-evaluating every constraint
-      // once on start costs one full pass and makes stop()/start() a reset.
-      constraintsManager.markAllDirty();
       if (state.isRunning) return;
       // follow-up — refuse to start while an eviction is in flight
       // or after the system has been destroyed. Both are terminal-ish:
@@ -3328,33 +3368,14 @@ export function createEngine<S extends Schema>(
       pluginManager.emitStart(system);
 
       // Start retry-later polling timer if configured
-      if (config.errorBoundary?.retryLater && !retryLaterTimer) {
-        const intervalMs = Math.max(
-          config.errorBoundary.retryLater.delayMs ?? 1000,
-          250,
-        );
-
-        retryLaterTimer = setInterval(
-          () => {
-            const dueRetries = errorBoundary.processDueRetries();
-
-            for (const entry of dueRetries) {
-              if (entry.callback) {
-                entry.callback();
-              } else {
-                // A constraint that threw is re-evaluated by name: a pass
-                // with no changed keys would otherwise carry its last
-                // answer forward and never ask it again.
-                if (entry.source === "constraint") {
-                  constraintsManager.markDirty(entry.sourceId);
-                }
-                scheduleReconcile();
-              }
-            }
-          },
-          Math.min(intervalMs, 500),
-        );
+      if (config.errorBoundary?.retryLater) {
+        ensureRetryLaterTimer();
       }
+
+      // Anything outside the facts may have changed while stopped, and a
+      // `when` should not depend on it, but re-evaluating every constraint
+      // once on start costs one full pass and makes stop()/start() a reset.
+      constraintsManager.markAllDirty();
 
       // Initial reconcile (now that all modules are initialized)
       scheduleReconcile();

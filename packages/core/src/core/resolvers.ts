@@ -994,7 +994,7 @@ export function createResolversManager<S extends Schema>(
     current: Map<string, number> | null;
     pass: Map<string, number> | null;
     satisfied: boolean;
-    /** Superseded after satisfying: later writes are dropped. */
+    /** Superseded: a newer run owns the requirement, later writes are dropped. */
     discard: boolean;
   }
   /**
@@ -1038,17 +1038,17 @@ export function createResolversManager<S extends Schema>(
 
   /**
    * The error a satisfied run reports when it fails afterwards (throws or
-   * times out). Its requirement was met, so it is marked as such, and the
-   * run is aborted with its later writes dropped.
+   * times out). Treated like any other failure, as RFC 0003 treats a
+   * cancel: the signal is aborted and the error is its one outcome, but its
+   * writes still land, so a `finally` that clears a loading flag runs to
+   * effect. Only a superseded run's writes are dropped: a newer run for the
+   * same requirement owns the facts then.
    */
   function failAfterSatisfied(
     controller: AbortController,
-    record: RunRecord,
     error: unknown,
   ): Error {
-    record.discard = true;
     controller.abort();
-    endRun(controller);
     const normalized =
       error instanceof Error ? error : new Error(String(error));
     noteFailureAfterSatisfied(normalized);
@@ -1406,7 +1406,7 @@ export function createResolversManager<S extends Schema>(
         if (record?.satisfied) {
           // It already satisfied its requirement; there is nothing left to
           // retry for. Reported once, and anything it writes later dropped.
-          lastError = failAfterSatisfied(controller, record, error);
+          lastError = failAfterSatisfied(controller, error);
           break;
         }
         // Canceled while it ran: the cancellation was its outcome.
@@ -1691,7 +1691,7 @@ export function createResolversManager<S extends Schema>(
           return null;
         }
         if (record?.satisfied) {
-          return failAfterSatisfied(controller, record, error);
+          return failAfterSatisfied(controller, error);
         }
         if (controller.signal.aborted) {
           return null;
