@@ -282,6 +282,10 @@
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ```
+- `ChainableStringType` — The chainable types the builders return.
+  ```ts
+  export interface ChainableStringType<T extends string>
+  ```
 - `Change` — A single change between two predicates at a specific path.
   ```ts
   export interface Change {
@@ -317,6 +321,10 @@
 - `CrossModuleEffectDefinition` — Effect definition with cross-module typed facts.
   ```ts
   export interface CrossModuleEffectDef<
+  ```
+- `CrossModuleResolverContext` — Resolver context for a module with `crossModuleDeps`. `facts` stays flat
+  ```ts
+  export interface CrossModuleResolverContext<
   ```
 - `DefinitionMeta` — Optional metadata for module, fact, event, constraint, resolver, effect, and derivation definitions.
   ```ts
@@ -597,6 +605,10 @@
   ```ts
   export type CrossModuleEffectsDef<
   ```
+- `CrossModuleResolversDef` — Resolvers for a module with `crossModuleDeps`: same as
+  ```ts
+  export type CrossModuleResolversDef<
+  ```
 - `DefinitionKind` — The seven things a system holds metadata for — the same seven the lookups on
   ```ts
   export type DefinitionKind =
@@ -705,6 +717,10 @@
   ```ts
   export type ResolverAbortReason =
   ```
+- `ResolverDeps` — Read-only view of each declared dependency's facts, as a resolver in a
+  ```ts
+  export type ResolverDeps<Deps extends CrossModuleDeps> = {
+  ```
 - `ResolversDefinition` — Map of resolver definitions
   ```ts
   export type ResolversDef<S extends Schema> = Record<
@@ -733,17 +749,21 @@
   ```ts
   export type SourceDropReason =
   ```
+- `SourceGateFacts` — Read-only fact snapshot handed to a gated source's `key` / `active`
+  ```ts
+  export type SourceGateFacts = Readonly<Record<string, unknown>>;
+  ```
 - `SourceReportError` — Source-side runtime-error reporter. Optional second argument to
   ```ts
   export type SourceReportError = (error: Error) => void;
   ```
-- `SourcesDef` — Map of source definitions, keyed by source name. Collision rules match
+- `SourcesDef` — Map of source definitions, keyed by source name. A name must be unique
   ```ts
-  export type SourcesDef = Record<string, SourceDef>;
+  export type SourcesDef<F = SourceGateFacts> = Record<string, SourceDef<F>>;
   ```
-- `SourcesDefinition` — Map of source definitions, keyed by source name. Collision rules match
+- `SourcesDefinition` — Map of source definitions, keyed by source name. A name must be unique
   ```ts
-  export type SourcesDef = Record<string, SourceDef>;
+  export type SourcesDef<F = SourceGateFacts> = Record<string, SourceDef<F>>;
   ```
 - `SourceUnsubscribe` — Cleanup function returned by a source's `attach`.
   ```ts
@@ -779,7 +799,7 @@
   ```
 - `TypedResolversDefinition` — Typed resolvers definition using the module schema.
   ```ts
-  export type TypedResolversDef<M extends ModuleSchema> = Record<
+  export type TypedResolversDef<
   ```
 - `VerifyResult` — Verify result — chain valid OR a break with full context for tamper visualization.
   ```ts
@@ -819,7 +839,6 @@ from the previous release. Descriptions arrive with the next one.
 - `ChainableArrayType`
 - `ChainableNumberType`
 - `ChainableObjectType`
-- `ChainableStringType`
 - `CheckAgainstResult`
 - `ConstraintDiff`
 - `Contradiction`
@@ -1457,6 +1476,10 @@ from the previous release. Descriptions arrive with the next one.
   ```ts
   class InMemoryCheckpointStore
   ```
+- `KvCheckpointStore` — Checkpoints in a key-value store, with the same FIFO and retention
+  ```ts
+  class KvCheckpointStore
+  ```
 - `PredicateFromIntentError` — Thrown by `predicateFromIntent` on retry exhaustion. `predicateFromIntentRaw` returns these as a diagnostics payload instead.
   ```ts
   class PredicateFromIntentError
@@ -1687,6 +1710,10 @@ from the previous release. Descriptions arrive with the next one.
 - `CheckpointDiff` — Diff between two checkpoint states
   ```ts
   export interface CheckpointDiff {
+  ```
+- `CheckpointKv` — The four verbs this store needs.
+  ```ts
+  export interface CheckpointKv {
   ```
 - `CheckpointProgress` — Progress computed from a checkpoint state
   ```ts
@@ -2898,6 +2925,7 @@ from the previous release. Descriptions arrive with the next one.
 - `FallbackConfig`
 - `GoalCheckpointConfig`
 - `JSONFileStoreOptions`
+- `KvCheckpointStoreOptions`
 - `MermaidDirection`
 - `MermaidNodeShapes`
 - `MermaidOptions`
