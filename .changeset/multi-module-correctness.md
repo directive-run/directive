@@ -39,4 +39,5 @@ Multi-module systems no longer fail silently.
 
 - An error that falls through to the default `"skip"` strategy with no `errorBoundary` handler warns once per source (resolvers, constraints, derivations), with the requirement that stays unmet. Effects already log every throw.
 - A write at the top level of the cross-module facts proxy in a derivation, constraint or effect warns once per system: those read facts and never write them.
+- A source gate that throws, or that a development check fails, closes the gate and warns once per source.
 - Every multi-module warning above is deduplicated per system, not per process, with a cap on how many keys are remembered.

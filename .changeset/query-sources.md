@@ -29,7 +29,7 @@ What you can see change:
   ignored. `subscribe` still receives the key object `key()` returned. When
   `key()` goes to null the stream closes and the state resets to idle, now
   through a small constraint and resolver. When `enabled()` returns false the
-  stream now closes; it used to stay open. At `stop()`, streams close in
+  stream now closes and the state resets to idle; it used to stay open. At `stop()`, streams close in
   reverse order of registration, like every source.
 - `SubscriptionDefinition.onStop` is no longer set by `createSubscription`;
   `withQueries` still honours it on hand-built definitions.
