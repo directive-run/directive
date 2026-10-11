@@ -63,15 +63,6 @@ export function noteFailureAfterSatisfied(error: Error): void {
   failuresAfterSatisfied.add(error);
 }
 
-/** @internal Whether a resolver error came after its requirement was met. */
-export function isFailureAfterSatisfied(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    failuresAfterSatisfied.has(error)
-  );
-}
-
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
   /** Schedule a retry */
   scheduleRetry: (

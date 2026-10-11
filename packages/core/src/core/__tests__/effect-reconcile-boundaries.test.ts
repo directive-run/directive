@@ -860,6 +860,9 @@ describe("effect facts types", () => {
               prev.pos = { p: { q: 1 } };
             }
             takesMutable(facts.list, facts.pos);
+            // @ts-expect-error nor write through the store
+            facts.$store.set("list", []);
+            facts.$store.get("list");
           },
         },
       },

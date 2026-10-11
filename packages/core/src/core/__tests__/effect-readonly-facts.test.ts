@@ -104,6 +104,7 @@ describe("an effect writing a fact", () => {
         sneak: {
           deps: ["n"],
           run: (facts) => {
+            // @ts-expect-error the type forbids it too; this checks the runtime
             facts.$store.set("pos", 5);
           },
         },

@@ -37,7 +37,7 @@ export interface FactsStore<S extends Schema = Schema>
 export type EffectFacts<S extends Schema = Schema> = Readonly<
   InferSchema<S>
 > & {
-  readonly $store: FactsStore<S>;
+  readonly $store: Omit<FactsStore<S>, "set" | "delete" | "batch">;
   readonly $snapshot: () => FactsSnapshot<S>;
 };
 

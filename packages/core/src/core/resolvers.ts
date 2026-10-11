@@ -1051,7 +1051,10 @@ export function createResolversManager<S extends Schema>(
     controller.abort();
     const normalized =
       error instanceof Error ? error : new Error(String(error));
-    noteFailureAfterSatisfied(normalized);
+    // Only the development warning reads this mark.
+    if (isDevelopment) {
+      noteFailureAfterSatisfied(normalized);
+    }
 
     return normalized;
   }

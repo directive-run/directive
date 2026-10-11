@@ -2297,11 +2297,6 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /**
-   * Dispatch an event by name, handling snapshot flags and batching.
-   *
-   * @returns Whether a handler was registered for the event.
-   */
   /** Sources already warned about a cross-module publish, per system. */
   const warnedCrossModuleSources = new Set<string>();
 
@@ -2324,6 +2319,11 @@ export function createEngine<S extends Schema>(
     );
   }
 
+  /**
+   * Dispatch an event by name, handling snapshot flags and batching.
+   *
+   * @returns Whether a handler was registered for the event.
+   */
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
