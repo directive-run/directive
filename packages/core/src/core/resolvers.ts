@@ -510,10 +510,16 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
 function validateDefinitions<S extends Schema>(
   definitions: ResolversDef<S>,
 ): void {
-  if (!isDevelopment) {
-    return;
+  // A positive dev block, not an early return on `!isDevelopment`, so a
+  // bundler that folds the check to `false` removes it (see tsup.config.ts).
+  if (isDevelopment) {
+    validateEachDefinition(definitions);
   }
+}
 
+function validateEachDefinition<S extends Schema>(
+  definitions: ResolversDef<S>,
+): void {
   for (const [id, def] of Object.entries(definitions)) {
     if (!def.resolve && !def.resolveBatch && !def.resolveBatchWithResults) {
       throw new Error(

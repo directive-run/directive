@@ -601,18 +601,19 @@ export function createEffectsManager<S extends Schema>(
    * place since its last check. Development only.
    */
   function checkInPlaceMutation(id: string): void {
-    if (!isDevelopment) {
-      return;
-    }
-    const found =
-      viewFor(id).takeMutation() ??
-      (runChecks.get(id) ?? []).reduce<string | null>(
-        (first, check) => first ?? check.takeMutation(),
-        null,
-      );
-    runChecks.delete(id);
-    if (found !== null) {
-      reportInPlaceMutation(id, found, onWriteBlocked);
+    // A positive dev block, not an early return on `!isDevelopment`, so a
+    // bundler that folds the check to `false` removes it (see tsup.config.ts).
+    if (isDevelopment) {
+      const found =
+        viewFor(id).takeMutation() ??
+        (runChecks.get(id) ?? []).reduce<string | null>(
+          (first, check) => first ?? check.takeMutation(),
+          null,
+        );
+      runChecks.delete(id);
+      if (found !== null) {
+        reportInPlaceMutation(id, found, onWriteBlocked);
+      }
     }
   }
 

@@ -48,43 +48,71 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "production": {
+        "import": "./dist/production/index.js",
+        "require": "./dist/production/index.cjs"
+      },
       "require": "./dist/index.cjs",
       "import": "./dist/index.js"
     },
     "./internals": {
       "types": "./dist/internals.d.ts",
+      "production": {
+        "import": "./dist/production/internals.js",
+        "require": "./dist/production/internals.cjs"
+      },
       "require": "./dist/internals.cjs",
       "import": "./dist/internals.js"
     },
     "./plugins": {
       "types": "./dist/plugins/index.d.ts",
+      "production": {
+        "import": "./dist/production/plugins/index.js",
+        "require": "./dist/production/plugins/index.cjs"
+      },
       "require": "./dist/plugins/index.cjs",
       "import": "./dist/plugins/index.js"
     },
     "./testing": {
       "types": "./dist/testing.d.ts",
+      "production": {
+        "import": "./dist/production/testing.js",
+        "require": "./dist/production/testing.cjs"
+      },
       "require": "./dist/testing.cjs",
       "import": "./dist/testing.js"
     },
     "./migration": {
       "types": "./dist/migration.d.ts",
+      "production": {
+        "import": "./dist/production/migration.js",
+        "require": "./dist/production/migration.cjs"
+      },
       "require": "./dist/migration.cjs",
       "import": "./dist/migration.js"
     },
     "./adapter-utils": {
       "types": "./dist/adapter-utils.d.ts",
+      "production": {
+        "import": "./dist/production/adapter-utils.js",
+        "require": "./dist/production/adapter-utils.cjs"
+      },
       "require": "./dist/adapter-utils.cjs",
       "import": "./dist/adapter-utils.js"
     },
     "./worker": {
       "types": "./dist/worker.d.ts",
+      "production": {
+        "import": "./dist/production/worker.js",
+        "require": "./dist/production/worker.cjs"
+      },
       "require": "./dist/worker.cjs",
       "import": "./dist/worker.js"
     }
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "rm -rf dist && tsup",
     "dev": "tsup --watch",
     "test": "cd ../.. && vitest run packages/core/",
     "typecheck": "tsc --noEmit",

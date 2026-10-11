@@ -445,10 +445,7 @@ export function createErrorBoundaryManager(
 
     // Max retries exceeded, fall back to skip
     retryAttempts.delete(sourceId);
-    if (
-      typeof process !== "undefined" &&
-      process.env?.NODE_ENV !== "production"
-    ) {
+    if (isDevelopment) {
       console.warn(
         `[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
       );

@@ -7,64 +7,94 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * Regression guard for the v1.5.0/v1.6.0 build-config bug.
+ * Regression guards for how the dev check ships.
  *
- * The `#is-development` package.json import resolved to `dev-true.ts` (a
- * literal `true`) during tsup's build, so the shipped bundle hard-coded
- * `isDevelopment = true`. Every consumer's production build then ran
- * dev-mode fact-validation and tripped on init writes that should have
- * been valid — the doc-site's `next build` failure on a clean v1.5.0.
+ * v1.5.0/v1.6.0 baked `isDevelopment = true` into the published bundle, so
+ * every consumer's production build ran dev-mode fact validation. The fix
+ * made the check a runtime expression of NODE_ENV that a bundler folds.
  *
- * The fix made `dev-true.ts` a runtime expression
- * (`typeof process !== "undefined" && process.env?.NODE_ENV !== "production"`)
- * so bundlers fold it to the right literal in their consumer.
+ * Since 1.35 there are two builds:
  *
- * This test asserts the dist does NOT bake a literal `true`/`!0` for the
- * isDevelopment value. It runs only when the dist exists (post-build);
- * skipping a fresh checkout is fine because release pipelines build before
- * test, and `pnpm test` from the package builds first.
+ * - `dist/` (the default): the check is written out at each use site as
+ *   `typeof process === "undefined" ? false : process.env.NODE_ENV !== "production"`,
+ *   so a bundler that defines NODE_ENV folds each one to `false`. It must
+ *   never be a literal.
+ * - `dist/production/` (the `production` export condition): the check is the
+ *   literal `false`, so the dev-only code and its messages are gone.
+ *
+ * These run only when the dist exists (post-build); a fresh checkout skips.
  */
 describe("isDevelopment bundle shape", () => {
   const distDir = join(__dirname, "../../dist");
+  const productionDir = join(distDir, "production");
 
-  it("does not ship `isDevelopment = true` as a literal", () => {
+  function chunks(dir: string): string[] {
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(".js"))
+      .map((f) => readFileSync(join(dir, f), "utf8"));
+  }
+
+  // The inlined `isDevelopment`, as the minifier prints it. Plugins keep
+  // their own, differently shaped checks, which this does not match.
+  const runtimeCheck =
+    /typeof process\s*[<>!=]+\s*"u"\s*\?\s*(?:false|!1)\s*:\s*process\.env\.NODE_ENV\s*!==?\s*"production"/;
+
+  it("ships the NODE_ENV check in the default build, never a literal", () => {
     if (!existsSync(distDir)) {
-      // Fresh clone, no dist — skip silently. CI builds first.
       return;
     }
 
-    const chunks = readdirSync(distDir).filter(
-      (f) => f.startsWith("chunk-") && f.endsWith(".js"),
-    );
+    expect(chunks(distDir).some((src) => runtimeCheck.test(src))).toBe(true);
+  });
 
-    // The dev-true module exports a single boolean expression. Bundlers
-    // inline it as the chunk's only top-level `var x=…` assignment for a
-    // single-character identifier `x`. A regression that bakes `true`
-    // would land as `var x=true;` or `var x=!0;` in one of the chunks.
-    let runtimeCheckSeen = false;
-    for (const f of chunks) {
-      const src = readFileSync(join(distDir, f), "utf8");
-      // Reject a bare literal-true module export.
-      // The export form esbuild emits for `export default true` is
-      // typically `var a=!0;export{a as default};` or `=true;`.
-      const looksLikeBareTrue =
-        /(?:^|[;,{(\s])var\s+[a-zA-Z]=true(?:;|,)/.test(src) ||
-        /(?:^|[;,{(\s])var\s+[a-zA-Z]=!0(?:;|,)/.test(src);
-      if (looksLikeBareTrue) {
-        // A literal `var x=true` for some other unrelated value in a
-        // chunk would also match — narrow the guard by also requiring
-        // the runtime check to be ABSENT in this chunk. The runtime
-        // check is what we want; if neither is present in any chunk,
-        // the bundler dropped the module entirely (also fine).
-      }
-      if (/typeof process\s*[<!=]/.test(src)) {
-        runtimeCheckSeen = true;
-      }
+  it("keeps the dev messages in the default build", () => {
+    if (!existsSync(distDir)) {
+      return;
     }
 
-    // The runtime check must appear in at least one chunk — that proves
-    // the published bundle has the inline-able expression instead of a
-    // baked-in literal.
-    expect(runtimeCheckSeen).toBe(true);
+    expect(chunks(distDir).some((src) => src.includes("tried to write"))).toBe(
+      true,
+    );
+  });
+
+  it("drops the dev check and its messages from the production build", () => {
+    if (!existsSync(productionDir)) {
+      return;
+    }
+
+    const sources = chunks(productionDir);
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.some((src) => runtimeCheck.test(src))).toBe(false);
+    expect(sources.some((src) => src.includes("tried to write"))).toBe(false);
+  });
+
+  it("points the production export condition at the production build", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, "../../package.json"), "utf8"),
+    ) as {
+      exports: Record<
+        string,
+        {
+          production?: { import: string; require: string };
+          import: string;
+          require: string;
+        }
+      >;
+    };
+
+    for (const [subpath, target] of Object.entries(pkg.exports)) {
+      expect(target.production, subpath).toEqual({
+        import: target.import.replace("./dist/", "./dist/production/"),
+        require: target.require.replace("./dist/", "./dist/production/"),
+      });
+      // The condition must come before import/require to win.
+      const keys = Object.keys(target);
+      expect(keys.indexOf("production"), subpath).toBeLessThan(
+        keys.indexOf("import"),
+      );
+      expect(keys.indexOf("production"), subpath).toBeLessThan(
+        keys.indexOf("require"),
+      );
+    }
   });
 });

@@ -751,23 +751,27 @@ function prefixResolvers(
       call: (wrapped: { facts: unknown; signal: AbortSignal }) => Promise<T>,
     ): Promise<T> {
       const wrapped = wrapCtx(ctx);
-      if (!isDevelopment || !hasCrossModuleDeps) {
-        return call(wrapped);
-      }
-      const checked = checkDependencyViews(
-        wrapped as { facts: unknown; signal: AbortSignal; deps?: unknown },
-        depNamespaces,
-      );
-      const result = await call(checked.ctx);
-      const mutated = checked.takeMutation();
-      if (mutated !== null) {
-        const owner = mutated.slice(0, mutated.indexOf("."));
-        throw new Error(
-          `[Directive] Module "${namespace}": a resolver changed "${mutated}" in place. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+      // Written as a positive dev block, not an early return on
+      // `!isDevelopment`, so a bundler that folds the check to `false`
+      // removes the block and its message (see tsup.config.ts).
+      if (isDevelopment && hasCrossModuleDeps) {
+        const checked = checkDependencyViews(
+          wrapped as { facts: unknown; signal: AbortSignal; deps?: unknown },
+          depNamespaces,
         );
+        const result = await call(checked.ctx);
+        const mutated = checked.takeMutation();
+        if (mutated !== null) {
+          const owner = mutated.slice(0, mutated.indexOf("."));
+          throw new Error(
+            `[Directive] Module "${namespace}": a resolver changed "${mutated}" in place. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+          );
+        }
+
+        return result;
       }
 
-      return result;
+      return call(wrapped);
     }
 
     result[prefixKey(namespace, key)] = {

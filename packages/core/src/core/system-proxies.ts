@@ -436,12 +436,14 @@ export function createCrossModuleFactsProxy(
     // The top level only maps namespaces, so a write here always fails. Say
     // why, once per system, instead of leaving a bare TypeError.
     set: (key) => {
-      warnOncePerSystem(
-        facts,
-        `cross-module-set|${selfNamespace}|${role}|${key}`,
-        () =>
-          `[Directive] Module "${selfNamespace}": ${roleSingular} tried to write "${key}". ${rolePlural} read facts and never write them – change "${key}" from an event handler or a resolver.`,
-      );
+      if (isDevelopment) {
+        warnOncePerSystem(
+          facts,
+          `cross-module-set|${selfNamespace}|${role}|${key}`,
+          () =>
+            `[Directive] Module "${selfNamespace}": ${roleSingular} tried to write "${key}". ${rolePlural} read facts and never write them – change "${key}" from an event handler or a resolver.`,
+        );
+      }
 
       return false;
     },
@@ -496,26 +498,27 @@ export function warnOncePerSystem(
   key: string,
   message: () => string,
 ): void {
-  if (!isDevelopment) {
-    return;
-  }
-  const systemKey = systemKeyOf(facts);
-  let warned = warnedOnceBySystem.get(systemKey);
-  if (warned === undefined) {
-    warned = new Set<string>();
-    warnedOnceBySystem.set(systemKey, warned);
-  }
-  if (warned.has(key)) {
-    return;
-  }
-  warned.add(key);
-  if (warned.size > MAX_WARNED_KEYS_PER_SYSTEM) {
-    const oldest = warned.values().next().value;
-    if (oldest !== undefined) {
-      warned.delete(oldest);
+  // A positive dev block, not an early return on `!isDevelopment`, so a
+  // bundler that folds the check to `false` removes it (see tsup.config.ts).
+  if (isDevelopment) {
+    const systemKey = systemKeyOf(facts);
+    let warned = warnedOnceBySystem.get(systemKey);
+    if (warned === undefined) {
+      warned = new Set<string>();
+      warnedOnceBySystem.set(systemKey, warned);
     }
+    if (warned.has(key)) {
+      return;
+    }
+    warned.add(key);
+    if (warned.size > MAX_WARNED_KEYS_PER_SYSTEM) {
+      const oldest = warned.values().next().value;
+      if (oldest !== undefined) {
+        warned.delete(oldest);
+      }
+    }
+    console.warn(message());
   }
-  console.warn(message());
 }
 
 // ============================================================================
@@ -640,7 +643,7 @@ export function createResolverDepsProxy(
           if (depNamesSet.has(prop)) {
             return resolverDepView(facts, selfNamespace, prop);
           }
-          if (!RUNTIME_PROBE_PROPS.has(prop)) {
+          if (isDevelopment && !RUNTIME_PROBE_PROPS.has(prop)) {
             warnOncePerSystem(
               facts,
               `resolver-deps|${selfNamespace}|${prop}`,
@@ -840,18 +843,20 @@ export function createResolverFactsProxy(
       });
 
       function warnLegacy(pivot: string): void {
-        warnOncePerSystem(
-          facts,
-          `resolver-pivot|${selfNamespace}|${pivot}`,
-          () => {
-            const hint =
-              pivot === "self"
-                ? 'write "ctx.facts.x" instead of "ctx.facts.self.x"'
-                : `read "ctx.deps.${pivot}.x" instead of "ctx.facts.${pivot}.x"`;
+        if (isDevelopment) {
+          warnOncePerSystem(
+            facts,
+            `resolver-pivot|${selfNamespace}|${pivot}`,
+            () => {
+              const hint =
+                pivot === "self"
+                  ? 'write "ctx.facts.x" instead of "ctx.facts.self.x"'
+                  : `read "ctx.deps.${pivot}.x" instead of "ctx.facts.${pivot}.x"`;
 
-            return `[Directive] Module "${selfNamespace}": resolvers read their own facts flat from ctx.facts and other modules from ctx.deps. Found "ctx.facts.${pivot}" – it still works, but ${hint}.`;
-          },
-        );
+              return `[Directive] Module "${selfNamespace}": resolvers read their own facts flat from ctx.facts and other modules from ctx.deps. Found "ctx.facts.${pivot}" – it still works, but ${hint}.`;
+            },
+          );
+        }
       }
 
       return createHardenedProxy<Record<string, unknown>>({
@@ -943,17 +948,19 @@ function buildSourceGateFactsProxy(
   const depNamesSet = depNamespaces ? new Set(depNamespaces) : null;
 
   function readFlat(prop: string): unknown {
-    warnOncePerSystem(facts, `gate-flat|${selfNamespace}|${prop}`, () => {
-      const bare = prop.slice(prop.indexOf(SEPARATOR) + SEPARATOR.length);
-      const isOwn = prop.startsWith(`${selfNamespace}${SEPARATOR}`);
-      const spelling = isOwn
-        ? depNamesSet
-          ? `facts.self.${bare}`
-          : `facts.${bare}`
-        : `facts.${prop.slice(0, prop.indexOf(SEPARATOR))}.${bare} (declare it in crossModuleDeps)`;
+    if (isDevelopment) {
+      warnOncePerSystem(facts, `gate-flat|${selfNamespace}|${prop}`, () => {
+        const bare = prop.slice(prop.indexOf(SEPARATOR) + SEPARATOR.length);
+        const isOwn = prop.startsWith(`${selfNamespace}${SEPARATOR}`);
+        const spelling = isOwn
+          ? depNamesSet
+            ? `facts.self.${bare}`
+            : `facts.${bare}`
+          : `facts.${prop.slice(0, prop.indexOf(SEPARATOR))}.${bare} (declare it in crossModuleDeps)`;
 
-      return `[Directive] Module "${selfNamespace}": a source gate read "${prop}" from the flat store. Gates receive the module's own facts; use ${spelling}. The flat form still works.`;
-    });
+        return `[Directive] Module "${selfNamespace}": a source gate read "${prop}" from the flat store. Gates receive the module's own facts; use ${spelling}. The flat form still works.`;
+      });
+    }
 
     return facts[prop];
   }
@@ -983,7 +990,7 @@ function buildSourceGateFactsProxy(
       }
       // Same advice the constraint proxy gives: with crossModuleDeps the
       // module's own facts live under `self`.
-      if (!RUNTIME_PROBE_PROPS.has(prop)) {
+      if (isDevelopment && !RUNTIME_PROBE_PROPS.has(prop)) {
         warnOncePerSystem(
           facts,
           `gate-undeclared|${selfNamespace}|${prop}`,
