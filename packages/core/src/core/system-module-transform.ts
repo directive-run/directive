@@ -11,6 +11,7 @@
 import isDevelopment from "#is-development";
 import { freezeSpec } from "../utils/utils.js";
 import { PREV_FACTS_READ, declaresPrevFacts } from "./effects.js";
+import { type CheckedReadView, createCheckedReadView } from "./read-only-view.js";
 import {
   applyPatch,
   evaluateTemplate,
@@ -735,6 +736,38 @@ function prefixResolvers(
       } as { facts: unknown; signal: AbortSignal };
     }
 
+    /**
+     * Run the resolver with its wrapped ctx. In development, a module with
+     * crossModuleDeps also gets its dependency views checked: the stored
+     * values are handed out as they are, so a resolver that changes one in
+     * place (`ctx.deps.auth.user.name = …`) is reported once it settles,
+     * naming the path. Production runs the resolver directly.
+     */
+    async function run<T>(
+      ctx: { facts: unknown; signal: AbortSignal },
+      call: (wrapped: { facts: unknown; signal: AbortSignal }) => Promise<T>,
+    ): Promise<T> {
+      const wrapped = wrapCtx(ctx);
+      if (!isDevelopment || !hasCrossModuleDeps) {
+        return call(wrapped);
+      }
+      const checked = checkDependencyViews(
+        wrapped as { facts: unknown; signal: AbortSignal; deps?: unknown },
+        namespace,
+        depNamespaces,
+      );
+      const result = await call(checked.ctx);
+      const mutated = checked.takeMutation();
+      if (mutated !== null) {
+        const owner = mutated.slice(0, mutated.indexOf("."));
+        throw new Error(
+          `[Directive] Module "${namespace}": a resolver changed "${mutated}" in place. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+        );
+      }
+
+      return result;
+    }
+
     result[prefixKey(namespace, key)] = {
       ...resolverDef,
       ...(resolverDef.resolve && {
@@ -742,7 +775,7 @@ function prefixResolvers(
           req: unknown,
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          await resolverDef.resolve!(req, wrapCtx(ctx));
+          await run(ctx, (wrapped) => resolverDef.resolve!(req, wrapped));
         },
       }),
       ...(resolverDef.resolveBatch && {
@@ -750,7 +783,7 @@ function prefixResolvers(
           reqs: unknown[],
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          await resolverDef.resolveBatch!(reqs, wrapCtx(ctx));
+          await run(ctx, (wrapped) => resolverDef.resolveBatch!(reqs, wrapped));
         },
       }),
       ...(resolverDef.resolveBatchWithResults && {
@@ -758,13 +791,88 @@ function prefixResolvers(
           reqs: unknown[],
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          return resolverDef.resolveBatchWithResults!(reqs, wrapCtx(ctx));
+          return run(ctx, (wrapped) =>
+            resolverDef.resolveBatchWithResults!(reqs, wrapped),
+          );
         },
       }),
     };
   }
 
   return nonEmpty(result);
+}
+
+/**
+ * Development: one resolver call's dependency views, each read through the
+ * shared checked view so an in-place change is caught after the call.
+ * Covers `ctx.deps.<ns>` and the legacy `ctx.facts.<ns>` pivot. Built per
+ * call, because the check records what that call read.
+ */
+function checkDependencyViews(
+  ctx: { facts: unknown; signal: AbortSignal; deps?: unknown },
+  namespace: string,
+  depNamespaces: string[],
+): {
+  ctx: { facts: unknown; signal: AbortSignal };
+  takeMutation(): string | null;
+} {
+  const deps = ctx.deps as Record<string, unknown>;
+  const depNames = new Set(depNamespaces);
+  const checks = new Map<string, CheckedReadView<Record<string, unknown>>>();
+
+  function checkedView(ns: string): Record<string, unknown> {
+    let check = checks.get(ns);
+    if (check === undefined) {
+      const raw = deps[ns] as Record<string, unknown>;
+      check = createCheckedReadView(
+        raw,
+        (key) => {
+          // The dependency view refuses the write itself, with its message.
+          raw[key] = undefined;
+
+          return true;
+        },
+        { prefix: ns },
+      );
+      checks.set(ns, check);
+    }
+
+    return check.view;
+  }
+
+  const pivotFacts = ctx.facts as Record<string, unknown>;
+
+  return {
+    ctx: {
+      ...ctx,
+      deps: new Proxy(deps, {
+        get: (target, prop) =>
+          typeof prop === "string" && depNames.has(prop)
+            ? checkedView(prop)
+            : Reflect.get(target, prop),
+      }),
+      facts: new Proxy(pivotFacts, {
+        get: (target, prop) => {
+          const value = Reflect.get(target, prop);
+
+          // Read through the pivot first, so its legacy warning still fires.
+          return typeof prop === "string" && depNames.has(prop)
+            ? checkedView(prop)
+            : value;
+        },
+      }),
+    } as { facts: unknown; signal: AbortSignal },
+    takeMutation(): string | null {
+      for (const check of checks.values()) {
+        const found = check.takeMutation();
+        if (found !== null) {
+          return found;
+        }
+      }
+
+      return null;
+    },
+  };
 }
 
 /** Prefix effect keys and wrap run functions with scoped proxies */

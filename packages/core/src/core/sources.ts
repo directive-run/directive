@@ -22,12 +22,21 @@
  * See {@link SourceDef} for the primitive's full semantics + rationale.
  */
 
+import isDevelopment from "#is-development";
+import { type CheckedReadView, createCheckedReadView } from "./read-only-view.js";
 import type {
   SourceDef,
   SourceDropReason,
   SourcePublish,
   SourceUnsubscribe,
 } from "./types/sources.js";
+
+/** The error a gate's refused write or in-place mutation raises. */
+function gateWriteError(id: string, what: string): Error {
+  return new Error(
+    `[Directive] Source "${id}": its key/active gate ${what}. Gates are pure reads of facts; change facts from an event handler or resolver.`,
+  );
+}
 
 // ============================================================================
 // Sources Manager
@@ -868,6 +877,46 @@ export function createSourcesManager(
     });
   }
 
+  /**
+   * Development: the read-only view gates read through, so a gate that writes
+   * a fact or changes a stored value in place is reported as a gate error.
+   * Built once per facts object; a namespaced gate's scoped proxy wraps it, so
+   * it covers single-module and namespaced systems alike. Production hands the
+   * gate the facts directly and records nothing.
+   */
+  let gateCheck: {
+    facts: Record<string, unknown>;
+    check: CheckedReadView<Record<string, unknown>>;
+  } | null = null;
+  /** The gate being evaluated, for the refused-write message. */
+  let gateId: string | null = null;
+
+  function gateCheckFor(
+    facts: Record<string, unknown>,
+  ): CheckedReadView<Record<string, unknown>> {
+    if (gateCheck?.facts === facts) {
+      return gateCheck.check;
+    }
+    const refuse = (key: string): never => {
+      throw gateWriteError(gateId ?? "<unknown>", `wrote "${key}"`);
+    };
+    const store = facts.$store as Record<string, unknown> | undefined;
+    const readonlyStore =
+      store === undefined
+        ? undefined
+        : Object.freeze({
+            ...store,
+            set: (key: string) => refuse(key),
+            delete: (key: string) => refuse(key),
+          });
+    const check = createCheckedReadView(facts, refuse, {
+      override: (prop) => (prop === "$store" ? readonlyStore : undefined),
+    });
+    gateCheck = { facts, check };
+
+    return check;
+  }
+
   function transitionGated(
     id: string,
     def: SourceDefinition,
@@ -1152,6 +1201,7 @@ export function createSourcesManager(
     evaluateGated(facts: Record<string, unknown>): void {
       if (phase !== "attached" || !liveDispatch) return;
       const dispatch = liveDispatch;
+      const check = isDevelopment ? gateCheckFor(facts) : null;
       for (const [id, keyFn] of keyFns) {
         const def = definitions.get(id);
         if (!def) continue;
@@ -1161,7 +1211,21 @@ export function createSourcesManager(
         // via `phase: "gate"`.
         let k: string | null;
         try {
-          const raw = keyFn(facts);
+          let raw: unknown;
+          if (check === null) {
+            raw = keyFn(facts);
+          } else {
+            gateId = id;
+            try {
+              raw = keyFn(check.view);
+            } finally {
+              gateId = null;
+            }
+            const mutated = check.takeMutation();
+            if (mutated !== null) {
+              throw gateWriteError(id, `changed "${mutated}" in place`);
+            }
+          }
           if (raw === null) {
             k = null;
           } else if (typeof raw === "string") {

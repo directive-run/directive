@@ -1,8 +1,8 @@
 /**
  * Read-only views over facts for code that must not change them.
  *
- * Effects use these today. Dependency views and source gates are meant to use
- * the same helper, so the rule and its error read the same everywhere.
+ * Effects, a resolver's view of its dependency modules, and source gates all
+ * read through this helper, so the rule and its check are the same everywhere.
  *
  * Not exported from any public entry point.
  *
@@ -38,7 +38,7 @@ function unwrap(value: unknown): unknown {
   return (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET] ?? value;
 }
 
-/** Plain objects and arrays: the values that can be mutated in place. */
+/** Plain objects and arrays: the values compared property by property. */
 function isPlainContainer(value: unknown): value is object {
   if (value === null || typeof value !== "object") {
     return false;
@@ -49,6 +49,70 @@ function isPlainContainer(value: unknown): value is object {
   const prototype = Object.getPrototypeOf(value);
 
   return prototype === Object.prototype || prototype === null;
+}
+
+/**
+ * Values that can be mutated in place and copied to check for it: plain
+ * objects and arrays, and the built-in collections and dates
+ * `structuredClone` copies faithfully.
+ */
+function isCheckable(value: unknown): value is object {
+  return (
+    isPlainContainer(value) ||
+    value instanceof Map ||
+    value instanceof Set ||
+    value instanceof Date
+  );
+}
+
+/**
+ * The first difference between two Maps or two Sets, compared in insertion
+ * order. A copy's object keys are never identical to the originals, so keys
+ * are compared structurally like values. A reordering is reported as a
+ * change, which is what a delete-then-add in place is.
+ */
+function firstCollectionDifference(
+  before: Map<unknown, unknown> | Set<unknown>,
+  after: Map<unknown, unknown> | Set<unknown>,
+  path: string,
+  seen: WeakSet<object>,
+): string | null {
+  if (before.size !== after.size) {
+    return `${path} (size ${before.size} → ${after.size})`;
+  }
+  const isMap = after instanceof Map;
+  const beforeEntries = isMap
+    ? [...(before as Map<unknown, unknown>)]
+    : [...before].map((value) => [value, undefined] as const);
+  const afterEntries = isMap
+    ? [...(after as Map<unknown, unknown>)]
+    : [...after].map((value) => [value, undefined] as const);
+  for (let index = 0; index < afterEntries.length; index++) {
+    const [beforeKey, beforeValue] = beforeEntries[index]!;
+    const [afterKey, afterValue] = afterEntries[index]!;
+    const keyPath = `${path}[${index}]`;
+    const keyDifference = firstDifference(beforeKey, afterKey, keyPath, seen);
+    if (keyDifference !== null) {
+      return keyDifference;
+    }
+    if (isMap) {
+      const valuePath =
+        typeof afterKey === "string" || typeof afterKey === "number"
+          ? `${path}.get(${JSON.stringify(afterKey)})`
+          : `${keyPath}.value`;
+      const valueDifference = firstDifference(
+        beforeValue,
+        afterValue,
+        valuePath,
+        seen,
+      );
+      if (valueDifference !== null) {
+        return valueDifference;
+      }
+    }
+  }
+
+  return null;
 }
 
 /** The first path at which `before` and `after` differ, or `null`. */
@@ -76,12 +140,24 @@ function firstDifference(
   if (Array.isArray(before) !== Array.isArray(after)) {
     return path;
   }
+  if (Object.getPrototypeOf(before) !== Object.getPrototypeOf(after)) {
+    return path;
+  }
+  if (after instanceof Date) {
+    return (before as Date).getTime() === after.getTime() ? null : path;
+  }
+  if (after instanceof Map || after instanceof Set) {
+    return firstCollectionDifference(
+      before as Map<unknown, unknown> | Set<unknown>,
+      after,
+      path,
+      seen,
+    );
+  }
   if (!isPlainContainer(after)) {
-    // A Date, Map or Set cannot be compared through its properties. A clone of
-    // one is never identical, so only a change of type is reported.
-    return Object.getPrototypeOf(before) === Object.getPrototypeOf(after)
-      ? null
-      : path;
+    // Any other class instance cannot be compared through a copy: a clone of
+    // one is never the same shape. Only a change of type is reported.
+    return null;
   }
   const beforeKeys = Object.keys(before);
   const afterKeys = Object.keys(after);
@@ -116,8 +192,8 @@ function firstDifference(
  * `Object.isFrozen` all see the stored value.
  *
  * A nested value cannot be stopped from being mutated without wrapping it, so
- * development checks for it instead. The first read of each plain object or
- * array records a structural copy; {@link CheckedReadView.takeMutation}
+ * development checks for it instead. The first read of each plain object,
+ * array, Map, Set or Date records a structural copy; {@link CheckedReadView.takeMutation}
  * compares it with the stored value and names the first path that changed.
  * Production records nothing.
  *
@@ -150,7 +226,7 @@ export function createCheckedReadView<T extends object>(
       if (
         recorded !== null &&
         typeof prop === "string" &&
-        isPlainContainer(value) &&
+        isCheckable(value) &&
         !recorded.has(prop)
       ) {
         try {
