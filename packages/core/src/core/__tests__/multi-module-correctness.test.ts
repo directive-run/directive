@@ -2,8 +2,9 @@
  * Multi-module correctness — the round-2 Aperture findings.
  *
  * Every case here failed silently before the fix: the app did nothing and
- * nothing was logged. The tests pin the scoped behaviour, the legacy forms
- * that must keep working, and the dev warnings that make a mistake visible.
+ * nothing was logged. The tests pin the scoped behaviour and the dev warnings
+ * that make a mistake visible. The pre-1.35 spellings (`ctx.facts.self`,
+ * flat `ns::fact` gate reads, prefixed publish names) are gone, not aliased.
  */
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -281,42 +282,24 @@ describe("resolvers in a module with crossModuleDeps", () => {
     system.destroy();
   });
 
-  it("keeps the legacy facts.self and facts.<dep> spellings working, warning once per system", async () => {
-    const spy = warnSpy();
-    const seen: string[] = [];
+  it("has no facts.self or facts.<dep> spelling – own facts are flat, dependencies are on ctx.deps", async () => {
+    const seen: unknown[] = [];
     const mod = notesModule(({ facts }) => {
-      seen.push(facts.auth.token);
-      facts.self.saved = facts.self.draft;
-      facts.self.draft = "";
+      seen.push(facts.self, facts.auth);
+      facts.saved = facts.draft;
+      facts.draft = "";
     });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "one" });
+    await system.settle();
 
-    async function run(): Promise<void> {
-      const system = createSystem({
-        modules: { auth: authModule(), notes: mod },
-      });
-      system.start();
-      system.events.notes.submit({ text: "one" });
-      await system.settle();
-      system.events.notes.submit({ text: "two" });
-      await system.settle();
-
-      expect(system.facts.notes.saved).toBe("two");
-      expect(system.inspect().unmet).toEqual([]);
-      system.destroy();
-    }
-
-    await run();
-    const first = warnings(spy).filter((w) => w.includes('Found "ctx.facts.'));
-    // Once for "self", once for "auth" – pointing at ctx.facts and ctx.deps.
-    expect(first).toHaveLength(2);
-    expect(first.join("\n")).toContain("ctx.deps.auth.x");
-
-    // A second system is a second chance to make the mistake.
-    await run();
-    expect(
-      warnings(spy).filter((w) => w.includes('Found "ctx.facts.')),
-    ).toHaveLength(4);
-    expect(seen).toEqual(["tok", "tok", "tok", "tok"]);
+    expect(seen).toEqual([undefined, undefined]);
+    expect(system.facts.notes.saved).toBe("one");
+    expect(system.inspect().unmet).toEqual([]);
+    system.destroy();
   });
 
   it("reads dependencies through typed, read-only ctx.deps", async () => {
@@ -419,10 +402,11 @@ describe("resolvers in a module with crossModuleDeps", () => {
     system.destroy();
   });
 
-  it("a legacy ctx.facts.<dep> write is rejected like ctx.deps", async () => {
-    const spy = warnSpy();
+  it("ctx.facts can't reach a dependency's facts", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    warnSpy();
     const mod = notesModule(({ facts }) => {
-      facts.auth.token = "stolen";
+      facts.token = "stolen";
     });
     const system = createSystem({
       modules: { auth: authModule(), notes: mod },
@@ -432,17 +416,14 @@ describe("resolvers in a module with crossModuleDeps", () => {
     await system.settle();
 
     expect(system.facts.auth.token).toBe("tok");
-    expect(warnings(spy).join("\n")).toContain(
-      'emit a requirement or dispatch an event that module "auth" owns',
-    );
     system.destroy();
   });
 
-  it("answers `in` for the pivots but enumerates only own facts", async () => {
-    const result: { keys?: string[]; pivots?: boolean[] } = {};
+  it("ctx.facts holds own facts only, for both `in` and enumeration", async () => {
+    const result: { keys?: string[]; has?: boolean[] } = {};
     const mod = notesModule(({ facts }) => {
       result.keys = Object.keys(facts).sort();
-      result.pivots = ["self" in facts, "auth" in facts, "draft" in facts];
+      result.has = ["self" in facts, "auth" in facts, "draft" in facts];
       facts.draft = "";
     });
     const system = createSystem({
@@ -453,7 +434,7 @@ describe("resolvers in a module with crossModuleDeps", () => {
     await system.settle();
 
     expect(result.keys).toEqual(["draft", "saved"]);
-    expect(result.pivots).toEqual([true, true, true]);
+    expect(result.has).toEqual([false, false, true]);
     system.destroy();
   });
 
@@ -600,16 +581,25 @@ describe("sources in a namespaced system", () => {
     system.destroy();
   });
 
-  it("an already-prefixed name still works", async () => {
+  it("a source can't publish another module's event – a prefixed name is dropped and warns once", async () => {
+    const spy = warnSpy();
     const capture = { publish: null as SourcePublish | null };
     const system = createSystem({
       modules: { loop: loopModule({ capture }), other: otherModule() },
     });
     system.start();
     capture.publish!("loop::START");
+    capture.publish!("other::PING");
     await system.settle();
 
-    expect(system.facts.loop.running).toBe(true);
+    expect(system.facts.loop.running).toBe(false);
+    const row = system.inspect().sources.find((s) => s.id === "loop::boot")!;
+    expect(row.dropCount).toBe(2);
+    expect(row.lastDropReason).toBe("unknown-event");
+    const cross = warnings(spy).filter((w) =>
+      w.includes("publishes only its own module's events"),
+    );
+    expect(cross).toHaveLength(1);
     system.destroy();
   });
 
@@ -706,16 +696,20 @@ describe("sources in a namespaced system", () => {
     system.destroy();
   });
 
-  it("the legacy flat 'ns::fact' gate read still works and warns once", async () => {
-    const spy = warnSpy();
+  it("a gate sees only its module's facts – a flat 'ns::fact' read is undefined", async () => {
     const capture = { publish: null as SourcePublish | null };
     const attached: string[] = [];
+    const seen: unknown[] = [];
     const system = createSystem({
       modules: {
         loop: loopModule({
           capture,
           attached,
-          gate: (f) => f["loop::running"] === true,
+          gate: (f) => {
+            seen.push(f["loop::running"], "loop::running" in f);
+
+            return f["loop::running"] === true;
+          },
         }),
         other: otherModule(),
       },
@@ -723,12 +717,9 @@ describe("sources in a namespaced system", () => {
     system.start();
     capture.publish!("START");
     await system.settle();
-    capture.publish!("TICK");
-    await system.settle();
 
-    expect(attached).toEqual(["frame"]);
-    const legacy = warnings(spy).filter((w) => w.includes('"loop::running"'));
-    expect(legacy).toHaveLength(1);
+    expect(attached).toEqual([]);
+    expect(seen.slice(-2)).toEqual([undefined, false]);
     system.destroy();
   });
 
@@ -1082,9 +1073,9 @@ describe("resolver ctx.facts.$store", () => {
     );
   });
 
-  it("blocks the same write through the legacy self pivot", async () => {
+  it("has no self pivot to reach the store through", async () => {
     const result = await runWith((facts) => {
-      facts.self.$store.set("auth::token", "X");
+      expect(facts.self).toBeUndefined();
     });
 
     expect(result.token).toBe("tok");

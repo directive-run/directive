@@ -212,7 +212,7 @@ const dataModule = createModule("data", {
 | resolvers | `context.facts.x` (writable) | `context.deps.auth.x` (read-only) |
 | source `key` / `active` gates | `facts.self.x` (read-only) | `facts.auth.x` (read-only) |
 
-A resolver can't change another module's state. Writing through `context.deps.auth` throws in development and is ignored in production – emit a requirement or dispatch an event the other module owns instead. The older resolver spellings `context.facts.self.x` and `context.facts.auth.x` still read, and warn once per system in development, pointing at `context.facts` and `context.deps`.
+A resolver can't change another module's state. Writing through `context.deps.auth` throws in development and is ignored in production – emit a requirement or dispatch an event the other module owns instead. A resolver has no `context.facts.self` or `context.facts.auth` – own facts are flat on `context.facts`, dependencies are on `context.deps`.
 
 ### `derived` is scoped to the own module
 

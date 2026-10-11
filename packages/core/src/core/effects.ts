@@ -831,7 +831,7 @@ export function createEffectsManager<S extends Schema>(
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
 
-    // A replaced definition may opt in or out of legacy writes.
+    // A replaced definition gets a fresh view (its id appears in messages).
     views.delete(id);
 
     // Always clear any stale gate from a previous registration of this id

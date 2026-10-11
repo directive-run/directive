@@ -784,44 +784,31 @@ function createScopedResolverStore(
 }
 
 /**
- * Create the facts proxy a resolver receives in a module with
- * `crossModuleDeps`.
+ * Create the facts proxy a namespaced resolver receives.
  *
  * Resolvers use flat, own-module access (`ctx.facts.draft`) – what their
- * types declare, and what event handlers get – and read dependencies through
- * `ctx.deps.<ns>`. Before 1.35 the runtime handed resolvers the cross-module
- * proxy instead, so a typed write threw and the error was swallowed. Code
- * written against that runtime spelled it `ctx.facts.self.draft` /
- * `ctx.facts.auth.token`; both keep working here and warn once per system in
- * development. The dependency pivot is read-only, like `ctx.deps`.
- *
- * `self` and dep namespace names are reserved fact keys (createModule
- * rejects them), so the pivots can never shadow a real fact. They answer
- * `in` but are not enumerated: `Object.keys(ctx.facts)` lists own facts.
+ * types declare, and what event handlers get – and read other modules
+ * through `ctx.deps.<ns>`. `$store` / `$snapshot` are scoped to the module's
+ * own facts: the module facts proxy passes those two straight through to the
+ * system-wide store, which would let `ctx.facts.$store.set("auth::token")`
+ * write a module the resolver doesn't own.
  *
  * @internal
  */
 export function createResolverFactsProxy(
   facts: Record<string, unknown>,
   selfNamespace: string,
-  depNamespaces: string[],
-  pivots = true,
 ): Record<string, unknown> {
   return cachedProxy(
     resolverProxyCache,
     facts,
-    `facts|${selfNamespace}|${depNamespaces.join(",")}|${pivots}`,
+    `facts|${selfNamespace}`,
     () => {
       const moduleFacts = createModuleFactsProxy(facts, selfNamespace);
-      const depNamesSet = new Set(pivots ? depNamespaces : []);
       const scopedStore = createScopedResolverStore(facts, selfNamespace);
       const scopedSnapshot = () => scopedStore;
 
-      // The module's own facts, with `$store` / `$snapshot` scoped to them.
-      // The module facts proxy passes those two straight through to the
-      // system-wide store, which let `ctx.facts.$store.set("auth::token")`
-      // write a module the resolver doesn't own.
-      const own = createHardenedProxy<Record<string, unknown>>({
+      return createHardenedProxy<Record<string, unknown>>({
         get: (prop) => {
           if (prop === "$store") {
             return scopedStore;
@@ -840,49 +827,6 @@ export function createResolverFactsProxy(
         has: (prop) => prop in moduleFacts,
         delete: (prop) => Reflect.deleteProperty(moduleFacts, prop),
         ownKeys: () => Object.keys(moduleFacts),
-      });
-
-      function warnLegacy(pivot: string): void {
-        if (isDevelopment) {
-          warnOncePerSystem(
-            facts,
-            `resolver-pivot|${selfNamespace}|${pivot}`,
-            () => {
-              const hint =
-                pivot === "self"
-                  ? 'write "ctx.facts.x" instead of "ctx.facts.self.x"'
-                  : `read "ctx.deps.${pivot}.x" instead of "ctx.facts.${pivot}.x"`;
-
-              return `[Directive] Module "${selfNamespace}": resolvers read their own facts flat from ctx.facts and other modules from ctx.deps. Found "ctx.facts.${pivot}" – it still works, but ${hint}.`;
-            },
-          );
-        }
-      }
-
-      return createHardenedProxy<Record<string, unknown>>({
-        get: (prop) => {
-          if (pivots && prop === "self") {
-            warnLegacy("self");
-
-            return own;
-          }
-          if (depNamesSet.has(prop)) {
-            warnLegacy(prop);
-
-            return resolverDepView(facts, selfNamespace, prop);
-          }
-
-          return own[prop];
-        },
-        set: (prop, value) => {
-          own[prop] = value;
-
-          return true;
-        },
-        has: (prop) =>
-          (pivots && prop === "self") || depNamesSet.has(prop) || prop in own,
-        delete: (prop) => Reflect.deleteProperty(own, prop),
-        ownKeys: () => Object.keys(own),
       });
     },
   );
@@ -909,10 +853,6 @@ function rejectGateWrite(selfNamespace: string, key: string): never {
  * Same scoping as the module's constraints: bare own-module keys
  * (`facts.running`), or `facts.self.*` / `facts.{dep}.*` when the module
  * declares crossModuleDeps. The view is read-only and throws on write.
- *
- * Before 1.35 gates received the whole flat store (`facts["loop::running"]`),
- * so that spelling keeps working here – reads of a key containing `::` fall
- * through to the flat store and warn once per system in development.
  *
  * Proxies are cached per facts store, so evaluating gates on every
  * reconcile allocates nothing after the first pass.
@@ -947,30 +887,12 @@ function buildSourceGateFactsProxy(
   const own = gateView(selfNamespace);
   const depNamesSet = depNamespaces ? new Set(depNamespaces) : null;
 
-  function readFlat(prop: string): unknown {
-    if (isDevelopment) {
-      warnOncePerSystem(facts, `gate-flat|${selfNamespace}|${prop}`, () => {
-        const bare = prop.slice(prop.indexOf(SEPARATOR) + SEPARATOR.length);
-        const isOwn = prop.startsWith(`${selfNamespace}${SEPARATOR}`);
-        const spelling = isOwn
-          ? depNamesSet
-            ? `facts.self.${bare}`
-            : `facts.${bare}`
-          : `facts.${prop.slice(0, prop.indexOf(SEPARATOR))}.${bare} (declare it in crossModuleDeps)`;
-
-        return `[Directive] Module "${selfNamespace}": a source gate read "${prop}" from the flat store. Gates receive the module's own facts; use ${spelling}. The flat form still works.`;
-      });
-    }
-
-    return facts[prop];
-  }
-
   if (!depNamesSet) {
     return createHardenedProxy<Record<string, unknown>>({
-      get: (prop) => (prop.includes(SEPARATOR) ? readFlat(prop) : own[prop]),
+      get: (prop) => own[prop],
       set: (prop) => rejectGateWrite(selfNamespace, prop),
       delete: (prop) => rejectGateWrite(selfNamespace, prop),
-      has: (prop) => (prop.includes(SEPARATOR) ? prop in facts : prop in own),
+      has: (prop) => prop in own,
       ownKeys: () => Object.keys(own),
     });
   }
@@ -984,9 +906,6 @@ function buildSourceGateFactsProxy(
       }
       if (depNamesSet.has(prop)) {
         return gateView(prop);
-      }
-      if (prop.includes(SEPARATOR)) {
-        return readFlat(prop);
       }
       // Same advice the constraint proxy gives: with crossModuleDeps the
       // module's own facts live under `self`.
