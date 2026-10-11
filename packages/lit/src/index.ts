@@ -850,13 +850,7 @@ export function createOptimisticUpdate(
 
 /**
  * Build a `ModuleController` from a Directive module definition.
- *
- * The function is exported as both `createModuleController` (preferred)
- * and `createModule` (legacy alias). The original `createModule` name
- * collides with `@directive-run/core`'s `createModule` — importing
- * both into the same scope shadows whichever lands last in editor
- * auto-import order. New code should use `createModuleController`;
- * the `createModule` alias remains so existing imports still resolve.
+
  */
 export function createModuleController<M extends ModuleSchema>(
   host: ReactiveControllerHost,
@@ -872,24 +866,6 @@ export function createModuleController<M extends ModuleSchema>(
   },
 ): ModuleController<M> {
   return new ModuleController<M>(host, moduleDef, config);
-}
-
-/**
- * Legacy alias for `createModuleController`. Collides by name with
- * `@directive-run/core`'s `createModule`. New code should prefer
- * `createModuleController`.
- *
- * @deprecated Renamed to `createModuleController` — same shape, no
- * import collision with `@directive-run/core`. The function-wrapper
- * shape (vs `export const x = y`) ensures the `@deprecated` JSDoc
- * tag renders the strikethrough in every TS-aware editor.
- */
-export function createModule<M extends ModuleSchema>(
-  host: ReactiveControllerHost,
-  moduleDef: ModuleDef<M>,
-  config?: Parameters<typeof createModuleController<M>>[2],
-): ModuleController<M> {
-  return createModuleController<M>(host, moduleDef, config);
 }
 
 // ============================================================================

@@ -450,48 +450,7 @@ const gameModule = createModule('game', {
 
 See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
 
-## 22. Abbreviating Type Names (`*Def` instead of `*Definition`)
-
-```typescript
-// WRONG – `Def` is short for `Definition`. Same anti-pattern as `ctx`
-// → `context` (entry #6). Source code reads better with spelled-out
-// names; the minifier handles the bytes either way.
-import type { ModuleDef, SourceDef, ResolverDef } from "@directive-run/core";
-
-// CORRECT – use the spelled-out aliases. `*Def` stays canonical in 1.x
-// for back-compat; consumers can migrate today.
-import type {
-  ModuleDefinition,
-  SourceDefinition,
-  ResolverDefinition,
-} from "@directive-run/core";
-```
-
-The `*Definition` aliases ship in 1.x via `export type { X as XDefinition }`
-in `packages/core/src/core/types/index.ts`, so generic forwarding +
-TS inference rules (mapped types, conditional distribution, tagged-
-union discrimination, barrel re-exports) match the canonical `*Def`
-form bit-for-bit. **2.0 swaps:** `*Definition` becomes canonical and
-`*Def` becomes the deprecated alias. Start writing `*Definition` in
-new code today so the 2.0 migration is a no-op.
-
-Per RFC 0006, this applies to:
-
-- `ModuleDef` → `ModuleDefinition`
-- `ConstraintDef` / `ConstraintsDef` → `ConstraintDefinition` / `ConstraintsDefinition`
-- `ResolverDef` / `ResolversDef` → `ResolverDefinition` / `ResolversDefinition`
-- `DerivationDef` / `DerivationsDef` → `DerivationDefinition` / `DerivationsDefinition`
-- `EffectDef` / `EffectsDef` → `EffectDefinition` / `EffectsDefinition`
-- `EventsDef` → `EventsDefinition`
-- `SourceDef` / `SourcesDef` → `SourceDefinition` / `SourcesDefinition`
-- `SourcePublish` → `SourcePublishFn`, `SourceUnsubscribe` → `SourceUnsubscribeFn`
-- Plus all `Typed*Def`, `CrossModule*Def`, `Dynamic*Def` variants.
-
-`EffectCleanup`, `MetaAccessor`, `EventsAccessor`, `DeriveAccessor`,
-`Snapshot` are explicitly kept as-is (each has reasoning recorded in
-RFC 0006).
-
-## 23. Writing Facts From an Effect
+## 22. Writing Facts From an Effect
 
 ```typescript
 // WRONG – effects only talk to the outside world. The `facts` an effect

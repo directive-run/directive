@@ -584,8 +584,11 @@ describe("sources in a namespaced system", () => {
   it("a source can't publish another module's event – a prefixed name is dropped and warns once", async () => {
     const spy = warnSpy();
     const capture = { publish: null as SourcePublish | null };
+    const onSourceDrop = vi.fn();
+    const onSourcePublish = vi.fn();
     const system = createSystem({
       modules: { loop: loopModule({ capture }), other: otherModule() },
+      plugins: [{ name: "spy", onSourceDrop, onSourcePublish }],
     });
     system.start();
     capture.publish!("loop::START");
@@ -595,7 +598,10 @@ describe("sources in a namespaced system", () => {
     expect(system.facts.loop.running).toBe(false);
     const row = system.inspect().sources.find((s) => s.id === "loop::boot")!;
     expect(row.dropCount).toBe(2);
+    expect(row.publishCount).toBe(0);
     expect(row.lastDropReason).toBe("unknown-event");
+    expect(onSourceDrop).toHaveBeenCalledTimes(2);
+    expect(onSourcePublish).not.toHaveBeenCalled();
     const cross = warnings(spy).filter((w) =>
       w.includes("publishes only its own module's events"),
     );

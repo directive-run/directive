@@ -37,9 +37,9 @@ export interface ExtendedSchemaType<T> extends SchemaType<T> {
   readonly _meta?: import("./types/meta.js").DefinitionMeta;
   /**
    * Structured kind discriminant used by introspection-time consumers
-   * (`predicateFromIntent`, `doctor`, `predicateToZod`). Optional for
-   * back-compat with legacy / third-party builders; when absent, the
-   * introspection layer parses `_typeName` instead.
+   * (`predicateFromIntent`, `doctor`, `predicateToZod`). Optional: core's
+   * builders don't set it, and the introspection layer parses `_typeName`
+   * instead.
    */
   readonly _kind?: SchemaKindNode;
 }

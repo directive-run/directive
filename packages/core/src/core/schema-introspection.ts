@@ -5,11 +5,10 @@
  * consumers (`predicateFromIntent`, `doctor`, future `predicateToZod`)
  * can ask "what kind is this fact?" without grepping the source.
  *
- * The discriminant lives at `_kind?: SchemaKindNode` on `ExtendedSchemaType`.
- * Base builders set it; chain mutators (`.nullable()`, `.brand()`, etc.)
- * preserve / decorate it. When `_kind` is absent (legacy or third-party
- * builder), the parser falls back to reading the freeform `_typeName`
- * string. When even that fails: `{ kind: "unknown" }` — graceful close.
+ * The `t.*()` builders record their type as the `_typeName` string, and
+ * this module parses it into a structured kind node. A builder may instead
+ * set an explicit `_kind?: SchemaKindNode`, which wins when present (core's
+ * builders don't today). When neither yields a kind: `{ kind: "unknown" }`.
  *
  * This module has zero hot-path cost; it is only invoked when an
  * introspecting caller asks for it.
@@ -94,7 +93,7 @@ export type SchemaKindNode = (
 };
 
 // ============================================================================
-// Parse `_typeName` → SchemaKindNode (fallback for legacy / third-party)
+// Parse `_typeName` → SchemaKindNode (the path every `t.*()` builder takes)
 // ============================================================================
 
 const PRIMITIVE_KINDS = new Set<SchemaKind>([
@@ -163,9 +162,8 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
 
 /**
  * Return the {@link SchemaKindNode} for a schema field. Prefers the
- * explicit `_kind` discriminant set by the builder; falls back to
- * parsing the freeform `_typeName` string for legacy / third-party
- * builders that don't set `_kind`.
+ * explicit `_kind` discriminant when a builder sets one; otherwise parses
+ * the `_typeName` string every `t.*()` builder records.
  *
  * Hostile-getter safe: `_kind` / `_typeName` reads are wrapped — a builder
  * that throws on property access returns `{ kind: "unknown" }` instead of
