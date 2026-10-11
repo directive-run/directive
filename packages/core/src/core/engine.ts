@@ -238,6 +238,15 @@ interface EngineState<_S extends Schema> {
  */
 const preparedSchemaTypes = new WeakSet<object>();
 
+/** The diff of a pass where nothing was required before or after. */
+const NO_REQUIREMENT_CHANGES: {
+  readonly added: RequirementWithId[];
+  readonly removed: RequirementWithId[];
+} = Object.freeze({
+  added: Object.freeze([]) as unknown as RequirementWithId[],
+  removed: Object.freeze([]) as unknown as RequirementWithId[],
+});
+
 function isOwnSchemaType(value: unknown): boolean {
   return (
     typeof value === "object" &&
@@ -555,8 +564,13 @@ export function createEngine<S extends Schema>(
    * inside `onBatch`, which is where the announcement used to happen anyway —
    * so listeners still hear about a batch at exactly the same moment, having
    * become able to read the right values before that moment arrives.
+   *
+   * A begin/end pair rather than a hold that returns its release, because it
+   * is taken on every batch and every unbatched write. Each `begin` is
+   * matched by exactly one `end`; `derivationHolds` below keeps the pairing.
    */
-  let holdDerivationNotifications: () => () => void = () => () => {};
+  let beginDerivationHold: () => void = () => {};
+  let endDerivationHold: () => void = () => {};
 
   /**
    * Outstanding derivation-notification holds, innermost last.
@@ -575,7 +589,12 @@ export function createEngine<S extends Schema>(
    * The manager already counts holds properly and its release is idempotent;
    * only this side needed to stop forgetting them.
    */
-  const derivationHolds: Array<{ release: () => void; released: boolean }> = [];
+  //
+  // Each entry is whether that hold has been released yet. The hold itself is
+  // `beginDerivationHold` / `endDerivationHold`, so a batch, and every effect
+  // runs in one, pushes a boolean instead of allocating a record and a
+  // release closure.
+  const derivationHolds: boolean[] = [];
 
   /**
    * How deep the stack was when each batch opened, so a batch can only ever
@@ -594,10 +613,10 @@ export function createEngine<S extends Schema>(
    * hold — announcing the parent early and then again when the parent finished.
    */
   function releaseDerivationHold(): void {
-    const top = derivationHolds[derivationHolds.length - 1];
-    if (top && !top.released) {
-      top.released = true;
-      top.release();
+    const top = derivationHolds.length - 1;
+    if (top >= 0 && !derivationHolds[top]) {
+      derivationHolds[top] = true;
+      endDerivationHold();
     }
   }
 
@@ -611,10 +630,9 @@ export function createEngine<S extends Schema>(
   function unwindDerivationHolds(): void {
     const base = derivationHoldBase.pop() ?? 0;
     while (derivationHolds.length > base) {
-      const frame = derivationHolds.pop();
-      if (frame && !frame.released) {
-        frame.released = true;
-        frame.release();
+      const released = derivationHolds.pop();
+      if (released === false) {
+        endDerivationHold();
       }
     }
   }
@@ -854,12 +872,12 @@ export function createEngine<S extends Schema>(
       // consumer code. Without the hold they would run between the commit and
       // the plugins, and a throw from one would skip `emitFactSet` entirely,
       // taking the guardrail with it.
-      const release = holdDerivationNotifications();
+      beginDerivationHold();
       try {
         invalidateDerivation(key);
         pluginManager.emitFactSet(key, value, prev);
       } finally {
-        release();
+        endDerivationHold();
       }
       // Track fact changes for trace
       if (traceEnabled) {
@@ -970,10 +988,8 @@ export function createEngine<S extends Schema>(
     },
     onBatchStart: () => {
       derivationHoldBase.push(derivationHolds.length);
-      derivationHolds.push({
-        release: holdDerivationNotifications(),
-        released: false,
-      });
+      beginDerivationHold();
+      derivationHolds.push(false);
     },
     onKeysRegistered: (entries) => {
       const asSchema: Record<string, unknown> = {};
@@ -1027,7 +1043,8 @@ export function createEngine<S extends Schema>(
   invalidateDerivation = (key: string) => derivationsManager.invalidate(key);
   invalidateManyDerivations = (keys: string[]) =>
     derivationsManager.invalidateMany(keys);
-  holdDerivationNotifications = () => derivationsManager.holdNotifications();
+  beginDerivationHold = () => derivationsManager.beginHold();
+  endDerivationHold = () => derivationsManager.endHold();
 
   // Create effects manager
   const effectsManager: EffectsManager<S> = createEffectsManager({
@@ -1037,6 +1054,8 @@ export function createEngine<S extends Schema>(
     derived: derivationsManager.getProxy() as Record<string, unknown>,
     isDerivation: observeDerivationDepName,
     isFactKey: isFactKeyName,
+    // The trace is the only reader of `deps`.
+    wantsRunDeps: () => traceManager.currentTrace != null,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
@@ -1462,6 +1481,8 @@ export function createEngine<S extends Schema>(
     readyPromise: null,
     readyResolve: null,
   };
+  /** The other half of `state.changedKeys`, swapped in at each pass. */
+  let spareChangedKeys = new Set<string>();
 
   // Dynamic definition registry (register, assign, unregister, call)
   const definitions = createDefinitionsRegistry({
@@ -1612,8 +1633,15 @@ export function createEngine<S extends Schema>(
     // after the effects phase instead dropped those writes for good: an effect
     // declared on the key never ran for it, and the first write after
     // `start()` was lost the same way.
-    const passKeys = new Set(state.changedKeys);
-    state.changedKeys.clear();
+    //
+    // Double-buffered rather than copied: the set writes have been landing in
+    // becomes this pass's keys, and the spare (last pass's keys, emptied)
+    // takes the writes from here on. Nothing keeps `passKeys` past the pass,
+    // and passes never overlap, so the spare is free to reuse.
+    const passKeys = state.changedKeys;
+    spareChangedKeys.clear();
+    state.changedKeys = spareChangedKeys;
+    spareChangedKeys = passKeys;
     if (passFromEffects) {
       previousChainKeys = new Set(passKeys);
     }
@@ -1649,19 +1677,23 @@ export function createEngine<S extends Schema>(
           (snapshotEventNames === null || shouldTakeSnapshot)
         ) {
           snapshotted = true;
-          const keys = passKeys;
-          const label =
-            keys.size <= 5
-              ? `facts-changed:${[...keys].join(",")}`
-              : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
-          historyManager.takeSnapshot(label);
+          // The label is only built for a history that keeps it.
+          if (config.history) {
+            const keys = passKeys;
+            const label =
+              keys.size <= 5
+                ? `facts-changed:${[...keys].join(",")}`
+                : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
+            historyManager.takeSnapshot(label);
+          }
         }
         shouldTakeSnapshot = false;
       }
 
-      // Get snapshot for plugins
-      const snapshot = facts.$snapshot() as FactsSnapshot<S>;
-      pluginManager.emitReconcileStart(snapshot);
+      // Snapshot for plugins, built only when one is listening.
+      if (hasPlugins()) {
+        pluginManager.emitReconcileStart(facts.$snapshot() as FactsSnapshot<S>);
+      }
 
       // Note: Derivations are already invalidated immediately when facts change
       // (in the onChange/onBatch callbacks), so we don't need to do it here
@@ -1694,7 +1726,17 @@ export function createEngine<S extends Schema>(
       effectsPhaseOpen = true;
       navigationEffectsOpen = navigationKeys !== null;
       try {
-        await effectsManager.runEffects(passKeys, navigationKeys);
+        // Awaited only when an effect returned a promise. A pass whose
+        // effects are all synchronous then finishes without yielding, so
+        // `settle()` sees it done on its first check instead of falling back
+        // to a timer and a subscription every frame.
+        const effectsDone = effectsManager.runEffectsFast(
+          passKeys,
+          navigationKeys,
+        );
+        if (effectsDone !== undefined) {
+          await effectsDone;
+        }
       } finally {
         effectsPhaseOpen = false;
         navigationEffectsOpen = false;
@@ -1756,13 +1798,28 @@ export function createEngine<S extends Schema>(
             ? await constraintsManager.evaluate(passKeys)
             : restored;
       } else {
-        // Evaluate constraints (pass changed keys for incremental evaluation)
-        currentRequirements = await constraintsManager.evaluate(passKeys);
+        // Evaluate constraints (pass changed keys for incremental evaluation).
+        // When no constraint reads a changed key, the answer is the last
+        // pass's requirements carried forward, and it comes back without a
+        // promise to await.
+        currentRequirements =
+          constraintsManager.evaluateUnaffected(passKeys) ??
+          (await constraintsManager.evaluate(passKeys));
       }
-      const currentSet = new RequirementSet();
-      for (const req of currentRequirements) {
-        currentSet.add(req);
-        pluginManager.emitRequirementCreated(req);
+
+      // Nothing required now or before: no set to build, nothing to diff,
+      // nothing to start or cancel.
+      const quiet =
+        currentRequirements.length === 0 &&
+        state.previousRequirements.size === 0;
+      const currentSet = quiet
+        ? state.previousRequirements
+        : new RequirementSet();
+      if (!quiet) {
+        for (const req of currentRequirements) {
+          currentSet.add(req);
+          pluginManager.emitRequirementCreated(req);
+        }
       }
 
       // Capture which constraints produced requirements for trace
@@ -1785,7 +1842,9 @@ export function createEngine<S extends Schema>(
       }
 
       // Diff with previous requirements
-      const { added, removed } = currentSet.diff(state.previousRequirements);
+      const { added, removed } = quiet
+        ? NO_REQUIREMENT_CHANGES
+        : currentSet.diff(state.previousRequirements);
 
       // Capture requirement diff for trace
       if (currentTrace) {
@@ -1889,20 +1948,35 @@ export function createEngine<S extends Schema>(
       // here guarantees the NEXT reconcile diff treats them as fresh.
       // If the constraint no longer fires next pass, the ID simply won't
       // be in currentSet — there's no infinite-loop risk.
+      //
+      // Held while the requeuing resolver is still in flight. Applied
+      // earlier, the next pass re-dispatches a requirement whose resolver has
+      // not finished, the dispatch is dropped as a duplicate, and the requeue
+      // is lost for good. That used to be hidden by how many microtasks a
+      // pass took, which is not something to depend on: a resolver slower
+      // than those lost it all along. Its completion schedules a pass, and
+      // the requeue is applied at the end of that one.
       if (pendingRequeueIds.size > 0) {
+        let applied = false;
         for (const reqId of pendingRequeueIds) {
+          if (resolversManager.isResolving(reqId)) {
+            continue;
+          }
           state.previousRequirements.remove(reqId);
+          pendingRequeueIds.delete(reqId);
+          applied = true;
         }
-        pendingRequeueIds.clear();
         // Schedule a follow-up reconcile so the next diff sees the
         // re-emitted requirement as added. Without this, the system
         // could go quiescent if no other fact change is pending.
-        scheduleReconcile();
+        if (applied) {
+          scheduleReconcile();
+        }
       }
 
       // Build reconcile result (only if plugins are listening)
-      const inflightInfo = resolversManager.getInflightInfo();
       if (config.plugins && config.plugins.length > 0) {
+        const inflightInfo = resolversManager.getInflightInfo();
         // Build Map for O(1) lookups on canceled requirements
         const inflightMap =
           removed.length > 0

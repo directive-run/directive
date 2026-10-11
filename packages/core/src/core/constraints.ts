@@ -66,6 +66,19 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]>;
   /**
+   * The answer `evaluate(changedKeys)` would give when it has nothing to
+   * evaluate, without the promise.
+   *
+   * When no enabled constraint reads any of `changedKeys` and none is dirty,
+   * `evaluate` only carries every constraint's last requirements forward. This
+   * returns that list synchronously. It returns `null` whenever `evaluate`
+   * would have real work to do (first evaluation, an empty key set, an
+   * affected or dirty constraint), and the caller must then call `evaluate`.
+   *
+   * @internal
+   */
+  evaluateUnaffected(changedKeys: Set<string>): RequirementWithId[] | null;
+  /**
    * Get the current state of a constraint by its definition ID.
    *
    * @param id - The constraint definition ID.
@@ -279,6 +292,9 @@ export interface CreateConstraintsOptions<S extends Schema> {
 
 /** Default async constraint timeout (5 seconds) */
 const DEFAULT_TIMEOUT = 5000;
+
+/** Shared empty answer for `evaluateUnaffected`, so a quiet pass allocates nothing. */
+const NO_REQUIREMENTS = Object.freeze([]) as unknown as RequirementWithId[];
 
 /**
  * What a manager built without derivations hands to `when()` and `require()`.
@@ -1376,6 +1392,57 @@ export function createConstraintsManager<S extends Schema>(
         }
         maxPasses--;
       }
+
+      return requirements.all();
+    },
+
+    evaluateUnaffected(changedKeys: Set<string>): RequirementWithId[] | null {
+      const sorted = getSortedConstraintIds();
+      // With no constraints at all, `evaluate` answers [] whatever it is
+      // given, as long as nothing was registered and left dirty.
+      if (sorted.length === 0 && dirtyConstraints.size === 0) {
+        noFireConstraints.clear();
+
+        return NO_REQUIREMENTS;
+      }
+      if (!hasEvaluated || changedKeys.size === 0) {
+        return null;
+      }
+      for (const id of dirtyConstraints) {
+        if (!disabled.has(id)) {
+          return null;
+        }
+      }
+      for (const key of changedKeys) {
+        const deps = factToConstraints.get(key);
+        if (deps === undefined) {
+          continue;
+        }
+        for (const id of deps) {
+          if (!disabled.has(id)) {
+            return null;
+          }
+        }
+      }
+
+      // Exactly what `evaluate` does for an empty affected set.
+      noFireConstraints.clear();
+      dirtyConstraints.clear();
+      const allConstraintIds =
+        disabled.size === 0 ? sorted : sorted.filter((id) => !disabled.has(id));
+      let any = false;
+      for (const id of allConstraintIds) {
+        const reqs = lastRequirements.get(id);
+        if (reqs !== undefined && reqs.length > 0) {
+          any = true;
+          break;
+        }
+      }
+      if (!any) {
+        return NO_REQUIREMENTS;
+      }
+      const requirements = new RequirementSet();
+      carryForwardRequirements(allConstraintIds, new Set(), requirements);
 
       return requirements.all();
     },
