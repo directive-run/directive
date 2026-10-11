@@ -140,7 +140,11 @@ function firstDifference(
   if (Array.isArray(before) !== Array.isArray(after)) {
     return path;
   }
-  if (Object.getPrototypeOf(before) !== Object.getPrototypeOf(after)) {
+  if (isPlainContainer(before) && isPlainContainer(after)) {
+    // Compared by content below. Not by prototype: `structuredClone` copies a
+    // null-prototype object as a plain one, so the copy's prototype differs
+    // from the stored value's while nothing changed.
+  } else if (Object.getPrototypeOf(before) !== Object.getPrototypeOf(after)) {
     return path;
   }
   if (after instanceof Date) {

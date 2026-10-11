@@ -94,6 +94,9 @@ export function withQueries(
   const allConstraints: Record<string, unknown> = {};
   const allResolvers: Record<string, unknown> = {};
   const allEffects: Record<string, unknown> = {};
+  const allSources: Record<string, unknown> = {};
+  const allEvents: Record<string, unknown> = {};
+  const allEventSchemas: Record<string, unknown> = {};
   const inits: ((facts: any) => void)[] = [];
 
   // Track queries with tags for tag-based invalidation
@@ -139,6 +142,23 @@ export function withQueries(
     }
     if (query.effects) {
       Object.assign(allEffects, query.effects);
+    }
+    // Focus, reconnect, timers and streams arrive from outside: sources that
+    // publish events, and the handlers that turn those events into facts.
+    const { sources, events } = query as {
+      sources?: Record<string, unknown>;
+      events?: Record<string, unknown>;
+    };
+    if (sources) {
+      Object.assign(allSources, sources);
+    }
+    if (events) {
+      Object.assign(allEvents, events);
+    }
+    const eventSchemas = (query.schema as { events?: Record<string, unknown> })
+      .events;
+    if (eventSchemas) {
+      Object.assign(allEventSchemas, eventSchemas);
     }
     const queryStop = (
       query as { onStop?: (facts: Record<string, unknown>) => void }
@@ -305,7 +325,7 @@ export function withQueries(
       ...userSchema,
       facts: { ...userFacts, ...allFacts },
       derivations: { ...userDerivations, ...allDerivations },
-      events: userEvents,
+      events: { ...userEvents, ...allEventSchemas },
       requirements: { ...userRequirements, ...allRequirements },
     },
     init: mergedInit,
@@ -313,6 +333,12 @@ export function withQueries(
     constraints: { ...(config.constraints ?? {}), ...allConstraints },
     resolvers: { ...(config.resolvers ?? {}), ...allResolvers },
     effects: { ...(config.effects ?? {}), ...allEffects },
+    ...(Object.keys(allEvents).length > 0 || config.events
+      ? { events: { ...(config.events ?? {}), ...allEvents } }
+      : {}),
+    ...(Object.keys(allSources).length > 0 || config.sources
+      ? { sources: { ...(config.sources ?? {}), ...allSources } }
+      : {}),
     hooks: mergedHooks,
   };
 }

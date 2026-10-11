@@ -23,7 +23,10 @@
  */
 
 import isDevelopment from "#is-development";
-import { type CheckedReadView, createCheckedReadView } from "./read-only-view.js";
+import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
 import type {
   SourceDef,
   SourceDropReason,
@@ -1216,12 +1219,15 @@ export function createSourcesManager(
             raw = keyFn(facts);
           } else {
             gateId = id;
+            let mutated: string | null;
             try {
               raw = keyFn(check.view);
             } finally {
               gateId = null;
+              // Always taken, so a gate that throws leaves nothing recorded
+              // for the next one to be blamed for.
+              mutated = check.takeMutation();
             }
-            const mutated = check.takeMutation();
             if (mutated !== null) {
               throw gateWriteError(id, `changed "${mutated}" in place`);
             }

@@ -99,6 +99,62 @@ describe("an effect mutating a collection or date in place", () => {
   });
 });
 
+describe("reading without mutating", () => {
+  it("is quiet for a null-prototype object, which a structured copy turns plain", async () => {
+    quiet();
+    const blocked: string[] = [];
+    const attached: string[] = [];
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), bag: t.object<{ a: number }>() } },
+      init: (facts) => {
+        const bag = Object.create(null) as { a: number };
+        bag.a = 1;
+        facts.n = 0;
+        facts.bag = { inner: bag } as never;
+      },
+      effects: {
+        reads: {
+          deps: ["n"],
+          run: (facts) => {
+            void (facts.bag as unknown as { inner: { a: number } }).inner.a;
+          },
+        },
+      },
+      sources: {
+        gate: {
+          active: (facts: Record<string, any>) => facts.bag.inner.a === 1,
+          attach: () => {
+            attached.push("gate");
+
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "watch",
+          onEffectWriteBlocked: (id, key) => {
+            blocked.push(`${id}:${key}`);
+          },
+        },
+      ],
+    });
+    await system.start();
+    system.facts.n = 1;
+    await system.settle();
+
+    expect(blocked).toEqual([]);
+    expect(attached).toEqual(["gate"]);
+    expect(
+      system.inspect().sources.find((s) => s.id === "gate")!.lastError,
+    ).toBeNull();
+    await system.stop();
+  });
+});
+
 describe("a resolver mutating a dependency module's value in place", () => {
   function build(mutate: (deps: Record<string, any>) => void) {
     const auth = createModule("auth", {

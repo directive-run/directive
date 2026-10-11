@@ -1,5 +1,5 @@
 /**
- * createSubscription — Generate effect fragments for push-based data (WebSocket, SSE, AI streaming).
+ * createSubscription — Generate source fragments for push-based data (WebSocket, SSE, AI streaming).
  *
  * Unlike createQuery (pull, Promise<T>), createSubscription handles push-based
  * protocols that deliver multiple values over time. Same ResourceState<T>
@@ -8,10 +8,10 @@
  * @module
  */
 
-import { withoutTracking } from "@directive-run/core/internals";
 import {
-  LEGACY_WRITING_EFFECT,
   PREFIX,
+  type QueryPublish,
+  buildEvent,
   buildKey,
   serializeKey,
 } from "./internal.js";
@@ -82,27 +82,31 @@ export interface SubscriptionDefinition<TData> {
   readonly schema: {
     readonly facts: Record<string, unknown>;
     readonly derivations: Record<string, unknown>;
+    readonly events?: Record<string, Record<string, unknown>>;
   };
   readonly requirements: Record<string, Record<string, unknown>>;
   readonly init: (facts: Record<string, unknown>) => void;
   readonly derive: Record<string, (facts: Record<string, unknown>) => unknown>;
   readonly constraints: Record<string, unknown>;
   readonly resolvers: Record<string, unknown>;
+  /** Empty: the stream arrives from outside, so it is a source. */
   readonly effects: Record<string, unknown>;
   /**
-   * Close the stream belonging to the stopping system. Wired by `withQueries`
-   * to the module's `onStop`, which Directive calls after every effect cleanup
-   * has fired, and handed that system's facts so the teardown can tell its own
-   * stream from one belonging to another system built from this same
-   * definition.
-   *
-   * A stream cannot be closed from an effect cleanup: that fires before every
-   * re-run of the effect too, and the two are indistinguishable from inside it.
-   *
-   * Optional because a hand-built definition — a test double, a wrapper typed
-   * as this interface — has no stream of its own to close, and `withQueries`
-   * already skips a definition that does not carry one. `createSubscription`
-   * always returns it.
+   * The stream, as a keyed source. Directive opens it when `key()` returns a
+   * value, re-opens it when that value changes, closes it when `key()`
+   * returns null or the system stops, and never re-opens it on a history
+   * rewind. Each system built from this definition has its own.
+   */
+  readonly sources?: Record<string, unknown>;
+  /** Handlers for what the stream publishes: started, data, error, complete. */
+  readonly events?: Record<
+    string,
+    (facts: Record<string, unknown>, event: Record<string, unknown>) => void
+  >;
+  /**
+   * Run when the system stops, handed that system's facts. Unused by
+   * `createSubscription`, whose stream is closed by its source; kept for
+   * hand-built definitions.
    */
   readonly onStop?: (facts: Record<string, unknown>) => void;
   setData: (facts: Record<string, unknown>, data: TData) => void;
@@ -139,91 +143,116 @@ export function createSubscription<
   const stateKey = buildKey(name, "state");
   const keyKey = buildKey(name, "key");
 
-  // The previous serialized key is tracked in a WeakMap keyed by the live
-  // facts object instead of inside the facts store. Reading + writing the
-  // same fact inside an auto-tracked effect makes the effect depend on
-  // itself: writing `facts[keyKey]` would re-trigger the effect, fire its
-  // cleanup, and abort the live AbortController on the first emission. A
-  // closure WeakMap removes that read-write self-trigger while still
-  // letting each system keep its own prev-key bookkeeping.
-  const prevKeyByFacts = new WeakMap<object, string>();
+  const startedEvent = buildEvent(name, "SUB_STARTED");
+  const dataEvent = buildEvent(name, "SUB_DATA");
+  const errorEvent = buildEvent(name, "SUB_ERROR");
+  const completeEvent = buildEvent(name, "SUB_COMPLETE");
+  const resetType = `${PREFIX}${name.toUpperCase()}_SUB_RESET`;
 
   /**
-   * The system a facts object belongs to, as an identity we can recover from
-   * both sides of a teardown.
+   * The key object behind each serialized key the gate has produced.
    *
-   * The effect body only ever sees facts, and in a namespaced system that is a
-   * module-scoped view rather than the store-wide proxy `onStop` is handed —
-   * two different objects over one system. What they share is the facts store
-   * underneath, which Directive exposes as `$store` on either view and creates
-   * exactly once per system. So the store is the thing that says "this system"
-   * no matter which door you came in through. A facts object with no store
-   * behind it stands for itself, which is the single-module case where the two
-   * views are the same object anyway.
+   * A source's `attach` receives only the gate's string key, but `subscribe`
+   * is promised the object `key()` returned, which may hold values JSON does
+   * not round-trip. The gate records it here and `attach` takes it back out.
+   * An entry lives from the gate pass that produced it to the attach that
+   * consumes it.
    */
-  function systemOf(facts: Record<string, unknown>): object {
-    return (facts.$store as object | undefined) ?? facts;
+  const paramsByKey = new Map<string, TKey>();
+
+  /** The serialized key the stream should be open for, or null for none. */
+  function gateKey(facts: Record<string, unknown>): string | null {
+    const currentKey = keyFn(facts);
+    if (currentKey === null) {
+      return null;
+    }
+    if (enabled && !enabled(facts)) {
+      return null;
+    }
+    const serialized = serializeKey(currentKey);
+    paramsByKey.set(serialized, currentKey);
+
+    return serialized;
   }
 
-  /**
-   * The stream currently established, per system.
-   *
-   * Directive fires an effect's cleanup **before** re-running it as well as
-   * when the system is torn down, and the two are indistinguishable from
-   * inside the cleanup. Aborting there killed the stream on every re-run — and
-   * an auto-tracked effect whose `key()` reads no facts records no
-   * dependencies, which Directive reads as "unknown" and re-runs on every
-   * reconcile. So a subscription with a constant key died the first time
-   * anything else in the system moved, silently: the controller was aborted,
-   * the body's same-key early return declined to re-establish anything, and
-   * every callback became a no-op with the resource state frozen on whatever
-   * had already arrived.
-   *
-   * So the cleanup *marks* rather than tears down, and the two things that
-   * genuinely end a stream do it themselves: a re-key, which the body handles
-   * because it is building the replacement, and system stop, which arrives on
-   * `onStop` after every cleanup has fired. A re-run marks and then clears the
-   * mark, and the stream never notices.
-   *
-   * Keyed per system, because this closure is per *definition*. A subscription
-   * definition is an ordinary value: nothing stops two systems being built from
-   * it, and request-scoped systems, isolated tests, and multi-tenant workers all
-   * do exactly that. A registry that held every system's stream together would
-   * hand teardown a list it cannot tell apart, and stopping one system would
-   * close streams belonging to systems still running — silently, since closing a
-   * stream leaves its resource state reporting the last value it received.
-   */
-  const liveBySystem = new WeakMap<
-    object,
-    {
-      controller: AbortController;
-      unsubscribe: (() => void) | undefined;
-      teardown: () => void;
-      /** Set by the cleanup, cleared by the body when it is only a re-run. */
-      marked: boolean;
-    }
-  >();
-
-  /** Close a stream for good. */
-  function close(record: {
-    controller: AbortController;
-    unsubscribe: (() => void) | undefined;
-  }): void {
-    record.controller.abort();
-    // `unsubscribe` is whatever the user's `subscribe` handed back. A throw
-    // here used to escape into `system.stop()`, which runs these in a loop —
-    // so one stream whose teardown failed left every stream after it open, and
-    // took the rest of the stop sequence with it. Abort has already happened
-    // by this point, so the stream is closed either way; what is lost on a
-    // throw is only the user's own teardown, and that is reported.
+  /** Close the user's stream: abort first, then their own teardown. */
+  function close(
+    controller: AbortController,
+    unsubscribe: (() => void) | undefined,
+  ): void {
+    controller.abort();
+    // `unsubscribe` is whatever the user's `subscribe` handed back. Abort has
+    // already happened, so the stream is closed either way; a throw here is
+    // reported rather than allowed to stop the teardown of every other source.
     try {
-      record.unsubscribe?.();
+      unsubscribe?.();
     } catch (error) {
       console.error(
         `[Directive] Subscription "${name}" unsubscribe threw an error:`,
         error,
       );
     }
+  }
+
+  /**
+   * Open the stream for one key.
+   *
+   * The source manager owns the lifecycle, per system: it attaches when the
+   * gate opens, tears down then re-attaches when the key changes, detaches
+   * when the gate closes or the system stops, and never re-attaches on a
+   * history rewind. So this only ever opens one stream and returns the one
+   * thing that closes it.
+   */
+  function attach(
+    publish: QueryPublish,
+    _reportError: unknown,
+    ctx?: { readonly key: string },
+  ): () => void {
+    const serialized = ctx!.key;
+    const params =
+      paramsByKey.get(serialized) ?? (JSON.parse(serialized) as TKey);
+    paramsByKey.delete(serialized);
+
+    const controller = new AbortController();
+    publish(startedEvent, { key: serialized });
+
+    const callbacks: SubscriptionCallbacks<TData> = {
+      onData: (dataOrUpdater) => {
+        if (!controller.signal.aborted) {
+          publish(dataEvent, { key: serialized, value: dataOrUpdater });
+        }
+      },
+      onError: (error) => {
+        if (!controller.signal.aborted) {
+          publish(errorEvent, { key: serialized, error });
+        }
+      },
+      onComplete: () => {
+        if (!controller.signal.aborted) {
+          publish(completeEvent, { key: serialized });
+        }
+      },
+      signal: controller.signal,
+    };
+
+    const unsubscribe = subscribe(params, callbacks) ?? undefined;
+
+    return () => close(controller, unsubscribe);
+  }
+
+  /**
+   * The current state, if the event belongs to the stream that is open now.
+   * An event from a stream that has since been replaced is ignored.
+   */
+  function stateFor(
+    facts: Record<string, unknown>,
+    event: Record<string, unknown>,
+  ): ResourceState<TData> | null {
+    if (facts[keyKey] !== event.key) {
+      return null;
+    }
+
+    return facts[stateKey] as ResourceState<TData>;
   }
 
   /** Build ResourceState derivation. */
@@ -247,9 +276,17 @@ export function createSubscription<
       derivations: {
         [name]: { _type: null as unknown },
       },
+      events: {
+        [startedEvent]: {},
+        [dataEvent]: {},
+        [errorEvent]: {},
+        [completeEvent]: {},
+      },
     },
 
-    requirements: {},
+    requirements: {
+      [resetType]: {},
+    },
 
     init: (facts: Record<string, unknown>) => {
       facts[stateKey] = createIdleResourceState<TData>();
@@ -260,188 +297,108 @@ export function createSubscription<
       [name]: buildState,
     },
 
-    // Subscriptions don't use constraints/resolvers — they use effects
-    constraints: {},
-    resolvers: {},
-
-    effects: {
-      [`${PREFIX}${name}_sub`]: {
-        ...LEGACY_WRITING_EFFECT,
-        run: (facts: Record<string, unknown>) => {
-          const system = systemOf(facts);
-          const currentKey = keyFn(facts);
-          if (currentKey === null) {
-            // Key gone (e.g. trigger fact cleared). The previous run's
-            // cleanup will fire before the next run by Directive's effect
-            // contract, so the AbortController is torn down already; here
-            // we just clear the prev-key bookkeeping so a future re-key
-            // to the same value still establishes a fresh subscription.
-            const gone = liveBySystem.get(system);
-            if (gone !== undefined) {
-              liveBySystem.delete(system);
-              close(gone);
-            }
-            if (prevKeyByFacts.delete(facts)) {
-              facts[keyKey] = null;
-              // Reset the resource state to idle so consumers re-render
-              // with no stale `isSuccess`/`isComplete` carry-over.
-              facts[stateKey] = createIdleResourceState<TData>();
-            }
-            return;
-          }
-
-          if (enabled && !enabled(facts)) {
-            return;
-          }
-
-          const serializedKey = serializeKey(currentKey);
-
-          // Track prev key off-fact so we don't depend on our own writes.
-          const prevKey = prevKeyByFacts.get(facts) ?? null;
-
-          const live = liveBySystem.get(system);
-
-          // Key hasn't changed and the stream is still established — this is a
-          // re-run, not a re-key. Clear the mark the cleanup left and hand the
-          // same teardown back, so Directive goes on holding it.
-          if (serializedKey === prevKey && live !== undefined) {
-            live.marked = false;
-
-            return live.teardown;
-          }
-
-          // Re-keyed. The stream being replaced goes now, because its
-          // successor is built below and the two must not overlap.
-          if (live !== undefined) {
-            liveBySystem.delete(system);
-            close(live);
-          }
-
-          // Update key tracking (in closure + in facts for downstream
-          // observers; the facts write isn't read by the effect so it
-          // doesn't cause a self-trigger).
-          prevKeyByFacts.set(facts, serializedKey);
-          facts[keyKey] = serializedKey;
-
-          // Set pending state. Re-keying resets `isComplete` because the
-          // previous stream's terminal signal no longer applies to the new
-          // subscription instance. Reading prev state is untracked so a
-          // re-emission of the stream (which writes `stateKey`) does not
-          // cause this effect to re-run.
-          const prevState = withoutTracking(
-            () => facts[stateKey] as ResourceState<TData>,
-          );
-          facts[stateKey] = {
-            ...prevState,
-            status: "pending",
-            isPending: prevState.data === null,
-            isFetching: true,
-            isComplete: false,
-          };
-
-          // Create abort controller for this subscription instance
-          const controller = new AbortController();
-
-          const callbacks: SubscriptionCallbacks<TData> = {
-            onData: (dataOrUpdater) => {
-              if (controller.signal.aborted) {
-                return;
-              }
-
-              const currentState = facts[stateKey] as ResourceState<TData>;
-              const newData =
-                typeof dataOrUpdater === "function"
-                  ? (dataOrUpdater as (current: TData | null) => TData)(
-                      currentState.data,
-                    )
-                  : dataOrUpdater;
-
-              facts[stateKey] = {
-                ...currentState,
-                data: newData,
-                status: "success",
-                isPending: false,
-                isFetching: false,
-                isSuccess: true,
-                isError: false,
-                isStale: false,
-                error: null,
-                dataUpdatedAt: Date.now(),
-              };
-            },
-            onError: (error) => {
-              if (controller.signal.aborted) {
-                return;
-              }
-
-              const currentState = facts[stateKey] as ResourceState<TData>;
-              facts[stateKey] = {
-                ...currentState,
-                status: "error",
-                isPending: false,
-                isFetching: false,
-                isError: true,
-                isSuccess: false,
-                error,
-                failureCount: currentState.failureCount + 1,
-                failureReason: error,
-              };
-            },
-            onComplete: () => {
-              if (controller.signal.aborted) {
-                return;
-              }
-
-              const currentState = facts[stateKey] as ResourceState<TData>;
-              facts[stateKey] = {
-                ...currentState,
-                isPending: false,
-                isFetching: false,
-                isComplete: true,
-              };
-            },
-            signal: controller.signal,
-          };
-
-          const unsubscribe = subscribe(currentKey, callbacks) ?? undefined;
-          const record = {
-            controller,
-            unsubscribe,
-            teardown: () => {},
-            marked: false,
-          };
-          // Marks, and nothing more. See `liveByFacts` for why a cleanup is
-          // the wrong place to end a stream.
-          record.teardown = () => {
-            record.marked = true;
-          };
-          liveBySystem.set(system, record);
-
-          return record.teardown;
-        },
-        // Re-run when key facts change (auto-tracked via proxy)
+    // When the key goes away, the stream is closed by the source and the
+    // state goes back to idle here, so consumers stop showing a value from a
+    // stream that no longer exists. A later re-key to the same value then
+    // starts fresh.
+    constraints: {
+      [`${PREFIX}${name}_sub_reset`]: {
+        when: (facts: Record<string, unknown>) =>
+          facts[keyKey] !== null && keyFn(facts) === null,
+        require: { type: resetType },
       },
     },
 
-    /**
-     * The one signal that means teardown.
-     *
-     * Fired by `withQueries` from the module's `onStop`, which Directive calls
-     * after every effect cleanup — so by this point a cleanup that was really
-     * a re-run has already been cleared by the body that followed it, and what
-     * is left is a stream nobody is going to re-establish.
-     *
-     * The facts belong to the system that is stopping, and only its stream is
-     * closed. Any other system built from this same definition is still running
-     * and still expecting its data.
-     */
-    onStop: (facts: Record<string, unknown>) => {
-      const system = systemOf(facts);
-      const live = liveBySystem.get(system);
-      if (live !== undefined) {
-        liveBySystem.delete(system);
-        close(live);
-      }
+    resolvers: {
+      [`${PREFIX}${name}_sub_reset`]: {
+        requirement: resetType,
+        resolve: async (
+          _req: unknown,
+          context: { facts: Record<string, unknown> },
+        ) => {
+          context.facts[keyKey] = null;
+          context.facts[stateKey] = createIdleResourceState<TData>();
+        },
+      },
+    },
+
+    // The stream arrives from outside, so it is a source, not an effect.
+    effects: {},
+
+    sources: {
+      [`${PREFIX}${name}_sub`]: {
+        key: gateKey,
+        attach,
+      },
+    },
+
+    events: {
+      [startedEvent]: (facts, event) => {
+        // A new stream resets `isComplete`: the previous stream's terminal
+        // signal no longer applies.
+        const prevState = facts[stateKey] as ResourceState<TData>;
+        facts[keyKey] = event.key;
+        facts[stateKey] = {
+          ...prevState,
+          status: "pending",
+          isPending: prevState.data === null,
+          isFetching: true,
+          isComplete: false,
+        };
+      },
+      [dataEvent]: (facts, event) => {
+        const currentState = stateFor(facts, event);
+        if (currentState === null) {
+          return;
+        }
+        const value = event.value as TData | ((current: TData | null) => TData);
+        const newData =
+          typeof value === "function"
+            ? (value as (current: TData | null) => TData)(currentState.data)
+            : value;
+        facts[stateKey] = {
+          ...currentState,
+          data: newData,
+          status: "success",
+          isPending: false,
+          isFetching: false,
+          isSuccess: true,
+          isError: false,
+          isStale: false,
+          error: null,
+          dataUpdatedAt: Date.now(),
+        };
+      },
+      [errorEvent]: (facts, event) => {
+        const currentState = stateFor(facts, event);
+        if (currentState === null) {
+          return;
+        }
+        const error = event.error as Error;
+        facts[stateKey] = {
+          ...currentState,
+          status: "error",
+          isPending: false,
+          isFetching: false,
+          isError: true,
+          isSuccess: false,
+          error,
+          failureCount: currentState.failureCount + 1,
+          failureReason: error,
+        };
+      },
+      [completeEvent]: (facts, event) => {
+        const currentState = stateFor(facts, event);
+        if (currentState === null) {
+          return;
+        }
+        facts[stateKey] = {
+          ...currentState,
+          isPending: false,
+          isFetching: false,
+          isComplete: true,
+        };
+      },
     },
 
     setData: (facts: Record<string, unknown>, data: TData) => {

@@ -441,22 +441,6 @@ function effectWriteMessage(
   return `[Directive] effect "${effectId}" ${what}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${fact} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
 }
 
-/**
- * Lets a first-party effect write facts while it moves to the right primitive.
- *
- * A temporary bridge: it is removed when `@directive-run/query` moves its
- * stream, polling, focus, reconnect and expiry effects to sources, which is the
- * primitive built for data arriving from outside. Keyed by a registered symbol
- * so query can name it without an import, and so it appears in no export. An
- * effect definition carrying it is handed the system's writable facts,
- * unchanged from before the rule existed. Grep for the key to find every use.
- *
- * @internal
- */
-export const LEGACY_EFFECT_WRITES: unique symbol = Symbol.for(
-  "directive.internal.legacyEffectWrites",
-);
-
 /** Called when a write through an effect's facts is refused. */
 type WriteBlocked = (effectId: string, key: string) => void;
 
@@ -588,14 +572,6 @@ export function createEffectsManager<S extends Schema>(
    */
   const views = new Map<string, CheckedReadView<Facts<S>>>();
 
-  /** Whether this definition still writes facts through the legacy bridge. */
-  function writesFacts(def: EffectsDef<S>[string]): boolean {
-    return (
-      (def as { [LEGACY_EFFECT_WRITES]?: boolean })[LEGACY_EFFECT_WRITES] ===
-      true
-    );
-  }
-
   /** The read-only view one effect reads facts through. */
   function viewFor(id: string): CheckedReadView<Facts<S>> {
     let view = views.get(id);
@@ -624,8 +600,8 @@ export function createEffectsManager<S extends Schema>(
    * Throw if the effect mutated a fact, a previous fact or a derived value in
    * place since its last check. Development only.
    */
-  function checkInPlaceMutation(id: string, def: EffectsDef<S>[string]): void {
-    if (!isDevelopment || writesFacts(def)) {
+  function checkInPlaceMutation(id: string): void {
+    if (!isDevelopment) {
       return;
     }
     const found =
@@ -657,15 +633,6 @@ export function createEffectsManager<S extends Schema>(
     const outer = runningEffectId;
     runningEffectId = id;
     try {
-      if (writesFacts(def)) {
-        // The bridge hands over the writable facts; the read-only type is
-        // what the definition was written against.
-        return def.run(
-          options.facts as unknown as EffectFacts<S>,
-          previousSnapshot as DeepReadonly<InferSchema<S>> | null,
-          derived,
-        );
-      }
       let prev: object | null = previousSnapshot;
       let derivedView: object = derived;
       if (isDevelopment) {
@@ -1025,7 +992,7 @@ export function createEffectsManager<S extends Schema>(
     } else {
       storeCleanup(state, effectPromise);
     }
-    checkInPlaceMutation(state.id, def);
+    checkInPlaceMutation(state.id);
   }
 
   /** Check whether two dep sets are identical */
@@ -1144,7 +1111,7 @@ export function createEffectsManager<S extends Schema>(
     // Update tracked dependencies
     state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
 
-    checkInPlaceMutation(state.id, def);
+    checkInPlaceMutation(state.id);
   }
 
   /** Run a single effect */
@@ -1388,7 +1355,7 @@ export function createEffectsManager<S extends Schema>(
         } else {
           storeCleanup(state, effectPromise);
         }
-        checkInPlaceMutation(id, def);
+        checkInPlaceMutation(id);
       } catch (error) {
         onError?.(id, error);
         console.error(`[Directive] Effect "${id}" threw an error:`, error);

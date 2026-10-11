@@ -761,11 +761,46 @@ describe("a refused effect write", () => {
   });
 });
 
-describe("the legacy effect-writes capability", () => {
-  it("is not exported from any entry point", () => {
+describe("the retired legacy effect-writes key", () => {
+  it("grants nothing: an effect carrying it still cannot write", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const blocked: string[] = [];
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), out: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.out = 0;
+      },
+      effects: {
+        sneaky: {
+          [Symbol.for("directive.internal.legacyEffectWrites")]: true,
+          deps: ["n"],
+          run: (facts: { n: number; out: number }) => {
+            facts.out = facts.n;
+          },
+        } as never,
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "watch",
+          onEffectWriteBlocked: (id, key) => {
+            blocked.push(`${id}:${key}`);
+          },
+        },
+      ],
+    });
+    await system.start();
+    system.facts.n = 3;
+    await system.settle();
+
+    expect(system.facts.out).toBe(0);
+    expect(blocked).toContain("sneaky:out");
     expect(Object.keys(internals)).not.toContain("unlockEffectFacts");
-    expect(Object.keys(internals)).not.toContain("LEGACY_EFFECT_WRITES");
     expect(Object.keys(core)).not.toContain("LEGACY_EFFECT_WRITES");
+    await system.stop();
   });
 });
 

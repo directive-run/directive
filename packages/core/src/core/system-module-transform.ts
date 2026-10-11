@@ -11,7 +11,10 @@
 import isDevelopment from "#is-development";
 import { freezeSpec } from "../utils/utils.js";
 import { PREV_FACTS_READ, declaresPrevFacts } from "./effects.js";
-import { type CheckedReadView, createCheckedReadView } from "./read-only-view.js";
+import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
 import {
   applyPatch,
   evaluateTemplate,
@@ -753,7 +756,6 @@ function prefixResolvers(
       }
       const checked = checkDependencyViews(
         wrapped as { facts: unknown; signal: AbortSignal; deps?: unknown },
-        namespace,
         depNamespaces,
       );
       const result = await call(checked.ctx);
@@ -810,7 +812,6 @@ function prefixResolvers(
  */
 function checkDependencyViews(
   ctx: { facts: unknown; signal: AbortSignal; deps?: unknown },
-  namespace: string,
   depNamespaces: string[],
 ): {
   ctx: { facts: unknown; signal: AbortSignal };
