@@ -646,15 +646,18 @@ export function createInfiniteQuery<
       ? {
           [`${PREFIX}${name}_gc`]: {
             key: (facts: Record<string, unknown>) => {
+              // Cheap checks first: while the query has a key, or has already
+              // expired, the cached state is never read.
+              if (keyFn(facts) !== null || facts[triggerKey] === "expired") {
+                return null;
+              }
               const state = facts[stateKey] as
                 | InfiniteResourceState<TData, TError>
                 | undefined;
               if (
                 !state ||
                 state.status !== "success" ||
-                !state.dataUpdatedAt ||
-                facts[triggerKey] === "expired" ||
-                keyFn(facts) !== null
+                !state.dataUpdatedAt
               ) {
                 return null;
               }

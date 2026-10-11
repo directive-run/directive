@@ -38,149 +38,248 @@ function unwrap(value: unknown): unknown {
   return (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET] ?? value;
 }
 
-/** Plain objects and arrays: the values compared property by property. */
-function isPlainContainer(value: unknown): value is object {
-  if (value === null || typeof value !== "object") {
-    return false;
-  }
-  if (Array.isArray(value)) {
-    return true;
-  }
-  const prototype = Object.getPrototypeOf(value);
+/**
+ * The most slots one check records before it gives up. A value bigger than
+ * this – a cached list of thousands of rows – is left unchecked rather than
+ * walked on every read, so development stays fast with large data.
+ */
+const NODE_BUDGET = 2000;
 
-  return prototype === Object.prototype || prototype === null;
+/** One recorded container: the object itself and what its slots held. */
+interface Snapshot {
+  readonly ref: object;
+  readonly prototype: object | null;
+  readonly extensible: boolean;
+  /** Date only: the time it held. */
+  readonly time?: number;
+  /**
+   * Own data properties (objects, arrays, class instances), entries (Map) or
+   * values (Set), in order, each with the snapshot of the object it held, if
+   * that was recorded.
+   */
+  readonly slots: Array<{
+    readonly key: unknown;
+    readonly value: unknown;
+    readonly child: Snapshot | null;
+  }>;
+  readonly kind: "object" | "map" | "set" | "date";
 }
 
-/**
- * Values that can be mutated in place and copied to check for it: plain
- * objects and arrays, and the built-in collections and dates
- * `structuredClone` copies faithfully.
- */
-function isCheckable(value: unknown): value is object {
+/** Counts recorded slots against {@link NODE_BUDGET}. */
+interface Budget {
+  left: number;
+}
+
+/** Values recorded slot by slot. Functions, typed arrays and the like are leaves. */
+function isRecordable(value: unknown): value is object {
   return (
-    isPlainContainer(value) ||
-    value instanceof Map ||
-    value instanceof Set ||
-    value instanceof Date
+    value !== null &&
+    typeof value === "object" &&
+    !ArrayBuffer.isView(value) &&
+    !(value instanceof ArrayBuffer) &&
+    !(value instanceof Promise) &&
+    !(value instanceof WeakMap) &&
+    !(value instanceof WeakSet)
   );
 }
 
 /**
- * The first difference between two Maps or two Sets, compared in insertion
- * order. A copy's object keys are never identical to the originals, so keys
- * are compared structurally like values. A reordering is reported as a
- * change, which is what a delete-then-add in place is.
+ * Record `value` by reference, without copying it and without running any
+ * getter: own properties are read through their descriptors, and an accessor
+ * is recorded as its getter and setter functions. Returns `null` once the
+ * budget runs out, which leaves the whole value unchecked.
  */
-function firstCollectionDifference(
-  before: Map<unknown, unknown> | Set<unknown>,
-  after: Map<unknown, unknown> | Set<unknown>,
-  path: string,
+function record(
+  value: object,
+  budget: Budget,
   seen: WeakSet<object>,
-): string | null {
-  if (before.size !== after.size) {
-    return `${path} (size ${before.size} → ${after.size})`;
-  }
-  const isMap = after instanceof Map;
-  const beforeEntries = isMap
-    ? [...(before as Map<unknown, unknown>)]
-    : [...before].map((value) => [value, undefined] as const);
-  const afterEntries = isMap
-    ? [...(after as Map<unknown, unknown>)]
-    : [...after].map((value) => [value, undefined] as const);
-  for (let index = 0; index < afterEntries.length; index++) {
-    const [beforeKey, beforeValue] = beforeEntries[index]!;
-    const [afterKey, afterValue] = afterEntries[index]!;
-    const keyPath = `${path}[${index}]`;
-    const keyDifference = firstDifference(beforeKey, afterKey, keyPath, seen);
-    if (keyDifference !== null) {
-      return keyDifference;
+): Snapshot | null {
+  seen.add(value);
+  const slots: Array<{ key: unknown; value: unknown; child: Snapshot | null }> =
+    [];
+  const base = {
+    ref: value,
+    prototype: Object.getPrototypeOf(value) as object | null,
+    extensible: Object.isExtensible(value),
+  };
+  const child = (held: unknown): Snapshot | null | undefined => {
+    if (!isRecordable(held) || seen.has(held)) {
+      return null;
     }
-    if (isMap) {
-      const valuePath =
-        typeof afterKey === "string" || typeof afterKey === "number"
-          ? `${path}.get(${JSON.stringify(afterKey)})`
-          : `${keyPath}.value`;
-      const valueDifference = firstDifference(
-        beforeValue,
-        afterValue,
-        valuePath,
-        seen,
+    const recorded = record(held, budget, seen);
+
+    // `undefined` means the budget ran out below.
+    return recorded ?? undefined;
+  };
+  const push = (key: unknown, held: unknown): boolean => {
+    budget.left--;
+    if (budget.left < 0) {
+      return false;
+    }
+    const nested = child(held);
+    if (nested === undefined) {
+      return false;
+    }
+    slots.push({ key, value: held, child: nested });
+
+    return true;
+  };
+
+  if (value instanceof Date) {
+    budget.left--;
+
+    return budget.left < 0
+      ? null
+      : { ...base, kind: "date", time: value.getTime(), slots };
+  }
+  if (value instanceof Map) {
+    for (const [key, held] of value) {
+      if (!push(key, held)) {
+        return null;
+      }
+    }
+
+    return { ...base, kind: "map", slots };
+  }
+  if (value instanceof Set) {
+    for (const held of value) {
+      if (!push(held, undefined)) {
+        return null;
+      }
+    }
+
+    return { ...base, kind: "set", slots };
+  }
+  // Give up before listing the keys of an array the budget cannot cover:
+  // listing them is itself a walk of the whole array.
+  if (Array.isArray(value) && value.length >= budget.left) {
+    budget.left = -1;
+
+    return null;
+  }
+  for (const key of Object.getOwnPropertyNames(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    const held =
+      "value" in descriptor
+        ? descriptor.value
+        : { get: descriptor.get, set: descriptor.set };
+    if ("value" in descriptor) {
+      if (!push(key, held)) {
+        return null;
+      }
+    } else {
+      budget.left--;
+      if (budget.left < 0) {
+        return null;
+      }
+      slots.push({ key, value: descriptor.get ?? descriptor.set, child: null });
+    }
+  }
+
+  return { ...base, kind: "object", slots };
+}
+
+/** Describe a slot for a reported path. */
+function slotPath(
+  snapshot: Snapshot,
+  path: string,
+  key: unknown,
+  index: number,
+) {
+  if (snapshot.kind === "object") {
+    return `${path}.${String(key)}`;
+  }
+  if (snapshot.kind === "map") {
+    return typeof key === "string" || typeof key === "number"
+      ? `${path}.get(${JSON.stringify(key)})`
+      : `${path}[${index}].value`;
+  }
+
+  return `${path}[${index}]`;
+}
+
+/** The current value a recorded object slot holds, read without getters. */
+function currentObjectSlot(
+  ref: object,
+  key: string,
+): { present: boolean; value: unknown } {
+  const descriptor = Object.getOwnPropertyDescriptor(ref, key);
+  if (descriptor === undefined) {
+    return { present: false, value: undefined };
+  }
+
+  return {
+    present: true,
+    value:
+      "value" in descriptor
+        ? descriptor.value
+        : (descriptor.get ?? descriptor.set),
+  };
+}
+
+/** The first path at which the recorded object no longer matches, or `null`. */
+function firstChange(snapshot: Snapshot, path: string): string | null {
+  const { ref } = snapshot;
+  if (Object.getPrototypeOf(ref) !== snapshot.prototype) {
+    return `${path} (prototype)`;
+  }
+  if (snapshot.extensible && !Object.isExtensible(ref)) {
+    return `${path} (frozen)`;
+  }
+  if (snapshot.kind === "date") {
+    return (ref as Date).getTime() === snapshot.time ? null : path;
+  }
+  if (snapshot.kind === "map" || snapshot.kind === "set") {
+    const collection = ref as Map<unknown, unknown> | Set<unknown>;
+    if (collection.size !== snapshot.slots.length) {
+      return `${path} (size ${snapshot.slots.length} → ${collection.size})`;
+    }
+    let index = 0;
+    for (const entry of collection) {
+      const recorded = snapshot.slots[index]!;
+      const [key, value] =
+        snapshot.kind === "map"
+          ? (entry as [unknown, unknown])
+          : [entry, undefined];
+      if (!Object.is(key, recorded.key)) {
+        return `${path}[${index}]`;
+      }
+      if (!Object.is(value, recorded.value)) {
+        return slotPath(snapshot, path, key, index);
+      }
+      index++;
+    }
+  } else {
+    const keys = Object.getOwnPropertyNames(ref);
+    if (keys.length !== snapshot.slots.length) {
+      const before = new Set(snapshot.slots.map((slot) => slot.key));
+      const added = keys.find((key) => !before.has(key));
+      const removed = snapshot.slots.find(
+        (slot) =>
+          !Object.prototype.hasOwnProperty.call(ref, slot.key as string),
       );
-      if (valueDifference !== null) {
-        return valueDifference;
+
+      return `${path}.${added ?? String(removed?.key ?? "")}`;
+    }
+    for (const slot of snapshot.slots) {
+      const current = currentObjectSlot(ref, slot.key as string);
+      if (!current.present || !Object.is(current.value, slot.value)) {
+        return `${path}.${String(slot.key)}`;
       }
     }
   }
-
-  return null;
-}
-
-/** The first path at which `before` and `after` differ, or `null`. */
-function firstDifference(
-  before: unknown,
-  after: unknown,
-  path: string,
-  seen: WeakSet<object>,
-): string | null {
-  if (Object.is(before, after)) {
-    return null;
-  }
-  if (
-    before === null ||
-    after === null ||
-    typeof before !== "object" ||
-    typeof after !== "object"
-  ) {
-    return path;
-  }
-  if (seen.has(after)) {
-    return null;
-  }
-  seen.add(after);
-  if (Array.isArray(before) !== Array.isArray(after)) {
-    return path;
-  }
-  if (isPlainContainer(before) && isPlainContainer(after)) {
-    // Compared by content below. Not by prototype: `structuredClone` copies a
-    // null-prototype object as a plain one, so the copy's prototype differs
-    // from the stored value's while nothing changed.
-  } else if (Object.getPrototypeOf(before) !== Object.getPrototypeOf(after)) {
-    return path;
-  }
-  if (after instanceof Date) {
-    return (before as Date).getTime() === after.getTime() ? null : path;
-  }
-  if (after instanceof Map || after instanceof Set) {
-    return firstCollectionDifference(
-      before as Map<unknown, unknown> | Set<unknown>,
-      after,
-      path,
-      seen,
-    );
-  }
-  if (!isPlainContainer(after)) {
-    // Any other class instance cannot be compared through a copy: a clone of
-    // one is never the same shape. Only a change of type is reported.
-    return null;
-  }
-  const beforeKeys = Object.keys(before);
-  const afterKeys = Object.keys(after);
-  if (beforeKeys.length !== afterKeys.length) {
-    const added = afterKeys.find((key) => !(key in before));
-    const removed = beforeKeys.find((key) => !(key in after));
-
-    return `${path}.${added ?? removed ?? ""}`;
-  }
-  for (const key of afterKeys) {
-    const difference = firstDifference(
-      (before as Record<string, unknown>)[key],
-      (after as Record<string, unknown>)[key],
-      `${path}.${key}`,
-      seen,
-    );
-    if (difference !== null) {
-      return difference;
+  let index = 0;
+  for (const slot of snapshot.slots) {
+    if (slot.child !== null) {
+      const nested = firstChange(
+        slot.child,
+        slotPath(snapshot, path, slot.key, index),
+      );
+      if (nested !== null) {
+        return nested;
+      }
     }
+    index++;
   }
 
   return null;
@@ -196,10 +295,13 @@ function firstDifference(
  * `Object.isFrozen` all see the stored value.
  *
  * A nested value cannot be stopped from being mutated without wrapping it, so
- * development checks for it instead. The first read of each plain object,
- * array, Map, Set or Date records a structural copy; {@link CheckedReadView.takeMutation}
- * compares it with the stored value and names the first path that changed.
- * Production records nothing.
+ * development checks for it instead. The first read of each object records it
+ * by reference: every own data property's value, every Map and Set entry, a
+ * Date's time, and the same one level down, recursively. Nothing is copied
+ * and no getter runs, so class instances, lazy getters and values that cannot
+ * be cloned are all fine. {@link CheckedReadView.takeMutation} then names the
+ * first slot that holds something else. A value bigger than the budget is
+ * left unchecked. Production records nothing.
  *
  * Reads forward to `source`, so a tracking proxy still records them.
  */
@@ -214,9 +316,8 @@ export function createCheckedReadView<T extends object>(
   } = {},
 ): CheckedReadView<T> {
   const target = source as unknown as Record<string | symbol, unknown>;
-  const recorded = isDevelopment
-    ? new Map<string, { value: object; copy: unknown; extensible: boolean }>()
-    : null;
+  const recorded = isDevelopment ? new Map<string, Snapshot | null>() : null;
+  let budget: Budget = { left: NODE_BUDGET };
 
   const view = new Proxy(Object.create(null) as T, {
     get(_, prop) {
@@ -230,18 +331,10 @@ export function createCheckedReadView<T extends object>(
       if (
         recorded !== null &&
         typeof prop === "string" &&
-        isCheckable(value) &&
+        isRecordable(value) &&
         !recorded.has(prop)
       ) {
-        try {
-          recorded.set(prop, {
-            value,
-            copy: structuredClone(value),
-            extensible: Object.isExtensible(value),
-          });
-        } catch {
-          // Holds something that cannot be copied; it is not checked.
-        }
+        recorded.set(prop, record(value, budget, new WeakSet()));
       }
 
       return value;
@@ -296,20 +389,20 @@ export function createCheckedReadView<T extends object>(
         return null;
       }
       let found: string | null = null;
-      for (const [name, { value, copy, extensible }] of recorded) {
-        const key = options.prefix ? `${options.prefix}.${name}` : name;
-        // `Object.freeze` or `preventExtensions` on a stored value changes
-        // nothing structural, but it is still a change to the fact.
-        if (extensible && !Object.isExtensible(value)) {
-          found = `${key} (frozen)`;
-          break;
+      for (const [name, snapshot] of recorded) {
+        if (snapshot === null) {
+          continue;
         }
-        found = firstDifference(copy, value, key, new WeakSet());
+        found = firstChange(
+          snapshot,
+          options.prefix ? `${options.prefix}.${name}` : name,
+        );
         if (found !== null) {
           break;
         }
       }
       recorded.clear();
+      budget = { left: NODE_BUDGET };
 
       return found;
     },

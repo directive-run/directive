@@ -574,7 +574,19 @@ export function createSourcesManager(
             stack: error.stack,
           });
     callbacks.onError?.(id, moduleId, pErr, safeError);
+    // A gate that throws fails closed: the source just never attaches. With
+    // no plugin listening that is invisible, so development says so, once
+    // per source.
+    if (isDevelopment && pErr === "gate" && !warnedGates.has(id)) {
+      warnedGates.add(id);
+      console.warn(
+        `[Directive] Source "${id}": its key/active gate threw, so the source stays detached: ${safeError.message} The error is in inspect().sources and reaches plugins through onSourceError; this warning shows once per source and only in development.`,
+      );
+    }
   }
+
+  /** Sources whose failed gate has been reported to the console. */
+  const warnedGates = new Set<string>();
 
   function attachOne(
     id: string,

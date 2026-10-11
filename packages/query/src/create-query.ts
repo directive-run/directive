@@ -468,15 +468,18 @@ export function createQuery<
         ? {
             [`${PREFIX}${name}_gc`]: {
               key: (facts: Record<string, unknown>) => {
+                // Cheap checks first: while the query has a key, or has already
+                // expired, the cached state is never read.
+                if (keyFn(facts) !== null || facts[triggerKey] === -1) {
+                  return null;
+                }
                 const state = facts[stateKey] as
                   | ResourceState<TData, TError>
                   | undefined;
                 if (
                   !state ||
                   state.status !== "success" ||
-                  !state.dataUpdatedAt ||
-                  facts[triggerKey] === -1 ||
-                  keyFn(facts) !== null
+                  !state.dataUpdatedAt
                 ) {
                   return null;
                 }

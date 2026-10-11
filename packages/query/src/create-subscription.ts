@@ -150,18 +150,31 @@ export function createSubscription<
   const resetType = `${PREFIX}${name.toUpperCase()}_SUB_RESET`;
 
   /**
-   * The key object behind each serialized key the gate has produced.
+   * The key object `key()` returned, per system, for the stream about to open.
    *
    * A source's `attach` receives only the gate's string key, but `subscribe`
    * is promised the object `key()` returned, which may hold values JSON does
-   * not round-trip. The gate records it here and `attach` takes it back out.
-   * An entry lives from the gate pass that produced it to the attach that
-   * consumes it.
+   * not round-trip. One definition can back many systems, so the gate's key
+   * carries a token for its system, and the object is kept under that token:
+   * the latest one the gate produced, removed when that stream closes.
    */
-  const paramsByKey = new Map<string, TKey>();
+  const pending = new Map<number, { serialized: string; params: TKey }>();
+  const tokens = new WeakMap<object, number>();
+  let nextToken = 0;
 
-  /** The serialized key the stream should be open for, or null for none. */
-  function gateKey(facts: Record<string, unknown>): string | null {
+  /** A number standing for the system whose gate facts these are. */
+  function tokenFor(facts: Record<string, unknown>): number {
+    let token = tokens.get(facts);
+    if (token === undefined) {
+      token = ++nextToken;
+      tokens.set(facts, token);
+    }
+
+    return token;
+  }
+
+  /** The key the stream should be open for, or null for none. */
+  function wantedKey(facts: Record<string, unknown>): TKey | null {
     const currentKey = keyFn(facts);
     if (currentKey === null) {
       return null;
@@ -169,10 +182,21 @@ export function createSubscription<
     if (enabled && !enabled(facts)) {
       return null;
     }
-    const serialized = serializeKey(currentKey);
-    paramsByKey.set(serialized, currentKey);
 
-    return serialized;
+    return currentKey;
+  }
+
+  /** The gate: `<token>|<serialized key>`, or null to close the stream. */
+  function gateKey(facts: Record<string, unknown>): string | null {
+    const currentKey = wantedKey(facts);
+    if (currentKey === null) {
+      return null;
+    }
+    const token = tokenFor(facts);
+    const serialized = serializeKey(currentKey);
+    pending.set(token, { serialized, params: currentKey });
+
+    return `${token}|${serialized}`;
   }
 
   /** Close the user's stream: abort first, then their own teardown. */
@@ -208,10 +232,15 @@ export function createSubscription<
     _reportError: unknown,
     ctx?: { readonly key: string },
   ): () => void {
-    const serialized = ctx!.key;
+    const gate = ctx!.key;
+    const split = gate.indexOf("|");
+    const token = Number(gate.slice(0, split));
+    const serialized = gate.slice(split + 1);
+    const held = pending.get(token);
     const params =
-      paramsByKey.get(serialized) ?? (JSON.parse(serialized) as TKey);
-    paramsByKey.delete(serialized);
+      held?.serialized === serialized
+        ? held.params
+        : (JSON.parse(serialized) as TKey);
 
     const controller = new AbortController();
     publish(startedEvent, { key: serialized });
@@ -237,7 +266,14 @@ export function createSubscription<
 
     const unsubscribe = subscribe(params, callbacks) ?? undefined;
 
-    return () => close(controller, unsubscribe);
+    return () => {
+      // Only this stream's entry: on a re-key the gate has already stored
+      // the next key's object, and that one is still to be opened.
+      if (pending.get(token)?.serialized === serialized) {
+        pending.delete(token);
+      }
+      close(controller, unsubscribe);
+    };
   }
 
   /**
@@ -297,14 +333,14 @@ export function createSubscription<
       [name]: buildState,
     },
 
-    // When the key goes away, the stream is closed by the source and the
-    // state goes back to idle here, so consumers stop showing a value from a
-    // stream that no longer exists. A later re-key to the same value then
-    // starts fresh.
+    // When the key goes away or `enabled()` turns false, the source closes
+    // the stream and the state goes back to idle here, so consumers stop
+    // showing a value (or a fetch in progress) from a stream that no longer
+    // exists. A later re-key to the same value then starts fresh.
     constraints: {
       [`${PREFIX}${name}_sub_reset`]: {
         when: (facts: Record<string, unknown>) =>
-          facts[keyKey] !== null && keyFn(facts) === null,
+          facts[keyKey] !== null && wantedKey(facts) === null,
         require: { type: resetType },
       },
     },
