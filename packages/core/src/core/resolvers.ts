@@ -1132,7 +1132,7 @@ export function createResolversManager<S extends Schema>(
       controller && requirementIds.length > 0
         ? recordRunWrites(baseFacts, runRecordFor(controller))
         : baseFacts;
-    return {
+    const ctx: ResolverContext<S> = {
       facts: ctxFacts,
       signal,
       snapshot: () => facts.$snapshot() as FactsSnapshot<S>,
@@ -1143,6 +1143,65 @@ export function createResolversManager<S extends Schema>(
         }
       },
     };
+    if (controller && requirementIds.length > 0) {
+      contextRuns.set(ctx, {
+        record: runRecordFor(controller),
+        requirementIds,
+      });
+    }
+
+    return ctx;
+  }
+
+  /**
+   * Resolver bodies still running, by requirement id: a run that timed out,
+   * failed or was canceled has left `inflight` but its body may still be
+   * going and still writing. Kept reachable until the body itself settles,
+   * so a new dispatch for the same requirement can mark it superseded and
+   * drop its later writes.
+   */
+  const contextRuns = new WeakMap<
+    object,
+    { record: RunRecord; requirementIds: readonly string[] }
+  >();
+  const runningBodies = new Map<string, Set<RunRecord>>();
+
+  function trackBody(ctx: object, body: Promise<unknown>): void {
+    const run = contextRuns.get(ctx);
+    if (!run) {
+      return;
+    }
+    for (const id of run.requirementIds) {
+      let set = runningBodies.get(id);
+      if (!set) {
+        set = new Set();
+        runningBodies.set(id, set);
+      }
+      set.add(run.record);
+    }
+    const settle = () => {
+      for (const id of run.requirementIds) {
+        const set = runningBodies.get(id);
+        if (set) {
+          set.delete(run.record);
+          if (set.size === 0) {
+            runningBodies.delete(id);
+          }
+        }
+      }
+    };
+    body.then(settle, settle);
+  }
+
+  /** A new dispatch for this requirement: any body still running for it is superseded. */
+  function supersedeRunningBodies(requirementId: string): void {
+    const set = runningBodies.get(requirementId);
+    if (!set) {
+      return;
+    }
+    for (const record of set) {
+      record.discard = true;
+    }
   }
 
   /**
@@ -1249,15 +1308,19 @@ export function createResolversManager<S extends Schema>(
 
     // Batch wraps only the synchronous start — see JSDoc above.
     let resolvePromise!: Promise<void>;
+    const ctx = createContext(signal, [req.id], binding, controller, baseline, {
+      resolverId,
+      requirements: [req],
+    });
     store.batch(() => {
       resolvePromise = def.resolve!(
         req.requirement as Parameters<NonNullable<typeof def.resolve>>[0],
-        createContext(signal, [req.id], binding, controller, baseline, {
-          resolverId,
-          requirements: [req],
-        }),
+        ctx,
       ) as Promise<void>;
     });
+    if (resolvePromise instanceof Promise) {
+      trackBody(ctx, resolvePromise);
+    }
 
     const timeout = def.timeout;
     if (timeout && timeout > 0) {
@@ -1462,6 +1525,9 @@ export function createResolversManager<S extends Schema>(
     store.batch(() => {
       resolvePromise = def.resolveBatchWithResults!(reqPayloads as any, ctx);
     });
+    if (resolvePromise instanceof Promise) {
+      trackBody(ctx, resolvePromise);
+    }
 
     const results = await awaitWithTimeout(
       resolvePromise,
@@ -1529,6 +1595,9 @@ export function createResolversManager<S extends Schema>(
         ctx,
       ) as Promise<void>;
     });
+    if (resolvePromise instanceof Promise) {
+      trackBody(ctx, resolvePromise);
+    }
 
     await awaitWithTimeout(
       resolvePromise,
@@ -1979,6 +2048,8 @@ export function createResolversManager<S extends Schema>(
 
       const def = definitions[resolverId];
       if (!def) return;
+
+      supersedeRunningBodies(req.id);
 
       // Check if this is a batched resolver
       if (def.batch?.enabled) {

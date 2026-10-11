@@ -569,6 +569,12 @@ export function createEngine<S extends Schema>(
     retryLaterTimer = setInterval(
       () => {
         const dueRetries = errorBoundary.processDueRetries();
+        // Nothing left to retry: stop polling until the next retry-later.
+        if (
+          errorBoundary.getRetryLaterManager().getPendingRetries().length === 0
+        ) {
+          stopRetryLaterTimer();
+        }
 
         for (const entry of dueRetries) {
           if (entry.callback) {
@@ -586,6 +592,15 @@ export function createEngine<S extends Schema>(
       },
       Math.min(intervalMs, 500),
     );
+    // Polling must not keep a Node process alive on its own.
+    (retryLaterTimer as { unref?: () => void }).unref?.();
+  }
+
+  function stopRetryLaterTimer(): void {
+    if (retryLaterTimer !== null) {
+      clearInterval(retryLaterTimer);
+      retryLaterTimer = null;
+    }
   }
 
   // Retry-later polling timer
