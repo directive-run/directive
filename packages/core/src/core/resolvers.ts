@@ -149,6 +149,16 @@ export interface ResolversManager<_S extends Schema> {
    */
   detach(requirementId: string): void;
   /**
+   * Like {@link ResolversManager.detach}, for a resolver whose own write
+   * retracted its requirement: it keeps running and reports completion, the
+   * requirement can re-dispatch if it returns, and it still counts toward
+   * {@link ResolversManager.getInflightCount} until it finishes, so
+   * `settle()` waits for it.
+   *
+   * @internal
+   */
+  release(requirementId: string): void;
+  /**
    * Abort every in-flight resolver and flush all pending batch queues.
    */
   abortAll(): void;
@@ -184,6 +194,22 @@ export interface ResolversManager<_S extends Schema> {
    * @returns `true` if the requirement has an active in-flight resolver.
    */
   isResolving(requirementId: string): boolean;
+  /**
+   * The fact keys written through `ctx.facts` by the resolver currently
+   * running for `requirementId` (single or batched), since the last
+   * {@link ResolversManager.clearWriteRecords}. `null` when nothing is
+   * running for it or it wrote nothing.
+   *
+   * @internal
+   */
+  writesFor(requirementId: string): ReadonlySet<string> | null;
+  /**
+   * Forget the writes recorded so far. The engine calls this once per pass,
+   * after the requirement diff has consulted them.
+   *
+   * @internal
+   */
+  clearWriteRecords(): void;
   /**
    * Immediately flush all pending batch queues, executing their resolvers.
    */
@@ -945,6 +971,60 @@ export function createResolversManager<S extends Schema>(
    * @param baseline - Optional pre-dispatch facts snapshot, threaded into
    *   `createBoundFacts` to defeat the sibling-clobber race.
    */
+  /**
+   * Fact keys each resolver definition has written through `ctx.facts`
+   * since the engine last cleared them (once per pass). The engine reads
+   * them when a requirement disappears while its resolver is running: if
+   * the resolver's own write is what retracted it, the resolver has done its
+   * job and must complete, not be canceled. Kept per definition, not per
+   * run, so `ctx.facts` keeps one identity per resolver and the namespaced
+   * proxies cached on it are reused.
+   */
+  const writeRecords = new Map<string, Set<string>>();
+  /** Runs released by {@link ResolversManager.release} that have not finished. */
+  const released = new Set<object>();
+  let releasedRunning = 0;
+  const recordingFacts = new Map<string, Facts<S>>();
+
+  function recordWrites(target: Facts<S>, resolverId?: string): Facts<S> {
+    if (resolverId === undefined) {
+      return target;
+    }
+    let written = writeRecords.get(resolverId);
+    if (!written) {
+      written = new Set();
+      writeRecords.set(resolverId, written);
+    }
+    const record = written;
+
+    return new Proxy(target, {
+      set(t, key, value) {
+        if (typeof key === "string") {
+          record.add(key);
+        }
+
+        return Reflect.set(t, key, value);
+      },
+      deleteProperty(t, key) {
+        if (typeof key === "string") {
+          record.add(key);
+        }
+
+        return Reflect.deleteProperty(t, key);
+      },
+    });
+  }
+
+  function recordingFactsFor(resolverId: string): Facts<S> {
+    let view = recordingFacts.get(resolverId);
+    if (!view) {
+      view = recordWrites(facts, resolverId);
+      recordingFacts.set(resolverId, view);
+    }
+
+    return view;
+  }
+
   function createContext(
     signal: AbortSignal,
     requirementIds: readonly string[],
@@ -974,16 +1054,22 @@ export function createResolversManager<S extends Schema>(
             }
           }
         : undefined;
+    const resolverId = clobberAttribution?.resolverId;
     const ctxFacts =
       binding && controller
-        ? createBoundFacts(
-            binding,
-            controller,
-            baseline,
-            onClobberDetected,
-            onClobberSuppressedForCtx,
+        ? recordWrites(
+            createBoundFacts(
+              binding,
+              controller,
+              baseline,
+              onClobberDetected,
+              onClobberSuppressedForCtx,
+            ),
+            resolverId,
           )
-        : facts;
+        : resolverId !== undefined
+          ? recordingFactsFor(resolverId)
+          : facts;
     return {
       facts: ctxFacts,
       signal,
@@ -1773,8 +1859,15 @@ export function createResolversManager<S extends Schema>(
         // Only fire onResolutionComplete if we're the first to clean up.
         // If abort() already removed us from inflight, skip to avoid
         // spurious double-notifications.
-        const wasInflight = inflight.delete(req.id);
+        const wasInflight = inflight.get(req.id) === state;
         if (wasInflight) {
+          inflight.delete(req.id);
+        }
+        const wasReleased = released.delete(state);
+        if (wasReleased) {
+          releasedRunning--;
+        }
+        if (wasInflight || wasReleased) {
           onResolutionComplete?.();
         }
         running.delete(runKey);
@@ -1920,6 +2013,16 @@ export function createResolversManager<S extends Schema>(
       }
     },
 
+    release(requirementId: string): void {
+      const state = inflight.get(requirementId);
+      if (!state) {
+        return;
+      }
+      inflight.delete(requirementId);
+      releasedRunning++;
+      released.add(state);
+    },
+
     detach(requirementId: string): void {
       // Untrack only — do NOT abort the controller. The resolver runs to
       // completion; its `.finally()` will find the slot already gone and skip
@@ -1998,11 +2101,40 @@ export function createResolversManager<S extends Schema>(
     },
 
     getInflightCount(): number {
-      return inflight.size;
+      return inflight.size + releasedRunning;
     },
 
     isResolving(requirementId: string): boolean {
       return inflight.has(requirementId);
+    },
+
+    writesFor(requirementId: string): ReadonlySet<string> | null {
+      const single = inflight.get(requirementId);
+      if (single) {
+        const written = writeRecords.get(single.resolverId);
+
+        return written && written.size > 0 ? written : null;
+      }
+      const owners = reqToBatch.get(requirementId);
+      if (owners) {
+        for (const batchInstanceId of owners) {
+          const batchState = batchInflight.get(batchInstanceId);
+          const written = batchState
+            ? writeRecords.get(batchState.resolverId)
+            : undefined;
+          if (written && written.size > 0) {
+            return written;
+          }
+        }
+      }
+
+      return null;
+    },
+
+    clearWriteRecords(): void {
+      for (const written of writeRecords.values()) {
+        written.clear();
+      }
     },
 
     processBatches(): void {
@@ -2046,6 +2178,8 @@ export function createResolversManager<S extends Schema>(
       if (!definitions[id]) {
         return;
       }
+      writeRecords.delete(id);
+      recordingFacts.delete(id);
 
       // Cancel any inflight resolutions using this resolver
       for (const [reqId, state] of inflight) {

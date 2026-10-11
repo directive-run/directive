@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+const nodeRequire = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -34,17 +36,69 @@ describe("isDevelopment bundle shape", () => {
       .map((f) => readFileSync(join(dir, f), "utf8"));
   }
 
-  // The inlined `isDevelopment`, as the minifier prints it. Plugins keep
-  // their own, differently shaped checks, which this does not match.
-  const runtimeCheck =
-    /typeof process\s*[<>!=]+\s*"u"\s*\?\s*(?:false|!1)\s*:\s*process\.env\.NODE_ENV\s*!==?\s*"production"/;
-
   it("ships the NODE_ENV check in the default build, never a literal", () => {
     if (!existsSync(distDir)) {
       return;
     }
 
-    expect(chunks(distDir).some((src) => runtimeCheck.test(src))).toBe(true);
+    // The minifier reshapes the guard around it, so only the plain member
+    // expression a bundler's define matches is stable to look for.
+    const sources = chunks(distDir);
+    // (The devtools and clobber-loop plugins keep their own try/catch-guarded
+    // checks with an optional chain; those run only when the plugin is used.)
+    expect(sources.some((src) => src.includes("process.env.NODE_ENV"))).toBe(
+      true,
+    );
+  });
+
+  /**
+   * Load the published CommonJS build with `process` shadowed, the way a
+   * browser shim or an edge runtime might provide it.
+   */
+  function loadCjsWithProcess(fakeProcess: unknown): Record<string, any> {
+    const cache = new Map<string, { exports: Record<string, unknown> }>();
+    function load(file: string): Record<string, unknown> {
+      const cached = cache.get(file);
+      if (cached) {
+        return cached.exports;
+      }
+      const mod = { exports: {} as Record<string, unknown> };
+      cache.set(file, mod);
+      const code = readFileSync(file, "utf8");
+      const localRequire = (spec: string) =>
+        spec.startsWith(".")
+          ? load(join(dirname(file), spec))
+          : nodeRequire(spec);
+      new Function("require", "module", "exports", "process", code)(
+        localRequire,
+        mod,
+        mod.exports,
+        fakeProcess,
+      );
+
+      return mod.exports;
+    }
+
+    return load(join(distDir, "index.cjs"));
+  }
+
+  it("runs when process exists without env, or not at all", () => {
+    if (!existsSync(join(distDir, "index.cjs"))) {
+      return;
+    }
+
+    for (const fakeProcess of [{}, undefined]) {
+      const core = loadCjsWithProcess(fakeProcess);
+      const counter = core.createModule("m", {
+        schema: { facts: { n: core.t.number() } },
+        init: (facts: Record<string, unknown>) => {
+          facts.n = 0;
+        },
+      });
+      const system = core.createSystem({ module: counter });
+      expect(() => system.start()).not.toThrow();
+      system.destroy();
+    }
   });
 
   it("keeps the dev messages in the default build", () => {
@@ -64,7 +118,9 @@ describe("isDevelopment bundle shape", () => {
 
     const sources = chunks(productionDir);
     expect(sources.length).toBeGreaterThan(0);
-    expect(sources.some((src) => runtimeCheck.test(src))).toBe(false);
+    expect(sources.some((src) => src.includes("process.env.NODE_ENV"))).toBe(
+      false,
+    );
     expect(sources.some((src) => src.includes("tried to write"))).toBe(false);
   });
 

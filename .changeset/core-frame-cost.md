@@ -11,7 +11,10 @@ Measured on a loop of four fact writes, one derivation read, one effect and `set
 - The plugin snapshot, the in-flight list, the effect trigger list and the history label are built only when a plugin, the trace or history will read them.
 - The changed-key set is double-buffered, and per-write derivation holds no longer allocate a closure.
 
-Two behaviors are now independent of timing:
+Three behaviors are now defined by rule instead of by how many microtasks a pass happened to take:
 
-- **`ctx.requeue()` waits for its resolver.** The requeue is applied once the requeuing resolver has finished. Before, it was applied at the end of the next pass whether or not the resolver was done, and a resolver still running then had its re-dispatch dropped as a duplicate. That only worked when the pass happened to take long enough.
-- **Plugin events at startup may arrive in a different order.** Plugin `onInit` runs asynchronously and is not awaited, so with a faster first pass a plugin can see the first `constraint.evaluate` before its own `system.init`. Nothing guarantees either order.
+- **A resolver whose own write retracts its requirement completes.** If a requirement disappears while its resolver is running, and that resolver wrote a fact the constraint reads (directly or through a derivation) since the last pass, the resolver is left to finish and reports completion only, never cancellation. This holds however long it waits between that write and its return, for single and batched resolvers. Before, a resolver that waited three or more microtasks after the write was canceled every time; a requirement retracted by anything else is still canceled as before.
+- **Coalescing.** A pass starts on the microtask after the first write and takes every write made before it starts; writes made while a pass awaits go to the next one. A pass that awaits nothing finishes inside its microtask, so writes separated by an `await` now each get their own pass, effect run and, with `history`, their own snapshot (10 awaited writes: 10 of each, where it used to be about 3). Writes in one synchronous run still share one. Whether some resolver is running no longer changes the count.
+- **`ctx.requeue()` waits for its resolver.** The requeue is applied once the requeuing resolver has finished. Before, a resolver still running at the end of the next pass had its re-dispatch dropped as a duplicate.
+
+Plugin events at startup may arrive in a different order: plugin `onInit` runs asynchronously and is not awaited, so a plugin can see the first `constraint.evaluate` before its own `system.init`. Nothing guaranteed either order.

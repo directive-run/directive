@@ -87,7 +87,7 @@ export default defineConfig([
     dts: true,
     esbuildPlugins: [
       inlineIsDevelopment(
-        'typeof process === "undefined" ? false : process.env.NODE_ENV !== "production"',
+        'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"',
         "./src/dev-true.ts",
       ),
     ],
@@ -100,6 +100,10 @@ export default defineConfig([
     ...shared,
     outDir: "dist/production",
     dts: false,
+    // No sourcemaps: the production build is the same source as the default
+    // build with dev branches removed, and its maps doubled the tarball.
+    // Debug against the default build, which keeps them.
+    sourcemap: false,
     esbuildPlugins: [inlineIsDevelopment("false", "./src/dev-false.ts")],
   },
 ]);

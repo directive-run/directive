@@ -445,6 +445,12 @@ system.registerModule("chat", chatModule); // adds module to running system
 
 See docs: https://directive.run/docs/advanced/runtime
 
+## Production Builds
+
+`@directive-run/core` publishes a second build under the `production` export condition, with every development check compiled out (dev warnings, dev-only validation and their message text). Bundlers that set the condition in a production build pick it with no configuration: webpack 5 (`mode: "production"`, so Next.js webpack builds too), Vite, and Rollup with `@rollup/plugin-node-resolve` (production unless `NODE_ENV` says otherwise). With esbuild, pass `--conditions=production`. Anything else gets the default build, whose dev check still folds away when `process.env.NODE_ENV` is defined as `"production"`, and which runs in production mode in a browser with no `process`.
+
+The two builds behave the same at runtime. An SSR setup that externalizes packages can end up loading both (one through the server's own resolution, one through the client bundle); that is harmless and costs only the memory of a second copy.
+
 ## Common Mistakes
 
 ### Reading facts before settling

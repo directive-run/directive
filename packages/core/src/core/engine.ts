@@ -48,6 +48,7 @@ import {
 } from "./sources.js";
 import {
   BLOCKED_PROPS,
+  derivationDep,
   derivationDepId,
   describeDep,
   isDerivationDep,
@@ -1269,6 +1270,50 @@ export function createEngine<S extends Schema>(
   const pendingRequeueIds = new Set<string>();
 
   /**
+   * Whether the resolver still running for `req` wrote a fact its constraint
+   * reads, directly or through a derivation, since the last pass. That write
+   * is then what retracted the requirement.
+   */
+  function retractedByOwnWrite(req: RequirementWithId): boolean {
+    if (!req.fromConstraint) {
+      return false;
+    }
+    const written = resolversManager.writesFor(req.id);
+    if (written === null) {
+      return false;
+    }
+    const deps = constraintsManager.getDependencies(req.fromConstraint);
+    if (!deps) {
+      return false;
+    }
+    const seen = new Set<string>();
+    const reads = (names: Iterable<string>): boolean => {
+      for (const name of names) {
+        if (isDerivationDep(name)) {
+          const id = derivationDepId(name);
+          if (seen.has(id)) {
+            continue;
+          }
+          seen.add(id);
+          const edges = derivationsManager.dependencyEdges(id);
+          if (
+            edges.facts.some((key) => written.has(key)) ||
+            reads(edges.derivations.map(derivationDep))
+          ) {
+            return true;
+          }
+        } else if (written.has(name)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    return reads(deps);
+  }
+
+  /**
    * Per-(constraintId, reason) sticky bit so `constraint.binding.disabled`
    * fires at most ONCE per pair across the lifetime of the registered
    * constraint. Without this, a hot async constraint that dispatches at
@@ -1731,15 +1776,10 @@ export function createEngine<S extends Schema>(
         // `settle()` sees it done on its first check instead of falling back
         // to a timer and a subscription every frame.
         //
-        // Only while no resolver is in flight. A resolver that finishes by
-        // writing the fact that retracts its own requirement relies on the
-        // effects phase yielding long enough for it to complete; a pass that
-        // no longer yields reaches the diff first and cancels it. So with a
-        // resolver running, effects keep their awaited timing.
-        const effectsDone =
-          resolversManager.getInflightCount() === 0
-            ? effectsManager.runEffectsFast(passKeys, navigationKeys)
-            : effectsManager.runEffects(passKeys, navigationKeys);
+        const effectsDone = effectsManager.runEffectsFast(
+          passKeys,
+          navigationKeys,
+        );
         if (effectsDone !== undefined) {
           await effectsDone;
         }
@@ -1882,12 +1922,24 @@ export function createEngine<S extends Schema>(
         const bound = req.fromConstraint
           ? getConstraintBinding(req.fromConstraint)
           : undefined;
+        if (retractedByOwnWrite(req)) {
+          // The resolver's own write is what made its requirement go away:
+          // it has done its job. Released rather than canceled, it completes
+          // and reports completion only. Decided from what it wrote, not from
+          // how far its promise has got, so the answer is the same however
+          // many microtasks pass between its write and its return. Released,
+          // not kept in place, so the requirement re-dispatches if it comes
+          // back before this run ends (a fresh request mid-flight).
+          resolversManager.release(req.id);
+          continue;
+        }
         if (bound) {
           resolversManager.detach(req.id);
         } else {
           resolversManager.abort(req.id);
         }
       }
+      resolversManager.clearWriteRecords();
 
       // Start resolvers for new requirements. Snapshot facts ONCE before the
       // dispatch loop so every resolver in this reconcile tick observes the

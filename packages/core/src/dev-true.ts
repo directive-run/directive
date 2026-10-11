@@ -9,6 +9,10 @@
 // `process.env.NODE_ENV` defined as "production", both branches are `false`
 // and the side-effect-free test lets the minifier drop the whole check. An
 // optional chain (`process.env?.NODE_ENV`) would not match a bundler's define.
+// The `!process.env` guard keeps a `process` shim without `env` from throwing;
+// it leaves a short side-effect-free residue at each site once folded.
 export default typeof process === "undefined"
   ? false
-  : process.env.NODE_ENV !== "production";
+  : !process.env
+    ? false
+    : process.env.NODE_ENV !== "production";

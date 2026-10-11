@@ -30,6 +30,8 @@ interface ConsumerBudget {
   fixture: string;
   gzBudget: number;
   forbidden?: string[];
+  /** Bundle without the `production` export condition (NODE_ENV define only). */
+  noCondition?: boolean;
 }
 
 interface BudgetFile {
@@ -60,7 +62,10 @@ const workspaceResolve: Plugin = {
   },
 };
 
-export async function bundleFixture(fixture: string): Promise<string> {
+export async function bundleFixture(
+  fixture: string,
+  noCondition = false,
+): Promise<string> {
   const result = await build({
     entryPoints: [join(REPO_ROOT, fixture)],
     bundle: true,
@@ -69,7 +74,7 @@ export async function bundleFixture(fixture: string): Promise<string> {
     format: "esm",
     platform: "browser",
     target: "es2022",
-    conditions: ["production"],
+    conditions: noCondition ? [] : ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
     plugins: [workspaceResolve],
     logLevel: "silent",
@@ -90,7 +95,7 @@ async function check(): Promise<number> {
   for (const c of consumers) {
     let code: string;
     try {
-      code = await bundleFixture(c.fixture);
+      code = await bundleFixture(c.fixture, c.noCondition);
     } catch (err) {
       console.error(`[size-consumer] could not bundle ${c.fixture}`);
       console.error(`  ${(err as Error).message.split("\n")[0]}`);
@@ -111,7 +116,7 @@ async function check(): Promise<number> {
 
     const delta = gz - c.gzBudget;
     console.log(
-      `  ${c.fixture.padEnd(36)}  min ${fmt(raw).padStart(9)}  gz ${fmt(gz).padStart(7)}  budget ${fmt(c.gzBudget).padStart(7)}  ${(delta > 0 ? "+" : "") + fmt(delta)}  ${pass ? "✓" : "✗"}`,
+      `  ${(c.fixture + (c.noCondition ? " (no condition)" : "")).padEnd(50)}  min ${fmt(raw).padStart(9)}  gz ${fmt(gz).padStart(7)}  budget ${fmt(c.gzBudget).padStart(7)}  ${(delta > 0 ? "+" : "") + fmt(delta)}  ${pass ? "✓" : "✗"}`,
     );
     for (const s of leaked) {
       console.error(

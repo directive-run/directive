@@ -33,6 +33,10 @@
             "exclusiveMinimum": 0,
             "description": "Ceiling in bytes for the gzipped production bundle, at zlib's default level."
           },
+          "noCondition": {
+            "type": "boolean",
+            "description": "Bundle without the production export condition, with only process.env.NODE_ENV defined. Guards the default build's dev-check fold."
+          },
           "forbidden": {
             "type": "array",
             "items": { "type": "string" },

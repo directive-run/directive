@@ -221,10 +221,7 @@ describe("a resolver mutating a dependency module's value in place", () => {
     system.facts.notes.draft = "hi";
     await system.settle();
 
-    // The resolver's own `saved = true` retracts its requirement, so the next
-    // pass aborts it and `settle()` stops counting it. The check runs as its
-    // promise finishes, which can be just after `settle()` resolves.
-    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors).toHaveLength(1);
     expect(String((errors[0]!.error as Error).message)).toContain(
       '"auth.user.name"',
     );
@@ -240,8 +237,7 @@ describe("a resolver mutating a dependency module's value in place", () => {
     system.facts.notes.draft = "hi";
     await system.settle();
 
-    // As above: reported as the aborted resolver's promise finishes.
-    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors).toHaveLength(1);
     expect(String((errors[0]!.error as Error).message)).toContain(
       'auth.roles.get("admin")',
     );
