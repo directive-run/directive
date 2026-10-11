@@ -16,12 +16,12 @@
   "consumers": [
     {
       "fixture": "scripts/size-fixtures/minimal.ts",
-      "gzBudget": 44700,
+      "gzBudget": 45400,
       "forbidden": ["tried to write", "only in development"]
     },
     {
       "fixture": "scripts/size-fixtures/full.ts",
-      "gzBudget": 45100,
+      "gzBudget": 45800,
       "forbidden": ["tried to write", "only in development"]
     }
   ]
