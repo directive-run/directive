@@ -668,6 +668,119 @@ export function createResolverDepsProxy(
 }
 
 /**
+ * The `$store` a namespaced resolver sees: the system's store, scoped to the
+ * module's own facts. Keys are the module's bare fact names (`"draft"`); the
+ * module's own prefixed form (`"notes::draft"`) is accepted too. A write to
+ * any other module's key throws in development and is ignored in
+ * production, the same rule as `ctx.deps`. Reads of another module's key
+ * return `undefined` – read dependencies through `ctx.deps`.
+ */
+function createScopedResolverStore(
+  facts: Record<string, unknown>,
+  selfNamespace: string,
+): Record<string, unknown> {
+  return cachedProxy(
+    resolverProxyCache,
+    facts,
+    `store|${selfNamespace}`,
+    () => {
+      const prefix = `${selfNamespace}${SEPARATOR}`;
+      const store = facts.$store as {
+        get(key: string): unknown;
+        has(key: string): boolean;
+        set(key: string, value: unknown): void;
+        delete(key: string): void;
+        batch(fn: () => void): void;
+        subscribe(keys: string[], listener: () => void): () => void;
+        subscribeAll(listener: () => void): () => void;
+        toObject(): Record<string, unknown>;
+      };
+
+      /** Full key for an own fact, or null when the key names another module. */
+      function ownKey(key: unknown): string | null {
+        if (typeof key !== "string") {
+          return null;
+        }
+        if (key.startsWith(prefix)) {
+          return key;
+        }
+        if (key.includes(SEPARATOR)) {
+          return null;
+        }
+
+        return `${prefix}${key}`;
+      }
+
+      function rejectWrite(key: unknown): void {
+        if (isDevelopment) {
+          const target = String(key);
+          const owner = target.includes(SEPARATOR)
+            ? target.slice(0, target.indexOf(SEPARATOR))
+            : "another module";
+          throw new Error(
+            `[Directive] Module "${selfNamespace}": a resolver wrote "${target}" through ctx.facts.$store. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+          );
+        }
+      }
+
+      const scoped = {
+        get: (key: string) => {
+          const full = ownKey(key);
+
+          return full === null ? undefined : store.get(full);
+        },
+        has: (key: string) => {
+          const full = ownKey(key);
+
+          return full === null ? false : store.has(full);
+        },
+        set: (key: string, value: unknown) => {
+          const full = ownKey(key);
+          if (full === null) {
+            rejectWrite(key);
+
+            return;
+          }
+          store.set(full, value);
+        },
+        delete: (key: string) => {
+          const full = ownKey(key);
+          if (full === null) {
+            rejectWrite(key);
+
+            return;
+          }
+          store.delete(full);
+        },
+        // Writes inside the batch go through this scoped store or the scoped
+        // facts proxy, so they are checked one by one.
+        batch: (fn: () => void) => store.batch(fn),
+        subscribe: (keys: string[], listener: () => void) =>
+          store.subscribe(
+            keys
+              .map((key) => ownKey(key))
+              .filter((k): k is string => k !== null),
+            listener,
+          ),
+        subscribeAll: (listener: () => void) => store.subscribeAll(listener),
+        toObject: () => {
+          const out: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(store.toObject())) {
+            if (key.startsWith(prefix)) {
+              out[key.slice(prefix.length)] = value;
+            }
+          }
+
+          return out;
+        },
+      };
+
+      return Object.freeze(scoped) as unknown as Record<string, unknown>;
+    },
+  );
+}
+
+/**
  * Create the facts proxy a resolver receives in a module with
  * `crossModuleDeps`.
  *
@@ -689,14 +802,42 @@ export function createResolverFactsProxy(
   facts: Record<string, unknown>,
   selfNamespace: string,
   depNamespaces: string[],
+  pivots = true,
 ): Record<string, unknown> {
   return cachedProxy(
     resolverProxyCache,
     facts,
-    `facts|${selfNamespace}|${depNamespaces.join(",")}`,
+    `facts|${selfNamespace}|${depNamespaces.join(",")}|${pivots}`,
     () => {
-      const own = createModuleFactsProxy(facts, selfNamespace);
-      const depNamesSet = new Set(depNamespaces);
+      const moduleFacts = createModuleFactsProxy(facts, selfNamespace);
+      const depNamesSet = new Set(pivots ? depNamespaces : []);
+      const scopedStore = createScopedResolverStore(facts, selfNamespace);
+      const scopedSnapshot = () => scopedStore;
+
+      // The module's own facts, with `$store` / `$snapshot` scoped to them.
+      // The module facts proxy passes those two straight through to the
+      // system-wide store, which let `ctx.facts.$store.set("auth::token")`
+      // write a module the resolver doesn't own.
+      const own = createHardenedProxy<Record<string, unknown>>({
+        get: (prop) => {
+          if (prop === "$store") {
+            return scopedStore;
+          }
+          if (prop === "$snapshot") {
+            return scopedSnapshot;
+          }
+
+          return moduleFacts[prop];
+        },
+        set: (prop, value) => {
+          moduleFacts[prop] = value;
+
+          return true;
+        },
+        has: (prop) => prop in moduleFacts,
+        delete: (prop) => Reflect.deleteProperty(moduleFacts, prop),
+        ownKeys: () => Object.keys(moduleFacts),
+      });
 
       function warnLegacy(pivot: string): void {
         warnOncePerSystem(
@@ -715,7 +856,7 @@ export function createResolverFactsProxy(
 
       return createHardenedProxy<Record<string, unknown>>({
         get: (prop) => {
-          if (prop === "self") {
+          if (pivots && prop === "self") {
             warnLegacy("self");
 
             return own;
@@ -733,7 +874,8 @@ export function createResolverFactsProxy(
 
           return true;
         },
-        has: (prop) => prop === "self" || depNamesSet.has(prop) || prop in own,
+        has: (prop) =>
+          (pivots && prop === "self") || depNamesSet.has(prop) || prop in own,
         delete: (prop) => Reflect.deleteProperty(own, prop),
         ownKeys: () => Object.keys(own),
       });

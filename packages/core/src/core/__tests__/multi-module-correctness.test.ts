@@ -1039,3 +1039,130 @@ describe("blocked keys", () => {
     }
   }
 });
+
+// ============================================================================
+// Round 3: a resolver's $store is scoped to its own module
+// ============================================================================
+
+describe("resolver ctx.facts.$store", () => {
+  async function runWith(
+    resolve: (facts: any) => void,
+  ): Promise<{ token: string; draft: string; saved: string; errors: string }> {
+    const spy = warnSpy();
+    const mod = notesModule(({ facts }) => {
+      resolve(facts);
+      facts.draft = "";
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), notes: mod },
+    });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+    const result = {
+      token: system.facts.auth.token,
+      draft: system.facts.notes.draft,
+      saved: system.facts.notes.saved,
+      errors: warnings(spy).join("\n"),
+    };
+    system.destroy();
+
+    return result;
+  }
+
+  it("blocks $store.set on a dependency's key", async () => {
+    const result = await runWith((facts) => {
+      facts.$store.set("auth::token", "X");
+    });
+
+    expect(result.token).toBe("tok");
+    expect(result.draft).toBe("hi"); // the resolver threw before clearing it
+    expect(result.errors).toContain(
+      'emit a requirement or dispatch an event that module "auth" owns',
+    );
+  });
+
+  it("blocks the same write through the legacy self pivot", async () => {
+    const result = await runWith((facts) => {
+      facts.self.$store.set("auth::token", "X");
+    });
+
+    expect(result.token).toBe("tok");
+  });
+
+  it("allows $store.set on the module's own key, bare or prefixed", async () => {
+    const result = await runWith((facts) => {
+      facts.$store.set("saved", "one");
+      facts.$store.set("notes::saved", "two");
+    });
+
+    expect(result.saved).toBe("two");
+    expect(result.draft).toBe("");
+    expect(result.token).toBe("tok");
+  });
+
+  it("blocks a dependency write inside $store.batch", async () => {
+    const result = await runWith((facts) => {
+      facts.$store.batch(() => {
+        facts.$store.set("auth::token", "X");
+      });
+    });
+
+    expect(result.token).toBe("tok");
+    expect(result.errors).toContain('a resolver wrote "auth::token"');
+  });
+
+  it("scopes reads and toObject to the module's own facts", async () => {
+    const seen: unknown[] = [];
+    await runWith((facts) => {
+      seen.push(
+        facts.$store.get("auth::token"),
+        facts.$store.get("draft"),
+        Object.keys(facts.$store.toObject()).sort(),
+        facts.$snapshot().get("draft"),
+      );
+    });
+
+    expect(seen).toEqual([undefined, "hi", ["draft", "saved"], "hi"]);
+  });
+
+  it("scopes $store in a namespaced module without crossModuleDeps", async () => {
+    warnSpy();
+    const mod = createModule("plain", {
+      schema: {
+        facts: { go: t.boolean() },
+        events: { start: {} },
+        requirements: { RUN: {} },
+      },
+      init: (f) => {
+        f.go = false;
+      },
+      events: {
+        start: (f) => {
+          f.go = true;
+        },
+      },
+      constraints: {
+        run: { when: (f) => f.go, require: { type: "RUN" } },
+      },
+      resolvers: {
+        run: {
+          requirement: "RUN",
+          resolve: async (_req, context) => {
+            (context.facts.$store as any).set("auth::token", "X");
+            context.facts.go = false;
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      modules: { auth: authModule(), plain: mod },
+    });
+    system.start();
+    system.events.plain.start();
+    await system.settle();
+
+    expect(system.facts.auth.token).toBe("tok");
+    system.destroy();
+  });
+});

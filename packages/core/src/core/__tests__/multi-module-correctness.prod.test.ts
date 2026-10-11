@@ -55,6 +55,58 @@ describe("production build", () => {
     system.destroy();
   });
 
+  it("ignores a resolver's $store write to a dependency key without throwing", async () => {
+    const authSchema = { facts: { token: t.string() } };
+    const auth = createModule("auth", {
+      schema: authSchema,
+      init: (f) => {
+        f.token = "tok";
+      },
+    });
+    const notes = createModule("notes", {
+      schema: {
+        facts: { draft: t.string() },
+        events: { submit: { text: t.string() } },
+        requirements: { SAVE: {} },
+      },
+      crossModuleDeps: { auth: authSchema },
+      init: (f) => {
+        f.draft = "";
+      },
+      events: {
+        submit: (f, e) => {
+          f.draft = e.text;
+        },
+      },
+      constraints: {
+        save: {
+          when: (f) => f.self.draft !== "",
+          require: { type: "SAVE" },
+        },
+      },
+      resolvers: {
+        save: {
+          requirement: "SAVE",
+          resolve: async (_req, context) => {
+            const store = context.facts.$store as any;
+            store.set("auth::token", "stolen");
+            store.batch(() => store.set("auth::token", "stolen-again"));
+            store.set("draft", "");
+          },
+        },
+      },
+    });
+    const system = createSystem({ modules: { auth, notes } });
+    system.start();
+    system.events.notes.submit({ text: "hi" });
+    await system.settle();
+
+    expect(system.facts.auth.token).toBe("tok");
+    expect(system.facts.notes.draft).toBe("");
+    expect(system.inspect().unmet).toEqual([]);
+    system.destroy();
+  });
+
   it("ignores a resolver's write to a dependency module without throwing", async () => {
     const authSchema = { facts: { token: t.string() } };
     const auth = createModule("auth", {

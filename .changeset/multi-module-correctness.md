@@ -13,6 +13,7 @@ Multi-module systems no longer fail silently.
 - The legacy `ctx.facts.self.x` / `ctx.facts.<ns>.x` spellings still read, and warn once per system in development, pointing at `ctx.facts` / `ctx.deps`.
 - `"self" in ctx.facts` and `"<ns>" in ctx.facts` answer `true`, but `Object.keys(ctx.facts)` lists only the module's own facts (it used to list `self` and the dep namespaces).
 - Namespaced resolvers now receive `ctx.requeue()` and `ctx.snapshot()`; the wrapper used to drop them.
+- `ctx.facts.$store` and `ctx.facts.$snapshot()` in a namespaced resolver are scoped to the module's own facts. Keys are bare names (`"draft"`) or the module's own prefixed form; writing another module's key throws in development and is ignored in production, and reading one returns `undefined`. They used to reach the whole system's store.
 
 **Sources in a namespaced system**
 

@@ -722,7 +722,10 @@ function prefixResolvers(
       const facts = ctx.facts as Record<string, unknown>;
 
       if (!hasCrossModuleDeps) {
-        return { ...ctx, facts: createModuleFactsProxy(facts, namespace) };
+        return {
+          ...ctx,
+          facts: createResolverFactsProxy(facts, namespace, [], false),
+        };
       }
 
       return {
