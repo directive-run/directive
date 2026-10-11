@@ -5,7 +5,7 @@
 import type { LeafClause } from "../rules-diff.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
 import type { EventsAccessorFromSchema, SystemEvent } from "./events.js";
-import type { Facts } from "./facts.js";
+import type { DeepReadonly, Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
@@ -716,8 +716,8 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
 /** Effect definition for dynamic registration — typed facts */
 export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
-    facts: Readonly<InferSchema<M["facts"]>>,
-    prevFacts: InferSchema<M["facts"]> | null,
+    facts: DeepReadonly<InferSchema<M["facts"]>>,
+    prevFacts: DeepReadonly<InferSchema<M["facts"]>> | null,
     derived: InferDerivations<M>,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
   /**

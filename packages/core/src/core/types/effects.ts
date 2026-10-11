@@ -2,7 +2,7 @@
  * Effect Types - Type definitions for effects
  */
 
-import type { Facts } from "./facts.js";
+import type { DeepReadonly, EffectFacts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { FactPredicate } from "./predicate.js";
 import type { InferSchema, Schema } from "./schema.js";
@@ -174,8 +174,8 @@ export interface EffectDef<
    * `onNavigate: "skip"` to opt out.
    */
   run(
-    facts: Readonly<Facts<S>>,
-    prevFacts: InferSchema<S> | null,
+    facts: EffectFacts<S>,
+    prevFacts: DeepReadonly<InferSchema<S>> | null,
     derived: Derived,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;

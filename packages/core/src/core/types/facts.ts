@@ -29,6 +29,36 @@ export interface FactsStore<S extends Schema = Schema>
   toObject(): Record<string, unknown>;
 }
 
+/**
+ * Deeply read-only. Arrays, maps and sets become their read-only interfaces,
+ * plain objects get `readonly` properties all the way down, and functions,
+ * dates and primitives pass through.
+ */
+export type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends Date | RegExp
+    ? T
+    : T extends ReadonlyMap<infer K, infer V>
+      ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
+      : T extends ReadonlySet<infer V>
+        ? ReadonlySet<DeepReadonly<V>>
+        : T extends readonly (infer E)[]
+          ? readonly DeepReadonly<E>[]
+          : T extends object
+            ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+            : T;
+
+/**
+ * The facts an effect receives: every fact read-only all the way down, plus the
+ * read-only store accessors.
+ */
+export type EffectFacts<S extends Schema = Schema> = DeepReadonly<
+  InferSchema<S>
+> & {
+  readonly $store: FactsStore<S>;
+  readonly $snapshot: () => FactsSnapshot<S>;
+};
+
 /** Proxy-based facts accessor (cleaner API) */
 export type Facts<S extends Schema = Schema> = InferSchema<S> & {
   readonly $store: FactsStore<S>;

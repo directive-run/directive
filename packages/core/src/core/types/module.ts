@@ -355,7 +355,7 @@ export interface CrossModuleEffectDef<
    */
   run: (
     facts: ReadonlyCrossModuleFacts<M, Deps>,
-    prevFacts: CrossModuleFactsWithSelf<M, Deps> | undefined,
+    prevFacts: ReadonlyCrossModuleFacts<M, Deps> | undefined,
     derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;

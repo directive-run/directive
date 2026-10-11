@@ -1784,15 +1784,19 @@ export const listModule = createModule("list", {
 
   effects: {
     observeScroll: {
-      run: (facts) => {
+      run: () => {
         const sentinel = document.getElementById("pg-scroll-sentinel");
         if (!sentinel) {
           return;
         }
 
+        // Effects cannot write facts, so the observer reports through the
+        // module's event.
         const observer = new IntersectionObserver(
           ([entry]) => {
-            facts.self.scrollNearBottom = entry.isIntersecting;
+            system.events.list.setScrollNearBottom({
+              value: entry.isIntersecting,
+            });
           },
           { rootMargin: "200px" },
         );

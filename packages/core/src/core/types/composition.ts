@@ -22,6 +22,7 @@
  */
 
 import type { ErrorBoundaryConfig } from "./errors.js";
+import type { DeepReadonly } from "./facts.js";
 import type { Facts } from "./facts.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin } from "./plugins.js";
@@ -163,11 +164,7 @@ export type CrossModuleFactsWithSelf<
 export type ReadonlyCrossModuleFacts<
   OwnSchema extends ModuleSchema,
   Deps extends CrossModuleDeps,
-> = {
-  readonly [K in keyof CrossModuleFactsWithSelf<OwnSchema, Deps>]: Readonly<
-    CrossModuleFactsWithSelf<OwnSchema, Deps>[K]
-  >;
-};
+> = DeepReadonly<CrossModuleFactsWithSelf<OwnSchema, Deps>>;
 
 // ============================================================================
 // Namespaced Facts Types

@@ -21,14 +21,19 @@ effects never did. Now:
   in development with a message naming the effect, the key, a one-line example
   and a docs link (`/docs/effects#effects-never-write-facts`). Production drops
   the write.
-- In development, plain objects and arrays read through it are read-only too,
-  so `facts.pos.x = 7` and `facts.list.push(item)` throw instead of mutating
-  the stored value without a sound. Production does not wrap them.
+- Nested values are the stored values themselves, in every build, so
+  `structuredClone`, `postMessage` and identity checks behave the same in
+  development and production (inside an effect, `structuredClone(facts.obj)`
+  now works in development too). Development records a copy of each object or
+  array an effect reads, and after the run reports the first path changed in
+  place (`facts.pos.x = 7`, `facts.list.push(1)`, `Object.freeze(facts.obj)`).
+  The same check covers `prevFacts` and `derived`, whose values are live too.
 - Every refused write is reported in every build through the new plugin hook
   `onEffectWriteBlocked(id, key)` and the `effect.write-blocked` observation
   event, which is how a production build sees the write it dropped.
-- `EffectDef.run` types `facts` as `Readonly`, and a cross-module effect's
-  `facts.self` and dependency namespaces are read-only one level down.
+- Effect `facts` and `prevFacts` are typed deeply read-only (new
+  `DeepReadonly` and `EffectFacts` types), in single-module, cross-module and
+  dynamic effects, so nested writes and array mutation fail to compile.
 
 Where the write belongs instead: an event handler for a change caused by
 input, a derivation for a computed value, a resolver for work a constraint
@@ -47,16 +52,23 @@ causes belong to the navigation, so they no longer destroy the redo stack.
 **Fixed: requirements after a rewind.** The requirement set from before the
 rewind stayed as the baseline, so a later write that satisfied a constraint
 again did not dispatch its resolver. A rewind now rebuilds the baseline from a
-full evaluation, without dispatching.
+full evaluation, without dispatching. A constraint reading a key written in
+the same pass as the rewind is left out of that baseline, so the write still
+dispatches.
 
 **Fixed: writes made while a pass is running.** A write that landed while
 effects were running (an event an effect dispatched, a captured
 `system.facts`, a caller writing while an async effect awaited) reached
 constraints but never effects. The first write right after `start()` was lost
-the same way. These writes now carry into the next pass. A chain of passes
-started only by such writes is cut after 100 passes with a development
-warning, so an effect that feeds its own dependency cannot spin. The `retry`
-error strategy for effects now retries at most three times in a row.
+the same way. These writes now carry into the next pass. They are folded into
+the history snapshot of the pass that caused them rather than taking one of
+their own, so undo lands on a settled state. A chain of passes started only
+by such writes is cut after 100 passes with a development warning, so an
+effect that feeds its own dependency cannot spin; the cut drops only what the
+chain keeps writing, never another write made meanwhile.
+
+**Fixed: the `retry` error strategy for effects** never re-ran anything. It now
+re-runs the failed effect on the next pass, up to three times in a row.
 
 `@directive-run/query` keeps its stream, polling, focus, reconnect and cache
 expiry effects writing through an internal capability while they move to

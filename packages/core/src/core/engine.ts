@@ -98,7 +98,6 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
  * copied for constraint evaluation, so nothing hands the key back to the phase
  * that raised it.
  */
-const EFFECT_RETRY_KEY = "*";
 
 /**
  * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
@@ -731,10 +730,25 @@ export function createEngine<S extends Schema>(
   /** A self-waking effect chain is cut after this many passes. */
   const MAX_EFFECT_CHAIN = 100;
 
+  /**
+   * Keys written synchronously from inside an effect's body (an event it
+   * dispatched, a captured `system.facts`) since the last pass began. A write
+   * made while effects ran but from outside any of them, such as a caller
+   * writing while an async effect awaits, is not in here.
+   */
+  const effectOriginKeys = new Set<string>();
+  /** The keys the previous pass was started with, when it was part of a chain. */
+  let previousChainKeys: Set<string> | null = null;
+  /** Whether the previous pass took (or refreshed) a history snapshot. */
+  let lastPassSnapshotted = false;
+
   function noteChangedKey(key: string): void {
     state.changedKeys.add(key);
     if (effectsPhaseOpen) {
       effectPhaseWrites++;
+      if (effectsManager.runningEffect() !== null) {
+        effectOriginKeys.add(key);
+      }
     } else {
       otherPhaseWrites++;
     }
@@ -1056,7 +1070,7 @@ export function createEngine<S extends Schema>(
         const attempts = (effectRetryAttempts.get(id) ?? 0) + 1;
         effectRetryAttempts.set(id, attempts);
         if (attempts <= MAX_EFFECT_RETRIES) {
-          noteChangedKey(EFFECT_RETRY_KEY);
+          effectsManager.requestRerun(id);
           scheduleReconcile();
         } else if (isDevelopment) {
           console.warn(
@@ -1512,10 +1526,12 @@ export function createEngine<S extends Schema>(
     // A chain of passes each started only by writes made while effects ran is
     // an effect waking itself. Cut it, say so, and drop what it carried, rather
     // than spin until the process does.
-    if (effectPhaseWrites > 0 && otherPhaseWrites === 0) {
+    const passFromEffects = effectPhaseWrites > 0 && otherPhaseWrites === 0;
+    if (passFromEffects) {
       effectChainLength++;
     } else {
       effectChainLength = 0;
+      previousChainKeys = null;
       if (otherPhaseWrites > 0) {
         effectRetryAttempts.clear();
       }
@@ -1523,20 +1539,40 @@ export function createEngine<S extends Schema>(
     effectPhaseWrites = 0;
     otherPhaseWrites = 0;
     if (effectChainLength > MAX_EFFECT_CHAIN) {
+      // Drop only what the chain itself keeps writing: keys an effect wrote
+      // from its own body, and keys the previous pass of the chain was
+      // started with. A key written while effects ran but from outside them,
+      // the first time, is someone else's write and is kept.
+      const kept = new Set<string>();
+      for (const key of state.changedKeys) {
+        if (!effectOriginKeys.has(key) && !previousChainKeys?.has(key)) {
+          kept.add(key);
+        }
+      }
       if (isDevelopment) {
         console.warn(
           `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...state.changedKeys].slice(0, 5).join(", ")}`,
         );
       }
       state.changedKeys.clear();
+      effectOriginKeys.clear();
+      previousChainKeys = null;
       derivationsManager.collectInvalidated(new Set());
       resetNavigationRecord();
       effectChainLength = 0;
       reconcileDepth = 0;
+      if (kept.size > 0) {
+        for (const key of kept) {
+          state.changedKeys.add(key);
+        }
+        otherPhaseWrites = kept.size;
+        scheduleReconcile();
+      }
       notifySettlementChange();
 
       return;
     }
+    effectOriginKeys.clear();
 
     state.isReconciling = true;
     notifySettlementChange();
@@ -1574,11 +1610,15 @@ export function createEngine<S extends Schema>(
     // `start()` was lost the same way.
     const passKeys = new Set(state.changedKeys);
     state.changedKeys.clear();
+    if (passFromEffects) {
+      previousChainKeys = new Set(passKeys);
+    }
     // Same lifetime, so the record can never be consumed by a later pass that
     // has nothing to do with the navigation that set it.
     resetNavigationRecord();
     const ordinaryKeyCount = passKeys.size;
 
+    let snapshotted = false;
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
       if (passKeys.size > 0) {
@@ -1589,8 +1629,22 @@ export function createEngine<S extends Schema>(
         // clearing the flag alone did not stop it.
         if (
           !followsNavigation &&
+          passFromEffects &&
           (snapshotEventNames === null || shouldTakeSnapshot)
         ) {
+          // These writes finish the pass that caused them, so they go into
+          // its snapshot instead of making their own. Otherwise undo lands on
+          // a state that never settled. Nothing to fold into when that pass
+          // took no snapshot, so none is taken.
+          if (lastPassSnapshotted) {
+            historyManager.refreshLatestSnapshot();
+            snapshotted = true;
+          }
+        } else if (
+          !followsNavigation &&
+          (snapshotEventNames === null || shouldTakeSnapshot)
+        ) {
+          snapshotted = true;
           const keys = passKeys;
           const label =
             keys.size <= 5
@@ -1680,6 +1734,16 @@ export function createEngine<S extends Schema>(
         const restored = await constraintsManager.evaluate();
         const restoredSet = new RequirementSet();
         for (const req of restored) {
+          // A constraint that reads a key written in this same pass was just
+          // evaluated against that write, not against the restored state, so
+          // it cannot be part of the baseline. Left out, it is diffed as
+          // added below and dispatches, as the write deserves.
+          if (ordinaryKeyCount > 0 && req.fromConstraint) {
+            const deps = constraintsManager.getDependencies(req.fromConstraint);
+            if (deps && [...deps].some((dep) => passKeys.has(dep))) {
+              continue;
+            }
+          }
           restoredSet.add(req);
         }
         state.previousRequirements = restoredSet;
@@ -1869,6 +1933,7 @@ export function createEngine<S extends Schema>(
       }
 
       state.isReconciling = false;
+      lastPassSnapshotted = snapshotted;
 
       // Flush any deferred dynamic definition operations that were queued
       // during this reconciliation cycle
@@ -1912,6 +1977,7 @@ export function createEngine<S extends Schema>(
       if (
         state.changedKeys.size > 0 ||
         restoredKeys.size > 0 ||
+        effectsManager.hasPendingReruns() ||
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
@@ -2931,6 +2997,9 @@ export function createEngine<S extends Schema>(
       effectPhaseWrites = 0;
       otherPhaseWrites = 0;
       effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -3023,6 +3092,9 @@ export function createEngine<S extends Schema>(
       effectPhaseWrites = 0;
       otherPhaseWrites = 0;
       effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -3091,6 +3163,9 @@ export function createEngine<S extends Schema>(
       effectPhaseWrites = 0;
       otherPhaseWrites = 0;
       effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;
