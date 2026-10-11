@@ -12,16 +12,16 @@ import isDevelopment from "#is-development";
 import { freezeSpec } from "../utils/utils.js";
 import { PREV_FACTS_READ, declaresPrevFacts } from "./effects.js";
 import {
-  type CheckedReadView,
-  createCheckedReadView,
-} from "./read-only-view.js";
-import {
   applyPatch,
   evaluateTemplate,
   isPredicate,
   isTemplate,
   memoizePredicate,
 } from "./predicate.js";
+import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
 import {
   type CrossModuleProxyRole,
   SEPARATOR,

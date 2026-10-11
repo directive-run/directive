@@ -12,11 +12,8 @@
  * while depending on something Cloudflare KV does not give it.
  */
 import { describe, expect, it } from "vitest";
-import {
-  type Checkpoint,
-  createCheckpointId,
-} from "../checkpoint.js";
 import { type CheckpointKv, KvCheckpointStore } from "../checkpoint-kv.js";
+import { type Checkpoint, createCheckpointId } from "../checkpoint.js";
 
 function fakeKv(): CheckpointKv & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -168,9 +165,7 @@ describe("⚠ FIFO eviction and retention match the in-memory store", () => {
     // `Infinity` is the default, and a store that pruned by default
     // would delete a caller's checkpoints for asking nothing.
     const store = new KvCheckpointStore(fakeKv());
-    await store.save(
-      checkpoint({ createdAt: new Date(1_000).toISOString() }),
-    );
+    await store.save(checkpoint({ createdAt: new Date(1_000).toISOString() }));
     expect(await store.prune()).toBe(0);
     expect(await store.list()).toHaveLength(1);
   });
@@ -214,9 +209,9 @@ describe("⚠ a corrupt store degrades, it does not throw", () => {
   });
 
   it("⚠ rejects maxCheckpoints < 1, which would evict everything", async () => {
-    expect(() => new KvCheckpointStore(fakeKv(), { maxCheckpoints: 0 })).toThrow(
-      /maxCheckpoints/,
-    );
+    expect(
+      () => new KvCheckpointStore(fakeKv(), { maxCheckpoints: 0 }),
+    ).toThrow(/maxCheckpoints/);
   });
 });
 
