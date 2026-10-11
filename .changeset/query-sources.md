@@ -31,8 +31,9 @@ What you can see change:
   through a small constraint and resolver. When `enabled()` returns false the
   stream now closes and the state resets to idle; it used to stay open. At `stop()`, streams close in
   reverse order of registration, like every source.
-- `SubscriptionDefinition.onStop` is no longer set by `createSubscription`;
-  `withQueries` still honours it on hand-built definitions.
+- `onStop` is removed from `SubscriptionDefinition` and `QueryDefinition`,
+  and `withQueries` no longer runs it. Long-lived resources belong in a
+  source, whose teardown runs at `stop()`.
 - New internal event names appear in `inspect()`, plugin hooks and the
   observation stream: `_q_<name>_FOCUSED`, `_ONLINE`, `_POLL_TICK`,
   `_EXPIRED`, and `_SUB_STARTED` / `_SUB_DATA` / `_SUB_ERROR` /

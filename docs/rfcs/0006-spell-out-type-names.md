@@ -1,6 +1,6 @@
 # RFC 0006 – Spell out `*Def` type names across `@directive-run/core`
 
-- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Withdrawn in 1.35 – the `*Definition` aliases were removed and `*Def` is the only name for each type (one name per thing, no compatibility aliases). Originally accepted and shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`).
 - **Author:** Jason Comes
 - **Related:** anti-patterns entry #5 (`context` → `ctx` is wrong).
 

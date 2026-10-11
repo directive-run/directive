@@ -70,20 +70,20 @@ interface ObservableLike {
 // System<...> so the helper works regardless of the system's generic
 // schema shape.
 type ObservationEventCompat =
-  | { type: "source.attach"; id: string; moduleId: string; localId?: string }
+  | { type: "source.attach"; id: string; moduleId: string; localId: string }
   | {
       type: "source.publish";
       id: string;
       moduleId: string;
-      localId?: string;
+      localId: string;
       eventName: string;
     }
-  | { type: "source.detach"; id: string; moduleId: string; localId?: string }
+  | { type: "source.detach"; id: string; moduleId: string; localId: string }
   | {
       type: "source.error";
       id: string;
       moduleId: string;
-      localId?: string;
+      localId: string;
       phase: "attach" | "cleanup" | "runtime" | "gate";
       error: unknown;
     }
@@ -146,8 +146,7 @@ export function attachSourcesToOtel(
       "service.name": serviceName,
       "source.id": id,
       "source.module_id": fields.moduleId as string,
-      "source.local_id":
-        typeof fields.localId === "string" ? fields.localId : id,
+      "source.local_id": fields.localId as string,
     };
   }
 

@@ -91,7 +91,7 @@ export interface PredicateFromIntentOptions<_F = Record<string, unknown>> {
   /** Natural-language intent (untrusted user input — sanitize via `redact`). */
   intent: string;
   /**
-   * Module schema (must expose builders with `_typeName` or `_kind`).
+   * Module schema (its `t.*()` builders expose `_typeName`).
    * Pass either `{ facts: {...} }` or a bare `Record<string, builder>`.
    */
   schema: unknown;

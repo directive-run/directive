@@ -714,8 +714,7 @@ function prefixResolvers(
     /**
      * Wrap the resolver ctx: `facts` is flat, own-module access – the shape
      * the resolver types declare, same as event handlers. Modules with
-     * crossModuleDeps also get read-only `ctx.deps.<ns>`, and their `facts`
-     * still answers the legacy `self` / dep-namespace spellings. Every other
+     * crossModuleDeps also get read-only `ctx.deps.<ns>`. Every other
      * ctx member (`snapshot`, `requeue`, …) passes through – dropping them
      * here left namespaced resolvers without `ctx.requeue()`.
      */
@@ -728,13 +727,13 @@ function prefixResolvers(
       if (!hasCrossModuleDeps) {
         return {
           ...ctx,
-          facts: createResolverFactsProxy(facts, namespace, [], false),
+          facts: createResolverFactsProxy(facts, namespace),
         };
       }
 
       return {
         ...ctx,
-        facts: createResolverFactsProxy(facts, namespace, depNamespaces),
+        facts: createResolverFactsProxy(facts, namespace),
         deps: createResolverDepsProxy(facts, namespace, depNamespaces),
       } as { facts: unknown; signal: AbortSignal };
     }
@@ -811,8 +810,7 @@ function prefixResolvers(
 /**
  * Development: one resolver call's dependency views, each read through the
  * shared checked view so an in-place change is caught after the call.
- * Covers `ctx.deps.<ns>` and the legacy `ctx.facts.<ns>` pivot. Built per
- * call, because the check records what that call read.
+ * Covers `ctx.deps.<ns>`. Built per call, because the check records what that call read.
  */
 function checkDependencyViews(
   ctx: { facts: unknown; signal: AbortSignal; deps?: unknown },
@@ -845,8 +843,6 @@ function checkDependencyViews(
     return check.view;
   }
 
-  const pivotFacts = ctx.facts as Record<string, unknown>;
-
   return {
     ctx: {
       ...ctx,
@@ -855,16 +851,6 @@ function checkDependencyViews(
           typeof prop === "string" && depNames.has(prop)
             ? checkedView(prop)
             : Reflect.get(target, prop),
-      }),
-      facts: new Proxy(pivotFacts, {
-        get: (target, prop) => {
-          const value = Reflect.get(target, prop);
-
-          // Read through the pivot first, so its legacy warning still fires.
-          return typeof prop === "string" && depNames.has(prop)
-            ? checkedView(prop)
-            : value;
-        },
       }),
     } as { facts: unknown; signal: AbortSignal },
     takeMutation(): string | null {
@@ -943,10 +929,9 @@ function prefixEffects(
 /**
  * Prefix source ids and scope each source to its module.
  *
- * - `publish("START")` dispatches the module's own `ns::START`. A name that
- *   already contains the separator passes through, so deliberate
- *   cross-module publishes (and code that worked around the old behaviour by
- *   prefixing by hand) keep working.
+ * - `publish("START")` dispatches the module's own `ns::START`. The engine
+ *   scopes the name from the source's `ns::` id, and drops a name that
+ *   already contains `::` as `cross-module-event`.
  * - `key` / `active` gates read the module's own facts through a read-only
  *   view, scoped like constraints (see {@link createSourceGateFactsProxy}).
  * - Source ids become `ns::id`, so one factory module registered under two
@@ -982,28 +967,6 @@ function prefixSources(
       active?: unknown;
     };
 
-    // Scope the publish callback to this module. A blocked name passes
-    // through untouched so the engine's guard still sees it and reports
-    // `blocked-event-name` – prefixing would turn it into a harmless-looking
-    // `ns::__proto__` and hide the probe.
-    const attach = (
-      publish: (event: string, payload?: unknown) => void,
-      ...rest: unknown[]
-    ) =>
-      def.attach(
-        (event: string, payload?: unknown) =>
-          publish(
-            typeof event === "string" &&
-              event.length > 0 &&
-              !BLOCKED_PROPS.has(event) &&
-              !isAlreadyPrefixed(event)
-              ? prefixKey(namespace, event)
-              : event,
-            payload,
-          ),
-        ...rest,
-      );
-
     // Copy the definition with its prototype and property descriptors, then
     // override only the wrapped members. A spread would flatten a class-based
     // source (methods and getters live on the prototype) and drop
@@ -1020,7 +983,11 @@ function prefixSources(
         enumerable: true,
         configurable: true,
       });
-    override("attach", attach);
+    // Call through to the original so a class-based source's `this` is the
+    // instance, not the copy.
+    override("attach", (...args: unknown[]) =>
+      def.attach(...(args as [unknown, ...unknown[]])),
+    );
     if (typeof def.key === "function") {
       override("key", wrapGate(def.key));
     }

@@ -361,7 +361,7 @@ is scoped to that module's namespace:
 | Surface | What you write | What the system sees |
 |---|---|---|
 | `publish("START")` | the module's own event name | `loop::START` – the module's own handler runs |
-| `publish("other::PING")` | a name that already contains `::` | dispatched as written |
+| `publish("other::PING")` or `publish("loop::START")` | a name containing `::` | dropped as `cross-module-event` under that name – a source publishes only its own module's events. Development warns once per source: drop your own prefix, or dispatch the other module's event from a handler or resolver |
 | `key` / `active` gate | `facts.running` | the module's own facts, read-only |
 | gate, module with `crossModuleDeps` | `facts.self.running`, `facts.auth.token` | same scoping as a constraint |
 | source id | `boot` | `loop::boot` in `inspect()`, plugin hooks, observation events, the audit ledger and OTel |
@@ -369,7 +369,7 @@ is scoped to that module's namespace:
 - **`localId`.** `inspect().sources[i].localId` and every `source.*` observation event carry the id the module declared (`boot`). It equals `id` in a single-module system.
 - **Factory modules.** Ids are per namespace, so one factory module registered twice (`{ a: room("a"), b: room("b") }`) gets two independent sources instead of a definition collision.
 - **Unknown events are drops.** A publish with no handler is counted in `dropCount` with `lastDropReason: "unknown-event"` and fires `source.drop` – in production too. It is not counted in `publishCount`.
-- **Legacy flat gate reads.** A gate reading `facts["loop::running"]` still works and warns once per system in development. In a module with `crossModuleDeps`, a bare `facts.running` warns with the `facts.self.running` spelling.
+- **Gates see only their module.** A gate has no flat `facts["loop::running"]` form – that read is `undefined`. In a module with `crossModuleDeps`, a bare `facts.running` warns with the `facts.self.running` spelling.
 
 ## Async-aware teardown — `system.stopAsync()` + DO `onEvict`
 

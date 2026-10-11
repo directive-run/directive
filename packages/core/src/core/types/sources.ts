@@ -133,7 +133,8 @@ export type SourceDropReason =
   | "invalid-event-name"
   | "coalesced"
   | "gate-closed"
-  | "unknown-event";
+  | "unknown-event"
+  | "cross-module-event";
 
 /**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
@@ -149,8 +150,8 @@ export type SourceDropReason =
  *   handler. The payload is augmented with `{ type: eventName, ...payload }`
  *   before passing to the handler (same shape as `system.events.X(payload)`).
  *   In a namespaced system the name is scoped to the source's own module
- *   (`START` → `loop::START`); a name already containing `::` is
- *   dispatched as written.
+ *   (`START` → `loop::START`); a name already containing `::` is dropped
+ *   with reason `"cross-module-event"` under the name it was published as.
  * - `publish('UNKNOWN_EVENT', ...)` — dropped and counted as a drop with
  *   reason `"unknown-event"` (`dropCount`, `lastDropReason`, `onSourceDrop`),
  *   in production too. Development also logs a

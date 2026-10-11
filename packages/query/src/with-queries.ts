@@ -109,18 +109,6 @@ export function withQueries(
         ) => (string | { type: string; id?: string | number })[]);
   }[] = [];
   let hasMutationsWithTags = false;
-  /**
-   * Teardown callbacks a query asked to have run at system stop.
-   *
-   * Separate from effect cleanups because they mean a different thing: a
-   * cleanup fires before every re-run of its effect, and these fire only when
-   * the system is actually going away.
-   *
-   * Each is handed the stopping system's facts. A query definition is a plain
-   * value that any number of systems can be built from, so "the system is going
-   * away" is only a useful signal if it also says *which* system.
-   */
-  const stops: Array<(facts: Record<string, unknown>) => void> = [];
 
   for (const query of queries) {
     // Merge schema facts
@@ -160,13 +148,6 @@ export function withQueries(
     if (eventSchemas) {
       Object.assign(allEventSchemas, eventSchemas);
     }
-    const queryStop = (
-      query as { onStop?: (facts: Record<string, unknown>) => void }
-    ).onStop;
-    if (typeof queryStop === "function") {
-      stops.push(queryStop);
-    }
-
     // Collect init functions
     inits.push(query.init);
 
@@ -284,41 +265,6 @@ export function withQueries(
     }
   };
 
-  // Module hooks, with the queries' teardowns appended to whatever the caller
-  // declared. Runs after `effectsManager.cleanupAll()`, which is what lets a
-  // subscription's cleanup mark rather than abort.
-  const userHooks = (
-    config as { hooks?: { onStop?: (system: unknown) => void } }
-  ).hooks;
-  const mergedHooks =
-    stops.length === 0
-      ? userHooks
-      : {
-          ...userHooks,
-          onStop: (system: unknown) => {
-            userHooks?.onStop?.(system);
-            // The facts of the system that is stopping — the identity a
-            // teardown needs to leave every other system's work alone.
-            const { facts } = system as { facts: Record<string, unknown> };
-            // Every teardown runs even if an earlier one throws. These close
-            // independent streams, so letting one failure end the loop would
-            // leak every stream registered after it — and the failure that
-            // leaks them is the one least likely to be noticed, because the
-            // streams it leaves open go on reporting the last value they
-            // received rather than going quiet.
-            for (const stop of stops) {
-              try {
-                stop(facts);
-              } catch (error) {
-                console.error(
-                  "[Directive] A query teardown threw during system stop:",
-                  error,
-                );
-              }
-            }
-          },
-        };
-
   return {
     ...config,
     schema: {
@@ -339,6 +285,5 @@ export function withQueries(
     ...(Object.keys(allSources).length > 0 || config.sources
       ? { sources: { ...(config.sources ?? {}), ...allSources } }
       : {}),
-    hooks: mergedHooks,
   };
 }
