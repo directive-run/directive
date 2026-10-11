@@ -146,9 +146,9 @@ export interface ModuleConfigWithDeps<
   /** Effects with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
   effects?: CrossModuleEffectsDef<M, Deps>;
   /**
-   * Typed external event sources. Cross-module modules use the same
-   * primitive — sources never access facts, so they are not affected by
-   * the `facts.self.*` / `facts.{dep}.*` namespace split.
+   * Typed external event sources. `publish` dispatches this module's own
+   * events. A `key` / `active` gate reads facts like a constraint does:
+   * `facts.self.*` for own facts, `facts.{dep}.*` for declared deps.
    */
   sources?: SourcesDef;
   /** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */

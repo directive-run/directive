@@ -132,7 +132,8 @@ export type SourceDropReason =
   | "blocked-event-name"
   | "invalid-event-name"
   | "coalesced"
-  | "gate-closed";
+  | "gate-closed"
+  | "unknown-event";
 
 /**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
@@ -147,10 +148,14 @@ export type SourceDropReason =
  * - `publish('KNOWN_EVENT', payload)` — dispatches into the module's event
  *   handler. The payload is augmented with `{ type: eventName, ...payload }`
  *   before passing to the handler (same shape as `system.events.X(payload)`).
- * - `publish('UNKNOWN_EVENT', ...)` — in development, logs a
- *   `[Directive] Unknown event type` warning and drops the dispatch.
- *   In production, silently drops. **This is a footgun for sources** —
- *   strongly prefer wrapping `publish` in a typed factory (per the example).
+ *   In a namespaced system the name is scoped to the source's own module
+ *   (`START` → `loop::START`); a name already containing `::` is
+ *   dispatched as written.
+ * - `publish('UNKNOWN_EVENT', ...)` — dropped and counted as a drop with
+ *   reason `"unknown-event"` (`dropCount`, `lastDropReason`, `onSourceDrop`),
+ *   in production too. Development also logs a
+ *   `[Directive] Unknown event type` warning. Prefer wrapping `publish` in
+ *   a typed factory (per the example).
  * - `publish(event, undefined)` — dispatches with an empty payload object.
  * - Calling `publish` after `system.destroy()` — silently no-ops. The
  *   engine guards against post-destroy dispatch so stale source callbacks
@@ -245,6 +250,11 @@ export interface SourceAttachContext {
  * subscribed, but it MUST NOT write facts (the gate is a fact-only
  * derivation; writing would break the determinism invariant that lets
  * replay re-derive the key without re-attaching the transport).
+ *
+ * In a namespaced system the gate sees its own module's facts by their bare
+ * names (`facts.gameId`), or `facts.self.*` / `facts.{dep}.*` when the module
+ * declares `crossModuleDeps` – the same scoping a constraint gets. A write
+ * throws and is reported as a `phase: "gate"` error.
  */
 export type SourceGateFacts = Readonly<Record<string, unknown>>;
 

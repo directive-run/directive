@@ -1039,7 +1039,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(order).toEqual(["attach:a", "attach:b", "detach:b", "detach:a"]);
   });
 
-  it("source collision across modules throws at createSystem time", () => {
+  it("the same source id in two modules is two sources, prefixed by namespace", () => {
     const moduleA = createModule("a", {
       schema: { facts: { v: t.number() } },
       init: (f) => {
@@ -1055,9 +1055,19 @@ describe("source primitive — end-to-end with createSystem", () => {
       sources: { shared: { attach: () => () => undefined } },
     });
 
-    expect(() =>
-      createSystem({ modules: { a: moduleA, b: moduleB } }),
-    ).toThrowError(/Definition collision: source "shared"/);
+    // Source ids are namespaced like every other module-scoped key, so the
+    // same id in two modules (or one factory module registered twice) no
+    // longer collides.
+    const system = createSystem({ modules: { a: moduleA, b: moduleB } });
+    system.start();
+    expect(
+      system
+        .inspect()
+        .sources.map((s) => s.id)
+        .sort(),
+    ).toEqual(["a::shared", "b::shared"]);
+    expect(system.inspect().attachedSourceCount).toBe(2);
+    system.destroy();
   });
 
   // BLOCKED_PROPS check on event names (parity with system.dispatch)

@@ -1802,11 +1802,15 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /** Dispatch an event by name, handling snapshot flags and batching */
+  /**
+   * Dispatch an event by name, handling snapshot flags and batching.
+   *
+   * @returns Whether a handler was registered for the event.
+   */
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
-  ): void {
+  ): boolean {
     const handler = mergedEvents[eventName];
     if (handler) {
       dispatchDepth++;
@@ -1826,11 +1830,16 @@ export function createEngine<S extends Schema>(
       } finally {
         dispatchDepth--;
       }
-    } else if (isDevelopment) {
+
+      return true;
+    }
+    if (isDevelopment) {
       console.warn(
         `[Directive] Unknown event type "${eventName}". No handler is registered for this event. Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
       );
     }
+
+    return false;
   }
 
   // Create typed derive accessor using a Proxy
@@ -2805,10 +2814,17 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(eventName)) {
           return { accepted: false, reason: "blocked-event-name" };
         }
-        dispatchEventByName(
+        // A name with no handler is a drop, not a publish – otherwise the
+        // source's counters and `onPublish` report success for an event
+        // nothing ran (and production has no other signal at all).
+        const handled = dispatchEventByName(
           eventName,
           (payload ?? {}) as Record<string, unknown>,
         );
+        if (!handled) {
+          return { accepted: false, reason: "unknown-event" };
+        }
+
         return { accepted: true };
       });
 

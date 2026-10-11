@@ -23,7 +23,10 @@ import {
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
   createModuleFactsProxy,
+  createResolverFactsProxy,
+  createSourceGateFactsProxy,
 } from "./system-proxies.js";
+import { BLOCKED_PROPS } from "./tracking.js";
 import type { ModuleDef, ModuleSchema } from "./types.js";
 import { isDerivationWithMeta } from "./types/meta.js";
 
@@ -42,9 +45,9 @@ export interface FlatModuleDefinition {
   events: Record<string, unknown> | undefined;
   effects: Record<string, unknown> | undefined;
   /**
-   * Typed external event sources — pass through unmodified from the
-   * module definition. Sources don't read facts, so they don't need
-   * namespace prefixing the way effects/constraints/derivations do.
+   * Typed external event sources, with ids prefixed (`ns::id`), `publish`
+   * scoped to the module's own events, and `key` / `active` gates reading
+   * the module's own facts – see `prefixSources`.
    */
   sources: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
@@ -662,18 +665,22 @@ function prefixResolvers(
       timeout?: number;
     };
 
-    /** Wrap resolver ctx.facts with the module-scoped proxy */
+    /**
+     * Wrap resolver ctx.facts with flat, own-module access – the shape the
+     * resolver types declare, same as event handlers. Modules with
+     * crossModuleDeps get a proxy that also answers the legacy
+     * `self` / dep-namespace spellings.
+     */
     function wrapCtx(ctx: { facts: unknown; signal: AbortSignal }): {
       facts: unknown;
       signal: AbortSignal;
     } {
+      const facts = ctx.facts as Record<string, unknown>;
+
       return {
-        facts: createScopedFactsProxy(
-          ctx.facts as Record<string, unknown>,
-          namespace,
-          hasCrossModuleDeps,
-          depNamespaces,
-        ),
+        facts: hasCrossModuleDeps
+          ? createResolverFactsProxy(facts, namespace, depNamespaces)
+          : createModuleFactsProxy(facts, namespace),
         signal: ctx.signal,
       };
     }
@@ -768,6 +775,81 @@ function prefixEffects(
   return nonEmpty(result);
 }
 
+/**
+ * Prefix source ids and scope each source to its module.
+ *
+ * - `publish("START")` dispatches the module's own `ns::START`. A name that
+ *   already contains the separator passes through, so deliberate
+ *   cross-module publishes (and code that worked around the old behaviour by
+ *   prefixing by hand) keep working.
+ * - `key` / `active` gates read the module's own facts through a read-only
+ *   view, scoped like constraints (see {@link createSourceGateFactsProxy}).
+ * - Source ids become `ns::id`, so one factory module registered under two
+ *   names gets two sources instead of a definition collision.
+ */
+function prefixSources(
+  mod: ModuleDef<ModuleSchema>,
+  namespace: string,
+  hasCrossModuleDeps: boolean,
+  depNamespaces: string[],
+): Record<string, unknown> | undefined {
+  const sources = (mod as { sources?: Record<string, unknown> }).sources;
+  if (!sources) {
+    return undefined;
+  }
+
+  const gateDeps = hasCrossModuleDeps ? depNamespaces : null;
+
+  function wrapGate(gate: unknown): unknown {
+    if (typeof gate !== "function") {
+      return gate;
+    }
+
+    return (facts: Record<string, unknown>) =>
+      gate(createSourceGateFactsProxy(facts, namespace, gateDeps));
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [id, raw] of Object.entries(sources)) {
+    // The engine's key check runs on the prefixed id, which can never be a
+    // blocked name, so check the author's id before prefixing hides it.
+    if (BLOCKED_PROPS.has(id)) {
+      throw new Error(
+        `[Directive] Security: Module "${namespace}" has dangerous key "${id}" in sources.`,
+      );
+    }
+    const def = raw as {
+      attach: (publish: unknown, ...rest: unknown[]) => unknown;
+      key?: unknown;
+      active?: unknown;
+    };
+
+    result[prefixKey(namespace, id)] = {
+      ...def,
+      ...(def.key !== undefined && { key: wrapGate(def.key) }),
+      ...(def.active !== undefined && { active: wrapGate(def.active) }),
+      attach: (
+        publish: (event: string, payload?: unknown) => void,
+        ...rest: unknown[]
+      ) =>
+        def.attach(
+          (event: string, payload?: unknown) =>
+            publish(
+              typeof event === "string" &&
+                event.length > 0 &&
+                !isAlreadyPrefixed(event)
+                ? prefixKey(namespace, event)
+                : event,
+              payload,
+            ),
+          ...rest,
+        ),
+    };
+  }
+
+  return nonEmpty(result);
+}
+
 /** Compute history config with prefixed snapshot events */
 function prefixHistory(
   mod: ModuleDef<ModuleSchema>,
@@ -829,10 +911,7 @@ export function prefixModuleDefinition(
     derive: prefixDerive(mod, namespace, hasCrossModuleDeps, depNamespaces),
     events: prefixEventHandlers(mod, namespace),
     effects: prefixEffects(mod, namespace, hasCrossModuleDeps, depNamespaces),
-    // Sources don't access facts, so no prefixing pass — copy through.
-    // The engine collision check still namespaces them per-module via the
-    // existing definitionOwners map.
-    sources: (mod as { sources?: Record<string, unknown> }).sources,
+    sources: prefixSources(mod, namespace, hasCrossModuleDeps, depNamespaces),
     constraints: prefixConstraints(
       mod,
       namespace,

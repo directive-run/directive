@@ -398,6 +398,7 @@ export interface SourceInspectionRow {
    * - `"coalesced"` — manager debounced a same-event-name publish
    *   ahead of the microtask flush (only when `SourceDef.coalesce`
    *   is `"lastWriteWins"`)
+   * - `"unknown-event"` — no handler is registered for the event name
    */
   lastDropReason: SourceDropReason | null;
   /** Wall-clock ms of the most recent rejected publish, or `null`. */
