@@ -152,6 +152,11 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @param id - The effect definition ID.
    */
   callOne(id: string): Promise<void>;
+  /**
+   * The effect whose `run()` is executing synchronously right now, or `null`.
+   * Past an effect's first `await` it is no longer known.
+   */
+  runningEffect(): string | null;
 }
 
 /** Number of consecutive identical dep sets before skipping re-tracking */
@@ -256,6 +261,11 @@ export interface CreateEffectsOptions<S extends Schema> {
   onRun?: (id: string, deps: string[]) => void;
   /** Called when an effect's `run()` or cleanup function throws. */
   onError?: (id: string, error: unknown) => void;
+  /**
+   * Called when an effect's write to a fact is refused, in every build. A
+   * production build drops the write without a sound otherwise.
+   */
+  onWriteBlocked?: (id: string, key: string) => void;
 }
 
 /**
@@ -406,96 +416,48 @@ function computeDeclaresPrevFacts(run: Function): boolean {
  * works for some readers and not others reads as an engine bug, so the write is
  * refused instead.
  */
-function effectWriteMessage(key: string): string {
-  return `[Directive] An effect tried to write the fact "${key}". Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input, a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver.`;
+function effectWriteMessage(effectId: string, key: string): string {
+  return `[Directive] effect "${effectId}" tried to write "${key}". Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
 }
 
 /**
- * Refuse a write made through an effect's facts. Throws in development, where
- * the message is the fix. In production the write is dropped: an effect that
- * broke the rule did so before this check existed, and crashing a shipped app
- * over it helps nobody.
- */
-function refuseEffectWrite(key: string): true {
-  if (isDevelopment) {
-    throw new Error(effectWriteMessage(key));
-  }
-
-  return true;
-}
-
-/**
- * Non-zero while a write made through {@link unlockEffectFacts} is on the
- * stack. Checked synchronously at each write, so it covers exactly the writes
- * an unlocked view makes and nothing else.
- */
-let unlockedWriteDepth = 0;
-
-function withUnlockedWrite<T>(fn: () => T): T {
-  unlockedWriteDepth++;
-  try {
-    return fn();
-  } finally {
-    unlockedWriteDepth--;
-  }
-}
-
-const unlockedViews = new WeakMap<object, Record<string, unknown>>();
-
-/**
- * The store each read-only store view stands in front of. An unlocked view
- * answers `$store` with the real one, so code that identifies a system by its
- * store sees the same object from an effect as from a hook.
- */
-const storeBehindView = new WeakMap<object, object>();
-
-/**
- * A writable view over an effect's read-only facts, for first-party packages
- * whose effects wrote facts before the rule was enforced.
+ * Lets a first-party effect write facts while it moves to the right primitive.
  *
- * **Not for applications.** It exists so `@directive-run/query` keeps working
- * while its stream, polling, focus and reconnect effects move to sources, which
- * are the primitive built for data arriving from outside. Every call site is a
- * migration still to do; grep for this name to find them.
- *
- * Reads forward unchanged, so tracking still works. Stable per view, so code
- * that keys a `WeakMap` on the facts it was handed keeps one entry.
+ * Keyed by a registered symbol, so a package that cannot import from core's
+ * internals can still name it, and so it appears in no export. An effect
+ * definition carrying it is handed the system's writable facts, unchanged from
+ * before the rule existed. Only `@directive-run/query` sets it, on the stream,
+ * polling, focus, reconnect and expiry effects that become sources next; grep
+ * for the key to find every one.
  *
  * @internal
  */
-export function unlockEffectFacts(
-  facts: Record<string, unknown>,
-): Record<string, unknown> {
-  const cached = unlockedViews.get(facts);
-  if (cached) {
-    return cached;
+export const LEGACY_EFFECT_WRITES: unique symbol = Symbol.for(
+  "directive.internal.legacyEffectWrites",
+);
+
+/** Called when a write through an effect's facts is refused. */
+type WriteBlocked = (effectId: string, key: string) => void;
+
+/**
+ * Refuse a write made through an effect's facts.
+ *
+ * Reported first, in every build, so a plugin or `system.observe()` sees the
+ * write a production build drops. Then it throws in development, where the
+ * message is the fix. In production the write is dropped: crashing a shipped
+ * app over a write it was already ignoring helps nobody.
+ */
+function refuseEffectWrite(
+  effectId: string,
+  key: string,
+  onBlocked: WriteBlocked | undefined,
+): true {
+  onBlocked?.(effectId, key);
+  if (isDevelopment) {
+    throw new Error(effectWriteMessage(effectId, key));
   }
 
-  const view = new Proxy(facts, {
-    get(target, prop) {
-      const value = (target as Record<string | symbol, unknown>)[prop];
-      if (prop === "$store" && value !== null && typeof value === "object") {
-        return storeBehindView.get(value) ?? value;
-      }
-
-      return value;
-    },
-    set(target, prop, value) {
-      return withUnlockedWrite(() => {
-        (target as Record<string | symbol, unknown>)[prop] = value;
-
-        return true;
-      });
-    },
-    deleteProperty(target, prop) {
-      return withUnlockedWrite(
-        () => delete (target as Record<string | symbol, unknown>)[prop],
-      );
-    },
-  });
-  unlockedViews.set(facts, view);
-
-  return view;
+  return true;
 }
 
 /**
@@ -507,44 +469,136 @@ export function unlockEffectFacts(
  */
 function createReadonlyEffectStore<S extends Schema>(
   store: FactsStore<S>,
+  effectId: string,
+  onBlocked: WriteBlocked | undefined,
 ): FactsStore<S> {
-  const view: FactsStore<S> = {
+  return {
     get: (key) => store.get(key),
     has: (key) => store.has(key),
-    set: (key, value) => {
-      if (unlockedWriteDepth > 0) {
-        store.set(key, value);
-
-        return;
-      }
-      refuseEffectWrite(String(key));
+    set: (key) => {
+      refuseEffectWrite(effectId, String(key), onBlocked);
     },
     delete: (key) => {
-      if (unlockedWriteDepth > 0) {
-        store.delete(key);
-
-        return;
-      }
-      refuseEffectWrite(String(key));
+      refuseEffectWrite(effectId, String(key), onBlocked);
     },
     batch: (fn) => store.batch(fn),
     subscribe: (keys, listener) => store.subscribe(keys, listener),
     subscribeAll: (listener) => store.subscribeAll(listener),
     toObject: () => store.toObject(),
   };
-  storeBehindView.set(view, store);
+}
+
+/**
+ * A read-only view of a plain object or array held in a fact, for development.
+ *
+ * `facts.pos.x = 7` and `facts.list.push(item)` mutate the stored value in
+ * place: no write reaches the store, so nothing reacts and nothing reports it.
+ * Inside an effect that is the same broken rule as a top-level write, so it is
+ * refused the same way. The stored value itself is never frozen; only what the
+ * effect is handed is read-only.
+ *
+ * Development only. Wrapping every nested read costs a proxy per value, which
+ * production does not pay; there a nested mutation lands as it always has.
+ */
+function createNestedReadonly(
+  value: object,
+  path: string,
+  effectId: string,
+  onBlocked: WriteBlocked | undefined,
+  cache: WeakMap<object, object>,
+): object {
+  const cached = cache.get(value);
+  if (cached) {
+    return cached;
+  }
+
+  const refuse = (prop: string | symbol): true =>
+    refuseEffectWrite(effectId, `${path}.${String(prop)}`, onBlocked);
+
+  const view = new Proxy(value, {
+    get(target, prop, receiver) {
+      const inner = Reflect.get(target, prop, receiver);
+
+      return readonlyNested(
+        inner,
+        target,
+        prop,
+        `${path}.${String(prop)}`,
+        effectId,
+        onBlocked,
+        cache,
+      );
+    },
+    set(_, prop) {
+      return refuse(prop);
+    },
+    deleteProperty(_, prop) {
+      return refuse(prop);
+    },
+    defineProperty(_, prop) {
+      return refuse(prop);
+    },
+    setPrototypeOf() {
+      return refuse("__proto__");
+    },
+  });
+  cache.set(value, view);
 
   return view;
 }
 
 /**
- * The facts an effect's `run()` (and the cleanup it returns) receives.
+ * Wrap a value read from a fact if it is a plain object or array that could be
+ * mutated in place. Everything else passes through: primitives, frozen values
+ * (already immutable), and Map, Set, Date or class instances, whose methods
+ * throw when called on a proxy.
+ */
+function readonlyNested(
+  value: unknown,
+  owner: object | null,
+  prop: string | symbol,
+  path: string,
+  effectId: string,
+  onBlocked: WriteBlocked | undefined,
+  cache: WeakMap<object, object>,
+): unknown {
+  if (typeof prop === "symbol" || value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Object.isFrozen(value)) {
+    return value;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (
+    prototype !== Object.prototype &&
+    prototype !== null &&
+    !Array.isArray(value)
+  ) {
+    return value;
+  }
+  // A proxy must return a non-configurable, non-writable property's own value.
+  if (owner !== null) {
+    const descriptor = Reflect.getOwnPropertyDescriptor(owner, prop);
+    if (descriptor && !descriptor.configurable && !descriptor.writable) {
+      return value;
+    }
+  }
+
+  return createNestedReadonly(value, path, effectId, onBlocked, cache);
+}
+
+/**
+ * The facts one effect's `run()` (and the cleanup it returns) receives.
  *
  * A view, not a flag. A flag raised while `run()` is on the stack cannot see a
  * write made after an `await`, or from a cleanup, or from a timer the effect
  * started. Every one of those writes goes through this object, so refusing here
  * covers all of them. Reads forward to the real facts proxy, so auto-tracking
  * still records them.
+ *
+ * One view per effect, so the error can name the effect. A different object
+ * from `system.facts`, with no prototype, so identity checks against the
+ * system's facts do not match.
  *
  * Namespaced systems wrap this object again, and their module proxies write
  * through to it, so a scoped write is refused here too.
@@ -553,38 +607,48 @@ function createReadonlyEffectStore<S extends Schema>(
  */
 export function createReadonlyEffectFacts<S extends Schema>(
   facts: Facts<S>,
+  effectId: string,
+  onBlocked?: WriteBlocked,
 ): Facts<S> {
   const source = facts as unknown as Record<string | symbol, unknown>;
   let readonlyStore: FactsStore<S> | null = null;
+  const nested = isDevelopment ? new WeakMap<object, object>() : null;
 
   return new Proxy(Object.create(null) as Facts<S>, {
     get(_, prop) {
       if (prop === "$store") {
-        readonlyStore ??= createReadonlyEffectStore(facts.$store);
+        readonlyStore ??= createReadonlyEffectStore(
+          facts.$store,
+          effectId,
+          onBlocked,
+        );
 
         return readonlyStore;
       }
 
-      return source[prop];
-    },
-    set(_, prop, value) {
-      if (unlockedWriteDepth > 0) {
-        source[prop] = value;
-
-        return true;
+      const value = source[prop];
+      if (nested === null) {
+        return value;
       }
 
-      return refuseEffectWrite(String(prop));
+      return readonlyNested(
+        value,
+        null,
+        prop,
+        String(prop),
+        effectId,
+        onBlocked,
+        nested,
+      );
+    },
+    set(_, prop) {
+      return refuseEffectWrite(effectId, String(prop), onBlocked);
     },
     deleteProperty(_, prop) {
-      if (unlockedWriteDepth > 0) {
-        return delete source[prop];
-      }
-
-      return refuseEffectWrite(String(prop));
+      return refuseEffectWrite(effectId, String(prop), onBlocked);
     },
     defineProperty(_, prop) {
-      return refuseEffectWrite(String(prop));
+      return refuseEffectWrite(effectId, String(prop), onBlocked);
     },
     has(_, prop) {
       return prop in source;
@@ -615,10 +679,53 @@ export function createEffectsManager<S extends Schema>(
     isFactKey = () => false,
     onRun,
     onError,
+    onWriteBlocked,
   } = options;
 
-  // Every effect body, and every cleanup it returns, reads through this view.
-  const facts = createReadonlyEffectFacts(options.facts);
+  /**
+   * The read-only view each effect reads through, one per effect so a refused
+   * write can name it. Built on first use and dropped when the definition is
+   * replaced.
+   */
+  const views = new Map<string, Facts<S>>();
+
+  /** The facts handed to one effect's `run()`. */
+  function factsFor(id: string, def: EffectsDef<S>[string]): Facts<S> {
+    if ((def as { [LEGACY_EFFECT_WRITES]?: boolean })[LEGACY_EFFECT_WRITES]) {
+      return options.facts;
+    }
+    let view = views.get(id);
+    if (!view) {
+      view = createReadonlyEffectFacts(options.facts, id, onWriteBlocked);
+      views.set(id, view);
+    }
+
+    return view;
+  }
+
+  /**
+   * The effect whose `run()` is on the stack right now, for a caller that wants
+   * to name it. Synchronous only: past an `await` this is no longer known.
+   */
+  let runningEffectId: string | null = null;
+
+  /** Call `run()` with its own facts, recording which effect is running. */
+  function callRun(
+    id: string,
+    def: EffectsDef<S>[string],
+  ): ReturnType<EffectsDef<S>[string]["run"]> {
+    const outer = runningEffectId;
+    runningEffectId = id;
+    try {
+      return def.run(
+        factsFor(id, def),
+        previousSnapshot as InferSchema<S> | null,
+        derived,
+      );
+    } finally {
+      runningEffectId = outer;
+    }
+  }
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
@@ -748,6 +855,9 @@ export function createEffectsManager<S extends Schema>(
     if (!def) {
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
+
+    // A replaced definition may opt in or out of legacy writes.
+    views.delete(id);
 
     // Always clear any stale gate from a previous registration of this id
     // before re-installing. Without this, swapping a data-form `on` effect
@@ -935,11 +1045,7 @@ export function createEffectsManager<S extends Schema>(
   ): Promise<void> {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(
-        facts,
-        previousSnapshot as InferSchema<S> | null,
-        derived,
-      );
+      effectPromise = callRun(state.id, def);
     });
     if (effectPromise instanceof Promise) {
       const result = await effectPromise;
@@ -1044,11 +1150,7 @@ export function createEffectsManager<S extends Schema>(
     let effectPromise: unknown;
     const trackingResult = withTracking(() => {
       store.batch(() => {
-        effectPromise = def.run(
-          facts,
-          previousSnapshot as InferSchema<S> | null,
-          derived,
-        );
+        effectPromise = callRun(state.id, def);
       });
       return effectPromise;
     });
@@ -1253,8 +1355,13 @@ export function createEffectsManager<S extends Schema>(
       // Remove from all maps
       delete (definitions as Record<string, unknown>)[id];
       states.delete(id);
+      views.delete(id);
       onGates.delete(id);
       recomputePrevFactsObserved();
+    },
+
+    runningEffect(): string | null {
+      return runningEffectId;
     },
 
     async callOne(id: string): Promise<void> {
@@ -1281,11 +1388,7 @@ export function createEffectsManager<S extends Schema>(
       try {
         let effectPromise: unknown;
         store.batch(() => {
-          effectPromise = def.run(
-            facts,
-            previousSnapshot as InferSchema<S> | null,
-            derived,
-          );
+          effectPromise = callRun(id, def);
         });
         if (effectPromise instanceof Promise) {
           const result = await effectPromise;

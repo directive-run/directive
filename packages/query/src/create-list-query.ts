@@ -23,8 +23,8 @@
  * @module
  */
 
-import { unlockEffectFacts } from "@directive-run/core/internals";
 import {
+  LEGACY_WRITING_EFFECT,
   PREFIX,
   buildKey,
   replaceEqualDeep,
@@ -471,10 +471,8 @@ export function createListQuery<
       ...(refetchOnWindowFocus
         ? {
             [`${PREFIX}${name}_focus_list`]: {
-              run: (lockedFacts: Record<string, unknown>) => {
-                // Effects cannot write facts. This one still does, from callbacks
-                // the outside world fires; it moves to a source next.
-                const facts = unlockEffectFacts(lockedFacts);
+              ...LEGACY_WRITING_EFFECT,
+              run: (facts: Record<string, unknown>) => {
                 if (typeof document === "undefined") return;
                 const handler = () => {
                   if (document.hidden) return;
@@ -491,10 +489,8 @@ export function createListQuery<
       ...(refetchOnReconnect
         ? {
             [`${PREFIX}${name}_online_list`]: {
-              run: (lockedFacts: Record<string, unknown>) => {
-                // Effects cannot write facts. This one still does, from callbacks
-                // the outside world fires; it moves to a source next.
-                const facts = unlockEffectFacts(lockedFacts);
+              ...LEGACY_WRITING_EFFECT,
+              run: (facts: Record<string, unknown>) => {
                 if (typeof window === "undefined") return;
                 const handler = () => {
                   bumpAllTriggers(facts, triggerKey, activeKeysKey);
@@ -510,10 +506,8 @@ export function createListQuery<
       ...(refetchInterval
         ? {
             [`${PREFIX}${name}_poll_list`]: {
-              run: (lockedFacts: Record<string, unknown>) => {
-                // Effects cannot write facts. This one still does, from callbacks
-                // the outside world fires; it moves to a source next.
-                const facts = unlockEffectFacts(lockedFacts);
+              ...LEGACY_WRITING_EFFECT,
+              run: (facts: Record<string, unknown>) => {
                 const intervalMs =
                   typeof refetchInterval === "function"
                     ? refetchInterval(undefined as unknown as TData)

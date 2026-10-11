@@ -1131,6 +1131,12 @@ export type ObservationEvent =
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   /**
+   * An effect tried to write a fact and was refused. Fires in every build;
+   * production drops the write, so this is its only trace there. `key` is a
+   * dotted path for a nested mutation (`"pos.x"`).
+   */
+  | { type: "effect.write-blocked"; id: string; key: string }
+  /**
    * Source attached at `system.start()` (or at registerModule when the
    * system was already running). Carries the source id + the module that
    * declared it so plugins can attribute per-module sources.

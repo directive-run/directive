@@ -618,8 +618,11 @@ export async function runComposition(
        * Close the composition out once nothing further will start.
        *
        * A constraint and a resolver rather than an effect, because closing
-       * writes facts (`closed`, `combinedPath`) and effects cannot. `closed` is
-       * written first, so the requirement retracts before the one `await`.
+       * writes facts (`closed`, `combinedPath`) and effects cannot. The
+       * resolver writes `closed` last: writing it first retracted the
+       * requirement while the resolver was still running, so the close showed
+       * as canceled. While it runs, the requirement keeps the same identity, so
+       * it is not dispatched a second time.
        */
       close: {
         when: (facts, derived) => !facts.closed && derived.compositionSettled,
@@ -746,8 +749,6 @@ export async function runComposition(
       close: {
         requirement: "CLOSE",
         resolve: async (_req, context) => {
-          context.facts.closed = true;
-
           const budgetExhausted = readDerived("budgetExhausted");
           const composedRunId = context.facts.runId;
           const composedInput = context.facts.input;
@@ -777,8 +778,8 @@ export async function runComposition(
           //
           // Caught, because this is the last thing between the composition and
           // the event that ends it. `runComposition` resolves off
-          // `composition:complete`, and `closed` above means this effect will
-          // not be entered a second time — so a store that rejected here used
+          // `composition:complete`, and `closed` below means this resolver
+          // will not be entered a second time — so a store that rejected here used
           // to leave a settled system, a correct ledger, every step's own
           // transcript already on disk, and a caller waiting forever for the
           // index of them.
@@ -797,6 +798,7 @@ export async function runComposition(
             });
           }
           context.facts.combinedPath = combinedPath;
+          context.facts.closed = true;
 
           emit({
             type: "composition:complete",

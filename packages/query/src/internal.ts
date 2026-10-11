@@ -5,6 +5,22 @@
  * @module
  */
 
+/**
+ * Spread into each query effect that still writes facts.
+ *
+ * Effects cannot write facts. These do, from callbacks the outside world fires
+ * (a stream message, a timer, focus, reconnect, cache expiry), and they become
+ * sources once source scoping lands. Until then, core hands an effect carrying
+ * `directive.internal.legacyEffectWrites` the system's writable facts.
+ *
+ * `onNavigate: "skip"` because each one performs an act: rewinding history
+ * must not re-subscribe a stream or re-arm a timer.
+ */
+export const LEGACY_WRITING_EFFECT = {
+  [Symbol.for("directive.internal.legacyEffectWrites")]: true,
+  onNavigate: "skip",
+} as const;
+
 /** Prefix for all internal query fact keys. Reserved — user facts must not start with `_q_`. */
 export const PREFIX = "_q_";
 

@@ -9,8 +9,12 @@
  */
 
 import type { RetryPolicy } from "@directive-run/core";
-import { unlockEffectFacts } from "@directive-run/core/internals";
-import { PREFIX, buildKey, serializeKey } from "./internal.js";
+import {
+  LEGACY_WRITING_EFFECT,
+  PREFIX,
+  buildKey,
+  serializeKey,
+} from "./internal.js";
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
@@ -623,10 +627,8 @@ export function createInfiniteQuery<
       ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
         ? {
             [`${PREFIX}${name}_gc`]: {
-              run: (lockedFacts: Record<string, unknown>) => {
-                // Effects cannot write facts. This one still does, from callbacks
-                // the outside world fires; it moves to a source next.
-                const facts = unlockEffectFacts(lockedFacts);
+              ...LEGACY_WRITING_EFFECT,
+              run: (facts: Record<string, unknown>) => {
                 // Read state to track as dependency — re-runs when state changes
                 void facts[stateKey];
 

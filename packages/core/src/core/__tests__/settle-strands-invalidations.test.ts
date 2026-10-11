@@ -140,26 +140,12 @@ describe("an effect's write reaches a derivation-gated constraint", () => {
   });
 
   /**
-   * Deliberately NOT fixed here, and the boundary is pinned so the next attempt
-   * knows where it is.
-   *
-   * The constraint half above works because the announcement is drained after
-   * the effects phase and read by the constraint pass in the same reconcile.
-   * The effects have already run by then, so reaching *them* means carrying the
-   * keys past the clear into the following pass — and that is the shape a
-   * previous fix took before being withdrawn the same day. See the sibling
-   * suite "effects and the reconcile boundary — pinned known limitation" in
-   * engine.test.ts for the full account.
-   *
-   * Re-derived here rather than taken on faith: carrying the keys forward and
-   * pointing a self-feeding effect at it produced 2,001 runs in 41ms, bounded
-   * only by the probe's own counter. An effect that writes a fact inside its
-   * own dependency set has no damping — `Object.is` suppresses a repeated
-   * value, so any effect writing a *changing* one runs until the process does.
-   *
-   * Closing this needs a bound on the feedback path, which is its own change.
+   * The effect half, which used to be pinned as a standing boundary: the keys
+   * written while effects ran are carried into the next pass, so an effect
+   * gated on the derivation they move is woken too. A self-feeding effect is
+   * bounded separately (see engine.test.ts).
    */
-  it("does not wake a derivation-gated effect from an effect-phase write", async () => {
+  it("wakes a derivation-gated effect from an effect-phase write", async () => {
     const run = vi.fn();
 
     const module = createModule("chain", {
@@ -196,10 +182,8 @@ describe("an effect's write reaches a derivation-gated constraint", () => {
     system.facts.trigger = 4;
     await system.settle();
 
-    // The value is right on pull, and a constraint gated the same way *would*
-    // have fired. The effect does not, and that is the standing boundary.
     expect(system.derive.tripled).toBe(12);
-    expect(run).toHaveBeenLastCalledWith(0);
+    expect(run).toHaveBeenLastCalledWith(12);
 
     // What matters for correctness is that the system does not lie about it:
     // nothing is left undelivered, so `settle()` is telling the truth when it

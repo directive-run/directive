@@ -156,6 +156,19 @@ export type CrossModuleFactsWithSelf<
   [K in keyof Deps]: InferFacts<Deps[K]>;
 };
 
+/**
+ * {@link CrossModuleFactsWithSelf} as an effect sees it: every namespace, and
+ * every fact in it, read-only. Effects never write facts.
+ */
+export type ReadonlyCrossModuleFacts<
+  OwnSchema extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = {
+  readonly [K in keyof CrossModuleFactsWithSelf<OwnSchema, Deps>]: Readonly<
+    CrossModuleFactsWithSelf<OwnSchema, Deps>[K]
+  >;
+};
+
 // ============================================================================
 // Namespaced Facts Types
 // ============================================================================

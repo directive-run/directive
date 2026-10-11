@@ -51,7 +51,7 @@ describe("an effect writing a fact", () => {
 
     expect(system.facts.pos).toBe(0);
     const message = String((errors.at(-1) as Error)?.message);
-    expect(message).toContain('write the fact "pos"');
+    expect(message).toContain('tried to write "pos"');
     expect(message).toContain("event handler");
     expect(message).toContain("derivation");
     expect(message).toContain("resolver");
@@ -86,7 +86,7 @@ describe("an effect writing a fact", () => {
 
     expect(system.facts.loaded).toBe(false);
     expect(String((errors.at(-1) as Error)?.message)).toContain(
-      'write the fact "loaded"',
+      'tried to write "loaded"',
     );
 
     await system.stop();
@@ -151,7 +151,7 @@ describe("an effect writing a fact", () => {
 
     expect(system.facts.closed).toBe(false);
     expect(String((cleanupError as Error)?.message)).toContain(
-      'write the fact "closed"',
+      'tried to write "closed"',
     );
 
     await system.stop();
@@ -187,7 +187,7 @@ describe("an effect writing a fact", () => {
 
     expect(system.facts.loop.pos).toBe(0);
     expect(String((errors.at(-1) as Error)?.message)).toContain(
-      'write the fact "loop::pos"',
+      'tried to write "loop::pos"',
     );
 
     await system.stop();

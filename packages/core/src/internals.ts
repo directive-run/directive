@@ -30,10 +30,7 @@ export {
 // ============================================================================
 
 export { createDerivationsManager } from "./core/derivations.js";
-export {
-  createEffectsManager,
-  unlockEffectFacts,
-} from "./core/effects.js";
+export { createEffectsManager } from "./core/effects.js";
 export { createConstraintsManager } from "./core/constraints.js";
 export { createResolversManager, type InflightInfo } from "./core/resolvers.js";
 export {

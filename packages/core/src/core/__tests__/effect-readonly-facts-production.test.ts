@@ -37,4 +37,70 @@ describe("an effect writing a fact, in production", () => {
     await system.stop();
     errors.mockRestore();
   });
+
+  it("still reports the dropped write to plugins", async () => {
+    const blocked: Array<[string, string]> = [];
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), pos: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.pos = 0;
+      },
+      effects: {
+        physics: {
+          deps: ["n"],
+          run: (facts) => {
+            if (facts.n > 0) {
+              (facts as { pos: number }).pos = 99;
+            }
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "watch",
+          onEffectWriteBlocked: (id, key) => {
+            blocked.push([id, key]);
+          },
+        },
+      ],
+    });
+    await system.start();
+    system.facts.n = 1;
+    await system.settle();
+
+    expect(blocked).toEqual([["physics", "pos"]]);
+
+    await system.stop();
+  });
+
+  it("does not wrap nested values, so reads cost nothing extra", async () => {
+    let seen: unknown = null;
+    const pos = { x: 0 };
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number(), pos: t.object<{ x: number }>() } },
+      init: (facts) => {
+        facts.n = 0;
+        facts.pos = pos;
+      },
+      effects: {
+        view: {
+          deps: ["n"],
+          run: (facts) => {
+            seen = facts.pos;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod });
+    await system.start();
+    await system.settle();
+
+    expect(seen).toBe(pos);
+
+    await system.stop();
+  });
 });

@@ -5,6 +5,7 @@
 import type {
   CrossModuleDeps,
   CrossModuleFactsWithSelf,
+  ReadonlyCrossModuleFacts,
 } from "./composition.js";
 import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
@@ -353,7 +354,7 @@ export interface CrossModuleEffectDef<
    * system. Third, because `facts` and `prevFacts` hold the first two positions.
    */
   run: (
-    facts: CrossModuleFactsWithSelf<M, Deps>,
+    facts: ReadonlyCrossModuleFacts<M, Deps>,
     prevFacts: CrossModuleFactsWithSelf<M, Deps> | undefined,
     derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return

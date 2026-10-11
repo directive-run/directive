@@ -60,6 +60,7 @@ import type {
   MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
+  RequirementWithId,
   ResolverDef,
   ResolversDef,
   Schema,
@@ -708,6 +709,44 @@ export function createEngine<S extends Schema>(
    */
   const restoredKeys = new Set<string>();
 
+  /**
+   * Whether this write landed while effects were running, counted per write
+   * since the last pass began.
+   *
+   * A write during the effects phase (an event an effect dispatched, a captured
+   * `system.facts`, a caller writing while an async effect awaits) is carried
+   * into the next pass, so it wakes the effects that read it. That opens a
+   * feedback path: an effect that dispatches a change to its own dependency
+   * wakes itself, forever. These counters let the pass tell a chain of passes
+   * started only by effect-phase writes from ordinary work, and bound it.
+   */
+  let effectsPhaseOpen = false;
+  let effectPhaseWrites = 0;
+  let otherPhaseWrites = 0;
+  /** Consecutive passes started only by writes made during an effects phase. */
+  let effectChainLength = 0;
+  /** Consecutive "retry" attempts per failing effect, reset by ordinary work. */
+  const effectRetryAttempts = new Map<string, number>();
+  const MAX_EFFECT_RETRIES = 3;
+  /** A self-waking effect chain is cut after this many passes. */
+  const MAX_EFFECT_CHAIN = 100;
+
+  function noteChangedKey(key: string): void {
+    state.changedKeys.add(key);
+    if (effectsPhaseOpen) {
+      effectPhaseWrites++;
+    } else {
+      otherPhaseWrites++;
+    }
+  }
+
+  /**
+   * Whether a dispatch is being made by an effect re-run for a history
+   * navigation, and which effect, when known. Warned once per effect.
+   */
+  let navigationEffectsOpen = false;
+  const warnedNavigationDispatch = new Set<string>();
+
   function noteRestored(key: string): void {
     restoredKeys.add(key);
     scheduleReconcile();
@@ -727,7 +766,9 @@ export function createEngine<S extends Schema>(
    * Returns whether it was.
    */
   function noteWrite(): boolean {
-    if (navigationDepth === 0) {
+    // A write an effect causes while re-running for a navigation belongs to the
+    // navigation: snapshotting it would splice away the redo stack.
+    if (navigationDepth === 0 && !navigationEffectsOpen) {
       ordinaryWrites++;
 
       return false;
@@ -838,7 +879,7 @@ export function createEngine<S extends Schema>(
       if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
-      state.changedKeys.add(key);
+      noteChangedKey(String(key));
       scheduleReconcile();
     },
     onBatch: (changes) => {
@@ -896,7 +937,7 @@ export function createEngine<S extends Schema>(
         shouldTakeSnapshot = true;
       }
       for (const change of authored) {
-        state.changedKeys.add(change.key);
+        noteChangedKey(change.key);
       }
       scheduleReconcile();
     },
@@ -989,6 +1030,9 @@ export function createEngine<S extends Schema>(
         });
       }
     },
+    onWriteBlocked: (id, key) => {
+      if (hasPlugins()) pluginManager.emitEffectWriteBlocked(id, key);
+    },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("effect", id, error);
       if (hasPlugins()) pluginManager.emitEffectError(id, error);
@@ -1006,9 +1050,19 @@ export function createEngine<S extends Schema>(
         effectsManager.disable(id);
       }
 
+      // Bounded. The retry is carried into the next pass, and an effect that
+      // fails every time would otherwise retry for as long as the process runs.
       if (strategy === "retry") {
-        state.changedKeys.add(EFFECT_RETRY_KEY);
-        scheduleReconcile();
+        const attempts = (effectRetryAttempts.get(id) ?? 0) + 1;
+        effectRetryAttempts.set(id, attempts);
+        if (attempts <= MAX_EFFECT_RETRIES) {
+          noteChangedKey(EFFECT_RETRY_KEY);
+          scheduleReconcile();
+        } else if (isDevelopment) {
+          console.warn(
+            `[Directive] effect "${id}" failed ${MAX_EFFECT_RETRIES} retries in a row; it will run again on its next change.`,
+          );
+        }
       }
     },
   });
@@ -1455,6 +1509,35 @@ export function createEngine<S extends Schema>(
       return;
     }
 
+    // A chain of passes each started only by writes made while effects ran is
+    // an effect waking itself. Cut it, say so, and drop what it carried, rather
+    // than spin until the process does.
+    if (effectPhaseWrites > 0 && otherPhaseWrites === 0) {
+      effectChainLength++;
+    } else {
+      effectChainLength = 0;
+      if (otherPhaseWrites > 0) {
+        effectRetryAttempts.clear();
+      }
+    }
+    effectPhaseWrites = 0;
+    otherPhaseWrites = 0;
+    if (effectChainLength > MAX_EFFECT_CHAIN) {
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...state.changedKeys].slice(0, 5).join(", ")}`,
+        );
+      }
+      state.changedKeys.clear();
+      derivationsManager.collectInvalidated(new Set());
+      resetNavigationRecord();
+      effectChainLength = 0;
+      reconcileDepth = 0;
+      notifySettlementChange();
+
+      return;
+    }
+
     state.isReconciling = true;
     notifySettlementChange();
 
@@ -1483,9 +1566,22 @@ export function createEngine<S extends Schema>(
       restoredKeys.clear();
     }
 
+    // The keys this pass is about, taken now. Anything written while the pass
+    // runs (during the effects phase or while constraints evaluate) stays in
+    // `changedKeys` and is picked up by the pass scheduled at the end. Clearing
+    // after the effects phase instead dropped those writes for good: an effect
+    // declared on the key never ran for it, and the first write after
+    // `start()` was lost the same way.
+    const passKeys = new Set(state.changedKeys);
+    state.changedKeys.clear();
+    // Same lifetime, so the record can never be consumed by a later pass that
+    // has nothing to do with the navigation that set it.
+    resetNavigationRecord();
+    const ordinaryKeyCount = passKeys.size;
+
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
-      if (state.changedKeys.size > 0) {
+      if (passKeys.size > 0) {
         // `followsNavigation` overrides both arms. Snapshotting here splices
         // away every snapshot ahead of the point just rewound to, so a single
         // reactive write during an undo destroys redo — and the default arm
@@ -1495,7 +1591,7 @@ export function createEngine<S extends Schema>(
           !followsNavigation &&
           (snapshotEventNames === null || shouldTakeSnapshot)
         ) {
-          const keys = state.changedKeys;
+          const keys = passKeys;
           const label =
             keys.size <= 5
               ? `facts-changed:${[...keys].join(",")}`
@@ -1533,11 +1629,18 @@ export function createEngine<S extends Schema>(
       // instead, so a derivation the rewind moved wakes effects without being
       // handed to constraints as a change.
       derivationsManager.collectInvalidated(
-        navigationKeys !== null && state.changedKeys.size === 0
+        navigationKeys !== null && ordinaryKeyCount === 0
           ? navigationKeys
-          : state.changedKeys,
+          : passKeys,
       );
-      await effectsManager.runEffects(state.changedKeys, navigationKeys);
+      effectsPhaseOpen = true;
+      navigationEffectsOpen = navigationKeys !== null;
+      try {
+        await effectsManager.runEffects(passKeys, navigationKeys);
+      } finally {
+        effectsPhaseOpen = false;
+        navigationEffectsOpen = false;
+      }
 
       // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
       // plane, immediately after effects, against the committed facts. Sits
@@ -1560,35 +1663,34 @@ export function createEngine<S extends Schema>(
         );
       }
 
-      // Again, because an effect can still cause a write.
-      //
-      // Effects cannot write facts themselves (their `facts` is read-only), but
-      // one can dispatch an event or write through a captured `system.facts`.
-      // The drain above happens before `runEffects` so an effect gated on a
-      // derivation is woken by it. But a write made during effects
-      // invalidates whatever derivations read that fact, and those roots land
-      // after that drain has already run — so without this second call the
-      // announcement misses the constraint pass immediately below, the pass
-      // ends with `changedKeys` cleared, and nothing is scheduled to carry it.
-      // The derivation still reads correctly on pull; only the wakeup is lost,
-      // which is why it survived a snapshot assertion for so long.
-      //
-      // Early-returns on an empty root set, so a reconcile in which no effect
-      // wrote anything pays one `Set.size` check.
-      derivationsManager.collectInvalidated(state.changedKeys);
+      // No second invalidation drain here. A write made while effects ran
+      // stays in `changedKeys`, and the derivations it invalidated stay
+      // pending; the pass scheduled at the end drains both, so effects and
+      // constraints reading them hear about it there.
 
-      // Copy changed keys for constraint evaluation before clearing
-      const keysForConstraints = new Set(state.changedKeys);
-
-      // Clear changed keys
-      state.changedKeys.clear();
-      // Same lifetime, so the record can never be consumed by a later pass
-      // that has nothing to do with the navigation that set it.
-      resetNavigationRecord();
-
-      // Evaluate constraints (pass changed keys for incremental evaluation)
-      const currentRequirements =
-        await constraintsManager.evaluate(keysForConstraints);
+      // A navigation restored state that was reconciled when it was captured,
+      // so its requirements are rebuilt from a full evaluation without
+      // dispatching anything. Without the rebuild, the requirement set from
+      // before the rewind stayed as the baseline: a later write that satisfied
+      // a constraint again looked like no change and its resolver never ran.
+      // Handing the evaluation an empty key set instead meant "evaluate all"
+      // and re-dispatched resolvers for the rewound state.
+      let currentRequirements: RequirementWithId[];
+      if (navigationKeys !== null) {
+        const restored = await constraintsManager.evaluate();
+        const restoredSet = new RequirementSet();
+        for (const req of restored) {
+          restoredSet.add(req);
+        }
+        state.previousRequirements = restoredSet;
+        currentRequirements =
+          ordinaryKeyCount > 0
+            ? await constraintsManager.evaluate(passKeys)
+            : restored;
+      } else {
+        // Evaluate constraints (pass changed keys for incremental evaluation)
+        currentRequirements = await constraintsManager.evaluate(passKeys);
+      }
       const currentSet = new RequirementSet();
       for (const req of currentRequirements) {
         currentSet.add(req);
@@ -1855,6 +1957,15 @@ export function createEngine<S extends Schema>(
     payload?: Record<string, unknown>,
   ): void {
     const handler = mergedEvents[eventName];
+    if (isDevelopment && navigationEffectsOpen) {
+      const effectId = effectsManager.runningEffect() ?? "(unknown effect)";
+      if (!warnedNavigationDispatch.has(effectId)) {
+        warnedNavigationDispatch.add(effectId);
+        console.warn(
+          `[Directive] effect "${effectId}" dispatched "${eventName}" while re-running after a history navigation. An effect that dispatches records acts rather than mirroring state, and a rewind should not repeat them. Set onNavigate: "skip" on it.`,
+        );
+      }
+    }
     if (handler) {
       dispatchDepth++;
       // Not while rewinding. A handler dispatched from a listener reacting to
@@ -1862,6 +1973,7 @@ export function createEngine<S extends Schema>(
       // splices away everything ahead of the point being rewound to.
       if (
         navigationDepth === 0 &&
+        !navigationEffectsOpen &&
         (snapshotEventNames === null || snapshotEventNames.has(eventName))
       ) {
         shouldTakeSnapshot = true;
@@ -2651,6 +2763,8 @@ export function createEngine<S extends Schema>(
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
+        onEffectWriteBlocked: (id: string, key: string) =>
+          observer({ type: "effect.write-blocked", id, key }),
         onModuleRegistered: (id: string) =>
           observer({ type: "module.registered", id }),
         onModuleUnregistered: (id: string) =>
@@ -2814,6 +2928,9 @@ export function createEngine<S extends Schema>(
       // against the first unrelated pass after this.
       resetNavigationRecord();
       restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -2903,6 +3020,9 @@ export function createEngine<S extends Schema>(
       state.isRunning = false;
       resetNavigationRecord();
       restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -2968,6 +3088,9 @@ export function createEngine<S extends Schema>(
       state.isRunning = false;
       resetNavigationRecord();
       restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;

@@ -8,11 +8,13 @@
  * @module
  */
 
+import { withoutTracking } from "@directive-run/core/internals";
 import {
-  unlockEffectFacts,
-  withoutTracking,
-} from "@directive-run/core/internals";
-import { PREFIX, buildKey, serializeKey } from "./internal.js";
+  LEGACY_WRITING_EFFECT,
+  PREFIX,
+  buildKey,
+  serializeKey,
+} from "./internal.js";
 
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
@@ -264,10 +266,8 @@ export function createSubscription<
 
     effects: {
       [`${PREFIX}${name}_sub`]: {
-        run: (lockedFacts: Record<string, unknown>) => {
-          // Effects cannot write facts. This one still does, from callbacks
-          // the outside world fires; it moves to a source next.
-          const facts = unlockEffectFacts(lockedFacts);
+        ...LEGACY_WRITING_EFFECT,
+        run: (facts: Record<string, unknown>) => {
           const system = systemOf(facts);
           const currentKey = keyFn(facts);
           if (currentKey === null) {
