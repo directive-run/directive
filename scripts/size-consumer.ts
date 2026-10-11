@@ -77,8 +77,20 @@ export async function bundleFixture(
     conditions: noCondition ? [] : ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
     plugins: [workspaceResolve],
+    metafile: true,
     logLevel: "silent",
   });
+
+  // The development build keeps every dev check on. A production bundle that
+  // resolves it ships them all, whatever NODE_ENV says.
+  const devInputs = Object.keys(result.metafile!.inputs).filter((path) =>
+    path.includes("/dist/development/"),
+  );
+  if (devInputs.length > 0) {
+    throw new Error(
+      `production bundle resolved the development build: ${devInputs[0]}`,
+    );
+  }
 
   return result.outputFiles[0]!.text;
 }

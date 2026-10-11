@@ -80,7 +80,11 @@ export default defineConfig([
   // `process.env.NODE_ENV` as "production" folds it to `false` and drops the
   // dev code: the test has no side effects and both branches become `false`.
   // With no bundler, `process` is undefined in a browser and the check is
-  // `false`; under Node it follows NODE_ENV.
+  // `false`; under Node it follows NODE_ENV. That branch has to stay `false`:
+  // a bundler that only defines `process.env.NODE_ENV` cannot fold
+  // `typeof process`, so `true` there would keep every dev branch alive in its
+  // production bundles. Browser dev servers get dev checks from the
+  // `development` build instead.
   {
     ...shared,
     outDir: "dist",
@@ -91,6 +95,21 @@ export default defineConfig([
         "./src/dev-true.ts",
       ),
     ],
+  },
+  // The development build, selected by the `development` export condition
+  // (Vite and webpack set it for dev servers and development builds).
+  // `isDevelopment` is the literal `true`, so dev checks run in a browser,
+  // where `process` does not exist and the default build's runtime check
+  // reads `false`. It is the build people debug in a browser, so it ships
+  // unminified and readable instead of minified with sourcemaps, which would
+  // add about 5 MB to the tarball.
+  {
+    ...shared,
+    outDir: "dist/development",
+    dts: false,
+    minify: false,
+    sourcemap: false,
+    esbuildPlugins: [inlineIsDevelopment("true", "./src/dev-true.ts")],
   },
   // The production build, selected by the `production` export condition
   // (webpack and Vite set it for production builds; esbuild takes

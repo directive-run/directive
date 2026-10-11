@@ -23,6 +23,9 @@ const __dirname = dirname(__filename);
  *   never be a literal.
  * - `dist/production/` (the `production` export condition): the check is the
  *   literal `false`, so the dev-only code and its messages are gone.
+ * - `dist/development/` (the `development` export condition): the check is
+ *   the literal `true`, so a browser dev server, which has no `process`, still
+ *   gets the dev checks.
  *
  * These run only when the dist exists (post-build); a fresh checkout skips.
  */
@@ -124,13 +127,95 @@ describe("isDevelopment bundle shape", () => {
     expect(sources.some((src) => src.includes("tried to write"))).toBe(false);
   });
 
-  it("points the production export condition at the production build", () => {
+  it("keeps the dev checks on in the development build, with no process", () => {
+    const developmentDir = join(distDir, "development");
+    if (!existsSync(developmentDir)) {
+      return;
+    }
+
+    const sources = chunks(developmentDir);
+    expect(sources.length).toBeGreaterThan(0);
+    // A browser dev server has no `process`; the check must not depend on it.
+    expect(sources.some((src) => src.includes("process.env.NODE_ENV"))).toBe(
+      false,
+    );
+    expect(sources.some((src) => src.includes("tried to write"))).toBe(true);
+  });
+
+  it("throws on an effect write in the development build without process", () => {
+    const developmentCjs = join(distDir, "development", "index.cjs");
+    if (!existsSync(developmentCjs)) {
+      return;
+    }
+
+    const core = loadCjsFrom(developmentCjs, undefined);
+    const errors: unknown[] = [];
+    const mod = core.createModule("m", {
+      schema: { facts: { n: core.t.number(), seen: core.t.number() } },
+      init: (facts: Record<string, unknown>) => {
+        facts.n = 0;
+        facts.seen = 0;
+      },
+      effects: {
+        write: {
+          run: (facts: Record<string, unknown>) => {
+            try {
+              facts.seen = 1;
+            } catch (err) {
+              errors.push(err);
+            }
+          },
+        },
+      },
+    });
+    const system = core.createSystem({ module: mod });
+    system.start();
+
+    return system.settle().then(() => {
+      expect(errors.length).toBeGreaterThan(0);
+      expect(String(errors[0])).toContain("tried to write");
+      system.destroy();
+    });
+  });
+
+  function loadCjsFrom(
+    entry: string,
+    fakeProcess: unknown,
+  ): Record<string, any> {
+    const cache = new Map<string, { exports: Record<string, unknown> }>();
+    function load(file: string): Record<string, unknown> {
+      const cached = cache.get(file);
+      if (cached) {
+        return cached.exports;
+      }
+      const mod = { exports: {} as Record<string, unknown> };
+      cache.set(file, mod);
+      const code = readFileSync(file, "utf8");
+      const localRequire = (spec: string) =>
+        spec.startsWith(".")
+          ? load(join(dirname(file), spec))
+          : nodeRequire(spec);
+      new Function("require", "module", "exports", "process", code)(
+        localRequire,
+        mod,
+        mod.exports,
+        fakeProcess,
+      );
+
+      return mod.exports;
+    }
+
+    return load(entry);
+  }
+
+  it("points the production and development conditions at their builds", () => {
     const pkg = JSON.parse(
       readFileSync(join(__dirname, "../../package.json"), "utf8"),
     ) as {
       exports: Record<
         string,
         {
+          development?: { import: string; require: string };
           production?: { import: string; require: string };
           import: string;
           require: string;
@@ -139,18 +224,20 @@ describe("isDevelopment bundle shape", () => {
     };
 
     for (const [subpath, target] of Object.entries(pkg.exports)) {
-      expect(target.production, subpath).toEqual({
-        import: target.import.replace("./dist/", "./dist/production/"),
-        require: target.require.replace("./dist/", "./dist/production/"),
-      });
-      // The condition must come before import/require to win.
-      const keys = Object.keys(target);
-      expect(keys.indexOf("production"), subpath).toBeLessThan(
-        keys.indexOf("import"),
-      );
-      expect(keys.indexOf("production"), subpath).toBeLessThan(
-        keys.indexOf("require"),
-      );
+      for (const condition of ["development", "production"] as const) {
+        expect(target[condition], `${subpath} ${condition}`).toEqual({
+          import: target.import.replace("./dist/", `./dist/${condition}/`),
+          require: target.require.replace("./dist/", `./dist/${condition}/`),
+        });
+        // A condition must come before import/require to win.
+        const keys = Object.keys(target);
+        expect(keys.indexOf(condition), subpath).toBeLessThan(
+          keys.indexOf("import"),
+        );
+        expect(keys.indexOf(condition), subpath).toBeLessThan(
+          keys.indexOf("require"),
+        );
+      }
     }
   });
 });

@@ -450,7 +450,9 @@ See docs: https://directive.run/docs/advanced/runtime
 
 `@directive-run/core` publishes a second build under the `production` export condition, with every development check compiled out (dev warnings, dev-only validation and their message text). Bundlers that set the condition in a production build pick it with no configuration: webpack 5 (`mode: "production"`, so Next.js webpack builds too), Vite, and Rollup with `@rollup/plugin-node-resolve` (production unless `NODE_ENV` says otherwise). With esbuild, pass `--conditions=production`. Anything else gets the default build, whose dev check still folds away when `process.env.NODE_ENV` is defined as `"production"`, and which runs in production mode in a browser with no `process`.
 
-The two builds behave the same at runtime. An SSR setup that externalizes packages can end up loading both (one through the server's own resolution, one through the client bundle); that is harmless and costs only the memory of a second copy.
+A third build sits under the `development` export condition, with every development check compiled on. Vite's dev server and webpack 5 in `mode: "development"` pick it, so a browser dev server gets the dev warnings and checks (such as an effect writing a fact throwing) even though the browser has no `process`. It ships unminified and without sourcemaps, so it reads directly in devtools. With esbuild, pass `--conditions=development` for a dev bundle.
+
+The builds behave the same apart from the development checks. An SSR setup that externalizes packages can end up loading both (one through the server's own resolution, one through the client bundle); that is harmless and costs only the memory of a second copy.
 
 ## Common Mistakes
 
