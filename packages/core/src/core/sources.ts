@@ -235,10 +235,14 @@ export type SourceDispatch = (
  * - `"blocked-event-name"` — event name was `__proto__` / `constructor` /
  *   `prototype` (BLOCKED_PROPS guard, parity with `system.dispatch`).
  * - `"invalid-event-name"` — event name was non-string or empty string.
+ *
+ * `eventName`, when present, is the name the engine dispatched (a namespaced
+ * source's bare `START` becomes `loop::START`); counters and plugin hooks
+ * report it in place of the name the source published.
  */
 export type SourceDispatchResult =
-  | { accepted: true }
-  | { accepted: false; reason: SourceDropReason };
+  | { accepted: true; eventName?: string }
+  | { accepted: false; reason: SourceDropReason; eventName?: string };
 
 /**
  * Per-source lifecycle callbacks the engine wires into the plugin manager.
@@ -421,6 +425,8 @@ export interface SourceInspectionRow {
    *   ahead of the microtask flush (only when `SourceDef.coalesce`
    *   is `"lastWriteWins"`)
    * - `"unknown-event"` — no handler is registered for the event name
+   * - `"cross-module-event"` — a namespaced source published a name that
+   *   already contains `::`; a source publishes only its own module's events
    */
   lastDropReason: SourceDropReason | null;
   /** Wall-clock ms of the most recent rejected publish, or `null`. */
@@ -649,15 +655,16 @@ export function createSourcesManager(
       const c = counters.get(id);
       if (!c) return; // unreachable; defensive no-op
       const now = Date.now();
+      const reported = result.eventName ?? eventName;
       if (result.accepted) {
         c.publishCount += 1;
         c.lastPublishAt = now;
-        callbacks.onPublish?.(id, record.moduleId, eventName);
+        callbacks.onPublish?.(id, record.moduleId, reported);
       } else {
         c.dropCount += 1;
         c.lastDropReason = result.reason;
         c.lastDropAt = now;
-        callbacks.onDrop?.(id, record.moduleId, eventName, result.reason);
+        callbacks.onDrop?.(id, record.moduleId, reported, result.reason);
       }
     };
 

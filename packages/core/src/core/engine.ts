@@ -77,6 +77,9 @@ import type {
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 import type { SourceDef, SourcesDef } from "./types/sources.js";
 
+/** Separator between a module namespace and a local name (`loop::START`). */
+const SOURCE_NAMESPACE_SEPARATOR = "::";
+
 // ============================================================================
 // Engine Implementation
 // ============================================================================
@@ -2106,6 +2109,28 @@ export function createEngine<S extends Schema>(
    *
    * @returns Whether a handler was registered for the event.
    */
+  /** Sources already warned about a cross-module publish, per system. */
+  const warnedCrossModuleSources = new Set<string>();
+
+  /** Development: say why a source's `ns::EVENT` publish was dropped. */
+  function warnCrossModulePublish(
+    sourceId: string,
+    namespace: string,
+    eventName: string,
+  ): void {
+    if (warnedCrossModuleSources.has(sourceId)) {
+      return;
+    }
+    warnedCrossModuleSources.add(sourceId);
+    const ownPrefix = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}`;
+    const fix = eventName.startsWith(ownPrefix)
+      ? `Drop the "${ownPrefix}" prefix: publish("${eventName.slice(ownPrefix.length)}").`
+      : `Publish an event module "${namespace}" declares; to reach another module, have that event's handler or a resolver dispatch an event the other module owns.`;
+    console.warn(
+      `[Directive] Source "${sourceId}" published "${eventName}". A source publishes only its own module's events, so this is dropped (reason "cross-module-event"). ${fix}`,
+    );
+  }
+
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
@@ -3140,7 +3165,7 @@ export function createEngine<S extends Schema>(
       // store. `onAttach` plugin events fire from inside the manager (one
       // per successful attach), so the static-start path AND the
       // `registerModule` immediate-attach path emit consistently.
-      sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
+      sourcesManager.attachAll((sourceId, _moduleId, eventName, payload) => {
         // Guards parity with the system.dispatch path (engine.ts:1692):
         //   - drop publishes after `system.destroy()` (engine-wide invariant)
         //   - drop publishes after `system.stop()` and before the next
@@ -3164,18 +3189,39 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(eventName)) {
           return { accepted: false, reason: "blocked-event-name" };
         }
+        // A namespaced source (id `ns::local`) publishes only its own
+        // module's events: the bare name is scoped here, and a name that
+        // already contains the separator is a cross-module publish – dropped
+        // under its original name, never dispatched.
+        let target = eventName;
+        const separatorIndex = sourceId.indexOf(SOURCE_NAMESPACE_SEPARATOR);
+        if (separatorIndex !== -1) {
+          const namespace = sourceId.slice(0, separatorIndex);
+          if (eventName.includes(SOURCE_NAMESPACE_SEPARATOR)) {
+            if (isDevelopment) {
+              warnCrossModulePublish(sourceId, namespace, eventName);
+            }
+
+            return { accepted: false, reason: "cross-module-event" };
+          }
+          target = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}${eventName}`;
+        }
         // A name with no handler is a drop, not a publish – otherwise the
         // source's counters and `onPublish` report success for an event
         // nothing ran (and production has no other signal at all).
         const handled = dispatchEventByName(
-          eventName,
+          target,
           (payload ?? {}) as Record<string, unknown>,
         );
         if (!handled) {
-          return { accepted: false, reason: "unknown-event" };
+          return {
+            accepted: false,
+            reason: "unknown-event",
+            eventName: target,
+          };
         }
 
-        return { accepted: true };
+        return { accepted: true, eventName: target };
       });
 
       // RFC 0012: initial gated attach. `attachAll` above attached only the

@@ -361,7 +361,7 @@ is scoped to that module's namespace:
 | Surface | What you write | What the system sees |
 |---|---|---|
 | `publish("START")` | the module's own event name | `loop::START` – the module's own handler runs |
-| `publish("other::PING")` | another module's event | dropped as `unknown-event` (warns once in development) – a source publishes only its own module's events |
+| `publish("other::PING")` or `publish("loop::START")` | a name containing `::` | dropped as `cross-module-event` under that name – a source publishes only its own module's events. Development warns once per source: drop your own prefix, or dispatch the other module's event from a handler or resolver |
 | `key` / `active` gate | `facts.running` | the module's own facts, read-only |
 | gate, module with `crossModuleDeps` | `facts.self.running`, `facts.auth.token` | same scoping as a constraint |
 | source id | `boot` | `loop::boot` in `inspect()`, plugin hooks, observation events, the audit ledger and OTel |

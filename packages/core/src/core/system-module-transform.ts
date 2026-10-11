@@ -929,10 +929,9 @@ function prefixEffects(
 /**
  * Prefix source ids and scope each source to its module.
  *
- * - `publish("START")` dispatches the module's own `ns::START`. A source
- *   publishes only its own module's events: a name containing `::` is
- *   prefixed like any other, matches no handler, and is dropped as
- *   `unknown-event` (with a development warning naming the fix).
+ * - `publish("START")` dispatches the module's own `ns::START`. The engine
+ *   scopes the name from the source's `ns::` id, and drops a name that
+ *   already contains `::` as `cross-module-event`.
  * - `key` / `active` gates read the module's own facts through a read-only
  *   view, scoped like constraints (see {@link createSourceGateFactsProxy}).
  * - Source ids become `ns::id`, so one factory module registered under two
@@ -968,37 +967,6 @@ function prefixSources(
       active?: unknown;
     };
 
-    // Scope the publish callback to this module. A blocked name passes
-    // through untouched so the engine's guard still sees it and reports
-    // `blocked-event-name` – prefixing would turn it into a harmless-looking
-    // `ns::__proto__` and hide the probe.
-    let warnedCrossModule = false;
-    const scopedPublish =
-      (publish: (event: string, payload?: unknown) => void) =>
-      (event: string, payload?: unknown) => {
-        if (typeof event !== "string" || event.length === 0) {
-          publish(event, payload);
-
-          return;
-        }
-        if (BLOCKED_PROPS.has(event)) {
-          publish(event, payload);
-
-          return;
-        }
-        if (isDevelopment && !warnedCrossModule && event.includes(SEPARATOR)) {
-          warnedCrossModule = true;
-          console.warn(
-            `[Directive] Source "${namespace}${SEPARATOR}${id}" published "${event}". A source publishes only its own module's events, so this is dropped. Publish an event module "${namespace}" declares; to reach another module, have that event's handler or a resolver dispatch an event the other module owns.`,
-          );
-        }
-        publish(prefixKey(namespace, event), payload);
-      };
-    const attach = (
-      publish: (event: string, payload?: unknown) => void,
-      ...rest: unknown[]
-    ) => def.attach(scopedPublish(publish), ...rest);
-
     // Copy the definition with its prototype and property descriptors, then
     // override only the wrapped members. A spread would flatten a class-based
     // source (methods and getters live on the prototype) and drop
@@ -1015,7 +983,11 @@ function prefixSources(
         enumerable: true,
         configurable: true,
       });
-    override("attach", attach);
+    // Call through to the original so a class-based source's `this` is the
+    // instance, not the copy.
+    override("attach", (...args: unknown[]) =>
+      def.attach(...(args as [unknown, ...unknown[]])),
+    );
     if (typeof def.key === "function") {
       override("key", wrapGate(def.key));
     }

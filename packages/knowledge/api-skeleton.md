@@ -99,7 +99,7 @@
   ```ts
   function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
   ```
-- `getKind` — Return the {@link SchemaKindNode} for a schema field. Prefers the
+- `getKind` — Return the {@link SchemaKindNode} for a schema field, parsed from the
   ```ts
   function getKind(schema: unknown): SchemaKindNode
   ```

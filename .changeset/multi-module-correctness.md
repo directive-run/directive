@@ -17,7 +17,7 @@ Multi-module systems no longer fail silently.
 
 **Sources in a namespaced system**
 
-- `publish("START")` dispatches the source's own module's `START` (`loop::START`). A source publishes only its own module's events: a name containing `::` is prefixed like any other, matches no handler, and is dropped as `unknown-event`, with a development warning (once per source) naming the fix – dispatch the other module's event from a handler or resolver. A blocked name (`__proto__`, `constructor`, `prototype`) passes through unprefixed so it is still reported as `blocked-event-name`.
+- `publish("START")` dispatches the source's own module's `START` (`loop::START`). A source publishes only its own module's events: a name containing `::` is dropped with the new reason `"cross-module-event"`, under the name it was published as, with a development warning once per source – `publish("loop::START")` from `loop` is told to drop the prefix, and another module's name is told to dispatch that module's event from a handler or resolver. A blocked name (`__proto__`, `constructor`, `prototype`) passes through unprefixed so it is still reported as `blocked-event-name`.
 - Plugin hooks (`onSourcePublish`, `onSourceDrop`) and `source.publish` / `source.drop` observation events report the prefixed event name (`loop::START`).
 - `key` / `active` gates read the module's own facts, scoped like constraints: `facts.running`, or `facts.self.*` / `facts.{dep}.*` with `crossModuleDeps`. They used to receive the whole flat store. Gate facts are typed from the module schema (`SourcesDef<F>`, `SourceGateFacts`), read-only, and a write is reported as a `phase: "gate"` error. There is no flat `"ns::fact"` form: such a read is `undefined`. A bare read in a module with `crossModuleDeps` warns once with the `facts.self.x` spelling. Gate proxies are cached, so evaluating gates allocates nothing per reconcile.
 - In development, every gate – single-module and namespaced – reads through a read-only view: a top-level write, or a value changed in place (`facts.cfg.hz += 1`), is reported as a `phase: "gate"` error and the gate fails closed. Production hands the gate the facts directly.
@@ -28,7 +28,7 @@ Multi-module systems no longer fail silently.
 **Unhandled publishes are drops**
 
 - A publish with no handler no longer counts toward `publishCount` or fires `onSourcePublish`. It counts toward `dropCount` with `lastDropReason: "unknown-event"` and fires `onSourceDrop` / `source.drop`, in production too.
-- `SourceDropReason` gains `"unknown-event"`; an exhaustive `switch` over it needs a new case.
+- `SourceDropReason` gains `"unknown-event"` and `"cross-module-event"`; an exhaustive `switch` over it needs new cases.
 
 **Blocked keys in namespaced systems**
 

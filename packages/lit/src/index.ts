@@ -850,7 +850,6 @@ export function createOptimisticUpdate(
 
 /**
  * Build a `ModuleController` from a Directive module definition.
-
  */
 export function createModuleController<M extends ModuleSchema>(
   host: ReactiveControllerHost,

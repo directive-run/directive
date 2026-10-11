@@ -103,12 +103,6 @@ export interface SubscriptionDefinition<TData> {
     string,
     (facts: Record<string, unknown>, event: Record<string, unknown>) => void
   >;
-  /**
-   * Run when the system stops, handed that system's facts. Unused by
-   * `createSubscription`, whose stream is closed by its source; kept for
-   * hand-built definitions.
-   */
-  readonly onStop?: (facts: Record<string, unknown>) => void;
   setData: (facts: Record<string, unknown>, data: TData) => void;
 }
 

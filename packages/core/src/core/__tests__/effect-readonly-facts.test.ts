@@ -195,6 +195,7 @@ describe("an effect writing a fact", () => {
 
   it("still lets the effect read facts and track them", async () => {
     const seen: number[] = [];
+    const shapes: { keys: string[]; spread: unknown; direct: unknown }[] = [];
     const mod = createModule("m", {
       schema: { facts: { n: t.number() } },
       init: (facts) => {
@@ -204,8 +205,11 @@ describe("an effect writing a fact", () => {
         view: {
           run: (facts) => {
             seen.push(facts.n);
-            expect(Object.keys(facts)).toContain("n");
-            expect({ ...facts }.n).toBe(facts.n);
+            shapes.push({
+              keys: Object.keys(facts),
+              spread: { ...facts }.n,
+              direct: facts.n,
+            });
           },
         },
       },
@@ -217,6 +221,11 @@ describe("an effect writing a fact", () => {
     await system.settle();
 
     expect(seen.at(-1)).toBe(4);
+    expect(shapes.length).toBeGreaterThan(0);
+    for (const shape of shapes) {
+      expect(shape.keys).toContain("n");
+      expect(shape.spread).toBe(shape.direct);
+    }
 
     await system.stop();
   });

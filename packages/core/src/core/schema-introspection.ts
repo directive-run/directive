@@ -6,9 +6,8 @@
  * can ask "what kind is this fact?" without grepping the source.
  *
  * The `t.*()` builders record their type as the `_typeName` string, and
- * this module parses it into a structured kind node. A builder may instead
- * set an explicit `_kind?: SchemaKindNode`, which wins when present (core's
- * builders don't today). When neither yields a kind: `{ kind: "unknown" }`.
+ * this module parses it into a structured kind node. When it can't:
+ * `{ kind: "unknown" }`.
  *
  * This module has zero hot-path cost; it is only invoked when an
  * introspecting caller asks for it.
@@ -26,7 +25,6 @@ import { PREDICATE_OPERATORS, type PredicateOp } from "./types/predicate.js";
  * compatible with this shape.
  */
 export interface IntrospectableSchema {
-  readonly _kind?: SchemaKindNode;
   readonly _typeName?: string;
 }
 
@@ -107,7 +105,7 @@ const PRIMITIVE_KINDS = new Set<SchemaKind>([
 
 /**
  * Best-effort parse of a freeform `_typeName` string into a structured
- * kind node. Used only when `_kind` is absent. Always falls back to
+ * kind node. Always falls back to
  * `{ kind: "unknown" }`; never throws.
  */
 function parseTypeName(typeName: string | undefined): SchemaKindNode {
@@ -161,11 +159,10 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
 // ============================================================================
 
 /**
- * Return the {@link SchemaKindNode} for a schema field. Prefers the
- * explicit `_kind` discriminant when a builder sets one; otherwise parses
- * the `_typeName` string every `t.*()` builder records.
+ * Return the {@link SchemaKindNode} for a schema field, parsed from the
+ * `_typeName` string every `t.*()` builder records.
  *
- * Hostile-getter safe: `_kind` / `_typeName` reads are wrapped — a builder
+ * Hostile-getter safe: the `_typeName` read is wrapped — a builder
  * that throws on property access returns `{ kind: "unknown" }` instead of
  * propagating the throw to introspecting callers.
  *
@@ -194,16 +191,8 @@ export function getKind(schema: unknown): SchemaKindNode {
   if (typeof schema !== "object") return { kind: "unknown" };
   const s = schema as IntrospectableSchema;
 
-  // Hostile-getter guard: a third-party builder that throws on `_kind` /
-  // `_typeName` reads must not crash an introspecting caller.
-  let kindNode: SchemaKindNode | undefined;
-  try {
-    kindNode = s._kind;
-  } catch {
-    return { kind: "unknown" };
-  }
-  if (kindNode) return kindNode;
-
+  // Hostile-getter guard: a builder that throws on the `_typeName` read
+  // must not crash an introspecting caller.
   let typeName: string | undefined;
   try {
     typeName = s._typeName;
@@ -228,7 +217,7 @@ export function getKind(schema: unknown): SchemaKindNode {
  * also works — anything iterable as `Record<string, ExtendedSchemaType>`
  * is acceptable.
  *
- * Hostile-getter safe: a builder whose `_kind` / `_typeName` throws is
+ * Hostile-getter safe: a builder whose `_typeName` throws is
  * silently skipped (treated as `{ kind: "unknown" }` for that field)
  * rather than aborting the whole walk.
  *

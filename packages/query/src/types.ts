@@ -426,15 +426,6 @@ export interface QueryDefinition<TData> {
     (facts: Record<string, unknown>, event: Record<string, unknown>) => void
   >;
 
-  /**
-   * Run when the system stops, handed that system's facts.
-   *
-   * Optional and unused by the built-in queries, which hold their long-lived
-   * resources in sources; kept for hand-built definitions that need a
-   * teardown signal tied to one system.
-   */
-  readonly onStop?: (facts: Record<string, unknown>) => void;
-
   // --- Imperative handles ---
 
   /** Trigger a manual refetch for this query. */

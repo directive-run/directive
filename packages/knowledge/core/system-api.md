@@ -205,6 +205,7 @@ inspection.sources;
 //                                 // | "blocked-event-name"
 //                                 // | "invalid-event-name"
 //                                 // | "unknown-event"
+//                                 // | "cross-module-event"
 //                                 // | "coalesced" | "gate-closed"
 //   lastDropAt: null,
 //   errorCount: 0,

@@ -262,6 +262,11 @@ describe("resolvers in a module with crossModuleDeps", () => {
           resolve: async (_req, context) => {
             // The documented, typed spelling.
             expectTypeOf(context.facts.draft).toEqualTypeOf<string>();
+            // The pre-1.35 spellings are gone from the types too.
+            // @ts-expect-error – no `self` pivot: own facts are flat
+            void context.facts.self;
+            // @ts-expect-error – dependencies are on ctx.deps, not ctx.facts
+            void context.facts.auth;
             context.facts.saved = context.facts.draft;
             context.facts.draft = "";
           },
@@ -358,6 +363,7 @@ describe("resolvers in a module with crossModuleDeps", () => {
 
   it("ctx.deps reads the dependency's current facts", async () => {
     const seen: string[] = [];
+    const depKeys: string[][] = [];
     const mod = createModule("notes", {
       schema: {
         facts: { draft: t.string() },
@@ -384,7 +390,7 @@ describe("resolvers in a module with crossModuleDeps", () => {
           requirement: "SAVE",
           resolve: async (_req, context) => {
             seen.push(context.deps.auth.token);
-            expect(Object.keys(context.deps)).toEqual(["auth"]);
+            depKeys.push(Object.keys(context.deps));
             context.facts.draft = "";
           },
         },
@@ -397,16 +403,17 @@ describe("resolvers in a module with crossModuleDeps", () => {
     system.events.notes.submit({ text: "hi" });
     await system.settle();
 
+    expect(depKeys).toEqual([["auth"]]);
     expect(seen).toEqual(["tok"]);
     expect(system.inspect().unmet).toEqual([]);
     system.destroy();
   });
 
   it("ctx.facts can't reach a dependency's facts", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    warnSpy();
+    const spy = warnSpy();
     const mod = notesModule(({ facts }) => {
       facts.token = "stolen";
+      facts.draft = "";
     });
     const system = createSystem({
       modules: { auth: authModule(), notes: mod },
@@ -415,10 +422,16 @@ describe("resolvers in a module with crossModuleDeps", () => {
     system.events.notes.submit({ text: "hi" });
     await system.settle();
 
+    // "token" isn't a notes fact: the write is rejected by the schema, the
+    // resolver throws before clearing the draft, and the dev warning names it.
     expect(system.facts.auth.token).toBe("tok");
+    expect(system.facts.notes.draft).toBe("hi");
+    expect(system.inspect().unmet.map((r) => r.requirement.type)).toEqual([
+      "SAVE",
+    ]);
+    expect(warnings(spy).join("\n")).toContain('resolver "notes::save" threw');
     system.destroy();
   });
-
   it("ctx.facts holds own facts only, for both `in` and enumeration", async () => {
     const result: { keys?: string[]; has?: boolean[] } = {};
     const mod = notesModule(({ facts }) => {
@@ -599,13 +612,37 @@ describe("sources in a namespaced system", () => {
     const row = system.inspect().sources.find((s) => s.id === "loop::boot")!;
     expect(row.dropCount).toBe(2);
     expect(row.publishCount).toBe(0);
-    expect(row.lastDropReason).toBe("unknown-event");
-    expect(onSourceDrop).toHaveBeenCalledTimes(2);
+    expect(row.lastDropReason).toBe("cross-module-event");
+    // Dropped under the name the source published, not a re-prefixed one.
+    expect(onSourceDrop.mock.calls.map((call) => [call[2], call[3]])).toEqual([
+      ["loop::START", "cross-module-event"],
+      ["other::PING", "cross-module-event"],
+    ]);
     expect(onSourcePublish).not.toHaveBeenCalled();
     const cross = warnings(spy).filter((w) =>
       w.includes("publishes only its own module's events"),
     );
+    // Once per source; the first offender carried the source's own prefix.
     expect(cross).toHaveLength(1);
+    expect(cross[0]).toContain('Drop the "loop::" prefix: publish("START")');
+    system.destroy();
+  });
+
+  it("tells a source publishing another module's event how to reach it", async () => {
+    const spy = warnSpy();
+    const capture = { publish: null as SourcePublish | null };
+    const system = createSystem({
+      modules: { loop: loopModule({ capture }), other: otherModule() },
+    });
+    system.start();
+    capture.publish!("other::PING");
+    await system.settle();
+
+    const cross = warnings(spy).filter((w) =>
+      w.includes("publishes only its own module's events"),
+    );
+    expect(cross).toHaveLength(1);
+    expect(cross[0]).toContain("dispatch an event the other module owns");
     system.destroy();
   });
 
@@ -909,6 +946,8 @@ describe("sources in a namespaced system – round 2", () => {
             expectTypeOf(f.running).toEqualTypeOf<boolean>();
             // @ts-expect-error – gates are read-only
             f.running = false;
+            // @ts-expect-error – no flat "ns::fact" form, only own facts
+            void f["typed::running"];
 
             return f.running;
           },
@@ -1080,10 +1119,13 @@ describe("resolver ctx.facts.$store", () => {
   });
 
   it("has no self pivot to reach the store through", async () => {
+    const seen: unknown[] = [];
     const result = await runWith((facts) => {
-      expect(facts.self).toBeUndefined();
+      seen.push(facts.self, "self" in facts);
     });
 
+    expect(seen).toEqual([undefined, false]);
+    expect(result.draft).toBe("");
     expect(result.token).toBe("tok");
   });
 

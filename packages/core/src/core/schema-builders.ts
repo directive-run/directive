@@ -8,7 +8,6 @@
  */
 
 import isDevelopment from "#is-development";
-import type { SchemaKindNode } from "./schema-introspection.js";
 import type { SchemaType } from "./types.js";
 
 // ============================================================================
@@ -35,13 +34,6 @@ export interface ExtendedSchemaType<T> extends SchemaType<T> {
   _lastFailedIndex?: number;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   readonly _meta?: import("./types/meta.js").DefinitionMeta;
-  /**
-   * Structured kind discriminant used by introspection-time consumers
-   * (`predicateFromIntent`, `doctor`, `predicateToZod`). Optional: core's
-   * builders don't set it, and the introspection layer parses `_typeName`
-   * instead.
-   */
-  readonly _kind?: SchemaKindNode;
 }
 
 /** Create a schema type builder with optional type name */
