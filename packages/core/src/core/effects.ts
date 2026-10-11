@@ -1294,12 +1294,121 @@ export function createEffectsManager<S extends Schema>(
     return Promise.all(pending).then(updatePreviousSnapshot);
   }
 
+  /** Write the ids of the effects this pass should run into `ids`; return how many. */
+  function selectEffects(
+    changedKeys: Set<string>,
+    navigationKeys: Set<string> | null | undefined,
+    ids: string[],
+  ): number {
+    let count = 0;
+
+    // A rewind changes what the outside world should show, so an effect that
+    // mirrors state there is woken by the restored keys like any change.
+    // `onNavigate: "skip"` opts out, for effects that record acts rather than
+    // mirror state (analytics, audit logs).
+    let withNavigation: Set<string> | null = null;
+    if (navigationKeys && navigationKeys.size > 0) {
+      withNavigation =
+        changedKeys.size === 0
+          ? navigationKeys
+          : new Set([...changedKeys, ...navigationKeys]);
+    }
+
+    const reruns = pendingReruns.size > 0 ? new Set(pendingReruns) : null;
+    pendingReruns.clear();
+
+    // `for...in` rather than `Object.keys`: the same own keys in the same
+    // order (definitions is a plain object), without an array per pass.
+    for (const id in definitions) {
+      if (reruns?.has(id) && getState(id).enabled) {
+        ids[count++] = id;
+        continue;
+      }
+      let keys = changedKeys;
+      if (withNavigation !== null) {
+        if (definitions[id]?.onNavigate !== "skip") {
+          keys = withNavigation;
+        } else if (changedKeys.size === 0) {
+          // Nothing but a navigation happened, and this effect asked to
+          // sit those out.
+          continue;
+        }
+      }
+      if (shouldRun(id, keys)) {
+        ids[count++] = id;
+      }
+    }
+
+    return count;
+  }
+
+  /**
+   * Run one effect with the microtask timing `runEffects` has always had:
+   * awaited at every level, the way the nested `async` functions it was made
+   * of awaited. `runEffects` keeps that timing because a caller can depend on
+   * it, and the engine does whenever a resolver is in flight (see
+   * `runEffectsFast` in engine.ts).
+   */
+  async function runEffectAwaited(id: string): Promise<void> {
+    const state = getState(id);
+    const def = definitions[id];
+
+    if (!state.enabled || !def) {
+      return;
+    }
+
+    runCleanup(state);
+
+    onRun?.(id, runDeps(state));
+
+    try {
+      if (state.hasExplicitDeps) {
+        await runBatchedAwaited(state, def);
+      } else if (state.depsStable && state.dependencies) {
+        await (async () => {
+          await runBatchedAwaited(state, def);
+        })();
+      } else {
+        await runAutoTrackedAwaited(state, def);
+      }
+    } catch (error) {
+      reportEffectError(id, state, error);
+    }
+  }
+
+  async function runBatchedAwaited(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    const pending = runBatchedEffect(state, def);
+    if (pending !== undefined) {
+      await pending;
+    }
+  }
+
+  async function runAutoTrackedAwaited(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    const pending = runAutoTrackedEffect(state, def);
+    if (pending !== undefined) {
+      await pending;
+    }
+  }
+
   const manager: EffectsManager<S> = {
     async runEffects(
       changedKeys: Set<string>,
       navigationKeys?: Set<string> | null,
     ): Promise<void> {
-      await manager.runEffectsFast(changedKeys, navigationKeys);
+      const ids: string[] = [];
+      const count = selectEffects(changedKeys, navigationKeys, ids);
+      ids.length = count;
+
+      // Run effects in parallel (they're independent)
+      await Promise.all(ids.map(runEffectAwaited));
+
+      updatePreviousSnapshot();
     },
 
     runEffectsFast(
@@ -1309,44 +1418,7 @@ export function createEffectsManager<S extends Schema>(
       // Reuse the selection buffer unless a run is already using it, which
       // only a re-entrant call made from inside an effect body could do.
       const ids = selected.length === 0 ? selected : [];
-      let count = 0;
-
-      // A rewind changes what the outside world should show, so an effect that
-      // mirrors state there is woken by the restored keys like any change.
-      // `onNavigate: "skip"` opts out, for effects that record acts rather than
-      // mirror state (analytics, audit logs).
-      let withNavigation: Set<string> | null = null;
-      if (navigationKeys && navigationKeys.size > 0) {
-        withNavigation =
-          changedKeys.size === 0
-            ? navigationKeys
-            : new Set([...changedKeys, ...navigationKeys]);
-      }
-
-      const reruns = pendingReruns.size > 0 ? new Set(pendingReruns) : null;
-      pendingReruns.clear();
-
-      // `for...in` rather than `Object.keys`: the same own keys in the same
-      // order (definitions is a plain object), without an array per pass.
-      for (const id in definitions) {
-        if (reruns?.has(id) && getState(id).enabled) {
-          ids[count++] = id;
-          continue;
-        }
-        let keys = changedKeys;
-        if (withNavigation !== null) {
-          if (definitions[id]?.onNavigate !== "skip") {
-            keys = withNavigation;
-          } else if (changedKeys.size === 0) {
-            // Nothing but a navigation happened, and this effect asked to
-            // sit those out.
-            continue;
-          }
-        }
-        if (shouldRun(id, keys)) {
-          ids[count++] = id;
-        }
-      }
+      const count = selectEffects(changedKeys, navigationKeys, ids);
 
       try {
         // Run effects in parallel (they're independent)
@@ -1368,7 +1440,8 @@ export function createEffectsManager<S extends Schema>(
         }
       }
 
-      await runSelected(ids, ids.length);
+      await Promise.all(ids.map(runEffectAwaited));
+      updatePreviousSnapshot();
     },
 
     disable(id: string): void {

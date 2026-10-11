@@ -1730,10 +1730,16 @@ export function createEngine<S extends Schema>(
         // effects are all synchronous then finishes without yielding, so
         // `settle()` sees it done on its first check instead of falling back
         // to a timer and a subscription every frame.
-        const effectsDone = effectsManager.runEffectsFast(
-          passKeys,
-          navigationKeys,
-        );
+        //
+        // Only while no resolver is in flight. A resolver that finishes by
+        // writing the fact that retracts its own requirement relies on the
+        // effects phase yielding long enough for it to complete; a pass that
+        // no longer yields reaches the diff first and cancels it. So with a
+        // resolver running, effects keep their awaited timing.
+        const effectsDone =
+          resolversManager.getInflightCount() === 0
+            ? effectsManager.runEffectsFast(passKeys, navigationKeys)
+            : effectsManager.runEffects(passKeys, navigationKeys);
         if (effectsDone !== undefined) {
           await effectsDone;
         }
