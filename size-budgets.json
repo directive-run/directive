@@ -11,5 +11,10 @@
     { "path": "packages/svelte/dist/index.js", "gzBudget": 4500 },
     { "path": "packages/solid/dist/index.js", "gzBudget": 4500 },
     { "path": "packages/lit/dist/index.js", "gzBudget": 5000 }
+  ],
+  "_CONSUMERS_README": "Consumer-fixture budgets enforced by scripts/size-consumer.ts. Each fixture is a small real app bundled the way a production build would (esbuild, minified, NODE_ENV=production, `production` export condition), so this number is what an app ships, not a ceiling. It moves when tree-shaking or dev-code elimination breaks, which the closure budgets above cannot see. `forbidden` lists dev-only text that must not survive into a production bundle. Budgets sit just above the measured size: tighten them whenever a change makes the bundle smaller.",
+  "consumers": [
+    { "fixture": "scripts/size-fixtures/minimal.ts", "gzBudget": 53800 },
+    { "fixture": "scripts/size-fixtures/full.ts", "gzBudget": 54200 }
   ]
 }

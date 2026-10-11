@@ -22,7 +22,7 @@
     "changeset:version": "changeset version && biome check --write packages/*/package.json",
     "changeset:publish": "pnpm changeset publish",
     "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
-    "size": "npx tsx scripts/size-check.ts",
+    "size": "npx tsx scripts/size-check.ts && npx tsx scripts/size-consumer.ts",
     "mirror-concepts": "npx tsx scripts/mirror-concepts.ts",
     "mirror-concepts:check": "npx tsx scripts/mirror-concepts.ts --dry-run"
   },
@@ -37,6 +37,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "@testing-library/react": "^16.3.2",
     "@types/react-dom": "^18",
+    "esbuild": "0.27.7",
     "happy-dom": "^20.8.3",
     "jotai": "^2.19.0",
     "mobx": "^6.15.0",
