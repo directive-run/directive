@@ -22,6 +22,7 @@
  */
 
 import type { ErrorBoundaryConfig } from "./errors.js";
+import type { DeepReadonly } from "./facts.js";
 import type { Facts } from "./facts.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin } from "./plugins.js";
@@ -155,6 +156,15 @@ export type CrossModuleFactsWithSelf<
 > = { self: InferFacts<OwnSchema> } & {
   [K in keyof Deps]: InferFacts<Deps[K]>;
 };
+
+/**
+ * {@link CrossModuleFactsWithSelf} as an effect sees it: every namespace, and
+ * every fact in it, read-only. Effects never write facts.
+ */
+export type ReadonlyCrossModuleFacts<
+  OwnSchema extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = DeepReadonly<CrossModuleFactsWithSelf<OwnSchema, Deps>>;
 
 // ============================================================================
 // Namespaced Facts Types

@@ -152,6 +152,7 @@ export interface PluginManager<_S extends Schema = any> {
   // Effect hooks
   emitEffectRun(id: string): void;
   emitEffectError(id: string, error: unknown): void;
+  emitEffectWriteBlocked(id: string, key: string): void;
 
   // Source hooks — inbound external event lifecycle (see SourceDef).
   // Mirrors the effect-shape so observation plugins (audit-ledger, devtools)
@@ -427,6 +428,7 @@ export function createPluginManager<
     // Effect hooks
     emitEffectRun: broadcast("onEffectRun"),
     emitEffectError: broadcast("onEffectError"),
+    emitEffectWriteBlocked: broadcast("onEffectWriteBlocked"),
 
     // Source hooks
     emitSourceAttach: broadcast("onSourceAttach"),

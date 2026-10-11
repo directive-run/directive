@@ -9,7 +9,12 @@
  */
 
 import type { RetryPolicy } from "@directive-run/core";
-import { PREFIX, buildKey, serializeKey } from "./internal.js";
+import {
+  LEGACY_WRITING_EFFECT,
+  PREFIX,
+  buildKey,
+  serializeKey,
+} from "./internal.js";
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
@@ -622,6 +627,7 @@ export function createInfiniteQuery<
       ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
         ? {
             [`${PREFIX}${name}_gc`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 // Read state to track as dependency — re-runs when state changes
                 void facts[stateKey];

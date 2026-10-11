@@ -401,17 +401,6 @@ export const elevenUpGame = createModule("eleven-up", {
   // ============================================================================
 
   effects: {
-    trackMoveTime: {
-      deps: ["moveCount"],
-      run: (facts) => {
-        if (facts.moveCount > 0) {
-          facts.lastMoveTimestamp = Date.now();
-        }
-
-        return undefined;
-      },
-    },
-
     streakAnnouncement: {
       // Auto-tracked: reads currentStreak
       run: (facts) => {
@@ -615,6 +604,7 @@ export const elevenUpGame = createModule("eleven-up", {
           // User move: track streak and moveCount, clear newCardIds
           context.facts.newCardIds = [];
           context.facts.moveCount++;
+          context.facts.lastMoveTimestamp = Date.now();
           context.facts.currentStreak++;
           if (context.facts.currentStreak > context.facts.maxStreak) {
             context.facts.maxStreak = context.facts.currentStreak;

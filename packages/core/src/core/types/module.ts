@@ -5,6 +5,7 @@
 import type {
   CrossModuleDeps,
   CrossModuleFactsWithSelf,
+  ReadonlyCrossModuleFacts,
 } from "./composition.js";
 import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
@@ -353,8 +354,8 @@ export interface CrossModuleEffectDef<
    * system. Third, because `facts` and `prevFacts` hold the first two positions.
    */
   run: (
-    facts: CrossModuleFactsWithSelf<M, Deps>,
-    prevFacts: CrossModuleFactsWithSelf<M, Deps> | undefined,
+    facts: ReadonlyCrossModuleFacts<M, Deps>,
+    prevFacts: ReadonlyCrossModuleFacts<M, Deps> | undefined,
     derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;
@@ -369,6 +370,11 @@ export interface CrossModuleEffectDef<
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }

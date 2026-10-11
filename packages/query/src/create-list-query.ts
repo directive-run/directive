@@ -24,6 +24,7 @@
  */
 
 import {
+  LEGACY_WRITING_EFFECT,
   PREFIX,
   buildKey,
   replaceEqualDeep,
@@ -470,6 +471,7 @@ export function createListQuery<
       ...(refetchOnWindowFocus
         ? {
             [`${PREFIX}${name}_focus_list`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 if (typeof document === "undefined") return;
                 const handler = () => {
@@ -487,6 +489,7 @@ export function createListQuery<
       ...(refetchOnReconnect
         ? {
             [`${PREFIX}${name}_online_list`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 if (typeof window === "undefined") return;
                 const handler = () => {
@@ -503,6 +506,7 @@ export function createListQuery<
       ...(refetchInterval
         ? {
             [`${PREFIX}${name}_poll_list`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 const intervalMs =
                   typeof refetchInterval === "function"

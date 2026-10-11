@@ -346,6 +346,17 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    */
   onEffectError?: (id: string, error: unknown) => void;
 
+  /**
+   * Called when an effect tries to write a fact and the write is refused.
+   *
+   * Fires in every build. Development also throws with the fix in the message;
+   * production drops the write, so this is how a production build reports it.
+   *
+   * @param id - The effect ID
+   * @param key - The fact key, or a dotted path for a nested mutation
+   */
+  onEffectWriteBlocked?: (id: string, key: string) => void;
+
   // ============================================================================
   // Source Hooks
   // ============================================================================

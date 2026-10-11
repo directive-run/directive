@@ -9,7 +9,12 @@
  */
 
 import { withoutTracking } from "@directive-run/core/internals";
-import { PREFIX, buildKey, serializeKey } from "./internal.js";
+import {
+  LEGACY_WRITING_EFFECT,
+  PREFIX,
+  buildKey,
+  serializeKey,
+} from "./internal.js";
 
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
@@ -261,6 +266,7 @@ export function createSubscription<
 
     effects: {
       [`${PREFIX}${name}_sub`]: {
+        ...LEGACY_WRITING_EFFECT,
         run: (facts: Record<string, unknown>) => {
           const system = systemOf(facts);
           const currentKey = keyFn(facts);

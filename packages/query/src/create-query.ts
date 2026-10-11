@@ -11,6 +11,7 @@
  */
 
 import {
+  LEGACY_WRITING_EFFECT,
   PREFIX,
   buildKey,
   replaceEqualDeep,
@@ -362,6 +363,7 @@ export function createQuery<
       ...(refetchOnWindowFocus
         ? {
             [`${PREFIX}${name}_focus`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 if (typeof document === "undefined") {
                   return;
@@ -401,6 +403,7 @@ export function createQuery<
       ...(refetchOnReconnect
         ? {
             [`${PREFIX}${name}_online`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 if (typeof window === "undefined") {
                   return;
@@ -436,6 +439,7 @@ export function createQuery<
       ...(refetchInterval
         ? {
             [`${PREFIX}${name}_poll`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 if (typeof refetchInterval === "function") {
                   // Dynamic interval — use setTimeout chain so interval re-evaluates after each tick
@@ -491,6 +495,7 @@ export function createQuery<
       ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
         ? {
             [`${PREFIX}${name}_gc`]: {
+              ...LEGACY_WRITING_EFFECT,
               run: (facts: Record<string, unknown>) => {
                 // Read state to track it as a dependency — effect re-runs when state changes
                 void facts[stateKey];

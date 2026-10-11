@@ -40,6 +40,10 @@ import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
 import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
+import {
   derivationDep,
   derivationDepId,
   describeDep,
@@ -53,6 +57,7 @@ import type {
   InferSchema,
   Schema,
 } from "./types.js";
+import type { DeepReadonly, EffectFacts } from "./types/facts.js";
 
 // ============================================================================
 // Effects Manager
@@ -75,8 +80,14 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * stored for the `prevFacts` parameter on the next invocation.
    *
    * @param changedKeys - Fact keys that changed since the last run.
+   * @param navigationKeys - Fact keys a history navigation (`goBack`,
+   *   `goForward`, `goTo`, `replay`, `import`) restored since the last run.
+   *   They wake every effect except those declaring `onNavigate: "skip"`.
    */
-  runEffects(changedKeys: Set<string>): Promise<void>;
+  runEffects(
+    changedKeys: Set<string>,
+    navigationKeys?: Set<string> | null,
+  ): Promise<void>;
   /**
    * Run every enabled effect unconditionally, regardless of dependencies.
    */
@@ -146,6 +157,18 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @param id - The effect definition ID.
    */
   callOne(id: string): Promise<void>;
+  /**
+   * The effect whose `run()` is executing synchronously right now, or `null`.
+   * Past an effect's first `await` it is no longer known.
+   */
+  runningEffect(): string | null;
+  /**
+   * Run this effect on the next pass whatever its dependencies say. Used by the
+   * `retry` error strategy.
+   */
+  requestRerun(id: string): void;
+  /** Whether any effect is waiting on {@link EffectsManager.requestRerun}. */
+  hasPendingReruns(): boolean;
 }
 
 /** Number of consecutive identical dep sets before skipping re-tracking */
@@ -250,6 +273,11 @@ export interface CreateEffectsOptions<S extends Schema> {
   onRun?: (id: string, deps: string[]) => void;
   /** Called when an effect's `run()` or cleanup function throws. */
   onError?: (id: string, error: unknown) => void;
+  /**
+   * Called when an effect's write to a fact is refused, in every build. A
+   * production build drops the write without a sound otherwise.
+   */
+  onWriteBlocked?: (id: string, key: string) => void;
 }
 
 /**
@@ -270,8 +298,10 @@ export interface CreateEffectsOptions<S extends Schema> {
  * Each effect can return a cleanup function that runs before the next
  * execution or when {@link EffectsManager.cleanupAll | cleanupAll} is called.
  * Errors in effects are isolated via try-catch and never break the
- * reconciliation loop. Synchronous fact mutations inside effects are
- * coalesced with `store.batch()`.
+ * reconciliation loop. Effects read facts but cannot write them: the facts
+ * handed to `run()` are a read-only view (see {@link createReadonlyEffectFacts}).
+ * The body still runs inside `store.batch()`, so anything it dispatches is
+ * coalesced into one notification.
  *
  * @param options - Configuration including effect definitions, facts proxy,
  *   store, and lifecycle callbacks.
@@ -388,19 +418,286 @@ function computeDeclaresPrevFacts(run: Function): boolean {
   return true;
 }
 
+/**
+ * Why an effect cannot write a fact, and what to use instead.
+ *
+ * An effect is the system talking to the outside world: a log line, a DOM
+ * update, a socket. A fact written from one used to be accepted and then only
+ * half handled. Constraints and derivations saw it, but other effects did not,
+ * because the pass that would have woken them had already started. A rule that
+ * works for some readers and not others reads as an engine bug, so the write is
+ * refused instead.
+ */
+function effectWriteMessage(
+  effectId: string,
+  key: string,
+  inPlace: boolean,
+): string {
+  const what = inPlace
+    ? `changed "${key}" in place`
+    : `tried to write "${key}"`;
+  const fact = key.split(".")[0];
+
+  return `[Directive] effect "${effectId}" ${what}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${fact} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
+}
+
+/**
+ * Lets a first-party effect write facts while it moves to the right primitive.
+ *
+ * A temporary bridge: it is removed when `@directive-run/query` moves its
+ * stream, polling, focus, reconnect and expiry effects to sources, which is the
+ * primitive built for data arriving from outside. Keyed by a registered symbol
+ * so query can name it without an import, and so it appears in no export. An
+ * effect definition carrying it is handed the system's writable facts,
+ * unchanged from before the rule existed. Grep for the key to find every use.
+ *
+ * @internal
+ */
+export const LEGACY_EFFECT_WRITES: unique symbol = Symbol.for(
+  "directive.internal.legacyEffectWrites",
+);
+
+/** Called when a write through an effect's facts is refused. */
+type WriteBlocked = (effectId: string, key: string) => void;
+
+/**
+ * Refuse a write made through an effect's facts.
+ *
+ * Reported first, in every build, so a plugin or `system.observe()` sees the
+ * write a production build drops. Then it throws in development, where the
+ * message is the fix. In production the write is dropped: crashing a shipped
+ * app over a write it was already ignoring helps nobody.
+ */
+function refuseEffectWrite(
+  effectId: string,
+  key: string,
+  onBlocked: WriteBlocked | undefined,
+): true {
+  onBlocked?.(effectId, key);
+  if (isDevelopment) {
+    throw new Error(effectWriteMessage(effectId, key, false));
+  }
+
+  return true;
+}
+
+/**
+ * Report a nested value an effect mutated in place. Development only: the
+ * mutation has already happened, exactly as it would in production, and this
+ * is the check that notices.
+ */
+function reportInPlaceMutation(
+  effectId: string,
+  path: string,
+  onBlocked: WriteBlocked | undefined,
+): never {
+  onBlocked?.(effectId, path);
+  throw new Error(effectWriteMessage(effectId, path, true));
+}
+
+/**
+ * The store as an effect sees it: every read, no writes.
+ *
+ * `$store` is reachable from `facts`, so leaving it writable would keep the
+ * back door open. `batch` still runs its callback, because the writes inside it
+ * go through `facts` or this store and are refused there.
+ */
+function createReadonlyEffectStore<S extends Schema>(
+  store: FactsStore<S>,
+  effectId: string,
+  onBlocked: WriteBlocked | undefined,
+): FactsStore<S> {
+  return {
+    get: (key) => store.get(key),
+    has: (key) => store.has(key),
+    set: (key) => {
+      refuseEffectWrite(effectId, String(key), onBlocked);
+    },
+    delete: (key) => {
+      refuseEffectWrite(effectId, String(key), onBlocked);
+    },
+    batch: (fn) => store.batch(fn),
+    subscribe: (keys, listener) => store.subscribe(keys, listener),
+    subscribeAll: (listener) => store.subscribeAll(listener),
+    toObject: () => store.toObject(),
+  };
+}
+
+/**
+ * The facts one effect's `run()` (and the cleanup it returns) receives.
+ *
+ * A view, not a flag. A flag raised while `run()` is on the stack cannot see a
+ * write made after an `await`, or from a cleanup, or from a timer the effect
+ * started. Every one of those writes goes through this object, so refusing here
+ * covers all of them. Reads forward to the real facts proxy, so auto-tracking
+ * still records them, and nested values are the stored values themselves, so
+ * cloning and identity behave the same in development and production. See
+ * {@link createCheckedReadView} for how development catches an in-place
+ * mutation.
+ *
+ * One view per effect, so the error can name the effect. A different object
+ * from `system.facts`, with no prototype.
+ *
+ * @internal
+ */
+export function createReadonlyEffectFacts<S extends Schema>(
+  facts: Facts<S>,
+  effectId: string,
+  onBlocked?: WriteBlocked,
+): CheckedReadView<Facts<S>> {
+  let readonlyStore: FactsStore<S> | null = null;
+
+  return createCheckedReadView(
+    facts,
+    (key) => refuseEffectWrite(effectId, key, onBlocked),
+    {
+      override: (prop) => {
+        if (prop !== "$store") {
+          return undefined;
+        }
+        readonlyStore ??= createReadonlyEffectStore(
+          facts.$store,
+          effectId,
+          onBlocked,
+        );
+
+        return readonlyStore;
+      },
+    },
+  );
+}
+
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
   const {
     definitions,
-    facts,
     store,
     derived = EMPTY_DERIVED,
     isDerivation = () => false,
     isFactKey = () => false,
     onRun,
     onError,
+    onWriteBlocked,
   } = options;
+
+  /**
+   * The read-only view each effect reads through, one per effect so a refused
+   * write can name it. Built on first use and dropped when the definition is
+   * replaced.
+   */
+  const views = new Map<string, CheckedReadView<Facts<S>>>();
+
+  /** Whether this definition still writes facts through the legacy bridge. */
+  function writesFacts(def: EffectsDef<S>[string]): boolean {
+    return (
+      (def as { [LEGACY_EFFECT_WRITES]?: boolean })[LEGACY_EFFECT_WRITES] ===
+      true
+    );
+  }
+
+  /** The read-only view one effect reads facts through. */
+  function viewFor(id: string): CheckedReadView<Facts<S>> {
+    let view = views.get(id);
+    if (!view) {
+      view = createReadonlyEffectFacts(options.facts, id, onWriteBlocked);
+      views.set(id, view);
+    }
+
+    return view;
+  }
+
+  /**
+   * Development: the in-place mutation checks for one run's `prevFacts` and
+   * `derived`, which are created per run because `prevFacts` is a new object
+   * each pass. Production passes both through untouched.
+   */
+  const runChecks = new Map<string, Array<CheckedReadView<object>>>();
+
+  /** Refuse a top-level write to `prevFacts` or `derived`. */
+  function refuseFor(id: string, prefix: string) {
+    return (key: string) =>
+      refuseEffectWrite(id, `${prefix}.${key}`, onWriteBlocked);
+  }
+
+  /**
+   * Throw if the effect mutated a fact, a previous fact or a derived value in
+   * place since its last check. Development only.
+   */
+  function checkInPlaceMutation(id: string, def: EffectsDef<S>[string]): void {
+    if (!isDevelopment || writesFacts(def)) {
+      return;
+    }
+    const found =
+      viewFor(id).takeMutation() ??
+      (runChecks.get(id) ?? []).reduce<string | null>(
+        (first, check) => first ?? check.takeMutation(),
+        null,
+      );
+    runChecks.delete(id);
+    if (found !== null) {
+      reportInPlaceMutation(id, found, onWriteBlocked);
+    }
+  }
+
+  /**
+   * The effect whose `run()` is on the stack right now, for a caller that wants
+   * to name it. Synchronous only: past an `await` this is no longer known.
+   */
+  let runningEffectId: string | null = null;
+
+  /** Effects asked to run on the next pass regardless of what changed. */
+  const pendingReruns = new Set<string>();
+
+  /** Call `run()` with its own facts, recording which effect is running. */
+  function callRun(
+    id: string,
+    def: EffectsDef<S>[string],
+  ): ReturnType<EffectsDef<S>[string]["run"]> {
+    const outer = runningEffectId;
+    runningEffectId = id;
+    try {
+      if (writesFacts(def)) {
+        // The bridge hands over the writable facts; the read-only type is
+        // what the definition was written against.
+        return def.run(
+          options.facts as unknown as EffectFacts<S>,
+          previousSnapshot as DeepReadonly<InferSchema<S>> | null,
+          derived,
+        );
+      }
+      let prev: object | null = previousSnapshot;
+      let derivedView: object = derived;
+      if (isDevelopment) {
+        const checks: Array<CheckedReadView<object>> = [];
+        if (prev !== null) {
+          const prevCheck = createCheckedReadView(
+            prev,
+            refuseFor(id, "prevFacts"),
+            { prefix: "prevFacts" },
+          );
+          checks.push(prevCheck);
+          prev = prevCheck.view;
+        }
+        const derivedCheck = createCheckedReadView(
+          derived,
+          refuseFor(id, "derived"),
+          { prefix: "derived" },
+        );
+        checks.push(derivedCheck);
+        derivedView = derivedCheck.view;
+        runChecks.set(id, checks);
+      }
+
+      return def.run(
+        viewFor(id).view as unknown as EffectFacts<S>,
+        prev as DeepReadonly<InferSchema<S>> | null,
+        derivedView as typeof derived,
+      );
+    } finally {
+      runningEffectId = outer;
+    }
+  }
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
@@ -530,6 +827,9 @@ export function createEffectsManager<S extends Schema>(
     if (!def) {
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
+
+    // A replaced definition may opt in or out of legacy writes.
+    views.delete(id);
 
     // Always clear any stale gate from a previous registration of this id
     // before re-installing. Without this, swapping a data-form `on` effect
@@ -717,11 +1017,7 @@ export function createEffectsManager<S extends Schema>(
   ): Promise<void> {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(
-        facts,
-        previousSnapshot as InferSchema<S> | null,
-        derived,
-      );
+      effectPromise = callRun(state.id, def);
     });
     if (effectPromise instanceof Promise) {
       const result = await effectPromise;
@@ -729,6 +1025,7 @@ export function createEffectsManager<S extends Schema>(
     } else {
       storeCleanup(state, effectPromise);
     }
+    checkInPlaceMutation(state.id, def);
   }
 
   /** Check whether two dep sets are identical */
@@ -826,11 +1123,7 @@ export function createEffectsManager<S extends Schema>(
     let effectPromise: unknown;
     const trackingResult = withTracking(() => {
       store.batch(() => {
-        effectPromise = def.run(
-          facts,
-          previousSnapshot as InferSchema<S> | null,
-          derived,
-        );
+        effectPromise = callRun(state.id, def);
       });
       return effectPromise;
     });
@@ -850,6 +1143,8 @@ export function createEffectsManager<S extends Schema>(
 
     // Update tracked dependencies
     state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
+
+    checkInPlaceMutation(state.id, def);
   }
 
   /** Run a single effect */
@@ -891,11 +1186,43 @@ export function createEffectsManager<S extends Schema>(
   recomputePrevFactsObserved();
 
   const manager: EffectsManager<S> = {
-    async runEffects(changedKeys: Set<string>): Promise<void> {
+    async runEffects(
+      changedKeys: Set<string>,
+      navigationKeys?: Set<string> | null,
+    ): Promise<void> {
       const effectsToRun: string[] = [];
 
+      // A rewind changes what the outside world should show, so an effect that
+      // mirrors state there is woken by the restored keys like any change.
+      // `onNavigate: "skip"` opts out, for effects that record acts rather than
+      // mirror state (analytics, audit logs).
+      let withNavigation: Set<string> | null = null;
+      if (navigationKeys && navigationKeys.size > 0) {
+        withNavigation =
+          changedKeys.size === 0
+            ? navigationKeys
+            : new Set([...changedKeys, ...navigationKeys]);
+      }
+
+      const reruns = pendingReruns.size > 0 ? new Set(pendingReruns) : null;
+      pendingReruns.clear();
+
       for (const id of Object.keys(definitions)) {
-        if (shouldRun(id, changedKeys)) {
+        if (reruns?.has(id) && getState(id).enabled) {
+          effectsToRun.push(id);
+          continue;
+        }
+        let keys = changedKeys;
+        if (withNavigation !== null) {
+          if (definitions[id]?.onNavigate !== "skip") {
+            keys = withNavigation;
+          } else if (changedKeys.size === 0) {
+            // Nothing but a navigation happened, and this effect asked to
+            // sit those out.
+            continue;
+          }
+        }
+        if (shouldRun(id, keys)) {
           effectsToRun.push(id);
         }
       }
@@ -1010,8 +1337,23 @@ export function createEffectsManager<S extends Schema>(
       // Remove from all maps
       delete (definitions as Record<string, unknown>)[id];
       states.delete(id);
+      views.delete(id);
       onGates.delete(id);
       recomputePrevFactsObserved();
+    },
+
+    runningEffect(): string | null {
+      return runningEffectId;
+    },
+
+    requestRerun(id: string): void {
+      if (definitions[id]) {
+        pendingReruns.add(id);
+      }
+    },
+
+    hasPendingReruns(): boolean {
+      return pendingReruns.size > 0;
     },
 
     async callOne(id: string): Promise<void> {
@@ -1038,11 +1380,7 @@ export function createEffectsManager<S extends Schema>(
       try {
         let effectPromise: unknown;
         store.batch(() => {
-          effectPromise = def.run(
-            facts,
-            previousSnapshot as InferSchema<S> | null,
-            derived,
-          );
+          effectPromise = callRun(id, def);
         });
         if (effectPromise instanceof Promise) {
           const result = await effectPromise;
@@ -1050,6 +1388,7 @@ export function createEffectsManager<S extends Schema>(
         } else {
           storeCleanup(state, effectPromise);
         }
+        checkInPlaceMutation(id, def);
       } catch (error) {
         onError?.(id, error);
         console.error(`[Directive] Effect "${id}" threw an error:`, error);

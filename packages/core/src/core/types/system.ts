@@ -5,7 +5,7 @@
 import type { LeafClause } from "../rules-diff.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
 import type { EventsAccessorFromSchema, SystemEvent } from "./events.js";
-import type { Facts } from "./facts.js";
+import type { DeepReadonly, Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
@@ -719,8 +719,8 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
 /** Effect definition for dynamic registration — typed facts */
 export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
-    facts: Readonly<InferSchema<M["facts"]>>,
-    prevFacts: InferSchema<M["facts"]> | null,
+    facts: DeepReadonly<InferSchema<M["facts"]>>,
+    prevFacts: DeepReadonly<InferSchema<M["facts"]>> | null,
     derived: InferDerivations<M>,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
   /**
@@ -739,6 +739,11 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<InferSchema<M["facts"]>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   meta?: DefinitionMeta;
 }
 
@@ -1128,6 +1133,12 @@ export type ObservationEvent =
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
+  /**
+   * An effect tried to write a fact and was refused. Fires in every build;
+   * production drops the write, so this is its only trace there. `key` is a
+   * dotted path for a nested mutation (`"pos.x"`).
+   */
+  | { type: "effect.write-blocked"; id: string; key: string }
   /**
    * Source attached at `system.start()` (or at registerModule when the
    * system was already running). Carries the source id + the module that

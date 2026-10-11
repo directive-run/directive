@@ -491,6 +491,40 @@ Per RFC 0006, this applies to:
 `Snapshot` are explicitly kept as-is (each has reasoning recorded in
 RFC 0006).
 
+## 23. Writing Facts From an Effect
+
+```typescript
+// WRONG – effects only talk to the outside world. The `facts` an effect
+// receives is read-only: this throws in development and is ignored in
+// production.
+effects: {
+  trackMoveTime: {
+    deps: ["moveCount"],
+    run: (facts) => {
+      facts.lastMoveTimestamp = Date.now();
+    },
+  },
+},
+
+// CORRECT – write it where the change happens (an event handler or the
+// resolver that bumps `moveCount`), or compute it as a derivation.
+events: {
+  move: (facts) => {
+    facts.moveCount += 1;
+    facts.lastMoveTimestamp = Date.now();
+  },
+},
+```
+
+**Where the write belongs:**
+
+- A change caused by input → an **event handler**.
+- A value computed from other facts → a **derivation**.
+- Work a constraint requires → a **resolver**.
+- Data coming back from async work (a fetch, a socket message, a timer) → a **source** that publishes an event, or a resolver.
+
+**Conditional reads:** an effect wakes only for the facts its *last* run read. `facts.a || facts.b` skips reading `b` while `a` is truthy, so a change to `b` alone does not wake it. Read both up front, or declare `deps`.
+
 ## Quick Reference Checklist
 
 Before generating any Directive code, verify:
@@ -507,6 +541,7 @@ Before generating any Directive code, verify:
 10. `await system.settle()` after `system.start()`
 11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
 12. Constraints and effects read their own derivations through the `derived` parameter, never through a closed-over `system.derive`
+13. Effects never write facts; the write goes in an event handler, derivation, resolver, or source
 
 ## See also
 
