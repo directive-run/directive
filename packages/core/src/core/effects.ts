@@ -57,7 +57,7 @@ import type {
   InferSchema,
   Schema,
 } from "./types.js";
-import type { DeepReadonly, EffectFacts } from "./types/facts.js";
+import type { EffectFacts } from "./types/facts.js";
 
 // ============================================================================
 // Effects Manager
@@ -694,7 +694,7 @@ export function createEffectsManager<S extends Schema>(
 
       return def.run(
         viewFor(id).view as unknown as EffectFacts<S>,
-        prev as DeepReadonly<InferSchema<S>> | null,
+        prev as Readonly<InferSchema<S>> | null,
         derivedView as typeof derived,
       );
     } finally {

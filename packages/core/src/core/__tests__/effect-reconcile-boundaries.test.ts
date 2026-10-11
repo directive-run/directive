@@ -804,8 +804,14 @@ describe("the retired legacy effect-writes key", () => {
   });
 });
 
+// The types forbid assigning a fact, one level down. Nested values keep their
+// own types, so an effect can hand them to ordinary helpers without a cast;
+// changing one in place is caught at runtime in development instead.
+const takesMutable = (list: string[], pos: { p: { q: number } }) =>
+  list.length + pos.p.q;
+
 describe("effect facts types", () => {
-  it("are read-only all the way down in every namespace", () => {
+  it("forbid assigning a fact in every namespace", () => {
     const own = {
       facts: { x: t.number(), pos: t.object<{ p: { q: number } }>() },
     } as const;
@@ -817,26 +823,25 @@ describe("effect facts types", () => {
     const check = (facts: Facts, prev: Prev) => {
       // @ts-expect-error effects never write facts
       facts.self.x = 1;
-      // @ts-expect-error nor nested values
-      facts.self.pos.p.q = 2;
-      // @ts-expect-error nor arrays in a dependency
-      facts.auth.tags.push("a");
+      // @ts-expect-error nor a dependency's facts
+      facts.auth.tags = [];
       // @ts-expect-error nor replace a namespace
       facts.self = { x: 1 };
       // @ts-expect-error prevFacts is read-only too
-      prev.self.pos.p.q = 3;
+      prev.self.x = 3;
 
-      return facts.self.x + facts.auth.tags.length + prev.self.pos.p.q;
+      // Values pass to helpers typed with mutable arrays and objects.
+      return takesMutable(facts.auth.tags, facts.self.pos) + prev.self.x;
     };
     expectTypeOf(check).returns.toEqualTypeOf<number>();
   });
 
-  it("are read-only all the way down in a single module", () => {
+  it("forbid assigning a fact in a single module", () => {
     createModule("m", {
       schema: {
         facts: {
           pos: t.object<{ p: { q: number } }>(),
-          list: t.array<number>(),
+          list: t.array<string>(),
         },
       },
       init: (facts) => {
@@ -846,14 +851,15 @@ describe("effect facts types", () => {
       effects: {
         look: {
           run: (facts, prev) => {
-            // @ts-expect-error nested write
-            facts.pos.p.q = 1;
-            // @ts-expect-error array mutation
-            facts.list.push(1);
+            // @ts-expect-error effects never write facts
+            facts.pos = { p: { q: 1 } };
+            // @ts-expect-error nor replace an array fact
+            facts.list = [];
             if (prev) {
-              // @ts-expect-error prevFacts nested write
-              prev.pos.p.q = 1;
+              // @ts-expect-error prevFacts is read-only too
+              prev.pos = { p: { q: 1 } };
             }
+            takesMutable(facts.list, facts.pos);
           },
         },
       },

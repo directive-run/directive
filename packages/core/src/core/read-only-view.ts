@@ -12,7 +12,6 @@
 
 import isDevelopment from "#is-development";
 import { DEV_PROXY_TARGET } from "./facts.js";
-export type { DeepReadonly } from "./types/facts.js";
 
 /** Called for a refused top-level write. Returns `true` when it does not throw. */
 export type RefuseWrite = (key: string) => true;

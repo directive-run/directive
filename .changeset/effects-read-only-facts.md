@@ -30,9 +30,11 @@ effects never did. Now:
 - Every refused write is reported in every build through the new plugin hook
   `onEffectWriteBlocked(id, key)` and the `effect.write-blocked` observation
   event, which is how a production build sees the write it dropped.
-- Effect `facts` and `prevFacts` are typed deeply read-only (new
-  `DeepReadonly` and `EffectFacts` types), in single-module, cross-module and
-  dynamic effects, so nested writes and array mutation fail to compile.
+- Effect `facts` and `prevFacts` are typed read-only one level down (new
+  `EffectFacts` type), in single-module, cross-module and dynamic effects, so
+  assigning a fact fails to compile. Values keep their own types, so an effect
+  can pass an array or object fact to an ordinary helper without a cast;
+  changing one in place is caught by the development check above.
 
 Where the write belongs instead: an event handler for a change caused by
 input, a derivation for a computed value, a resolver for work a constraint
