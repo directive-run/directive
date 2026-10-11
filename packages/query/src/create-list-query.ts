@@ -23,6 +23,7 @@
  * @module
  */
 
+import { unlockEffectFacts } from "@directive-run/core/internals";
 import {
   PREFIX,
   buildKey,
@@ -470,7 +471,10 @@ export function createListQuery<
       ...(refetchOnWindowFocus
         ? {
             [`${PREFIX}${name}_focus_list`]: {
-              run: (facts: Record<string, unknown>) => {
+              run: (lockedFacts: Record<string, unknown>) => {
+                // Effects cannot write facts. This one still does, from callbacks
+                // the outside world fires; it moves to a source next.
+                const facts = unlockEffectFacts(lockedFacts);
                 if (typeof document === "undefined") return;
                 const handler = () => {
                   if (document.hidden) return;
@@ -487,7 +491,10 @@ export function createListQuery<
       ...(refetchOnReconnect
         ? {
             [`${PREFIX}${name}_online_list`]: {
-              run: (facts: Record<string, unknown>) => {
+              run: (lockedFacts: Record<string, unknown>) => {
+                // Effects cannot write facts. This one still does, from callbacks
+                // the outside world fires; it moves to a source next.
+                const facts = unlockEffectFacts(lockedFacts);
                 if (typeof window === "undefined") return;
                 const handler = () => {
                   bumpAllTriggers(facts, triggerKey, activeKeysKey);
@@ -503,7 +510,10 @@ export function createListQuery<
       ...(refetchInterval
         ? {
             [`${PREFIX}${name}_poll_list`]: {
-              run: (facts: Record<string, unknown>) => {
+              run: (lockedFacts: Record<string, unknown>) => {
+                // Effects cannot write facts. This one still does, from callbacks
+                // the outside world fires; it moves to a source next.
+                const facts = unlockEffectFacts(lockedFacts);
                 const intervalMs =
                   typeof refetchInterval === "function"
                     ? refetchInterval(undefined as unknown as TData)

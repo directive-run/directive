@@ -736,6 +736,11 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<InferSchema<M["facts"]>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   meta?: DefinitionMeta;
 }
 

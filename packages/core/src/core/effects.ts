@@ -75,8 +75,14 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * stored for the `prevFacts` parameter on the next invocation.
    *
    * @param changedKeys - Fact keys that changed since the last run.
+   * @param navigationKeys - Fact keys a history navigation (`goBack`,
+   *   `goForward`, `goTo`, `replay`, `import`) restored since the last run.
+   *   They wake every effect except those declaring `onNavigate: "skip"`.
    */
-  runEffects(changedKeys: Set<string>): Promise<void>;
+  runEffects(
+    changedKeys: Set<string>,
+    navigationKeys?: Set<string> | null,
+  ): Promise<void>;
   /**
    * Run every enabled effect unconditionally, regardless of dependencies.
    */
@@ -270,8 +276,10 @@ export interface CreateEffectsOptions<S extends Schema> {
  * Each effect can return a cleanup function that runs before the next
  * execution or when {@link EffectsManager.cleanupAll | cleanupAll} is called.
  * Errors in effects are isolated via try-catch and never break the
- * reconciliation loop. Synchronous fact mutations inside effects are
- * coalesced with `store.batch()`.
+ * reconciliation loop. Effects read facts but cannot write them: the facts
+ * handed to `run()` are a read-only view (see {@link createReadonlyEffectFacts}).
+ * The body still runs inside `store.batch()`, so anything it dispatches is
+ * coalesced into one notification.
  *
  * @param options - Configuration including effect definitions, facts proxy,
  *   store, and lifecycle callbacks.
@@ -388,12 +396,219 @@ function computeDeclaresPrevFacts(run: Function): boolean {
   return true;
 }
 
+/**
+ * Why an effect cannot write a fact, and what to use instead.
+ *
+ * An effect is the system talking to the outside world: a log line, a DOM
+ * update, a socket. A fact written from one used to be accepted and then only
+ * half handled. Constraints and derivations saw it, but other effects did not,
+ * because the pass that would have woken them had already started. A rule that
+ * works for some readers and not others reads as an engine bug, so the write is
+ * refused instead.
+ */
+function effectWriteMessage(key: string): string {
+  return `[Directive] An effect tried to write the fact "${key}". Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input, a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver.`;
+}
+
+/**
+ * Refuse a write made through an effect's facts. Throws in development, where
+ * the message is the fix. In production the write is dropped: an effect that
+ * broke the rule did so before this check existed, and crashing a shipped app
+ * over it helps nobody.
+ */
+function refuseEffectWrite(key: string): true {
+  if (isDevelopment) {
+    throw new Error(effectWriteMessage(key));
+  }
+
+  return true;
+}
+
+/**
+ * Non-zero while a write made through {@link unlockEffectFacts} is on the
+ * stack. Checked synchronously at each write, so it covers exactly the writes
+ * an unlocked view makes and nothing else.
+ */
+let unlockedWriteDepth = 0;
+
+function withUnlockedWrite<T>(fn: () => T): T {
+  unlockedWriteDepth++;
+  try {
+    return fn();
+  } finally {
+    unlockedWriteDepth--;
+  }
+}
+
+const unlockedViews = new WeakMap<object, Record<string, unknown>>();
+
+/**
+ * The store each read-only store view stands in front of. An unlocked view
+ * answers `$store` with the real one, so code that identifies a system by its
+ * store sees the same object from an effect as from a hook.
+ */
+const storeBehindView = new WeakMap<object, object>();
+
+/**
+ * A writable view over an effect's read-only facts, for first-party packages
+ * whose effects wrote facts before the rule was enforced.
+ *
+ * **Not for applications.** It exists so `@directive-run/query` keeps working
+ * while its stream, polling, focus and reconnect effects move to sources, which
+ * are the primitive built for data arriving from outside. Every call site is a
+ * migration still to do; grep for this name to find them.
+ *
+ * Reads forward unchanged, so tracking still works. Stable per view, so code
+ * that keys a `WeakMap` on the facts it was handed keeps one entry.
+ *
+ * @internal
+ */
+export function unlockEffectFacts(
+  facts: Record<string, unknown>,
+): Record<string, unknown> {
+  const cached = unlockedViews.get(facts);
+  if (cached) {
+    return cached;
+  }
+
+  const view = new Proxy(facts, {
+    get(target, prop) {
+      const value = (target as Record<string | symbol, unknown>)[prop];
+      if (prop === "$store" && value !== null && typeof value === "object") {
+        return storeBehindView.get(value) ?? value;
+      }
+
+      return value;
+    },
+    set(target, prop, value) {
+      return withUnlockedWrite(() => {
+        (target as Record<string | symbol, unknown>)[prop] = value;
+
+        return true;
+      });
+    },
+    deleteProperty(target, prop) {
+      return withUnlockedWrite(
+        () => delete (target as Record<string | symbol, unknown>)[prop],
+      );
+    },
+  });
+  unlockedViews.set(facts, view);
+
+  return view;
+}
+
+/**
+ * The store as an effect sees it: every read, no writes.
+ *
+ * `$store` is reachable from `facts`, so leaving it writable would keep the
+ * back door open. `batch` still runs its callback, because the writes inside it
+ * go through `facts` or this store and are refused there.
+ */
+function createReadonlyEffectStore<S extends Schema>(
+  store: FactsStore<S>,
+): FactsStore<S> {
+  const view: FactsStore<S> = {
+    get: (key) => store.get(key),
+    has: (key) => store.has(key),
+    set: (key, value) => {
+      if (unlockedWriteDepth > 0) {
+        store.set(key, value);
+
+        return;
+      }
+      refuseEffectWrite(String(key));
+    },
+    delete: (key) => {
+      if (unlockedWriteDepth > 0) {
+        store.delete(key);
+
+        return;
+      }
+      refuseEffectWrite(String(key));
+    },
+    batch: (fn) => store.batch(fn),
+    subscribe: (keys, listener) => store.subscribe(keys, listener),
+    subscribeAll: (listener) => store.subscribeAll(listener),
+    toObject: () => store.toObject(),
+  };
+  storeBehindView.set(view, store);
+
+  return view;
+}
+
+/**
+ * The facts an effect's `run()` (and the cleanup it returns) receives.
+ *
+ * A view, not a flag. A flag raised while `run()` is on the stack cannot see a
+ * write made after an `await`, or from a cleanup, or from a timer the effect
+ * started. Every one of those writes goes through this object, so refusing here
+ * covers all of them. Reads forward to the real facts proxy, so auto-tracking
+ * still records them.
+ *
+ * Namespaced systems wrap this object again, and their module proxies write
+ * through to it, so a scoped write is refused here too.
+ *
+ * @internal
+ */
+export function createReadonlyEffectFacts<S extends Schema>(
+  facts: Facts<S>,
+): Facts<S> {
+  const source = facts as unknown as Record<string | symbol, unknown>;
+  let readonlyStore: FactsStore<S> | null = null;
+
+  return new Proxy(Object.create(null) as Facts<S>, {
+    get(_, prop) {
+      if (prop === "$store") {
+        readonlyStore ??= createReadonlyEffectStore(facts.$store);
+
+        return readonlyStore;
+      }
+
+      return source[prop];
+    },
+    set(_, prop, value) {
+      if (unlockedWriteDepth > 0) {
+        source[prop] = value;
+
+        return true;
+      }
+
+      return refuseEffectWrite(String(prop));
+    },
+    deleteProperty(_, prop) {
+      if (unlockedWriteDepth > 0) {
+        return delete source[prop];
+      }
+
+      return refuseEffectWrite(String(prop));
+    },
+    defineProperty(_, prop) {
+      return refuseEffectWrite(String(prop));
+    },
+    has(_, prop) {
+      return prop in source;
+    },
+    ownKeys() {
+      return Reflect.ownKeys(source);
+    },
+    getOwnPropertyDescriptor(_, prop) {
+      return Reflect.getOwnPropertyDescriptor(source, prop);
+    },
+    getPrototypeOf() {
+      return null;
+    },
+    setPrototypeOf() {
+      return false;
+    },
+  });
+}
+
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
   const {
     definitions,
-    facts,
     store,
     derived = EMPTY_DERIVED,
     isDerivation = () => false,
@@ -401,6 +616,9 @@ export function createEffectsManager<S extends Schema>(
     onRun,
     onError,
   } = options;
+
+  // Every effect body, and every cleanup it returns, reads through this view.
+  const facts = createReadonlyEffectFacts(options.facts);
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
@@ -891,11 +1109,36 @@ export function createEffectsManager<S extends Schema>(
   recomputePrevFactsObserved();
 
   const manager: EffectsManager<S> = {
-    async runEffects(changedKeys: Set<string>): Promise<void> {
+    async runEffects(
+      changedKeys: Set<string>,
+      navigationKeys?: Set<string> | null,
+    ): Promise<void> {
       const effectsToRun: string[] = [];
 
+      // A rewind changes what the outside world should show, so an effect that
+      // mirrors state there is woken by the restored keys like any change.
+      // `onNavigate: "skip"` opts out, for effects that record acts rather than
+      // mirror state (analytics, audit logs).
+      let withNavigation: Set<string> | null = null;
+      if (navigationKeys && navigationKeys.size > 0) {
+        withNavigation =
+          changedKeys.size === 0
+            ? navigationKeys
+            : new Set([...changedKeys, ...navigationKeys]);
+      }
+
       for (const id of Object.keys(definitions)) {
-        if (shouldRun(id, changedKeys)) {
+        let keys = changedKeys;
+        if (withNavigation !== null) {
+          if (definitions[id]?.onNavigate !== "skip") {
+            keys = withNavigation;
+          } else if (changedKeys.size === 0) {
+            // Nothing but a navigation happened, and this effect asked to
+            // sit those out.
+            continue;
+          }
+        }
+        if (shouldRun(id, keys)) {
           effectsToRun.push(id);
         }
       }

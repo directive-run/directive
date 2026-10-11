@@ -369,6 +369,11 @@ export interface CrossModuleEffectDef<
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }

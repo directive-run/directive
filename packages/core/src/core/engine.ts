@@ -696,6 +696,23 @@ export function createEngine<S extends Schema>(
     ordinaryWrites = 0;
   }
 
+  /**
+   * Keys a history navigation restored since the last pass.
+   *
+   * A restore needs no reconciling: its state was reconciled when captured. But
+   * effects mirror state to the outside world, and a canvas or document title
+   * left showing the pre-rewind state is wrong. So restored keys skip the
+   * changed set and wake effects alone, in a pass that does nothing a replay
+   * must not do: no snapshot, no gated-source re-attach, and no keys handed to
+   * constraints as changed.
+   */
+  const restoredKeys = new Set<string>();
+
+  function noteRestored(key: string): void {
+    restoredKeys.add(key);
+    scheduleReconcile();
+  }
+
   function withNavigation(fn: () => void): void {
     navigationDepth++;
     try {
@@ -804,7 +821,11 @@ export function createEngine<S extends Schema>(
       // The restore's own writes are batched, so they are gated on the other
       // path; what reaches here during a restore is a reaction to it, and a
       // reaction is the program's own work.
-      if (currentFactOrigin() === "restore") return;
+      if (currentFactOrigin() === "restore") {
+        noteRestored(String(key));
+
+        return;
+      }
       // Asked unconditionally, and before the dispatch check. Behind it, a
       // navigation driven from inside an event handler recorded nothing and
       // its pass went on to snapshot and re-attach — the two things a replay
@@ -856,6 +877,13 @@ export function createEngine<S extends Schema>(
       // it. Observers only reach this path at all because batched writes now
       // announce, so the gap arrived with that arm.
       const authored = changes.filter((change) => change.origin !== "restore");
+      if (authored.length !== changes.length) {
+        for (const change of changes) {
+          if (change.origin === "restore") {
+            noteRestored(change.key);
+          }
+        }
+      }
       if (authored.length === 0) return;
       let duringNavigation = false;
       for (const _change of authored) {
@@ -1445,7 +1473,15 @@ export function createEngine<S extends Schema>(
     // Writes made during a navigation reconcile like any other, but a pass
     // made up entirely of them must not snapshot over the redo stack or
     // re-open a transport.
-    const followsNavigation = passIsEntirelyNavigation();
+    const followsNavigation =
+      passIsEntirelyNavigation() ||
+      (ordinaryWrites === 0 && restoredKeys.size > 0);
+    // Taken now, so a restore made while this pass awaits lands in the next.
+    let navigationKeys: Set<string> | null = null;
+    if (restoredKeys.size > 0) {
+      navigationKeys = new Set(restoredKeys);
+      restoredKeys.clear();
+    }
 
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
@@ -1492,8 +1528,16 @@ export function createEngine<S extends Schema>(
       // nothing reads back stays stale — so pushing it meant re-walking the
       // whole downstream graph per write forever, while the set it fed is
       // drained once per pass regardless.
-      derivationsManager.collectInvalidated(state.changedKeys);
-      await effectsManager.runEffects(state.changedKeys);
+      //
+      // A pass that only carries a navigation drains into the restored keys
+      // instead, so a derivation the rewind moved wakes effects without being
+      // handed to constraints as a change.
+      derivationsManager.collectInvalidated(
+        navigationKeys !== null && state.changedKeys.size === 0
+          ? navigationKeys
+          : state.changedKeys,
+      );
+      await effectsManager.runEffects(state.changedKeys, navigationKeys);
 
       // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
       // plane, immediately after effects, against the committed facts. Sits
@@ -1516,10 +1560,12 @@ export function createEngine<S extends Schema>(
         );
       }
 
-      // Again, because effects write facts.
+      // Again, because an effect can still cause a write.
       //
+      // Effects cannot write facts themselves (their `facts` is read-only), but
+      // one can dispatch an event or write through a captured `system.facts`.
       // The drain above happens before `runEffects` so an effect gated on a
-      // derivation is woken by it. But an effect that *writes* a fact
+      // derivation is woken by it. But a write made during effects
       // invalidates whatever derivations read that fact, and those roots land
       // after that drain has already run — so without this second call the
       // announcement misses the constraint pass immediately below, the pass
@@ -1763,6 +1809,7 @@ export function createEngine<S extends Schema>(
       // with something to say and no pass in which to say it.
       if (
         state.changedKeys.size > 0 ||
+        restoredKeys.size > 0 ||
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
@@ -2766,6 +2813,7 @@ export function createEngine<S extends Schema>(
       // writes that no pass ever consumed; they would otherwise be counted
       // against the first unrelated pass after this.
       resetNavigationRecord();
+      restoredKeys.clear();
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -2854,6 +2902,7 @@ export function createEngine<S extends Schema>(
       if (!state.isRunning) return;
       state.isRunning = false;
       resetNavigationRecord();
+      restoredKeys.clear();
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -2918,6 +2967,7 @@ export function createEngine<S extends Schema>(
       if (!state.isRunning) return;
       state.isRunning = false;
       resetNavigationRecord();
+      restoredKeys.clear();
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;

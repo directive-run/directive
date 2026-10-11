@@ -21,31 +21,32 @@ describe("reading your own write inside a batched body", () => {
   it("an effect sees its own write through derived", async () => {
     const seen: Array<{ fact: number; derived: number }> = [];
 
-    const system = createSystem({
-      module: createModule("m", {
-        schema: {
-          facts: { n: t.number(), go: t.boolean() },
-          derivations: { doubled: t.number() },
-        },
-        init: (facts) => {
-          facts.n = 1;
-          facts.go = false;
-        },
-        derive: { doubled: (facts) => facts.n * 2 },
-        effects: {
-          bump: {
-            deps: ["go"],
-            run: (facts, _prev, derived) => {
-              if (!facts.go) {
-                return;
-              }
-              facts.n = 5;
-              seen.push({ fact: facts.n, derived: derived.doubled });
-            },
+    const mod = createModule("m", {
+      schema: {
+        facts: { n: t.number(), go: t.boolean() },
+        derivations: { doubled: t.number() },
+      },
+      init: (facts) => {
+        facts.n = 1;
+        facts.go = false;
+      },
+      derive: { doubled: (facts) => facts.n * 2 },
+      effects: {
+        bump: {
+          deps: ["go"],
+          run: (facts, _prev, derived) => {
+            if (!facts.go) {
+              return;
+            }
+            // The effect's own `facts` is read-only. A captured system
+            // writes inside the same batch, which is what this holds.
+            system.facts.n = 5;
+            seen.push({ fact: facts.n, derived: derived.doubled });
           },
         },
-      }),
+      },
     });
+    const system = createSystem({ module: mod });
     system.start();
     await system.settle();
 
@@ -103,32 +104,33 @@ describe("reading your own write inside a batched body", () => {
     // and notification did not.
     const observedAtNotify: Array<{ a: number; b: number }> = [];
 
-    const system = createSystem({
-      module: createModule("m", {
-        schema: {
-          facts: { a: t.number(), b: t.number(), go: t.boolean() },
-          derivations: { sum: t.number() },
-        },
-        init: (facts) => {
-          facts.a = 0;
-          facts.b = 0;
-          facts.go = false;
-        },
-        derive: { sum: (facts) => facts.a + facts.b },
-        effects: {
-          writeBoth: {
-            deps: ["go"],
-            run: (facts) => {
-              if (!facts.go) {
-                return;
-              }
-              facts.a = 1;
-              facts.b = 2;
-            },
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.number(), b: t.number(), go: t.boolean() },
+        derivations: { sum: t.number() },
+      },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+        facts.go = false;
+      },
+      derive: { sum: (facts) => facts.a + facts.b },
+      effects: {
+        writeBoth: {
+          deps: ["go"],
+          run: (facts) => {
+            if (!facts.go) {
+              return;
+            }
+            // Through a captured system: the effect's own `facts` is
+            // read-only, but the body still runs inside one batch.
+            system.facts.a = 1;
+            system.facts.b = 2;
           },
         },
-      }),
+      },
     });
+    const system = createSystem({ module: mod });
     system.start();
     await system.settle();
 
@@ -140,6 +142,8 @@ describe("reading your own write inside a batched body", () => {
     system.facts.go = true;
     await system.settle();
 
+    // The listener ran, so the loop below is not vacuous.
+    expect(observedAtNotify.length).toBeGreaterThan(0);
     // Never `{ a: 1, b: 0 }` — no listener saw the batch half-applied.
     for (const observation of observedAtNotify) {
       expect(observation).not.toEqual({ a: 1, b: 0 });

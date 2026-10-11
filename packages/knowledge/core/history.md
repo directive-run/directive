@@ -215,6 +215,23 @@ history.goForward();
 console.log(system.facts.text); // "Hello, world"
 ```
 
+### Effects After a Rewind
+
+`goBack()`, `goForward()`, `goTo()`, `replay()` and `import()` restore facts without re-running constraints or resolvers, because the restored state was already reconciled when it was captured. Effects **do** run again for the restored facts they depend on, so whatever an effect draws outside Directive (a canvas, the DOM, the document title) matches the rewound state. Gated sources are not re-attached and no new snapshot is taken.
+
+Opt an effect out with `onNavigate: "skip"` when it records acts rather than mirroring state, such as analytics:
+
+```typescript
+effects: {
+  render: { deps: ["text"], run: (facts) => draw(facts.text) },
+  analytics: {
+    deps: ["text"],
+    onNavigate: "skip", // an undo is not a new edit
+    run: (facts) => track("edit", facts.text.length),
+  },
+},
+```
+
 ## How Snapshots Work
 
 Snapshots are taken **once per reconciliation cycle**, not per individual fact change. All synchronous fact mutations within the same event handler batch into a single snapshot. One `goBack()` reverts all changes from that event.

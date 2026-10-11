@@ -420,6 +420,7 @@ const compositionSchema = {
       step: t.number(),
       presetId: t.string(),
     },
+    CLOSE: {},
   },
 } satisfies ModuleSchema;
 
@@ -612,6 +613,19 @@ export async function runComposition(
         }),
         meta: { label: "Next step", category: "chain" },
       },
+
+      /**
+       * Close the composition out once nothing further will start.
+       *
+       * A constraint and a resolver rather than an effect, because closing
+       * writes facts (`closed`, `combinedPath`) and effects cannot. `closed` is
+       * written first, so the requirement retracts before the one `await`.
+       */
+      close: {
+        when: (facts, derived) => !facts.closed && derived.compositionSettled,
+        require: { type: "CLOSE" as const },
+        meta: { label: "Close the composition", category: "lifecycle" },
+      },
     },
 
     resolvers: {
@@ -728,6 +742,76 @@ export async function runComposition(
         },
         meta: { label: "Run composition step", category: "chain" },
       },
+
+      close: {
+        requirement: "CLOSE",
+        resolve: async (_req, context) => {
+          context.facts.closed = true;
+
+          const budgetExhausted = readDerived("budgetExhausted");
+          const composedRunId = context.facts.runId;
+          const composedInput = context.facts.input;
+          const spentUsd = context.facts.spentUsd;
+
+          // Said before the composition closes: the step that did *not* start,
+          // and what it would have needed. What ran before it is whole — this
+          // is not a partial step, it is a step declined.
+          if (budgetExhausted) {
+            emit({
+              type: "composition:budget-exhausted",
+              runId: composedRunId,
+              step: context.facts.step + 1,
+              total: presets.length,
+              presetId: presets[context.facts.step]?.id ?? "",
+              spentUsd,
+              budgetUsd: context.facts.budgetUsd,
+              requiredUsd: readDerived("nextStepFloorUsd"),
+              at: now(),
+            });
+          }
+
+          // Through the same store every step's transcript went through, so
+          // containment — and whether there is a filesystem here at all — is
+          // decided in one place rather than asserted again by a second writer
+          // that has to remember the rule.
+          //
+          // Caught, because this is the last thing between the composition and
+          // the event that ends it. `runComposition` resolves off
+          // `composition:complete`, and `closed` above means this effect will
+          // not be entered a second time — so a store that rejected here used
+          // to leave a settled system, a correct ledger, every step's own
+          // transcript already on disk, and a caller waiting forever for the
+          // index of them.
+          let combinedPath = "";
+          try {
+            combinedPath = await store.writeDocument(
+              `${composedRunId}.md`,
+              renderCombined(composedRunId, composedInput, steps),
+            );
+          } catch (error) {
+            emit({
+              type: "error",
+              scope: "transcript",
+              message: error instanceof Error ? error.message : String(error),
+              at: now(),
+            });
+          }
+          context.facts.combinedPath = combinedPath;
+
+          emit({
+            type: "composition:complete",
+            runId: composedRunId,
+            steps: steps.length,
+            spentUsd,
+            budgetUsd: context.facts.budgetUsd,
+            combinedPath,
+            interrupted: context.facts.interrupted,
+            budgetExhausted,
+            at: now(),
+          });
+        },
+        meta: { label: "Close the composition", category: "lifecycle" },
+      },
     },
 
     hooks: {
@@ -788,87 +872,6 @@ export async function runComposition(
           });
         },
         meta: { label: "Announce step", category: "events" },
-      },
-
-      /**
-       * Close the composition out once nothing further will start.
-       *
-       * Deliberately has no `deps` — it reads `compositionStopped`, which is
-       * derived from most of the fact set, and repeating that list here would
-       * be a second copy of the derivation's dependencies. Every read happens
-       * before the one `await`, because auto-tracking closes when the body
-       * returns its promise.
-       */
-      close: {
-        run: async (facts, _prev, derived) => {
-          if (facts.closed || !derived.compositionSettled) {
-            return;
-          }
-          facts.closed = true;
-
-          const budgetExhausted = derived.budgetExhausted;
-          const composedRunId = facts.runId;
-          const composedInput = facts.input;
-          const spentUsd = facts.spentUsd;
-
-          // Said before the composition closes: the step that did *not* start,
-          // and what it would have needed. What ran before it is whole — this
-          // is not a partial step, it is a step declined.
-          if (budgetExhausted) {
-            emit({
-              type: "composition:budget-exhausted",
-              runId: composedRunId,
-              step: facts.step + 1,
-              total: presets.length,
-              presetId: presets[facts.step]?.id ?? "",
-              spentUsd,
-              budgetUsd: facts.budgetUsd,
-              requiredUsd: derived.nextStepFloorUsd,
-              at: now(),
-            });
-          }
-
-          // Through the same store every step's transcript went through, so
-          // containment — and whether there is a filesystem here at all — is
-          // decided in one place rather than asserted again by a second writer
-          // that has to remember the rule.
-          //
-          // Caught, because this is the last thing between the composition and
-          // the event that ends it. `runComposition` resolves off
-          // `composition:complete`, and `closed` above means this effect will
-          // not be entered a second time — so a store that rejected here used
-          // to leave a settled system, a correct ledger, every step's own
-          // transcript already on disk, and a caller waiting forever for the
-          // index of them.
-          let combinedPath = "";
-          try {
-            combinedPath = await store.writeDocument(
-              `${composedRunId}.md`,
-              renderCombined(composedRunId, composedInput, steps),
-            );
-          } catch (error) {
-            emit({
-              type: "error",
-              scope: "transcript",
-              message: error instanceof Error ? error.message : String(error),
-              at: now(),
-            });
-          }
-          facts.combinedPath = combinedPath;
-
-          emit({
-            type: "composition:complete",
-            runId: composedRunId,
-            steps: steps.length,
-            spentUsd,
-            budgetUsd: facts.budgetUsd,
-            combinedPath,
-            interrupted: facts.interrupted,
-            budgetExhausted,
-            at: now(),
-          });
-        },
-        meta: { label: "Close the composition", category: "events" },
       },
     },
   });

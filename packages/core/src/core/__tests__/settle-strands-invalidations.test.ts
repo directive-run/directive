@@ -1,6 +1,11 @@
 /**
- * An effect writes a fact; a derivation reads that fact; a constraint gates on
- * the derivation. All three should happen in one settle.
+ * A write made during the effects phase lands on a fact; a derivation reads
+ * that fact; a constraint gates on the derivation. All three should happen in
+ * one settle.
+ *
+ * An effect cannot write through the `facts` it is handed, which is read-only.
+ * It can still cause a write, by dispatching an event or through a captured
+ * `system.facts`, so these tests write the second way.
  *
  * They did not. The invalidation drain ran once per reconcile, *before* effects,
  * so a derivation invalidated by an effect's write landed in `invalidationRoots`
@@ -44,7 +49,9 @@ describe("an effect's write reaches a derivation-gated constraint", () => {
         propagate: {
           deps: ["trigger"],
           run: (facts) => {
-            facts.source = facts.trigger;
+            // Effects cannot write through their own `facts`; a write through
+            // a captured system still lands during the effects phase.
+            system.facts.source = facts.trigger;
           },
         },
       },
@@ -103,7 +110,9 @@ describe("an effect's write reaches a derivation-gated constraint", () => {
         propagate: {
           deps: ["trigger"],
           run: (facts) => {
-            facts.source = facts.trigger;
+            // Effects cannot write through their own `facts`; a write through
+            // a captured system still lands during the effects phase.
+            system.facts.source = facts.trigger;
           },
         },
         watch: {
@@ -167,7 +176,9 @@ describe("an effect's write reaches a derivation-gated constraint", () => {
         propagate: {
           deps: ["trigger"],
           run: (facts) => {
-            facts.source = facts.trigger;
+            // Effects cannot write through their own `facts`; a write through
+            // a captured system still lands during the effects phase.
+            system.facts.source = facts.trigger;
           },
         },
         report: {

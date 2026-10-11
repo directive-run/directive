@@ -2304,6 +2304,12 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
  * nothing telling it what the current behaviour was and where it was observable
  * from.
  *
+ * Effects can no longer write through the `facts` they are handed, which is
+ * read-only, so that feedback path is closed. A write made during the phase by
+ * anything else still misses: a captured `system.facts`, an event an effect
+ * dispatches, or a caller outside the system. The cases below that used to
+ * write through the effect's facts now write the captured way.
+ *
  * The four cases below are that scope, measured rather than assumed. The
  * limitation needs neither an async effect nor a resolver to appear: a
  * synchronous effect's write is dropped, a write arriving from outside the
@@ -2359,7 +2365,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
               release = resolve;
               setTimeout(resolve, 0);
             });
-            facts.b = facts.a * 10;
+            system.facts.b = facts.a * 10;
           },
         },
         watchB: {
@@ -2412,7 +2418,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
           deps: ["a"],
           run: (facts) => {
             if (facts.a !== 0) {
-              facts.b = facts.a * 10;
+              system.facts.b = facts.a * 10;
             }
           },
         },
@@ -2530,7 +2536,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
             await new Promise<void>((resolve) => {
               release = resolve;
             });
-            facts.b = 7;
+            system.facts.b = 7;
           },
         },
         watchDoubled: {
