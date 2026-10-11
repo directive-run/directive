@@ -1,8 +1,8 @@
 /**
- * A run that timed out has left the in-flight set, but its body may still
- * be running and writing. If its requirement is dispatched again, that body
- * is superseded: its later writes are dropped, so it cannot overwrite the
- * new run's result.
+ * Late writes from runs that left the in-flight set keep landing (RFC 0003):
+ * timed out, canceled or detached, their writes — `finally` blocks
+ * included — are theirs to make. Only a run superseded while still in
+ * flight has its later writes dropped. Results here match 78d2d131.
  *
  * The retry-later poller stops when nothing is left to retry, and never
  * keeps a Node process alive on its own.
@@ -18,51 +18,172 @@ import { createModule, createSystem, t } from "../../index.js";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const here = dirname(fileURLToPath(import.meta.url));
 
-describe("a timed-out run whose requirement is dispatched again", () => {
-  it("cannot overwrite the new run's result (K2)", async () => {
+function loadSystem(
+  resolver: Record<string, unknown>,
+  constraint: Record<string, unknown> = {},
+) {
+  const mod = createModule("m", {
+    schema: {
+      facts: {
+        go: t.boolean(),
+        done: t.boolean(),
+        status: t.string(),
+        loading: t.boolean(),
+        log: t.array<number>(),
+        data: t.string(),
+      },
+      derivations: {},
+      events: {},
+      requirements: { LOAD: {} },
+    },
+    init: (facts: any) => {
+      facts.go = false;
+      facts.done = false;
+      facts.status = "idle";
+      facts.loading = false;
+      facts.log = [];
+      facts.data = "";
+    },
+    constraints: {
+      load: {
+        when: (facts: any) => facts.go && !facts.done,
+        require: { type: "LOAD" },
+        ...constraint,
+      },
+    },
+    resolvers: { load: { requirement: "LOAD", ...resolver } },
+  } as never);
+  const system: any = createSystem({ module: mod });
+  system.start();
+
+  return system;
+}
+
+describe("late writes from runs no longer in flight still land", () => {
+  it("a timed-out run's late write lands after its replacement (K2, resolver's job to guard)", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     let n = 0;
-    const mod = createModule("m", {
-      schema: {
-        facts: { go: t.boolean(), done: t.boolean(), data: t.string() },
-        derivations: {},
-        events: {},
-        requirements: { LOAD: {} },
+    const system = loadSystem({
+      timeout: 10,
+      resolve: async (_req: unknown, context: any) => {
+        const k = ++n;
+        context.facts.done = true;
+        await sleep(k === 1 ? 60 : 5);
+        context.facts.data = `r${k}`;
       },
-      init: (facts: any) => {
-        facts.go = false;
-        facts.done = false;
-        facts.data = "";
-      },
-      constraints: {
-        load: {
-          when: (facts: any) => facts.go && !facts.done,
-          require: { type: "LOAD" },
-        },
-      },
-      resolvers: {
-        load: {
-          requirement: "LOAD",
-          timeout: 10,
-          resolve: async (_req: unknown, context: any) => {
-            const k = ++n;
-            context.facts.done = true;
-            await sleep(k === 1 ? 60 : 5);
-            context.facts.data = `r${k}`;
-          },
-        },
-      },
-    } as never);
-    const system: any = createSystem({ module: mod });
-    system.start();
+    });
     system.facts.go = true;
-    await sleep(20); // run 1 satisfied, then timed out; its body still runs
-    system.facts.done = false; // the requirement returns: run 2
+    await sleep(20);
+    system.facts.done = false;
     await sleep(20);
     expect(system.facts.data).toBe("r2");
-    await sleep(60); // run 1's body finishes and tries to write
-    expect(system.facts.data).toBe("r2");
+    await sleep(60);
+    // Run 1 timed out and left; its late write lands. Guard with
+    // context.signal.aborted (it is aborted) or abortOn.
+    expect(system.facts.data).toBe("r1");
+    system.destroy();
+    vi.restoreAllMocks();
+  });
+
+  it("a detached bound run's writes land (M1)", async () => {
+    let n = 0;
+    const system = loadSystem(
+      {
+        resolve: async (_req: unknown, context: any) => {
+          const k = ++n;
+          await sleep(k === 1 ? 30 : 5);
+          context.facts.log = [...context.facts.log, k];
+        },
+      },
+      { when: (facts: any) => facts.go, abortOn: ["status"] },
+    );
+    system.facts.go = true;
+    await sleep(5);
+    system.facts.go = false;
+    await sleep(5);
+    system.facts.go = true;
+    await sleep(60);
+    expect(system.facts.log).toEqual([2, 1]);
     expect(n).toBe(2);
+    system.destroy();
+  });
+
+  it("a detached bound run that checks its signal still writes (M1b)", async () => {
+    let n = 0;
+    const system = loadSystem(
+      {
+        resolve: async (_req: unknown, context: any) => {
+          const k = ++n;
+          await sleep(k === 1 ? 30 : 5);
+          if (context.signal.aborted) {
+            return;
+          }
+          context.facts.data = `won-by-${k}`;
+        },
+      },
+      { when: (facts: any) => facts.go, abortOn: ["status"] },
+    );
+    system.facts.go = true;
+    await sleep(5);
+    system.facts.go = false;
+    await sleep(5);
+    system.facts.go = true;
+    await sleep(60);
+    expect(system.facts.data).toBe("won-by-1");
+    system.destroy();
+  });
+
+  function guardedOnLoading(extra: Record<string, unknown> = {}) {
+    let n = 0;
+    const system = loadSystem(
+      {
+        ...extra,
+        resolve: async (_req: unknown, context: any) => {
+          const k = ++n;
+          if (context.facts.loading) {
+            return;
+          }
+          try {
+            context.facts.loading = true;
+            await sleep(20);
+            context.facts.data = `d${k}`;
+          } finally {
+            context.facts.loading = false;
+          }
+        },
+      },
+      { when: (facts: any) => facts.go },
+    );
+
+    return { system, runs: () => n };
+  }
+
+  it("canceled, re-dispatched, new run guarded on loading: the old finally lands (M2)", async () => {
+    const { system, runs } = guardedOnLoading();
+    system.facts.go = true;
+    await sleep(2);
+    system.facts.go = false;
+    await sleep(2);
+    system.facts.go = true;
+    await sleep(60);
+    expect(system.facts.loading).toBe(false);
+    expect(system.facts.data).toBe("d1");
+    expect(runs()).toBe(2);
+    system.destroy();
+  });
+
+  it("timed out, re-dispatched, new run guarded on loading: the old finally lands (M3)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { system, runs } = guardedOnLoading({ timeout: 5 });
+    system.facts.go = true;
+    await sleep(10);
+    system.facts.go = false;
+    await sleep(0);
+    system.facts.go = true;
+    await sleep(60);
+    expect(system.facts.loading).toBe(false);
+    expect(system.facts.data).toBe("d1");
+    expect(runs()).toBe(2);
     system.destroy();
     vi.restoreAllMocks();
   });
@@ -130,10 +251,15 @@ describe("the retry-later poller", () => {
   });
 
   it("does not keep the process alive", () => {
+    // CI builds every package before running tests. Fail loudly rather than
+    // pass by skipping if that order ever changes.
     const dist = join(here, "../../../dist/index.js");
-    if (!existsSync(dist)) {
-      return;
-    }
+    expect(
+      existsSync(dist),
+      "packages/core/dist is missing: run `pnpm --filter @directive-run/core build` before this test",
+    ).toBe(true);
+    // A constraint that throws on every evaluation keeps a retry pending,
+    // so the poller is running for the whole life of the process.
     const script = `
       const { createModule, createSystem, t } = await import(${JSON.stringify(dist)});
       const mod = createModule("m", {
@@ -142,8 +268,9 @@ describe("the retry-later poller", () => {
         constraints: { c: { when: () => { throw new Error("always"); }, require: { type: "R" } } },
         resolvers: { r: { requirement: "R", resolve: async () => {} } },
       });
-      const s = createSystem({ module: mod, errorBoundary: { onConstraintError: "retry-later" } });
+      const s = createSystem({ module: mod, errorBoundary: { onConstraintError: "retry-later", retryLater: { delayMs: 250, maxRetries: 1000 } } });
       s.start();
+      setTimeout(() => { globalThis.__polling = true; }, 600);
     `;
     const started = Date.now();
     const result = spawnSync(

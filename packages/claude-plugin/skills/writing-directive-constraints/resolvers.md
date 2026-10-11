@@ -249,9 +249,9 @@ resolvers: {
 
 ## Late Writes and Stale Runs
 
-A run's writes are dropped only when it is superseded: its requirement (same id) is dispatched again while its body is still running, including a body that already timed out, failed or was canceled. The new run owns the facts from then on.
+A run's late writes are dropped only when it is superseded while still in flight: its requirement (same id) returns and is dispatched again after the run had satisfied it. A run that timed out, failed, was canceled or was detached (RFC 0003) keeps its writes, so its `finally` blocks land.
 
-Runs for different requirement ids run in parallel and are not superseded by each other. If the key changes (`q: 0` to `q: 2`), the old run can still finish and write after the new one. Guarding that is the resolver's job: check `context.signal.aborted` before writing, or declare `abortOn` on the constraint so a write to a fact it owns is refused once the run is stale.
+That leaves two cases where an old run can write after a newer one: a run that timed out or was canceled and is still running when its requirement is dispatched again, and a run for a different requirement id after the key changed (`q: 0` to `q: 2`). Guarding both is the resolver's job: check `context.signal.aborted` before writing, or declare `abortOn` on the constraint so a write to a fact it owns is refused once the run is stale.
 
 ```typescript
 resolve: async (req, context) => {
