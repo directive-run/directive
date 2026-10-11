@@ -176,11 +176,14 @@ const dataModule = createModule("data", {
     },
   },
 
+  // Resolvers write their own facts flat; dependencies are read-only on context.deps
   resolvers: {
     fetchItems: {
       requirement: "FETCH_ITEMS",
       resolve: async (req, context) => {
-        const res = await fetch("/api/items");
+        const res = await fetch("/api/items", {
+          headers: { authorization: context.deps.auth.token },
+        });
         context.facts.items = await res.json();
         context.facts.loaded = true;
       },
@@ -199,6 +202,17 @@ const dataModule = createModule("data", {
   },
 });
 ```
+
+### What each callback sees
+
+| Callback | Own facts | Other modules |
+|---|---|---|
+| `init`, event handlers | `facts.x` (writable) | none |
+| `derive`, constraints, effects | `facts.self.x` | `facts.auth.x` (read-only) |
+| resolvers | `context.facts.x` (writable) | `context.deps.auth.x` (read-only) |
+| source `key` / `active` gates | `facts.self.x` (read-only) | `facts.auth.x` (read-only) |
+
+A resolver can't change another module's state. Writing through `context.deps.auth` throws in development and is ignored in production – emit a requirement or dispatch an event the other module owns instead. The older resolver spellings `context.facts.self.x` and `context.facts.auth.x` still read, and warn once per system in development, pointing at `context.facts` and `context.deps`.
 
 ### `derived` is scoped to the own module
 

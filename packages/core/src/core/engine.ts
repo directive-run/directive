@@ -41,7 +41,11 @@ import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
-import { type SourcesManager, createSourcesManager } from "./sources.js";
+import {
+  type SourcesManager,
+  createSourcesManager,
+  localSourceId,
+} from "./sources.js";
 import {
   BLOCKED_PROPS,
   derivationDepId,
@@ -1802,11 +1806,15 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /** Dispatch an event by name, handling snapshot flags and batching */
+  /**
+   * Dispatch an event by name, handling snapshot flags and batching.
+   *
+   * @returns Whether a handler was registered for the event.
+   */
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
-  ): void {
+  ): boolean {
     const handler = mergedEvents[eventName];
     if (handler) {
       dispatchDepth++;
@@ -1826,11 +1834,16 @@ export function createEngine<S extends Schema>(
       } finally {
         dispatchDepth--;
       }
-    } else if (isDevelopment) {
+
+      return true;
+    }
+    if (isDevelopment) {
       console.warn(
         `[Directive] Unknown event type "${eventName}". No handler is registered for this event. Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
       );
     }
+
+    return false;
   }
 
   // Create typed derive accessor using a Proxy
@@ -2609,23 +2622,55 @@ export function createEngine<S extends Schema>(
         onModuleUnregistered: (id: string) =>
           observer({ type: "module.unregistered", id }),
         onSourceAttach: (id: string, moduleId: string) =>
-          observer({ type: "source.attach", id, moduleId }),
+          observer({
+            type: "source.attach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
-          observer({ type: "source.publish", id, moduleId, eventName }),
+          observer({
+            type: "source.publish",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+          }),
         onSourceDrop: (
           id: string,
           moduleId: string,
           eventName: string,
           reason: import("./types/sources.js").SourceDropReason,
-        ) => observer({ type: "source.drop", id, moduleId, eventName, reason }),
+        ) =>
+          observer({
+            type: "source.drop",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+            reason,
+          }),
         onSourceDetach: (id: string, moduleId: string) =>
-          observer({ type: "source.detach", id, moduleId }),
+          observer({
+            type: "source.detach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourceError: (
           id: string,
           moduleId: string,
           phase: "attach" | "cleanup" | "runtime" | "gate",
           error: unknown,
-        ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        ) =>
+          observer({
+            type: "source.error",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            phase,
+            error,
+          }),
         onGuardrailBlocked: (
           plugin: string,
           key: string,
@@ -2805,10 +2850,17 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(eventName)) {
           return { accepted: false, reason: "blocked-event-name" };
         }
-        dispatchEventByName(
+        // A name with no handler is a drop, not a publish – otherwise the
+        // source's counters and `onPublish` report success for an event
+        // nothing ran (and production has no other signal at all).
+        const handled = dispatchEventByName(
           eventName,
           (payload ?? {}) as Record<string, unknown>,
         );
+        if (!handled) {
+          return { accepted: false, reason: "unknown-event" };
+        }
+
         return { accepted: true };
       });
 
@@ -3219,6 +3271,7 @@ export function createEngine<S extends Schema>(
         sources: sourcesManager.listDefinitions().map((row) => ({
           id: row.id,
           moduleId: row.moduleId,
+          localId: row.localId,
           meta: row.meta as DefinitionMeta | undefined,
           attached: row.attached,
           attachedAt: row.attachedAt,

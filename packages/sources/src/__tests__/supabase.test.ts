@@ -140,6 +140,55 @@ describe("sourceFromSupabaseChannel", () => {
     system.destroy();
   });
 
+  it("publishes into its own module in a namespaced system", () => {
+    const fake = makeFakeClient();
+    const game = createModule("game", {
+      schema: {
+        facts: { snapshot: t.string() },
+        events: { GAME_UPDATED: { snapshot: t.string() } },
+      },
+      init: (f) => {
+        f.snapshot = "";
+      },
+      events: {
+        GAME_UPDATED: (f, p) => {
+          f.snapshot = p.snapshot;
+        },
+      },
+      sources: {
+        game: sourceFromSupabaseChannel({
+          client: fake.client as unknown as Parameters<
+            typeof sourceFromSupabaseChannel
+          >[0]["client"],
+          channel: "game:abc",
+          events: [
+            {
+              event: "UPDATE",
+              table: "games",
+              map: (payload) => ({
+                name: "GAME_UPDATED",
+                payload: { snapshot: String(payload.new.snapshot) },
+              }),
+            },
+          ],
+        }),
+      },
+    });
+    const lobby = createModule("lobby", {
+      schema: { facts: { open: t.boolean() } },
+      init: (f) => {
+        f.open = true;
+      },
+    });
+    const system = createSystem({ modules: { game, lobby } });
+    system.start();
+    fake.lastChannel?.fireEvent("games", "UPDATE", { snapshot: "live-2" });
+    expect(system.facts.game.snapshot).toBe("live-2");
+    const row = system.inspect().sources.find((s) => s.id === "game::game");
+    expect(row?.publishCount).toBe(1);
+    system.destroy();
+  });
+
   it("returning null from `map` skips the publish", () => {
     const fake = makeFakeClient();
     const eventHandler = vi.fn();

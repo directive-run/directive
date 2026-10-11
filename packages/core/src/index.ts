@@ -83,6 +83,9 @@ export type {
   SystemDerived,
   // Cross-Module Dependencies
   CrossModuleDeps,
+  CrossModuleResolverContext,
+  CrossModuleResolversDef,
+  ResolverDeps,
   // Dynamic Definitions
   DynamicConstraintDef,
   DynamicEffectDef,
@@ -90,6 +93,7 @@ export type {
   // Sources — typed external event sources (inbound dual of effects).
   SourceDef,
   SourcesDef,
+  SourceGateFacts,
   SourcePublish,
   SourceUnsubscribe,
   SourceReportError,

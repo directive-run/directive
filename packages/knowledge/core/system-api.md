@@ -188,19 +188,24 @@ inspection.events;      // [{ name: "increment", meta: { ... } }]
 // plugin. Counters reset at every system.start() cycle.
 inspection.sources;
 // [{
-//   id: "supabaseRealtime",
+//   id: "messages::supabaseRealtime", // prefixed in a namespaced system
 //   moduleId: "messages",
+//   localId: "supabaseRealtime",      // the id the module declared
 //   attached: true,
 //   attachedAt: 1709000000,
 //   detachedAt: null,
+//   // publishCount counts publishes a handler ran for.
 //   publishCount: 47,
 //   lastPublishAt: 1709000123,
-//   // dropCount counts publishes the engine's dispatch guard rejected
-//   // (post-stop, BLOCKED_PROPS event name, empty / non-string name).
+//   // dropCount counts publishes the engine rejected (post-stop,
+//   // BLOCKED_PROPS event name, empty / non-string name, no handler for
+//   // the event) or the manager coalesced / dropped after the gate closed.
 //   dropCount: 0,
 //   lastDropReason: null,        // | "post-destroy" | "post-stop"
 //                                 // | "blocked-event-name"
 //                                 // | "invalid-event-name"
+//                                 // | "unknown-event"
+//                                 // | "coalesced" | "gate-closed"
 //   lastDropAt: null,
 //   errorCount: 0,
 //   lastError: null,             // { phase, message (truncated), at } | null

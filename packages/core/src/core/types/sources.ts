@@ -132,7 +132,8 @@ export type SourceDropReason =
   | "blocked-event-name"
   | "invalid-event-name"
   | "coalesced"
-  | "gate-closed";
+  | "gate-closed"
+  | "unknown-event";
 
 /**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
@@ -147,10 +148,14 @@ export type SourceDropReason =
  * - `publish('KNOWN_EVENT', payload)` — dispatches into the module's event
  *   handler. The payload is augmented with `{ type: eventName, ...payload }`
  *   before passing to the handler (same shape as `system.events.X(payload)`).
- * - `publish('UNKNOWN_EVENT', ...)` — in development, logs a
- *   `[Directive] Unknown event type` warning and drops the dispatch.
- *   In production, silently drops. **This is a footgun for sources** —
- *   strongly prefer wrapping `publish` in a typed factory (per the example).
+ *   In a namespaced system the name is scoped to the source's own module
+ *   (`START` → `loop::START`); a name already containing `::` is
+ *   dispatched as written.
+ * - `publish('UNKNOWN_EVENT', ...)` — dropped and counted as a drop with
+ *   reason `"unknown-event"` (`dropCount`, `lastDropReason`, `onSourceDrop`),
+ *   in production too. Development also logs a
+ *   `[Directive] Unknown event type` warning. Prefer wrapping `publish` in
+ *   a typed factory (per the example).
  * - `publish(event, undefined)` — dispatches with an empty payload object.
  * - Calling `publish` after `system.destroy()` — silently no-ops. The
  *   engine guards against post-destroy dispatch so stale source callbacks
@@ -245,10 +250,15 @@ export interface SourceAttachContext {
  * subscribed, but it MUST NOT write facts (the gate is a fact-only
  * derivation; writing would break the determinism invariant that lets
  * replay re-derive the key without re-attaching the transport).
+ *
+ * In a namespaced system the gate sees its own module's facts by their bare
+ * names (`facts.gameId`), or `facts.self.*` / `facts.{dep}.*` when the module
+ * declares `crossModuleDeps` – the same scoping a constraint gets. A write
+ * throws and is reported as a `phase: "gate"` error.
  */
 export type SourceGateFacts = Readonly<Record<string, unknown>>;
 
-export interface SourceDef {
+export interface SourceDef<F = SourceGateFacts> {
   /**
    * Mount the source against the system. Runs once at `system.start()`
    * for ungated sources, or once per rising gate edge for keyed sources.
@@ -308,7 +318,7 @@ export interface SourceDef {
    * }
    * ```
    */
-  key?: (facts: SourceGateFacts) => string | null;
+  key?: (facts: F) => string | null;
   /**
    * RFC 0010 — sugar for a simple on/off gate. `active: f => cond` is
    * normalized at registration to `key: f => cond ? "__on__" : null`, so
@@ -329,7 +339,7 @@ export interface SourceDef {
    * }
    * ```
    */
-  active?: (facts: SourceGateFacts) => boolean;
+  active?: (facts: F) => boolean;
   /**
    * RFC 0010 — hysteresis (in ms) on a FALLING gate edge (key → null) or a
    * re-key edge (key A → key B). When set, the manager WAITS this long
@@ -419,8 +429,12 @@ export interface SourceDef {
 }
 
 /**
- * Map of source definitions, keyed by source name. Collision rules match
- * effects/events/constraints: a source name must be unique across all
- * modules in a system.
+ * Map of source definitions, keyed by source name. A name must be unique
+ * within its module; in a namespaced system ids are prefixed (`ns::name`),
+ * so two modules may use the same name.
+ *
+ * `F` types what a `key` / `active` gate reads. `createModule` fills it from
+ * the module schema: own facts by name, or `self` plus each dependency when
+ * the module declares `crossModuleDeps`.
  */
-export type SourcesDef = Record<string, SourceDef>;
+export type SourcesDef<F = SourceGateFacts> = Record<string, SourceDef<F>>;

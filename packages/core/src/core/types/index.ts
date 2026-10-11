@@ -79,6 +79,7 @@ export type { EffectDef, EffectsDef, EffectCleanup } from "./effects.js";
 export type {
   SourceDef,
   SourcesDef,
+  SourceGateFacts,
   SourcePublish,
   SourceUnsubscribe,
   SourceDropReason,
@@ -155,6 +156,9 @@ export type {
   CrossModuleConstraintsDef,
   CrossModuleEffectDef,
   CrossModuleEffectsDef,
+  CrossModuleResolverContext,
+  CrossModuleResolversDef,
+  ResolverDeps,
 } from "./module.js";
 
 // System types
