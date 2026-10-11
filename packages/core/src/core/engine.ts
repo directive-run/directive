@@ -48,7 +48,6 @@ import {
 } from "./sources.js";
 import {
   BLOCKED_PROPS,
-  derivationDep,
   derivationDepId,
   describeDep,
   isDerivationDep,
@@ -1333,43 +1332,48 @@ export function createEngine<S extends Schema>(
     if (!deps) {
       return false;
     }
+    // Fact deps first, without allocating: the common case has no
+    // derivation in between.
     let changed = 0;
-    let foreign = false;
-    let seen: Set<string> | null = null;
-    const checkFact = (key: string): void => {
-      if (!passKeys.has(key)) {
-        return;
+    let derivationIds: string[] | null = null;
+    for (const name of deps) {
+      if (isDerivationDep(name)) {
+        (derivationIds ??= []).push(derivationDepId(name));
+        continue;
+      }
+      if (!passKeys.has(name)) {
+        continue;
       }
       changed++;
-      if ((joint.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
-        foreign = true;
+      if ((joint.get(name) ?? 0) !== (passCounts.get(name) ?? 0)) {
+        return false;
       }
-    };
-    const visit = (names: Iterable<string>): void => {
-      for (const name of names) {
-        if (foreign) {
-          return;
-        }
-        if (!isDerivationDep(name)) {
-          checkFact(name);
-          continue;
-        }
-        const id = derivationDepId(name);
-        seen ??= new Set();
+    }
+    if (derivationIds !== null) {
+      const seen = new Set<string>();
+      while (derivationIds.length > 0) {
+        const id = derivationIds.pop()!;
         if (seen.has(id)) {
           continue;
         }
         seen.add(id);
         const edges = derivationsManager.dependencyEdges(id);
         for (const key of edges.facts) {
-          checkFact(key);
+          if (!passKeys.has(key)) {
+            continue;
+          }
+          changed++;
+          if ((joint.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
+            return false;
+          }
         }
-        visit(edges.derivations.map(derivationDep));
+        for (const next of edges.derivations) {
+          derivationIds.push(next);
+        }
       }
-    };
-    visit(deps);
+    }
 
-    return changed > 0 && !foreign;
+    return changed > 0;
   }
 
   /**
@@ -3210,6 +3214,10 @@ export function createEngine<S extends Schema>(
     },
 
     start(): void {
+      // Anything outside the facts may have changed while stopped, and a
+      // `when` should not depend on it, but re-evaluating every constraint
+      // once on start costs one full pass and makes stop()/start() a reset.
+      constraintsManager.markAllDirty();
       if (state.isRunning) return;
       // follow-up — refuse to start while an eviction is in flight
       // or after the system has been destroyed. Both are terminal-ish:
@@ -3334,6 +3342,12 @@ export function createEngine<S extends Schema>(
               if (entry.callback) {
                 entry.callback();
               } else {
+                // A constraint that threw is re-evaluated by name: a pass
+                // with no changed keys would otherwise carry its last
+                // answer forward and never ask it again.
+                if (entry.source === "constraint") {
+                  constraintsManager.markDirty(entry.sourceId);
+                }
                 scheduleReconcile();
               }
             }

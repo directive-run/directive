@@ -18,3 +18,8 @@ Three behaviors are now defined by rule instead of by how many microtasks a pass
 - **`ctx.requeue()` waits for its resolver.** The requeue is applied once the requeuing resolver has finished. Before, a resolver still running at the end of the next pass had its re-dispatch dropped as a duplicate.
 
 Plugin events at startup may arrive in a different order: plugin `onInit` runs asynchronously and is not awaited, so a plugin can see the first `constraint.evaluate` before its own `system.init`. Nothing guaranteed either order.
+
+**Constraint re-evaluation is now defined, not incidental.** A pass that changed nothing a constraint reads carries its last answer forward instead of re-evaluating every constraint. A constraint is re-evaluated when a fact or derivation it read changes, when it is registered, enabled or assigned, on `start()`, and when `retry-later` retries it. A `when` that throws keeps the dependencies it read before throwing; an async `when` without `deps` is re-evaluated every pass. A `when` must be a pure function of facts and derivations: one that read the clock or an outside variable used to be re-asked by unrelated passes (a resolver finishing, for example) and no longer is. Put time and outside input in a fact or a source.
+
+**Errors after a run satisfied its requirement** are passed on as the original error; only the development warning changes (it no longer says the requirement stays unmet).
+

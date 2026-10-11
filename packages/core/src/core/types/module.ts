@@ -196,6 +196,14 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
    * derivation body receives them. Gate on it directly — reaching back through
    * `system.derive` works in a single-module system and silently resolves a
    * namespace once the module is composed with others.
+   *
+   * Keep it a pure function of `facts` and `derived`. A constraint is
+   * re-evaluated when a fact or derivation it read changes (and on
+   * `start()`), so a `when` that reads the clock or a variable outside the
+   * system is not re-asked when that changes. Put time and outside input in
+   * a fact, or publish it from a source. An async `when` without `deps` is
+   * re-evaluated on every pass, because reads after its first `await` cannot
+   * be tracked: declare `deps`.
    */
   when:
     | ((

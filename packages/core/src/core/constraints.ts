@@ -154,6 +154,21 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   hasDirty(): boolean;
   /**
+   * Mark one constraint for re-evaluation on the next pass, whatever
+   * changed. Used when something other than a fact makes its answer stale
+   * (a retry-later of a constraint that threw).
+   *
+   * @internal
+   */
+  markDirty(constraintId: string): void;
+  /**
+   * Mark every constraint for re-evaluation on the next pass. Used by
+   * `start()`, since anything may have changed while stopped.
+   *
+   * @internal
+   */
+  markAllDirty(): void;
+  /**
    * Check whether a constraint is currently disabled.
    *
    * @param id - The constraint definition ID.
@@ -485,6 +500,28 @@ export function createConstraintsManager<S extends Schema>(
 
   // Track which constraints are async
   const asyncConstraintIds = new Set<string>();
+  /**
+   * Async constraints with no declared `deps`. Their reads past the first
+   * `await` cannot be tracked, so no changed key reliably wakes them; they
+   * are evaluated on every pass instead (and warned about in development).
+   * Cached; reset whenever definitions or async detection change.
+   */
+  let untrackedAsyncCache: string[] | null = null;
+  function untrackedAsyncIds(): string[] {
+    if (untrackedAsyncCache === null) {
+      untrackedAsyncCache = Object.keys(definitions).filter((id) => {
+        const def = definitions[id];
+
+        return (
+          def !== undefined &&
+          !def.deps &&
+          (def.async === true || asyncConstraintIds.has(id))
+        );
+      });
+    }
+
+    return untrackedAsyncCache;
+  }
 
   // Dependency tracking: which facts each constraint depends on
   const constraintDeps = new Map<string, Set<string>>();
@@ -661,6 +698,7 @@ export function createConstraintsManager<S extends Schema>(
     const isAsync = isAsyncConstraint(id, def);
     if (isAsync) {
       asyncConstraintIds.add(id);
+      untrackedAsyncCache = null;
     }
 
     const state: ConstraintState = {
@@ -776,9 +814,26 @@ export function createConstraintsManager<S extends Schema>(
       return whenFn(facts, derived);
     }
 
-    // Track dependencies during evaluation
-    const tracked = withTracking(() => whenFn(facts, derived));
+    // Track dependencies during evaluation. Kept when `when` throws too:
+    // the facts it read before throwing are the ones whose change can fix
+    // it, so a later write to one of them wakes the constraint. Dropping
+    // them left a constraint that threw once with no dependencies at all.
+    let threw = false;
+    let thrown: unknown;
+    const tracked = withTracking(() => {
+      try {
+        return whenFn(facts, derived);
+      } catch (error) {
+        threw = true;
+        thrown = error;
+
+        return false;
+      }
+    });
     latestWhenDeps.set(id, tracked.deps);
+    if (threw) {
+      throw thrown;
+    }
 
     return tracked.value;
   }
@@ -817,6 +872,7 @@ export function createConstraintsManager<S extends Schema>(
     promise: Promise<boolean>,
   ): Promise<boolean> {
     asyncConstraintIds.add(id);
+    untrackedAsyncCache = null;
     state.isAsync = true;
 
     if (isDevelopment) {
@@ -1333,6 +1389,11 @@ export function createConstraintsManager<S extends Schema>(
     const affected = new Set<string>();
     collectAffectedByKeys(changedKeys, affected);
     collectDirtyConstraints(affected);
+    for (const id of untrackedAsyncIds()) {
+      if (!disabled.has(id)) {
+        affected.add(id);
+      }
+    }
 
     return affected;
   }
@@ -1373,9 +1434,11 @@ export function createConstraintsManager<S extends Schema>(
       let constraintsToEvaluate: string[];
 
       if (!hasEvaluated || !changedKeys || changedKeys.size === 0) {
-        // First evaluation or no specific changes: evaluate all
+        // First evaluation or no specific changes: evaluate all, which
+        // covers every dirty mark too.
         constraintsToEvaluate = allConstraintIds;
         hasEvaluated = true;
+        dirtyConstraints.clear();
       } else {
         const affected = computeAffectedConstraints(changedKeys);
         constraintsToEvaluate = [...affected];
@@ -1417,6 +1480,11 @@ export function createConstraintsManager<S extends Schema>(
       // answer is last pass's carried forward, not a full re-evaluation.
       if (!hasEvaluated) {
         return null;
+      }
+      for (const id of untrackedAsyncIds()) {
+        if (!disabled.has(id)) {
+          return null;
+        }
       }
       for (const id of dirtyConstraints) {
         if (!disabled.has(id)) {
@@ -1490,6 +1558,7 @@ export function createConstraintsManager<S extends Schema>(
       disabled.add(id);
       // Invalidate cache when constraints change
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Mark as dirty so it gets removed from requirements on next evaluate
       lastRequirements.delete(id);
       // Clean up dependency maps for disabled constraint
@@ -1508,6 +1577,7 @@ export function createConstraintsManager<S extends Schema>(
       disabled.delete(id);
       // Invalidate cache when constraints change
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Mark as dirty so it gets evaluated on next cycle
       dirtyConstraints.add(id);
     },
@@ -1544,6 +1614,18 @@ export function createConstraintsManager<S extends Schema>(
       }
     },
 
+    markDirty(constraintId: string): void {
+      if (definitions[constraintId]) {
+        dirtyConstraints.add(constraintId);
+      }
+    },
+
+    markAllDirty(): void {
+      for (const id of Object.keys(definitions)) {
+        dirtyConstraints.add(id);
+      }
+    },
+
     hasDirty(): boolean {
       for (const id of dirtyConstraints) {
         if (!disabled.has(id)) {
@@ -1571,6 +1653,7 @@ export function createConstraintsManager<S extends Schema>(
       }
       // Invalidate cached sort order
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Only rebuild topo order when new constraints have `after` dependencies
       if (hasAfterDeps) {
         detectCyclesAndComputeTopoOrder();
@@ -1598,6 +1681,7 @@ export function createConstraintsManager<S extends Schema>(
       dirtyConstraints.add(id);
       // Invalidate cached sort order (priority may have changed)
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Rebuild topo order + reverse deps in case `after` changed
       detectCyclesAndComputeTopoOrder();
       buildReverseDependencyMap();
@@ -1613,6 +1697,7 @@ export function createConstraintsManager<S extends Schema>(
       states.delete(id);
       disabled.delete(id);
       asyncConstraintIds.delete(id);
+      untrackedAsyncCache = null;
       dirtyConstraints.delete(id);
       noFireConstraints.delete(id);
       resolvedConstraints.delete(id);
@@ -1625,6 +1710,7 @@ export function createConstraintsManager<S extends Schema>(
 
       // Invalidate cached sort order
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Rebuild topo order
       detectCyclesAndComputeTopoOrder();
       buildReverseDependencyMap();

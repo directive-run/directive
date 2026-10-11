@@ -51,6 +51,27 @@ export interface PendingRetry {
  *
  * @internal
  */
+/**
+ * Errors a resolver run reported after it had already satisfied its
+ * requirement. The error itself is passed on untouched; this only stops the
+ * development warning from saying the requirement stays unmet.
+ */
+const failuresAfterSatisfied = new WeakSet<object>();
+
+/** @internal */
+export function noteFailureAfterSatisfied(error: Error): void {
+  failuresAfterSatisfied.add(error);
+}
+
+/** @internal Whether a resolver error came after its requirement was met. */
+export function isFailureAfterSatisfied(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    failuresAfterSatisfied.has(error)
+  );
+}
+
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
   /** Schedule a retry */
   scheduleRetry: (
@@ -342,8 +363,9 @@ export function createErrorBoundaryManager(
         ? (context as { requirement: { type: string } }).requirement.type
         : null;
     const satisfied =
-      (error as { satisfiedRequirement?: boolean } | null)
-        ?.satisfiedRequirement === true;
+      typeof error === "object" &&
+      error !== null &&
+      failuresAfterSatisfied.has(error);
     const consequence =
       requirementType && !satisfied
         ? ` Requirement "${requirementType}" stays unmet.`

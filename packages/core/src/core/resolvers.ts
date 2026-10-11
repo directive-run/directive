@@ -11,6 +11,7 @@
 
 import isDevelopment from "#is-development";
 import { TIMEOUT_MARKER, withTimeout } from "../utils/utils.js";
+import { noteFailureAfterSatisfied } from "./errors.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -1048,16 +1049,11 @@ export function createResolversManager<S extends Schema>(
     record.discard = true;
     controller.abort();
     endRun(controller);
-    const message = error instanceof Error ? error.message : String(error);
-    const wrapped = new Error(
-      `Resolver failed after satisfying its requirement: ${message}`,
-      { cause: error },
-    );
-    (
-      wrapped as Error & { satisfiedRequirement?: boolean }
-    ).satisfiedRequirement = true;
+    const normalized =
+      error instanceof Error ? error : new Error(String(error));
+    noteFailureAfterSatisfied(normalized);
 
-    return wrapped;
+    return normalized;
   }
 
   /** `ctx.facts` for one run: counts the changes it makes, drops them once discarded. */
@@ -2271,6 +2267,9 @@ export function createResolversManager<S extends Schema>(
     },
 
     beginPass(): void {
+      if (liveRuns.size === 0) {
+        return;
+      }
       for (const record of liveRuns) {
         const done = record.pass;
         record.pass = record.current;
