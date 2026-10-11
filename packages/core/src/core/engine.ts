@@ -765,8 +765,17 @@ export function createEngine<S extends Schema>(
   /** Whether the previous pass took (or refreshed) a history snapshot. */
   let lastPassSnapshotted = false;
 
+  /**
+   * Changes made in the current pass, counted per key, double-buffered like
+   * `changedKeys`. Compared with a resolver run's own counts to tell whether
+   * that run is the only thing that changed a key.
+   */
+  let writeCounts = new Map<string, number>();
+  let spareWriteCounts = new Map<string, number>();
+
   function noteChangedKey(key: string): void {
     state.changedKeys.add(key);
+    writeCounts.set(key, (writeCounts.get(key) ?? 0) + 1);
     if (effectsPhaseOpen) {
       effectPhaseWrites++;
       if (effectsManager.runningEffect() !== null) {
@@ -1270,24 +1279,31 @@ export function createEngine<S extends Schema>(
   const pendingRequeueIds = new Set<string>();
 
   /**
-   * Whether the resolver still running for `req` wrote a fact its constraint
-   * reads, directly or through a derivation, since the last pass. That write
-   * is then what retracted the requirement.
+   * Whether the run still resolving `req` satisfied it with its own write:
+   * in this pass, at least one fact the constraint reads (directly or
+   * through a derivation) changed, and every such change was that run's.
+   * Anything else that touched what the constraint reads makes it an
+   * ordinary retraction, and the run is canceled as before.
    */
-  function retractedByOwnWrite(req: RequirementWithId): boolean {
+  function satisfiedByOwnWrite(
+    req: RequirementWithId,
+    passKeys: Set<string>,
+    passCounts: Map<string, number>,
+  ): boolean {
     if (!req.fromConstraint) {
       return false;
     }
-    const written = resolversManager.writesFor(req.id);
-    if (written === null) {
+    const own = resolversManager.passWritesFor(req.id);
+    if (own === null) {
       return false;
     }
     const deps = constraintsManager.getDependencies(req.fromConstraint);
     if (!deps) {
       return false;
     }
+    const factKeys = new Set<string>();
     const seen = new Set<string>();
-    const reads = (names: Iterable<string>): boolean => {
+    const collect = (names: Iterable<string>): void => {
       for (const name of names) {
         if (isDerivationDep(name)) {
           const id = derivationDepId(name);
@@ -1296,21 +1312,28 @@ export function createEngine<S extends Schema>(
           }
           seen.add(id);
           const edges = derivationsManager.dependencyEdges(id);
-          if (
-            edges.facts.some((key) => written.has(key)) ||
-            reads(edges.derivations.map(derivationDep))
-          ) {
-            return true;
+          for (const key of edges.facts) {
+            factKeys.add(key);
           }
-        } else if (written.has(name)) {
-          return true;
+          collect(edges.derivations.map(derivationDep));
+        } else {
+          factKeys.add(name);
         }
       }
-
-      return false;
     };
+    collect(deps);
+    let changed = 0;
+    for (const key of factKeys) {
+      if (!passKeys.has(key)) {
+        continue;
+      }
+      changed++;
+      if ((own.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
+        return false;
+      }
+    }
 
-    return reads(deps);
+    return changed > 0;
   }
 
   /**
@@ -1687,6 +1710,11 @@ export function createEngine<S extends Schema>(
     spareChangedKeys.clear();
     state.changedKeys = spareChangedKeys;
     spareChangedKeys = passKeys;
+    const passCounts = writeCounts;
+    spareWriteCounts.clear();
+    writeCounts = spareWriteCounts;
+    spareWriteCounts = passCounts;
+    resolversManager.beginPass();
     if (passFromEffects) {
       previousChainKeys = new Set(passKeys);
     }
@@ -1922,15 +1950,15 @@ export function createEngine<S extends Schema>(
         const bound = req.fromConstraint
           ? getConstraintBinding(req.fromConstraint)
           : undefined;
-        if (retractedByOwnWrite(req)) {
-          // The resolver's own write is what made its requirement go away:
-          // it has done its job. Released rather than canceled, it completes
-          // and reports completion only. Decided from what it wrote, not from
-          // how far its promise has got, so the answer is the same however
-          // many microtasks pass between its write and its return. Released,
-          // not kept in place, so the requirement re-dispatches if it comes
-          // back before this run ends (a fresh request mid-flight).
-          resolversManager.release(req.id);
+        if (satisfiedByOwnWrite(req, passKeys, passCounts)) {
+          // The run's own write, and nothing else, made its requirement go
+          // away: it satisfied it. It is not canceled; it finishes and
+          // reports completion. Decided from what it wrote, not from how far
+          // its promise has got, so the answer does not depend on timing.
+          // It stays in flight, so stop() aborts it and settle() waits for
+          // it; it is not retried; and if the requirement comes back while
+          // it runs, the new dispatch supersedes it.
+          resolversManager.markSatisfied(req.id);
           continue;
         }
         if (bound) {
@@ -1939,7 +1967,6 @@ export function createEngine<S extends Schema>(
           resolversManager.abort(req.id);
         }
       }
-      resolversManager.clearWriteRecords();
 
       // Start resolvers for new requirements. Snapshot facts ONCE before the
       // dispatch loop so every resolver in this reconcile tick observes the

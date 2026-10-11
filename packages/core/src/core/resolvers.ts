@@ -149,16 +149,6 @@ export interface ResolversManager<_S extends Schema> {
    */
   detach(requirementId: string): void;
   /**
-   * Like {@link ResolversManager.detach}, for a resolver whose own write
-   * retracted its requirement: it keeps running and reports completion, the
-   * requirement can re-dispatch if it returns, and it still counts toward
-   * {@link ResolversManager.getInflightCount} until it finishes, so
-   * `settle()` waits for it.
-   *
-   * @internal
-   */
-  release(requirementId: string): void;
-  /**
    * Abort every in-flight resolver and flush all pending batch queues.
    */
   abortAll(): void;
@@ -195,21 +185,32 @@ export interface ResolversManager<_S extends Schema> {
    */
   isResolving(requirementId: string): boolean;
   /**
-   * The fact keys written through `ctx.facts` by the resolver currently
-   * running for `requirementId` (single or batched), since the last
-   * {@link ResolversManager.clearWriteRecords}. `null` when nothing is
-   * running for it or it wrote nothing.
+   * Start a pass: what each running resolver wrote so far becomes "this
+   * pass's writes", and new writes are recorded for the next pass. Called by
+   * the engine at the same point it takes the pass's changed keys.
    *
    * @internal
    */
-  writesFor(requirementId: string): ReadonlySet<string> | null;
+  beginPass(): void;
   /**
-   * Forget the writes recorded so far. The engine calls this once per pass,
-   * after the requirement diff has consulted them.
+   * Changes the run resolving `requirementId` made through its own
+   * `ctx.facts` that belong to the current pass, counted per key. Only
+   * writes that changed a value are counted. `null` when nothing runs for
+   * it or it changed nothing.
    *
    * @internal
    */
-  clearWriteRecords(): void;
+  passWritesFor(requirementId: string): ReadonlyMap<string, number> | null;
+  /**
+   * Mark the run resolving `requirementId` as having satisfied its
+   * requirement with its own write. It keeps running and completes as
+   * usual, but is not retried if it then throws, and if the requirement is
+   * dispatched again while it runs, it is aborted and its later writes are
+   * discarded.
+   *
+   * @internal
+   */
+  markSatisfied(requirementId: string): void;
   /**
    * Immediately flush all pending batch queues, executing their resolvers.
    */
@@ -972,57 +973,72 @@ export function createResolversManager<S extends Schema>(
    *   `createBoundFacts` to defeat the sibling-clobber race.
    */
   /**
-   * Fact keys each resolver definition has written through `ctx.facts`
-   * since the engine last cleared them (once per pass). The engine reads
-   * them when a requirement disappears while its resolver is running: if
-   * the resolver's own write is what retracted it, the resolver has done its
-   * job and must complete, not be canceled. Kept per definition, not per
-   * run, so `ctx.facts` keeps one identity per resolver and the namespaced
-   * proxies cached on it are reused.
+   * What one run (one controller: a single resolver run or one batch) has
+   * written through its own `ctx.facts`. The engine reads `pass` when a
+   * requirement disappears while its run is going: if the run's own writes
+   * are the only change to what the constraint reads, the run satisfied it.
    */
-  const writeRecords = new Map<string, Set<string>>();
-  /** Runs released by {@link ResolversManager.release} that have not finished. */
-  const released = new Set<object>();
-  let releasedRunning = 0;
-  const recordingFacts = new Map<string, Facts<S>>();
+  interface RunRecord {
+    current: Map<string, number>;
+    pass: Map<string, number>;
+    satisfied: boolean;
+    /** Superseded after satisfying: later writes are dropped. */
+    discard: boolean;
+  }
+  const runRecords = new WeakMap<AbortController, RunRecord>();
+  const liveRuns = new Set<RunRecord>();
 
-  function recordWrites(target: Facts<S>, resolverId?: string): Facts<S> {
-    if (resolverId === undefined) {
-      return target;
+  function runRecordFor(controller: AbortController): RunRecord {
+    let record = runRecords.get(controller);
+    if (!record) {
+      record = {
+        current: new Map(),
+        pass: new Map(),
+        satisfied: false,
+        discard: false,
+      };
+      runRecords.set(controller, record);
+      liveRuns.add(record);
     }
-    let written = writeRecords.get(resolverId);
-    if (!written) {
-      written = new Set();
-      writeRecords.set(resolverId, written);
+
+    return record;
+  }
+
+  function endRun(controller: AbortController): void {
+    const record = runRecords.get(controller);
+    if (record) {
+      liveRuns.delete(record);
     }
-    const record = written;
+  }
+
+  /** `ctx.facts` for one run: counts the changes it makes, drops them once discarded. */
+  function recordRunWrites(target: Facts<S>, record: RunRecord): Facts<S> {
+    const count = (key: string) => {
+      record.current.set(key, (record.current.get(key) ?? 0) + 1);
+    };
 
     return new Proxy(target, {
       set(t, key, value) {
-        if (typeof key === "string") {
-          record.add(key);
+        if (record.discard) {
+          return true;
+        }
+        if (typeof key === "string" && !Object.is(Reflect.get(t, key), value)) {
+          count(key);
         }
 
         return Reflect.set(t, key, value);
       },
       deleteProperty(t, key) {
-        if (typeof key === "string") {
-          record.add(key);
+        if (record.discard) {
+          return true;
+        }
+        if (typeof key === "string" && Reflect.has(t, key)) {
+          count(key);
         }
 
         return Reflect.deleteProperty(t, key);
       },
     });
-  }
-
-  function recordingFactsFor(resolverId: string): Facts<S> {
-    let view = recordingFacts.get(resolverId);
-    if (!view) {
-      view = recordWrites(facts, resolverId);
-      recordingFacts.set(resolverId, view);
-    }
-
-    return view;
   }
 
   function createContext(
@@ -1054,22 +1070,20 @@ export function createResolversManager<S extends Schema>(
             }
           }
         : undefined;
-    const resolverId = clobberAttribution?.resolverId;
-    const ctxFacts =
+    const baseFacts =
       binding && controller
-        ? recordWrites(
-            createBoundFacts(
-              binding,
-              controller,
-              baseline,
-              onClobberDetected,
-              onClobberSuppressedForCtx,
-            ),
-            resolverId,
+        ? createBoundFacts(
+            binding,
+            controller,
+            baseline,
+            onClobberDetected,
+            onClobberSuppressedForCtx,
           )
-        : resolverId !== undefined
-          ? recordingFactsFor(resolverId)
-          : facts;
+        : facts;
+    const ctxFacts =
+      controller && requirementIds.length > 0
+        ? recordRunWrites(baseFacts, runRecordFor(controller))
+        : baseFacts;
     return {
       facts: ctxFacts,
       signal,
@@ -1312,6 +1326,11 @@ export function createResolversManager<S extends Schema>(
       if (controller.signal.aborted) {
         return;
       }
+      // Satisfied by its own write while waiting to retry: nothing is left
+      // to retry for. The failure is reported once.
+      if (attempt > 1 && runRecords.get(controller)?.satisfied) {
+        break;
+      }
 
       updateInflightAttempt(req.id, attempt, startedAt);
 
@@ -1324,10 +1343,23 @@ export function createResolversManager<S extends Schema>(
           controller,
           baseline,
         );
+        if (runRecords.get(controller)?.discard) {
+          return;
+        }
         recordSuccess(resolverId, req, startedAt);
 
         return;
       } catch (error) {
+        const record = runRecords.get(controller);
+        if (record?.discard) {
+          return;
+        }
+        if (record?.satisfied) {
+          // It already satisfied its requirement; there is nothing left to
+          // retry for. Reported once.
+          lastError = error instanceof Error ? error : new Error(String(error));
+          break;
+        }
         const outcome = await processRetryError(
           error,
           attempt,
@@ -1573,6 +1605,9 @@ export function createResolversManager<S extends Schema>(
       if (controller.signal.aborted) {
         return null;
       }
+      if (attempt > 1 && runRecords.get(controller)?.satisfied) {
+        break;
+      }
 
       try {
         const outcome = await executeBatchAttempt(
@@ -1590,6 +1625,9 @@ export function createResolversManager<S extends Schema>(
           return null;
         }
       } catch (error) {
+        if (runRecords.get(controller)?.satisfied) {
+          return error instanceof Error ? error : new Error(String(error));
+        }
         const outcome = await processRetryError(
           error,
           attempt,
@@ -1666,6 +1704,7 @@ export function createResolversManager<S extends Schema>(
         controller,
       );
     } finally {
+      endRun(controller);
       batchInflight.delete(batchInstanceId);
       for (const r of requirements) {
         const owners = reqToBatch.get(r.id);
@@ -1795,9 +1834,26 @@ export function createResolversManager<S extends Schema>(
       req: RequirementWithId,
       options?: { factsBaseline?: Readonly<Record<string, unknown>> },
     ): void {
-      // Already resolving?
-      if (inflight.has(req.id)) {
-        return;
+      // Already resolving? A run that satisfied this requirement with its own
+      // write and is still going is superseded: the requirement is back, so
+      // a fresh run handles it, and the old one is aborted with its later
+      // writes dropped so it cannot overwrite the new run's result.
+      const current = inflight.get(req.id);
+      if (current) {
+        const record = runRecords.get(current.controller);
+        if (!record?.satisfied) {
+          return;
+        }
+        record.discard = true;
+        current.controller.abort();
+        inflight.delete(req.id);
+        statuses.set(req.id, {
+          state: "canceled",
+          requirementId: req.id,
+          canceledAt: Date.now(),
+        });
+        cleanupStatuses();
+        onCancel?.(current.resolverId, current.originalRequirement);
       }
 
       // Find resolver
@@ -1859,15 +1915,12 @@ export function createResolversManager<S extends Schema>(
         // Only fire onResolutionComplete if we're the first to clean up.
         // If abort() already removed us from inflight, skip to avoid
         // spurious double-notifications.
+        endRun(controller);
+        // Only this run's own slot: after a supersede the slot holds the
+        // run that replaced it.
         const wasInflight = inflight.get(req.id) === state;
         if (wasInflight) {
           inflight.delete(req.id);
-        }
-        const wasReleased = released.delete(state);
-        if (wasReleased) {
-          releasedRunning--;
-        }
-        if (wasInflight || wasReleased) {
           onResolutionComplete?.();
         }
         running.delete(runKey);
@@ -2013,16 +2066,6 @@ export function createResolversManager<S extends Schema>(
       }
     },
 
-    release(requirementId: string): void {
-      const state = inflight.get(requirementId);
-      if (!state) {
-        return;
-      }
-      inflight.delete(requirementId);
-      releasedRunning++;
-      released.add(state);
-    },
-
     detach(requirementId: string): void {
       // Untrack only — do NOT abort the controller. The resolver runs to
       // completion; its `.finally()` will find the slot already gone and skip
@@ -2101,39 +2144,59 @@ export function createResolversManager<S extends Schema>(
     },
 
     getInflightCount(): number {
-      return inflight.size + releasedRunning;
+      return inflight.size;
     },
 
     isResolving(requirementId: string): boolean {
       return inflight.has(requirementId);
     },
 
-    writesFor(requirementId: string): ReadonlySet<string> | null {
+    beginPass(): void {
+      for (const record of liveRuns) {
+        const done = record.pass;
+        done.clear();
+        record.pass = record.current;
+        record.current = done;
+      }
+    },
+
+    passWritesFor(requirementId: string): ReadonlyMap<string, number> | null {
       const single = inflight.get(requirementId);
       if (single) {
-        const written = writeRecords.get(single.resolverId);
+        const record = runRecords.get(single.controller);
 
-        return written && written.size > 0 ? written : null;
+        return record && record.pass.size > 0 ? record.pass : null;
       }
       const owners = reqToBatch.get(requirementId);
-      if (owners) {
+      if (owners && owners.size === 1) {
         for (const batchInstanceId of owners) {
           const batchState = batchInflight.get(batchInstanceId);
-          const written = batchState
-            ? writeRecords.get(batchState.resolverId)
+          const record = batchState
+            ? runRecords.get(batchState.controller)
             : undefined;
-          if (written && written.size > 0) {
-            return written;
-          }
+
+          return record && record.pass.size > 0 ? record.pass : null;
         }
       }
 
       return null;
     },
 
-    clearWriteRecords(): void {
-      for (const written of writeRecords.values()) {
-        written.clear();
+    markSatisfied(requirementId: string): void {
+      const single = inflight.get(requirementId);
+      if (single) {
+        runRecordFor(single.controller).satisfied = true;
+
+        return;
+      }
+      const owners = reqToBatch.get(requirementId);
+      if (owners) {
+        for (const batchInstanceId of owners) {
+          const batchState = batchInflight.get(batchInstanceId);
+          if (batchState) {
+            runRecordFor(batchState.controller).satisfied = true;
+          }
+        }
       }
     },
 
@@ -2178,8 +2241,6 @@ export function createResolversManager<S extends Schema>(
       if (!definitions[id]) {
         return;
       }
-      writeRecords.delete(id);
-      recordingFacts.delete(id);
 
       // Cancel any inflight resolutions using this resolver
       for (const [reqId, state] of inflight) {
