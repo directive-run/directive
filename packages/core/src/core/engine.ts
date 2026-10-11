@@ -775,7 +775,9 @@ export function createEngine<S extends Schema>(
 
   function noteChangedKey(key: string): void {
     state.changedKeys.add(key);
-    writeCounts.set(key, (writeCounts.get(key) ?? 0) + 1);
+    if (resolversManager.hasLiveRuns()) {
+      writeCounts.set(key, (writeCounts.get(key) ?? 0) + 1);
+    }
     if (effectsPhaseOpen) {
       effectPhaseWrites++;
       if (effectsManager.runningEffect() !== null) {
@@ -1279,61 +1281,95 @@ export function createEngine<S extends Schema>(
   const pendingRequeueIds = new Set<string>();
 
   /**
-   * Whether the run still resolving `req` satisfied it with its own write:
-   * in this pass, at least one fact the constraint reads (directly or
-   * through a derivation) changed, and every such change was that run's.
-   * Anything else that touched what the constraint reads makes it an
-   * ordinary retraction, and the run is canceled as before.
+   * The writes of every run whose requirement disappeared in this pass,
+   * summed per key: those runs own the pass's changes jointly. `null` when
+   * none of them wrote anything.
+   */
+  function jointPassWrites(
+    removed: RequirementWithId[],
+  ): ReadonlyMap<string, number> | null {
+    let only: ReadonlyMap<string, number> | null = null;
+    let joint: Map<string, number> | null = null;
+    for (const req of removed) {
+      const own = resolversManager.passWritesFor(req.id);
+      if (own === null || own === only) {
+        continue;
+      }
+      if (only === null) {
+        only = own;
+        continue;
+      }
+      if (joint === null) {
+        joint = new Map(only);
+      }
+      for (const [key, n] of own) {
+        joint.set(key, (joint.get(key) ?? 0) + n);
+      }
+    }
+
+    return joint ?? only;
+  }
+
+  /**
+   * Whether the run still resolving `req` satisfied it: it wrote something
+   * this pass, and every change this pass to a fact the constraint reads
+   * (directly or through a derivation) came from the runs whose
+   * requirements disappeared in this pass. Anything else that touched what
+   * the constraint reads makes it an ordinary retraction, canceled as before.
    */
   function satisfiedByOwnWrite(
     req: RequirementWithId,
     passKeys: Set<string>,
     passCounts: Map<string, number>,
+    joint: ReadonlyMap<string, number>,
   ): boolean {
-    if (!req.fromConstraint) {
-      return false;
-    }
-    const own = resolversManager.passWritesFor(req.id);
-    if (own === null) {
+    if (
+      !req.fromConstraint ||
+      resolversManager.passWritesFor(req.id) === null
+    ) {
       return false;
     }
     const deps = constraintsManager.getDependencies(req.fromConstraint);
     if (!deps) {
       return false;
     }
-    const factKeys = new Set<string>();
-    const seen = new Set<string>();
-    const collect = (names: Iterable<string>): void => {
-      for (const name of names) {
-        if (isDerivationDep(name)) {
-          const id = derivationDepId(name);
-          if (seen.has(id)) {
-            continue;
-          }
-          seen.add(id);
-          const edges = derivationsManager.dependencyEdges(id);
-          for (const key of edges.facts) {
-            factKeys.add(key);
-          }
-          collect(edges.derivations.map(derivationDep));
-        } else {
-          factKeys.add(name);
-        }
-      }
-    };
-    collect(deps);
     let changed = 0;
-    for (const key of factKeys) {
+    let foreign = false;
+    let seen: Set<string> | null = null;
+    const checkFact = (key: string): void => {
       if (!passKeys.has(key)) {
-        continue;
+        return;
       }
       changed++;
-      if ((own.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
-        return false;
+      if ((joint.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
+        foreign = true;
       }
-    }
+    };
+    const visit = (names: Iterable<string>): void => {
+      for (const name of names) {
+        if (foreign) {
+          return;
+        }
+        if (!isDerivationDep(name)) {
+          checkFact(name);
+          continue;
+        }
+        const id = derivationDepId(name);
+        seen ??= new Set();
+        if (seen.has(id)) {
+          continue;
+        }
+        seen.add(id);
+        const edges = derivationsManager.dependencyEdges(id);
+        for (const key of edges.facts) {
+          checkFact(key);
+        }
+        visit(edges.derivations.map(derivationDep));
+      }
+    };
+    visit(deps);
 
-    return changed > 0;
+    return changed > 0 && !foreign;
   }
 
   /**
@@ -1468,10 +1504,21 @@ export function createEngine<S extends Schema>(
         });
       }
     },
-    onResolutionComplete: () => {
-      // After a resolver completes, schedule another reconcile
+    onResolutionComplete: (satisfied) => {
+      // After a resolver completes, schedule another reconcile. A run that
+      // had already satisfied its requirement changed nothing a pass would
+      // act on by finishing, unless it left a requeue, a dirty constraint
+      // (`after` ordering) or a queued batch behind; otherwise only settle()
+      // needs to hear about it.
       notifySettlementChange();
-      scheduleReconcile();
+      if (
+        !satisfied ||
+        pendingRequeueIds.size > 0 ||
+        constraintsManager.hasDirty() ||
+        resolversManager.hasPendingBatches()
+      ) {
+        scheduleReconcile();
+      }
     },
     onRequeue: (requirementId: string) => {
       // ctx.requeue() opt-in: the resolver explicitly wants its owning
@@ -1946,11 +1993,15 @@ export function createEngine<S extends Schema>(
       // Cancelling a bound resolver would abort the signal and make a
       // signal-checking resolver bail early, losing those data writes (the
       // win-at-the-buzzer regression).
+      const joint = removed.length > 0 ? jointPassWrites(removed) : null;
       for (const req of removed) {
         const bound = req.fromConstraint
           ? getConstraintBinding(req.fromConstraint)
           : undefined;
-        if (satisfiedByOwnWrite(req, passKeys, passCounts)) {
+        if (
+          joint !== null &&
+          satisfiedByOwnWrite(req, passKeys, passCounts, joint)
+        ) {
           // The run's own write, and nothing else, made its requirement go
           // away: it satisfied it. It is not canceled; it finishes and
           // reports completion. Decided from what it wrote, not from how far

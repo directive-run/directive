@@ -341,9 +341,13 @@ export function createErrorBoundaryManager(
         ?.type === "string"
         ? (context as { requirement: { type: string } }).requirement.type
         : null;
-    const consequence = requirementType
-      ? ` Requirement "${requirementType}" stays unmet.`
-      : "";
+    const satisfied =
+      (error as { satisfiedRequirement?: boolean } | null)
+        ?.satisfiedRequirement === true;
+    const consequence =
+      requirementType && !satisfied
+        ? ` Requirement "${requirementType}" stays unmet.`
+        : "";
 
     console.warn(
       `[Directive] ${source} "${sourceId}" threw: ${message}.${consequence} The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,

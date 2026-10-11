@@ -212,6 +212,13 @@ export interface ResolversManager<_S extends Schema> {
    */
   markSatisfied(requirementId: string): void;
   /**
+   * Whether any run is going that could write through its own `ctx.facts`.
+   * The engine counts changes per pass only while this is true.
+   *
+   * @internal
+   */
+  hasLiveRuns(): boolean;
+  /**
    * Immediately flush all pending batch queues, executing their resolvers.
    */
   processBatches(): void;
@@ -376,7 +383,7 @@ export interface CreateResolversOptions<S extends Schema> {
     dropped: number,
   ) => void;
   /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
-  onResolutionComplete?: () => void;
+  onResolutionComplete?: (satisfied?: boolean) => void;
   /**
    * Called when a resolver invokes `ctx.requeue()` for one of its owning
    * requirements. The engine uses this to drop the requirement from its
@@ -387,6 +394,9 @@ export interface CreateResolversOptions<S extends Schema> {
 }
 
 /** Default retry policy */
+/** Where a run's write record is kept on its AbortController. */
+const RUN_RECORD = Symbol("directive.resolverRun");
+
 const DEFAULT_RETRY: RetryPolicy = {
   attempts: 1,
   backoff: "none",
@@ -979,21 +989,35 @@ export function createResolversManager<S extends Schema>(
    * are the only change to what the constraint reads, the run satisfied it.
    */
   interface RunRecord {
-    current: Map<string, number>;
-    pass: Map<string, number>;
+    /** Created on the first write, so a run that writes nothing costs no map. */
+    current: Map<string, number> | null;
+    pass: Map<string, number> | null;
     satisfied: boolean;
     /** Superseded after satisfying: later writes are dropped. */
     discard: boolean;
   }
-  const runRecords = new WeakMap<AbortController, RunRecord>();
+  /**
+   * Each run's record lives on its controller under a private symbol: a
+   * property read is cheaper than a WeakMap lookup on the resolver hot path.
+   */
+  const runRecords = {
+    get(controller: AbortController): RunRecord | undefined {
+      return (controller as unknown as Record<symbol, RunRecord | undefined>)[
+        RUN_RECORD
+      ];
+    },
+    set(controller: AbortController, record: RunRecord): void {
+      (controller as unknown as Record<symbol, RunRecord>)[RUN_RECORD] = record;
+    },
+  };
   const liveRuns = new Set<RunRecord>();
 
   function runRecordFor(controller: AbortController): RunRecord {
     let record = runRecords.get(controller);
     if (!record) {
       record = {
-        current: new Map(),
-        pass: new Map(),
+        current: null,
+        pass: null,
         satisfied: false,
         discard: false,
       };
@@ -1011,9 +1035,37 @@ export function createResolversManager<S extends Schema>(
     }
   }
 
+  /**
+   * The error a satisfied run reports when it fails afterwards (throws or
+   * times out). Its requirement was met, so it is marked as such, and the
+   * run is aborted with its later writes dropped.
+   */
+  function failAfterSatisfied(
+    controller: AbortController,
+    record: RunRecord,
+    error: unknown,
+  ): Error {
+    record.discard = true;
+    controller.abort();
+    endRun(controller);
+    const message = error instanceof Error ? error.message : String(error);
+    const wrapped = new Error(
+      `Resolver failed after satisfying its requirement: ${message}`,
+      { cause: error },
+    );
+    (
+      wrapped as Error & { satisfiedRequirement?: boolean }
+    ).satisfiedRequirement = true;
+
+    return wrapped;
+  }
+
   /** `ctx.facts` for one run: counts the changes it makes, drops them once discarded. */
   function recordRunWrites(target: Facts<S>, record: RunRecord): Facts<S> {
     const count = (key: string) => {
+      if (record.current === null) {
+        record.current = new Map();
+      }
       record.current.set(key, (record.current.get(key) ?? 0) + 1);
     };
 
@@ -1343,7 +1395,8 @@ export function createResolversManager<S extends Schema>(
           controller,
           baseline,
         );
-        if (runRecords.get(controller)?.discard) {
+        // Canceled or superseded: that was its one outcome.
+        if (controller.signal.aborted) {
           return;
         }
         recordSuccess(resolverId, req, startedAt);
@@ -1356,9 +1409,13 @@ export function createResolversManager<S extends Schema>(
         }
         if (record?.satisfied) {
           // It already satisfied its requirement; there is nothing left to
-          // retry for. Reported once.
-          lastError = error instanceof Error ? error : new Error(String(error));
+          // retry for. Reported once, and anything it writes later dropped.
+          lastError = failAfterSatisfied(controller, record, error);
           break;
+        }
+        // Canceled while it ran: the cancellation was its outcome.
+        if (controller.signal.aborted) {
+          return;
         }
         const outcome = await processRetryError(
           error,
@@ -1415,6 +1472,10 @@ export function createResolversManager<S extends Schema>(
       timeout,
       `Batch resolver "${resolverId}" timed out after ${timeout}ms`,
     );
+
+    if (ctx.signal.aborted) {
+      return "done";
+    }
 
     if (results.length !== requirements.length) {
       throw new Error(
@@ -1479,6 +1540,10 @@ export function createResolversManager<S extends Schema>(
       `Batch resolver "${resolverId}" timed out after ${timeout}ms`,
     );
 
+    // Canceled or superseded: that was its one outcome.
+    if (ctx.signal.aborted) {
+      return;
+    }
     for (const req of requirements) {
       recordSuccess(resolverId, req, startedAt);
     }
@@ -1625,8 +1690,15 @@ export function createResolversManager<S extends Schema>(
           return null;
         }
       } catch (error) {
-        if (runRecords.get(controller)?.satisfied) {
-          return error instanceof Error ? error : new Error(String(error));
+        const record = runRecords.get(controller);
+        if (record?.discard) {
+          return null;
+        }
+        if (record?.satisfied) {
+          return failAfterSatisfied(controller, record, error);
+        }
+        if (controller.signal.aborted) {
+          return null;
         }
         const outcome = await processRetryError(
           error,
@@ -1750,6 +1822,46 @@ export function createResolversManager<S extends Schema>(
   }
 
   /** Add a requirement to a batch */
+  /**
+   * The requirement is back while a batch that satisfied it is still going.
+   * That batch stops owning it, so the new batch is its only owner. A batch
+   * left owning nothing is aborted with its later writes dropped, as a
+   * superseded single run is.
+   */
+  function supersedeSatisfiedBatches(req: RequirementWithId): void {
+    const owners = reqToBatch.get(req.id);
+    if (!owners) {
+      return;
+    }
+    for (const batchInstanceId of [...owners]) {
+      const batchState = batchInflight.get(batchInstanceId);
+      const record = batchState
+        ? runRecords.get(batchState.controller)
+        : undefined;
+      if (!batchState || !record?.satisfied) {
+        continue;
+      }
+      owners.delete(batchInstanceId);
+      batchState.requirementIds.delete(req.id);
+      if (batchState.requirementIds.size === 0) {
+        record.discard = true;
+        batchState.controller.abort();
+        endRun(batchState.controller);
+        batchInflight.delete(batchInstanceId);
+        statuses.set(req.id, {
+          state: "canceled",
+          requirementId: req.id,
+          canceledAt: Date.now(),
+        });
+        cleanupStatuses();
+        onCancel?.(batchState.resolverId, req);
+      }
+    }
+    if (owners.size === 0) {
+      reqToBatch.delete(req.id);
+    }
+  }
+
   function addToBatch(
     resolverId: string,
     req: RequirementWithId,
@@ -1762,6 +1874,7 @@ export function createResolversManager<S extends Schema>(
 
     const batchConfig = { ...DEFAULT_BATCH, ...def.batch };
     const batch = ensureBatch(resolverId);
+    supersedeSatisfiedBatches(req);
 
     // Enforce hard cap to prevent OOM from unbounded accumulation
     const effectiveMax = batchConfig.maxSize || DEFAULT_MAX_QUEUE_SIZE;
@@ -1846,6 +1959,7 @@ export function createResolversManager<S extends Schema>(
         }
         record.discard = true;
         current.controller.abort();
+        endRun(current.controller);
         inflight.delete(req.id);
         statuses.set(req.id, {
           state: "canceled",
@@ -1921,7 +2035,9 @@ export function createResolversManager<S extends Schema>(
         const wasInflight = inflight.get(req.id) === state;
         if (wasInflight) {
           inflight.delete(req.id);
-          onResolutionComplete?.();
+          onResolutionComplete?.(
+            runRecords.get(controller)?.satisfied === true,
+          );
         }
         running.delete(runKey);
       });
@@ -1975,6 +2091,7 @@ export function createResolversManager<S extends Schema>(
       const state = inflight.get(requirementId);
       if (state) {
         state.controller.abort();
+        endRun(state.controller);
         inflight.delete(requirementId);
 
         statuses.set(requirementId, {
@@ -2037,6 +2154,7 @@ export function createResolversManager<S extends Schema>(
           const batchState = batchInflight.get(batchInstanceId);
           if (!batchState) continue;
           batchState.controller.abort();
+          endRun(batchState.controller);
           for (const id of batchState.requirementIds) {
             statuses.set(id, {
               state: "canceled",
@@ -2100,6 +2218,7 @@ export function createResolversManager<S extends Schema>(
       // canceled, and clears the lookup index.
       for (const [, state] of batchInflight) {
         state.controller.abort();
+        endRun(state.controller);
         for (const id of state.requirementIds) {
           statuses.set(id, {
             state: "canceled",
@@ -2154,8 +2273,10 @@ export function createResolversManager<S extends Schema>(
     beginPass(): void {
       for (const record of liveRuns) {
         const done = record.pass;
-        done.clear();
         record.pass = record.current;
+        if (done !== null) {
+          done.clear();
+        }
         record.current = done;
       }
     },
@@ -2165,7 +2286,7 @@ export function createResolversManager<S extends Schema>(
       if (single) {
         const record = runRecords.get(single.controller);
 
-        return record && record.pass.size > 0 ? record.pass : null;
+        return record?.pass && record.pass.size > 0 ? record.pass : null;
       }
       const owners = reqToBatch.get(requirementId);
       if (owners && owners.size === 1) {
@@ -2175,11 +2296,15 @@ export function createResolversManager<S extends Schema>(
             ? runRecords.get(batchState.controller)
             : undefined;
 
-          return record && record.pass.size > 0 ? record.pass : null;
+          return record?.pass && record.pass.size > 0 ? record.pass : null;
         }
       }
 
       return null;
+    },
+
+    hasLiveRuns(): boolean {
+      return liveRuns.size > 0;
     },
 
     markSatisfied(requirementId: string): void {

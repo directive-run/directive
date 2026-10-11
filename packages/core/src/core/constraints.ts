@@ -147,6 +147,13 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   markResolved(constraintId: string): void;
   /**
+   * Whether any enabled constraint is marked dirty and waiting to be
+   * re-evaluated.
+   *
+   * @internal
+   */
+  hasDirty(): boolean;
+  /**
    * Check whether a constraint is currently disabled.
    *
    * @param id - The constraint definition ID.
@@ -1405,7 +1412,10 @@ export function createConstraintsManager<S extends Schema>(
 
         return NO_REQUIREMENTS;
       }
-      if (!hasEvaluated || changedKeys.size === 0) {
+      // A pass with no changed keys (a resolver finished, a requeue) has
+      // nothing new for any constraint to read: unless one is dirty, the
+      // answer is last pass's carried forward, not a full re-evaluation.
+      if (!hasEvaluated) {
         return null;
       }
       for (const id of dirtyConstraints) {
@@ -1532,6 +1542,16 @@ export function createConstraintsManager<S extends Schema>(
           dirtyConstraints.add(id);
         }
       }
+    },
+
+    hasDirty(): boolean {
+      for (const id of dirtyConstraints) {
+        if (!disabled.has(id)) {
+          return true;
+        }
+      }
+
+      return false;
     },
 
     isResolved(constraintId: string): boolean {
