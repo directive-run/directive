@@ -4,7 +4,7 @@
 
 Production builds no longer ship Directive's development-only code.
 
-The package now publishes a second build under the `production` export condition, with every development check compiled to `false`. The dev warnings, the validation that only runs in development, and their message text are gone from it. webpack 5 in `mode: "production"` (so Next.js webpack builds), Vite, and Rollup with `@rollup/plugin-node-resolve` select it automatically; with esbuild, pass `--conditions=production`. Other tools, including Bun and Turbopack, were not checked: verify with your bundler. A minimal app drops from 53.2 KB to 44.9 KB gzipped. The production build ships without sourcemaps; the package grows from 1.66 MB to 1.84 MB packed.
+The package now publishes a second build under the `production` export condition, with every development check compiled to `false`. The dev warnings, the validation that only runs in development, and their message text are gone from it. webpack 5 in `mode: "production"` (so Next.js webpack builds), Vite, and Rollup with `@rollup/plugin-node-resolve` select it automatically; with esbuild, pass `--conditions=production`. Other tools, including Bun and Turbopack, were not checked: verify with your bundler. A minimal app drops from 53.2 KB to 44.9 KB gzipped.
 
 An SSR setup that externalizes packages may load both builds, one on the server and one in the client bundle. That is harmless; it costs the memory of a second copy.
 

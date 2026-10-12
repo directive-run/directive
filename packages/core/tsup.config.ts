@@ -18,7 +18,11 @@ const shared: Options = {
   entry,
   format: ["esm", "cjs"],
   minify: true,
-  sourcemap: true,
+  // No build ships sourcemaps. The default and development builds are
+  // unminified, so a stack trace through them is readable without one; the
+  // production build is only ever reached through an app bundler, which
+  // minifies again anyway. Maps were most of the tarball.
+  sourcemap: false,
   // `pnpm build` empties dist first. Cleaning here would race the two
   // builds below, which run at the same time and share the directory.
   clean: false,
@@ -85,10 +89,14 @@ export default defineConfig([
   // `typeof process`, so `true` there would keep every dev branch alive in its
   // production bundles. Browser dev servers get dev checks from the
   // `development` build instead.
+  //
+  // Unminified: consumers' bundlers minify it themselves, and Node reads it
+  // as-is, so the readable form costs nothing in a browser bundle.
   {
     ...shared,
     outDir: "dist",
     dts: true,
+    minify: false,
     esbuildPlugins: [
       inlineIsDevelopment(
         'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"',
@@ -101,14 +109,12 @@ export default defineConfig([
   // `isDevelopment` is the literal `true`, so dev checks run in a browser,
   // where `process` does not exist and the default build's runtime check
   // reads `false`. It is the build people debug in a browser, so it ships
-  // unminified and readable instead of minified with sourcemaps, which would
-  // add about 5 MB to the tarball.
+  // unminified and readable.
   {
     ...shared,
     outDir: "dist/development",
     dts: false,
     minify: false,
-    sourcemap: false,
     esbuildPlugins: [inlineIsDevelopment("true", "./src/dev-true.ts")],
   },
   // The production build, selected by the `production` export condition
@@ -119,10 +125,6 @@ export default defineConfig([
     ...shared,
     outDir: "dist/production",
     dts: false,
-    // No sourcemaps: the production build is the same source as the default
-    // build with dev branches removed, and its maps doubled the tarball.
-    // Debug against the default build, which keeps them.
-    sourcemap: false,
     esbuildPlugins: [inlineIsDevelopment("false", "./src/dev-false.ts")],
   },
 ]);
