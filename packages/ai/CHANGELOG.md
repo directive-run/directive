@@ -1,5 +1,98 @@
 # @directive-run/ai
 
+## 1.35.0
+
+### Minor Changes
+
+- [`a37f57b`](https://github.com/directive-run/directive/commit/a37f57b008b98d6df929114741edbfcbb07f41e9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add `KvCheckpointStore` — a checkpoint store that survives the process.
+
+  `InMemoryCheckpointStore` is a `Map`, so every checkpoint dies with the
+  isolate that made it. That is the right default for a test and useless
+  for the case checkpoints exist for: a long multi-agent run that is
+  interrupted and resumed later, possibly on a different machine.
+
+  It takes a structural `CheckpointKv` (`get` / `put` / `delete`) rather
+  than a platform SDK, so `@directive-run/ai` still has no Cloudflare,
+  Deno or Node storage dependency. Cloudflare's `KVNamespace` satisfies
+  the interface as-is; anything else adapts in a few lines.
+
+  FIFO eviction, time-based retention and `preserveLabeled` match
+  `InMemoryCheckpointStore` exactly, so the two are swappable.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`10faae5`](https://github.com/directive-run/directive/commit/10faae51d44832a444d6b4f6e1ba11bf9e2bf5c1) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Multi-module systems no longer fail silently.
+
+  **Resolvers in a module with `crossModuleDeps`**
+
+  - `ctx.facts` is flat access to the module's own facts (`ctx.facts.draft = ""`), as the types always said. Before, the runtime handed resolvers the cross-module proxy, the typed write threw, and the requirement stayed unmet with nothing logged.
+  - New typed, read-only `ctx.deps.<ns>` reads declared dependencies (`ctx.deps.auth.token`). Types: `CrossModuleResolverContext`, `CrossModuleResolversDef`, `ResolverDeps`.
+  - Another module's facts are read-only from a resolver. A write through `ctx.deps.<ns>` throws in development and is ignored in production. Emit a requirement or dispatch an event the other module owns instead.
+  - `ctx.facts.self` and `ctx.facts.<ns>` are gone: `ctx.facts` holds the module's own facts only, for reads, writes, `in` and `Object.keys` (it used to expose `self` and the dep namespaces). Rewrite `ctx.facts.self.x` as `ctx.facts.x` and `ctx.facts.auth.x` as `ctx.deps.auth.x`.
+  - Namespaced resolvers now receive `ctx.requeue()` and `ctx.snapshot()`; the wrapper used to drop them.
+  - Changing a dependency's value in place (`ctx.deps.auth.user.name = …`, `ctx.deps.auth.roles.set(…)`) is reported in development once the resolver settles, naming the path, and the resolver fails. The values are the stored ones, unwrapped, so production pays nothing. It is the same check effects use.
+  - `ctx.facts.$store` and `ctx.facts.$snapshot()` in a namespaced resolver are scoped to the module's own facts. Keys are bare names (`"draft"`) or the module's own prefixed form; writing another module's key throws in development and is ignored in production, and reading one returns `undefined`. They used to reach the whole system's store.
+
+  **Sources in a namespaced system**
+
+  - `publish("START")` dispatches the source's own module's `START` (`loop::START`). A source publishes only its own module's events: a name containing `::` is dropped with the new reason `"cross-module-event"`, under the name it was published as, with a development warning once per source – `publish("loop::START")` from `loop` is told to drop the prefix, and another module's name is told to dispatch that module's event from a handler or resolver. A blocked name (`__proto__`, `constructor`, `prototype`) passes through unprefixed so it is still reported as `blocked-event-name`.
+  - Plugin hooks (`onSourcePublish`, `onSourceDrop`) and `source.publish` / `source.drop` observation events report the prefixed event name (`loop::START`).
+  - `key` / `active` gates read the module's own facts, scoped like constraints: `facts.running`, or `facts.self.*` / `facts.{dep}.*` with `crossModuleDeps`. They used to receive the whole flat store. Gate facts are typed from the module schema (`SourcesDef<F>`, `SourceGateFacts`), read-only, and a write is reported as a `phase: "gate"` error. There is no flat `"ns::fact"` form: such a read is `undefined`. A bare read in a module with `crossModuleDeps` warns once with the `facts.self.x` spelling. Gate proxies are cached, so evaluating gates allocates nothing per reconcile.
+  - In development, every gate – single-module and namespaced – reads through a read-only view: a top-level write, or a value changed in place (`facts.cfg.hz += 1`), is reported as a `phase: "gate"` error and the gate fails closed. Production hands the gate the facts directly.
+  - Source ids are namespaced (`loop::boot`), so the same id in two modules, or one factory module registered twice, no longer throws a definition collision. The prefixed id appears in `inspect().sources[i].id`, plugin source hooks, `source.*` observation events, the audit ledger's `sourceId`, and the `source.id` OpenTelemetry attribute from `attachSourcesToOtel`.
+  - New `localId` (the id the module declared, `boot`) on `inspect().sources[i]` and every `source.*` observation event, and a `source.local_id` OpenTelemetry attribute. It equals `id` in a single-module system. Label sources with `${moduleId}/${localId}`; `${moduleId}::${id}` now prints `loop::loop::boot`.
+  - Source definitions keep their prototype and property descriptors when namespaced, so class-based sources and non-enumerable `meta` work.
+
+  **Unhandled publishes are drops**
+
+  - A publish with no handler no longer counts toward `publishCount` or fires `onSourcePublish`. It counts toward `dropCount` with `lastDropReason: "unknown-event"` and fires `onSourceDrop` / `source.drop`, in production too.
+  - `SourceDropReason` gains `"unknown-event"` and `"cross-module-event"`; an exhaustive `switch` over it needs new cases.
+
+  **Blocked keys in namespaced systems**
+
+  - `__proto__`, `constructor` and `prototype` are rejected as keys in facts, events, derive, effects, sources, constraints and resolvers in namespaced systems, as they already were in single-module systems. The check used to run on the prefixed keys and could never match.
+
+  **New development warnings**
+
+  - An error that falls through to the default `"skip"` strategy with no `errorBoundary` handler warns once per source (resolvers, constraints, derivations), with the requirement that stays unmet. Effects already log every throw.
+  - A write at the top level of the cross-module facts proxy in a derivation, constraint or effect warns once per system: those read facts and never write them.
+  - A source gate that throws, or that a development check fails, closes the gate and warns once per source.
+  - Every multi-module warning above is deduplicated per system, not per process, with a cap on how many keys are remembered.
+
+- [#135](https://github.com/directive-run/directive/pull/135) [`69c4197`](https://github.com/directive-run/directive/commit/69c419778df2d435fa1b2c49f43a3a52d8837b51) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `withStructuredOutput` now reports what the whole call spent, not what its last
+  attempt spent.
+
+  The wrapper re-prompts when a model's answer will not parse, so one call from
+  the caller's side can be several calls to the provider — each one billed. It
+  reported only the attempt that finally succeeded, treating the failed ones as
+  free. On three attempts of thirty tokens it reported thirty against ninety
+  spent, and the under-count is worst exactly when a model is struggling and
+  costing the most. A budget reading that total will authorise spend it has
+  already made.
+
+  Failed attempts leave no trace anywhere else — they happen inside the wrapper,
+  emit no event, and produce no separate result — so this was the only place the
+  number could be recovered.
+
+  **`totalTokens` now sums every attempt**, and `tokenUsage` sums the input,
+  output, and cache breakdown alongside it. Cache writes are read through
+  `normalizeTokenUsage`, so the two spellings a provider may use are reconciled by
+  the one function that owns that rule.
+
+  **New `structuredOutputAttempts` on `RunResult`** — how many provider calls were
+  paid for. Two attempts at thirty tokens is not the same event as one attempt at
+  sixty, and a total alone cannot tell them apart. Present only when this wrapper
+  ran.
+
+  **`StructuredOutputError` now carries `totalTokens` and `attempts`.** A run that
+  exhausts its retries produces nothing a caller can use and still costs money;
+  the error previously carried a single attempt's result and no total at all.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`77437ad`](https://github.com/directive-run/directive/commit/77437ad720a2b53efe5df3547c1c98f852092079) Thanks [@jasoncomes](https://github.com/jasoncomes)! - One name per thing: the duplicate names are gone.
+
+  - The RFC 0006 `*Definition` type aliases are removed. Each type has one name, the `*Def` form: `ModuleDef`, `ConstraintDef`, `ResolverDef`, `EffectDef`, `SourceDef` and the rest. `SourcePublishFn` and `SourceUnsubscribeFn` are removed too; use `SourcePublish` and `SourceUnsubscribe`. Rewrite `ModuleDefinition` as `ModuleDef`, and so on.
+  - `@directive-run/lit` no longer exports `createModule`, the old name for `createModuleController` that collided with core's `createModule`. Import `createModuleController`.
+  - The unused `_kind` field is removed from `ExtendedSchemaType` and `IntrospectableSchema`. Schema introspection reads the `_typeName` every `t.*()` builder records.
+  - `@directive-run/ai`: `attachSourcesToOtel` reads `localId` from every source event (no fallback to `id`), and the core peer range is `^1.35.0`.
+
 ## 1.34.1
 
 ## 1.34.0

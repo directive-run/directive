@@ -1,5 +1,166 @@
 # @directive-run/core
 
+## 1.35.0
+
+### Minor Changes
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`f372f1f`](https://github.com/directive-run/directive/commit/f372f1f6e00dd10f36fbce49c2453e248ecf1f59) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Browser dev servers now get Directive's development checks.
+
+  A browser has no `process`, so the default build's development check read `false` under a dev server such as Vite's: no dev warnings, and no error when an effect wrote a fact. The package now also publishes a build under the `development` export condition with every development check compiled on. Vite 5 and 6 dev servers select it automatically (checked), and so does webpack 5 in `mode: "development"`; with esbuild, pass `--conditions=development`. Production builds still select the `production` build, and Node without a condition still gets the default build, which follows `NODE_ENV`.
+
+  The development build ships unminified, so it reads directly in devtools.
+
+  A browser with no bundler still runs the default build in production mode. That branch has to stay off: a bundler that only defines `process.env.NODE_ENV` cannot fold `typeof process`, and turning it on would keep every dev check in its production bundles.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`c16ce1f`](https://github.com/directive-run/directive/commit/c16ce1f8b922027bd2365fa924323279a94437f0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Each reconcile pass allocates about half as much and runs about 45% faster.
+
+  Measured on a loop of four fact writes, one derivation read, one effect and `settle()` per frame, production build: 12.7 KB to 6.3 KB allocated per frame, 2.86 µs to 1.57 µs.
+
+  - A pass whose effects are all synchronous no longer yields between phases, so `settle()` usually finds the system settled on its first check instead of setting up a timer and a subscription.
+  - When no constraint reads a changed fact, the constraint phase answers synchronously. When nothing is required before or after, it builds no requirement set and no diff.
+  - The plugin snapshot, the in-flight list, the effect trigger list and the history label are built only when a plugin, the trace or history will read them.
+  - The changed-key set is double-buffered, and per-write derivation holds no longer allocate a closure.
+
+  Three behaviors are now defined by rule instead of by how many microtasks a pass happened to take:
+
+  - **A resolver run that satisfied its own requirement completes.** Rule: a run whose requirement disappears was satisfied by it when every change in that pass to what the constraint reads (directly or through derivations) came from the runs whose requirements disappeared in that pass; otherwise it is canceled as before. Guarantees: writes are attributed per run (keyed siblings and separate batches never shield one another, and runs that each write their own entry of a shared fact are satisfied together); a satisfied run reports completion only, stays in flight so `stop()` and `destroy()` abort it and `settle()` waits for it, is not retried, and if it fails or times out afterwards it is treated like a cancel under RFC 0003: its signal aborts, it reports one error (without "stays unmet"), and its writes still land, so a `finally` that clears a loading flag takes effect. A run's late writes are dropped only when it is superseded while still in flight: its requirement returns and is dispatched again while the run that satisfied it is going (single run or batch). Timed-out, canceled and detached runs keep their writes, per RFC 0003. Guarding against a late write from such a run, or from a run for a different requirement id after its key changed, is the resolver's job, through `context.signal` or `abortOn`. Every run now reports exactly one of complete, cancel or error: a canceled run that returns normally no longer also reports completion. Before, the outcome depended on timing.
+  - **Coalescing.** A pass starts on the microtask after the first write and takes every write made before it starts; writes made while a pass awaits go to the next one. A pass that awaits nothing finishes inside its microtask, so writes separated by an `await` now each get their own pass, effect run and, with `history`, their own snapshot (10 awaited writes: 10 of each, where it used to be about 3). Writes in one synchronous run still share one. Whether some resolver is running no longer changes the count.
+  - **`ctx.requeue()` waits for its resolver.** The requeue is applied once the requeuing resolver has finished. Before, a resolver still running at the end of the next pass had its re-dispatch dropped as a duplicate.
+
+  Plugin events at startup may arrive in a different order: plugin `onInit` runs asynchronously and is not awaited, so a plugin can see the first `constraint.evaluate` before its own `system.init`. Nothing guaranteed either order.
+
+  **Constraint re-evaluation is now defined, not incidental.** A pass that changed nothing a constraint reads carries its last answer forward instead of re-evaluating every constraint. A constraint is re-evaluated when a fact or derivation it read changes, when it is registered, enabled or assigned, on `start()`, and when `retry-later` retries it. `retry-later` now retries even without a `retryLater` config (default delay 1000 ms, polled at most every 500 ms); the poller stops when nothing is left to retry and never keeps a Node process alive on its own. A `when` or `require()` that throws keeps the dependencies it read before throwing; an async `when` without `deps` is re-evaluated every pass. Under the default `skip` error strategy, a `when` that throws before reading any fact has nothing to wake it, so it is not asked again until `start()`. A `when` must be a pure function of facts and derivations: one that read the clock or an outside variable used to be re-asked by unrelated passes (a resolver finishing, for example) and no longer is. Put time and outside input in a fact or a source.
+
+  **Errors after a run satisfied its requirement** are passed on as the original error; only the development warning changes (it no longer says the requirement stays unmet).
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`c0b5dbb`](https://github.com/directive-run/directive/commit/c0b5dbbaec6e348caf700dc246314c204e2f9d8d) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Core no longer ships sourcemaps, and its default build is no longer minified. The default build is what Node and bundlers without a `development`/`production` setting load, so a stack trace through it now reads directly, with real names, instead of needing a map. App bundles are unchanged: bundlers minify the default build themselves, and production builds use the separate minified `production` build. The package drops from 6.1 MB to 4.7 MB unpacked (1.66 MB to 1.1 MB packed, compared with 1.34.1), despite now carrying three builds.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`856098c`](https://github.com/directive-run/directive/commit/856098c1233e2691b4b5d5b0acbef597f5786da9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Production builds no longer ship Directive's development-only code.
+
+  The package now publishes a second build under the `production` export condition, with every development check compiled to `false`. The dev warnings, the validation that only runs in development, and their message text are gone from it. webpack 5 in `mode: "production"` (so Next.js webpack builds), Vite, and Rollup with `@rollup/plugin-node-resolve` select it automatically; with esbuild, pass `--conditions=production`. Other tools, including Bun and Turbopack, were not checked: verify with your bundler. A minimal app drops from 53.2 KB to 44.9 KB gzipped.
+
+  An SSR setup that externalizes packages may load both builds, one on the server and one in the client bundle. That is harmless; it costs the memory of a second copy.
+
+  Builds that don't set the condition still get the default build, which now writes the development check in a form a bundler can fold: with `process.env.NODE_ENV` defined as `"production"`, most of the dev code drops out there too (53.2 KB to 48.3 KB for the same app). With no bundler, behavior is unchanged: a browser without `process`, or a `process` shim without `env`, runs in production mode, and Node follows `NODE_ENV`.
+
+  Nothing changes at runtime. The production build behaves exactly as the default build does when `NODE_ENV` is `"production"`.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`a41aea3`](https://github.com/directive-run/directive/commit/a41aea3994204fc9c6e74acb3a8f45be076df5fa) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Effects can no longer write facts, effects re-run after a history rewind, and
+  writes made while a pass is running are no longer lost.
+
+  **Effects are read-only.** An effect is for talking to the outside world: a
+  log line, the DOM, a socket. A fact written from one used to be accepted and
+  then handled halfway. Constraints and derivations saw the write, but other
+  effects never did. Now:
+
+  - Each effect receives its own read-only view of the facts. It is a different
+    object from `system.facts`, with no prototype, so identity checks against
+    `system.facts` no longer match inside an effect.
+  - Assigning to it, deleting from it, or writing through `facts.$store` throws
+    in development with a message naming the effect, the key, a one-line example
+    and a docs link (`/docs/effects#effects-never-write-facts`). Production drops
+    the write.
+  - Nested values are the stored values themselves, in every build, so
+    `structuredClone`, `postMessage` and identity checks behave the same in
+    development and production (inside an effect, `structuredClone(facts.obj)`
+    now works in development too). Development records a copy of each object,
+    array, Map, Set or Date an effect reads, and after the run reports the
+    first path changed in place (`facts.pos.x = 7`, `facts.list.push(1)`, `Object.freeze(facts.obj)`).
+    The same check covers `prevFacts` and `derived`, whose values are live too.
+  - Every refused write is reported in every build through the new plugin hook
+    `onEffectWriteBlocked(id, key)` and the `effect.write-blocked` observation
+    event, which is how a production build sees the write it dropped.
+  - Effect `facts` and `prevFacts` are typed read-only one level down (new
+    `EffectFacts` type), in single-module, cross-module and dynamic effects, so
+    assigning a fact fails to compile. Values keep their own types, so an effect
+    can pass an array or object fact to an ordinary helper without a cast;
+    changing one in place is caught by the development check above.
+
+  Where the write belongs instead: an event handler for a change caused by
+  input, a derivation for a computed value, a resolver for work a constraint
+  requires, and a source or resolver for data coming back from async work.
+  Dispatching an event from an effect is unchanged.
+
+  **Effects re-run after `goBack()`, `goForward()`, `goTo()`, `replay()` and
+  `import()`.** Effect-driven views (a canvas, the DOM, the document title) used
+  to stay on the state from before the rewind. Effects whose dependencies were
+  restored now run again. That pass takes no snapshot, attaches no gated
+  sources, and dispatches no resolvers. An effect that dispatches an event while
+  re-running for a rewind gets a development warning; set `onNavigate: "skip"`
+  on effects that record acts rather than mirror state. Writes such an effect
+  causes belong to the navigation, so they no longer destroy the redo stack.
+
+  **Fixed: requirements after a rewind.** The requirement set from before the
+  rewind stayed as the baseline, so a later write that satisfied a constraint
+  again did not dispatch its resolver. A rewind now rebuilds the baseline from a
+  full evaluation, without dispatching. A constraint reading a key written in
+  the same pass as the rewind is left out of that baseline, so the write still
+  dispatches.
+
+  **Fixed: writes made while a pass is running.** A write that landed while
+  effects were running (an event an effect dispatched, a captured
+  `system.facts`, a caller writing while an async effect awaited) reached
+  constraints but never effects. The first write right after `start()` was lost
+  the same way. These writes now carry into the next pass. They are folded into
+  the history snapshot of the pass that caused them rather than taking one of
+  their own, so undo lands on a settled state. A chain of passes started only
+  by such writes is cut after 100 passes with a development warning, so an
+  effect that feeds its own dependency cannot spin; the cut drops only what the
+  chain keeps writing, never another write made meanwhile.
+
+  **Fixed: the `retry` error strategy for effects** never re-ran anything. It now
+  re-runs the failed effect on the next pass, up to three times in a row.
+
+  `@directive-run/query` no longer writes facts from effects: its focus,
+  reconnect, polling, cache-expiry and stream handling are sources (see its own
+  changeset). `@sizls/ai-harness` closes its composition from a constraint and
+  resolver instead of an effect.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`10faae5`](https://github.com/directive-run/directive/commit/10faae51d44832a444d6b4f6e1ba11bf9e2bf5c1) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Multi-module systems no longer fail silently.
+
+  **Resolvers in a module with `crossModuleDeps`**
+
+  - `ctx.facts` is flat access to the module's own facts (`ctx.facts.draft = ""`), as the types always said. Before, the runtime handed resolvers the cross-module proxy, the typed write threw, and the requirement stayed unmet with nothing logged.
+  - New typed, read-only `ctx.deps.<ns>` reads declared dependencies (`ctx.deps.auth.token`). Types: `CrossModuleResolverContext`, `CrossModuleResolversDef`, `ResolverDeps`.
+  - Another module's facts are read-only from a resolver. A write through `ctx.deps.<ns>` throws in development and is ignored in production. Emit a requirement or dispatch an event the other module owns instead.
+  - `ctx.facts.self` and `ctx.facts.<ns>` are gone: `ctx.facts` holds the module's own facts only, for reads, writes, `in` and `Object.keys` (it used to expose `self` and the dep namespaces). Rewrite `ctx.facts.self.x` as `ctx.facts.x` and `ctx.facts.auth.x` as `ctx.deps.auth.x`.
+  - Namespaced resolvers now receive `ctx.requeue()` and `ctx.snapshot()`; the wrapper used to drop them.
+  - Changing a dependency's value in place (`ctx.deps.auth.user.name = …`, `ctx.deps.auth.roles.set(…)`) is reported in development once the resolver settles, naming the path, and the resolver fails. The values are the stored ones, unwrapped, so production pays nothing. It is the same check effects use.
+  - `ctx.facts.$store` and `ctx.facts.$snapshot()` in a namespaced resolver are scoped to the module's own facts. Keys are bare names (`"draft"`) or the module's own prefixed form; writing another module's key throws in development and is ignored in production, and reading one returns `undefined`. They used to reach the whole system's store.
+
+  **Sources in a namespaced system**
+
+  - `publish("START")` dispatches the source's own module's `START` (`loop::START`). A source publishes only its own module's events: a name containing `::` is dropped with the new reason `"cross-module-event"`, under the name it was published as, with a development warning once per source – `publish("loop::START")` from `loop` is told to drop the prefix, and another module's name is told to dispatch that module's event from a handler or resolver. A blocked name (`__proto__`, `constructor`, `prototype`) passes through unprefixed so it is still reported as `blocked-event-name`.
+  - Plugin hooks (`onSourcePublish`, `onSourceDrop`) and `source.publish` / `source.drop` observation events report the prefixed event name (`loop::START`).
+  - `key` / `active` gates read the module's own facts, scoped like constraints: `facts.running`, or `facts.self.*` / `facts.{dep}.*` with `crossModuleDeps`. They used to receive the whole flat store. Gate facts are typed from the module schema (`SourcesDef<F>`, `SourceGateFacts`), read-only, and a write is reported as a `phase: "gate"` error. There is no flat `"ns::fact"` form: such a read is `undefined`. A bare read in a module with `crossModuleDeps` warns once with the `facts.self.x` spelling. Gate proxies are cached, so evaluating gates allocates nothing per reconcile.
+  - In development, every gate – single-module and namespaced – reads through a read-only view: a top-level write, or a value changed in place (`facts.cfg.hz += 1`), is reported as a `phase: "gate"` error and the gate fails closed. Production hands the gate the facts directly.
+  - Source ids are namespaced (`loop::boot`), so the same id in two modules, or one factory module registered twice, no longer throws a definition collision. The prefixed id appears in `inspect().sources[i].id`, plugin source hooks, `source.*` observation events, the audit ledger's `sourceId`, and the `source.id` OpenTelemetry attribute from `attachSourcesToOtel`.
+  - New `localId` (the id the module declared, `boot`) on `inspect().sources[i]` and every `source.*` observation event, and a `source.local_id` OpenTelemetry attribute. It equals `id` in a single-module system. Label sources with `${moduleId}/${localId}`; `${moduleId}::${id}` now prints `loop::loop::boot`.
+  - Source definitions keep their prototype and property descriptors when namespaced, so class-based sources and non-enumerable `meta` work.
+
+  **Unhandled publishes are drops**
+
+  - A publish with no handler no longer counts toward `publishCount` or fires `onSourcePublish`. It counts toward `dropCount` with `lastDropReason: "unknown-event"` and fires `onSourceDrop` / `source.drop`, in production too.
+  - `SourceDropReason` gains `"unknown-event"` and `"cross-module-event"`; an exhaustive `switch` over it needs new cases.
+
+  **Blocked keys in namespaced systems**
+
+  - `__proto__`, `constructor` and `prototype` are rejected as keys in facts, events, derive, effects, sources, constraints and resolvers in namespaced systems, as they already were in single-module systems. The check used to run on the prefixed keys and could never match.
+
+  **New development warnings**
+
+  - An error that falls through to the default `"skip"` strategy with no `errorBoundary` handler warns once per source (resolvers, constraints, derivations), with the requirement that stays unmet. Effects already log every throw.
+  - A write at the top level of the cross-module facts proxy in a derivation, constraint or effect warns once per system: those read facts and never write them.
+  - A source gate that throws, or that a development check fails, closes the gate and warns once per source.
+  - Every multi-module warning above is deduplicated per system, not per process, with a cap on how many keys are remembered.
+
+- [#172](https://github.com/directive-run/directive/pull/172) [`77437ad`](https://github.com/directive-run/directive/commit/77437ad720a2b53efe5df3547c1c98f852092079) Thanks [@jasoncomes](https://github.com/jasoncomes)! - One name per thing: the duplicate names are gone.
+
+  - The RFC 0006 `*Definition` type aliases are removed. Each type has one name, the `*Def` form: `ModuleDef`, `ConstraintDef`, `ResolverDef`, `EffectDef`, `SourceDef` and the rest. `SourcePublishFn` and `SourceUnsubscribeFn` are removed too; use `SourcePublish` and `SourceUnsubscribe`. Rewrite `ModuleDefinition` as `ModuleDef`, and so on.
+  - `@directive-run/lit` no longer exports `createModule`, the old name for `createModuleController` that collided with core's `createModule`. Import `createModuleController`.
+  - The unused `_kind` field is removed from `ExtendedSchemaType` and `IntrospectableSchema`. Schema introspection reads the `_typeName` every `t.*()` builder records.
+  - `@directive-run/ai`: `attachSourcesToOtel` reads `localId` from every source event (no fallback to `id`), and the core peer range is `^1.35.0`.
+
 ## 1.34.1
 
 ### Patch Changes

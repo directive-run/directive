@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/mcp",
-  "version": "0.6.28",
+  "version": "0.6.29",
   "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
