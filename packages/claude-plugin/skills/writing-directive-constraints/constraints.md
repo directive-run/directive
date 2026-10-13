@@ -219,6 +219,14 @@ system.constraints.isDisabled("fetchUserWhenReady"); // true
 system.constraints.enable("fetchUserWhenReady");
 ```
 
+## When a Constraint Is Re-evaluated
+
+A constraint is re-evaluated when a fact or derivation its `when` read changes, when it is (re)registered, enabled or assigned, when `start()` runs, and when the `retry-later` error strategy retries it. A pass that changed nothing it reads carries its last answer forward. So:
+
+- Keep `when` a pure function of facts and derivations. Read the clock or outside state through a fact (or a source that publishes into one), not directly.
+- A `when` that throws keeps the dependencies it read before throwing, so the write that fixes it wakes it.
+- An async `when` without `deps` is re-evaluated on every pass, since its reads after the first `await` cannot be tracked. Declare `deps` to avoid that.
+
 ## Common Mistakes
 
 ### Putting async logic in resolvers instead of constraints

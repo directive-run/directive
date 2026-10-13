@@ -69,6 +69,15 @@ export interface Changeset {
 export interface HistoryManager<_S extends Schema> extends HistoryAPI {
   /** Take a snapshot of current state */
   takeSnapshot(trigger: string): Snapshot;
+  /**
+   * Re-capture the newest snapshot from the current facts, in place.
+   *
+   * For writes that finish the work of the pass that took it (an event an
+   * effect dispatched): they belong in that snapshot, not in one of their own,
+   * so undo lands on a settled state. A no-op unless the newest snapshot is the
+   * current one.
+   */
+  refreshLatestSnapshot(): void;
   /** Restore facts from a snapshot */
   restore(snapshot: Snapshot): void;
   /** Check if history is enabled */
@@ -384,6 +393,17 @@ export function createHistoryManager<S extends Schema>(
       return snapshot;
     },
 
+    refreshLatestSnapshot(): void {
+      if (!isEnabled || paused || snapshots.length === 0) {
+        return;
+      }
+      if (currentIndex !== snapshots.length - 1) {
+        return;
+      }
+      const latest = snapshots[currentIndex]!;
+      snapshots[currentIndex] = { ...latest, facts: serializeFacts() };
+    },
+
     restore(snapshot: Snapshot): void {
       if (!isEnabled) return;
 
@@ -627,6 +647,7 @@ export function createDisabledHistory<S extends Schema>(): HistoryManager<S> {
     snapshots: [],
     currentIndex: -1,
     takeSnapshot: () => noopSnapshot,
+    refreshLatestSnapshot: () => {},
     restore: () => {},
     goBack: () => {},
     goForward: () => {},

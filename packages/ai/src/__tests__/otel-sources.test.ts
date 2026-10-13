@@ -54,6 +54,55 @@ function makeFakeTracer(): { tracer: OtelTracer; spans: RecordedSpan[] } {
 }
 
 describe("attachSourcesToOtel", () => {
+  it("labels a namespaced source with its prefixed id and local id", () => {
+    const { tracer, spans } = makeFakeTracer();
+    let publishTick: (() => void) | null = null;
+    const loop = createModule("loop", {
+      schema: { facts: { v: t.number() }, events: { TICK: {} } },
+      init: (f) => {
+        f.v = 0;
+      },
+      events: {
+        TICK: (f) => {
+          f.v += 1;
+        },
+      },
+      sources: {
+        boot: {
+          attach: (publish) => {
+            publishTick = () => publish("TICK");
+
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ modules: { loop } });
+    const unsub = attachSourcesToOtel(system, {
+      tracer,
+      serviceName: "test",
+    });
+    system.start();
+    publishTick!();
+
+    const attached = spans.find((s) => s.name === "directive.source.attached");
+    expect(attached?.attributes).toMatchObject({
+      "source.id": "loop::boot",
+      "source.module_id": "loop",
+      "source.local_id": "boot",
+    });
+    expect(attached?.events).toEqual([
+      expect.objectContaining({
+        name: "publish",
+        attributes: expect.objectContaining({
+          "source.event_name": "loop::TICK",
+        }),
+      }),
+    ]);
+    unsub();
+    system.destroy();
+  });
+
   it("emits a span at source.attach + ends it at source.detach", () => {
     const { tracer, spans } = makeFakeTracer();
     const module = createModule("m", {

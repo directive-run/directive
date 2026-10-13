@@ -386,6 +386,8 @@ export interface QueryDefinition<TData> {
   readonly schema: {
     readonly facts: Record<string, unknown>;
     readonly derivations: Record<string, unknown>;
+    /** The events this query's sources publish. */
+    readonly events?: Record<string, Record<string, unknown>>;
   };
 
   /** Requirement type entries to merge. */
@@ -403,24 +405,26 @@ export interface QueryDefinition<TData> {
   /** Resolver fragments to merge. */
   readonly resolvers: Record<string, unknown>;
 
-  /** Effect fragments to merge (focus, reconnect, polling). */
+  /**
+   * Effect fragments to merge. Empty for the built-in queries: focus,
+   * reconnect, polling and cache expiry arrive from outside, so they are
+   * sources.
+   */
   readonly effects: Record<string, unknown>;
 
   /**
-   * Run when the system stops, after every effect cleanup has fired.
-   *
-   * A query holding a long-lived resource — a subscription's stream — needs a
-   * teardown signal it can tell apart from an effect re-run. An effect cleanup
-   * cannot do that: Directive fires it before *every* re-run as well as at
-   * teardown, and the two look identical from inside it. This fires only at
-   * teardown, so a cleanup is free to mark rather than tear down and let this
-   * be the one that acts.
-   *
-   * Receives the facts of the system that is stopping. A definition can back
-   * any number of systems at once, so a teardown that did not know which one
-   * had stopped could only release everything it held.
+   * Source fragments to merge: window focus, reconnect, the polling timer and
+   * the cache-expiry timer. Each publishes an event this query handles.
+   * Sources attach at `start()`, detach at `stop()`, and never re-attach on a
+   * history rewind.
    */
-  readonly onStop?: (facts: Record<string, unknown>) => void;
+  readonly sources?: Record<string, unknown>;
+
+  /** Handlers for the events this query's sources publish. */
+  readonly events?: Record<
+    string,
+    (facts: Record<string, unknown>, event: Record<string, unknown>) => void
+  >;
 
   // --- Imperative handles ---
 

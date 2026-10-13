@@ -46,12 +46,32 @@ jobs:
       # The build now refuses to substitute a placeholder, so the release has
       # to supply the real file. A failed fetch stops the release here rather
       # than publishing something hollow.
-      - name: Fetch api-reference.json from the newest release carrying it
-        run: .github/scripts/fetch-api-reference.sh
+      #
+      # The file must describe THIS tree, not the previous release. Fetching the
+      # newest release's copy meant every publish shipped the API skeleton of
+      # the release before it: knowledge and every plugin skill copy described
+      # last version's exports, and nothing failed, because the skeleton was
+      # regenerated consistently from the stale file. Generate it here instead.
+      # The extractor resolves @directive-run/ai's re-exports through core's
+      # built types, so core builds first.
+      - name: Generate api-reference.json from this tree
+        run: |
+          pnpm --filter @directive-run/core build
+          npm i -g @directive-run/toolkit@latest
+          mkdir -p ../directive-docs/docs/generated
+          extract-api-docs \
+            --packages packages/core,packages/ai \
+            --out ../directive-docs/docs/generated
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
+
+      # The committed api-skeleton.md is regenerated from this tree during
+      # development. If the build produced something different, the release
+      # would publish a skeleton nobody reviewed: stop instead.
+      - name: Published API skeleton matches the committed one
+        run: git diff --exit-code packages/knowledge/api-skeleton.md
 
       - run: pnpm -r --filter './packages/*' typecheck
 

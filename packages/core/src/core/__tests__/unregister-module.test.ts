@@ -439,7 +439,7 @@ describe("unregisterModule", () => {
       },
       sources: {
         feed: {
-          key: (facts) => (facts["gated::open"] ? "on" : null),
+          key: (facts) => (facts.open ? "on" : null),
           gateLingerMs: 40,
           attach: () => {
             attachCount++;

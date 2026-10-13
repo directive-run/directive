@@ -22,12 +22,24 @@
  * See {@link SourceDef} for the primitive's full semantics + rationale.
  */
 
+import isDevelopment from "#is-development";
+import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
 import type {
   SourceDef,
   SourceDropReason,
   SourcePublish,
   SourceUnsubscribe,
 } from "./types/sources.js";
+
+/** The error a gate's refused write or in-place mutation raises. */
+function gateWriteError(id: string, what: string): Error {
+  return new Error(
+    `[Directive] Source "${id}": its key/active gate ${what}. Gates are pure reads of facts; change facts from an event handler or resolver.`,
+  );
+}
 
 // ============================================================================
 // Sources Manager
@@ -223,10 +235,14 @@ export type SourceDispatch = (
  * - `"blocked-event-name"` — event name was `__proto__` / `constructor` /
  *   `prototype` (BLOCKED_PROPS guard, parity with `system.dispatch`).
  * - `"invalid-event-name"` — event name was non-string or empty string.
+ *
+ * `eventName`, when present, is the name the engine dispatched (a namespaced
+ * source's bare `START` becomes `loop::START`); counters and plugin hooks
+ * report it in place of the name the source published.
  */
 export type SourceDispatchResult =
-  | { accepted: true }
-  | { accepted: false; reason: SourceDropReason };
+  | { accepted: true; eventName?: string }
+  | { accepted: false; reason: SourceDropReason; eventName?: string };
 
 /**
  * Per-source lifecycle callbacks the engine wires into the plugin manager.
@@ -378,8 +394,18 @@ export interface SourcesManager {
  * when writing helpers over the inspect output.
  */
 export interface SourceInspectionRow {
+  /**
+   * The source's id in the system. In a namespaced system this is
+   * prefixed with the module's namespace (`loop::boot`).
+   */
   id: string;
   moduleId: string;
+  /**
+   * The id as the module declared it (`boot`), without the namespace. Equal
+   * to `id` in a single-module system. Use it with `moduleId` for labels:
+   * `${row.moduleId}/${row.localId}`.
+   */
+  localId: string;
   meta?: unknown;
   attached: boolean;
   publishCount: number;
@@ -398,6 +424,9 @@ export interface SourceInspectionRow {
    * - `"coalesced"` — manager debounced a same-event-name publish
    *   ahead of the microtask flush (only when `SourceDef.coalesce`
    *   is `"lastWriteWins"`)
+   * - `"unknown-event"` — no handler is registered for the event name
+   * - `"cross-module-event"` — a namespaced source published a name that
+   *   already contains `::`; a source publishes only its own module's events
    */
   lastDropReason: SourceDropReason | null;
   /** Wall-clock ms of the most recent rejected publish, or `null`. */
@@ -418,6 +447,18 @@ export interface SourceLastError {
   phase: "attach" | "cleanup" | "runtime" | "gate";
   message: string;
   at: number;
+}
+
+/**
+ * The id a module declared for a source, without the namespace prefix the
+ * module transform adds in namespaced systems (`loop::boot` → `boot`).
+ *
+ * @internal
+ */
+export function localSourceId(id: string, moduleId: string): string {
+  const prefix = `${moduleId}::`;
+
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
 }
 
 /**
@@ -539,7 +580,19 @@ export function createSourcesManager(
             stack: error.stack,
           });
     callbacks.onError?.(id, moduleId, pErr, safeError);
+    // A gate that throws fails closed: the source just never attaches. With
+    // no plugin listening that is invisible, so development says so, once
+    // per source.
+    if (isDevelopment && pErr === "gate" && !warnedGates.has(id)) {
+      warnedGates.add(id);
+      console.warn(
+        `[Directive] Source "${id}": its key/active gate threw, so the source stays detached: ${safeError.message} The error is in inspect().sources and reaches plugins through onSourceError; this warning shows once per source and only in development.`,
+      );
+    }
   }
+
+  /** Sources whose failed gate has been reported to the console. */
+  const warnedGates = new Set<string>();
 
   function attachOne(
     id: string,
@@ -602,15 +655,16 @@ export function createSourcesManager(
       const c = counters.get(id);
       if (!c) return; // unreachable; defensive no-op
       const now = Date.now();
+      const reported = result.eventName ?? eventName;
       if (result.accepted) {
         c.publishCount += 1;
         c.lastPublishAt = now;
-        callbacks.onPublish?.(id, record.moduleId, eventName);
+        callbacks.onPublish?.(id, record.moduleId, reported);
       } else {
         c.dropCount += 1;
         c.lastDropReason = result.reason;
         c.lastDropAt = now;
-        callbacks.onDrop?.(id, record.moduleId, eventName, result.reason);
+        callbacks.onDrop?.(id, record.moduleId, reported, result.reason);
       }
     };
 
@@ -843,6 +897,46 @@ export function createSourcesManager(
       attempts,
       nextAt: Date.now() + retryDelayMs(attempts),
     });
+  }
+
+  /**
+   * Development: the read-only view gates read through, so a gate that writes
+   * a fact or changes a stored value in place is reported as a gate error.
+   * Built once per facts object; a namespaced gate's scoped proxy wraps it, so
+   * it covers single-module and namespaced systems alike. Production hands the
+   * gate the facts directly and records nothing.
+   */
+  let gateCheck: {
+    facts: Record<string, unknown>;
+    check: CheckedReadView<Record<string, unknown>>;
+  } | null = null;
+  /** The gate being evaluated, for the refused-write message. */
+  let gateId: string | null = null;
+
+  function gateCheckFor(
+    facts: Record<string, unknown>,
+  ): CheckedReadView<Record<string, unknown>> {
+    if (gateCheck?.facts === facts) {
+      return gateCheck.check;
+    }
+    const refuse = (key: string): never => {
+      throw gateWriteError(gateId ?? "<unknown>", `wrote "${key}"`);
+    };
+    const store = facts.$store as Record<string, unknown> | undefined;
+    const readonlyStore =
+      store === undefined
+        ? undefined
+        : Object.freeze({
+            ...store,
+            set: (key: string) => refuse(key),
+            delete: (key: string) => refuse(key),
+          });
+    const check = createCheckedReadView(facts, refuse, {
+      override: (prop) => (prop === "$store" ? readonlyStore : undefined),
+    });
+    gateCheck = { facts, check };
+
+    return check;
   }
 
   function transitionGated(
@@ -1129,6 +1223,7 @@ export function createSourcesManager(
     evaluateGated(facts: Record<string, unknown>): void {
       if (phase !== "attached" || !liveDispatch) return;
       const dispatch = liveDispatch;
+      const check = isDevelopment ? gateCheckFor(facts) : null;
       for (const [id, keyFn] of keyFns) {
         const def = definitions.get(id);
         if (!def) continue;
@@ -1138,7 +1233,24 @@ export function createSourcesManager(
         // via `phase: "gate"`.
         let k: string | null;
         try {
-          const raw = keyFn(facts);
+          let raw: unknown;
+          if (check === null) {
+            raw = keyFn(facts);
+          } else {
+            gateId = id;
+            let mutated: string | null;
+            try {
+              raw = keyFn(check.view);
+            } finally {
+              gateId = null;
+              // Always taken, so a gate that throws leaves nothing recorded
+              // for the next one to be blamed for.
+              mutated = check.takeMutation();
+            }
+            if (mutated !== null) {
+              throw gateWriteError(id, `changed "${mutated}" in place`);
+            }
+          }
           if (raw === null) {
             k = null;
           } else if (typeof raw === "string") {
@@ -1209,6 +1321,7 @@ export function createSourcesManager(
         out.push({
           id,
           moduleId: record.moduleId,
+          localId: localSourceId(id, record.moduleId),
           meta: record.def.meta,
           attached: attachedDefinitionIds.has(id),
           publishCount: c.publishCount,

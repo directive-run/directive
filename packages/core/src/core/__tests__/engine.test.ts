@@ -2283,42 +2283,30 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
 // ============================================================================
 
 /**
- * **These pin a known limitation. They assert what the engine does, not what
- * it should do.** A test that fails here is not necessarily a regression — it
- * may be the limitation being closed, in which case these are what has to be
- * rewritten, and rewriting them is the point of their being here.
+ * A write made while the effects phase is open reaches the effects too.
  *
- * `reconcile` clears the changed-key set after the effects phase awaits.
- * Anything written while that phase is open therefore reaches the constraints,
- * which are evaluated on a later pass against live facts, and never reaches the
- * effects, which are dispatched from the key set that was cleared. An effect
- * declared on the exact key that changed does not run for that write.
+ * `reconcile` used to clear the changed-key set after the effects phase
+ * awaited, so anything written while that phase was open reached the
+ * constraints and never the effects: an effect declared on the exact key that
+ * changed did not run for that write. The pass now takes its keys when it
+ * starts, and a write made while it runs is carried into the next pass.
  *
- * A fix was written for this and withdrawn the same day. Delivering late keys
- * on a following pass, without also bounding the feedback path, turns an effect
- * that writes a fact in its own dependency set into an unbounded reconcile loop
- * — measured at 480,784 effect runs per second, with `settle()` never
- * resolving, because `reconcileDepth` resets per top-level pass and the depth
- * ceiling is therefore never reached. The revert was right. What it left behind
- * was a limitation with no coverage at all, so the next attempt to re-land had
- * nothing telling it what the current behaviour was and where it was observable
- * from.
+ * A first attempt at this was withdrawn because carrying keys forward with no
+ * bound turned an effect that feeds its own dependency into an unbounded loop
+ * (480,784 effect runs per second, `settle()` never resolving). The engine now
+ * cuts a chain of passes started only by effect-phase writes after a fixed
+ * length; the last test below holds that bound.
  *
- * The four cases below are that scope, measured rather than assumed. The
- * limitation needs neither an async effect nor a resolver to appear: a
- * synchronous effect's write is dropped, a write arriving from outside the
- * system is dropped, and an effect gated on a derivation the write invalidates
- * is dropped. Only the last case needs an `await` at all, and it needs a second
- * effect to hold the phase open — a resolver dispatched by the pass whose phase
- * is open does not even enter its body until that phase has completed.
+ * Effects cannot write through their own `facts`, so these write through a
+ * captured system, an event, or from outside the system.
  */
-describe("effects and the reconcile boundary — pinned known limitation", () => {
+describe("effects and the reconcile boundary", () => {
   /**
    * The original shape: an async effect holds the phase open and writes while
    * it is. The write lands, a constraint reading it fires, and the effect
    * declared on it does not run.
    */
-  it("gives a fact written during the effects phase to the constraints and not to the effects", async () => {
+  it("gives a fact written during the effects phase to the constraints and to the effects", async () => {
     const sawB: number[] = [];
     const resolved: number[] = [];
     let release: (() => void) | undefined;
@@ -2359,7 +2347,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
               release = resolve;
               setTimeout(resolve, 0);
             });
-            facts.b = facts.a * 10;
+            system.facts.b = facts.a * 10;
           },
         },
         watchB: {
@@ -2386,9 +2374,9 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
     expect(system.facts.b).toBe(30);
     // The constraint saw it.
     expect(resolved).toEqual([30]);
-    // The effect declared on the very key that changed did not.
-    expect(sawB.length).toBe(before);
-    expect(sawB.at(-1)).toBe(0);
+    // And the effect declared on the very key that changed ran for it.
+    expect(sawB.length).toBe(before + 1);
+    expect(sawB.at(-1)).toBe(30);
 
     system.destroy();
   });
@@ -2398,7 +2386,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
    * or not the phase suspended, so an effect that writes a key another effect
    * is declared on drops it in the same synchronous run.
    */
-  it("drops it for a synchronous effect's write, with no async effect and no resolver in sight", async () => {
+  it("delivers a synchronous effect-phase write, with no async effect and no resolver in sight", async () => {
     const sawB: number[] = [];
 
     const mod = createModule("sync-late-write", {
@@ -2412,7 +2400,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
           deps: ["a"],
           run: (facts) => {
             if (facts.a !== 0) {
-              facts.b = facts.a * 10;
+              system.facts.b = facts.a * 10;
             }
           },
         },
@@ -2436,7 +2424,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
     await flush();
 
     expect(system.facts.b).toBe(30);
-    expect(sawB.length).toBe(before);
+    expect(sawB.slice(before)).toEqual([30]);
 
     system.destroy();
   });
@@ -2448,7 +2436,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
    * line of caller code works or does not depending on what the system was
    * doing at the time.
    */
-  it("drops it for a write arriving from outside the system", async () => {
+  it("delivers a write arriving from outside the system while the phase is open", async () => {
     const sawB: number[] = [];
     let release: (() => void) | undefined;
 
@@ -2495,7 +2483,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
     await flush();
 
     expect(system.facts.b).toBe(99);
-    expect(sawB.length).toBe(before);
+    expect(sawB.slice(before)).toEqual([99]);
 
     system.destroy();
   });
@@ -2506,7 +2494,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
    * way — which matters because a derivation dependency is the shape the
    * effects doc recommends for anything gating on composed state.
    */
-  it("drops it for an effect gated on a derivation the write invalidates", async () => {
+  it("delivers it to an effect gated on a derivation the write invalidates", async () => {
     const sawDoubled: number[] = [];
     let release: (() => void) | undefined;
 
@@ -2530,7 +2518,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
             await new Promise<void>((resolve) => {
               release = resolve;
             });
-            facts.b = 7;
+            system.facts.b = 7;
           },
         },
         watchDoubled: {
@@ -2560,7 +2548,7 @@ describe("effects and the reconcile boundary — pinned known limitation", () =>
 
     // The derivation moved, and nothing woke the effect watching it.
     expect(system.derive.doubledB).toBe(14);
-    expect(sawDoubled).toEqual([2]);
+    expect(sawDoubled).toEqual([2, 14]);
 
     system.destroy();
   });

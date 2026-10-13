@@ -134,10 +134,13 @@ describe("observe() and batched writes", () => {
 
     const changes = factChanges(events);
     expect(changes).toHaveLength(1);
+    // Back one step, to 42. This used to read 0: the first write after
+    // `start()` landed while the opening pass was running and was dropped, so
+    // no snapshot ever held 42.
     expect(changes[0]).toMatchObject({
       key: "a",
       prev: 43,
-      next: 0,
+      next: 42,
       origin: "restore",
     });
   });

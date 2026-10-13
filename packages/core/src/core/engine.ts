@@ -41,7 +41,11 @@ import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
-import { type SourcesManager, createSourcesManager } from "./sources.js";
+import {
+  type SourcesManager,
+  createSourcesManager,
+  localSourceId,
+} from "./sources.js";
 import {
   BLOCKED_PROPS,
   derivationDepId,
@@ -60,6 +64,7 @@ import type {
   MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
+  RequirementWithId,
   ResolverDef,
   ResolversDef,
   Schema,
@@ -71,6 +76,9 @@ import type {
 } from "./types.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 import type { SourceDef, SourcesDef } from "./types/sources.js";
+
+/** Separator between a module namespace and a local name (`loop::START`). */
+const SOURCE_NAMESPACE_SEPARATOR = "::";
 
 // ============================================================================
 // Engine Implementation
@@ -97,7 +105,6 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
  * copied for constraint evaluation, so nothing hands the key back to the phase
  * that raised it.
  */
-const EFFECT_RETRY_KEY = "*";
 
 /**
  * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
@@ -233,6 +240,15 @@ interface EngineState<_S extends Schema> {
  * froze themselves, and would then skip the tag validation.
  */
 const preparedSchemaTypes = new WeakSet<object>();
+
+/** The diff of a pass where nothing was required before or after. */
+const NO_REQUIREMENT_CHANGES: {
+  readonly added: RequirementWithId[];
+  readonly removed: RequirementWithId[];
+} = Object.freeze({
+  added: Object.freeze([]) as unknown as RequirementWithId[],
+  removed: Object.freeze([]) as unknown as RequirementWithId[],
+});
 
 function isOwnSchemaType(value: unknown): boolean {
   return (
@@ -530,9 +546,65 @@ export function createEngine<S extends Schema>(
   const errorBoundary: ErrorBoundaryManager = createErrorBoundaryManager({
     config: config.errorBoundary,
     onError: (error) => pluginManager.emitError(error),
-    onRecovery: (error, strategy) =>
-      pluginManager.emitErrorRecovery(error, strategy),
+    onRecovery: (error, strategy) => {
+      if (strategy === "retry-later") {
+        ensureRetryLaterTimer();
+      }
+      pluginManager.emitErrorRecovery(error, strategy);
+    },
   });
+
+  /**
+   * Poll for due retry-later entries. Started when `retryLater` is
+   * configured, and otherwise the first time a retry-later strategy is
+   * chosen, so a strategy returned by a callback (or set without
+   * `retryLater`) still retries. Default delay 1000 ms, polled at most
+   * every 500 ms.
+   */
+  function ensureRetryLaterTimer(): void {
+    if (retryLaterTimer || !state.isRunning) {
+      return;
+    }
+    const intervalMs = Math.max(
+      config.errorBoundary?.retryLater?.delayMs ?? 1000,
+      250,
+    );
+    retryLaterTimer = setInterval(
+      () => {
+        const dueRetries = errorBoundary.processDueRetries();
+        // Nothing left to retry: stop polling until the next retry-later.
+        if (
+          errorBoundary.getRetryLaterManager().getPendingRetries().length === 0
+        ) {
+          stopRetryLaterTimer();
+        }
+
+        for (const entry of dueRetries) {
+          if (entry.callback) {
+            entry.callback();
+          } else {
+            // A constraint that threw is re-evaluated by name: a pass with
+            // no changed keys would otherwise carry its last answer forward
+            // and never ask it again.
+            if (entry.source === "constraint") {
+              constraintsManager.markDirty(entry.sourceId);
+            }
+            scheduleReconcile();
+          }
+        }
+      },
+      Math.min(intervalMs, 500),
+    );
+    // Polling must not keep a Node process alive on its own.
+    (retryLaterTimer as { unref?: () => void }).unref?.();
+  }
+
+  function stopRetryLaterTimer(): void {
+    if (retryLaterTimer !== null) {
+      clearInterval(retryLaterTimer);
+      retryLaterTimer = null;
+    }
+  }
 
   // Retry-later polling timer
   let retryLaterTimer: ReturnType<typeof setInterval> | null = null;
@@ -551,8 +623,13 @@ export function createEngine<S extends Schema>(
    * inside `onBatch`, which is where the announcement used to happen anyway —
    * so listeners still hear about a batch at exactly the same moment, having
    * become able to read the right values before that moment arrives.
+   *
+   * A begin/end pair rather than a hold that returns its release, because it
+   * is taken on every batch and every unbatched write. Each `begin` is
+   * matched by exactly one `end`; `derivationHolds` below keeps the pairing.
    */
-  let holdDerivationNotifications: () => () => void = () => () => {};
+  let beginDerivationHold: () => void = () => {};
+  let endDerivationHold: () => void = () => {};
 
   /**
    * Outstanding derivation-notification holds, innermost last.
@@ -571,7 +648,12 @@ export function createEngine<S extends Schema>(
    * The manager already counts holds properly and its release is idempotent;
    * only this side needed to stop forgetting them.
    */
-  const derivationHolds: Array<{ release: () => void; released: boolean }> = [];
+  //
+  // Each entry is whether that hold has been released yet. The hold itself is
+  // `beginDerivationHold` / `endDerivationHold`, so a batch, and every effect
+  // runs in one, pushes a boolean instead of allocating a record and a
+  // release closure.
+  const derivationHolds: boolean[] = [];
 
   /**
    * How deep the stack was when each batch opened, so a batch can only ever
@@ -590,10 +672,10 @@ export function createEngine<S extends Schema>(
    * hold — announcing the parent early and then again when the parent finished.
    */
   function releaseDerivationHold(): void {
-    const top = derivationHolds[derivationHolds.length - 1];
-    if (top && !top.released) {
-      top.released = true;
-      top.release();
+    const top = derivationHolds.length - 1;
+    if (top >= 0 && !derivationHolds[top]) {
+      derivationHolds[top] = true;
+      endDerivationHold();
     }
   }
 
@@ -607,10 +689,9 @@ export function createEngine<S extends Schema>(
   function unwindDerivationHolds(): void {
     const base = derivationHoldBase.pop() ?? 0;
     while (derivationHolds.length > base) {
-      const frame = derivationHolds.pop();
-      if (frame && !frame.released) {
-        frame.released = true;
-        frame.release();
+      const released = derivationHolds.pop();
+      if (released === false) {
+        endDerivationHold();
       }
     }
   }
@@ -696,6 +777,87 @@ export function createEngine<S extends Schema>(
     ordinaryWrites = 0;
   }
 
+  /**
+   * Keys a history navigation restored since the last pass.
+   *
+   * A restore needs no reconciling: its state was reconciled when captured. But
+   * effects mirror state to the outside world, and a canvas or document title
+   * left showing the pre-rewind state is wrong. So restored keys skip the
+   * changed set and wake effects alone, in a pass that does nothing a replay
+   * must not do: no snapshot, no gated-source re-attach, and no keys handed to
+   * constraints as changed.
+   */
+  const restoredKeys = new Set<string>();
+
+  /**
+   * Whether this write landed while effects were running, counted per write
+   * since the last pass began.
+   *
+   * A write during the effects phase (an event an effect dispatched, a captured
+   * `system.facts`, a caller writing while an async effect awaits) is carried
+   * into the next pass, so it wakes the effects that read it. That opens a
+   * feedback path: an effect that dispatches a change to its own dependency
+   * wakes itself, forever. These counters let the pass tell a chain of passes
+   * started only by effect-phase writes from ordinary work, and bound it.
+   */
+  let effectsPhaseOpen = false;
+  let effectPhaseWrites = 0;
+  let otherPhaseWrites = 0;
+  /** Consecutive passes started only by writes made during an effects phase. */
+  let effectChainLength = 0;
+  /** Consecutive "retry" attempts per failing effect, reset by ordinary work. */
+  const effectRetryAttempts = new Map<string, number>();
+  const MAX_EFFECT_RETRIES = 3;
+  /** A self-waking effect chain is cut after this many passes. */
+  const MAX_EFFECT_CHAIN = 100;
+
+  /**
+   * Keys written synchronously from inside an effect's body (an event it
+   * dispatched, a captured `system.facts`) since the last pass began. A write
+   * made while effects ran but from outside any of them, such as a caller
+   * writing while an async effect awaits, is not in here.
+   */
+  const effectOriginKeys = new Set<string>();
+  /** The keys the previous pass was started with, when it was part of a chain. */
+  let previousChainKeys: Set<string> | null = null;
+  /** Whether the previous pass took (or refreshed) a history snapshot. */
+  let lastPassSnapshotted = false;
+
+  /**
+   * Changes made in the current pass, counted per key, double-buffered like
+   * `changedKeys`. Compared with a resolver run's own counts to tell whether
+   * that run is the only thing that changed a key.
+   */
+  let writeCounts = new Map<string, number>();
+  let spareWriteCounts = new Map<string, number>();
+
+  function noteChangedKey(key: string): void {
+    state.changedKeys.add(key);
+    if (resolversManager.hasLiveRuns()) {
+      writeCounts.set(key, (writeCounts.get(key) ?? 0) + 1);
+    }
+    if (effectsPhaseOpen) {
+      effectPhaseWrites++;
+      if (effectsManager.runningEffect() !== null) {
+        effectOriginKeys.add(key);
+      }
+    } else {
+      otherPhaseWrites++;
+    }
+  }
+
+  /**
+   * Whether a dispatch is being made by an effect re-run for a history
+   * navigation, and which effect, when known. Warned once per effect.
+   */
+  let navigationEffectsOpen = false;
+  const warnedNavigationDispatch = new Set<string>();
+
+  function noteRestored(key: string): void {
+    restoredKeys.add(key);
+    scheduleReconcile();
+  }
+
   function withNavigation(fn: () => void): void {
     navigationDepth++;
     try {
@@ -710,7 +872,9 @@ export function createEngine<S extends Schema>(
    * Returns whether it was.
    */
   function noteWrite(): boolean {
-    if (navigationDepth === 0) {
+    // A write an effect causes while re-running for a navigation belongs to the
+    // navigation: snapshotting it would splice away the redo stack.
+    if (navigationDepth === 0 && !navigationEffectsOpen) {
       ordinaryWrites++;
 
       return false;
@@ -778,12 +942,12 @@ export function createEngine<S extends Schema>(
       // consumer code. Without the hold they would run between the commit and
       // the plugins, and a throw from one would skip `emitFactSet` entirely,
       // taking the guardrail with it.
-      const release = holdDerivationNotifications();
+      beginDerivationHold();
       try {
         invalidateDerivation(key);
         pluginManager.emitFactSet(key, value, prev);
       } finally {
-        release();
+        endDerivationHold();
       }
       // Track fact changes for trace
       if (traceEnabled) {
@@ -804,7 +968,11 @@ export function createEngine<S extends Schema>(
       // The restore's own writes are batched, so they are gated on the other
       // path; what reaches here during a restore is a reaction to it, and a
       // reaction is the program's own work.
-      if (currentFactOrigin() === "restore") return;
+      if (currentFactOrigin() === "restore") {
+        noteRestored(String(key));
+
+        return;
+      }
       // Asked unconditionally, and before the dispatch check. Behind it, a
       // navigation driven from inside an event handler recorded nothing and
       // its pass went on to snapshot and re-attach — the two things a replay
@@ -817,7 +985,7 @@ export function createEngine<S extends Schema>(
       if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
-      state.changedKeys.add(key);
+      noteChangedKey(String(key));
       scheduleReconcile();
     },
     onBatch: (changes) => {
@@ -856,6 +1024,13 @@ export function createEngine<S extends Schema>(
       // it. Observers only reach this path at all because batched writes now
       // announce, so the gap arrived with that arm.
       const authored = changes.filter((change) => change.origin !== "restore");
+      if (authored.length !== changes.length) {
+        for (const change of changes) {
+          if (change.origin === "restore") {
+            noteRestored(change.key);
+          }
+        }
+      }
       if (authored.length === 0) return;
       let duringNavigation = false;
       for (const _change of authored) {
@@ -868,7 +1043,7 @@ export function createEngine<S extends Schema>(
         shouldTakeSnapshot = true;
       }
       for (const change of authored) {
-        state.changedKeys.add(change.key);
+        noteChangedKey(change.key);
       }
       scheduleReconcile();
     },
@@ -883,10 +1058,8 @@ export function createEngine<S extends Schema>(
     },
     onBatchStart: () => {
       derivationHoldBase.push(derivationHolds.length);
-      derivationHolds.push({
-        release: holdDerivationNotifications(),
-        released: false,
-      });
+      beginDerivationHold();
+      derivationHolds.push(false);
     },
     onKeysRegistered: (entries) => {
       const asSchema: Record<string, unknown> = {};
@@ -940,7 +1113,8 @@ export function createEngine<S extends Schema>(
   invalidateDerivation = (key: string) => derivationsManager.invalidate(key);
   invalidateManyDerivations = (keys: string[]) =>
     derivationsManager.invalidateMany(keys);
-  holdDerivationNotifications = () => derivationsManager.holdNotifications();
+  beginDerivationHold = () => derivationsManager.beginHold();
+  endDerivationHold = () => derivationsManager.endHold();
 
   // Create effects manager
   const effectsManager: EffectsManager<S> = createEffectsManager({
@@ -950,6 +1124,8 @@ export function createEngine<S extends Schema>(
     derived: derivationsManager.getProxy() as Record<string, unknown>,
     isDerivation: observeDerivationDepName,
     isFactKey: isFactKeyName,
+    // The trace is the only reader of `deps`.
+    wantsRunDeps: () => traceManager.currentTrace != null,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
@@ -960,6 +1136,9 @@ export function createEngine<S extends Schema>(
             ?.meta,
         });
       }
+    },
+    onWriteBlocked: (id, key) => {
+      if (hasPlugins()) pluginManager.emitEffectWriteBlocked(id, key);
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("effect", id, error);
@@ -978,9 +1157,19 @@ export function createEngine<S extends Schema>(
         effectsManager.disable(id);
       }
 
+      // Bounded. The retry is carried into the next pass, and an effect that
+      // fails every time would otherwise retry for as long as the process runs.
       if (strategy === "retry") {
-        state.changedKeys.add(EFFECT_RETRY_KEY);
-        scheduleReconcile();
+        const attempts = (effectRetryAttempts.get(id) ?? 0) + 1;
+        effectRetryAttempts.set(id, attempts);
+        if (attempts <= MAX_EFFECT_RETRIES) {
+          effectsManager.requestRerun(id);
+          scheduleReconcile();
+        } else if (isDevelopment) {
+          console.warn(
+            `[Directive] effect "${id}" failed ${MAX_EFFECT_RETRIES} retries in a row; it will run again on its next change.`,
+          );
+        }
       }
     },
   });
@@ -1150,6 +1339,103 @@ export function createEngine<S extends Schema>(
   const pendingRequeueIds = new Set<string>();
 
   /**
+   * The writes of every run whose requirement disappeared in this pass,
+   * summed per key: those runs own the pass's changes jointly. `null` when
+   * none of them wrote anything.
+   */
+  function jointPassWrites(
+    removed: RequirementWithId[],
+  ): ReadonlyMap<string, number> | null {
+    let only: ReadonlyMap<string, number> | null = null;
+    let joint: Map<string, number> | null = null;
+    for (const req of removed) {
+      const own = resolversManager.passWritesFor(req.id);
+      if (own === null || own === only) {
+        continue;
+      }
+      if (only === null) {
+        only = own;
+        continue;
+      }
+      if (joint === null) {
+        joint = new Map(only);
+      }
+      for (const [key, n] of own) {
+        joint.set(key, (joint.get(key) ?? 0) + n);
+      }
+    }
+
+    return joint ?? only;
+  }
+
+  /**
+   * Whether the run still resolving `req` satisfied it: it wrote something
+   * this pass, and every change this pass to a fact the constraint reads
+   * (directly or through a derivation) came from the runs whose
+   * requirements disappeared in this pass. Anything else that touched what
+   * the constraint reads makes it an ordinary retraction, canceled as before.
+   */
+  function satisfiedByOwnWrite(
+    req: RequirementWithId,
+    passKeys: Set<string>,
+    passCounts: Map<string, number>,
+    joint: ReadonlyMap<string, number>,
+  ): boolean {
+    if (
+      !req.fromConstraint ||
+      resolversManager.passWritesFor(req.id) === null
+    ) {
+      return false;
+    }
+    const deps = constraintsManager.getDependencies(req.fromConstraint);
+    if (!deps) {
+      return false;
+    }
+    // Fact deps first, without allocating: the common case has no
+    // derivation in between.
+    let changed = 0;
+    let derivationIds: string[] | null = null;
+    for (const name of deps) {
+      if (isDerivationDep(name)) {
+        (derivationIds ??= []).push(derivationDepId(name));
+        continue;
+      }
+      if (!passKeys.has(name)) {
+        continue;
+      }
+      changed++;
+      if ((joint.get(name) ?? 0) !== (passCounts.get(name) ?? 0)) {
+        return false;
+      }
+    }
+    if (derivationIds !== null) {
+      const seen = new Set<string>();
+      while (derivationIds.length > 0) {
+        const id = derivationIds.pop()!;
+        if (seen.has(id)) {
+          continue;
+        }
+        seen.add(id);
+        const edges = derivationsManager.dependencyEdges(id);
+        for (const key of edges.facts) {
+          if (!passKeys.has(key)) {
+            continue;
+          }
+          changed++;
+          if ((joint.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
+            return false;
+          }
+        }
+        for (const next of edges.derivations) {
+          derivationIds.push(next);
+        }
+      }
+    }
+
+    return changed > 0;
+  }
+
+  /**
    * Per-(constraintId, reason) sticky bit so `constraint.binding.disabled`
    * fires at most ONCE per pair across the lifetime of the registered
    * constraint. Without this, a hot async constraint that dispatches at
@@ -1281,10 +1567,21 @@ export function createEngine<S extends Schema>(
         });
       }
     },
-    onResolutionComplete: () => {
-      // After a resolver completes, schedule another reconcile
+    onResolutionComplete: (satisfied) => {
+      // After a resolver completes, schedule another reconcile. A run that
+      // had already satisfied its requirement changed nothing a pass would
+      // act on by finishing, unless it left a requeue, a dirty constraint
+      // (`after` ordering) or a queued batch behind; otherwise only settle()
+      // needs to hear about it.
       notifySettlementChange();
-      scheduleReconcile();
+      if (
+        !satisfied ||
+        pendingRequeueIds.size > 0 ||
+        constraintsManager.hasDirty() ||
+        resolversManager.hasPendingBatches()
+      ) {
+        scheduleReconcile();
+      }
     },
     onRequeue: (requirementId: string) => {
       // ctx.requeue() opt-in: the resolver explicitly wants its owning
@@ -1362,6 +1659,8 @@ export function createEngine<S extends Schema>(
     readyPromise: null,
     readyResolve: null,
   };
+  /** The other half of `state.changedKeys`, swapped in at each pass. */
+  let spareChangedKeys = new Set<string>();
 
   // Dynamic definition registry (register, assign, unregister, call)
   const definitions = createDefinitionsRegistry({
@@ -1427,6 +1726,57 @@ export function createEngine<S extends Schema>(
       return;
     }
 
+    // A chain of passes each started only by writes made while effects ran is
+    // an effect waking itself. Cut it, say so, and drop what it carried, rather
+    // than spin until the process does.
+    const passFromEffects = effectPhaseWrites > 0 && otherPhaseWrites === 0;
+    if (passFromEffects) {
+      effectChainLength++;
+    } else {
+      effectChainLength = 0;
+      previousChainKeys = null;
+      if (otherPhaseWrites > 0) {
+        effectRetryAttempts.clear();
+      }
+    }
+    effectPhaseWrites = 0;
+    otherPhaseWrites = 0;
+    if (effectChainLength > MAX_EFFECT_CHAIN) {
+      // Drop only what the chain itself keeps writing: keys an effect wrote
+      // from its own body, and keys the previous pass of the chain was
+      // started with. A key written while effects ran but from outside them,
+      // the first time, is someone else's write and is kept.
+      const kept = new Set<string>();
+      for (const key of state.changedKeys) {
+        if (!effectOriginKeys.has(key) && !previousChainKeys?.has(key)) {
+          kept.add(key);
+        }
+      }
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...state.changedKeys].slice(0, 5).join(", ")}`,
+        );
+      }
+      state.changedKeys.clear();
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      derivationsManager.collectInvalidated(new Set());
+      resetNavigationRecord();
+      effectChainLength = 0;
+      reconcileDepth = 0;
+      if (kept.size > 0) {
+        for (const key of kept) {
+          state.changedKeys.add(key);
+        }
+        otherPhaseWrites = kept.size;
+        scheduleReconcile();
+      }
+      notifySettlementChange();
+
+      return;
+    }
+    effectOriginKeys.clear();
+
     state.isReconciling = true;
     notifySettlementChange();
 
@@ -1445,11 +1795,51 @@ export function createEngine<S extends Schema>(
     // Writes made during a navigation reconcile like any other, but a pass
     // made up entirely of them must not snapshot over the redo stack or
     // re-open a transport.
-    const followsNavigation = passIsEntirelyNavigation();
+    const followsNavigation =
+      passIsEntirelyNavigation() ||
+      (ordinaryWrites === 0 && restoredKeys.size > 0);
+    // Taken now, so a restore made while this pass awaits lands in the next.
+    let navigationKeys: Set<string> | null = null;
+    if (restoredKeys.size > 0) {
+      navigationKeys = new Set(restoredKeys);
+      restoredKeys.clear();
+    }
 
+    // The keys this pass is about, taken now. Anything written while the pass
+    // runs (during the effects phase or while constraints evaluate) stays in
+    // `changedKeys` and is picked up by the pass scheduled at the end. Clearing
+    // after the effects phase instead dropped those writes for good: an effect
+    // declared on the key never ran for it, and the first write after
+    // `start()` was lost the same way.
+    //
+    // Double-buffered rather than copied: the set writes have been landing in
+    // becomes this pass's keys, and the spare (last pass's keys, emptied)
+    // takes the writes from here on. Nothing keeps `passKeys` past the pass,
+    // and passes never overlap, so the spare is free to reuse.
+    const passKeys = state.changedKeys;
+    spareChangedKeys.clear();
+    state.changedKeys = spareChangedKeys;
+    spareChangedKeys = passKeys;
+    // Run attribution bookkeeping, only while a resolver run could write.
+    const passCounts = writeCounts;
+    if (writeCounts.size > 0 || resolversManager.hasLiveRuns()) {
+      spareWriteCounts.clear();
+      writeCounts = spareWriteCounts;
+      spareWriteCounts = passCounts;
+      resolversManager.beginPass();
+    }
+    if (passFromEffects) {
+      previousChainKeys = new Set(passKeys);
+    }
+    // Same lifetime, so the record can never be consumed by a later pass that
+    // has nothing to do with the navigation that set it.
+    resetNavigationRecord();
+    const ordinaryKeyCount = passKeys.size;
+
+    let snapshotted = false;
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
-      if (state.changedKeys.size > 0) {
+      if (passKeys.size > 0) {
         // `followsNavigation` overrides both arms. Snapshotting here splices
         // away every snapshot ahead of the point just rewound to, so a single
         // reactive write during an undo destroys redo — and the default arm
@@ -1457,21 +1847,39 @@ export function createEngine<S extends Schema>(
         // clearing the flag alone did not stop it.
         if (
           !followsNavigation &&
+          passFromEffects &&
           (snapshotEventNames === null || shouldTakeSnapshot)
         ) {
-          const keys = state.changedKeys;
-          const label =
-            keys.size <= 5
-              ? `facts-changed:${[...keys].join(",")}`
-              : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
-          historyManager.takeSnapshot(label);
+          // These writes finish the pass that caused them, so they go into
+          // its snapshot instead of making their own. Otherwise undo lands on
+          // a state that never settled. Nothing to fold into when that pass
+          // took no snapshot, so none is taken.
+          if (lastPassSnapshotted) {
+            historyManager.refreshLatestSnapshot();
+            snapshotted = true;
+          }
+        } else if (
+          !followsNavigation &&
+          (snapshotEventNames === null || shouldTakeSnapshot)
+        ) {
+          snapshotted = true;
+          // The label is only built for a history that keeps it.
+          if (config.history) {
+            const keys = passKeys;
+            const label =
+              keys.size <= 5
+                ? `facts-changed:${[...keys].join(",")}`
+                : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
+            historyManager.takeSnapshot(label);
+          }
         }
         shouldTakeSnapshot = false;
       }
 
-      // Get snapshot for plugins
-      const snapshot = facts.$snapshot() as FactsSnapshot<S>;
-      pluginManager.emitReconcileStart(snapshot);
+      // Snapshot for plugins, built only when one is listening.
+      if (hasPlugins()) {
+        pluginManager.emitReconcileStart(facts.$snapshot() as FactsSnapshot<S>);
+      }
 
       // Note: Derivations are already invalidated immediately when facts change
       // (in the onChange/onBatch callbacks), so we don't need to do it here
@@ -1492,8 +1900,34 @@ export function createEngine<S extends Schema>(
       // nothing reads back stays stale — so pushing it meant re-walking the
       // whole downstream graph per write forever, while the set it fed is
       // drained once per pass regardless.
-      derivationsManager.collectInvalidated(state.changedKeys);
-      await effectsManager.runEffects(state.changedKeys);
+      //
+      // A pass that only carries a navigation drains into the restored keys
+      // instead, so a derivation the rewind moved wakes effects without being
+      // handed to constraints as a change.
+      derivationsManager.collectInvalidated(
+        navigationKeys !== null && ordinaryKeyCount === 0
+          ? navigationKeys
+          : passKeys,
+      );
+      effectsPhaseOpen = true;
+      navigationEffectsOpen = navigationKeys !== null;
+      try {
+        // Awaited only when an effect returned a promise. A pass whose
+        // effects are all synchronous then finishes without yielding, so
+        // `settle()` sees it done on its first check instead of falling back
+        // to a timer and a subscription every frame.
+        //
+        const effectsDone = effectsManager.runEffectsFast(
+          passKeys,
+          navigationKeys,
+        );
+        if (effectsDone !== undefined) {
+          await effectsDone;
+        }
+      } finally {
+        effectsPhaseOpen = false;
+        navigationEffectsOpen = false;
+      }
 
       // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
       // plane, immediately after effects, against the committed facts. Sits
@@ -1516,37 +1950,63 @@ export function createEngine<S extends Schema>(
         );
       }
 
-      // Again, because effects write facts.
-      //
-      // The drain above happens before `runEffects` so an effect gated on a
-      // derivation is woken by it. But an effect that *writes* a fact
-      // invalidates whatever derivations read that fact, and those roots land
-      // after that drain has already run — so without this second call the
-      // announcement misses the constraint pass immediately below, the pass
-      // ends with `changedKeys` cleared, and nothing is scheduled to carry it.
-      // The derivation still reads correctly on pull; only the wakeup is lost,
-      // which is why it survived a snapshot assertion for so long.
-      //
-      // Early-returns on an empty root set, so a reconcile in which no effect
-      // wrote anything pays one `Set.size` check.
-      derivationsManager.collectInvalidated(state.changedKeys);
+      // No second invalidation drain here. A write made while effects ran
+      // stays in `changedKeys`, and the derivations it invalidated stay
+      // pending; the pass scheduled at the end drains both, so effects and
+      // constraints reading them hear about it there.
 
-      // Copy changed keys for constraint evaluation before clearing
-      const keysForConstraints = new Set(state.changedKeys);
+      // A navigation restored state that was reconciled when it was captured,
+      // so its requirements are rebuilt from a full evaluation without
+      // dispatching anything. Without the rebuild, the requirement set from
+      // before the rewind stayed as the baseline: a later write that satisfied
+      // a constraint again looked like no change and its resolver never ran.
+      // Handing the evaluation an empty key set instead meant "evaluate all"
+      // and re-dispatched resolvers for the rewound state.
+      let currentRequirements: RequirementWithId[];
+      if (navigationKeys !== null) {
+        const restored = await constraintsManager.evaluate();
+        const restoredSet = new RequirementSet();
+        for (const req of restored) {
+          // A constraint that reads a key written in this same pass was just
+          // evaluated against that write, not against the restored state, so
+          // it cannot be part of the baseline. Left out, it is diffed as
+          // added below and dispatches, as the write deserves.
+          if (ordinaryKeyCount > 0 && req.fromConstraint) {
+            const deps = constraintsManager.getDependencies(req.fromConstraint);
+            if (deps && [...deps].some((dep) => passKeys.has(dep))) {
+              continue;
+            }
+          }
+          restoredSet.add(req);
+        }
+        state.previousRequirements = restoredSet;
+        currentRequirements =
+          ordinaryKeyCount > 0
+            ? await constraintsManager.evaluate(passKeys)
+            : restored;
+      } else {
+        // Evaluate constraints (pass changed keys for incremental evaluation).
+        // When no constraint reads a changed key, the answer is the last
+        // pass's requirements carried forward, and it comes back without a
+        // promise to await.
+        currentRequirements =
+          constraintsManager.evaluateUnaffected(passKeys) ??
+          (await constraintsManager.evaluate(passKeys));
+      }
 
-      // Clear changed keys
-      state.changedKeys.clear();
-      // Same lifetime, so the record can never be consumed by a later pass
-      // that has nothing to do with the navigation that set it.
-      resetNavigationRecord();
-
-      // Evaluate constraints (pass changed keys for incremental evaluation)
-      const currentRequirements =
-        await constraintsManager.evaluate(keysForConstraints);
-      const currentSet = new RequirementSet();
-      for (const req of currentRequirements) {
-        currentSet.add(req);
-        pluginManager.emitRequirementCreated(req);
+      // Nothing required now or before: no set to build, nothing to diff,
+      // nothing to start or cancel.
+      const quiet =
+        currentRequirements.length === 0 &&
+        state.previousRequirements.size === 0;
+      const currentSet = quiet
+        ? state.previousRequirements
+        : new RequirementSet();
+      if (!quiet) {
+        for (const req of currentRequirements) {
+          currentSet.add(req);
+          pluginManager.emitRequirementCreated(req);
+        }
       }
 
       // Capture which constraints produced requirements for trace
@@ -1569,7 +2029,9 @@ export function createEngine<S extends Schema>(
       }
 
       // Diff with previous requirements
-      const { added, removed } = currentSet.diff(state.previousRequirements);
+      const { added, removed } = quiet
+        ? NO_REQUIREMENT_CHANGES
+        : currentSet.diff(state.previousRequirements);
 
       // Capture requirement diff for trace
       if (currentTrace) {
@@ -1597,10 +2059,25 @@ export function createEngine<S extends Schema>(
       // Cancelling a bound resolver would abort the signal and make a
       // signal-checking resolver bail early, losing those data writes (the
       // win-at-the-buzzer regression).
+      const joint = removed.length > 0 ? jointPassWrites(removed) : null;
       for (const req of removed) {
         const bound = req.fromConstraint
           ? getConstraintBinding(req.fromConstraint)
           : undefined;
+        if (
+          joint !== null &&
+          satisfiedByOwnWrite(req, passKeys, passCounts, joint)
+        ) {
+          // The run's own write, and nothing else, made its requirement go
+          // away: it satisfied it. It is not canceled; it finishes and
+          // reports completion. Decided from what it wrote, not from how far
+          // its promise has got, so the answer does not depend on timing.
+          // It stays in flight, so stop() aborts it and settle() waits for
+          // it; it is not retried; and if the requirement comes back while
+          // it runs, the new dispatch supersedes it.
+          resolversManager.markSatisfied(req.id);
+          continue;
+        }
         if (bound) {
           resolversManager.detach(req.id);
         } else {
@@ -1673,20 +2150,35 @@ export function createEngine<S extends Schema>(
       // here guarantees the NEXT reconcile diff treats them as fresh.
       // If the constraint no longer fires next pass, the ID simply won't
       // be in currentSet — there's no infinite-loop risk.
+      //
+      // Held while the requeuing resolver is still in flight. Applied
+      // earlier, the next pass re-dispatches a requirement whose resolver has
+      // not finished, the dispatch is dropped as a duplicate, and the requeue
+      // is lost for good. That used to be hidden by how many microtasks a
+      // pass took, which is not something to depend on: a resolver slower
+      // than those lost it all along. Its completion schedules a pass, and
+      // the requeue is applied at the end of that one.
       if (pendingRequeueIds.size > 0) {
+        let applied = false;
         for (const reqId of pendingRequeueIds) {
+          if (resolversManager.isResolving(reqId)) {
+            continue;
+          }
           state.previousRequirements.remove(reqId);
+          pendingRequeueIds.delete(reqId);
+          applied = true;
         }
-        pendingRequeueIds.clear();
         // Schedule a follow-up reconcile so the next diff sees the
         // re-emitted requirement as added. Without this, the system
         // could go quiescent if no other fact change is pending.
-        scheduleReconcile();
+        if (applied) {
+          scheduleReconcile();
+        }
       }
 
       // Build reconcile result (only if plugins are listening)
-      const inflightInfo = resolversManager.getInflightInfo();
       if (config.plugins && config.plugins.length > 0) {
+        const inflightInfo = resolversManager.getInflightInfo();
         // Build Map for O(1) lookups on canceled requirements
         const inflightMap =
           removed.length > 0
@@ -1721,6 +2213,7 @@ export function createEngine<S extends Schema>(
       }
 
       state.isReconciling = false;
+      lastPassSnapshotted = snapshotted;
 
       // Flush any deferred dynamic definition operations that were queued
       // during this reconciliation cycle
@@ -1763,6 +2256,8 @@ export function createEngine<S extends Schema>(
       // with something to say and no pass in which to say it.
       if (
         state.changedKeys.size > 0 ||
+        restoredKeys.size > 0 ||
+        effectsManager.hasPendingReruns() ||
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
@@ -1802,12 +2297,47 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  /** Dispatch an event by name, handling snapshot flags and batching */
+  /** Sources already warned about a cross-module publish, per system. */
+  const warnedCrossModuleSources = new Set<string>();
+
+  /** Development: say why a source's `ns::EVENT` publish was dropped. */
+  function warnCrossModulePublish(
+    sourceId: string,
+    namespace: string,
+    eventName: string,
+  ): void {
+    if (warnedCrossModuleSources.has(sourceId)) {
+      return;
+    }
+    warnedCrossModuleSources.add(sourceId);
+    const ownPrefix = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}`;
+    const fix = eventName.startsWith(ownPrefix)
+      ? `Drop the "${ownPrefix}" prefix: publish("${eventName.slice(ownPrefix.length)}").`
+      : `Publish an event module "${namespace}" declares; to reach another module, have that event's handler or a resolver dispatch an event the other module owns.`;
+    console.warn(
+      `[Directive] Source "${sourceId}" published "${eventName}". A source publishes only its own module's events, so this is dropped (reason "cross-module-event"). ${fix}`,
+    );
+  }
+
+  /**
+   * Dispatch an event by name, handling snapshot flags and batching.
+   *
+   * @returns Whether a handler was registered for the event.
+   */
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
-  ): void {
+  ): boolean {
     const handler = mergedEvents[eventName];
+    if (isDevelopment && navigationEffectsOpen) {
+      const effectId = effectsManager.runningEffect() ?? "(unknown effect)";
+      if (!warnedNavigationDispatch.has(effectId)) {
+        warnedNavigationDispatch.add(effectId);
+        console.warn(
+          `[Directive] effect "${effectId}" dispatched "${eventName}" while re-running after a history navigation. An effect that dispatches records acts rather than mirroring state, and a rewind should not repeat them. Set onNavigate: "skip" on it.`,
+        );
+      }
+    }
     if (handler) {
       dispatchDepth++;
       // Not while rewinding. A handler dispatched from a listener reacting to
@@ -1815,6 +2345,7 @@ export function createEngine<S extends Schema>(
       // splices away everything ahead of the point being rewound to.
       if (
         navigationDepth === 0 &&
+        !navigationEffectsOpen &&
         (snapshotEventNames === null || snapshotEventNames.has(eventName))
       ) {
         shouldTakeSnapshot = true;
@@ -1826,11 +2357,16 @@ export function createEngine<S extends Schema>(
       } finally {
         dispatchDepth--;
       }
-    } else if (isDevelopment) {
+
+      return true;
+    }
+    if (isDevelopment) {
       console.warn(
         `[Directive] Unknown event type "${eventName}". No handler is registered for this event. Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
       );
     }
+
+    return false;
   }
 
   // Create typed derive accessor using a Proxy
@@ -2604,28 +3140,62 @@ export function createEngine<S extends Schema>(
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
+        onEffectWriteBlocked: (id: string, key: string) =>
+          observer({ type: "effect.write-blocked", id, key }),
         onModuleRegistered: (id: string) =>
           observer({ type: "module.registered", id }),
         onModuleUnregistered: (id: string) =>
           observer({ type: "module.unregistered", id }),
         onSourceAttach: (id: string, moduleId: string) =>
-          observer({ type: "source.attach", id, moduleId }),
+          observer({
+            type: "source.attach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
-          observer({ type: "source.publish", id, moduleId, eventName }),
+          observer({
+            type: "source.publish",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+          }),
         onSourceDrop: (
           id: string,
           moduleId: string,
           eventName: string,
           reason: import("./types/sources.js").SourceDropReason,
-        ) => observer({ type: "source.drop", id, moduleId, eventName, reason }),
+        ) =>
+          observer({
+            type: "source.drop",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+            reason,
+          }),
         onSourceDetach: (id: string, moduleId: string) =>
-          observer({ type: "source.detach", id, moduleId }),
+          observer({
+            type: "source.detach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourceError: (
           id: string,
           moduleId: string,
           phase: "attach" | "cleanup" | "runtime" | "gate",
           error: unknown,
-        ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        ) =>
+          observer({
+            type: "source.error",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            phase,
+            error,
+          }),
         onGuardrailBlocked: (
           plugin: string,
           key: string,
@@ -2766,6 +3336,13 @@ export function createEngine<S extends Schema>(
       // writes that no pass ever consumed; they would otherwise be counted
       // against the first unrelated pass after this.
       resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -2781,7 +3358,7 @@ export function createEngine<S extends Schema>(
       // store. `onAttach` plugin events fire from inside the manager (one
       // per successful attach), so the static-start path AND the
       // `registerModule` immediate-attach path emit consistently.
-      sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
+      sourcesManager.attachAll((sourceId, _moduleId, eventName, payload) => {
         // Guards parity with the system.dispatch path (engine.ts:1692):
         //   - drop publishes after `system.destroy()` (engine-wide invariant)
         //   - drop publishes after `system.stop()` and before the next
@@ -2805,11 +3382,39 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(eventName)) {
           return { accepted: false, reason: "blocked-event-name" };
         }
-        dispatchEventByName(
-          eventName,
+        // A namespaced source (id `ns::local`) publishes only its own
+        // module's events: the bare name is scoped here, and a name that
+        // already contains the separator is a cross-module publish – dropped
+        // under its original name, never dispatched.
+        let target = eventName;
+        const separatorIndex = sourceId.indexOf(SOURCE_NAMESPACE_SEPARATOR);
+        if (separatorIndex !== -1) {
+          const namespace = sourceId.slice(0, separatorIndex);
+          if (eventName.includes(SOURCE_NAMESPACE_SEPARATOR)) {
+            if (isDevelopment) {
+              warnCrossModulePublish(sourceId, namespace, eventName);
+            }
+
+            return { accepted: false, reason: "cross-module-event" };
+          }
+          target = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}${eventName}`;
+        }
+        // A name with no handler is a drop, not a publish – otherwise the
+        // source's counters and `onPublish` report success for an event
+        // nothing ran (and production has no other signal at all).
+        const handled = dispatchEventByName(
+          target,
           (payload ?? {}) as Record<string, unknown>,
         );
-        return { accepted: true };
+        if (!handled) {
+          return {
+            accepted: false,
+            reason: "unknown-event",
+            eventName: target,
+          };
+        }
+
+        return { accepted: true, eventName: target };
       });
 
       // RFC 0012: initial gated attach. `attachAll` above attached only the
@@ -2824,27 +3429,14 @@ export function createEngine<S extends Schema>(
       pluginManager.emitStart(system);
 
       // Start retry-later polling timer if configured
-      if (config.errorBoundary?.retryLater && !retryLaterTimer) {
-        const intervalMs = Math.max(
-          config.errorBoundary.retryLater.delayMs ?? 1000,
-          250,
-        );
-
-        retryLaterTimer = setInterval(
-          () => {
-            const dueRetries = errorBoundary.processDueRetries();
-
-            for (const entry of dueRetries) {
-              if (entry.callback) {
-                entry.callback();
-              } else {
-                scheduleReconcile();
-              }
-            }
-          },
-          Math.min(intervalMs, 500),
-        );
+      if (config.errorBoundary?.retryLater) {
+        ensureRetryLaterTimer();
       }
+
+      // Anything outside the facts may have changed while stopped, and a
+      // `when` should not depend on it, but re-evaluating every constraint
+      // once on start costs one full pass and makes stop()/start() a reset.
+      constraintsManager.markAllDirty();
 
       // Initial reconcile (now that all modules are initialized)
       scheduleReconcile();
@@ -2854,6 +3446,13 @@ export function createEngine<S extends Schema>(
       if (!state.isRunning) return;
       state.isRunning = false;
       resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -2918,6 +3517,13 @@ export function createEngine<S extends Schema>(
       if (!state.isRunning) return;
       state.isRunning = false;
       resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;
@@ -3219,6 +3825,7 @@ export function createEngine<S extends Schema>(
         sources: sourcesManager.listDefinitions().map((row) => ({
           id: row.id,
           moduleId: row.moduleId,
+          localId: row.localId,
           meta: row.meta as DefinitionMeta | undefined,
           attached: row.attached,
           attachedAt: row.attachedAt,

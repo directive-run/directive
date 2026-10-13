@@ -821,12 +821,15 @@ describe("createAuditLedger — per-subject erase()", () => {
     // Erase one fact-change entry.
     ledger.erase({ factPath: "cartTotal" });
 
-    // Tamper with an EARLY entry (system.init) — has nothing to do
-    // with the erasure window.
+    // Tamper with an EARLY entry (system.start) — has nothing to do
+    // with the erasure window. Not `system.init`: plugin init is async, so
+    // where it lands relative to the first constraint evaluation depends
+    // on microtask timing, and it can land directly before a tombstone,
+    // which `verify()` does not yet check (see the `it.fails` below).
     swap = (entries) => {
-      const initIdx = entries.findIndex((e) => e.kind === "system.init");
-      if (initIdx >= 0 && entries[initIdx]) {
-        (entries[initIdx] as { kind: string }).kind = "fact.change";
+      const startIdx = entries.findIndex((e) => e.kind === "system.start");
+      if (startIdx >= 0 && entries[startIdx]) {
+        (entries[startIdx] as { kind: string }).kind = "fact.change";
       }
     };
 
@@ -838,6 +841,66 @@ describe("createAuditLedger — per-subject erase()", () => {
 
     system.destroy();
   });
+
+  // KNOWN GAP, pinned so it is tracked: tampering with the entry directly
+  // before a tombstone passes `verify()`. Found while changing reconcile
+  // timing moved `system.init` into that slot; it reproduces with the old
+  // timing too, on whichever entry sits there. Remove `.fails` when fixed.
+  it.fails(
+    "verify() detects tamper of the entry just before a tombstone",
+    async () => {
+      const realSink = memorySink();
+      let swap: ((entries: AuditEntry[]) => void) | null = null;
+      const sink: typeof realSink = {
+        ...realSink,
+        query: realSink.query.bind(realSink),
+        recent: realSink.recent.bind(realSink),
+        forFact: realSink.forFact.bind(realSink),
+        forConstraint: realSink.forConstraint.bind(realSink),
+        write: realSink.write.bind(realSink),
+        clear: realSink.clear.bind(realSink),
+        destroy: realSink.destroy.bind(realSink),
+        erase: realSink.erase?.bind(realSink),
+        onTruncate: realSink.onTruncate?.bind(realSink),
+        toJSON: () => {
+          const out = realSink.toJSON();
+          if (swap) {
+            const cloned = JSON.parse(JSON.stringify(out)) as typeof out;
+            swap(cloned.entries as AuditEntry[]);
+
+            return cloned;
+          }
+
+          return out;
+        },
+      };
+      const ledger = createAuditLedger({ sink });
+      const system = createSystem({
+        module: makeModule(),
+        plugins: [ledger.plugin],
+      });
+      system.start();
+      await new Promise((r) => setTimeout(r, 0));
+      system.facts.cartTotal = 25;
+      await new Promise((r) => setTimeout(r, 0));
+      system.facts.cartTotal = 75;
+      await new Promise((r) => setTimeout(r, 0));
+      ledger.erase({ factPath: "cartTotal" });
+
+      swap = (entries) => {
+        const tomb = entries.findIndex(
+          (e, i) => i > 0 && e.kind === "system.entry-erased",
+        );
+        const before = entries[tomb - 1];
+        if (before) {
+          (before as { kind: string }).kind = "fact.change";
+        }
+      };
+
+      expect(ledger.verify().valid).toBe(false);
+      system.destroy();
+    },
+  );
 
   it("verify() reports an unknown hashAlgo rather than throwing", () => {
     const sink = memorySink();

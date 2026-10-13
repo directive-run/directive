@@ -121,7 +121,7 @@ Shorthand for creating controllers:
 | `createExplain(host, system, reqId)` | `ExplainController` |
 | `createConstraintStatus(host, system)` | `ConstraintStatusController` |
 | `createOptimisticUpdate(host, system)` | `OptimisticUpdateController` |
-| `createModule(host, module)` | `ModuleController` |
+| `createModuleController(host, module)` | `ModuleController` |
 
 ### Functional Helpers
 

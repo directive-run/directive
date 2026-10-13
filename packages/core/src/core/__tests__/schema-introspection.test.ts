@@ -9,7 +9,7 @@ import {
 } from "../schema-introspection.js";
 
 // ============================================================================
-// Primitives — _typeName parser path (no explicit _kind needed)
+// Primitives — _typeName parser path
 // ============================================================================
 
 describe("getKind — primitive builders", () => {
@@ -235,15 +235,6 @@ describe("listAllPredicateOperators", () => {
 // ============================================================================
 
 describe("getKind — hostile-getter safety", () => {
-  it("returns { kind: 'unknown' } if _kind getter throws", () => {
-    const hostile = {
-      get _kind(): never {
-        throw new Error("boom");
-      },
-    };
-    expect(getKind(hostile)).toEqual({ kind: "unknown" });
-  });
-
   it("returns { kind: 'unknown' } if _typeName getter throws", () => {
     const hostile = {
       get _typeName(): never {
@@ -252,25 +243,12 @@ describe("getKind — hostile-getter safety", () => {
     };
     expect(getKind(hostile)).toEqual({ kind: "unknown" });
   });
-
-  it("does NOT throw even when both getters are hostile", () => {
-    const hostile = {
-      get _kind(): never {
-        throw new Error("kind boom");
-      },
-      get _typeName(): never {
-        throw new Error("name boom");
-      },
-    };
-    expect(() => getKind(hostile)).not.toThrow();
-    expect(getKind(hostile)).toEqual({ kind: "unknown" });
-  });
 });
 
 describe("getSchemaFieldKinds — hostile-getter resilience", () => {
   it("one hostile builder does not abort the whole walk", () => {
     const hostile = {
-      get _kind(): never {
+      get _typeName(): never {
         throw new Error("boom");
       },
     };

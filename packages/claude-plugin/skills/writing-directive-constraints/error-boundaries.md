@@ -40,6 +40,8 @@ Directive supports five recovery strategies:
 | `"disable"` | Disable the failing constraint/effect permanently |
 | `"throw"` | Re-throw the error, halting the system |
 
+`"skip"` is the default for constraints, resolvers, effects and derivations. When an error falls through to that default with nothing configured to hear it – no `onConstraintError` / `onResolverError` / `onDerivationError` for that source and no `onError` – development builds warn once per source with the error and, for a resolver, the requirement that stays unmet. Production stays silent. Effects already log every throw with `console.error`. Configure a handler for the source (even `"skip"`) to silence the warning.
+
 ## System-Level Error Boundary
 
 Configure error handling for the entire system:

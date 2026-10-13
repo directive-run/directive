@@ -153,6 +153,14 @@ export interface DerivationsManager<
    */
   holdNotifications(): () => void;
   /**
+   * `holdNotifications` without the release closure, for the per-write path.
+   * Every `beginHold()` must be matched by exactly one `endHold()`, in a
+   * `finally`.
+   */
+  beginHold(): void;
+  /** Release one `beginHold()` and flush if it was the outermost. */
+  endHold(): void;
+  /**
    * What a derivation currently reads, split by kind.
    *
    * Computes the derivation first if it has not run — an unrun derivation has
@@ -968,6 +976,15 @@ export function createDerivationsManager<
         invalidationDepth--;
         flushNotifications();
       };
+    },
+
+    beginHold(): void {
+      invalidationDepth++;
+    },
+
+    endHold(): void {
+      invalidationDepth--;
+      flushNotifications();
     },
 
     invalidateAll(): void {

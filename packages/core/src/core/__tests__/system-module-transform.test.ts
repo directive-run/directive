@@ -926,7 +926,7 @@ describe("prefixModuleDefinition", () => {
       expect(receivedReq).toBe(req);
     });
 
-    it("resolve uses cross-module proxy when crossModuleDeps defined", async () => {
+    it("resolve gets flat own facts and read-only ctx.deps when crossModuleDeps defined", async () => {
       const otherSchema: ModuleSchema = { facts: { token: { _type: "" } } };
       let readToken: unknown;
       const mod = makeModule({
@@ -935,8 +935,8 @@ describe("prefixModuleDefinition", () => {
           fetch: {
             requirement: "FETCH",
             resolve: async (_req: any, ctx: any) => {
-              readToken = ctx.facts.other.token;
-              ctx.facts.self.count = 42;
+              readToken = ctx.deps.other.token;
+              ctx.facts.count = 42;
             },
           },
         } as any,

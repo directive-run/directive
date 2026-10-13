@@ -25,7 +25,11 @@
 
 import {
   PREFIX,
+  type QueryPublish,
+  buildEvent,
   buildKey,
+  domEventSource,
+  intervalSource,
   replaceEqualDeep,
   serializeKey,
 } from "./internal.js";
@@ -288,6 +292,17 @@ export function createListQuery<
     return out;
   }
 
+  // ---- Events from the outside world ----
+
+  const focusedEvent = buildEvent(name, "FOCUSED");
+  const onlineEvent = buildEvent(name, "ONLINE");
+  const pollEvent = buildEvent(name, "POLL_TICK");
+
+  /** Refetch every active key at once. */
+  const bumpAll = (facts: Record<string, unknown>) => {
+    bumpAllTriggers(facts, triggerKey, activeKeysKey);
+  };
+
   // ---- Build the QueryDefinition ----
 
   const definition: QueryDefinition<ListResourceMap<TData, TError>> = {
@@ -310,6 +325,11 @@ export function createListQuery<
       },
       derivations: {
         [name]: { _type: null as unknown },
+      },
+      events: {
+        ...(refetchOnWindowFocus ? { [focusedEvent]: {} } : {}),
+        ...(refetchOnReconnect ? { [onlineEvent]: {} } : {}),
+        ...(refetchInterval ? { [pollEvent]: {} } : {}),
       },
     },
 
@@ -464,59 +484,59 @@ export function createListQuery<
       },
     },
 
-    effects: {
-      // Window focus refetch — triggers ALL active keys at once via the
-      // shared trigger map.
+    // Focus, reconnect and polling arrive from outside, so they are sources
+    // that publish events; each handler bumps every active key's trigger.
+    effects: {},
+
+    sources: {
       ...(refetchOnWindowFocus
         ? {
-            [`${PREFIX}${name}_focus_list`]: {
-              run: (facts: Record<string, unknown>) => {
-                if (typeof document === "undefined") return;
-                const handler = () => {
-                  if (document.hidden) return;
-                  bumpAllTriggers(facts, triggerKey, activeKeysKey);
-                };
-                document.addEventListener("visibilitychange", handler);
-                return () =>
-                  document.removeEventListener("visibilitychange", handler);
-              },
-            },
+            [`${PREFIX}${name}_focus_list`]: domEventSource(
+              "document",
+              "visibilitychange",
+              focusedEvent,
+              () => !document.hidden,
+            ),
           }
         : {}),
-
       ...(refetchOnReconnect
         ? {
-            [`${PREFIX}${name}_online_list`]: {
-              run: (facts: Record<string, unknown>) => {
-                if (typeof window === "undefined") return;
-                const handler = () => {
-                  bumpAllTriggers(facts, triggerKey, activeKeysKey);
-                };
-                window.addEventListener("online", handler);
-                return () => window.removeEventListener("online", handler);
-              },
-            },
+            [`${PREFIX}${name}_online_list`]: domEventSource(
+              "window",
+              "online",
+              onlineEvent,
+            ),
           }
         : {}),
-
-      // Polling — same trigger-map approach.
       ...(refetchInterval
         ? {
             [`${PREFIX}${name}_poll_list`]: {
-              run: (facts: Record<string, unknown>) => {
+              attach: (publish: QueryPublish) => {
+                // One interval for the whole list. A function interval is
+                // asked once, with no data, because no single item's data
+                // decides it.
                 const intervalMs =
                   typeof refetchInterval === "function"
                     ? refetchInterval(undefined as unknown as TData)
                     : refetchInterval;
-                if (!intervalMs || intervalMs <= 0) return;
-                const id = setInterval(() => {
-                  bumpAllTriggers(facts, triggerKey, activeKeysKey);
-                }, intervalMs);
-                return () => clearInterval(id);
+                if (!intervalMs || intervalMs <= 0) {
+                  return () => undefined;
+                }
+
+                return intervalSource(intervalMs, pollEvent).attach(
+                  publish,
+                  () => undefined,
+                );
               },
             },
           }
         : {}),
+    },
+
+    events: {
+      ...(refetchOnWindowFocus ? { [focusedEvent]: bumpAll } : {}),
+      ...(refetchOnReconnect ? { [onlineEvent]: bumpAll } : {}),
+      ...(refetchInterval ? { [pollEvent]: bumpAll } : {}),
     },
 
     // Imperative handles — operate on individual keys, not the whole map.

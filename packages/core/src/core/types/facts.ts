@@ -29,6 +29,18 @@ export interface FactsStore<S extends Schema = Schema>
   toObject(): Record<string, unknown>;
 }
 
+/**
+ * The facts an effect receives: no fact can be assigned, plus the read-only
+ * store accessors. Values keep their own types, so they pass to ordinary
+ * helpers; changing one in place is caught at runtime in development.
+ */
+export type EffectFacts<S extends Schema = Schema> = Readonly<
+  InferSchema<S>
+> & {
+  readonly $store: Omit<FactsStore<S>, "set" | "delete" | "batch">;
+  readonly $snapshot: () => FactsSnapshot<S>;
+};
+
 /** Proxy-based facts accessor (cleaner API) */
 export type Facts<S extends Schema = Schema> = InferSchema<S> & {
   readonly $store: FactsStore<S>;

@@ -156,6 +156,18 @@ export type CrossModuleFactsWithSelf<
   [K in keyof Deps]: InferFacts<Deps[K]>;
 };
 
+/**
+ * {@link CrossModuleFactsWithSelf} as an effect sees it: no namespace and no
+ * fact in it can be assigned. Effects never write facts. Values keep their
+ * own types; changing one in place is caught at runtime in development.
+ */
+export type ReadonlyCrossModuleFacts<
+  OwnSchema extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = { readonly self: Readonly<InferFacts<OwnSchema>> } & {
+  readonly [K in keyof Deps]: Readonly<InferFacts<Deps[K]>>;
+};
+
 // ============================================================================
 // Namespaced Facts Types
 // ============================================================================

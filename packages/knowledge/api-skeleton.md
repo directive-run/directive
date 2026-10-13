@@ -99,7 +99,7 @@
   ```ts
   function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
   ```
-- `getKind` — Return the {@link SchemaKindNode} for a schema field. Prefers the
+- `getKind` — Return the {@link SchemaKindNode} for a schema field, parsed from the
   ```ts
   function getKind(schema: unknown): SchemaKindNode
   ```
@@ -282,6 +282,10 @@
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ```
+- `ChainableStringType` — The chainable types the builders return.
+  ```ts
+  export interface ChainableStringType<T extends string>
+  ```
 - `Change` — A single change between two predicates at a specific path.
   ```ts
   export interface Change {
@@ -298,10 +302,6 @@
   ```ts
   export interface ClauseResult {
   ```
-- `ConstraintDefinition` — Constraint definition
-  ```ts
-  export interface ConstraintDef<
-  ```
 - `CreateSystemOptionsNamed` — Options for createSystem with object modules (namespaced mode).
   ```ts
   export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
@@ -310,25 +310,13 @@
   ```ts
   export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
   ```
-- `CrossModuleConstraintDefinition` — Constraint definition with cross-module typed facts.
+- `CrossModuleResolverContext` — Resolver context for a module with `crossModuleDeps`. `facts` stays flat
   ```ts
-  export interface CrossModuleConstraintDef<
-  ```
-- `CrossModuleEffectDefinition` — Effect definition with cross-module typed facts.
-  ```ts
-  export interface CrossModuleEffectDef<
+  export interface CrossModuleResolverContext<
   ```
 - `DefinitionMeta` — Optional metadata for module, fact, event, constraint, resolver, effect, and derivation definitions.
   ```ts
   export interface DefinitionMeta {
-  ```
-- `DerivationDefinition` — Derivation definition function signature.
-  ```ts
-  export interface DerivationDef<
-  ```
-- `DerivationDefinitionWithMeta` — Derivation definition with metadata (object form).
-  ```ts
-  export interface DerivationDefWithMeta<
   ```
 - `DerivationDefWithMeta` — Derivation definition with metadata (object form).
   ```ts
@@ -354,10 +342,6 @@
   ```ts
   export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   ```
-- `DynamicConstraintDefinition` — Constraint definition for dynamic registration — typed facts, relaxed requirements
-  ```ts
-  export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
-  ```
 - `DynamicEffectDef` — Effect definition for dynamic registration — typed facts
   ```ts
   export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
@@ -365,14 +349,6 @@
 - `DynamicResolverDef` — Resolver definition for dynamic registration — typed context.facts, relaxed requirement
   ```ts
   export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
-  ```
-- `DynamicResolverDefinition` — Resolver definition for dynamic registration — typed context.facts, relaxed requirement
-  ```ts
-  export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
-  ```
-- `EffectDefinition` — Effect definition - side effects with optional cleanup.
-  ```ts
-  export interface EffectDef<
   ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
@@ -426,10 +402,6 @@
   ```ts
   export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
   ```
-- `ModuleDefinition` — Module definition using consolidated schema.
-  ```ts
-  export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
-  ```
 - `ModuleHooks` — Lifecycle hooks for modules
   ```ts
   export interface ModuleHooks<M extends ModuleSchema> {
@@ -478,10 +450,6 @@
   ```ts
   export interface RequirementWithId {
   ```
-- `ResolverDefinition` — Single resolver definition (untyped - use TypedResolversDef for type safety)
-  ```ts
-  export interface ResolverDef<
-  ```
 - `RetryPolicy` — Retry policy configuration
   ```ts
   export interface RetryPolicy {
@@ -522,10 +490,6 @@
   ```ts
   export interface SourcePublish {
   ```
-- `SourcePublishFn` — Type-wrapped as an interface (rather than a bare function type) so
-  ```ts
-  export interface SourcePublish {
-  ```
 - `SweepHole` — A placeholder inside a predicate template — substituted from `sweep` values.
   ```ts
   export interface SweepHole {
@@ -554,14 +518,6 @@
   ```ts
   export interface TraceEntry {
   ```
-- `TypedConstraintDefinition` — Constraint definition with typed requirements.
-  ```ts
-  export interface TypedConstraintDef<M extends ModuleSchema> {
-  ```
-- `TypedResolverDefinition` — Typed resolver definition for a specific requirement type.
-  ```ts
-  export interface TypedResolverDef<
-  ```
 
 ### Types
 
@@ -573,49 +529,25 @@
   ```ts
   export type ChangeKind =
   ```
-- `ConstraintsDefinition` — Map of constraint definitions (generic)
-  ```ts
-  export type ConstraintsDef<S extends Schema> = Record<
-  ```
 - `ConstraintStatus` — Status of a single constraint across the two snapshots.
   ```ts
   export type ConstraintStatus = "added" | "removed" | "changed" | "unchanged";
-  ```
-- `CrossModuleConstraintsDefinition` — Cross-module constraints definition.
-  ```ts
-  export type CrossModuleConstraintsDef<
   ```
 - `CrossModuleDeps` — Map of namespace to schema for cross-module dependencies.
   ```ts
   export type CrossModuleDeps = Record<string, ModuleSchema>;
   ```
-- `CrossModuleDerivationsDefinition` — Cross-module derivations definition.
+- `CrossModuleResolversDef` — Resolvers for a module with `crossModuleDeps`: same as
   ```ts
-  export type CrossModuleDerivationsDef<
-  ```
-- `CrossModuleEffectsDefinition` — Cross-module effects definition.
-  ```ts
-  export type CrossModuleEffectsDef<
+  export type CrossModuleResolversDef<
   ```
 - `DefinitionKind` — The seven things a system holds metadata for — the same seven the lookups on
   ```ts
   export type DefinitionKind =
   ```
-- `DerivationsDefinition` — Map of derivation definitions (internal — always bare functions after unwrap).
-  ```ts
-  export type DerivationsDef<S extends Schema> = Record<
-  ```
 - `DynamicDefinitionKind` — The four kinds `register` / `assign` / `unregister` / `call` operate on.
   ```ts
   export type DynamicDefinitionKind = Extract<
-  ```
-- `EffectsDefinition` — Map of effect definitions
-  ```ts
-  export type EffectsDef<
-  ```
-- `EventsDefinition` — Events definition - accepts any event handler signature
-  ```ts
-  export type EventsDef<S extends Schema> = Record<
   ```
 - `FactPredicate` — A declarative boolean spec over a fact namespace `F`. The data form of a
   ```ts
@@ -705,9 +637,9 @@
   ```ts
   export type ResolverAbortReason =
   ```
-- `ResolversDefinition` — Map of resolver definitions
+- `ResolverDeps` — Read-only view of each declared dependency's facts, as a resolver in a
   ```ts
-  export type ResolversDef<S extends Schema> = Record<
+  export type ResolverDeps<Deps extends CrossModuleDeps> = {
   ```
 - `RulesMapInput` — Accepted shapes for the `before` / `after` predicate maps:
   ```ts
@@ -725,31 +657,23 @@
   ```ts
   export type SchemaKindNode = (
   ```
-- `SchemaTypedResolversDefinition` — Map of typed resolver definitions (schema-based variant).
-  ```ts
-  export type SchemaTypedResolversDef<
-  ```
 - `SourceDropReason` — Why a source publish was rejected. Mirrored across the three
   ```ts
   export type SourceDropReason =
+  ```
+- `SourceGateFacts` — Read-only fact snapshot handed to a gated source's `key` / `active`
+  ```ts
+  export type SourceGateFacts = Readonly<Record<string, unknown>>;
   ```
 - `SourceReportError` — Source-side runtime-error reporter. Optional second argument to
   ```ts
   export type SourceReportError = (error: Error) => void;
   ```
-- `SourcesDef` — Map of source definitions, keyed by source name. Collision rules match
+- `SourcesDef` — Map of source definitions, keyed by source name. A name must be unique
   ```ts
-  export type SourcesDef = Record<string, SourceDef>;
-  ```
-- `SourcesDefinition` — Map of source definitions, keyed by source name. Collision rules match
-  ```ts
-  export type SourcesDef = Record<string, SourceDef>;
+  export type SourcesDef<F = SourceGateFacts> = Record<string, SourceDef<F>>;
   ```
 - `SourceUnsubscribe` — Cleanup function returned by a source's `attach`.
-  ```ts
-  export type SourceUnsubscribe = () => void | Promise<void>;
-  ```
-- `SourceUnsubscribeFn` — Cleanup function returned by a source's `attach`.
   ```ts
   export type SourceUnsubscribe = () => void | Promise<void>;
   ```
@@ -768,18 +692,6 @@
 - `TraceOption` — Trace option: boolean shorthand or full config (presence implies enabled)
   ```ts
   export type TraceOption = boolean | TraceConfig;
-  ```
-- `TypedConstraintsDefinition` — Typed constraints definition using the module schema.
-  ```ts
-  export type TypedConstraintsDef<M extends ModuleSchema> = Record<
-  ```
-- `TypedEventsDefinition` — Typed events definition using the module schema.
-  ```ts
-  export type TypedEventsDef<M extends ModuleSchema> = {
-  ```
-- `TypedResolversDefinition` — Typed resolvers definition using the module schema.
-  ```ts
-  export type TypedResolversDef<M extends ModuleSchema> = Record<
   ```
 - `VerifyResult` — Verify result — chain valid OR a break with full context for tamper visualization.
   ```ts
@@ -819,7 +731,6 @@ from the previous release. Descriptions arrive with the next one.
 - `ChainableArrayType`
 - `ChainableNumberType`
 - `ChainableObjectType`
-- `ChainableStringType`
 - `CheckAgainstResult`
 - `ConstraintDiff`
 - `Contradiction`
@@ -838,12 +749,10 @@ from the previous release. Descriptions arrive with the next one.
 - `SchemaValidationOptions`
 - `SchemaValidationResult`
 - `SourceDef`
-- `SourceDefinition`
 - `SweepReport`
 - `SweepUnderOptions`
 - `System`
 - `TimerFactOpts`
-- `TypedDerivationsDefinition`
 - `doctor`
 
 ## @directive-run/ai
@@ -1457,6 +1366,10 @@ from the previous release. Descriptions arrive with the next one.
   ```ts
   class InMemoryCheckpointStore
   ```
+- `KvCheckpointStore` — Checkpoints in a key-value store, with the same FIFO and retention
+  ```ts
+  class KvCheckpointStore
+  ```
 - `PredicateFromIntentError` — Thrown by `predicateFromIntent` on retry exhaustion. `predicateFromIntentRaw` returns these as a diagnostics payload instead.
   ```ts
   class PredicateFromIntentError
@@ -1687,6 +1600,10 @@ from the previous release. Descriptions arrive with the next one.
 - `CheckpointDiff` — Diff between two checkpoint states
   ```ts
   export interface CheckpointDiff {
+  ```
+- `CheckpointKv` — The four verbs this store needs.
+  ```ts
+  export interface CheckpointKv {
   ```
 - `CheckpointProgress` — Progress computed from a checkpoint state
   ```ts
@@ -2898,6 +2815,7 @@ from the previous release. Descriptions arrive with the next one.
 - `FallbackConfig`
 - `GoalCheckpointConfig`
 - `JSONFileStoreOptions`
+- `KvCheckpointStoreOptions`
 - `MermaidDirection`
 - `MermaidNodeShapes`
 - `MermaidOptions`
