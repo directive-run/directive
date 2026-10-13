@@ -1,5 +1,15 @@
 # @directive-run/example-cloudflare-directive-ai
 
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [[`f372f1f`](https://github.com/directive-run/directive/commit/f372f1f6e00dd10f36fbce49c2453e248ecf1f59), [`c16ce1f`](https://github.com/directive-run/directive/commit/c16ce1f8b922027bd2365fa924323279a94437f0), [`c0b5dbb`](https://github.com/directive-run/directive/commit/c0b5dbbaec6e348caf700dc246314c204e2f9d8d), [`856098c`](https://github.com/directive-run/directive/commit/856098c1233e2691b4b5d5b0acbef597f5786da9), [`a41aea3`](https://github.com/directive-run/directive/commit/a41aea3994204fc9c6e74acb3a8f45be076df5fa), [`a37f57b`](https://github.com/directive-run/directive/commit/a37f57b008b98d6df929114741edbfcbb07f41e9), [`10faae5`](https://github.com/directive-run/directive/commit/10faae51d44832a444d6b4f6e1ba11bf9e2bf5c1), [`d78d873`](https://github.com/directive-run/directive/commit/d78d8731ff4927f4589867711c1c08381ccaff88), [`69c4197`](https://github.com/directive-run/directive/commit/69c419778df2d435fa1b2c49f43a3a52d8837b51), [`77437ad`](https://github.com/directive-run/directive/commit/77437ad720a2b53efe5df3547c1c98f852092079)]:
+  - @directive-run/core@1.35.0
+  - @directive-run/ai@1.35.0
+  - @directive-run/query@1.3.0
+  - @directive-run/sources@0.3.2
+
 ## 0.1.25
 
 ### Patch Changes

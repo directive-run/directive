@@ -1,5 +1,15 @@
 # @directive-run/mcp
 
+## 0.6.29
+
+### Patch Changes
+
+- Updated dependencies [[`a41aea3`](https://github.com/directive-run/directive/commit/a41aea3994204fc9c6e74acb3a8f45be076df5fa)]:
+  - @directive-run/lint@0.1.4
+  - @directive-run/knowledge@1.35.0
+  - @directive-run/claude-plugin@1.35.0
+  - @directive-run/sandbox@0.4.28
+
 ## 0.6.28
 
 ### Patch Changes
