@@ -52,15 +52,36 @@ import {
 
 /** The single source of OpenAI rates. Widened below; never exported raw. */
 const OPENAI_RATES = {
-  "gpt-4.1": { input: 2, output: 8 },
-  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
-  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
-  "gpt-4o": { input: 2.5, output: 10 },
-  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  // `cacheRead` is OpenAI's cached-input rate. There is no cache-write charge:
+  // caching is automatic and storing a prefix costs nothing, so `cacheWrite` is
+  // deliberately absent rather than defaulted to the input rate.
+  "gpt-5.6-sol": { input: 5, output: 30, cacheRead: 0.5 },
+  "gpt-5.6-terra": { input: 2, output: 12, cacheRead: 0.2 },
+  "gpt-5.6-luna": { input: 0.2, output: 1.2, cacheRead: 0.02 },
+  "gpt-5.5": { input: 5, output: 30, cacheRead: 0.5 },
+  "gpt-5.5-pro": { input: 30, output: 180 },
+  "gpt-5.4": { input: 2.5, output: 15, cacheRead: 0.25 },
+  "gpt-5.4-mini": { input: 0.75, output: 4.5, cacheRead: 0.075 },
+  "gpt-5.4-nano": { input: 0.2, output: 1.25, cacheRead: 0.02 },
+  "gpt-5.4-pro": { input: 30, output: 180 },
+  "gpt-5.2": { input: 1.75, output: 14, cacheRead: 0.175 },
+  "gpt-5.1": { input: 1.25, output: 10, cacheRead: 0.125 },
+  "gpt-5": { input: 1.25, output: 10, cacheRead: 0.125 },
+  "gpt-5-mini": { input: 0.25, output: 2, cacheRead: 0.025 },
+  "gpt-5-nano": { input: 0.05, output: 0.4, cacheRead: 0.005 },
+  "gpt-4.1": { input: 2, output: 8, cacheRead: 0.5 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6, cacheRead: 0.1 },
+  "gpt-4.1-nano": { input: 0.1, output: 0.4, cacheRead: 0.025 },
+  "gpt-4o": { input: 2.5, output: 10, cacheRead: 1.25 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6, cacheRead: 0.075 },
   "gpt-4-turbo": { input: 10, output: 30 },
-  "o4-mini": { input: 1.1, output: 4.4 },
-  o3: { input: 10, output: 40 },
-  "o3-mini": { input: 1.1, output: 4.4 },
+  o1: { input: 15, output: 60, cacheRead: 7.5 },
+  "o1-pro": { input: 150, output: 600 },
+  // Was carried at $10/$40 — five times the published rate on input.
+  o3: { input: 2, output: 8, cacheRead: 0.5 },
+  "o3-pro": { input: 20, output: 80 },
+  "o3-mini": { input: 1.1, output: 4.4, cacheRead: 0.55 },
+  "o4-mini": { input: 1.1, output: 4.4, cacheRead: 0.275 },
 };
 
 /**
@@ -112,7 +133,7 @@ const OPENAI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OPENAI_PRICING_AS_OF = "2026-08-14";
+export const OPENAI_PRICING_AS_OF = "2026-08-15";
 
 export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OPENAI_RATES,

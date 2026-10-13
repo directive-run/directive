@@ -8,6 +8,7 @@
  * - Error reporting to plugins
  */
 
+import isDevelopment from "#is-development";
 import {
   DirectiveError,
   type ErrorBoundaryConfig,
@@ -50,6 +51,18 @@ export interface PendingRetry {
  *
  * @internal
  */
+/**
+ * Errors a resolver run reported after it had already satisfied its
+ * requirement. The error itself is passed on untouched; this only stops the
+ * development warning from saying the requirement stays unmet.
+ */
+const failuresAfterSatisfied = new WeakSet<object>();
+
+/** @internal */
+export function noteFailureAfterSatisfied(error: Error): void {
+  failuresAfterSatisfied.add(error);
+}
+
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
   /** Schedule a retry */
   scheduleRetry: (
@@ -277,6 +290,83 @@ export function createErrorBoundaryManager(
     return new DirectiveError(message, source, sourceId, context, recoverable);
   }
 
+  // Dev-only: sources whose unhandled error has already been reported once.
+  const warnedUnhandled = new Set<string>();
+
+  /** Config key that would handle errors from this source */
+  function handlerOptionFor(source: ErrorSource): string | null {
+    switch (source) {
+      case "constraint":
+        return "onConstraintError";
+      case "resolver":
+        return "onResolverError";
+      case "derivation":
+        return "onDerivationError";
+      default:
+        // Effects already log every throw with console.error, and system
+        // errors default to "throw", so neither needs a second message.
+        return null;
+    }
+  }
+
+  /**
+   * In dev, say once per source when an error falls through to the default
+   * "skip" with nothing configured to hear it. Without this, a resolver that
+   * throws leaves its requirement unmet forever and nothing is logged.
+   */
+  function warnUnhandledOnce(
+    source: ErrorSource,
+    sourceId: string,
+    error: unknown,
+    context: unknown,
+  ): void {
+    const option = handlerOptionFor(source);
+    if (!option) {
+      return;
+    }
+    if ((config as Record<string, unknown>)[option] !== undefined) {
+      return;
+    }
+    if (config.onError) {
+      return;
+    }
+    const onceKey = `${source}:${sourceId}`;
+    if (warnedUnhandled.has(onceKey)) {
+      return;
+    }
+    warnedUnhandled.add(onceKey);
+    if (warnedUnhandled.size > MAX_RETRY_SOURCES) {
+      const oldest = warnedUnhandled.values().next().value;
+      if (oldest !== undefined) {
+        warnedUnhandled.delete(oldest);
+      }
+    }
+
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    // The sentence below adds its own full stop.
+    const message = rawMessage.replace(/[.!?]+\s*$/, "");
+    const requirementType =
+      source === "resolver" &&
+      context &&
+      typeof context === "object" &&
+      typeof (context as { requirement?: { type?: unknown } }).requirement
+        ?.type === "string"
+        ? (context as { requirement: { type: string } }).requirement.type
+        : null;
+    const satisfied =
+      typeof error === "object" &&
+      error !== null &&
+      failuresAfterSatisfied.has(error);
+    const consequence =
+      requirementType && !satisfied
+        ? ` Requirement "${requirementType}" stays unmet.`
+        : "";
+
+    console.warn(
+      `[Directive] ${source} "${sourceId}" threw: ${message}.${consequence} The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
+    );
+  }
+
   /** Get recovery strategy for a source */
   function getStrategy(
     source: ErrorSource,
@@ -372,10 +462,7 @@ export function createErrorBoundaryManager(
 
     // Max retries exceeded, fall back to skip
     retryAttempts.delete(sourceId);
-    if (
-      typeof process !== "undefined" &&
-      process.env?.NODE_ENV !== "production"
-    ) {
+    if (isDevelopment) {
       console.warn(
         `[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
       );
@@ -405,6 +492,10 @@ export function createErrorBoundaryManager(
       // Handle retry-later strategy
       if (strategy === "retry-later") {
         strategy = processRetryLater(source, sourceId, context);
+      }
+
+      if (isDevelopment && strategy === "skip") {
+        warnUnhandledOnce(source, sourceId, error, context);
       }
 
       // Notify recovery callback

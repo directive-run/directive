@@ -1488,3 +1488,71 @@ describe("non-JSON fact assignment warning (MIGRATION_FEEDBACK item 20)", () => 
     warnSpy.mockRestore();
   });
 });
+
+describe("flush clears its buffer before notifying", () => {
+  it("a listener that opens a nested batch does not re-report the outer batch", () => {
+    const batches: string[][] = [];
+    const store = createFactsStore({
+      schema: { a: t.number(), b: t.number(), c: t.number() },
+      onBatch: (changes) => batches.push(changes.map((ch) => ch.key)),
+    });
+    store.set("a", 0);
+    store.set("b", 0);
+    store.set("c", 0);
+    batches.length = 0;
+
+    let nested = false;
+    store.subscribe(["a"], () => {
+      if (nested) {
+        return;
+      }
+      nested = true;
+      store.batch(() => {
+        store.set("c", 99);
+      });
+    });
+
+    store.batch(() => {
+      store.set("a", 1);
+      store.set("b", 2);
+    });
+
+    // The buffer used to be cleared after the notify phase, so the nested
+    // batch opened by the listener saw the outer batch's changes still sitting
+    // there and reported them a second time. Anything reconstructing state
+    // from this stream — an audit trail, a replica — got duplicates carrying
+    // pre-write values.
+    expect(batches).toEqual([["a", "b"], ["c"]]);
+  });
+
+  it("a listener that writes to a key in the outer batch does not recurse forever", () => {
+    const store = createFactsStore({
+      schema: { a: t.number(), z: t.number() },
+    });
+    store.set("a", 0);
+    store.set("z", 0);
+
+    let once = false;
+    store.subscribe(["a"], () => {
+      if (once) {
+        return;
+      }
+      once = true;
+      store.batch(() => {
+        store.set("z", 1);
+      });
+    });
+
+    // A guard, not a reproduction: this passes with or without the change on
+    // its own. It overflowed the stack only once the observation bridge began
+    // emitting on the batch path, because that gave a second consumer a chance
+    // to re-enter the notify phase. Kept so the shape is pinned before that
+    // path is opened again.
+    expect(() =>
+      store.batch(() => {
+        store.set("a", 1);
+      }),
+    ).not.toThrow();
+    expect(store.get("z")).toBe(1);
+  });
+});

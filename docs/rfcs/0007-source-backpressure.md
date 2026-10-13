@@ -12,6 +12,19 @@ into the async-resolver tier, the resolver pool grows unbounded, the
 reconcile-depth guard trips at depth 50, and `previousRequirements`
 is silently reset – **data loss disguised as "recovery."**
 
+> **Correction (2026-08-27).** The second half of that sentence is no longer
+> true of the engine, and the difference matters in both directions. The depth
+> counter is reset at the end of every pass, so it never accumulates across
+> passes and the guard is unreachable — deliberately, because depth turned out
+> to be the wrong instrument: it fired on safe work, did damage when it fired,
+> and still missed the dangerous case. So `previousRequirements` is not silently
+> reset. But nothing replaced it either, which means there is currently **no
+> runaway-reconcile bound at all**. The engine already holds every edge needed
+> to name a cycle, and repeat-detection on `(constraintId, requirement key)`
+> sees the async case a depth counter cannot; that is the intended replacement
+> and it is unbuilt. The throughput figures below stand — they were measured
+> against the fact path, not against the guard.
+
 This RFC adds an optional `coalesce` field on `SourceDef` so high-frequency
 sources (cursor movement, sensor telemetry, Supabase channel storms) can
 declare their throughput posture once and let the manager debounce

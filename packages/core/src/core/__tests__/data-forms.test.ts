@@ -405,7 +405,7 @@ describe("constraint `when` — $changed rejected unconditionally", () => {
       },
       constraints: {
         bad: {
-          // $changed is effects-only; constraint `when` has no prev snapshot.
+          // $changed is effects-only; constraint `when` has no prevFacts snapshot.
           when: { phase: { $changed: true } } as unknown as (
             f: unknown,
           ) => boolean,
@@ -445,7 +445,7 @@ describe("constraint `when` — $changed rejected unconditionally", () => {
     });
 
     expect(() => createSystem({ module: mod })).toThrow(
-      /Move the change-detection to an effect|boolean derivation as a synthetic prev/,
+      /Move the change-detection to an effect|boolean derivation as a synthetic prevFacts/,
     );
   });
 

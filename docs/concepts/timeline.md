@@ -148,6 +148,23 @@ Non-dispatchable frames (`system.start`, `reconcile.start`,
 `derivation.compute`, …) are skipped by default; opt out with
 `{ dispatchableOnly: false }` for diagnostic walks.
 
+**Only frames your program authored are re-dispatched.** Every
+`fact.change` frame carries an `origin` – `authored`, `restore` or
+`hydrate` – and replay skips anything that is not `authored`. A restored
+frame is the *result* of an action rather than the action, so dispatching
+it would apply the mutation a second time: a timeline containing an undo
+would replay as two mutations where the user made one. `toMutate` counts
+authored frames for the same reason. A timeline recorded before `origin`
+existed replays unchanged, because replayed writes could not be recorded
+then.
+
+In rendered output a non-authored frame is marked:
+
+```
+[+12.0ms]   cartTotal: 120 → 75 (restored)
+[+0.1ms]    session: null → {…} (hydrated)
+```
+
 ### Bisect for non-determinism – git-bisect over frames
 
 ```ts

@@ -331,9 +331,9 @@ export const ${camelName} = createModule("${name}", {
   effects: {
     logStatusChange: {
       deps: ["status"],
-      run: (facts, prev) => {
-        if (prev && prev.status !== facts.status) {
-          console.log(\`Auth status: \${prev.status} → \${facts.status}\`);
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.status !== facts.status) {
+          console.log(\`Auth status: \${prevFacts.status} → \${facts.status}\`);
         }
       },
     },

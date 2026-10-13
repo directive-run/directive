@@ -13,6 +13,88 @@ export function buildKey(name: string, suffix: string): string {
   return `${PREFIX}${name}_${suffix}`;
 }
 
+/** Build a query's internal event name, e.g. `_q_user_FOCUSED`. */
+export function buildEvent(name: string, event: string): string {
+  return `${PREFIX}${name}_${event}`;
+}
+
+/** The publish callback a source's `attach` receives. */
+export type QueryPublish = (event: string, payload?: unknown) => void;
+
+/**
+ * A source definition as a query fragment builds it. Typed loosely, like the
+ * other fragments, because it is merged into a module config the caller
+ * types.
+ */
+export interface QuerySource {
+  key?: (facts: Record<string, unknown>) => string | null;
+  active?: (facts: Record<string, unknown>) => boolean;
+  attach: (
+    publish: QueryPublish,
+    reportError: (error: unknown) => void,
+    ctx?: { readonly key: string },
+  ) => () => void;
+}
+
+/** An event handler as a query fragment builds it. */
+export type QueryEventHandler = (
+  facts: Record<string, unknown>,
+  event: Record<string, unknown>,
+) => void;
+
+/**
+ * A source that publishes `event` whenever a browser event fires on the
+ * document or the window – focus and reconnect. Where there is no DOM (a
+ * server, a worker) it attaches as a no-op.
+ *
+ * The outside world arrives through a source and becomes facts in an event
+ * handler; an effect only ever talks outward.
+ */
+export function domEventSource(
+  target: "document" | "window",
+  domEvent: string,
+  event: string,
+  when: () => boolean = () => true,
+): QuerySource {
+  return {
+    attach: (publish) => {
+      const host =
+        target === "document"
+          ? typeof document === "undefined"
+            ? undefined
+            : document
+          : typeof window === "undefined"
+            ? undefined
+            : window;
+      if (host === undefined) {
+        return () => undefined;
+      }
+      const handler = () => {
+        if (when()) {
+          publish(event);
+        }
+      };
+      host.addEventListener(domEvent, handler);
+
+      return () => host.removeEventListener(domEvent, handler);
+    },
+  };
+}
+
+/** A source that publishes `event` every `ms` milliseconds while attached. */
+export function intervalSource(
+  ms: number,
+  event: string,
+): Pick<QuerySource, "attach"> {
+  return {
+    attach: (publish) => {
+      const timer = setInterval(() => publish(event), ms);
+
+      return () => clearInterval(timer);
+    },
+  };
+}
+
 /**
  * Property names that must never appear in a serialized cache key. If an
  * attacker can influence the shape of a key object, allowing one of these

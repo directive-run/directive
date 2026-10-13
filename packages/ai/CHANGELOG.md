@@ -1,5 +1,254 @@
 # @directive-run/ai
 
+## 1.34.1
+
+## 1.34.0
+
+## 1.33.1
+
+## 1.33.0
+
+## 1.32.0
+
+## 1.31.3
+
+## 1.31.2
+
+## 1.31.1
+
+## 1.31.0
+
+## 1.30.0
+
+### Minor Changes
+
+- [#148](https://github.com/directive-run/directive/pull/148) [`9e9445d`](https://github.com/directive-run/directive/commit/9e9445d343e134b84dd9a6b67af6daa661030905) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **BREAKING:** metadata queries ask per definition, and tell you when the answer moves.
+
+  `system.meta.byTag("pii")` decides what gets redacted before a value reaches a
+  model, a log, or a hash-chained audit ledger. Answering it walks every definition
+  in the system, so all three consumers cached the answer — and every defect this
+  area has had was a cache built once and never rebuilt.
+
+  **New:**
+
+  ```ts
+  // O(1) for a fact. `undefined` means "could not answer" — not "no tag".
+  system.meta.carriesTag("fact", key, "pii");
+
+  // Replaces the polled revision() counter. Fires for dynamic
+  // register/assign/unregister as well as module registration.
+  system.meta.subscribe(["pii"], rebuild, { immediate: true });
+
+  // Narrow the walk when you only want one kind.
+  system.meta.byTag("pii", { kind: "fact" });
+  ```
+
+  **Renamed, with no aliases:**
+
+  | Before                          | After                                                  |
+  | ------------------------------- | ------------------------------------------------------ |
+  | `MetaMatch.type`                | `kind`, typed `DefinitionKind`                         |
+  | `via?: "inherited"`             | `tagOrigin: "authored" \| "inherited"`, always present |
+  | `meta: { inheritsTags: false }` | `meta: { tagBoundary: true }`                          |
+  | `byCategory(...)`               | removed                                                |
+  | `revision()`                    | removed — use `subscribe`                              |
+
+  **Fixed along the way:**
+
+  - Plugins are now told about a write _after_ the graph is invalidated, so a
+    plugin asking what a value carries during `onFactSet` is told about the write
+    it is being notified of. The batched path already worked this way, so the two
+    disagreed with each other.
+  - A throwing `system.subscribe` / `system.watch` callback no longer aborts the
+    write it was notified of, taking every plugin behind it down.
+  - A fact's tags can no longer be taken back. Schema types are frozen,
+    `registerKeys` refuses to re-declare an existing key, and `tags` must be a
+    plain array of strings — an `Array` subclass could override `includes` and
+    answer differently on each call.
+  - The audit ledger and the clobber-loop detector refreshed their pii sets from a
+    hook `registerModule` does not emit, so a module registered after start put raw
+    values into a sink that cannot be edited afterwards. Both now ask per lookup,
+    and both resolve a dotted clause path to the fact that carries the tag.
+  - The fact-PII guardrail screens `initialFacts` and hydrated state regardless of
+    where it sits in the plugin list.
+
+  **New event:** `guardrail.coverage` reports what a guardrail covers rather than
+  what it caught, so a screen that has stopped covering anything is no longer
+  indistinguishable from one with nothing to report.
+
+  See `docs/rfcs/0011-metadata-queries.md` for the measurements and the two
+  rejected designs.
+
+### Patch Changes
+
+- [#150](https://github.com/directive-run/directive/pull/150) [`fedff2a`](https://github.com/directive-run/directive/commit/fedff2aac07e72c2f215a23dd7497a25a4df1580) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Four fixes to the metadata-query change, found by reviewing the implementation
+  rather than the plan.
+
+  **A Zod fact stopped working.** Fact tags decide what gets redacted, so the
+  schema type holding them was frozen — unconditionally. A Zod schema is a
+  supported fact type and mutates itself while validating: v3 caches its shape
+  onto the instance on first parse, v4 re-defines properties on it. Either throws
+  on a frozen object, so the first validated write to a `z.object()` fact threw
+  instead of validating. The freeze now covers only the types this package builds;
+  the tag immutability it exists for is unaffected.
+
+  **A fact key containing a dot was redacted against the wrong fact.** The audit
+  ledger and the loop detector resolve a clause path like `user.email` to the fact
+  that carries the tag, which meant taking the first segment. A key _literally_
+  named `user.email` was then looked up as `user` — so a tagged key could be
+  answered for by an untagged one, and its value went into the hash chain in the
+  clear. Both now try the exact key first and fall back to the root only when the
+  exact key is unknown.
+
+  **The coverage signal read maximum when it was blind.** `guardrail.coverage`
+  counted a key as covered whenever the guardrail would screen it — and it screens
+  when it cannot tell. A guardrail whose tag lookup was completely broken
+  therefore reported full coverage. It now counts only keys it has a definite
+  answer for, and reports `reason: "unanswerable"` when any key could not be
+  answered. That value was declared and never emitted, while two doc comments told
+  operators to watch for it.
+
+  **Metadata queries are fenced off the tracking stack.** Walking the tag graph
+  forces derivations to compute, and forcing goes through the same accessor a
+  derivation body uses. Defensive rather than demonstrated: the mechanism is plain
+  in the code and two reviews flagged it, but six attempts to observe the symptom
+  measured no dependency growth. The fence is inert if the path is unreachable.
+
+  **A fact could be tagged everywhere except where it counted.** `carriesTag`
+  answered `false` for a key present in the schema but absent from the recorded
+  tag map, which made "carries nothing" and "not recorded yet" the same answer.
+  Three ways to reach it: a module's schema became visible one statement before
+  its tags were recorded, and a source registered by that same module attaches
+  synchronously in between; a key registered through `facts.$store.registerKeys`
+  was never recorded at all; and a validation throw part-way through registration
+  left earlier keys live and unrecorded. Every fact key is recorded now, tags are
+  recorded immediately after the schema merge, and the store tells the engine
+  about keys it registers.
+
+  **A caller-frozen schema type skipped the validation the freeze exists for.**
+  `Object.isFrozen` cannot tell "we prepared this" from "the author froze it
+  first", so a pre-frozen type bypassed the `tags` check. Tracked in a `WeakSet`
+  instead.
+
+  **One bad value could disable the guardrail's startup sweep and its coverage
+  channel for the process.** The sweep, the coverage report and the metadata
+  subscription were one unguarded block, so a throwing detector or a value with
+  hostile property traps ended all three. The sweep now guards per key, and the
+  report and subscription are armed before it runs. The subscription is also
+  idempotent across `stop()`/`start()`, which previously leaked a listener and
+  duplicated every report.
+
+  **Cross-realm arrays are accepted.** `tags` was rejected unless its prototype
+  was exactly `Array.prototype`, which fails for an array from a `vm` context, a
+  worker or an iframe. The runtime copies `tags` into its own array, and that copy
+  — not the prototype check — is what defeats a subclass overriding `includes`.
+
+  **The coverage digest is delimited.** Hashing the bare concatenation gave
+  `{"a","bc"}` and `{"ab","c"}` the same digest and the same count, so a coverage
+  swap was invisible to the signal meant to catch it.
+
+## 1.29.5
+
+## 1.29.4
+
+## 1.29.3
+
+### Patch Changes
+
+- [#142](https://github.com/directive-run/directive/pull/142) [`7f02618`](https://github.com/directive-run/directive/commit/7f02618a6af0e28f19e7caa3df8460f9a1463f59) Thanks [@jasoncomes](https://github.com/jasoncomes)! - The Gemini runners defaulted to a model that no longer exists.
+
+  `createGeminiRunner` and `createGeminiStreamingRunner` used `gemini-2.0-flash`
+  when no model was named. That model was shut down on 2026-06-01, so the default
+  had been an unmakeable call for two and a half months. Nothing caught it: the
+  default is only reached when a caller names no model, and the failure arrives
+  from the provider, so it reads as a network problem rather than a stale
+  constant.
+
+  The default is now `gemini-2.5-flash` — the current model closest to what the
+  old default was chosen for, the inexpensive general-purpose one. It is exported
+  as `DEFAULT_GEMINI_MODEL` so a caller can read it rather than guess, though
+  anything with an opinion should name its own model: a default that names a
+  specific model ages by construction.
+
+  A test now requires every adapter's default to be a model its own rate table
+  prices. The rate table is the one thing in this package that has to be kept
+  current, so agreeing with it is a cheap standing check that the default still
+  exists.
+
+## 1.29.2
+
+### Patch Changes
+
+- [#140](https://github.com/directive-run/directive/pull/140) [`ce5b582`](https://github.com/directive-run/directive/commit/ce5b58256e8d8cafea19a40d51345ca9060d46bf) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Corrects the published provider rate tables against each provider's own pricing
+  page, and adds the current model generations. The `*_PRICING_AS_OF` dates shipped
+  in 1.29.0 asserted these tables had been checked; they had not.
+
+  **Rates that were wrong:**
+
+  | Model              | Was           | Published         |
+  | ------------------ | ------------- | ----------------- |
+  | `claude-sonnet-5`  | $3 / $15      | **$2 / $10**      |
+  | `o3`               | $10 / $40     | **$2 / $8**       |
+  | `gemini-2.5-flash` | $0.15 / $0.60 | **$0.30 / $2.50** |
+
+  `claude-sonnet-5` carried the figures from a repricing that was cancelled — $2/$10
+  was introduced as promotional and is now the standard rate. `o3` over-charged five
+  times on input. `gemini-2.5-flash` _under_-charged, which is the worse direction: a
+  budget built on it had quietly stopped stopping anything.
+
+  **Models added.** OpenAI's table held nine legacy entries and none of the gpt-5
+  family; all fourteen are now present, along with `o1`, `o1-pro` and `o3-pro`.
+  Gemini gained the 3.x line and `gemini-2.5-flash-lite`.
+
+  **Models removed.** `gemini-2.0-flash` and `gemini-2.0-flash-lite` were shut down
+  on 2026-06-01. A caller naming one now gets an error naming the model rather than
+  a price for something that cannot be called.
+
+  **Cached-input rates** are now populated for OpenAI and Gemini, where they were
+  absent. Neither provider charges for cache writes — caching is automatic — so
+  `cacheWrite` is deliberately unset rather than defaulted to the input rate.
+
+  **The freshness claim now expires.** A table whose checked-on date is more than
+  ninety days old fails its test, with a message naming what to do. The date said a
+  person compared these numbers to the provider's page; that claim decays, and
+  nothing used to notice.
+
+## 1.29.1
+
+### Patch Changes
+
+- [#136](https://github.com/directive-run/directive/pull/136) [`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Three fixes for defects in 1.28.0 and 1.29.0, two of them silent data exposure
+  and one a duplicate side effect. Upgrade if you use `factPIIGuardrail` or run
+  chains longer than fifty reconcile passes.
+
+  **The personal-data screen could latch open permanently.** 1.28.0 taught it to
+  rebuild its screened-key list when the system's metadata changed. That rebuild
+  emptied the live list and marked itself current _before_ asking which keys to
+  screen — so if the lookup failed, or answered with nothing, the screen was left
+  holding nothing with the marker already advanced, and every later write took the
+  "already current" shortcut. One transient fault, and the screen never looked
+  again. It now builds a new list to the side and swaps it in only on success, so
+  a failure leaves the previous screen in place and the next write retries.
+
+  **A single unscannable member switched the screen off for the whole value.** The
+  walker copies a value before inspecting it, and when that copy was refused — by
+  a function property, a class instance carrying methods, a DOM node — it reported
+  "nothing found", which a caller cannot tell from "scanned and clean". A payload
+  of `{ email, ssn, retry: () => {} }` committed both the address and the number
+  in the clear. A member the copier refuses says nothing about its siblings, so
+  refused members are now dropped and everything else is scanned.
+
+  **A reconcile chain longer than fifty passes could re-run resolvers that had
+  already finished.** 1.28.0 made a long-dormant depth ceiling reachable. It turned
+  out to be reachable by ordinary bounded work — a sixty-item queue drain, cursor
+  pagination, a backoff counter — and tripping it clears the requirement diff, so
+  every live requirement is treated as new and dispatched again, including ones
+  that had nothing to do with the long chain. For a resolver that charges a card
+  or sends a message, that is a duplicate. The ceiling is dormant again while a
+  proper instrument is built: depth cannot see the runaway it was aimed at anyway,
+  because a resolver that reschedules without writing a fact resets the counter
+  every pass.
+
 ## 1.29.0
 
 ### Minor Changes

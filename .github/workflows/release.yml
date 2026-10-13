@@ -46,12 +46,32 @@ jobs:
       # The build now refuses to substitute a placeholder, so the release has
       # to supply the real file. A failed fetch stops the release here rather
       # than publishing something hollow.
-      - name: Fetch api-reference.json from the newest release carrying it
-        run: .github/scripts/fetch-api-reference.sh
+      #
+      # The file must describe THIS tree, not the previous release. Fetching the
+      # newest release's copy meant every publish shipped the API skeleton of
+      # the release before it: knowledge and every plugin skill copy described
+      # last version's exports, and nothing failed, because the skeleton was
+      # regenerated consistently from the stale file. Generate it here instead.
+      # The extractor resolves @directive-run/ai's re-exports through core's
+      # built types, so core builds first.
+      - name: Generate api-reference.json from this tree
+        run: |
+          pnpm --filter @directive-run/core build
+          npm i -g @directive-run/toolkit@latest
+          mkdir -p ../directive-docs/docs/generated
+          extract-api-docs \
+            --packages packages/core,packages/ai \
+            --out ../directive-docs/docs/generated
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
+
+      # The committed api-skeleton.md is regenerated from this tree during
+      # development. If the build produced something different, the release
+      # would publish a skeleton nobody reviewed: stop instead.
+      - name: Published API skeleton matches the committed one
+        run: git diff --exit-code packages/knowledge/api-skeleton.md
 
       - run: pnpm -r --filter './packages/*' typecheck
 
@@ -103,16 +123,38 @@ jobs:
           # previous form silently exited 0 even when every package
           # 404'd; the 2026-06-02 release of claude-plugin@1.16.0 and
           # knowledge-mcp@0.1.0 shipped green CI but never reached npm.
+          # Retried, because the registry does not serve a package the instant
+          # `publish` returns. Measured: `@directive-run/cli` has twice been the
+          # last to appear, and on the 1.33.0 release it became visible 2m03s
+          # after publishing — twenty-seven seconds after a one-minute window
+          # gave up. The window is five minutes for that reason.
+          #
+          # A check that cries wolf is a check people learn to scroll past, and
+          # this one is the only thing between a silent publish failure and a
+          # green run. Being slow to pass costs a few minutes; being wrong costs
+          # the check.
           fail=0
           while read -r pkg; do
             name=$(echo "$pkg" | jq -r '.name')
             version=$(echo "$pkg" | jq -r '.version')
             url="https://registry.npmjs.org/${name}/${version}"
-            echo "Verify: $url"
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            status=000
+            for attempt in $(seq 1 30); do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo 000)
+              if [ "$status" = "200" ]; then
+                break
+              fi
+              echo "Verify: $url — HTTP ${status}, attempt ${attempt}/30"
+              sleep 10
+            done
             if [ "$status" != "200" ]; then
-              echo "::error title=Publish verification failed::${name}@${version} returned HTTP ${status} from npm registry. Token likely lacks 'create new package' permission for @directive-run/* scope."
+              # Says what it saw, not what it concludes. The previous wording
+              # asserted "not propagation lag" on evidence that could not
+              # support it, and was wrong the first time it fired.
+              echo "::error title=Publish verification failed::${name}@${version} still returned HTTP ${status} after 30 attempts over five minutes. Either it never reached the registry — check the token's permissions for the @directive-run/* scope — or propagation is slower than five minutes, which has not been observed. Check https://www.npmjs.com/package/${name} before assuming the release failed."
               fail=1
+            else
+              echo "Verify: $url — ok"
             fi
           done < <(echo "$published" | jq -c '.[]')
           exit $fail

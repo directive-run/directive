@@ -647,7 +647,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
   // attempts structuredClone. Walker catches the throw, logs a
   // warning, and treats the value as no-match — same posture as the
   // per-Proxy-trap try/catches, just collapsed to one site.
-  it("non-cloneable input does not leak PII; walker warns and skips", () => {
+  it("non-cloneable input is still scanned for what it does hold", () => {
     const module = createModule("non-cloneable", {
       schema: {
         facts: {
@@ -678,14 +678,17 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.events.wire({
       payload: { email: "leak@example.com", handler: () => 42 },
     });
-    // Warning fired; raw payload stayed in the store (no in-place
-    // redaction possible without a clone — consumer is expected to
-    // wire a customDetector for function-containing shapes).
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("not structured-cloneable"),
-      expect.any(String),
-    );
-    expect(system.facts.payload.email).toBe("leak@example.com");
+    // This test used to assert the leak. Its name said the payload did not
+    // leak; its last line asserted the address was still in the store, and the
+    // fixture is called `leak@example.com`. The cloner refusing one member said
+    // nothing about that member's siblings, but the walker gave up on all of
+    // them and returned "no match" — which the caller cannot tell from
+    // "scanned and clean".
+    //
+    // The refused member is now dropped and the rest is scanned, so the
+    // address is redacted like any other.
+    expect(system.facts.payload.email).not.toBe("leak@example.com");
+    expect(system.facts.payload.email).toContain("[EMAIL]");
     warnSpy.mockRestore();
     system.destroy();
   });

@@ -10,6 +10,23 @@
  */
 
 import isDevelopment from "#is-development";
+
+/**
+ * Marks an error the runtime raised to stop a runaway, as opposed to one a
+ * consumer threw. Guards that isolate consumer callbacks rethrow these instead
+ * of logging them — a loop guard that is caught and swallowed has been
+ * disarmed, and doing it per item re-arms it once per item.
+ */
+export const RUNAWAY: unique symbol = Symbol("directive.runaway");
+
+/** True when `error` was raised by a runtime guard rather than consumer code. */
+export function isRunawayError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as Record<symbol, unknown>)[RUNAWAY] === true
+  );
+}
 import {
   BLOCKED_PROPS,
   detectNonJsonValueType,
@@ -18,6 +35,8 @@ import {
   withoutTracking,
 } from "./tracking.js";
 import type {
+  FactChange,
+  FactOrigin,
   Facts,
   FactsSnapshot,
   FactsStore,
@@ -50,14 +69,7 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   /** Callback when facts change (for plugin hooks) */
   onChange?: (key: string, value: unknown, prev: unknown) => void;
   /** Callback for batch changes */
-  onBatch?: (
-    changes: Array<{
-      key: string;
-      value: unknown;
-      prev: unknown;
-      type: "set" | "delete";
-    }>,
-  ) => void;
+  onBatch?: (changes: FactChange[]) => void;
   /**
    * Called the moment a key is written inside a batch, before the batch ends.
    *
@@ -75,6 +87,18 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   /** Called when the outermost batch opens. */
   onBatchStart?: () => void;
   /**
+   * Called after `registerKeys` adds fact keys, with the key and its schema
+   * type.
+   *
+   * The store is not the only thing that has to know a fact exists. Anything
+   * deciding what a fact carries — and therefore whether writes to it are
+   * redacted — has to learn about it at the same moment, or the two disagree
+   * with nothing saying so.
+   */
+  onKeysRegistered?: (
+    entries: ReadonlyArray<readonly [string, unknown]>,
+  ) => void;
+  /**
    * Called after the outermost batch has flushed.
    *
    * A backstop for a batch that wrote nothing: `onBatch` is skipped when there
@@ -82,6 +106,18 @@ export interface CreateFactsStoreOptions<S extends Schema> {
    * unconditional to be undone.
    */
   onBatchEnd?: () => void;
+  /**
+   * Asked, at the moment of each write, where that write came from.
+   *
+   * Called per write rather than per batch, and that is the whole point. The
+   * batch is reported when it ends; a flag read at that moment describes
+   * whatever is in effect then, which for a restore nested inside a wider
+   * batch is already over. Reading it here records what was true when the
+   * value actually changed.
+   *
+   * Defaults to `"authored"` when not supplied.
+   */
+  originOf?: () => FactOrigin;
 }
 
 /**
@@ -115,8 +151,16 @@ export interface CreateFactsStoreOptions<S extends Schema> {
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { schema, onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
-    options;
+  const {
+    schema,
+    onChange,
+    onBatch,
+    onWrite,
+    onBatchStart,
+    onBatchEnd,
+    originOf,
+    onKeysRegistered,
+  } = options;
 
   // Detect if this is a type assertion schema (empty object with no keys)
   const schemaKeys = Object.keys(schema);
@@ -131,6 +175,16 @@ export function createFactsStore<S extends Schema>(
   const map = new Map<string, unknown>();
   const knownKeys = new Set<string>(); // Track all keys that have been set
   const keyListeners = new Map<string, Set<() => void>>();
+  /**
+   * Keys whose module was unregistered (RFC 0002).
+   *
+   * A resolver that ignores its abort signal keeps running after teardown, and
+   * its writes are documented as landing nowhere. Without this set they landed
+   * somewhere: `set` would re-add the key to `map` and `knownKeys`, resurrecting
+   * a fact with no schema entry and no tags — so it was invisible to redaction
+   * and grew without bound across a rotation.
+   */
+  const unregisteredKeys = new Set<string>();
   const allListeners = new Set<() => void>();
 
   let batching = 0;
@@ -139,6 +193,7 @@ export function createFactsStore<S extends Schema>(
     value: unknown;
     prev: unknown;
     type: "set" | "delete";
+    origin: FactOrigin;
   }> = [];
   const dirtyKeys = new Set<string>();
 
@@ -374,9 +429,15 @@ export function createFactsStore<S extends Schema>(
     while (pendingNonBatchedChanges.length > 0) {
       if (++iterations > MAX_NOTIFY_ITERATIONS) {
         pendingNonBatchedChanges.length = 0;
-        throw new Error(
+        const runaway = new Error(
           `[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations${context}.`,
         );
+        // Marked so the guards that isolate consumer code can tell this apart
+        // from a consumer's own throw and let it through. A runaway that is
+        // caught and logged per key is a runaway that has been re-armed once
+        // per key, which is the opposite of what a loop guard is for.
+        (runaway as Error & { [RUNAWAY]?: true })[RUNAWAY] = true;
+        throw runaway;
       }
 
       const deferred = [...pendingNonBatchedChanges];
@@ -396,16 +457,33 @@ export function createFactsStore<S extends Schema>(
       return;
     }
 
+    // Take the batch and CLEAR IT before anything downstream runs.
+    //
+    // Consumer code runs during the notify phase below, and a listener is
+    // allowed to open a nested batch. While this state stayed populated until
+    // after that phase, the nested flush saw the outer batch's changes still
+    // sitting in the buffer and reported them a second time. Three writes
+    // produced five records, the duplicates carried pre-write values, and the
+    // last recorded value for a key was the one it held BEFORE the batch — so
+    // anything reconstructing state from that stream got it wrong.
+    //
+    // Nothing is lost by clearing early: a write made during the notify phase
+    // lands in the now-empty buffer and is reported by its own flush.
+    const changes = batchChanges.length > 0 ? [...batchChanges] : null;
+    const keys = dirtyKeys.size > 0 ? [...dirtyKeys] : null;
+    batchChanges.length = 0;
+    dirtyKeys.clear();
+
     // Notify batch callback
-    if (onBatch && batchChanges.length > 0) {
-      onBatch([...batchChanges]);
+    if (onBatch && changes) {
+      onBatch(changes);
     }
 
     // Notify key-specific listeners (within coalescing guard)
-    if (dirtyKeys.size > 0) {
+    if (keys) {
       isNotifying = true;
       try {
-        for (const key of dirtyKeys) {
+        for (const key of keys) {
           notifyKey(key);
         }
         notifyAll();
@@ -414,10 +492,6 @@ export function createFactsStore<S extends Schema>(
         isNotifying = false;
       }
     }
-
-    // Clear batch state
-    batchChanges.length = 0;
-    dirtyKeys.clear();
   }
 
   const store: FactsStore<S> = {
@@ -437,6 +511,15 @@ export function createFactsStore<S extends Schema>(
       key: K,
       value: InferSchema<S>[K],
     ): void {
+      // Checked BEFORE validation, deliberately. A write to a key whose module
+      // was unregistered lands nowhere, which is what the API promises for a
+      // resolver that ignored its abort signal — and validation would instead
+      // throw "unknown fact key", because the schema entry is exactly what
+      // unregistering removes. Behind validation this guard was unreachable in
+      // development, so the documented behaviour held only in production, and
+      // an orphaned timer or stream callback raised in user code.
+      if (unregisteredKeys.has(key as string)) return;
+
       if (isDevelopment) validateValue(key as string, value);
 
       const prev = map.get(key as string);
@@ -449,7 +532,13 @@ export function createFactsStore<S extends Schema>(
 
       // Record change
       if (batching > 0) {
-        batchChanges.push({ key: key as string, value, prev, type: "set" });
+        batchChanges.push({
+          key: key as string,
+          value,
+          prev,
+          type: "set",
+          origin: originOf?.() ?? "authored",
+        });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);
       } else {
@@ -469,6 +558,7 @@ export function createFactsStore<S extends Schema>(
           value: undefined,
           prev,
           type: "delete",
+          origin: originOf?.() ?? "authored",
         });
         dirtyKeys.add(key as string);
         onWrite?.(key as string);
@@ -487,11 +577,17 @@ export function createFactsStore<S extends Schema>(
         fn();
       } finally {
         batching--;
-        flush();
-        // After `flush()`, so whatever `onBatch` did during the flush is inside
-        // the scope that opened.
-        if (outermost) {
-          onBatchEnd?.();
+        // `onBatchEnd` pairs with `onBatchStart` on every exit, including a
+        // throw out of the flush. Anything scoped to the batch — the engine's
+        // derivation hold, for one — is given back rather than stranded.
+        try {
+          flush();
+        } finally {
+          // After `flush()`, so whatever `onBatch` did during the flush is
+          // inside the scope that opened.
+          if (outermost) {
+            onBatchEnd?.();
+          }
         }
       }
     },
@@ -549,13 +645,86 @@ export function createFactsStore<S extends Schema>(
   (store as unknown as Record<string, unknown>).registerKeys = (
     newSchema: Record<string, unknown>,
   ) => {
+    const added: string[] = [];
     for (const key of Object.keys(newSchema)) {
       // Defense-in-depth: skip prototype pollution keys
       if (BLOCKED_PROPS.has(key)) continue;
+      // Replacing an existing key would swap its declared type and its meta —
+      // including the tags that decide whether writes to it get redacted.
+      // `registerModule` refuses a duplicate fact key before it gets here, and
+      // then hands us the very objects it just merged, so an identical
+      // reference is that no-op and not an overwrite. A DIFFERENT declaration
+      // for a key we already hold is the untag, and it is refused.
+      const existing = (schema as Record<string, unknown>)[key];
+      if (
+        Object.hasOwn(schema as Record<string, unknown>, key) &&
+        existing !== newSchema[key]
+      ) {
+        throw new Error(
+          `[Directive] Cannot re-declare fact "${key}". A fact's type and its tags are fixed once registered — replacing the declaration would silently change what gets redacted.`,
+        );
+      }
       // Add to schema for validation
       (schema as Record<string, unknown>)[key] = newSchema[key];
       knownKeys.add(key);
+      // A name coming back is live again. Leaving it marked would make the
+      // replacement instance silently unwritable — the rotation would appear to
+      // work and then hold its opening values forever.
+      unregisteredKeys.delete(key);
+      added.push(key);
     }
+    // Tell the engine, so a key registered through the store is recorded the
+    // same way one registered through a module is. Without this a fact could
+    // be tagged `pii` in every query surface and untagged to the screen that
+    // acts on it — permanently, and with nothing reporting the difference.
+    if (added.length > 0) {
+      onKeysRegistered?.(added.map((k) => [k, newSchema[k]] as const));
+    }
+  };
+
+  // Internal: drop schema keys when a module is unregistered (RFC 0002).
+  // Not part of the public FactsStore interface — used by engine.unregisterModule().
+  //
+  // The declaration is removed, not merely the value. `registerKeys` refuses to
+  // re-declare a key it already holds, because swapping a declaration would
+  // swap the tags that decide what gets redacted. A module registered again
+  // under the same name brings freshly-built schema objects, so leaving the old
+  // declaration behind would make re-registration throw — the one thing this
+  // whole API exists to allow.
+  (store as unknown as Record<string, unknown>).unregisterKeys = (
+    keys: readonly string[],
+  ) => {
+    // One batch for the whole module, not one notification per fact. Notifying
+    // per key published every torn intermediate state — a watcher on a
+    // three-fact module saw the first key gone while the other two remained,
+    // then the second, then the third. Three renders of states that never
+    // existed, scaling with the module's fact count.
+    store.batch(() => {
+      for (const key of keys) {
+        const prev = map.get(key);
+        map.delete(key);
+        knownKeys.delete(key);
+        delete (schema as Record<string, unknown>)[key];
+        unregisteredKeys.add(key);
+        // Announced, not silent. Invalidation walks the dependency index only
+        // when a change is reported, so removing values quietly left a
+        // derivation in another module holding its cached value forever —
+        // a number for something that no longer existed.
+        batchChanges.push({
+          key,
+          value: undefined,
+          prev,
+          type: "delete",
+          origin: originOf?.() ?? "authored",
+        });
+        dirtyKeys.add(key);
+        onWrite?.(key);
+      }
+    });
+    // Listeners are deliberately NOT dropped. A key coming back under the same
+    // name is the headline use case, not an edge case, and a subscriber that
+    // survived the rotation must keep working. Dropping them silently killed
+    // every `useFact` and `system.subscribe` across a re-register.
   };
 
   return store;
@@ -568,10 +737,71 @@ export function createFactsStore<S extends Schema>(
 const nestedProxyCache = new WeakMap<object, object>();
 
 /**
+ * Reads the object a dev warning Proxy wraps, or `undefined` for anything else.
+ *
+ * The wrapper is a development aid, but it does not stay on the read path: the
+ * documented immutable update `facts.doc = { ...facts.doc, title }` reads every
+ * nested value THROUGH the wrapper and spreads the results into a new object,
+ * so the wrappers are stored. From then on the fact holds Proxies where the
+ * author put a `Date` or a `Map`.
+ *
+ * That matters because `structuredClone` refuses a Proxy, and cloning is how
+ * state crosses every boundary in this codebase — history snapshots, optimistic
+ * rollback, worker `postMessage`, distributable snapshots. A dev-only aid was
+ * making dev-mode state uncloneable.
+ */
+export const DEV_PROXY_TARGET: unique symbol = Symbol.for(
+  "directive.devProxyTarget",
+);
+
+/**
+ * Recursively replace dev warning Proxies with the objects they wrap.
+ *
+ * Returns the input untouched when there is nothing to unwrap, so callers can
+ * use the result unconditionally. Only reachable in development: production
+ * builds never create the wrappers.
+ */
+export function unwrapDevProxies<T>(value: T, seen = new WeakSet()): T {
+  if (typeof value !== "object" || value === null) return value;
+
+  const target = (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET];
+  const source = (target ?? value) as object;
+
+  // Cycles are legal in facts and `structuredClone` handles them, so the walk
+  // has to as well rather than recursing forever.
+  if (seen.has(source)) return source as T;
+  seen.add(source);
+
+  if (Array.isArray(source)) {
+    return source.map((item) => unwrapDevProxies(item, seen)) as T;
+  }
+  // Anything with internal slots — Date, Map, Set, TypedArray, RegExp — is
+  // returned whole. Walking its properties would produce a plain object and
+  // lose exactly what makes it that type.
+  if (Object.getPrototypeOf(source) !== Object.prototype) {
+    return source as T;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    out[key] = unwrapDevProxies(item, seen);
+  }
+
+  return out as T;
+}
+
+/**
  * Wrap an object in a Proxy that warns when properties are set.
  * Catches `facts.user.name = "John"` which silently skips reactivity.
  * Only used in dev mode — tree-shaken in production builds.
  */
+/** Is this value one of the development-mode warning wrappers? */
+function isDevProxy(value: unknown): boolean {
+  return (
+    (value as { [DEV_PROXY_TARGET]?: object })[DEV_PROXY_TARGET] !== undefined
+  );
+}
+
 function wrapWithNestedWarning(
   obj: object,
   rootKey: string,
@@ -587,6 +817,12 @@ function wrapWithNestedWarning(
       // pretty-format) render the underlying object directly rather
       // than the warning-wrapped Proxy. `Symbol.toPrimitive` is left
       // alone — the protocol requires a primitive return.
+      // Unwrap hatch. Cloning refuses a Proxy, and these wrappers end up
+      // stored, so anything that has to serialize state needs a way back to
+      // the real object.
+      if (prop === DEV_PROXY_TARGET) {
+        return target;
+      }
       if (prop === Symbol.for("nodejs.util.inspect.custom")) {
         return () => target;
       }
@@ -599,6 +835,53 @@ function wrapWithNestedWarning(
         return value;
       }
 
+      // Already one of ours — hand it back rather than wrapping it again.
+      //
+      // These wrappers get *stored*: the ordinary way to update an object fact is
+      // `facts.map = { ...facts.map, k: v }`, which copies whatever the store just
+      // handed back into the new object. Without this check every such update adds
+      // a layer, so read cost grows with the number of writes and the whole chain
+      // stays live. Silent, and compounding — an eight-key map measured 38 ms for
+      // 5,000 reads after 8 writes and 8,164 ms after 108.
+      if (isDevProxy(value)) {
+        return value;
+      }
+
+      // Only plain objects and arrays are wrapped.
+      //
+      // The warning this wrapper exists for is about *properties* —
+      // `facts.user.name = "x"` skipping reactivity. A Map's or a Set's contents
+      // are not properties; they live in an internal slot no proxy can reach. So
+      // wrapping one buys no warning and costs the object's own methods, because
+      // `Set.prototype.has` called on a Proxy throws "called on incompatible
+      // receiver". Same for `Map`, `Date`, typed arrays and any class instance
+      // whose state is not enumerable own properties.
+      //
+      // Dev-only, which is the worst part: the wrapper is tree-shaken out of
+      // production, so a `Map` in a fact works in the shipped bundle and throws
+      // in the test suite.
+      const valuePrototype = Object.getPrototypeOf(value);
+      if (
+        valuePrototype !== Object.prototype &&
+        valuePrototype !== null &&
+        !Array.isArray(value)
+      ) {
+        return value;
+      }
+
+      // A frozen container's properties are non-configurable and non-writable,
+      // and a Proxy is required to return the target's own value for those. A
+      // wrapper here is not a warning, it is a TypeError on the read — so
+      // `Object.freeze`, the ordinary way to make a stored value immutable,
+      // makes the value unreadable in development and works in production,
+      // where this wrapper is tree-shaken away.
+      //
+      // Returning the raw value loses nothing: a frozen property cannot be
+      // mutated, so there is no nested mutation left to warn about.
+      const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+      if (descriptor && !descriptor.configurable && !descriptor.writable) {
+        return value;
+      }
       if (nestedProxyCache.has(value as object)) {
         return nestedProxyCache.get(value as object);
       }
@@ -702,6 +985,13 @@ export function createFactsProxy<S extends Schema>(
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
       if (isDevelopment && value !== null && typeof value === "object") {
+        // A wrapper written straight back in is already wrapped — see the note in
+        // `wrapWithNestedWarning`. Re-wrapping it here is the same accumulation
+        // one level up.
+        if (isDevProxy(value)) {
+          return value;
+        }
+
         return wrapWithNestedWarning(value as object, prop);
       }
 

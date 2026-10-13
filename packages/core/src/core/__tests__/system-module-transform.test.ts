@@ -72,12 +72,16 @@ function makeOptions(
 
 describe("prefixModuleDefinition", () => {
   describe("return shape", () => {
-    it("returns id from the module", () => {
+    it("identifies the flattened module by its namespace, not the definition's id", () => {
+      // One definition can be registered under several namespaces, so the
+      // definition's id is not unique inside a flattened system. Every key the
+      // module contributes is namespace-prefixed, so the namespace is the
+      // identity that actually distinguishes instances.
       const result = prefixModuleDefinition(
         makeOptions({ mod: makeModule({ id: "my-module" }) }),
       );
 
-      expect(result.id).toBe("my-module");
+      expect(result.id).toBe("auth");
     });
 
     it("returns hooks from the module unchanged", () => {
@@ -922,7 +926,7 @@ describe("prefixModuleDefinition", () => {
       expect(receivedReq).toBe(req);
     });
 
-    it("resolve uses cross-module proxy when crossModuleDeps defined", async () => {
+    it("resolve gets flat own facts and read-only ctx.deps when crossModuleDeps defined", async () => {
       const otherSchema: ModuleSchema = { facts: { token: { _type: "" } } };
       let readToken: unknown;
       const mod = makeModule({
@@ -931,8 +935,8 @@ describe("prefixModuleDefinition", () => {
           fetch: {
             requirement: "FETCH",
             resolve: async (_req: any, ctx: any) => {
-              readToken = ctx.facts.other.token;
-              ctx.facts.self.count = 42;
+              readToken = ctx.deps.other.token;
+              ctx.facts.count = 42;
             },
           },
         } as any,
@@ -1429,8 +1433,8 @@ describe("prefixModuleDefinition", () => {
       // History
       expect(result.history.snapshotEvents).toEqual(["app::increment"]);
 
-      // ID
-      expect(result.id).toBe("full");
+      // ID — the namespace, which is what identifies an instance
+      expect(result.id).toBe("app");
     });
   });
 });

@@ -98,10 +98,10 @@ export const uiModule = createModule("ui", {
   effects: {
     // Show notification when login status changes
     onAuthStatusChange: {
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         // Type-safe cross-module access!
         const currentAuth = facts.auth.isAuthenticated;
-        const prevAuth = prev?.auth.isAuthenticated;
+        const prevAuth = prevFacts?.auth.isAuthenticated;
 
         if (prevAuth !== undefined && currentAuth !== prevAuth) {
           if (currentAuth) {
@@ -116,9 +116,9 @@ export const uiModule = createModule("ui", {
 
     // Show notification when data is loaded
     onDataLoaded: {
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         const currentStatus = facts.data.lastFetched;
-        const prevStatus = prev?.data.lastFetched;
+        const prevStatus = prevFacts?.data.lastFetched;
 
         if (currentStatus && !prevStatus) {
           const count = facts.data.users.length;
@@ -129,9 +129,9 @@ export const uiModule = createModule("ui", {
 
     // Show notification on error
     onDataError: {
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         const currentError = facts.data.error;
-        const prevError = prev?.data.error;
+        const prevError = prevFacts?.data.error;
 
         if (currentError && currentError !== prevError) {
           console.log(`[UI Effect] Error: ${currentError}`);

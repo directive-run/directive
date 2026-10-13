@@ -568,7 +568,9 @@ describe("teardown on system stop", () => {
       system.stop();
     }).not.toThrow();
 
-    expect(order).toEqual(["first", "second"]);
+    // Both closed. Streams are sources, which tear down in reverse order of
+    // registration, so the second closes first.
+    expect(order).toEqual(["second", "first"]);
     expect(errors).toHaveBeenCalled();
 
     errors.mockRestore();

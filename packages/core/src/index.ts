@@ -55,6 +55,8 @@ export type {
   SystemConfig,
   SystemInspection,
   SystemSnapshot,
+  DefinitionKind,
+  DynamicDefinitionKind,
   MetaAccessor,
   MetaMatch,
   ObservationEvent,
@@ -81,6 +83,9 @@ export type {
   SystemDerived,
   // Cross-Module Dependencies
   CrossModuleDeps,
+  CrossModuleResolverContext,
+  CrossModuleResolversDef,
+  ResolverDeps,
   // Dynamic Definitions
   DynamicConstraintDef,
   DynamicEffectDef,
@@ -88,6 +93,7 @@ export type {
   // Sources — typed external event sources (inbound dual of effects).
   SourceDef,
   SourcesDef,
+  SourceGateFacts,
   SourcePublish,
   SourceUnsubscribe,
   SourceReportError,
@@ -95,42 +101,6 @@ export type {
   // Definition Meta
   DefinitionMeta,
   DerivationDefWithMeta,
-  // RFC 0006 — `*Definition` aliases for the `*Def` cohort.
-  // Spelled-out names available today via 1.x forward-compat; 2.0 swaps
-  // which is canonical and which is the deprecated alias. Identity is
-  // preserved across generic constraints, mapped keys, conditional
-  // distribution, tagged-union discriminants, and barrel re-exports
-  // because the underlying aliases use the `export type { X as Y }`
-  // pattern (see packages/core/src/core/types/index.ts).
-  ModuleDefinition,
-  ConstraintDefinition,
-  ConstraintsDefinition,
-  TypedConstraintDefinition,
-  TypedConstraintsDefinition,
-  CrossModuleConstraintDefinition,
-  CrossModuleConstraintsDefinition,
-  DynamicConstraintDefinition,
-  ResolverDefinition,
-  ResolversDefinition,
-  DynamicResolverDefinition,
-  TypedResolverDefinition,
-  TypedResolversDefinition,
-  SchemaTypedResolversDefinition,
-  DerivationDefinition,
-  DerivationDefinitionWithMeta,
-  DerivationsDefinition,
-  TypedDerivationsDefinition,
-  CrossModuleDerivationsDefinition,
-  EffectDefinition,
-  EffectsDefinition,
-  CrossModuleEffectDefinition,
-  CrossModuleEffectsDefinition,
-  EventsDefinition,
-  TypedEventsDefinition,
-  SourceDefinition,
-  SourcesDefinition,
-  SourcePublishFn,
-  SourceUnsubscribeFn,
   // Data-configuration predicates and templates
   FactPredicate,
   FactTemplate,
@@ -308,7 +278,11 @@ export {
   t,
   type Branded,
   type ExtendedSchemaType,
+  type ChainableArrayType,
+  type ChainableNumberType,
+  type ChainableObjectType,
   type ChainableSchemaType,
+  type ChainableStringType,
 } from "./core/schema-builders.js";
 
 // ============================================================================

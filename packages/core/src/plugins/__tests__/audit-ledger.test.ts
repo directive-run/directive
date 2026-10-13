@@ -301,8 +301,18 @@ describe("createAuditLedger — hash chain integrity", () => {
     // Now tell the sink wrapper to mutate entry[1].kind on the next
     // toJSON() call. verify() pulls entries via toJSON, so this models
     // persisted-bytes tampering visible to the verifier.
+    // Derive the tampered value from the one that is there, so the swap is
+    // always a real edit. This wrote a literal `"fact.change"` and went inert
+    // the day entry[1] became a `fact.change` of its own accord — the test
+    // then passed by tampering with nothing, which is the failure mode a
+    // tamper-detection test can least afford.
     swap = (entries) => {
-      if (entries[1]) (entries[1] as { kind: string }).kind = "fact.change";
+      const target = entries[1] as { kind: string } | undefined;
+      if (!target) throw new Error("fixture: no entry at index 1 to tamper");
+      const before = target.kind;
+      target.kind =
+        before === "fact.change" ? "constraint.evaluate" : "fact.change";
+      expect(target.kind).not.toBe(before);
     };
 
     const after = ledger.verify();
@@ -440,12 +450,22 @@ describe("createAuditLedger — PII redaction", () => {
 
     const emailEntries = ledger.forFact("email");
     expect(emailEntries.length).toBeGreaterThan(0);
+    let sawAPrior = false;
     for (const e of emailEntries) {
-      if (e.kind === "fact.change") {
-        expect(e.next).toBe("[redacted]");
+      if (e.kind !== "fact.change") continue;
+      expect(e.next).toBe("[redacted]");
+      // A value that was never there is not redacted into existence. The
+      // first write of a key has no prior at all, and recording
+      // `"[redacted]"` for it asserted a previous value the fact never held.
+      if ("prior" in e && e.prior !== undefined) {
         expect(e.prior).toBe("[redacted]");
+        sawAPrior = true;
       }
     }
+    expect(sawAPrior).toBe(true);
+    const firstWrite = emailEntries.at(-1);
+    expect(firstWrite?.kind).toBe("fact.change");
+    expect((firstWrite as { prior?: unknown }).prior).toBeUndefined();
 
     // Non-PII facts NOT redacted
     const publicEntries = ledger.forFact("public");
@@ -801,12 +821,15 @@ describe("createAuditLedger — per-subject erase()", () => {
     // Erase one fact-change entry.
     ledger.erase({ factPath: "cartTotal" });
 
-    // Tamper with an EARLY entry (system.init) — has nothing to do
-    // with the erasure window.
+    // Tamper with an EARLY entry (system.start) — has nothing to do
+    // with the erasure window. Not `system.init`: plugin init is async, so
+    // where it lands relative to the first constraint evaluation depends
+    // on microtask timing, and it can land directly before a tombstone,
+    // which `verify()` does not yet check (see the `it.fails` below).
     swap = (entries) => {
-      const initIdx = entries.findIndex((e) => e.kind === "system.init");
-      if (initIdx >= 0 && entries[initIdx]) {
-        (entries[initIdx] as { kind: string }).kind = "fact.change";
+      const startIdx = entries.findIndex((e) => e.kind === "system.start");
+      if (startIdx >= 0 && entries[startIdx]) {
+        (entries[startIdx] as { kind: string }).kind = "fact.change";
       }
     };
 
@@ -819,7 +842,67 @@ describe("createAuditLedger — per-subject erase()", () => {
     system.destroy();
   });
 
-  it("verify() throws on unknown hashAlgo discriminator", () => {
+  // KNOWN GAP, pinned so it is tracked: tampering with the entry directly
+  // before a tombstone passes `verify()`. Found while changing reconcile
+  // timing moved `system.init` into that slot; it reproduces with the old
+  // timing too, on whichever entry sits there. Remove `.fails` when fixed.
+  it.fails(
+    "verify() detects tamper of the entry just before a tombstone",
+    async () => {
+      const realSink = memorySink();
+      let swap: ((entries: AuditEntry[]) => void) | null = null;
+      const sink: typeof realSink = {
+        ...realSink,
+        query: realSink.query.bind(realSink),
+        recent: realSink.recent.bind(realSink),
+        forFact: realSink.forFact.bind(realSink),
+        forConstraint: realSink.forConstraint.bind(realSink),
+        write: realSink.write.bind(realSink),
+        clear: realSink.clear.bind(realSink),
+        destroy: realSink.destroy.bind(realSink),
+        erase: realSink.erase?.bind(realSink),
+        onTruncate: realSink.onTruncate?.bind(realSink),
+        toJSON: () => {
+          const out = realSink.toJSON();
+          if (swap) {
+            const cloned = JSON.parse(JSON.stringify(out)) as typeof out;
+            swap(cloned.entries as AuditEntry[]);
+
+            return cloned;
+          }
+
+          return out;
+        },
+      };
+      const ledger = createAuditLedger({ sink });
+      const system = createSystem({
+        module: makeModule(),
+        plugins: [ledger.plugin],
+      });
+      system.start();
+      await new Promise((r) => setTimeout(r, 0));
+      system.facts.cartTotal = 25;
+      await new Promise((r) => setTimeout(r, 0));
+      system.facts.cartTotal = 75;
+      await new Promise((r) => setTimeout(r, 0));
+      ledger.erase({ factPath: "cartTotal" });
+
+      swap = (entries) => {
+        const tomb = entries.findIndex(
+          (e, i) => i > 0 && e.kind === "system.entry-erased",
+        );
+        const before = entries[tomb - 1];
+        if (before) {
+          (before as { kind: string }).kind = "fact.change";
+        }
+      };
+
+      expect(ledger.verify().valid).toBe(false);
+      system.destroy();
+    },
+  );
+
+  it("verify() reports an unknown hashAlgo rather than throwing", () => {
     const sink = memorySink();
     // Genesis entry with a bogus hashAlgo.
     sink.write({
@@ -834,7 +917,14 @@ describe("createAuditLedger — per-subject erase()", () => {
     } as AuditEntry);
 
     const ledger = createAuditLedger({ sink });
-    expect(() => ledger.verify()).toThrow(/unknown hashAlgo/i);
+    // It used to throw. An auditor asking whether a record is intact should
+    // get an answer — and one row written under an algorithm this version does
+    // not know is a reason to say no, not a reason to say nothing.
+    const verdict = ledger.verify();
+    expect(verdict.valid).toBe(false);
+    if (!verdict.valid) {
+      expect(verdict.reason).toMatch(/unknown hashAlgo/i);
+    }
   });
 
   it("erase marker uses filterHash + filterShape — no raw PII", async () => {
@@ -1134,7 +1224,7 @@ describe("createAuditLedger — hashAlgo canonicalization tag", () => {
 // ============================================================================
 
 describe("createAuditLedger — schemaVersion", () => {
-  it("stamps schemaVersion: 1 on every entry", async () => {
+  it("stamps the current schemaVersion on every entry", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -1148,7 +1238,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const entries = ledger.query();
     expect(entries.length).toBeGreaterThan(0);
     for (const e of entries) {
-      expect((e as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((e as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();
@@ -1170,7 +1260,7 @@ describe("createAuditLedger — schemaVersion", () => {
     const tombstones = ledger.query({ kind: "system.entry-erased" });
     expect(tombstones.length).toBeGreaterThan(0);
     for (const t of tombstones) {
-      expect((t as { schemaVersion: number }).schemaVersion).toBe(1);
+      expect((t as { schemaVersion: number }).schemaVersion).toBe(2);
     }
 
     system.destroy();
@@ -1211,16 +1301,25 @@ describe("createAuditLedger — N7 tombstone forgery detection", () => {
       schemaVersion: 1,
       originalKind: "fact.change",
       erasedAt: Date.now(),
-      // NOTE: no `__internal` sentinel — sink consumers cannot reach
-      // the in-module symbol.
+      // NOTE: not written through `ledger.erase()`, so the runtime has no
+      // record of having minted it.
     } as unknown as AuditEntry);
 
     const after = ledger.verify();
-    expect(after.valid).toBe(false);
-    if (!after.valid) {
-      expect(after.reason).toBeDefined();
-      expect(after.reason).toMatch(/tombstone forgery/i);
-      expect(after.reason).toMatch(/sentinel/i);
+    // Named rather than rejected. This used to return `valid: false`, and
+    // that was changed deliberately: the mark saying "the runtime wrote this"
+    // lives in memory against the entry object and does not survive being
+    // stored, so an honest ledger looks identical to a forged one as soon as
+    // its entries have been anywhere. Deciding the verdict on it accused a
+    // live ledger over any persisting sink of forging its own erasures, and
+    // accused a ledger resumed from an export the moment it wrote anything.
+    //
+    // Tampering with an entry's contents still breaks the chain and still
+    // returns `valid: false`. This is the narrower claim that an appended
+    // tombstone cannot be told apart from a recorded one.
+    expect(after.valid).toBe(true);
+    if (after.valid) {
+      expect(after.unmarkedTombstoneSeqs).toContain(99);
     }
 
     system.destroy();
@@ -1338,5 +1437,112 @@ describe("createAuditLedger — erase() 0-match guard", () => {
     expect(after).toBe(before);
 
     system.destroy();
+  });
+});
+
+describe("the ledger does not alter the system it audits", () => {
+  it("leaves a fact's own object untouched", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("obj", {
+      schema: { facts: { user: t.object<{ profile: { email: string } }>() } },
+      init: (facts) => {
+        facts.user = { profile: { email: "a@b.c" } };
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    // Written outside a batch, which is the path the ledger sees today.
+    system.facts.user = { profile: { email: "c@d.e" } };
+    await flushTick();
+
+    // Recording a value must not change it. `freezeEntry` froze whatever it
+    // was handed, and what it was handed was the application's own object — so
+    // installing the audit plugin froze application state, and reading a
+    // nested property then threw a proxy invariant error. An audit control
+    // that breaks the system it audits is not deployable.
+    expect(Object.isFrozen(system.facts.user)).toBe(false);
+    expect(
+      () => (system.facts.user as { profile: { email: string } }).profile,
+    ).not.toThrow();
+
+    system.destroy();
+    ledger.destroy();
+  });
+
+  it("keeps the value it recorded even if the caller mutates theirs afterwards", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("mut", {
+      schema: { facts: { payload: t.object<{ amount: number }>() } },
+      init: (facts) => {
+        facts.payload = { amount: 10 };
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    system.facts.payload = { amount: 10 };
+    await flushTick();
+
+    const held = system.facts.payload as { amount: number };
+    held.amount = 999;
+
+    // The freeze existed to stop exactly this — a value mutated after it was
+    // recorded, changing what the record says. Holding a copy gives that
+    // guarantee without reaching into the caller's object to get it.
+    const row = ledger
+      .query()
+      .find(
+        (e: AuditEntry) =>
+          e.kind === "fact.change" && (e as { key: string }).key === "payload",
+      );
+    expect((row as { next: { amount: number } }).next.amount).toBe(10);
+
+    system.destroy();
+    ledger.destroy();
+  });
+});
+
+describe("an exported ledger verifies", () => {
+  it("survives a JSON round trip", async () => {
+    const ledger = createAuditLedger();
+    const mod = createModule("export", {
+      schema: { facts: { seen: t.number(), unset: t.string() } },
+      init: (facts) => {
+        facts.seen = 0;
+      },
+    });
+    const system = createSystem({ module: mod, plugins: [ledger.plugin] });
+    system.start();
+    await flushTick();
+    // `unset` was never written, so this write's `prior` is `undefined` — the
+    // shape that does not survive `JSON.stringify`.
+    system.facts.unset = "first";
+    await flushTick();
+    system.facts.seen = 50;
+    await flushTick();
+
+    expect(ledger.verify().valid).toBe(true);
+
+    // The chain is hashed over a stable stringification that encodes a
+    // present-but-undefined key; `JSON.stringify` drops it. The first write of
+    // any fact carries `prior: undefined`, so every export re-hashed
+    // differently from the live entry — an auditor exporting the trail was
+    // told it had been altered, by the tool whose whole job is to answer that
+    // question.
+    const exported = JSON.parse(JSON.stringify(ledger.toJSON())) as {
+      entries: AuditEntry[];
+    };
+    const reloaded = memorySink();
+    for (const entry of exported.entries) {
+      reloaded.write(entry);
+    }
+    const replay = createAuditLedger({ sink: reloaded });
+
+    expect(replay.verify().valid).toBe(true);
+
+    system.destroy();
+    ledger.destroy();
+    replay.destroy();
   });
 });

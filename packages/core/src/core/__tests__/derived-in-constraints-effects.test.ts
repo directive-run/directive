@@ -108,7 +108,7 @@ describe("derived in constraints", () => {
       },
       effects: {
         record: {
-          run: (_facts, _prev, derived) => {
+          run: (_facts, _prevFacts, derived) => {
             seen.push(derived.doubled);
           },
         },
@@ -206,7 +206,7 @@ describe("derived in effects", () => {
         onParity: {
           // No `deps` — the read through `derived` is what records the
           // dependency, exactly as it does inside a derivation body.
-          run: (_facts, _prev, derived) => {
+          run: (_facts, _prevFacts, derived) => {
             run(derived.isEven);
           },
         },
@@ -234,8 +234,8 @@ describe("derived in effects", () => {
     system.stop();
   });
 
-  it("leaves `prev` in the second position", async () => {
-    const observed: Array<{ prev: unknown; derived: unknown }> = [];
+  it("leaves `prevFacts` in the second position", async () => {
+    const observed: Array<{ prevFacts: unknown; derived: unknown }> = [];
 
     const module = createModule("ordering", {
       schema: {
@@ -250,8 +250,11 @@ describe("derived in effects", () => {
       },
       effects: {
         record: {
-          run: (_facts, prev, derived) => {
-            observed.push({ prev: prev?.n, derived: derived.doubled });
+          run: (_facts, prevFacts, derived) => {
+            observed.push({
+              prevFacts: prevFacts?.n,
+              derived: derived.doubled,
+            });
           },
         },
       },
@@ -264,7 +267,7 @@ describe("derived in effects", () => {
     system.facts.n = 4;
     await system.settle();
 
-    expect(observed.at(-1)).toEqual({ prev: 1, derived: 8 });
+    expect(observed.at(-1)).toEqual({ prevFacts: 1, derived: 8 });
 
     system.stop();
   });
@@ -312,7 +315,7 @@ describe("derived is an object", () => {
       },
       effects: {
         record: {
-          run: (_facts, _prev, derived) => {
+          run: (_facts, _prevFacts, derived) => {
             probe = {
               has: "doubled" in derived,
               missing: "nope" in derived,
@@ -354,7 +357,7 @@ describe("derived is an object", () => {
       derive: { own: (facts) => facts.n },
       effects: {
         record: {
-          run: (_facts, _prev, derived) => {
+          run: (_facts, _prevFacts, derived) => {
             keys = Object.keys(derived);
           },
         },
@@ -384,7 +387,7 @@ describe("derived is an object", () => {
       derive: { v: (facts) => facts.n },
       effects: {
         record: {
-          run: (_facts, _prev, derived) => {
+          run: (_facts, _prevFacts, derived) => {
             probe = {
               proto: Object.getPrototypeOf(derived),
               polluted: "__proto__" in derived,

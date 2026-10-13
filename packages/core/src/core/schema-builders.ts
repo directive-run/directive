@@ -8,7 +8,6 @@
  */
 
 import isDevelopment from "#is-development";
-import type { SchemaKindNode } from "./schema-introspection.js";
 import type { SchemaType } from "./types.js";
 
 // ============================================================================
@@ -35,13 +34,6 @@ export interface ExtendedSchemaType<T> extends SchemaType<T> {
   _lastFailedIndex?: number;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   readonly _meta?: import("./types/meta.js").DefinitionMeta;
-  /**
-   * Structured kind discriminant used by introspection-time consumers
-   * (`predicateFromIntent`, `doctor`, `predicateToZod`). Optional for
-   * back-compat with legacy / third-party builders; when absent, the
-   * introspection layer parses `_typeName` instead.
-   */
-  readonly _kind?: SchemaKindNode;
 }
 
 /** Create a schema type builder with optional type name */
@@ -91,6 +83,51 @@ export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   optional(): ChainableSchemaType<T | undefined>;
   /** Attach metadata for debugging and devtools. */
   meta(meta: import("./types/meta.js").DefinitionMeta): ChainableSchemaType<T>;
+}
+
+/**
+ * The chainable types the builders return.
+ *
+ * Declared here at module scope rather than inside each builder, and that
+ * placement is load-bearing. These types are recursive — `minLength` returns the
+ * same chainable type — and a recursive type declared *inside* a function has no
+ * name the declaration emitter can reference. The bundled `.d.ts` then emitted the
+ * recursive position as `ChainableSchemaType<T> & any`, which is `any`, so a
+ * consumer who tightened a fact with `t.number().min(0)` silently lost the fact's
+ * type and the type of everything reading it. The source was correct throughout,
+ * which is why no test running against `src/` could see it.
+ *
+ * Covered by `packages/core/__tests__/dist-types.test.ts`, which typechecks
+ * against the built declarations the way a consumer does.
+ */
+export interface ChainableStringType<T extends string>
+  extends ChainableSchemaType<T> {
+  minLength(n: number): ChainableStringType<T>;
+  maxLength(n: number): ChainableStringType<T>;
+  pattern(regex: RegExp): ChainableStringType<T>;
+  meta(m: import("./types/meta.js").DefinitionMeta): ChainableStringType<T>;
+}
+
+export interface ChainableNumberType extends ChainableSchemaType<number> {
+  min(n: number): ChainableNumberType;
+  max(n: number): ChainableNumberType;
+  meta(m: import("./types/meta.js").DefinitionMeta): ChainableNumberType;
+}
+
+export interface ChainableArrayType<T> extends ChainableSchemaType<T[]> {
+  of(elementType: SchemaType<T>): ChainableArrayType<T>;
+  nonEmpty(): ChainableArrayType<T>;
+  maxLength(n: number): ChainableArrayType<T>;
+  minLength(n: number): ChainableArrayType<T>;
+  meta(m: import("./types/meta.js").DefinitionMeta): ChainableArrayType<T>;
+  _lastFailedIndex?: number;
+}
+
+export interface ChainableObjectType<T> extends ChainableSchemaType<T> {
+  shape(schema: { [K in keyof T]?: SchemaType<T[K]> }): ChainableObjectType<T>;
+  nonNull(): ChainableObjectType<T>;
+  hasKeys(...keys: string[]): ChainableObjectType<T>;
+  meta(m: import("./types/meta.js").DefinitionMeta): ChainableObjectType<T>;
 }
 
 /** Create a chainable schema type with common methods */
@@ -301,12 +338,7 @@ export const t = {
    * ```
    */
   string<T extends string = string>() {
-    type ChainableString = ChainableSchemaType<T> & {
-      minLength(n: number): ChainableString;
-      maxLength(n: number): ChainableString;
-      pattern(regex: RegExp): ChainableString;
-      meta(m: import("./types/meta.js").DefinitionMeta): ChainableString;
-    };
+    type ChainableString = ChainableStringType<T>;
 
     const createChainableString = (
       validators: Array<(v: T) => boolean>,
@@ -432,11 +464,7 @@ export const t = {
    * ```
    */
   number() {
-    type ChainableNumber = ChainableSchemaType<number> & {
-      min(n: number): ChainableNumber;
-      max(n: number): ChainableNumber;
-      meta(m: import("./types/meta.js").DefinitionMeta): ChainableNumber;
-    };
+    type ChainableNumber = ChainableNumberType;
 
     const createChainableNumber = (
       validators: Array<(v: number) => boolean>,
@@ -554,14 +582,7 @@ export const t = {
    * - `t.array<string>().of(t.string())` - With element validation
    */
   array<T>() {
-    type ChainableArray = ChainableSchemaType<T[]> & {
-      of(elementType: SchemaType<T>): ChainableArray;
-      nonEmpty(): ChainableArray;
-      maxLength(n: number): ChainableArray;
-      minLength(n: number): ChainableArray;
-      meta(m: import("./types/meta.js").DefinitionMeta): ChainableArray;
-      _lastFailedIndex?: number;
-    };
+    type ChainableArray = ChainableArrayType<T>;
 
     const createChainableArray = (
       validators: Array<(v: T[]) => boolean>,
@@ -687,12 +708,7 @@ export const t = {
    * For arrays, prefer `t.array<T>()` which adds `Array.isArray` validation.
    */
   object<T>() {
-    type ChainableObject = ChainableSchemaType<T> & {
-      shape(schema: { [K in keyof T]?: SchemaType<T[K]> }): ChainableObject;
-      nonNull(): ChainableObject;
-      hasKeys(...keys: string[]): ChainableObject;
-      meta(m: import("./types/meta.js").DefinitionMeta): ChainableObject;
-    };
+    type ChainableObject = ChainableObjectType<T>;
 
     const createChainableObject = (
       validators: Array<(v: T) => boolean>,

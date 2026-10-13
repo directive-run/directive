@@ -1,5 +1,5 @@
 /**
- * createQuery — Generate constraint/resolver/effect fragments for declarative data fetching.
+ * createQuery — Generate constraint/resolver/source fragments for declarative data fetching.
  *
  * Takes a QueryOptions config and returns a QueryDefinition containing
  * fragments that merge into a module via `withQueries`.
@@ -12,7 +12,11 @@
 
 import {
   PREFIX,
+  type QueryPublish,
+  buildEvent,
   buildKey,
+  domEventSource,
+  intervalSource,
   replaceEqualDeep,
   serializeKey,
 } from "./internal.js";
@@ -191,6 +195,34 @@ export function createQuery<
     return false;
   }
 
+  // ---- Events from the outside world ----
+
+  const focusedEvent = buildEvent(name, "FOCUSED");
+  const onlineEvent = buildEvent(name, "ONLINE");
+  const pollEvent = buildEvent(name, "POLL_TICK");
+  const expiredEvent = buildEvent(name, "EXPIRED");
+  const expiresCache =
+    expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY;
+
+  /** Whether a focus or reconnect should refetch, given the option's value. */
+  function refetchesOn(
+    option: boolean | "always",
+    facts: Record<string, unknown>,
+  ): boolean {
+    const state = facts[stateKey] as ResourceState<TData, TError> | undefined;
+    if (!state) {
+      return false;
+    }
+
+    return (
+      option === "always" ||
+      refetchAfter === 0 ||
+      (state.dataUpdatedAt !== null &&
+        refetchAfter > 0 &&
+        Date.now() - state.dataUpdatedAt >= refetchAfter)
+    );
+  }
+
   // ---- Build the definition ----
 
   const definition: QueryDefinition<TData> = {
@@ -208,6 +240,12 @@ export function createQuery<
       },
       derivations: {
         [name]: { _type: null as unknown },
+      },
+      events: {
+        ...(refetchOnWindowFocus ? { [focusedEvent]: {} } : {}),
+        ...(refetchOnReconnect ? { [onlineEvent]: {} } : {}),
+        ...(refetchInterval ? { [pollEvent]: {} } : {}),
+        ...(expiresCache ? { [expiredEvent]: {} } : {}),
       },
     },
 
@@ -357,174 +395,164 @@ export function createQuery<
       },
     },
 
-    effects: {
-      // Window focus refetch
+    // Focus, reconnect, polling and cache expiry arrive from outside, so they
+    // are sources that publish events; the handlers below turn them into
+    // facts. Sources attach at start, detach at stop, and never re-attach on
+    // a history rewind.
+    effects: {},
+
+    sources: {
       ...(refetchOnWindowFocus
         ? {
-            [`${PREFIX}${name}_focus`]: {
-              run: (facts: Record<string, unknown>) => {
-                if (typeof document === "undefined") {
-                  return;
-                }
-
-                const handler = () => {
-                  if (document.hidden) {
-                    return;
-                  }
-                  const state = facts[stateKey] as
-                    | ResourceState<TData, TError>
-                    | undefined;
-                  if (!state) {
-                    return;
-                  }
-                  const shouldRefetch =
-                    refetchOnWindowFocus === "always" ||
-                    refetchAfter === 0 ||
-                    (state.dataUpdatedAt !== null &&
-                      refetchAfter > 0 &&
-                      Date.now() - state.dataUpdatedAt >= refetchAfter);
-                  if (shouldRefetch) {
-                    facts[triggerKey] = Date.now();
-                  }
-                };
-
-                document.addEventListener("visibilitychange", handler);
-
-                return () =>
-                  document.removeEventListener("visibilitychange", handler);
-              },
-            },
+            [`${PREFIX}${name}_focus`]: domEventSource(
+              "document",
+              "visibilitychange",
+              focusedEvent,
+              () => !document.hidden,
+            ),
           }
         : {}),
 
-      // Network reconnect refetch
       ...(refetchOnReconnect
         ? {
-            [`${PREFIX}${name}_online`]: {
-              run: (facts: Record<string, unknown>) => {
-                if (typeof window === "undefined") {
-                  return;
-                }
-
-                const handler = () => {
-                  const state = facts[stateKey] as
-                    | ResourceState<TData, TError>
-                    | undefined;
-                  if (!state) {
-                    return;
-                  }
-                  const shouldRefetch =
-                    refetchOnReconnect === "always" ||
-                    refetchAfter === 0 ||
-                    (state.dataUpdatedAt !== null &&
-                      refetchAfter > 0 &&
-                      Date.now() - state.dataUpdatedAt >= refetchAfter);
-                  if (shouldRefetch) {
-                    facts[triggerKey] = Date.now();
-                  }
-                };
-
-                window.addEventListener("online", handler);
-
-                return () => window.removeEventListener("online", handler);
-              },
-            },
+            [`${PREFIX}${name}_online`]: domEventSource(
+              "window",
+              "online",
+              onlineEvent,
+            ),
           }
         : {}),
 
-      // Polling
+      // Polling. A static interval runs while the query has a key. A
+      // function interval is part of the source's key, so a new interval
+      // re-arms the timer and a falsy one stops it.
       ...(refetchInterval
         ? {
-            [`${PREFIX}${name}_poll`]: {
-              run: (facts: Record<string, unknown>) => {
-                if (typeof refetchInterval === "function") {
-                  // Dynamic interval — use setTimeout chain so interval re-evaluates after each tick
-                  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-                  let stopped = false;
+            [`${PREFIX}${name}_poll`]:
+              typeof refetchInterval === "function"
+                ? {
+                    key: (facts: Record<string, unknown>) => {
+                      if (keyFn(facts) === null) {
+                        return null;
+                      }
+                      const state = facts[stateKey] as
+                        | ResourceState<TData, TError>
+                        | undefined;
+                      const ms = refetchInterval(state?.data ?? undefined);
 
-                  const tick = () => {
-                    if (stopped) {
-                      return;
-                    }
-                    const ms = refetchInterval(
-                      (facts[stateKey] as ResourceState<TData, TError>)?.data ??
-                        undefined,
-                    );
-                    if (!ms) {
-                      return;
-                    }
-                    timeoutId = setTimeout(() => {
-                      facts[triggerKey] = Date.now();
-                      tick();
-                    }, ms as number);
-                  };
+                      return ms && ms > 0 ? String(ms) : null;
+                    },
+                    attach: (
+                      publish: QueryPublish,
+                      _reportError: unknown,
+                      ctx?: { readonly key: string },
+                    ) =>
+                      intervalSource(Number(ctx!.key), pollEvent).attach(
+                        publish,
+                        () => undefined,
+                      ),
+                  }
+                : {
+                    active: (facts: Record<string, unknown>) =>
+                      keyFn(facts) !== null,
+                    ...intervalSource(refetchInterval as number, pollEvent),
+                  },
+          }
+        : {}),
 
-                  tick();
-
-                  return () => {
-                    stopped = true;
-                    if (timeoutId) {
-                      clearTimeout(timeoutId);
-                    }
-                  };
+      // Cache expiration. Open while the query is idle (no key) and holds
+      // successful data, keyed by when that data arrived: one timer, set for
+      // the moment the data expires. A new fetch re-keys it; a key coming
+      // back closes it.
+      ...(expiresCache
+        ? {
+            [`${PREFIX}${name}_gc`]: {
+              key: (facts: Record<string, unknown>) => {
+                // Cheap checks first: while the query has a key, or has already
+                // expired, the cached state is never read.
+                if (keyFn(facts) !== null || facts[triggerKey] === -1) {
+                  return null;
+                }
+                const state = facts[stateKey] as
+                  | ResourceState<TData, TError>
+                  | undefined;
+                if (
+                  !state ||
+                  state.status !== "success" ||
+                  !state.dataUpdatedAt
+                ) {
+                  return null;
                 }
 
-                // Static interval
-                if (!refetchInterval) {
-                  return;
-                }
+                return String(state.dataUpdatedAt);
+              },
+              attach: (
+                publish: QueryPublish,
+                _reportError: unknown,
+                ctx?: { readonly key: string },
+              ) => {
+                const expiresAt = Number(ctx!.key) + expireAfter;
+                const timer = setTimeout(
+                  () => publish(expiredEvent, { at: ctx!.key }),
+                  Math.max(0, expiresAt - Date.now()),
+                );
 
-                const timer = setInterval(() => {
-                  facts[triggerKey] = Date.now();
-                }, refetchInterval as number);
-
-                return () => clearInterval(timer);
+                return () => clearTimeout(timer);
               },
             },
           }
         : {}),
+    },
 
-      // Cache expiration (garbage collection)
-      // Uses a polling effect that checks if the query has been idle too long.
-      // When it detects expiry, writes triggerKey = -1 which buildResourceState
-      // interprets as "return idle state".
-      ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
+    events: {
+      ...(refetchOnWindowFocus
         ? {
-            [`${PREFIX}${name}_gc`]: {
-              run: (facts: Record<string, unknown>) => {
-                // Read state to track it as a dependency — effect re-runs when state changes
-                void facts[stateKey];
-
-                // Poll periodically to check if idle data has expired
-                const checkInterval = Math.min(expireAfter, 5000);
-                const interval = setInterval(() => {
-                  // Only expire if query has success data
-                  const currentState = facts[stateKey] as
-                    | ResourceState<TData, TError>
-                    | undefined;
-                  if (
-                    !currentState ||
-                    currentState.status !== "success" ||
-                    !currentState.dataUpdatedAt
-                  ) {
-                    return;
-                  }
-
-                  // Check if the query key is currently null (idle)
-                  const currentKeyVal = keyFn(facts);
-                  if (currentKeyVal !== null) {
-                    return;
-                  }
-
-                  // Check if expiry time has passed
-                  if (Date.now() - currentState.dataUpdatedAt >= expireAfter) {
-                    facts[triggerKey] = -1;
-                    facts[keyKey] = null;
-                  }
-                }, checkInterval);
-
-                return () => clearInterval(interval);
-              },
+            [focusedEvent]: (facts: Record<string, unknown>) => {
+              if (refetchesOn(refetchOnWindowFocus, facts)) {
+                facts[triggerKey] = Date.now();
+              }
+            },
+          }
+        : {}),
+      ...(refetchOnReconnect
+        ? {
+            [onlineEvent]: (facts: Record<string, unknown>) => {
+              if (refetchesOn(refetchOnReconnect, facts)) {
+                facts[triggerKey] = Date.now();
+              }
+            },
+          }
+        : {}),
+      ...(refetchInterval
+        ? {
+            [pollEvent]: (facts: Record<string, unknown>) => {
+              facts[triggerKey] = Date.now();
+            },
+          }
+        : {}),
+      ...(expiresCache
+        ? {
+            [expiredEvent]: (
+              facts: Record<string, unknown>,
+              event: Record<string, unknown>,
+            ) => {
+              // The timer decides when; this only confirms the event is about
+              // the data still held. A timer may fire a millisecond before
+              // Date.now() agrees, so elapsed time is not re-checked.
+              const state = facts[stateKey] as
+                | ResourceState<TData, TError>
+                | undefined;
+              if (
+                !state ||
+                state.status !== "success" ||
+                !state.dataUpdatedAt ||
+                keyFn(facts) !== null ||
+                String(state.dataUpdatedAt) !== event.at
+              ) {
+                return;
+              }
+              facts[triggerKey] = -1;
+              facts[keyKey] = null;
             },
           }
         : {}),

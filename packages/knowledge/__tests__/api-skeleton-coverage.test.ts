@@ -18,10 +18,20 @@
  * always current: the type declarations this repository just built. Every
  * public export has to appear as an entry.
  *
- * The gaps that exist today are listed rather than fixed. Fixing them means
- * changing what the extractor emits, and that lives in the docs repository.
- * Listing them makes the set a ratchet: it can shrink without touching this
- * file, and it cannot grow.
+ * There is no allow-list, and there was. Sixty-odd exports the extractor does
+ * not emit were recorded here as known gaps, on the reasoning that fixing them
+ * meant changing the extractor in the docs repository. That reasoning had a hole
+ * in it: `api-reference.json` is fetched from *the release before the one being
+ * cut*, so an export added in this release can never be in it — which made this
+ * test fail on exactly the releases doing the most, and offered two remedies,
+ * both wrong. Hand-editing a generated file is overwritten by the next build.
+ * Adding a name to a list of things "not meant to be documented" is false of
+ * every one of them.
+ *
+ * The generator names them instead, under a heading that says the description is
+ * still coming. So the roster is complete by construction, this test has nothing
+ * to excuse, and what it still catches is the thing it was written for: a
+ * skeleton committed without being regenerated.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -61,83 +71,6 @@ function publicExports(dtsPath: string): string[] {
   return [...names];
 }
 
-/**
- * Exports with no entry in the skeleton as of 2026-08-13, at core 1.27.0.
- *
- * Not an approval — a record of what the extractor does not emit today. Most
- * are types re-exported from a subpath (the audit ledger, the predicate
- * translators, the AI transports) plus a handful of surprising ones: `System`
- * and `doctor` are as public as anything in the library.
- *
- * The test fails if a name leaves this list without being documented, so the
- * list cannot quietly outlive the gap it describes.
- */
-const KNOWN_GAPS: Readonly<Record<"core" | "ai", readonly string[]>> = {
-  core: [
-    "AuditEntry",
-    "AuditEntryKind",
-    "AuditLedger",
-    "AuditLedgerOptions",
-    "AuditLedgerSink",
-    "CheckAgainstResult",
-    "ConstraintDiff",
-    "Contradiction",
-    "ContradictionType",
-    "DiffRulesOptions",
-    "PredicateToMongoOptions",
-    "PredicateToPostgrestOptions",
-    "PredicateToSqlOptions",
-    "PredicateToSqlResult",
-    "PredictMissingChange",
-    "PredictResult",
-    "QueryFilter",
-    "ReplayUnderOptions",
-    "RulesDiffReport",
-    "SchemaValidationError",
-    "SchemaValidationOptions",
-    "SourceDef",
-    "SourceDefinition",
-    "SweepReport",
-    "SweepUnderOptions",
-    "System",
-    "TimerFactOpts",
-    "TypedDerivationsDefinition",
-    "doctor",
-  ],
-  ai: [
-    "BatchQueue",
-    "BatchQueueConfig",
-    "BudgetConfig",
-    "BudgetExceededDetails",
-    "ConstraintRouterConfig",
-    "FactPIIGuardrailOptions",
-    "FallbackConfig",
-    "GoalCheckpointConfig",
-    "JSONFileStoreOptions",
-    "MermaidDirection",
-    "MermaidNodeShapes",
-    "MermaidOptions",
-    "PredicateFromIntentDiagnostics",
-    "PredicateFromIntentOptions",
-    "PredicateFromIntentProvenance",
-    "PredicateFromIntentWithProvenanceResult",
-    "PredicateToolSpec",
-    "PredicateToolSpecOptions",
-    "ProviderStats",
-    "RAGEnrichOptions",
-    "RAGEnricher",
-    "RAGEnricherConfig",
-    "SSEEvent",
-    "SSETransport",
-    "SSETransportConfig",
-    "SafeParseResult",
-    "SourcesOtelOptions",
-    "StructuredOutputConfig",
-    "parseHttpStatus",
-    "predicateToolSpec",
-  ],
-};
-
 const PACKAGES = [
   { key: "core" as const, dts: join(REPO, "packages/core/dist/index.d.ts") },
   { key: "ai" as const, dts: join(REPO, "packages/ai/dist/index.d.ts") },
@@ -162,7 +95,6 @@ describe("api-skeleton describes the code in this repository", () => {
 
         const undocumented = publicExports(dts)
           .filter((name) => !documented(name))
-          .filter((name) => !KNOWN_GAPS[key].includes(name))
           .sort();
 
         expect(
@@ -173,22 +105,8 @@ describe("api-skeleton describes the code in this repository", () => {
             "sibling directive-docs checkout pinned to an older core.\n\n" +
             "Regenerate against a current api-reference.json:\n" +
             "  pnpm --filter @directive-run/knowledge generate\n\n" +
-            "If the export is genuinely not meant to be documented, add it to KNOWN_GAPS\n" +
-            "in this file with a reason.",
-        ).toEqual([]);
-      });
-
-      it("has no stale entries in its known-gap list", () => {
-        const skeleton = readFileSync(SKELETON, "utf-8");
-        const nowDocumented = KNOWN_GAPS[key].filter((name) =>
-          new RegExp(`\`${name}\``).test(skeleton),
-        );
-
-        expect(
-          nowDocumented,
-          "These names are listed as undocumented but now have entries. Remove them " +
-            "from KNOWN_GAPS — a list that outlives the gap it describes stops being " +
-            "a record of debt and starts being a place where new gaps hide.",
+            "Every public export is named, so a miss here means the committed skeleton\n" +
+            "is older than the declarations beside it.",
         ).toEqual([]);
       });
     });

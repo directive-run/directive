@@ -1,5 +1,753 @@
 # @directive-run/core
 
+## 1.34.1
+
+### Patch Changes
+
+- [`1448b68`](https://github.com/directive-run/directive/commit/1448b6816da5d79ff35534c8d3ba68ce7f51218e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Chaining a validator no longer erases the fact's type
+
+  `t.number().min(0)`, `t.string().minLength(1)`, `t.array<T>().nonEmpty()` and
+  `t.object<T>().hasKeys(...)` returned `any` in the published declarations, so
+  tightening a fact with a validator silently removed static checking from that fact
+  and from every derivation, constraint and resolver reading it.
+
+  The chainable types are recursive and were declared inside their builder
+  functions, where the declaration emitter has no name to reference — it emitted the
+  recursive return as an intersection with `any`. They are now module-scope
+  interfaces. The runtime never changed; only the emitted types were wrong, which is
+  why the source type-checked and every existing test passed.
+
+  Adds `packages/core/__tests__/dist-types.test.ts`, which type-checks a fixture
+  against the built `dist/index.d.ts` the way a consumer does. Tests that run
+  against `src/` cannot see this class of defect.
+
+- [`4c2289b`](https://github.com/directive-run/directive/commit/4c2289b62e61bdc62365206376b16daf2755b2b4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A `Map`, `Set`, `Date` or class instance stored in a fact stays usable in
+  development mode. The nested mutation warning proxy wrapped every nested object,
+  and a method called on a wrapped `Set` throws "called on incompatible receiver"
+  because its contents live in an internal slot rather than in properties — so the
+  wrapper bought no warning and cost the object's own API. Only plain objects and
+  arrays are wrapped now; the warning is unchanged for them.
+
+- [`cce0b99`](https://github.com/directive-run/directive/commit/cce0b99858773172fc36e98a6cf3b1a308deb036) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A frozen value stored in a fact can be read back in development mode. The nested
+  mutation warning proxy returned a wrapper for every nested object, which a Proxy
+  may not do for a non-configurable, non-writable property — so reading anything
+  under an `Object.freeze` threw a TypeError in development and worked in
+  production, where the wrapper is tree-shaken away.
+
+- [`b44e6e2`](https://github.com/directive-run/directive/commit/b44e6e2fddfb123bd7cd604f787e9815ac1cea29) Thanks [@jasoncomes](https://github.com/jasoncomes)! - An interface can now be used as an event or requirement payload
+
+  `events: { go: {} as Payload }` silently voided a module's entire schema when
+  `Payload` was declared as an `interface` rather than a type alias — every fact
+  became `unknown`, every event possibly undefined, with no error at the payload
+  declaration and a pile of them in consumer files describing symptoms.
+
+  TypeScript grants an implicit index signature to an object type alias and never to
+  an interface, so an interface failed the `Record<string, unknown>` constraint and
+  `createModule` fell through to the overload where the schema widens to its base
+  type. The value type in that constraint was already `unknown`, so the record bought
+  nothing but the index signature; `EventPayloadSchema` and `RequirementPayloadSchema`
+  are now `object`.
+
+  Also exports `ChainableStringType`, `ChainableNumberType`, `ChainableArrayType` and
+  `ChainableObjectType` from the package entry. They became nameable types in a
+  consumer's own declaration output in the previous patch, and a consumer building
+  with `declaration: true` could not name them.
+
+- [`c528613`](https://github.com/directive-run/directive/commit/c5286133a59c3ccf2d3bf117a612cd4f266043fa) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Read cost of an object fact no longer grows with the number of writes
+
+  Updating an object fact the ordinary way — `facts.map = { ...facts.map, k: v }` —
+  copies the development-mode warning wrapper the store just handed back into the
+  new object. Reading it again wrapped the wrapper, so every update added a Proxy
+  layer: read cost grew with the number of writes and the whole chain stayed live.
+
+  An eight-key map measured 38 ms for 5,000 full reads after 8 writes, 1,400 ms
+  after 48, and 8,164 ms after 108. After the fix, 13 ms at every point.
+
+  Both wrap sites now return a value that is already wrapped instead of wrapping it
+  again. Production builds were never affected — the wrapper only exists in
+  development — but development is where the slowdown looked like a bug in the
+  consumer's own code.
+
+## 1.34.0
+
+### Minor Changes
+
+- [`49e5de5`](https://github.com/directive-run/directive/commit/49e5de5b462200c9e88d80b64c9ee4096dc76039) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Modules can now be removed from a running system with `system.unregisterModule(name)`
+
+  A system's module set could grow at runtime but never shrink. `registerModule` shipped a while
+  back; there was no way to undo it, so every module registered was permanent for the life of the
+  system. That made a whole family of patterns unbuildable — anything where instances come and go.
+  A representative unit repeated N times, a per-match or per-turn module opened and closed as play
+  moves on, a detailed submodel swapped in while you look at something closely and dropped when you
+  look away. Each of those needs instances to retire, and the only workaround was a registry of
+  manually disabled modules shadowing the real one, which is a second source of truth by another name.
+
+  ```ts
+  await system.unregisterModule("turn:42");
+  system.registerModule("turn:43", createTurnModule({ id: 43 }));
+  ```
+
+  Teardown runs in the reverse order of registration, and the order matters. Sources detach first so
+  nothing new arrives mid-teardown. Resolvers go next, because an in-flight one holds a facts proxy
+  over keys that are about to stop existing. Constraints come before derivations so nothing recomputes
+  a value on its way out. Facts go last.
+
+  In-flight resolvers are aborted through `context.signal`. A resolver that watches the signal stops
+  promptly; one that ignores it runs to completion and its writes land nowhere, since the facts are
+  gone. The returned promise settles once that work has genuinely finished rather than merely been
+  told to stop — those are different moments, and the later one is what a caller registering a
+  replacement under the same name actually needs.
+
+  Batched resolvers are included in both halves of that: an in-flight batch is aborted and waited for,
+  not skipped. The wait is bounded at ten seconds — a resolver that ignores its signal and never
+  settles would otherwise hang the call forever, and detaching has already happened by then, so giving
+  up on the wait costs nothing but the orphaned work. A write from a resolver that outlived its module
+  is dropped rather than applied, so it cannot resurrect a fact with no schema entry and no tags, and
+  cannot reach whatever instance took the name next.
+
+  A module's `hooks.onStop` throwing is reported and does not abort the unregister. It runs after
+  teardown, so letting it escape would leave a namespace that could be neither unregistered again nor
+  registered again.
+
+  Two smaller additions come with it. `system.observe()` gains `module.registered` and
+  `module.unregistered` events, which carry the module boundary that a stream of individual definition
+  events cannot express — replay needs to know where one instance ended and the next began. And
+  plugins gain matching `onModuleRegistered` / `onModuleUnregistered` hooks.
+
+  Registering a module again under a name that was previously unregistered works, including with a
+  freshly built schema. The declaration is removed on unregister rather than merely the values,
+  because a fact's type and its tags are fixed once registered and leaving a stale declaration behind
+  would make re-registration throw — the one thing this API exists to allow.
+
+### Patch Changes
+
+- [`1ab02c2`](https://github.com/directive-run/directive/commit/1ab02c2aa712c7c56083ce8823b7475d1bcc9a55) Thanks [@jasoncomes](https://github.com/jasoncomes)! - History snapshots no longer alias live state, and no longer drop facts they can capture
+
+  Snapshot serialization degraded through three tiers in silence — `structuredClone`,
+  then `JSON.parse(JSON.stringify(…))`, then a shallow spread — with both fallbacks
+  behind bare `catch` blocks.
+
+  The last tier was the problem. A shallow copy aliases every nested object, so
+  mutating a fact after a snapshot had been taken rewrote the snapshot too. Time
+  travel then showed a past that never happened, which is worse than refusing to
+  record one: an operator comparing two points in history was handed a difference
+  manufactured by the act of reading it.
+
+  Reaching that tier needed two hostile values at once — something `structuredClone`
+  rejects, such as a function, and something `JSON.stringify` rejects, such as a
+  bigint — which is why it went unnoticed.
+
+  The snapshot is now built one fact at a time, so a value that refuses to clone
+  costs only itself, and there is no shallow-copy tier at all.
+
+  **A development-only defect surfaced while fixing it, and mattered more.** In dev
+  every object-valued fact is read through a Proxy that warns about nested mutation.
+  The immutable update the docs recommend — `facts.doc = { ...facts.doc, title }` —
+  reads each nested value through that Proxy and spreads the results, so the wrappers
+  end up _stored_. `structuredClone` refuses a Proxy, so an ordinary fact holding a
+  string and a `Date` became uncapturable, was omitted from every snapshot, and was
+  never restored: `goBack` rewound some facts and not others. Snapshots now unwrap
+  those wrappers before cloning, on the fallback path only, so it costs nothing when
+  cloning already works.
+
+  A fact that genuinely cannot be cloned is left out and reported once, naming it:
+
+  ```
+  [Directive] These facts cannot be captured in history and are omitted from
+  snapshots: connection. Restoring leaves them at their current values.
+  ```
+
+  Two limits worth stating plainly. The report covers a value that fails to clone
+  whole; loss _inside_ a value — a nested function dropped by the JSON tier, a
+  nested `Map` flattened to `{}` — is still silent. And class instances are not
+  affected by any of this: they clone successfully into prototype-stripped plain
+  objects, so they never reach this path. The engine already warns about
+  class-instance facts where they are written, which is the right place for it.
+
+- [`20fe678`](https://github.com/directive-run/directive/commit/20fe678433aaaf8dcc5e9b9d3b3744a3380f1eb7) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Effects no longer copy every fact on every pass when nothing reads `prevFacts`
+
+  An effect's second parameter, `prevFacts`, was built by copying the entire fact
+  store once per reconciliation pass — whether or not a single effect took a second
+  parameter. Most effects only read `facts`, and they paid for the copy anyway.
+
+  The cost scaled with the size of the whole system rather than with the effects in
+  it, which made it the dominant per-pass cost at scale and put a ceiling on how
+  many facts a system could hold before reconciliation stopped fitting in a frame.
+
+  Measured, per pass, comparing an effect declared `(facts)` against the same effect
+  declared `(facts, prevFacts)`:
+
+  | facts  | reads prevFacts | does not | saved per pass |
+  | ------ | --------------- | -------- | -------------- |
+  | 500    | 0.045 ms        | 0.014 ms | 0.03 ms        |
+  | 5,000  | 0.311 ms        | 0.009 ms | 0.30 ms        |
+  | 20,000 | 1.502 ms        | 0.015 ms | 1.49 ms        |
+  | 50,000 | 5.344 ms        | 0.007 ms | 5.34 ms        |
+
+  The saving is quoted rather than a ratio on purpose: the second column is small
+  enough that a ratio would be reporting measurement noise as precision. What
+  matters is its shape, not its size — it is flat. Effects that do not read
+  `prevFacts` now cost the same per pass whether the system holds five hundred
+  facts or fifty thousand, so the per-pass cost stops scaling with the size of the
+  system and starts scaling with the effects in it.
+
+  This applies to composed systems as well as single-module ones. The namespace
+  transform wraps every effect in a three-parameter function, so the wrapper now
+  records whether the effect inside it reads `prevFacts` — otherwise every
+  namespaced effect would look like a reader, and systems built from several
+  modules, which hold the most facts, would have been the ones to get nothing.
+
+  Nothing changes for effects that do read it. Detection is deliberately pessimistic
+  because arity alone cannot answer the question — `Function.length` stops counting
+  at the first default or rest parameter, so it reports one for
+  `(facts, prevFacts = null) => …` and zero for `(...args) => …`, and both read
+  `prevFacts`. When arity is inconclusive the parameter list is read from the
+  function source, and any answer that cannot be reached confidently is "yes". A
+  snapshot nobody reads costs time; a skipped snapshot somebody reads is a wrong
+  value in a place that looks like a comparison against history, and those are not
+  symmetric.
+
+  An effect using a data `on` gate always gets a real snapshot, since the runtime
+  hands the gate `prevFacts` itself. An effect registered after the system is
+  running also gets one immediately rather than on its second pass — for a gate
+  that matters more than a wrong value, because the predicate runtime reads an
+  absent previous state as "everything changed", which would fire a `$changed`
+  gate on a fact that had not changed.
+
+## 1.33.1
+
+### Patch Changes
+
+- [`80f0f20`](https://github.com/directive-run/directive/commit/80f0f20f31a9d435f75da0d271b06aba67f9f282) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Writing a fact into a worker system works.** `SET_FACT` and `SET_FACTS` threw
+  for every worker system, which means the main thread could not write to a worker
+  at all — `workerClient.setFact()` and `.setFacts()` were both dead.
+
+  A worker always builds a namespaced system, whose top-level facts object exposes
+  a namespace per module and correctly refuses a flat `module::fact` assignment,
+  since that name belongs to a module rather than to the system. It was being
+  assigned flat anyway, so the proxy rejected it. `setFacts` probed for a store on
+  the same object, did not find one, and fell through to the same failing path.
+
+  Writes now go through the module that owns the fact, and `setFacts` applies them
+  in one batch so a set of facts that belong together arrive together. A key naming
+  no module reports that rather than being dropped — these arrive from the far side
+  of a thread boundary, where a typo has nothing else to announce it.
+
+## 1.33.0
+
+### Minor Changes
+
+- [`4d2bc0d`](https://github.com/directive-run/directive/commit/4d2bc0da3d7ba7429058217d6ced18b78a9ae227) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **The testing utilities and the worker adapter now see writes made inside a
+  batch.** They were the last two consumers watching only the unbatched hook, and
+  nearly every write a running system makes is batched: event handlers, effects,
+  resolvers before their first `await`, the opening state, and every history
+  navigation.
+
+  **`assertFactChanges` was under-reporting.** A fact that changed four times was
+  recorded as having changed once, so an assertion that a value did not change
+  passed for a value that did — inside the tooling written to catch that. Counts
+  from `getFactsHistory()` and `assertFactChanges()` will be higher after this,
+  and the module's own `init` writes now appear too. If a test asserts an exact
+  count, expect to update the number; the previous one was missing whatever the
+  system did through a batch.
+
+  **The worker adapter was letting the main thread drift.** `FACT_CHANGED` is the
+  only path a fact value has across the boundary — there is no wholesale sync
+  behind it — so a worker-backed application missed every write an event handler
+  made, and its view diverged from the worker's with nothing reporting it. Derived
+  values were not gated the same way, so the mirror could be told a computed value
+  had changed while never being told the fact it is computed from had: two numbers
+  on screen contradicting each other, both delivered by a channel that looked
+  healthy.
+
+  **Three things that came with recording those writes**, each of which the
+  codebase had already solved once elsewhere:
+
+  - The worker posts one message per _run_ of writes to a key rather than one per
+    write, matching how the observation stream coalesces. A handler writing one
+    key five hundred times in a batch sends one message, not five hundred — each
+    of which is a structured clone across a thread boundary and a render on the
+    other side, carrying values the main thread can never observe.
+  - A test system keeps the most recent 10,000 fact changes, configurable with
+    `maxFactsHistory`, and says so when it drops any. The log holds the value
+    before and after every change, so it pins every intermediate object a test
+    produces, and that is now nearly every write.
+  - `assertFactChanges` and `assertFactSet` on a namespaced system accept either
+    the short name or the namespaced one. They matched the short name only, so two
+    modules with a same-named fact shared a count while the name that would have
+    told them apart matched nothing — which began failing as soon as each module's
+    opening write was recorded.
+
+## 1.32.0
+
+### Minor Changes
+
+- [`5aa8e67`](https://github.com/directive-run/directive/commit/5aa8e67613754d764fbc60eff326ac5040488fb3) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A write made inside `system.batch()` now reaches `system.observe()`.** It did
+  not before. The bridge behind `observe()` implemented the single-write plugin
+  hook and not the batched one, so the audit ledger — and anything else observing
+  — recorded an unwrapped write and missed the identical wrapped one.
+
+  That is not a corner of the API. Event handlers, effects, resolvers before their
+  first `await`, `initialFacts`, `hydrate` and every history navigation write
+  through a batch, so most of the writes a running system makes were arriving on
+  the path that recorded nothing. Wrapping a write in a batch was enough to keep
+  it out of the record entirely, while the plain write beside it was captured in
+  full.
+
+  **Each key gets one entry per batch**, carrying the value it held before the
+  batch and the value it holds after — not one entry per write. A body that writes
+  one key in a loop produces one entry: a hundred thousand writes to a single key
+  in one batch coalesce to a single row. The cost, which matters if you are
+  auditing rather than debugging, is that a value a fact held _only inside_ a
+  batch is not recorded. Write a value and overwrite it before the batch closes
+  and the entry describes the first-to-last transition with nothing in between. If
+  you need every intermediate value, do not batch those writes.
+
+  **Every `fact.change` now carries an `origin`**: `"authored"` when your program
+  made the write, `"restore"` when a history navigation replayed it, `"hydrate"`
+  when stored state was loaded in through `hydrate`, `initialFacts` or
+  `system.restore`. It is stamped against each write as it is made rather than
+  read from a flag when the batch is reported — a batch can hold writes of more
+  than one origin, and one label taken at the end describes neither. Select on it
+  in the query (`ledger.query({ kind: "fact.change", origin: "authored" })`)
+  rather than filtering the result, because `query()` stops at `limit` before your
+  filter runs.
+
+  `origin` says how a write arrived, not whether to trust it. `"authored"` means
+  only that the write did not come through a replay or hydration door.
+
+  **`@directive-run/timeline`** marks non-authored frames in rendered output and
+  no longer re-dispatches them during `replayTimeline` — a timeline containing an
+  undo used to replay as two mutations where the user made one. `toMutate` counts
+  authored frames only. Timelines recorded before this release replay unchanged.
+  Its peer range on core moves to `^1.32.0`, since it now reads `origin`.
+
+  **Migration.** Expect more entries: on a workload of a hundred event dispatches
+  touching three facts each, ledger entries go from 102 to 405, and a system's
+  opening state now appears because `init` writes through a batch.
+  On the default in-memory sink — 10,000 entries — that rotates roughly four times
+  sooner, so size your sink for your write rate. Truncation markers share that
+  capacity: a steadily overflowing sink writes one marker per real entry, so ask
+  for about twice what you intend to keep. Anything asserting ledger row
+  counts in tests or dashboards will see different numbers. Ledger entries now
+  stamp `schemaVersion: 2`; entries written under 1 still verify, because the
+  version is part of what each entry is hashed over, and they answer
+  `origin: "authored"` to a query, since replayed writes could not be recorded
+  under that schema.
+
+  **One type-level break.** `origin` is required on `FactChange` and on the
+  `fact.change` member of `ObservationEvent`. Reading either is unaffected —
+  every event the runtime emits carries the field — but code that _constructs_
+  one in TypeScript, which in practice means plugin test fixtures and synthetic
+  timelines, needs the property added. It is required rather than optional
+  deliberately: a predicate that reads a missing field as "the program did it" is
+  the failure this field exists to prevent. `@directive-run/timeline` keeps it
+  optional on its serialized wire format, so timelines recorded before this
+  release still load.
+
+  **The ledger holds up better under someone trying to make it lie.** A sink that
+  refuses an entry no longer breaks the chain behind it — the entry never landed,
+  so nothing chains to it, and a new `onWriteError` option says which entry was
+  lost instead of leaving it to a console line inside a plugin-manager catch.
+  Truncation markers carry the same in-module sentinel tombstones do, so an
+  appended marker cannot make a hand-trimmed prefix read as routine rotation. An
+  entry claiming the current schema with no `origin` answers no origin query,
+  rather than passing as one the program made. And an `erase()` filter is checked
+  against the values `origin` can hold before any of it is copied into the
+  permanent, frozen marker — a filter can arrive from a request body, and that
+  marker is the record of the erasure.
+
+  `verify()` also reports two things it used to pass over in silence.
+  `missingSeqCount` and `missingSeqs` name a gap left by an entry the sink
+  refused — the chain closes over one so a single failure does not condemn the
+  whole record, but the gap is no longer silent. And `marksChecked` says whether
+  the provenance of erasure tombstones and truncation markers could be checked at
+  all: the runtime records which entries it wrote in memory, off the entries
+  themselves, so a ledger reloaded from an export reports `false`, as does any
+  sink that does not hand back the same object it was given. It is always present
+  rather than optional, because a caller checking `valid` alone should not be able
+  to miss it.
+
+  **Two changes to what `verify()` returns.** An erasure tombstone the runtime did
+  not write is now named in `unmarkedTombstoneSeqs` rather than returning
+  `valid: false`. The mark that distinguishes one is held in memory against the
+  entry object, so it does not survive being stored — which means an honest record
+  that has been anywhere looks identical to a forged one. Deciding a verdict on it
+  was tried in both directions and each accused an honest ledger: once every sink
+  that persists anything, once every restart from an export. Tampering with an
+  entry's contents still breaks the chain and still returns `valid: false`. And an
+  entry written under an unknown `hashAlgo` returns an invalid verdict naming it,
+  instead of throwing — an auditor asking whether a record is intact should get an
+  answer.
+
+  **A ledger built over a sink that already holds entries continues them.** It
+  used to begin its numbering and its chain from nothing, so a process restarting
+  onto its own store broke the record at exactly the point it came back up.
+
+  None of this makes the in-memory sink evidentiary. The chain is unkeyed, so
+  anyone who can reach the buffer can recompute it; it detects accident and
+  in-process mutation, not an adversary holding your storage. `system.restore()`
+  is public and files its writes as `hydrate`, so a caller can choose that label
+  for their own writes — which is why `origin` says how a write arrived and never
+  whether to trust it.
+
+  **A rotated ledger no longer reports itself tampered.** Once a bounded sink
+  fills, it drops its oldest entries — ordinary operation — but `verify()` began
+  every walk at the genesis hash, so the first link failed the moment the head
+  rotated out and a healthy ledger returned `valid: false` for the rest of its
+  life. It now starts from the surviving window and reports `windowStartSeq` on
+  the valid arm; a gap after that point is still a break. Two defects underneath
+  it are fixed too: an entry's hash is recorded before it is written, so a
+  truncation marker emitted from inside the write no longer shares a `prevHash`
+  with the entry that caused it, and drop counts now include the entry displaced
+  by the marker itself — the count was short by half. This is pre-existing, and it
+  is in this release because recording batched writes makes rotation roughly four
+  times more frequent.
+
+## 1.31.3
+
+### Patch Changes
+
+- [#164](https://github.com/directive-run/directive/pull/164) [`c46845c`](https://github.com/directive-run/directive/commit/c46845cabe6fabae56dab68c0112f4a0824109b4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Two fixes to `createAuditLedger`, both in the class of "the control damages the
+  thing it was controlling".
+
+  **Installing the ledger no longer freezes application state.** Entries are
+  frozen so a consumer cannot mutate a payload in place and forge the chain — but
+  the freeze was applied to whatever it was handed, and what it was handed was the
+  application's own fact value. Recording a change froze that object, and reading
+  a nested property afterwards threw a proxy invariant error. The ledger now takes
+  its own copy first. That is also a stronger guarantee than before: a value
+  mutated after it was recorded no longer changes what the record says. A value
+  that cannot be copied is kept as-is and left unfrozen, on the grounds that a
+  payload which could in principle be mutated is better than an audit control that
+  mutates the system.
+
+  **An exported ledger verifies again.** The chain is hashed over a stable
+  stringification that encodes a present-but-undefined key, and `JSON.stringify`
+  drops it — so an entry carrying one, which the first write of any fact does,
+  hashed one way live and another way after export. Anyone exporting the trail and
+  checking it was told it had been altered, by the tool whose job is to answer
+  that question. Keys with no value are now omitted before the entry is built, so
+  it is hashed over what an export can carry.
+
+## 1.31.2
+
+### Patch Changes
+
+- [#161](https://github.com/directive-run/directive/pull/161) [`7accf96`](https://github.com/directive-run/directive/commit/7accf96337f8235f10f623a6ea724331c57ed5d6) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A plugin that writes in response to a batch no longer silences every derivation
+  notification, or causes a batch to be announced twice.
+
+  `onFactsBatch` is broadcast to plugins before the batch's derivation hold is
+  released, so a plugin that writes there opens a nested batch from inside that
+  window. The engine kept a single release closure, so the nested hold overwrote
+  the outer one and the outer release was lost — the hold count never returned to
+  zero, and from that point `watch`, `subscribe`, and every framework hook built
+  on them stopped firing for the life of the process. Derived values still read
+  correctly on demand and nothing threw, so the symptom looks like a bug in
+  whatever renders.
+
+  Holds are now tracked per batch: released once when the batch's derivations have
+  been invalidated, and unwound to the depth the batch opened at when it ends —
+  including when it throws. A nested batch can no longer release the hold of the
+  batch it is running inside, which was announcing that outer batch early and then
+  again when it finished.
+
+  A batch announces once, on the nested path as well as the plain one.
+
+- [#159](https://github.com/directive-run/directive/pull/159) [`3845d7f`](https://github.com/directive-run/directive/commit/3845d7ffcbb5b0e0d767ad3441c78ac159f570c4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A listener that opens a batch during a flush no longer causes the batch it is
+  reacting to be reported twice.
+
+  `flush()` cleared its buffer after the notify phase rather than before, so a
+  listener that opened a nested batch saw the outer batch's changes still sitting
+  there and reported them again. Anything reconstructing state from `onFactsBatch`
+  — a replica, a persistence layer, an audit trail — received duplicates carrying
+  pre-write values.
+
+  Nothing is lost by clearing early: a write made during the notify phase lands in
+  the now-empty buffer and is reported by its own flush.
+
+## 1.31.1
+
+### Patch Changes
+
+- [#156](https://github.com/directive-run/directive/pull/156) [`7a408e0`](https://github.com/directive-run/directive/commit/7a408e0d6f9b71b9e93c837972cd94d676a2c1ed) Thanks [@jasoncomes](https://github.com/jasoncomes)! - A gated source whose `attach` fails now retries instead of staying dark.
+
+  When a gate opened and `attach` threw — a transport briefly unavailable at the
+  moment a fact changed — the key was recorded as attached even though nothing
+  was. The next evaluation saw no change and did nothing, so the source stayed
+  detached until the key happened to move again.
+
+  `lastKey` now records what is attached rather than what was intended, so a
+  failed attach leaves the gate open and the next reconcile tries again. Retries
+  back off (250ms doubling to a 30s ceiling) so a transport that is simply down is
+  not re-attached on every reconcile of a busy system. A gate that moves to a new
+  key starts a fresh subscription immediately rather than waiting out the old
+  backoff.
+
+## 1.31.0
+
+### Minor Changes
+
+- [#155](https://github.com/directive-run/directive/pull/155) [`b37fc2e`](https://github.com/directive-run/directive/commit/b37fc2e0b0f807e0257fe0b20684e68989a76f9e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Sources can now gate and re-key their subscription lifecycle on module facts.
+
+  A `source` may declare a pure `key` (or `active`) gate that reads facts to
+  decide whether — and under what identity — its transport is subscribed. This
+  closes the long-standing gap where a source that needed to re-subscribe on a
+  fact change had to be torn down and re-registered by hand.
+
+  ```typescript
+  sources: {
+    gameChannel: {
+      // null → detached; a string → attached under that key; a CHANGED string
+      // → old torn down BEFORE the new attaches (re-key).
+      key: (facts) => (facts.gameId ? `game:${facts.gameId}` : null),
+      attach: (publish, _reportError, ctx) => {
+        const channel = supabase.channel(ctx!.key)
+          .on('postgres_changes', { /* ... */ }, (p) => publish('GAME_UPDATE', p.new))
+          .subscribe();
+        return () => channel.unsubscribe();
+      },
+    },
+  }
+  ```
+
+  New optional `SourceDef` fields (fully backward compatible — ungated sources
+  behave exactly as before):
+
+  - `key(facts) => string | null` — lifecycle gate + identity.
+  - `active(facts) => boolean` — sugar, normalized to `key: f => active(f) ? "__on__" : null`.
+    Declaring both `key` and `active` throws a dev error at registration.
+  - `gateLingerMs` — hysteresis on a falling / re-key edge: wait before tearing
+    the old subscription down; cancel if the key returns to its prior value
+    within the window. Default `0` (immediate).
+  - `attach` gains an optional 3rd arg `ctx: { key }` carrying the resolved key
+    (keyed sources only).
+
+  The gate is evaluated on the post-commit effects plane and once at
+  `system.start()`. It runs behind the same replay / time-travel guard effects
+  use: replay re-derives the key value but never re-attaches a transport
+  (determinism invariant). A gate that throws or returns a non-`(string | null)`
+  value fails closed (treated as `null`, reported via `source.error` with the new
+  `phase: "gate"`). An in-flight publish that lands after a gate closes is
+  counted as a drop with `lastDropReason: "gate-closed"`.
+
+### Patch Changes
+
+- [#153](https://github.com/directive-run/directive/pull/153) [`c943307`](https://github.com/directive-run/directive/commit/c943307630366ef1c5a36d2854629345d6a2ff6b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `schema.derivations` is optional again, as its documentation always claimed.
+
+  Omitting the section made every derivation's expected return type resolve to
+  `never`, so nothing you returned type-checked:
+
+  ```
+  Type 'boolean' is not assignable to type 'never'.
+  ```
+
+  The runtime has always inferred these; only the types refused. Declaring the
+  section still constrains each return type exactly, so nothing changes for
+  modules that already declare it.
+
+## 1.30.0
+
+### Minor Changes
+
+- [#148](https://github.com/directive-run/directive/pull/148) [`9e9445d`](https://github.com/directive-run/directive/commit/9e9445d343e134b84dd9a6b67af6daa661030905) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **BREAKING:** metadata queries ask per definition, and tell you when the answer moves.
+
+  `system.meta.byTag("pii")` decides what gets redacted before a value reaches a
+  model, a log, or a hash-chained audit ledger. Answering it walks every definition
+  in the system, so all three consumers cached the answer — and every defect this
+  area has had was a cache built once and never rebuilt.
+
+  **New:**
+
+  ```ts
+  // O(1) for a fact. `undefined` means "could not answer" — not "no tag".
+  system.meta.carriesTag("fact", key, "pii");
+
+  // Replaces the polled revision() counter. Fires for dynamic
+  // register/assign/unregister as well as module registration.
+  system.meta.subscribe(["pii"], rebuild, { immediate: true });
+
+  // Narrow the walk when you only want one kind.
+  system.meta.byTag("pii", { kind: "fact" });
+  ```
+
+  **Renamed, with no aliases:**
+
+  | Before                          | After                                                  |
+  | ------------------------------- | ------------------------------------------------------ |
+  | `MetaMatch.type`                | `kind`, typed `DefinitionKind`                         |
+  | `via?: "inherited"`             | `tagOrigin: "authored" \| "inherited"`, always present |
+  | `meta: { inheritsTags: false }` | `meta: { tagBoundary: true }`                          |
+  | `byCategory(...)`               | removed                                                |
+  | `revision()`                    | removed — use `subscribe`                              |
+
+  **Fixed along the way:**
+
+  - Plugins are now told about a write _after_ the graph is invalidated, so a
+    plugin asking what a value carries during `onFactSet` is told about the write
+    it is being notified of. The batched path already worked this way, so the two
+    disagreed with each other.
+  - A throwing `system.subscribe` / `system.watch` callback no longer aborts the
+    write it was notified of, taking every plugin behind it down.
+  - A fact's tags can no longer be taken back. Schema types are frozen,
+    `registerKeys` refuses to re-declare an existing key, and `tags` must be a
+    plain array of strings — an `Array` subclass could override `includes` and
+    answer differently on each call.
+  - The audit ledger and the clobber-loop detector refreshed their pii sets from a
+    hook `registerModule` does not emit, so a module registered after start put raw
+    values into a sink that cannot be edited afterwards. Both now ask per lookup,
+    and both resolve a dotted clause path to the fact that carries the tag.
+  - The fact-PII guardrail screens `initialFacts` and hydrated state regardless of
+    where it sits in the plugin list.
+
+  **New event:** `guardrail.coverage` reports what a guardrail covers rather than
+  what it caught, so a screen that has stopped covering anything is no longer
+  indistinguishable from one with nothing to report.
+
+  See `docs/rfcs/0011-metadata-queries.md` for the measurements and the two
+  rejected designs.
+
+### Patch Changes
+
+- [#150](https://github.com/directive-run/directive/pull/150) [`fedff2a`](https://github.com/directive-run/directive/commit/fedff2aac07e72c2f215a23dd7497a25a4df1580) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Four fixes to the metadata-query change, found by reviewing the implementation
+  rather than the plan.
+
+  **A Zod fact stopped working.** Fact tags decide what gets redacted, so the
+  schema type holding them was frozen — unconditionally. A Zod schema is a
+  supported fact type and mutates itself while validating: v3 caches its shape
+  onto the instance on first parse, v4 re-defines properties on it. Either throws
+  on a frozen object, so the first validated write to a `z.object()` fact threw
+  instead of validating. The freeze now covers only the types this package builds;
+  the tag immutability it exists for is unaffected.
+
+  **A fact key containing a dot was redacted against the wrong fact.** The audit
+  ledger and the loop detector resolve a clause path like `user.email` to the fact
+  that carries the tag, which meant taking the first segment. A key _literally_
+  named `user.email` was then looked up as `user` — so a tagged key could be
+  answered for by an untagged one, and its value went into the hash chain in the
+  clear. Both now try the exact key first and fall back to the root only when the
+  exact key is unknown.
+
+  **The coverage signal read maximum when it was blind.** `guardrail.coverage`
+  counted a key as covered whenever the guardrail would screen it — and it screens
+  when it cannot tell. A guardrail whose tag lookup was completely broken
+  therefore reported full coverage. It now counts only keys it has a definite
+  answer for, and reports `reason: "unanswerable"` when any key could not be
+  answered. That value was declared and never emitted, while two doc comments told
+  operators to watch for it.
+
+  **Metadata queries are fenced off the tracking stack.** Walking the tag graph
+  forces derivations to compute, and forcing goes through the same accessor a
+  derivation body uses. Defensive rather than demonstrated: the mechanism is plain
+  in the code and two reviews flagged it, but six attempts to observe the symptom
+  measured no dependency growth. The fence is inert if the path is unreachable.
+
+  **A fact could be tagged everywhere except where it counted.** `carriesTag`
+  answered `false` for a key present in the schema but absent from the recorded
+  tag map, which made "carries nothing" and "not recorded yet" the same answer.
+  Three ways to reach it: a module's schema became visible one statement before
+  its tags were recorded, and a source registered by that same module attaches
+  synchronously in between; a key registered through `facts.$store.registerKeys`
+  was never recorded at all; and a validation throw part-way through registration
+  left earlier keys live and unrecorded. Every fact key is recorded now, tags are
+  recorded immediately after the schema merge, and the store tells the engine
+  about keys it registers.
+
+  **A caller-frozen schema type skipped the validation the freeze exists for.**
+  `Object.isFrozen` cannot tell "we prepared this" from "the author froze it
+  first", so a pre-frozen type bypassed the `tags` check. Tracked in a `WeakSet`
+  instead.
+
+  **One bad value could disable the guardrail's startup sweep and its coverage
+  channel for the process.** The sweep, the coverage report and the metadata
+  subscription were one unguarded block, so a throwing detector or a value with
+  hostile property traps ended all three. The sweep now guards per key, and the
+  report and subscription are armed before it runs. The subscription is also
+  idempotent across `stop()`/`start()`, which previously leaked a listener and
+  duplicated every report.
+
+  **Cross-realm arrays are accepted.** `tags` was rejected unless its prototype
+  was exactly `Array.prototype`, which fails for an array from a `vm` context, a
+  worker or an iframe. The runtime copies `tags` into its own array, and that copy
+  — not the prototype check — is what defeats a subclass overriding `includes`.
+
+  **The coverage digest is delimited.** Hashing the bare concatenation gave
+  `{"a","bc"}` and `{"ab","c"}` the same digest and the same count, so a coverage
+  swap was invisible to the signal meant to catch it.
+
+## 1.29.5
+
+## 1.29.4
+
+### Patch Changes
+
+- [#144](https://github.com/directive-run/directive/pull/144) [`1c2355f`](https://github.com/directive-run/directive/commit/1c2355feccba001f2b195d9b2a3aa06865ba6aff) Thanks [@jasoncomes](https://github.com/jasoncomes)! - An effect's second parameter is now called `prevFacts` rather than `prev`.
+
+  It always held the previous facts — the same shape as the first parameter — but
+  only one of the two said so:
+
+  ```ts
+  run: (facts, prev, derived) => { ... }        // prev what? value? state? result?
+  run: (facts, prevFacts, derived) => { ... }
+  ```
+
+  Nothing to change on your side. Parameter names are positional in TypeScript, so
+  callers name their own; this changes hover text, the emitted types, and every
+  example — including the module `directive init` writes, the scaffolded module
+  body, the knowledge files, and the plugin skills.
+
+  One thing constraints do not get is a rename, because they never had the
+  parameter: a constraint `when` has no previous-facts snapshot at all. The
+  `$changed` registration error now says that in those words rather than calling it
+  "no prev snapshot".
+
+  There is deliberately no `prevDerived`. The runtime keeps a snapshot of the
+  previous _facts_ and nothing else, because derivations are computed from facts —
+  a previous derived value would have to be recomputed from `prevFacts`, which the
+  callback already has. The asymmetry in `(facts, prevFacts, derived)` is real, and
+  naming it is better than hiding it behind a word that means nothing in
+  particular.
+
+## 1.29.3
+
+## 1.29.2
+
+## 1.29.1
+
+### Patch Changes
+
+- [#136](https://github.com/directive-run/directive/pull/136) [`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Three fixes for defects in 1.28.0 and 1.29.0, two of them silent data exposure
+  and one a duplicate side effect. Upgrade if you use `factPIIGuardrail` or run
+  chains longer than fifty reconcile passes.
+
+  **The personal-data screen could latch open permanently.** 1.28.0 taught it to
+  rebuild its screened-key list when the system's metadata changed. That rebuild
+  emptied the live list and marked itself current _before_ asking which keys to
+  screen — so if the lookup failed, or answered with nothing, the screen was left
+  holding nothing with the marker already advanced, and every later write took the
+  "already current" shortcut. One transient fault, and the screen never looked
+  again. It now builds a new list to the side and swaps it in only on success, so
+  a failure leaves the previous screen in place and the next write retries.
+
+  **A single unscannable member switched the screen off for the whole value.** The
+  walker copies a value before inspecting it, and when that copy was refused — by
+  a function property, a class instance carrying methods, a DOM node — it reported
+  "nothing found", which a caller cannot tell from "scanned and clean". A payload
+  of `{ email, ssn, retry: () => {} }` committed both the address and the number
+  in the clear. A member the copier refuses says nothing about its siblings, so
+  refused members are now dropped and everything else is scanned.
+
+  **A reconcile chain longer than fifty passes could re-run resolvers that had
+  already finished.** 1.28.0 made a long-dormant depth ceiling reachable. It turned
+  out to be reachable by ordinary bounded work — a sixty-item queue drain, cursor
+  pagination, a backoff counter — and tripping it clears the requirement diff, so
+  every live requirement is treated as new and dispatched again, including ones
+  that had nothing to do with the long chain. For a resolver that charges a card
+  or sends a message, that is a duplicate. The ceiling is dormant again while a
+  proper instrument is built: depth cannot see the runaway it was aimed at anyway,
+  because a resolver that reschedules without writing a fact resets the counter
+  every pass.
+
 ## 1.29.0
 
 ## 1.28.1

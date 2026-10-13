@@ -40,6 +40,10 @@ import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
 import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
+import {
   derivationDep,
   derivationDepId,
   describeDep,
@@ -53,6 +57,7 @@ import type {
   InferSchema,
   Schema,
 } from "./types.js";
+import type { EffectFacts } from "./types/facts.js";
 
 // ============================================================================
 // Effects Manager
@@ -72,11 +77,31 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @remarks
    * Effects with no recorded dependencies (first run or auto-tracked with no
    * reads) run on any change. After execution, a snapshot of current facts is
-   * stored for the `prev` parameter on the next invocation.
+   * stored for the `prevFacts` parameter on the next invocation.
    *
    * @param changedKeys - Fact keys that changed since the last run.
+   * @param navigationKeys - Fact keys a history navigation (`goBack`,
+   *   `goForward`, `goTo`, `replay`, `import`) restored since the last run.
+   *   They wake every effect except those declaring `onNavigate: "skip"`.
    */
-  runEffects(changedKeys: Set<string>): Promise<void>;
+  runEffects(
+    changedKeys: Set<string>,
+    navigationKeys?: Set<string> | null,
+  ): Promise<void>;
+  /**
+   * `runEffects` without a promise when it does not need one.
+   *
+   * Returns `undefined` when every effect that ran was synchronous, having
+   * done all the work `runEffects` would, in the same order. Returns a promise
+   * only when an effect returned one, and that promise settles when
+   * `runEffects`'s would.
+   *
+   * @internal
+   */
+  runEffectsFast(
+    changedKeys: Set<string>,
+    navigationKeys?: Set<string> | null,
+  ): Promise<void> | undefined;
   /**
    * Run every enabled effect unconditionally, regardless of dependencies.
    */
@@ -146,6 +171,18 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @param id - The effect definition ID.
    */
   callOne(id: string): Promise<void>;
+  /**
+   * The effect whose `run()` is executing synchronously right now, or `null`.
+   * Past an effect's first `await` it is no longer known.
+   */
+  runningEffect(): string | null;
+  /**
+   * Run this effect on the next pass whatever its dependencies say. Used by the
+   * `retry` error strategy.
+   */
+  requestRerun(id: string): void;
+  /** Whether any effect is waiting on {@link EffectsManager.requestRerun}. */
+  hasPendingReruns(): boolean;
 }
 
 /** Number of consecutive identical dep sets before skipping re-tracking */
@@ -158,6 +195,9 @@ const STABLE_THRESHOLD = 3;
 const EMPTY_DERIVED: Record<string, unknown> = Object.freeze(
   Object.create(null),
 );
+
+/** What `onRun` gets when `wantsRunDeps` says it will not read the list. */
+const NO_DEPS = Object.freeze([]) as unknown as string[];
 
 /** Internal effect state */
 interface EffectState {
@@ -196,7 +236,7 @@ export interface CreateEffectsOptions<S extends Schema> {
   store: FactsStore<S>;
   /**
    * The system's derived values, handed to `run()` as its third argument —
-   * after `facts` and `prev`, which already occupy the first two.
+   * after `facts` and `prevFacts`, which already occupy the first two.
    *
    * An effect that reads a derivation used to have to reach back through
    * `system.derive`, which is the single-module accessor: compose that module
@@ -248,8 +288,19 @@ export interface CreateEffectsOptions<S extends Schema> {
   isFactKey?: (name: string) => boolean;
   /** Called when an effect executes, with the fact keys that triggered it. */
   onRun?: (id: string, deps: string[]) => void;
+  /**
+   * Whether `onRun` will use its `deps` argument right now. When this returns
+   * false, `onRun` is handed an empty list instead of one built per run.
+   * Defaults to always true.
+   */
+  wantsRunDeps?: () => boolean;
   /** Called when an effect's `run()` or cleanup function throws. */
   onError?: (id: string, error: unknown) => void;
+  /**
+   * Called when an effect's write to a fact is refused, in every build. A
+   * production build drops the write without a sound otherwise.
+   */
+  onWriteBlocked?: (id: string, key: string) => void;
 }
 
 /**
@@ -270,8 +321,10 @@ export interface CreateEffectsOptions<S extends Schema> {
  * Each effect can return a cleanup function that runs before the next
  * execution or when {@link EffectsManager.cleanupAll | cleanupAll} is called.
  * Errors in effects are isolated via try-catch and never break the
- * reconciliation loop. Synchronous fact mutations inside effects are
- * coalesced with `store.batch()`.
+ * reconciliation loop. Effects read facts but cannot write them: the facts
+ * handed to `run()` are a read-only view (see {@link createReadonlyEffectFacts}).
+ * The body still runs inside `store.batch()`, so anything it dispatches is
+ * coalesced into one notification.
  *
  * @param options - Configuration including effect definitions, facts proxy,
  *   store, and lifecycle callbacks.
@@ -283,8 +336,8 @@ export interface CreateEffectsOptions<S extends Schema> {
  * const effects = createEffectsManager({
  *   definitions: {
  *     logPhase: {
- *       run: (facts, prev) => {
- *         if (prev?.phase !== facts.phase) {
+ *       run: (facts, prevFacts) => {
+ *         if (prevFacts?.phase !== facts.phase) {
  *           console.log(`Phase changed to ${facts.phase}`);
  *         }
  *       },
@@ -299,25 +352,395 @@ export interface CreateEffectsOptions<S extends Schema> {
  *
  * @internal
  */
+/**
+ * Set by a wrapper that forwards to a user effect, recording whether the
+ * wrapped function reads `prevFacts`. A wrapper's own arity describes the
+ * wrapper, so without this every namespaced effect looks like a reader.
+ */
+export const PREV_FACTS_READ: unique symbol = Symbol.for(
+  "directive.effect.readsPrevFacts",
+);
+
+/**
+ * Whether an effect's `run` could read its second parameter, `prevFacts`.
+ *
+ * Arity alone cannot answer this. `Function.length` stops counting at the first
+ * default or rest parameter, so it reports 1 for `(facts, prevFacts = null) =>`
+ * and 0 for `(...args) =>` — both of which read `prevFacts`. The parameter list
+ * is therefore read from the source when arity is inconclusive.
+ *
+ * Every uncertain answer is "yes". Building a snapshot nobody reads costs time;
+ * skipping one somebody reads hands them a wrong value, silently, in a place
+ * that looks like a comparison against history. Those are not symmetric.
+ */
+export function declaresPrevFacts(run: unknown): boolean {
+  if (typeof run !== "function") return true;
+
+  // A wrapper built by the namespace transform reports the arity of the
+  // wrapper, not of the effect the author wrote. It records the real answer
+  // here so composed systems are not permanently opted out.
+  const declared = (run as { [PREV_FACTS_READ]?: boolean })[PREV_FACTS_READ];
+  if (typeof declared === "boolean") return declared;
+
+  const cached = prevFactsCache.get(run);
+  if (cached !== undefined) return cached;
+
+  const answer = computeDeclaresPrevFacts(run);
+  prevFactsCache.set(run, answer);
+
+  return answer;
+}
+
+/**
+ * Memoized because a definition's `run` is a stable reference, and the answer
+ * is a property of the source text. Without this, registering N effects one at
+ * a time reparsed every previously-registered effect on each call.
+ */
+const prevFactsCache = new WeakMap<object, boolean>();
+
+function computeDeclaresPrevFacts(run: Function): boolean {
+  // Rest parameters report zero, and so does a body reaching for `arguments`
+  // with no parameters at all.
+  if (run.length === 0) return true;
+  if (run.length >= 2) return true;
+
+  let source: string;
+  try {
+    source = Function.prototype.toString.call(run);
+  } catch {
+    return true;
+  }
+
+  // `arguments` reaches past the parameter list entirely, so a one-parameter
+  // function can still read the second argument. Bound and native functions
+  // stringify to a stub whose parameter list says nothing about the target.
+  if (source.includes("arguments") || source.includes("[native code]")) {
+    return true;
+  }
+
+  const open = source.indexOf("(");
+  // A bare single-parameter arrow — `facts => …` — has no parameter list.
+  if (open === -1) return false;
+
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+    } else if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+      // Closed the parameter list without meeting a top-level comma, so the
+      // one parameter arity reported is the only one declared.
+      if (depth === 0) return false;
+    } else if (ch === "," && depth === 1) {
+      return true;
+    }
+  }
+
+  // Unbalanced — the source could not be read confidently.
+  return true;
+}
+
+/**
+ * Why an effect cannot write a fact, and what to use instead.
+ *
+ * An effect is the system talking to the outside world: a log line, a DOM
+ * update, a socket. A fact written from one used to be accepted and then only
+ * half handled. Constraints and derivations saw it, but other effects did not,
+ * because the pass that would have woken them had already started. A rule that
+ * works for some readers and not others reads as an engine bug, so the write is
+ * refused instead.
+ */
+function effectWriteMessage(
+  effectId: string,
+  key: string,
+  inPlace: boolean,
+): string {
+  const what = inPlace
+    ? `changed "${key}" in place`
+    : `tried to write "${key}"`;
+  const fact = key.split(".")[0];
+
+  return `[Directive] effect "${effectId}" ${what}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${fact} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
+}
+
+/** Called when a write through an effect's facts is refused. */
+type WriteBlocked = (effectId: string, key: string) => void;
+
+/**
+ * Refuse a write made through an effect's facts.
+ *
+ * Reported first, in every build, so a plugin or `system.observe()` sees the
+ * write a production build drops. Then it throws in development, where the
+ * message is the fix. In production the write is dropped: crashing a shipped
+ * app over a write it was already ignoring helps nobody.
+ */
+function refuseEffectWrite(
+  effectId: string,
+  key: string,
+  onBlocked: WriteBlocked | undefined,
+): true {
+  onBlocked?.(effectId, key);
+  if (isDevelopment) {
+    throw new Error(effectWriteMessage(effectId, key, false));
+  }
+
+  return true;
+}
+
+/**
+ * Report a nested value an effect mutated in place. Development only: the
+ * mutation has already happened, exactly as it would in production, and this
+ * is the check that notices.
+ */
+function reportInPlaceMutation(
+  effectId: string,
+  path: string,
+  onBlocked: WriteBlocked | undefined,
+): never {
+  onBlocked?.(effectId, path);
+  throw new Error(effectWriteMessage(effectId, path, true));
+}
+
+/**
+ * The store as an effect sees it: every read, no writes.
+ *
+ * `$store` is reachable from `facts`, so leaving it writable would keep the
+ * back door open. `batch` still runs its callback, because the writes inside it
+ * go through `facts` or this store and are refused there.
+ */
+function createReadonlyEffectStore<S extends Schema>(
+  store: FactsStore<S>,
+  effectId: string,
+  onBlocked: WriteBlocked | undefined,
+): FactsStore<S> {
+  return {
+    get: (key) => store.get(key),
+    has: (key) => store.has(key),
+    set: (key) => {
+      refuseEffectWrite(effectId, String(key), onBlocked);
+    },
+    delete: (key) => {
+      refuseEffectWrite(effectId, String(key), onBlocked);
+    },
+    batch: (fn) => store.batch(fn),
+    subscribe: (keys, listener) => store.subscribe(keys, listener),
+    subscribeAll: (listener) => store.subscribeAll(listener),
+    toObject: () => store.toObject(),
+  };
+}
+
+/**
+ * The facts one effect's `run()` (and the cleanup it returns) receives.
+ *
+ * A view, not a flag. A flag raised while `run()` is on the stack cannot see a
+ * write made after an `await`, or from a cleanup, or from a timer the effect
+ * started. Every one of those writes goes through this object, so refusing here
+ * covers all of them. Reads forward to the real facts proxy, so auto-tracking
+ * still records them, and nested values are the stored values themselves, so
+ * cloning and identity behave the same in development and production. See
+ * {@link createCheckedReadView} for how development catches an in-place
+ * mutation.
+ *
+ * One view per effect, so the error can name the effect. A different object
+ * from `system.facts`, with no prototype.
+ *
+ * @internal
+ */
+export function createReadonlyEffectFacts<S extends Schema>(
+  facts: Facts<S>,
+  effectId: string,
+  onBlocked?: WriteBlocked,
+): CheckedReadView<Facts<S>> {
+  let readonlyStore: FactsStore<S> | null = null;
+
+  return createCheckedReadView(
+    facts,
+    (key) => refuseEffectWrite(effectId, key, onBlocked),
+    {
+      override: (prop) => {
+        if (prop !== "$store") {
+          return undefined;
+        }
+        readonlyStore ??= createReadonlyEffectStore(
+          facts.$store,
+          effectId,
+          onBlocked,
+        );
+
+        return readonlyStore;
+      },
+    },
+  );
+}
+
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
   const {
     definitions,
-    facts,
     store,
     derived = EMPTY_DERIVED,
     isDerivation = () => false,
     isFactKey = () => false,
     onRun,
+    wantsRunDeps = () => true,
     onError,
+    onWriteBlocked,
   } = options;
+
+  /** What `onRun` is told triggered an effect, built only when it will be read. */
+  function runDeps(state: EffectState): string[] {
+    if (!wantsRunDeps()) {
+      return NO_DEPS;
+    }
+
+    return state.dependencies
+      ? Array.from(state.dependencies, describeDep)
+      : [];
+  }
+
+  /**
+   * The read-only view each effect reads through, one per effect so a refused
+   * write can name it. Built on first use and dropped when the definition is
+   * replaced.
+   */
+  const views = new Map<string, CheckedReadView<Facts<S>>>();
+
+  /** The read-only view one effect reads facts through. */
+  function viewFor(id: string): CheckedReadView<Facts<S>> {
+    let view = views.get(id);
+    if (!view) {
+      view = createReadonlyEffectFacts(options.facts, id, onWriteBlocked);
+      views.set(id, view);
+    }
+
+    return view;
+  }
+
+  /**
+   * Development: the in-place mutation checks for one run's `prevFacts` and
+   * `derived`, which are created per run because `prevFacts` is a new object
+   * each pass. Production passes both through untouched.
+   */
+  const runChecks = new Map<string, Array<CheckedReadView<object>>>();
+
+  /** Refuse a top-level write to `prevFacts` or `derived`. */
+  function refuseFor(id: string, prefix: string) {
+    return (key: string) =>
+      refuseEffectWrite(id, `${prefix}.${key}`, onWriteBlocked);
+  }
+
+  /**
+   * Throw if the effect mutated a fact, a previous fact or a derived value in
+   * place since its last check. Development only.
+   */
+  function checkInPlaceMutation(id: string): void {
+    // A positive dev block, not an early return on `!isDevelopment`, so a
+    // bundler that folds the check to `false` removes it (see tsup.config.ts).
+    if (isDevelopment) {
+      const found =
+        viewFor(id).takeMutation() ??
+        (runChecks.get(id) ?? []).reduce<string | null>(
+          (first, check) => first ?? check.takeMutation(),
+          null,
+        );
+      runChecks.delete(id);
+      if (found !== null) {
+        reportInPlaceMutation(id, found, onWriteBlocked);
+      }
+    }
+  }
+
+  /**
+   * The effect whose `run()` is on the stack right now, for a caller that wants
+   * to name it. Synchronous only: past an `await` this is no longer known.
+   */
+  let runningEffectId: string | null = null;
+
+  /** Effects asked to run on the next pass regardless of what changed. */
+  const pendingReruns = new Set<string>();
+
+  /** Call `run()` with its own facts, recording which effect is running. */
+  function callRun(
+    id: string,
+    def: EffectsDef<S>[string],
+  ): ReturnType<EffectsDef<S>[string]["run"]> {
+    const outer = runningEffectId;
+    runningEffectId = id;
+    try {
+      let prev: object | null = previousSnapshot;
+      let derivedView: object = derived;
+      if (isDevelopment) {
+        const checks: Array<CheckedReadView<object>> = [];
+        if (prev !== null) {
+          const prevCheck = createCheckedReadView(
+            prev,
+            refuseFor(id, "prevFacts"),
+            { prefix: "prevFacts" },
+          );
+          checks.push(prevCheck);
+          prev = prevCheck.view;
+        }
+        const derivedCheck = createCheckedReadView(
+          derived,
+          refuseFor(id, "derived"),
+          { prefix: "derived" },
+        );
+        checks.push(derivedCheck);
+        derivedView = derivedCheck.view;
+        runChecks.set(id, checks);
+      }
+
+      return def.run(
+        viewFor(id).view as unknown as EffectFacts<S>,
+        prev as Readonly<InferSchema<S>> | null,
+        derivedView as typeof derived,
+      );
+    } finally {
+      runningEffectId = outer;
+    }
+  }
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
 
   // Previous facts snapshot for comparison (plain object for bracket-style proxy access)
   let previousSnapshot: Record<string, unknown> | null = null;
+
+  /**
+   * Whether anything in this manager can actually read `prevFacts`.
+   *
+   * Building the snapshot copies every fact in the system, and it ran once per
+   * reconciliation pass regardless of whether a single effect took a second
+   * parameter. The cost therefore scaled with the size of the whole system
+   * rather than with the effects — the dominant per-pass cost at scale, and
+   * paid most heavily by systems whose effects only ever read `facts`.
+   *
+   * Recomputed whenever the definition set changes, never per pass.
+   */
+  let prevFactsObserved = true;
+
+  function recomputePrevFactsObserved(): void {
+    const wasObserved = prevFactsObserved;
+
+    // A data `on` gate is handed `prevFacts` by the runtime, so its presence
+    // settles the question before any effect body is considered.
+    prevFactsObserved =
+      onGates.size > 0 ||
+      Object.values(definitions as Record<string, unknown>).some((def) =>
+        declaresPrevFacts((def as { run?: unknown })?.run),
+      );
+
+    // Backfill the moment the answer turns true. The snapshot is only refilled
+    // at the END of a pass, so an effect registered mid-life would have read
+    // `null` on its first run — and for a data gate that is worse than a wrong
+    // value, because the predicate runtime reads an absent previous state as
+    // "everything changed" and fires a `$changed` gate on a fact that did not.
+    if (!wasObserved && prevFactsObserved && previousSnapshot === null) {
+      previousSnapshot = createSnapshot();
+    }
+  }
 
   // Track whether cleanupAll has been called (system stopped/destroyed).
   // If an async effect resolves after stop, its cleanup is invoked immediately.
@@ -326,7 +749,10 @@ export function createEffectsManager<S extends Schema>(
   // Compiled predicate gate per effect (only effects with a data `on` field).
   const onGates = new Map<
     string,
-    (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean
+    (
+      facts: Record<string, unknown>,
+      prevFacts?: Record<string, unknown>,
+    ) => boolean
   >();
 
   /**
@@ -405,6 +831,9 @@ export function createEffectsManager<S extends Schema>(
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
 
+    // A replaced definition gets a fresh view (its id appears in messages).
+    views.delete(id);
+
     // Always clear any stale gate from a previous registration of this id
     // before re-installing. Without this, swapping a data-form `on` effect
     // for a function-form one would leave the old gate active in shouldRun().
@@ -452,7 +881,9 @@ export function createEffectsManager<S extends Schema>(
       // owning effect so the stack trace points at user config.
       onGates.set(
         id,
-        attributeError("effect", id, (facts, prev) => memoized(facts, prev)),
+        attributeError("effect", id, (facts, prevFacts) =>
+          memoized(facts, prevFacts),
+        ),
       );
     }
 
@@ -478,7 +909,7 @@ export function createEffectsManager<S extends Schema>(
   }
 
   /** Create a plain-object snapshot of current facts.
-   *  Effects receive `prev` through module-scoped proxies (system.ts) that use
+   *  Effects receive `prevFacts` through module-scoped proxies (system.ts) that use
    *  bracket-style property access, so the snapshot must be a plain object —
    *  NOT a FactsSnapshot (which only exposes .get()/.has()). */
   function createSnapshot(): Record<string, unknown> {
@@ -528,15 +959,15 @@ export function createEffectsManager<S extends Schema>(
 
       // For effects with a declarative `on` predicate, also evaluate the
       // predicate after the dep-overlap pre-filter so we only run when the
-      // condition currently holds. `$changed` reads `prev` via the previous
-      // snapshot — on the first run `prev` is null, which the predicate
+      // condition currently holds. `$changed` reads `prevFacts` via the previous
+      // snapshot — on the first run `prevFacts` is null, which the predicate
       // runtime treats as "value present is a change".
       const gate = onGates.get(id);
       if (gate) {
         const facts = createSnapshot();
-        const prev = previousSnapshot ?? undefined;
+        const prevFacts = previousSnapshot ?? undefined;
 
-        return gate(facts, prev);
+        return gate(facts, prevFacts);
       }
 
       return true;
@@ -582,25 +1013,32 @@ export function createEffectsManager<S extends Schema>(
     }
   }
 
-  /** Run the effect's `run()` inside a store.batch(), await if needed, and store cleanup */
-  async function runBatchedEffect(
+  /**
+   * Run the effect's `run()` inside a store.batch() and store its cleanup.
+   *
+   * Synchronous unless `run()` returned a promise: only then is a promise
+   * returned, settling once the cleanup is stored and checked. Every step
+   * happens in the same order as when this was an `async` function; what
+   * goes is the promise a synchronous effect never needed.
+   */
+  function runBatchedEffect(
     state: EffectState,
     def: EffectsDef<S>[string],
-  ): Promise<void> {
+  ): Promise<void> | undefined {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(
-        facts,
-        previousSnapshot as InferSchema<S> | null,
-        derived,
-      );
+      effectPromise = callRun(state.id, def);
     });
     if (effectPromise instanceof Promise) {
-      const result = await effectPromise;
-      storeCleanup(state, result);
-    } else {
-      storeCleanup(state, effectPromise);
+      return effectPromise.then((result) => {
+        storeCleanup(state, result);
+        checkInPlaceMutation(state.id);
+      });
     }
+    storeCleanup(state, effectPromise);
+    checkInPlaceMutation(state.id);
+
+    return undefined;
   }
 
   /** Check whether two dep sets are identical */
@@ -682,120 +1120,328 @@ export function createEffectsManager<S extends Schema>(
     );
   }
 
-  /** Run an auto-tracked effect, re-tracking dependencies each time */
-  async function runAutoTrackedEffect(
+  /** Record what an auto-tracked run read, once its result has settled. */
+  function finishAutoTracked(
     state: EffectState,
-    def: EffectsDef<S>[string],
-  ): Promise<void> {
-    // Deps have been stable — skip withTracking() overhead
-    if (state.depsStable && state.dependencies) {
-      await runBatchedEffect(state, def);
-
-      return;
-    }
-
-    // Re-track dependencies so conditional reads are picked up
-    let effectPromise: unknown;
-    const trackingResult = withTracking(() => {
-      store.batch(() => {
-        effectPromise = def.run(
-          facts,
-          previousSnapshot as InferSchema<S> | null,
-          derived,
-        );
-      });
-      return effectPromise;
-    });
-    const trackedDeps = trackingResult.deps;
-
-    // If the effect is async, wait for it and capture cleanup
-    let result = trackingResult.value;
-    if (result instanceof Promise) {
-      if (isDevelopment) {
-        warnAsyncAutoTracked(state.id, trackedDeps);
-      }
-      result = await result;
-    }
+    trackedDeps: Set<string>,
+    result: unknown,
+  ): void {
     storeCleanup(state, result);
 
     updateDepStability(state, trackedDeps);
 
     // Update tracked dependencies
     state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
+
+    checkInPlaceMutation(state.id);
   }
 
-  /** Run a single effect */
-  async function runEffect(id: string): Promise<void> {
+  /**
+   * Run an auto-tracked effect, re-tracking dependencies each time.
+   * Synchronous unless the effect returned a promise, as `runBatchedEffect`.
+   */
+  function runAutoTrackedEffect(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> | undefined {
+    // Deps have been stable — skip withTracking() overhead
+    if (state.depsStable && state.dependencies) {
+      return runBatchedEffect(state, def);
+    }
+
+    // Re-track dependencies so conditional reads are picked up
+    let effectPromise: unknown;
+    const trackingResult = withTracking(() => {
+      store.batch(() => {
+        effectPromise = callRun(state.id, def);
+      });
+      return effectPromise;
+    });
+    const trackedDeps = trackingResult.deps;
+
+    // If the effect is async, wait for it and capture cleanup
+    const result = trackingResult.value;
+    if (result instanceof Promise) {
+      if (isDevelopment) {
+        warnAsyncAutoTracked(state.id, trackedDeps);
+      }
+
+      return result.then((settled) =>
+        finishAutoTracked(state, trackedDeps, settled),
+      );
+    }
+    finishAutoTracked(state, trackedDeps, result);
+
+    return undefined;
+  }
+
+  /** Report an effect that threw. Effects are fire-and-forget: it goes no further. */
+  function reportEffectError(
+    id: string,
+    state: EffectState,
+    error: unknown,
+  ): void {
+    onError?.(id, error);
+    console.error(`[Directive] Effect "${id}" threw an error:`, error);
+    // Reset dep stability — we don't know what the effect would have read
+    if (!state.hasExplicitDeps) {
+      resetStability(state);
+    }
+  }
+
+  /**
+   * Run a single effect. Synchronous unless the effect returned a promise.
+   *
+   * A synchronous throw is not reported here but pushed onto `thrown`, for
+   * the caller to report once every selected effect has run. That is when
+   * the `async` version reported it, from a microtask after the loop, so
+   * every effect body still runs before the first error is announced.
+   */
+  function runEffect(
+    id: string,
+    thrown: Array<[string, EffectState, unknown]>,
+  ): Promise<void> | undefined {
     const state = getState(id);
     const def = definitions[id];
 
-    if (!state.enabled || !def) return;
+    if (!state.enabled || !def) {
+      return undefined;
+    }
 
     // Run previous cleanup before re-running
     runCleanup(state);
 
-    onRun?.(
-      id,
-      state.dependencies ? Array.from(state.dependencies, describeDep) : [],
-    );
+    onRun?.(id, runDeps(state));
 
     try {
-      if (!state.hasExplicitDeps) {
-        await runAutoTrackedEffect(state, def);
-      } else {
-        await runBatchedEffect(state, def);
+      const pending = state.hasExplicitDeps
+        ? runBatchedEffect(state, def)
+        : runAutoTrackedEffect(state, def);
+      if (pending !== undefined) {
+        return pending.catch((error) => reportEffectError(id, state, error));
       }
     } catch (error) {
-      // Effects are fire-and-forget - errors are reported but don't propagate
-      onError?.(id, error);
-      console.error(`[Directive] Effect "${id}" threw an error:`, error);
-      // Reset dep stability — we don't know what the effect would have read
-      if (!state.hasExplicitDeps) {
-        resetStability(state);
-      }
+      thrown.push([id, state, error]);
+    }
+
+    return undefined;
+  }
+
+  /** Report the synchronous throws `runEffect` set aside, in run order. */
+  function reportThrown(thrown: Array<[string, EffectState, unknown]>): void {
+    for (const [id, state, error] of thrown) {
+      reportEffectError(id, state, error);
     }
   }
+
+  /** Effect ids chosen for this pass. Reused: filled and drained synchronously. */
+  const selected: string[] = [];
+  /** Synchronous throws set aside during a run. Reused the same way. */
+  const thrownSink: Array<[string, EffectState, unknown]> = [];
 
   // Initialize all effect states
   for (const id of Object.keys(definitions)) {
     initState(id);
   }
+  recomputePrevFactsObserved();
 
-  const manager: EffectsManager<S> = {
-    async runEffects(changedKeys: Set<string>): Promise<void> {
-      const effectsToRun: string[] = [];
+  /** Snapshot for the next run's `prevFacts`, but only when something can read it. */
+  function updatePreviousSnapshot(): void {
+    previousSnapshot = prevFactsObserved ? createSnapshot() : null;
+  }
 
-      for (const id of Object.keys(definitions)) {
-        if (shouldRun(id, changedKeys)) {
-          effectsToRun.push(id);
+  /**
+   * Run the chosen effects, all bodies first, then report synchronous throws.
+   * Returns a promise only when an effect returned one.
+   */
+  function runSelected(
+    ids: string[],
+    count: number,
+  ): Promise<void> | undefined {
+    let pending: Array<Promise<void>> | null = null;
+    // Shared and kept empty between runs, so a pass with no throw allocates
+    // nothing. A re-entrant run (only possible from inside an effect body)
+    // gets its own.
+    const sink = thrownSink.length === 0 ? thrownSink : [];
+    for (let i = 0; i < count; i++) {
+      const done = runEffect(ids[i]!, sink);
+      if (done !== undefined) {
+        if (pending === null) {
+          pending = [];
+        }
+        pending.push(done);
+      }
+    }
+    let thrown: Array<[string, EffectState, unknown]> | null = null;
+    if (sink.length > 0) {
+      thrown = sink.splice(0);
+    }
+    if (pending === null) {
+      if (thrown !== null) {
+        reportThrown(thrown);
+      }
+      updatePreviousSnapshot();
+
+      return undefined;
+    }
+
+    // Some effect is async. Report synchronous throws first, as the
+    // microtask-queued handlers of the `async` version did, then wait.
+    if (thrown !== null) {
+      reportThrown(thrown);
+    }
+
+    return Promise.all(pending).then(updatePreviousSnapshot);
+  }
+
+  /** Write the ids of the effects this pass should run into `ids`; return how many. */
+  function selectEffects(
+    changedKeys: Set<string>,
+    navigationKeys: Set<string> | null | undefined,
+    ids: string[],
+  ): number {
+    let count = 0;
+
+    // A rewind changes what the outside world should show, so an effect that
+    // mirrors state there is woken by the restored keys like any change.
+    // `onNavigate: "skip"` opts out, for effects that record acts rather than
+    // mirror state (analytics, audit logs).
+    let withNavigation: Set<string> | null = null;
+    if (navigationKeys && navigationKeys.size > 0) {
+      withNavigation =
+        changedKeys.size === 0
+          ? navigationKeys
+          : new Set([...changedKeys, ...navigationKeys]);
+    }
+
+    const reruns = pendingReruns.size > 0 ? new Set(pendingReruns) : null;
+    pendingReruns.clear();
+
+    // `for...in` rather than `Object.keys`: the same own keys in the same
+    // order (definitions is a plain object), without an array per pass.
+    for (const id in definitions) {
+      if (reruns?.has(id) && getState(id).enabled) {
+        ids[count++] = id;
+        continue;
+      }
+      let keys = changedKeys;
+      if (withNavigation !== null) {
+        if (definitions[id]?.onNavigate !== "skip") {
+          keys = withNavigation;
+        } else if (changedKeys.size === 0) {
+          // Nothing but a navigation happened, and this effect asked to
+          // sit those out.
+          continue;
         }
       }
+      if (shouldRun(id, keys)) {
+        ids[count++] = id;
+      }
+    }
+
+    return count;
+  }
+
+  /**
+   * Run one effect with the microtask timing `runEffects` has always had:
+   * awaited at every level, the way the nested `async` functions it was made
+   * of awaited. `runEffects` keeps that timing because a caller can depend on
+   * it, and the engine does whenever a resolver is in flight (see
+   * `runEffectsFast` in engine.ts).
+   */
+  async function runEffectAwaited(id: string): Promise<void> {
+    const state = getState(id);
+    const def = definitions[id];
+
+    if (!state.enabled || !def) {
+      return;
+    }
+
+    runCleanup(state);
+
+    onRun?.(id, runDeps(state));
+
+    try {
+      if (state.hasExplicitDeps) {
+        await runBatchedAwaited(state, def);
+      } else if (state.depsStable && state.dependencies) {
+        await (async () => {
+          await runBatchedAwaited(state, def);
+        })();
+      } else {
+        await runAutoTrackedAwaited(state, def);
+      }
+    } catch (error) {
+      reportEffectError(id, state, error);
+    }
+  }
+
+  async function runBatchedAwaited(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    const pending = runBatchedEffect(state, def);
+    if (pending !== undefined) {
+      await pending;
+    }
+  }
+
+  async function runAutoTrackedAwaited(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    const pending = runAutoTrackedEffect(state, def);
+    if (pending !== undefined) {
+      await pending;
+    }
+  }
+
+  const manager: EffectsManager<S> = {
+    async runEffects(
+      changedKeys: Set<string>,
+      navigationKeys?: Set<string> | null,
+    ): Promise<void> {
+      const ids: string[] = [];
+      const count = selectEffects(changedKeys, navigationKeys, ids);
+      ids.length = count;
 
       // Run effects in parallel (they're independent)
-      await Promise.all(effectsToRun.map(runEffect));
+      await Promise.all(ids.map(runEffectAwaited));
 
-      // Update previous snapshot
-      previousSnapshot = createSnapshot();
+      updatePreviousSnapshot();
+    },
+
+    runEffectsFast(
+      changedKeys: Set<string>,
+      navigationKeys?: Set<string> | null,
+    ): Promise<void> | undefined {
+      // Reuse the selection buffer unless a run is already using it, which
+      // only a re-entrant call made from inside an effect body could do.
+      const ids = selected.length === 0 ? selected : [];
+      const count = selectEffects(changedKeys, navigationKeys, ids);
+
+      try {
+        // Run effects in parallel (they're independent)
+        return runSelected(ids, count);
+      } finally {
+        ids.length = 0;
+      }
     },
 
     async runAll(): Promise<void> {
-      const effectIds = Object.keys(definitions);
-      await Promise.all(
-        effectIds.map((id) => {
-          const state = getState(id);
-          if (state.enabled) {
-            // Reset stability so runEffect re-tracks deps
-            // (runAll bypasses shouldRun where the normal reset lives)
-            resetStability(state);
+      const ids: string[] = [];
+      for (const id of Object.keys(definitions)) {
+        const state = getState(id);
+        if (state.enabled) {
+          // Reset stability so runEffect re-tracks deps
+          // (runAll bypasses shouldRun where the normal reset lives)
+          resetStability(state);
+          ids.push(id);
+        }
+      }
 
-            return runEffect(id);
-          }
-          return Promise.resolve();
-        }),
-      );
-
-      // Update previous snapshot
-      previousSnapshot = createSnapshot();
+      await Promise.all(ids.map(runEffectAwaited));
+      updatePreviousSnapshot();
     },
 
     disable(id: string): void {
@@ -845,6 +1491,7 @@ export function createEffectsManager<S extends Schema>(
         (definitions as Record<string, unknown>)[key] = def;
         initState(key);
       }
+      recomputePrevFactsObserved();
     },
 
     assignDefinition(id: string, def: EffectsDef<Schema>[string]): void {
@@ -863,6 +1510,7 @@ export function createEffectsManager<S extends Schema>(
       // Replace definition and re-init state
       (definitions as Record<string, unknown>)[id] = def;
       initState(id);
+      recomputePrevFactsObserved();
     },
 
     unregisterDefinition(id: string): void {
@@ -879,7 +1527,23 @@ export function createEffectsManager<S extends Schema>(
       // Remove from all maps
       delete (definitions as Record<string, unknown>)[id];
       states.delete(id);
+      views.delete(id);
       onGates.delete(id);
+      recomputePrevFactsObserved();
+    },
+
+    runningEffect(): string | null {
+      return runningEffectId;
+    },
+
+    requestRerun(id: string): void {
+      if (definitions[id]) {
+        pendingReruns.add(id);
+      }
+    },
+
+    hasPendingReruns(): boolean {
+      return pendingReruns.size > 0;
     },
 
     async callOne(id: string): Promise<void> {
@@ -906,11 +1570,7 @@ export function createEffectsManager<S extends Schema>(
       try {
         let effectPromise: unknown;
         store.batch(() => {
-          effectPromise = def.run(
-            facts,
-            previousSnapshot as InferSchema<S> | null,
-            derived,
-          );
+          effectPromise = callRun(id, def);
         });
         if (effectPromise instanceof Promise) {
           const result = await effectPromise;
@@ -918,6 +1578,7 @@ export function createEffectsManager<S extends Schema>(
         } else {
           storeCleanup(state, effectPromise);
         }
+        checkInPlaceMutation(id);
       } catch (error) {
         onError?.(id, error);
         console.error(`[Directive] Effect "${id}" threw an error:`, error);

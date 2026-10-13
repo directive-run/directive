@@ -1,5 +1,155 @@
 # @directive-run/example-cloudflare-directive-ai
 
+## 0.1.25
+
+### Patch Changes
+
+- Updated dependencies [[`1448b68`](https://github.com/directive-run/directive/commit/1448b6816da5d79ff35534c8d3ba68ce7f51218e), [`4c2289b`](https://github.com/directive-run/directive/commit/4c2289b62e61bdc62365206376b16daf2755b2b4), [`cce0b99`](https://github.com/directive-run/directive/commit/cce0b99858773172fc36e98a6cf3b1a308deb036), [`b44e6e2`](https://github.com/directive-run/directive/commit/b44e6e2fddfb123bd7cd604f787e9815ac1cea29), [`c528613`](https://github.com/directive-run/directive/commit/c5286133a59c3ccf2d3bf117a612cd4f266043fa)]:
+  - @directive-run/core@1.34.1
+  - @directive-run/ai@1.34.1
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.24
+
+### Patch Changes
+
+- Updated dependencies [[`1ab02c2`](https://github.com/directive-run/directive/commit/1ab02c2aa712c7c56083ce8823b7475d1bcc9a55), [`49e5de5`](https://github.com/directive-run/directive/commit/49e5de5b462200c9e88d80b64c9ee4096dc76039), [`20fe678`](https://github.com/directive-run/directive/commit/20fe678433aaaf8dcc5e9b9d3b3744a3380f1eb7)]:
+  - @directive-run/core@1.34.0
+  - @directive-run/ai@1.34.0
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.23
+
+### Patch Changes
+
+- Updated dependencies [[`80f0f20`](https://github.com/directive-run/directive/commit/80f0f20f31a9d435f75da0d271b06aba67f9f282)]:
+  - @directive-run/core@1.33.1
+  - @directive-run/ai@1.33.1
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.22
+
+### Patch Changes
+
+- Updated dependencies [[`4d2bc0d`](https://github.com/directive-run/directive/commit/4d2bc0da3d7ba7429058217d6ced18b78a9ae227)]:
+  - @directive-run/core@1.33.0
+  - @directive-run/ai@1.33.0
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.21
+
+### Patch Changes
+
+- Updated dependencies [[`5aa8e67`](https://github.com/directive-run/directive/commit/5aa8e67613754d764fbc60eff326ac5040488fb3)]:
+  - @directive-run/core@1.32.0
+  - @directive-run/ai@1.32.0
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`c46845c`](https://github.com/directive-run/directive/commit/c46845cabe6fabae56dab68c0112f4a0824109b4)]:
+  - @directive-run/core@1.31.3
+  - @directive-run/ai@1.31.3
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [[`7accf96`](https://github.com/directive-run/directive/commit/7accf96337f8235f10f623a6ea724331c57ed5d6), [`3845d7f`](https://github.com/directive-run/directive/commit/3845d7ffcbb5b0e0d767ad3441c78ac159f570c4)]:
+  - @directive-run/core@1.31.2
+  - @directive-run/ai@1.31.2
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.18
+
+### Patch Changes
+
+- Updated dependencies [[`7a408e0`](https://github.com/directive-run/directive/commit/7a408e0d6f9b71b9e93c837972cd94d676a2c1ed)]:
+  - @directive-run/core@1.31.1
+  - @directive-run/ai@1.31.1
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.17
+
+### Patch Changes
+
+- Updated dependencies [[`c943307`](https://github.com/directive-run/directive/commit/c943307630366ef1c5a36d2854629345d6a2ff6b), [`b37fc2e`](https://github.com/directive-run/directive/commit/b37fc2e0b0f807e0257fe0b20684e68989a76f9e)]:
+  - @directive-run/core@1.31.0
+  - @directive-run/ai@1.31.0
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.16
+
+### Patch Changes
+
+- Updated dependencies [[`9e9445d`](https://github.com/directive-run/directive/commit/9e9445d343e134b84dd9a6b67af6daa661030905), [`fedff2a`](https://github.com/directive-run/directive/commit/fedff2aac07e72c2f215a23dd7497a25a4df1580)]:
+  - @directive-run/core@1.30.0
+  - @directive-run/ai@1.30.0
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.15
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.29.5
+  - @directive-run/ai@1.29.5
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.14
+
+### Patch Changes
+
+- Updated dependencies [[`1c2355f`](https://github.com/directive-run/directive/commit/1c2355feccba001f2b195d9b2a3aa06865ba6aff)]:
+  - @directive-run/core@1.29.4
+  - @directive-run/ai@1.29.4
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [[`7f02618`](https://github.com/directive-run/directive/commit/7f02618a6af0e28f19e7caa3df8460f9a1463f59)]:
+  - @directive-run/ai@1.29.3
+  - @directive-run/core@1.29.3
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`ce5b582`](https://github.com/directive-run/directive/commit/ce5b58256e8d8cafea19a40d51345ca9060d46bf)]:
+  - @directive-run/ai@1.29.2
+  - @directive-run/core@1.29.2
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`f10770d`](https://github.com/directive-run/directive/commit/f10770d429a0ccdb16daccaa6615c11bfe37efba)]:
+  - @directive-run/core@1.29.1
+  - @directive-run/ai@1.29.1
+  - @directive-run/query@1.2.2
+  - @directive-run/sources@0.3.2
+
 ## 0.1.10
 
 ### Patch Changes

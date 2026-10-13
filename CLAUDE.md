@@ -64,7 +64,8 @@ Every definition type supports optional `meta` for debugging/devtools:
 - Derivations: `{ compute: (facts) => ..., meta: { ... } }` object form
 - Events: `{ handler: (facts) => ..., meta: { ... } }` object form
 - Facts: `t.number().meta({ label: "Score", tags: ["pii"] })`
+- Derivations opting out of tag inheritance: `meta: { tagBoundary: true }`
 - Modules: `meta: { label: "Auth Module" }` on createModule
 
-Access: `system.meta.constraint("id")`, `system.meta.byTag("pii")`, etc.
-All meta is frozen at registration. Zero hot-path cost.
+Access: `system.meta.constraint("id")`, `system.meta.byTag("pii")`, `system.meta.carriesTag("fact", key, "pii")`, `system.meta.subscribe(tags, fn, { immediate: true })`.
+All meta is frozen at registration. `label`/`description`/`category`/`color` are informational; `tags` and `tagBoundary` decide what gets redacted and are read per write.

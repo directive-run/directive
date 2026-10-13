@@ -186,13 +186,13 @@ const newsletter = createModule("newsletter", {
   effects: {
     logSubscription: {
       deps: ["status"],
-      run: (facts, prev) => {
-        if (!prev) {
+      run: (facts, prevFacts) => {
+        if (!prevFacts) {
           return;
         }
 
-        if (facts.status !== prev.status) {
-          addLog(`Status: ${prev.status} → ${facts.status}`);
+        if (facts.status !== prevFacts.status) {
+          addLog(`Status: ${prevFacts.status} → ${facts.status}`);
         }
       },
     },

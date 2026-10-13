@@ -78,6 +78,32 @@ const TABLES = [
 ];
 
 describe("published rate tables", () => {
+  /**
+   * How long a checked-on date may stand before it stops meaning anything.
+   *
+   * The date says a person compared these numbers to the provider's page. That
+   * claim decays: providers reprice, retire models, and end promotional rates,
+   * and none of it produces a signal here. Without a ceiling the date ages
+   * silently and a table checked once keeps asserting freshness forever —
+   * which is how four wrong rates shipped under a same-day claim.
+   *
+   * Ninety days is a working guess, not a derived number. The point is that
+   * the claim expires at all.
+   */
+  const MAX_AGE_DAYS = 90;
+
+  it.each(TABLES)(
+    "$name was checked recently enough to mean it",
+    ({ asOf }) => {
+      const ageDays = (Date.now() - Date.parse(asOf)) / 86_400_000;
+
+      expect(
+        ageDays,
+        `${asOf} is ${Math.round(ageDays)} days old. Re-check this table against the provider's pricing page, correct any rate that moved, then update both the date and the pinned digest.`,
+      ).toBeLessThan(MAX_AGE_DAYS);
+    },
+  );
+
   it.each(TABLES)("$name carries a plausible checked-on date", ({ asOf }) => {
     expect(asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -109,9 +135,9 @@ describe("a rate cannot move without its date moving", () => {
   // make them agree with anything, which is the failure this whole file is
   // about: a check that cannot go red is not a check.
   const PINNED: Record<string, string> = {
-    ANTHROPIC_PRICING: "1e0700fed588f985",
-    OPENAI_PRICING: "42d2aafffd354e0b",
-    GEMINI_PRICING: "12c6651bba2e35bf",
+    ANTHROPIC_PRICING: "5fd4d231ad8f25a2",
+    OPENAI_PRICING: "5dacdbb0a433f50a",
+    GEMINI_PRICING: "38cc87759ab22df0",
     OLLAMA_PRICING: "f81daede7c795e7c",
   };
 

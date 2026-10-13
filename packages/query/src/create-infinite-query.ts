@@ -9,7 +9,13 @@
  */
 
 import type { RetryPolicy } from "@directive-run/core";
-import { PREFIX, buildKey, serializeKey } from "./internal.js";
+import {
+  PREFIX,
+  type QueryPublish,
+  buildEvent,
+  buildKey,
+  serializeKey,
+} from "./internal.js";
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
@@ -87,13 +93,22 @@ export interface InfiniteQueryDefinition<TData = unknown> {
   readonly schema: {
     readonly facts: Record<string, unknown>;
     readonly derivations: Record<string, unknown>;
+    readonly events?: Record<string, Record<string, unknown>>;
   };
   readonly requirements: Record<string, Record<string, unknown>>;
   readonly init: (facts: Record<string, unknown>) => void;
   readonly derive: Record<string, (facts: Record<string, unknown>) => unknown>;
   readonly constraints: Record<string, unknown>;
   readonly resolvers: Record<string, unknown>;
+  /** Empty: cache expiry arrives from outside, so it is a source. */
   readonly effects: Record<string, unknown>;
+  /** The cache-expiry timer, as a source. */
+  readonly sources?: Record<string, unknown>;
+  /** Handlers for the events its sources publish. */
+  readonly events?: Record<
+    string,
+    (facts: Record<string, unknown>, event: Record<string, unknown>) => void
+  >;
   fetchNextPage: (facts: Record<string, unknown>) => void;
   fetchPreviousPage: (facts: Record<string, unknown>) => void;
   refetch: (facts: Record<string, unknown>) => void;
@@ -179,6 +194,9 @@ export function createInfiniteQuery<
   const stateKey = buildKey(name, "state");
   const keyKey = buildKey(name, "key");
   const triggerKey = buildKey(name, "trigger"); // "initial" | "next" | "prev" | timestamp
+  const expiredEvent = buildEvent(name, "EXPIRED");
+  const expiresCache =
+    expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY;
   const reqInitial = reqType(name, "INITIAL");
   const reqNext = reqType(name, "NEXT");
   const reqPrev = reqType(name, "PREV");
@@ -302,6 +320,7 @@ export function createInfiniteQuery<
       derivations: {
         [name]: { _type: null as unknown },
       },
+      events: expiresCache ? { [expiredEvent]: {} } : {},
     },
 
     requirements: {
@@ -617,45 +636,77 @@ export function createInfiniteQuery<
         : {}),
     },
 
-    effects: {
-      // Cache expiration (garbage collection)
-      ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
-        ? {
-            [`${PREFIX}${name}_gc`]: {
-              run: (facts: Record<string, unknown>) => {
-                // Read state to track as dependency — re-runs when state changes
-                void facts[stateKey];
+    // Cache expiration arrives from outside (a timer), so it is a source
+    // that publishes an event. Open while the query is idle (no key) and
+    // holds successful data, keyed by when that data arrived: one timer, set
+    // for the moment the data expires.
+    effects: {},
 
-                const checkInterval = Math.min(expireAfter, 5000);
-                const interval = setInterval(() => {
-                  const currentState = facts[stateKey] as
-                    | InfiniteResourceState<TData, TError>
-                    | undefined;
-                  if (
-                    !currentState ||
-                    currentState.status !== "success" ||
-                    !currentState.dataUpdatedAt
-                  ) {
-                    return;
-                  }
+    sources: expiresCache
+      ? {
+          [`${PREFIX}${name}_gc`]: {
+            key: (facts: Record<string, unknown>) => {
+              // Cheap checks first: while the query has a key, or has already
+              // expired, the cached state is never read.
+              if (keyFn(facts) !== null || facts[triggerKey] === "expired") {
+                return null;
+              }
+              const state = facts[stateKey] as
+                | InfiniteResourceState<TData, TError>
+                | undefined;
+              if (
+                !state ||
+                state.status !== "success" ||
+                !state.dataUpdatedAt
+              ) {
+                return null;
+              }
 
-                  const currentKeyVal = keyFn(facts);
-                  if (currentKeyVal !== null) {
-                    return;
-                  }
-
-                  if (Date.now() - currentState.dataUpdatedAt >= expireAfter) {
-                    facts[triggerKey] = "expired";
-                    facts[keyKey] = null;
-                  }
-                }, checkInterval);
-
-                return () => clearInterval(interval);
-              },
+              return String(state.dataUpdatedAt);
             },
-          }
-        : {}),
-    },
+            attach: (
+              publish: QueryPublish,
+              _reportError: unknown,
+              ctx?: { readonly key: string },
+            ) => {
+              const expiresAt = Number(ctx!.key) + expireAfter;
+              const timer = setTimeout(
+                () => publish(expiredEvent, { at: ctx!.key }),
+                Math.max(0, expiresAt - Date.now()),
+              );
+
+              return () => clearTimeout(timer);
+            },
+          },
+        }
+      : {},
+
+    events: expiresCache
+      ? {
+          [expiredEvent]: (
+            facts: Record<string, unknown>,
+            event: Record<string, unknown>,
+          ) => {
+            // The timer decides when; this only confirms the event is about
+            // the data still held. A timer may fire a millisecond before
+            // Date.now() agrees, so elapsed time is not re-checked.
+            const state = facts[stateKey] as
+              | InfiniteResourceState<TData, TError>
+              | undefined;
+            if (
+              !state ||
+              state.status !== "success" ||
+              !state.dataUpdatedAt ||
+              keyFn(facts) !== null ||
+              String(state.dataUpdatedAt) !== event.at
+            ) {
+              return;
+            }
+            facts[triggerKey] = "expired";
+            facts[keyKey] = null;
+          },
+        }
+      : {},
 
     // --- Imperative handles ---
 

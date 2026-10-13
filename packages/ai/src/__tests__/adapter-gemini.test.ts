@@ -81,7 +81,7 @@ describe("createGeminiRunner", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url] = mockFetch.mock.calls[0]!;
     expect(url).toBe(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
     );
   });
 
@@ -269,7 +269,7 @@ describe("createGeminiRunner", () => {
 
     const [url] = mockFetch.mock.calls[0]!;
     expect(url).toBe(
-      "https://my-proxy.example.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://my-proxy.example.com/v1beta/models/gemini-2.5-flash:generateContent",
     );
   });
 
@@ -361,7 +361,7 @@ describe("createGeminiStreamingRunner", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url] = mockFetch.mock.calls[0]!;
     expect(url).toBe(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
     );
   });
 

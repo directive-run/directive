@@ -397,7 +397,7 @@ A few sharp edges worth knowing once:
 - **Typo'd `$`-operators dev-warn.** `{ elapsed: { $eqq: 30 } }`
   triggers a runtime dev warning naming the typo and the known
   operators; the malformed clause evaluates to `false`.
-- **`$changed` is effects-only.** Constraints have no `prev` snapshot,
+- **`$changed` is effects-only.** Constraints have no `prevFacts` snapshot,
   so `$changed` only makes sense inside an effect `on`. Gate a
   constraint on "fact changed" with a boolean derivation that watches
   the change source.

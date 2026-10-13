@@ -169,6 +169,15 @@ export interface CreateDefinitionsRegistryOptions<S extends Schema> {
   scheduleReconcile: () => void;
   /** Max deferred registrations */
   maxDeferredRegistrations: number;
+  /**
+   * Called after a definition is registered, replaced or removed.
+   *
+   * A definition carries meta, and meta carries tags, so any of these three can
+   * change what a tag query answers. Only module registration used to say so,
+   * which left a dynamically registered constraint able to change the answer
+   * with nothing downstream told.
+   */
+  onDefinitionsChanged?: () => void;
 }
 
 // ============================================================================
@@ -245,6 +254,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     getState,
     scheduleReconcile,
     maxDeferredRegistrations,
+    onDefinitionsChanged,
   } = options;
 
   /** Track which definitions were dynamically registered */
@@ -352,6 +362,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.manager.registerDefinitions({ [id]: def });
     desc.dynamicSet.add(id);
     pluginManager.emitDefinitionRegister(type, id, def);
+    onDefinitionsChanged?.();
 
     scheduleIfWorkOwed(desc);
   }
@@ -407,6 +418,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.originalsMap.set(id, original);
     desc.mergedMap[id] = def;
     pluginManager.emitDefinitionAssign(type, id, def, original);
+    onDefinitionsChanged?.();
 
     scheduleIfWorkOwed(desc);
   }
@@ -430,6 +442,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     desc.dynamicSet.delete(id);
     desc.originalsMap.delete(id);
     pluginManager.emitDefinitionUnregister(type, id);
+    onDefinitionsChanged?.();
 
     scheduleIfWorkOwed(desc);
   }

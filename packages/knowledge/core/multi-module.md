@@ -176,11 +176,14 @@ const dataModule = createModule("data", {
     },
   },
 
+  // Resolvers write their own facts flat; dependencies are read-only on context.deps
   resolvers: {
     fetchItems: {
       requirement: "FETCH_ITEMS",
       resolve: async (req, context) => {
-        const res = await fetch("/api/items");
+        const res = await fetch("/api/items", {
+          headers: { authorization: context.deps.auth.token },
+        });
         context.facts.items = await res.json();
         context.facts.loaded = true;
       },
@@ -190,8 +193,8 @@ const dataModule = createModule("data", {
   // Effects also get cross-module facts
   effects: {
     onAuthChange: {
-      run: (facts, prev) => {
-        if (prev && prev.auth.isAuthenticated && !facts.auth.isAuthenticated) {
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.auth.isAuthenticated && !facts.auth.isAuthenticated) {
           console.log("User logged out, clearing data");
         }
       },
@@ -199,6 +202,17 @@ const dataModule = createModule("data", {
   },
 });
 ```
+
+### What each callback sees
+
+| Callback | Own facts | Other modules |
+|---|---|---|
+| `init`, event handlers | `facts.x` (writable) | none |
+| `derive`, constraints, effects | `facts.self.x` | `facts.auth.x` (read-only) |
+| resolvers | `context.facts.x` (writable) | `context.deps.auth.x` (read-only) |
+| source `key` / `active` gates | `facts.self.x` (read-only) | `facts.auth.x` (read-only) |
+
+A resolver can't change another module's state. Writing through `context.deps.auth` throws in development and is ignored in production – emit a requirement or dispatch an event the other module owns instead. A resolver has no `context.facts.self` or `context.facts.auth` – own facts are flat on `context.facts`, dependencies are on `context.deps`.
 
 ### `derived` is scoped to the own module
 

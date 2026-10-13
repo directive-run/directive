@@ -25,7 +25,7 @@ import {
   createExplain,
   createFact,
   createInspect,
-  createModule as createModuleController,
+  createModuleController,
   createOptimisticUpdate,
   createWatch,
   shallowEqual,
@@ -1174,7 +1174,7 @@ describe("Factory functions", () => {
     expect(controller.isPending).toBe(false);
   });
 
-  it("createModule (controller factory) returns a ModuleController", () => {
+  it("createModuleController returns a ModuleController", () => {
     const mod = createModule("factory-test", {
       schema: testSchema,
       init: (facts) => {

@@ -5,6 +5,7 @@
 import type {
   CrossModuleDeps,
   CrossModuleFactsWithSelf,
+  ReadonlyCrossModuleFacts,
 } from "./composition.js";
 import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
@@ -79,7 +80,7 @@ export interface ModuleHooks<M extends ModuleSchema> {
 type GetDerivationsSchema<M extends ModuleSchema> =
   M["derivations"] extends DerivationsSchema
     ? M["derivations"]
-    : Record<string, never>;
+    : Record<string, unknown>;
 
 /** Helper to get events schema, defaulting to empty */
 type GetEventsSchema<M extends ModuleSchema> = M["events"] extends EventsSchema
@@ -195,6 +196,14 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
    * derivation body receives them. Gate on it directly — reaching back through
    * `system.derive` works in a single-module system and silently resolves a
    * namespace once the module is composed with others.
+   *
+   * Keep it a pure function of `facts` and `derived`. A constraint is
+   * re-evaluated when a fact or derivation it read changes (and on
+   * `start()`), so a `when` that reads the clock or a variable outside the
+   * system is not re-asked when that changes. Put time and outside input in
+   * a fact, or publish it from a source. An async `when` without `deps` is
+   * re-evaluated on every pass, because reads after its first `await` cannot
+   * be tracked: declare `deps`.
    */
   when:
     | ((
@@ -339,13 +348,22 @@ export interface CrossModuleEffectDef<
    * Effect function with cross-module facts access. Return a cleanup function
    * for teardown.
    *
+   * `prevFacts` is the fact snapshot from before this pass — the same shape as
+   * `facts`, or absent on the first run. Named for what it holds: `facts` and
+   * `prevFacts` sat side by side and only one of them said.
+   *
+   * There is deliberately no `prevDerived`. Derivations are computed from
+   * facts, and the runtime keeps a previous snapshot of the facts only, so a
+   * previous derived value would have to be recomputed rather than recalled —
+   * from `prevFacts`, which the caller already has.
+   *
    * `derived` is this module's own derivations — read it rather than reaching
    * back through `system.derive`, which resolves a namespace in a composed
-   * system. Third, because `facts` and `prev` hold the first two positions.
+   * system. Third, because `facts` and `prevFacts` hold the first two positions.
    */
   run: (
-    facts: CrossModuleFactsWithSelf<M, Deps>,
-    prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
+    facts: ReadonlyCrossModuleFacts<M, Deps>,
+    prevFacts: ReadonlyCrossModuleFacts<M, Deps> | undefined,
     derived: InferDerivations<M>,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;
@@ -360,6 +378,11 @@ export interface CrossModuleEffectDef<
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }
@@ -450,6 +473,27 @@ export interface TypedResolverContext<M extends ModuleSchema> {
 }
 
 /**
+ * Read-only view of each declared dependency's facts, as a resolver in a
+ * module with `crossModuleDeps` receives it on `ctx.deps`.
+ */
+export type ResolverDeps<Deps extends CrossModuleDeps> = {
+  readonly [K in keyof Deps]: Readonly<InferFacts<Deps[K]>>;
+};
+
+/**
+ * Resolver context for a module with `crossModuleDeps`. `facts` stays flat
+ * and writable for the module's own facts; other modules are read through
+ * `deps`, which is read-only – change another module's state by emitting a
+ * requirement or dispatching an event that module owns.
+ */
+export interface CrossModuleResolverContext<
+  M extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> extends TypedResolverContext<M> {
+  readonly deps: ResolverDeps<Deps>;
+}
+
+/**
  * Helper to extract a specific requirement type from the schema.
  */
 type ExtractRequirement<
@@ -465,6 +509,7 @@ type ExtractRequirement<
 export interface TypedResolverDef<
   M extends ModuleSchema,
   T extends keyof GetRequirementsSchema<M> & string,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
 > {
   /** Requirement type to handle */
   requirement: T;
@@ -483,19 +528,13 @@ export interface TypedResolverDef<
   /** Batch configuration */
   batch?: BatchConfig;
   /** Resolve function for single requirement */
-  resolve?: (
-    req: ExtractRequirement<M, T>,
-    ctx: TypedResolverContext<M>,
-  ) => Promise<void>;
+  resolve?: (req: ExtractRequirement<M, T>, ctx: Ctx) => Promise<void>;
   /** Resolve batched requirements as a group (all-or-nothing). Receives the full array collected during the batch window. If this throws, all items in the batch are considered failed. */
-  resolveBatch?: (
-    reqs: ExtractRequirement<M, T>[],
-    ctx: TypedResolverContext<M>,
-  ) => Promise<void>;
+  resolveBatch?: (reqs: ExtractRequirement<M, T>[], ctx: Ctx) => Promise<void>;
   /** Resolve batched requirements with per-item success/failure results. Return a `BatchResolveResults` array in the same order as the input. Failed items can be individually retried. */
   resolveBatchWithResults?: (
     reqs: ExtractRequirement<M, T>[],
-    ctx: TypedResolverContext<M>,
+    ctx: Ctx,
   ) => Promise<BatchResolveResults>;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
@@ -504,17 +543,29 @@ export interface TypedResolverDef<
 /**
  * Union of all typed resolver definitions for all requirement types.
  */
-type AnyTypedResolverDef<M extends ModuleSchema> = {
-  [T in keyof GetRequirementsSchema<M> & string]: TypedResolverDef<M, T>;
+type AnyTypedResolverDef<
+  M extends ModuleSchema,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
+> = {
+  [T in keyof GetRequirementsSchema<M> & string]: TypedResolverDef<M, T, Ctx>;
 }[keyof GetRequirementsSchema<M> & string];
 
 /**
  * Typed resolvers definition using the module schema.
  */
-export type TypedResolversDef<M extends ModuleSchema> = Record<
-  string,
-  AnyTypedResolverDef<M>
->;
+export type TypedResolversDef<
+  M extends ModuleSchema,
+  Ctx extends TypedResolverContext<M> = TypedResolverContext<M>,
+> = Record<string, AnyTypedResolverDef<M, Ctx>>;
+
+/**
+ * Resolvers for a module with `crossModuleDeps`: same as
+ * {@link TypedResolversDef}, plus read-only `ctx.deps.<ns>`.
+ */
+export type CrossModuleResolversDef<
+  M extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = TypedResolversDef<M, CrossModuleResolverContext<M, Deps>>;
 
 // ============================================================================
 // Module Definition

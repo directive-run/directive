@@ -66,6 +66,19 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]>;
   /**
+   * The answer `evaluate(changedKeys)` would give when it has nothing to
+   * evaluate, without the promise.
+   *
+   * When no enabled constraint reads any of `changedKeys` and none is dirty,
+   * `evaluate` only carries every constraint's last requirements forward. This
+   * returns that list synchronously. It returns `null` whenever `evaluate`
+   * would have real work to do (first evaluation, an empty key set, an
+   * affected or dirty constraint), and the caller must then call `evaluate`.
+   *
+   * @internal
+   */
+  evaluateUnaffected(changedKeys: Set<string>): RequirementWithId[] | null;
+  /**
    * Get the current state of a constraint by its definition ID.
    *
    * @param id - The constraint definition ID.
@@ -133,6 +146,28 @@ export interface ConstraintsManager<_S extends Schema> {
    * @param constraintId - The constraint definition ID whose resolver finished.
    */
   markResolved(constraintId: string): void;
+  /**
+   * Whether any enabled constraint is marked dirty and waiting to be
+   * re-evaluated.
+   *
+   * @internal
+   */
+  hasDirty(): boolean;
+  /**
+   * Mark one constraint for re-evaluation on the next pass, whatever
+   * changed. Used when something other than a fact makes its answer stale
+   * (a retry-later of a constraint that threw).
+   *
+   * @internal
+   */
+  markDirty(constraintId: string): void;
+  /**
+   * Mark every constraint for re-evaluation on the next pass. Used by
+   * `start()`, since anything may have changed while stopped.
+   *
+   * @internal
+   */
+  markAllDirty(): void;
   /**
    * Check whether a constraint is currently disabled.
    *
@@ -280,6 +315,17 @@ export interface CreateConstraintsOptions<S extends Schema> {
 /** Default async constraint timeout (5 seconds) */
 const DEFAULT_TIMEOUT = 5000;
 
+/** Carries what a throwing `require()` read, so its deps are not lost. */
+class RequireError {
+  constructor(
+    readonly original: unknown,
+    readonly deps: Set<string>,
+  ) {}
+}
+
+/** Shared empty answer for `evaluateUnaffected`, so a quiet pass allocates nothing. */
+const NO_REQUIREMENTS = Object.freeze([]) as unknown as RequirementWithId[];
+
 /**
  * What a manager built without derivations hands to `when()` and `require()`.
  * Frozen and shared — every such manager has the same nothing to offer.
@@ -387,12 +433,13 @@ export function createConstraintsManager<S extends Schema>(
       (def as { deps?: string[] }).deps = undefined;
     }
 
-    // `$changed` is effects-only — constraints have no prev snapshot. Throw
+    // `$changed` is effects-only — constraints have no previous-facts
+    // snapshot. Throw
     // unconditionally at registration so production cannot silently collapse
     // this clause to a defined-check (which would have wrong semantics).
     if (containsChangedOperator(spec)) {
       throw new Error(
-        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no prev snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic prev.`,
+        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
 
@@ -426,7 +473,7 @@ export function createConstraintsManager<S extends Schema>(
   /**
    * Walk a {@link FactPredicate} spec checking for the `$changed` operator.
    * Used to block its use inside a constraint `when`, where there is no
-   * prev-snapshot to compare against.
+   * previous-facts snapshot to compare against.
    *
    * Delegates the depth-guarded, cycle-guarded structural traversal to
    * {@link walkPredicate} — a `$changed` surfaces as an operator clause
@@ -461,6 +508,28 @@ export function createConstraintsManager<S extends Schema>(
 
   // Track which constraints are async
   const asyncConstraintIds = new Set<string>();
+  /**
+   * Async constraints with no declared `deps`. Their reads past the first
+   * `await` cannot be tracked, so no changed key reliably wakes them; they
+   * are evaluated on every pass instead (and warned about in development).
+   * Cached; reset whenever definitions or async detection change.
+   */
+  let untrackedAsyncCache: string[] | null = null;
+  function untrackedAsyncIds(): string[] {
+    if (untrackedAsyncCache === null) {
+      untrackedAsyncCache = Object.keys(definitions).filter((id) => {
+        const def = definitions[id];
+
+        return (
+          def !== undefined &&
+          !def.deps &&
+          (def.async === true || asyncConstraintIds.has(id))
+        );
+      });
+    }
+
+    return untrackedAsyncCache;
+  }
 
   // Dependency tracking: which facts each constraint depends on
   const constraintDeps = new Map<string, Set<string>>();
@@ -637,6 +706,7 @@ export function createConstraintsManager<S extends Schema>(
     const isAsync = isAsyncConstraint(id, def);
     if (isAsync) {
       asyncConstraintIds.add(id);
+      untrackedAsyncCache = null;
     }
 
     const state: ConstraintState = {
@@ -752,9 +822,26 @@ export function createConstraintsManager<S extends Schema>(
       return whenFn(facts, derived);
     }
 
-    // Track dependencies during evaluation
-    const tracked = withTracking(() => whenFn(facts, derived));
+    // Track dependencies during evaluation. Kept when `when` throws too:
+    // the facts it read before throwing are the ones whose change can fix
+    // it, so a later write to one of them wakes the constraint. Dropping
+    // them left a constraint that threw once with no dependencies at all.
+    let threw = false;
+    let thrown: unknown;
+    const tracked = withTracking(() => {
+      try {
+        return whenFn(facts, derived);
+      } catch (error) {
+        threw = true;
+        thrown = error;
+
+        return false;
+      }
+    });
     latestWhenDeps.set(id, tracked.deps);
+    if (threw) {
+      throw thrown;
+    }
 
     return tracked.value;
   }
@@ -793,6 +880,7 @@ export function createConstraintsManager<S extends Schema>(
     promise: Promise<boolean>,
   ): Promise<boolean> {
     asyncConstraintIds.add(id);
+    untrackedAsyncCache = null;
     state.isAsync = true;
 
     if (isDevelopment) {
@@ -943,10 +1031,23 @@ export function createConstraintsManager<S extends Schema>(
 
     const requireDef = def.require;
     if (typeof requireDef === "function") {
-      // Track dependencies when require is a function
-      const { value: output, deps } = withTracking(() =>
-        requireDef(facts, derived),
-      );
+      // Track dependencies when require is a function. Kept when it throws,
+      // like `when`: a later write to what it read can fix it.
+      let threw = false;
+      let thrown: unknown;
+      const { value: output, deps } = withTracking(() => {
+        try {
+          return requireDef(facts, derived);
+        } catch (error) {
+          threw = true;
+          thrown = error;
+
+          return [];
+        }
+      });
+      if (threw) {
+        throw new RequireError(thrown, deps);
+      }
       const requirements = normalizeRequirements(
         output as RequirementOutput,
         id,
@@ -1156,7 +1257,17 @@ export function createConstraintsManager<S extends Schema>(
       reqs = result.requirements;
       requireDeps = result.deps;
     } catch (error) {
-      onError?.(id, error);
+      const original = error instanceof RequireError ? error.original : error;
+      onError?.(id, original);
+      if (error instanceof RequireError) {
+        // What `when` and `require` read, so the write that fixes either
+        // wakes it.
+        updateConstraintDeps(id, whenDeps, error.deps);
+        noFireConstraints.add(id);
+        lastRequirements.set(id, []);
+
+        return;
+      }
       handleInactiveConstraint(id);
 
       return;
@@ -1309,6 +1420,11 @@ export function createConstraintsManager<S extends Schema>(
     const affected = new Set<string>();
     collectAffectedByKeys(changedKeys, affected);
     collectDirtyConstraints(affected);
+    for (const id of untrackedAsyncIds()) {
+      if (!disabled.has(id)) {
+        affected.add(id);
+      }
+    }
 
     return affected;
   }
@@ -1349,9 +1465,11 @@ export function createConstraintsManager<S extends Schema>(
       let constraintsToEvaluate: string[];
 
       if (!hasEvaluated || !changedKeys || changedKeys.size === 0) {
-        // First evaluation or no specific changes: evaluate all
+        // First evaluation or no specific changes: evaluate all, which
+        // covers every dirty mark too.
         constraintsToEvaluate = allConstraintIds;
         hasEvaluated = true;
+        dirtyConstraints.clear();
       } else {
         const affected = computeAffectedConstraints(changedKeys);
         constraintsToEvaluate = [...affected];
@@ -1375,6 +1493,65 @@ export function createConstraintsManager<S extends Schema>(
         }
         maxPasses--;
       }
+
+      return requirements.all();
+    },
+
+    evaluateUnaffected(changedKeys: Set<string>): RequirementWithId[] | null {
+      const sorted = getSortedConstraintIds();
+      // With no constraints at all, `evaluate` answers [] whatever it is
+      // given, as long as nothing was registered and left dirty.
+      if (sorted.length === 0 && dirtyConstraints.size === 0) {
+        noFireConstraints.clear();
+
+        return NO_REQUIREMENTS;
+      }
+      // A pass with no changed keys (a resolver finished, a requeue) has
+      // nothing new for any constraint to read: unless one is dirty, the
+      // answer is last pass's carried forward, not a full re-evaluation.
+      if (!hasEvaluated) {
+        return null;
+      }
+      for (const id of untrackedAsyncIds()) {
+        if (!disabled.has(id)) {
+          return null;
+        }
+      }
+      for (const id of dirtyConstraints) {
+        if (!disabled.has(id)) {
+          return null;
+        }
+      }
+      for (const key of changedKeys) {
+        const deps = factToConstraints.get(key);
+        if (deps === undefined) {
+          continue;
+        }
+        for (const id of deps) {
+          if (!disabled.has(id)) {
+            return null;
+          }
+        }
+      }
+
+      // Exactly what `evaluate` does for an empty affected set.
+      noFireConstraints.clear();
+      dirtyConstraints.clear();
+      const allConstraintIds =
+        disabled.size === 0 ? sorted : sorted.filter((id) => !disabled.has(id));
+      let any = false;
+      for (const id of allConstraintIds) {
+        const reqs = lastRequirements.get(id);
+        if (reqs !== undefined && reqs.length > 0) {
+          any = true;
+          break;
+        }
+      }
+      if (!any) {
+        return NO_REQUIREMENTS;
+      }
+      const requirements = new RequirementSet();
+      carryForwardRequirements(allConstraintIds, new Set(), requirements);
 
       return requirements.all();
     },
@@ -1412,6 +1589,7 @@ export function createConstraintsManager<S extends Schema>(
       disabled.add(id);
       // Invalidate cache when constraints change
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Mark as dirty so it gets removed from requirements on next evaluate
       lastRequirements.delete(id);
       // Clean up dependency maps for disabled constraint
@@ -1430,6 +1608,7 @@ export function createConstraintsManager<S extends Schema>(
       disabled.delete(id);
       // Invalidate cache when constraints change
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Mark as dirty so it gets evaluated on next cycle
       dirtyConstraints.add(id);
     },
@@ -1466,6 +1645,28 @@ export function createConstraintsManager<S extends Schema>(
       }
     },
 
+    markDirty(constraintId: string): void {
+      if (definitions[constraintId]) {
+        dirtyConstraints.add(constraintId);
+      }
+    },
+
+    markAllDirty(): void {
+      for (const id of Object.keys(definitions)) {
+        dirtyConstraints.add(id);
+      }
+    },
+
+    hasDirty(): boolean {
+      for (const id of dirtyConstraints) {
+        if (!disabled.has(id)) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+
     isResolved(constraintId: string): boolean {
       return resolvedConstraints.has(constraintId);
     },
@@ -1483,6 +1684,7 @@ export function createConstraintsManager<S extends Schema>(
       }
       // Invalidate cached sort order
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Only rebuild topo order when new constraints have `after` dependencies
       if (hasAfterDeps) {
         detectCyclesAndComputeTopoOrder();
@@ -1510,6 +1712,7 @@ export function createConstraintsManager<S extends Schema>(
       dirtyConstraints.add(id);
       // Invalidate cached sort order (priority may have changed)
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Rebuild topo order + reverse deps in case `after` changed
       detectCyclesAndComputeTopoOrder();
       buildReverseDependencyMap();
@@ -1525,6 +1728,7 @@ export function createConstraintsManager<S extends Schema>(
       states.delete(id);
       disabled.delete(id);
       asyncConstraintIds.delete(id);
+      untrackedAsyncCache = null;
       dirtyConstraints.delete(id);
       noFireConstraints.delete(id);
       resolvedConstraints.delete(id);
@@ -1537,6 +1741,7 @@ export function createConstraintsManager<S extends Schema>(
 
       // Invalidate cached sort order
       sortedConstraintIds = null;
+      untrackedAsyncCache = null;
       // Rebuild topo order
       detectCyclesAndComputeTopoOrder();
       buildReverseDependencyMap();

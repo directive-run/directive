@@ -98,7 +98,7 @@ export type SchemasMap = Record<string, ModuleSchema>;
  *
  * effects: {
  *   onAuthChange: {
- *     run: (facts: AllFacts, prev: AllFacts | undefined) => {
+ *     run: (facts: AllFacts, prevFacts: AllFacts | undefined) => {
  *       facts.auth.isAuthenticated // ✅ typed!
  *       facts.data.users           // ✅ typed!
  *     }
@@ -154,6 +154,18 @@ export type CrossModuleFactsWithSelf<
   Deps extends CrossModuleDeps,
 > = { self: InferFacts<OwnSchema> } & {
   [K in keyof Deps]: InferFacts<Deps[K]>;
+};
+
+/**
+ * {@link CrossModuleFactsWithSelf} as an effect sees it: no namespace and no
+ * fact in it can be assigned. Effects never write facts. Values keep their
+ * own types; changing one in place is caught at runtime in development.
+ */
+export type ReadonlyCrossModuleFacts<
+  OwnSchema extends ModuleSchema,
+  Deps extends CrossModuleDeps,
+> = { readonly self: Readonly<InferFacts<OwnSchema>> } & {
+  readonly [K in keyof Deps]: Readonly<InferFacts<Deps[K]>>;
 };
 
 // ============================================================================
@@ -489,6 +501,30 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
     namespace: string,
     moduleDef: ModuleDef<S>,
   ): void;
+
+  /**
+   * Remove a module from a running system (RFC 0002).
+   *
+   * The module's sources detach, its in-flight resolvers abort, and its facts,
+   * derivations, constraints, effects and events are dropped. Modules that
+   * remain keep running throughout.
+   *
+   * In-flight resolvers receive an abort on `context.signal`. One that watches
+   * the signal stops promptly; one that ignores it runs to completion and its
+   * writes land nowhere, because the facts are gone. The returned promise
+   * settles once that work has genuinely finished — so when it resolves, the
+   * namespace is free and a replacement instance can take it.
+   *
+   * @example
+   * ```ts
+   * await system.unregisterModule("turn:42");
+   * system.registerModule("turn:43", createTurnModule({ id: 43 }));
+   * ```
+   *
+   * @throws if the namespace is not registered, the system is destroyed, or
+   * reconciliation is in progress.
+   */
+  unregisterModule(namespace: string): Promise<void>;
 
   /**
    * Get a distributable snapshot of computed derivations.
@@ -843,6 +879,20 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
    * ```
    */
   registerModule<S2 extends ModuleSchema>(moduleDef: ModuleDef<S2>): void;
+
+  /**
+   * Remove a previously registered module by its id (RFC 0002).
+   *
+   * Same semantics as the namespaced form: sources detach, in-flight resolvers
+   * abort via `context.signal`, and the promise settles once that work has
+   * actually stopped. The module this system was created with can be removed
+   * too — the system keeps running with nothing in it, which is what makes
+   * swapping the root module possible.
+   *
+   * @throws if no module with that id is registered, the system is destroyed,
+   * or reconciliation is in progress.
+   */
+  unregisterModule(moduleId: string): Promise<void>;
 
   /**
    * Get a distributable snapshot of computed derivations.

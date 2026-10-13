@@ -8,6 +8,7 @@
  * - Export/import state history
  */
 
+import { unwrapDevProxies } from "../core/facts.js";
 import type {
   Facts,
   FactsStore,
@@ -21,6 +22,15 @@ import { isPrototypeSafe } from "./utils.js";
 // ============================================================================
 // History Manager
 // ============================================================================
+
+/**
+ * Fact keys already reported as uncapturable.
+ *
+ * Module scope on purpose — the same fact shape warns identically in every
+ * system built from it, so a per-manager set would repeat the message once per
+ * system, which for a server creating one per request is forever.
+ */
+const uncapturableReported = new Set<string>();
 
 /**
  * A changeset groups multiple snapshots into a single undo/redo unit.
@@ -45,7 +55,7 @@ export interface Changeset {
  * @remarks
  * - `takeSnapshot(trigger)` records the current facts into the ring buffer.
  * - `restore(snapshot)` deserializes a snapshot back into the facts store,
- *   setting `isRestoring = true` so the engine skips reconciliation.
+ *   marking itself as restoring for the duration.
  * - `pause()` / `resume()` temporarily suspend snapshot recording (e.g.,
  *   during bulk imports or programmatic state resets).
  * - `beginChangeset(label)` / `endChangeset()` group consecutive snapshots
@@ -59,11 +69,30 @@ export interface Changeset {
 export interface HistoryManager<_S extends Schema> extends HistoryAPI {
   /** Take a snapshot of current state */
   takeSnapshot(trigger: string): Snapshot;
+  /**
+   * Re-capture the newest snapshot from the current facts, in place.
+   *
+   * For writes that finish the work of the pass that took it (an event an
+   * effect dispatched): they belong in that snapshot, not in one of their own,
+   * so undo lands on a settled state. A no-op unless the newest snapshot is the
+   * current one.
+   */
+  refreshLatestSnapshot(): void;
   /** Restore facts from a snapshot */
   restore(snapshot: Snapshot): void;
   /** Check if history is enabled */
   readonly isEnabled: boolean;
-  /** True while restoring a snapshot (engine should skip reconciliation) */
+  /**
+   * True while a snapshot is being restored.
+   *
+   * Informational. The engine does not read it: whether a write reconciles,
+   * and whether the pass it schedules is safe to snapshot or to re-evaluate
+   * gated sources with, are decided per write from the scope the manager runs
+   * its own assignments in. A flag covering the whole navigation answered for
+   * writes that were not the manager's — a listener reacting to a rewind is
+   * doing the program's own work — and it was still up during the flush where
+   * those reactions run.
+   */
   readonly isRestoring: boolean;
   /** Pause snapshot taking */
   pause(): void;
@@ -86,6 +115,21 @@ export interface CreateHistoryOptions<S extends Schema> {
   onSnapshot?: (snapshot: Snapshot) => void;
   /** Callback when history navigation occurs */
   onHistoryChange?: (from: number, to: number) => void;
+  /**
+   * Runs the manager's own fact assignments in whatever scope marks a write as
+   * replayed. Supplied by the engine; defaults to running `fn` unchanged so a
+   * standalone manager still works.
+   */
+  withRestoreOrigin?: (fn: () => void) => void;
+  /**
+   * Runs a whole navigation in whatever scope marks it as one — wider than
+   * {@link withRestoreOrigin}, which covers only the manager's own writes.
+   *
+   * A listener that writes while rewinding is doing the program's own work and
+   * its write reconciles like any other, but the pass it schedules must not
+   * take a snapshot over the redo stack or re-open a gated transport.
+   */
+  withNavigation?: (fn: () => void) => void;
 }
 
 /**
@@ -130,7 +174,15 @@ function resolveHistoryOption(option: HistoryOption): {
 export function createHistoryManager<S extends Schema>(
   options: CreateHistoryOptions<S>,
 ): HistoryManager<S> {
-  const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
+  const {
+    historyOption,
+    facts,
+    store,
+    onSnapshot,
+    onHistoryChange,
+    withRestoreOrigin = (fn: () => void) => fn(),
+    withNavigation = (fn: () => void) => fn(),
+  } = options;
 
   const {
     enabled: isEnabled,
@@ -174,17 +226,81 @@ export function createHistoryManager<S extends Schema>(
       }
     }
 
-    // Deep clone to prevent mutation
+    // Deep clone to prevent mutation. The fast path is one call for the whole
+    // object; only a fact that refuses to clone drops to the per-key path.
     try {
       return structuredClone(factsObj);
     } catch {
-      // Fallback for non-cloneable values (functions, DOM nodes, etc.)
+      return serializePerKey(factsObj);
+    }
+  }
+
+  // Reported keys live at module scope, not per manager: the same fact shape
+  // produces the same warning in every system built from it, and a server
+  // creating one system per request would otherwise repeat it forever.
+
+  /**
+   * Clone one fact at a time, so a single uncloneable value costs only itself.
+   *
+   * There is deliberately no shallow-copy tier. A shallow copy aliases every
+   * nested object, which means mutating a fact after a snapshot was taken
+   * silently rewrites the snapshot — and then time travel shows a past that
+   * never happened. That is worse than not recording one at all: an operator
+   * comparing two points in history is handed a difference manufactured by the
+   * act of reading. A fact that cannot be captured is left out and said out
+   * loud instead.
+   */
+  function serializePerKey(
+    factsObj: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    const uncapturable: string[] = [];
+
+    for (const [key, value] of Object.entries(factsObj)) {
       try {
-        return JSON.parse(JSON.stringify(factsObj));
+        out[key] = structuredClone(value);
+        continue;
       } catch {
-        return { ...factsObj };
+        // Fall through.
+      }
+      // In development, an object fact updated the documented way holds the
+      // nested warning Proxies its own reads produced, and `structuredClone`
+      // refuses a Proxy. That is a dev aid making dev state uncloneable, not a
+      // fact the author cannot serialize — so unwrap and try again before
+      // concluding anything. Done here rather than on the fast path because it
+      // is a walk, and it should cost nothing when cloning already works.
+      try {
+        out[key] = structuredClone(unwrapDevProxies(value));
+        continue;
+      } catch {
+        // Fall through to the JSON attempt.
+      }
+      try {
+        // Lossy for Date, Map and Set, but never aliased — and this tier only
+        // runs for a value structuredClone already refused.
+        out[key] = JSON.parse(JSON.stringify(value));
+      } catch {
+        uncapturable.push(key);
       }
     }
+
+    const unreported = uncapturable.filter(
+      (key) => !uncapturableReported.has(key),
+    );
+    if (unreported.length > 0) {
+      for (const key of unreported) {
+        uncapturableReported.add(key);
+      }
+      // Deliberately not naming class instances. They clone — into prototype-
+      // stripped plain objects — so they never reach this path, and listing
+      // them here sent people looking for the wrong cause. The engine already
+      // warns about class-instance facts where they are written.
+      console.warn(
+        `[Directive] These facts cannot be captured in history and are omitted from snapshots: ${unreported.join(", ")}. Restoring leaves them at their current values. A fact holding a function, a live handle, or another value that cannot be cloned cannot take part in time travel.`,
+      );
+    }
+
+    return out;
   }
 
   /** Deserialize and restore facts from a snapshot */
@@ -198,20 +314,30 @@ export function createHistoryManager<S extends Schema>(
     }
 
     store.batch(() => {
-      for (const [key, value] of Object.entries(serialized)) {
-        // Prototype pollution protection (redundant but defensive)
-        if (
-          key === "__proto__" ||
-          key === "constructor" ||
-          key === "prototype"
-        ) {
-          console.warn(
-            `[Directive] Skipping dangerous key "${key}" during fact restoration`,
-          );
-          continue;
+      // Scoped to the assignment loop, deliberately not to the batch.
+      //
+      // The batch flushes when it closes, and consumer code runs during that
+      // flush — an observer is free to write a value of its own. Those writes
+      // are the program's, not the replay's, and a scope that covered the
+      // flush would hand them this label. Narrowing it to the assignments
+      // separates the two exactly: the replay's writes happen inside, the
+      // reactions to them happen after.
+      withRestoreOrigin(() => {
+        for (const [key, value] of Object.entries(serialized)) {
+          // Prototype pollution protection (redundant but defensive)
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            console.warn(
+              `[Directive] Skipping dangerous key "${key}" during fact restoration`,
+            );
+            continue;
+          }
+          (facts as Record<string, unknown>)[key] = value;
         }
-        (facts as Record<string, unknown>)[key] = value;
-      }
+      });
     });
   }
 
@@ -267,6 +393,17 @@ export function createHistoryManager<S extends Schema>(
       return snapshot;
     },
 
+    refreshLatestSnapshot(): void {
+      if (!isEnabled || paused || snapshots.length === 0) {
+        return;
+      }
+      if (currentIndex !== snapshots.length - 1) {
+        return;
+      }
+      const latest = snapshots[currentIndex]!;
+      snapshots[currentIndex] = { ...latest, facts: serializeFacts() };
+    },
+
     restore(snapshot: Snapshot): void {
       if (!isEnabled) return;
 
@@ -278,7 +415,11 @@ export function createHistoryManager<S extends Schema>(
       restoring = true;
 
       try {
-        deserializeFacts(snapshot.facts);
+        // The whole navigation, flush included. Reactions to a restore run in
+        // that flush, and what they schedule has to know it followed one.
+        withNavigation(() => {
+          deserializeFacts(snapshot.facts);
+        });
       } finally {
         paused = false;
         restoring = false;
@@ -506,6 +647,7 @@ export function createDisabledHistory<S extends Schema>(): HistoryManager<S> {
     snapshots: [],
     currentIndex: -1,
     takeSnapshot: () => noopSnapshot,
+    refreshLatestSnapshot: () => {},
     restore: () => {},
     goBack: () => {},
     goForward: () => {},

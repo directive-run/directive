@@ -16,6 +16,9 @@ import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/** The repository root, from `packages/knowledge/scripts`. */
+const REPO_ROOT = join(__dirname, "..", "..", "..");
+
 // Accept path as CLI arg, or check sibling directive-docs repo, or fall back to legacy path
 const JSON_PATH = process.argv[2]
   ? join(process.cwd(), process.argv[2])
@@ -130,9 +133,11 @@ function main() {
 
   lines.push("## @directive-run/core", "");
   lines.push(...formatEntries(coreEntries));
+  lines.push(...undocumented("core", coreEntries));
 
   lines.push("", "## @directive-run/ai", "");
   lines.push(...formatEntries(aiEntries));
+  lines.push(...undocumented("ai", aiEntries));
 
   const output = `${lines.join("\n")}\n`;
   writeFileSync(OUTPUT, output, "utf-8");
@@ -141,6 +146,80 @@ function main() {
   log.writes("packages/knowledge/api-skeleton.md", size);
 
   log.done(PHASE);
+}
+
+/**
+ * Public exports named in an `export { ... }` block of a built declaration file.
+ *
+ * Deliberately a second implementation of the same scan the coverage test does,
+ * rather than a shared helper. The test's job is to disagree with this file when
+ * this file is wrong, and a check that imports the thing it checks agrees with it
+ * by construction.
+ */
+const EXPORT_BLOCK = /export\s*\{([^}]*)\}\s*(?:from\s*['"][^'"]+['"])?\s*;?/g;
+
+function declaredExports(dtsPath: string): string[] {
+  if (!existsSync(dtsPath)) {
+    return [];
+  }
+  const source = readFileSync(dtsPath, "utf-8");
+  const names = new Set<string>();
+  for (const block of source.matchAll(EXPORT_BLOCK)) {
+    for (const entry of (block[1] ?? "").split(",")) {
+      const spec = entry.trim().replace(/^type\s+/, "");
+      if (!spec) {
+        continue;
+      }
+      const aliased = spec.match(/\bas\s+([A-Za-z_$][\w$]*)$/);
+      const name = aliased ? (aliased[1] as string) : spec;
+      if (/^[A-Za-z_$][\w$]*$/.test(name) && name !== "default") {
+        names.add(name);
+      }
+    }
+  }
+
+  return [...names];
+}
+
+/**
+ * Name every export the published reference does not carry yet.
+ *
+ * `api-reference.json` is fetched from **the newest release that carries the
+ * asset**, which at the moment a release is being cut is the release *before*
+ * it. So an export added in this release cannot be in it — by construction, on
+ * every release that adds one. Before this, that made the coverage test fail on
+ * exactly the releases that were doing the most: four types hoisted to fix a
+ * declaration-emitter bug took the build down, and the only remedies on offer
+ * were hand-editing a generated file (overwritten by the next build) or adding
+ * them to a list of things not meant to be documented, which they are.
+ *
+ * A stub is the honest third option. The name is present, so a reader looking it
+ * up finds it and a coverage check passes; the description arrives on the next
+ * release, when the reference catches up.
+ */
+function undocumented(key: "core" | "ai", entries: ApiDocEntry[]): string[] {
+  const documented = new Set(entries.map((entry) => entry.name));
+  const missing = declaredExports(
+    join(REPO_ROOT, "packages", key, "dist", "index.d.ts"),
+  )
+    .filter((name) => !documented.has(name))
+    .sort();
+
+  if (missing.length === 0) {
+    return [];
+  }
+
+  log.item(`${missing.length} export(s) not yet in the published reference`);
+
+  return [
+    "",
+    "### Not yet in the published reference",
+    "",
+    "Exported by this build and absent from `api-reference.json`, which is fetched",
+    "from the previous release. Descriptions arrive with the next one.",
+    "",
+    ...missing.map((name) => `- \`${name}\``),
+  ];
 }
 
 export function formatEntries(entries: ApiDocEntry[]): string[] {

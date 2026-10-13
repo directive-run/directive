@@ -338,8 +338,11 @@ describe("the Anthropic table keys real model IDs", () => {
     "claude-opus-4-8": { input: 5, output: 25 },
     "claude-opus-4-7": { input: 5, output: 25 },
     "claude-opus-4-6": { input: 5, output: 25 },
-    // List price, not the introductory promotion — see the adapter's comment.
-    "claude-sonnet-5": { input: 3, output: 15 },
+    // $2/$10 was introduced as promotional pricing through 2026-08-31 and has
+    // since become the standard price; the scheduled rise to $3/$15 was
+    // cancelled. This pin read $3/$15 on the reasoning that the promotion would
+    // lapse — a forecast, held as though it were a published figure, and wrong.
+    "claude-sonnet-5": { input: 2, output: 10 },
     "claude-sonnet-4-6": { input: 3, output: 15 },
     "claude-haiku-4-5": { input: 1, output: 5 },
     "claude-haiku-4-5-20251001": { input: 1, output: 5 },

@@ -10,6 +10,7 @@
 
 import isDevelopment from "#is-development";
 import { freezeSpec } from "../utils/utils.js";
+import { PREV_FACTS_READ, declaresPrevFacts } from "./effects.js";
 import {
   applyPatch,
   evaluateTemplate,
@@ -18,11 +19,20 @@ import {
   memoizePredicate,
 } from "./predicate.js";
 import {
+  type CheckedReadView,
+  createCheckedReadView,
+} from "./read-only-view.js";
+import {
+  type CrossModuleProxyRole,
   SEPARATOR,
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
   createModuleFactsProxy,
+  createResolverDepsProxy,
+  createResolverFactsProxy,
+  createSourceGateFactsProxy,
 } from "./system-proxies.js";
+import { BLOCKED_PROPS } from "./tracking.js";
 import type { ModuleDef, ModuleSchema } from "./types.js";
 import { isDerivationWithMeta } from "./types/meta.js";
 
@@ -41,9 +51,9 @@ export interface FlatModuleDefinition {
   events: Record<string, unknown> | undefined;
   effects: Record<string, unknown> | undefined;
   /**
-   * Typed external event sources — pass through unmodified from the
-   * module definition. Sources don't read facts, so they don't need
-   * namespace prefixing the way effects/constraints/derivations do.
+   * Typed external event sources, with ids prefixed (`ns::id`), `publish`
+   * scoped to the module's own events, and `key` / `active` gates reading
+   * the module's own facts – see `prefixSources`.
    */
   sources: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
@@ -78,10 +88,47 @@ function createScopedFactsProxy(
   namespace: string,
   hasCrossModuleDeps: boolean,
   depNamespaces: string[],
+  role: CrossModuleProxyRole,
 ): Record<string, unknown> {
   return hasCrossModuleDeps
-    ? createCrossModuleFactsProxy(facts, namespace, depNamespaces)
+    ? createCrossModuleFactsProxy(facts, namespace, depNamespaces, role)
     : createModuleFactsProxy(facts, namespace);
+}
+
+/**
+ * Reject prototype-walking keys (`__proto__`, `constructor`, `prototype`) in
+ * every section of a module, before prefixing.
+ *
+ * The engine runs the same check in single-module mode, but in a namespaced
+ * system it only ever sees prefixed keys (`m::constructor`), which can never
+ * match – so without this the check silently never ran for composed systems.
+ * Same sections and message as the engine, so both modes reject alike.
+ */
+function assertNoBlockedKeys(
+  mod: ModuleDef<ModuleSchema>,
+  namespace: string,
+): void {
+  const sections: [string, object | undefined][] = [
+    ["schema", mod.schema?.facts],
+    ["events", mod.events],
+    ["derive", mod.derive],
+    ["effects", mod.effects],
+    ["sources", (mod as { sources?: object }).sources],
+    ["constraints", mod.constraints],
+    ["resolvers", mod.resolvers],
+  ];
+  for (const [section, obj] of sections) {
+    if (!obj) {
+      continue;
+    }
+    for (const key of Object.keys(obj)) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${namespace}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
+        );
+      }
+    }
+  }
 }
 
 /** Prefix a key with the namespace separator */
@@ -494,6 +541,7 @@ function prefixDerive(
         namespace,
         hasCrossModuleDeps,
         depNamespaces,
+        "derive",
       );
       const deriveProxy = moduleDerive(derive, namespace);
       return (fn as any)(factsProxy, deriveProxy);
@@ -593,6 +641,7 @@ function prefixConstraints(
               namespace,
               hasCrossModuleDeps,
               depNamespaces,
+              "constraint",
             );
             const deriveProxy = moduleDerive(derive, namespace);
 
@@ -612,6 +661,7 @@ function prefixConstraints(
                 namespace,
                 hasCrossModuleDeps,
                 depNamespaces,
+                "constraint",
               );
               const deriveProxy = moduleDerive(derive, namespace);
 
@@ -661,20 +711,66 @@ function prefixResolvers(
       timeout?: number;
     };
 
-    /** Wrap resolver ctx.facts with the module-scoped proxy */
+    /**
+     * Wrap the resolver ctx: `facts` is flat, own-module access – the shape
+     * the resolver types declare, same as event handlers. Modules with
+     * crossModuleDeps also get read-only `ctx.deps.<ns>`. Every other
+     * ctx member (`snapshot`, `requeue`, …) passes through – dropping them
+     * here left namespaced resolvers without `ctx.requeue()`.
+     */
     function wrapCtx(ctx: { facts: unknown; signal: AbortSignal }): {
       facts: unknown;
       signal: AbortSignal;
     } {
+      const facts = ctx.facts as Record<string, unknown>;
+
+      if (!hasCrossModuleDeps) {
+        return {
+          ...ctx,
+          facts: createResolverFactsProxy(facts, namespace),
+        };
+      }
+
       return {
-        facts: createScopedFactsProxy(
-          ctx.facts as Record<string, unknown>,
-          namespace,
-          hasCrossModuleDeps,
+        ...ctx,
+        facts: createResolverFactsProxy(facts, namespace),
+        deps: createResolverDepsProxy(facts, namespace, depNamespaces),
+      } as { facts: unknown; signal: AbortSignal };
+    }
+
+    /**
+     * Run the resolver with its wrapped ctx. In development, a module with
+     * crossModuleDeps also gets its dependency views checked: the stored
+     * values are handed out as they are, so a resolver that changes one in
+     * place (`ctx.deps.auth.user.name = …`) is reported once it settles,
+     * naming the path. Production runs the resolver directly.
+     */
+    async function run<T>(
+      ctx: { facts: unknown; signal: AbortSignal },
+      call: (wrapped: { facts: unknown; signal: AbortSignal }) => Promise<T>,
+    ): Promise<T> {
+      const wrapped = wrapCtx(ctx);
+      // Written as a positive dev block, not an early return on
+      // `!isDevelopment`, so a bundler that folds the check to `false`
+      // removes the block and its message (see tsup.config.ts).
+      if (isDevelopment && hasCrossModuleDeps) {
+        const checked = checkDependencyViews(
+          wrapped as { facts: unknown; signal: AbortSignal; deps?: unknown },
           depNamespaces,
-        ),
-        signal: ctx.signal,
-      };
+        );
+        const result = await call(checked.ctx);
+        const mutated = checked.takeMutation();
+        if (mutated !== null) {
+          const owner = mutated.slice(0, mutated.indexOf("."));
+          throw new Error(
+            `[Directive] Module "${namespace}": a resolver changed "${mutated}" in place. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+          );
+        }
+
+        return result;
+      }
+
+      return call(wrapped);
     }
 
     result[prefixKey(namespace, key)] = {
@@ -684,7 +780,7 @@ function prefixResolvers(
           req: unknown,
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          await resolverDef.resolve!(req, wrapCtx(ctx));
+          await run(ctx, (wrapped) => resolverDef.resolve!(req, wrapped));
         },
       }),
       ...(resolverDef.resolveBatch && {
@@ -692,7 +788,7 @@ function prefixResolvers(
           reqs: unknown[],
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          await resolverDef.resolveBatch!(reqs, wrapCtx(ctx));
+          await run(ctx, (wrapped) => resolverDef.resolveBatch!(reqs, wrapped));
         },
       }),
       ...(resolverDef.resolveBatchWithResults && {
@@ -700,13 +796,74 @@ function prefixResolvers(
           reqs: unknown[],
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          return resolverDef.resolveBatchWithResults!(reqs, wrapCtx(ctx));
+          return run(ctx, (wrapped) =>
+            resolverDef.resolveBatchWithResults!(reqs, wrapped),
+          );
         },
       }),
     };
   }
 
   return nonEmpty(result);
+}
+
+/**
+ * Development: one resolver call's dependency views, each read through the
+ * shared checked view so an in-place change is caught after the call.
+ * Covers `ctx.deps.<ns>`. Built per call, because the check records what that call read.
+ */
+function checkDependencyViews(
+  ctx: { facts: unknown; signal: AbortSignal; deps?: unknown },
+  depNamespaces: string[],
+): {
+  ctx: { facts: unknown; signal: AbortSignal };
+  takeMutation(): string | null;
+} {
+  const deps = ctx.deps as Record<string, unknown>;
+  const depNames = new Set(depNamespaces);
+  const checks = new Map<string, CheckedReadView<Record<string, unknown>>>();
+
+  function checkedView(ns: string): Record<string, unknown> {
+    let check = checks.get(ns);
+    if (check === undefined) {
+      const raw = deps[ns] as Record<string, unknown>;
+      check = createCheckedReadView(
+        raw,
+        (key) => {
+          // The dependency view refuses the write itself, with its message.
+          raw[key] = undefined;
+
+          return true;
+        },
+        { prefix: ns },
+      );
+      checks.set(ns, check);
+    }
+
+    return check.view;
+  }
+
+  return {
+    ctx: {
+      ...ctx,
+      deps: new Proxy(deps, {
+        get: (target, prop) =>
+          typeof prop === "string" && depNames.has(prop)
+            ? checkedView(prop)
+            : Reflect.get(target, prop),
+      }),
+    } as { facts: unknown; signal: AbortSignal },
+    takeMutation(): string | null {
+      for (const check of checks.values()) {
+        const found = check.takeMutation();
+        if (found !== null) {
+          return found;
+        }
+      }
+
+      return null;
+    },
+  };
 }
 
 /** Prefix effect keys and wrap run functions with scoped proxies */
@@ -723,33 +880,122 @@ function prefixEffects(
   const result: Record<string, unknown> = {};
   for (const [key, effect] of Object.entries(mod.effects)) {
     const effectDef = effect as {
-      run: (facts: any, prev: any, derived: any) => void | Promise<void>;
+      run: (facts: any, prevFacts: any, derived: any) => void | Promise<void>;
       deps?: string[];
     };
 
+    // Whether the AUTHOR's effect reads `prevFacts`, recorded before wrapping.
+    // The wrapper below always takes three parameters, so its own arity says
+    // nothing about the effect inside it — and reading the wrapper instead
+    // meant every namespaced effect looked like a reader, which silently opted
+    // composed systems out of skipping the full-store copy entirely. Those are
+    // the systems holding the most facts.
+    const readsPrevFacts = declaresPrevFacts(effectDef.run);
+
+    const wrappedRun = (facts: any, prevFacts: any, derive: any) => {
+      const factsProxy = createScopedFactsProxy(
+        facts as Record<string, unknown>,
+        namespace,
+        hasCrossModuleDeps,
+        depNamespaces,
+        "effect",
+      );
+      const prevProxy = prevFacts
+        ? createScopedFactsProxy(
+            prevFacts as Record<string, unknown>,
+            namespace,
+            hasCrossModuleDeps,
+            depNamespaces,
+            "effect",
+          )
+        : undefined;
+      const deriveProxy = moduleDerive(derive, namespace);
+
+      return effectDef.run(factsProxy, prevProxy, deriveProxy);
+    };
+    (wrappedRun as { [PREV_FACTS_READ]?: boolean })[PREV_FACTS_READ] =
+      readsPrevFacts;
+
     result[prefixKey(namespace, key)] = {
       ...effectDef,
-      run: (facts: any, prev: any, derive: any) => {
-        const factsProxy = createScopedFactsProxy(
-          facts as Record<string, unknown>,
-          namespace,
-          hasCrossModuleDeps,
-          depNamespaces,
-        );
-        const prevProxy = prev
-          ? createScopedFactsProxy(
-              prev as Record<string, unknown>,
-              namespace,
-              hasCrossModuleDeps,
-              depNamespaces,
-            )
-          : undefined;
-        const deriveProxy = moduleDerive(derive, namespace);
-
-        return effectDef.run(factsProxy, prevProxy, deriveProxy);
-      },
+      run: wrappedRun,
       deps: effectDef.deps?.map((dep) => prefixKey(namespace, dep)),
     };
+  }
+
+  return nonEmpty(result);
+}
+
+/**
+ * Prefix source ids and scope each source to its module.
+ *
+ * - `publish("START")` dispatches the module's own `ns::START`. The engine
+ *   scopes the name from the source's `ns::` id, and drops a name that
+ *   already contains `::` as `cross-module-event`.
+ * - `key` / `active` gates read the module's own facts through a read-only
+ *   view, scoped like constraints (see {@link createSourceGateFactsProxy}).
+ * - Source ids become `ns::id`, so one factory module registered under two
+ *   names gets two sources instead of a definition collision.
+ */
+function prefixSources(
+  mod: ModuleDef<ModuleSchema>,
+  namespace: string,
+  hasCrossModuleDeps: boolean,
+  depNamespaces: string[],
+): Record<string, unknown> | undefined {
+  const sources = (mod as { sources?: Record<string, unknown> }).sources;
+  if (!sources) {
+    return undefined;
+  }
+
+  const gateDeps = hasCrossModuleDeps ? depNamespaces : null;
+
+  function wrapGate(gate: unknown): unknown {
+    if (typeof gate !== "function") {
+      return gate;
+    }
+
+    return (facts: Record<string, unknown>) =>
+      gate(createSourceGateFactsProxy(facts, namespace, gateDeps));
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [id, raw] of Object.entries(sources)) {
+    const def = raw as {
+      attach: (publish: unknown, ...rest: unknown[]) => unknown;
+      key?: unknown;
+      active?: unknown;
+    };
+
+    // Copy the definition with its prototype and property descriptors, then
+    // override only the wrapped members. A spread would flatten a class-based
+    // source (methods and getters live on the prototype) and drop
+    // non-enumerable fields such as `meta`.
+    const wrapped = Object.create(Object.getPrototypeOf(def)) as Record<
+      string,
+      unknown
+    >;
+    Object.defineProperties(wrapped, Object.getOwnPropertyDescriptors(def));
+    const override = (name: string, value: unknown) =>
+      Object.defineProperty(wrapped, name, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    // Call through to the original so a class-based source's `this` is the
+    // instance, not the copy.
+    override("attach", (...args: unknown[]) =>
+      def.attach(...(args as [unknown, ...unknown[]])),
+    );
+    if (typeof def.key === "function") {
+      override("key", wrapGate(def.key));
+    }
+    if (typeof def.active === "function") {
+      override("active", wrapGate(def.active));
+    }
+
+    result[prefixKey(namespace, id)] = wrapped;
   }
 
   return nonEmpty(result);
@@ -786,6 +1032,9 @@ export function prefixModuleDefinition(
 ): FlatModuleDefinition {
   const { mod: rawMod, namespace, snapshotModulesSet } = options;
 
+  // A security boundary, not a dev convenience – runs in every environment.
+  assertNoBlockedKeys(rawMod, namespace);
+
   // Normalize data-form definition arms before namespace prefixing so the
   // per-arm prefixers can assume function-shaped definitions (where they
   // wrap with module-scoped proxies) or already-prefixed data specs (where
@@ -801,17 +1050,22 @@ export function prefixModuleDefinition(
     : [];
 
   return {
-    id: mod.id,
+    // The NAMESPACE, not `mod.id`. Every key this module contributes is
+    // already namespace-prefixed, so the namespace is what actually identifies
+    // it inside a flattened system — and it is unique by construction, which
+    // `mod.id` is not. One factory-built definition registered under several
+    // names produced several modules sharing an id, and everything downstream
+    // that keys on module identity (source ownership, module meta, teardown)
+    // then acted on whichever it found first. Retiring one instance detached a
+    // sibling's live subscription, permanently and with nothing reported.
+    id: namespace,
     schema: prefixSchema(mod, namespace),
     requirements: mod.schema.requirements ?? {},
     init: prefixInit(mod, namespace),
     derive: prefixDerive(mod, namespace, hasCrossModuleDeps, depNamespaces),
     events: prefixEventHandlers(mod, namespace),
     effects: prefixEffects(mod, namespace, hasCrossModuleDeps, depNamespaces),
-    // Sources don't access facts, so no prefixing pass — copy through.
-    // The engine collision check still namespaces them per-module via the
-    // existing definitionOwners map.
-    sources: (mod as { sources?: Record<string, unknown> }).sources,
+    sources: prefixSources(mod, namespace, hasCrossModuleDeps, depNamespaces),
     constraints: prefixConstraints(
       mod,
       namespace,

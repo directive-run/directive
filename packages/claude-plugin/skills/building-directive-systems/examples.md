@@ -1784,15 +1784,19 @@ export const listModule = createModule("list", {
 
   effects: {
     observeScroll: {
-      run: (facts) => {
+      run: () => {
         const sentinel = document.getElementById("pg-scroll-sentinel");
         if (!sentinel) {
           return;
         }
 
+        // Effects cannot write facts, so the observer reports through the
+        // module's event.
         const observer = new IntersectionObserver(
           ([entry]) => {
-            facts.self.scrollNearBottom = entry.isIntersecting;
+            system.events.list.setScrollNearBottom({
+              value: entry.isIntersecting,
+            });
           },
           { rootMargin: "200px" },
         );
@@ -2552,9 +2556,9 @@ export const websocketModule = createModule("websocket", {
   effects: {
     logStatusChange: {
       deps: ["status"],
-      run: (facts, prev) => {
-        if (prev && prev.status !== facts.status) {
-          addLogEntry(facts, "status", `${prev.status} \u2192 ${facts.status}`);
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.status !== facts.status) {
+          addLogEntry(facts, "status", `${prevFacts.status} \u2192 ${facts.status}`);
         }
       },
     },
@@ -3178,19 +3182,19 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
   effects: {
     logSyncChange: {
       deps: ["syncingOpId"],
-      run: (facts, prev) => {
-        if (prev) {
-          if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
+      run: (facts, prevFacts) => {
+        if (prevFacts) {
+          if (prevFacts.syncingOpId === "" && facts.syncingOpId !== "") {
             addLogEntry(
               facts,
               "status",
               `Sync started: op ${facts.syncingOpId}`,
             );
-          } else if (prev.syncingOpId !== "" && facts.syncingOpId === "") {
+          } else if (prevFacts.syncingOpId !== "" && facts.syncingOpId === "") {
             addLogEntry(
               facts,
               "status",
-              `Sync completed: op ${prev.syncingOpId}`,
+              `Sync completed: op ${prevFacts.syncingOpId}`,
             );
           }
         }

@@ -1,5 +1,26 @@
 # @directive-run/scaffold
 
+## 0.2.3
+
+### Patch Changes
+
+- [#146](https://github.com/directive-run/directive/pull/146) [`33967c0`](https://github.com/directive-run/directive/commit/33967c091f63eaa410cede624208078d059b7e5c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - The scaffolded module now names an effect's second parameter `prevFacts`, matching the runtime and every other generated surface.
+
+  ```ts
+  effects: {
+    logChange: {
+      deps: ["status"],
+      run: (facts, prevFacts) => {
+        if (prevFacts && prevFacts.status !== facts.status) {
+          console.log(`Status: ${prevFacts.status} → ${facts.status}`);
+        }
+      },
+    },
+  },
+  ```
+
+  Only the generated text changes. Anything already scaffolded keeps working — parameter names are positional, so a module written against the old output is unaffected.
+
 ## 0.2.2
 
 ### Patch Changes

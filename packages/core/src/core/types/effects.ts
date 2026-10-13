@@ -2,7 +2,7 @@
  * Effect Types - Type definitions for effects
  */
 
-import type { Facts } from "./facts.js";
+import type { EffectFacts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { FactPredicate } from "./predicate.js";
 import type { InferSchema, Schema } from "./schema.js";
@@ -148,18 +148,34 @@ export interface EffectDef<
    * back through `system.derive`, which is the single-module accessor and
    * resolves a namespace instead of a value once the module is composed into a
    * `createSystem({ modules })`. Third rather than second because `facts` and
-   * `prev` already hold the first two positions.
+   * `prevFacts` already hold the first two positions.
    *
-   * It reads your own writes. Write a fact and read a derivation of it later in
-   * the same body and you get the value that follows from the write, the same
-   * way reading the fact back does. The body runs inside a batch, so listeners
-   * are still notified once at the end — the derivation is *invalidated* as you
-   * write and only the announcement waits. Without that, `facts` and `derived`
-   * would answer from two different moments inside one function.
+   * Effects read facts; they never write them. `facts` is a read-only view:
+   * assigning to it, deleting from it, or writing through `facts.$store`
+   * throws in development and is ignored in production. That holds after an
+   * `await`, inside the cleanup the body returns, and in any callback the
+   * body starts, because all of them write through the same view.
+   *
+   * Reach for the primitive that owns the change instead:
+   * - an **event handler** for a change caused by input,
+   * - a **derivation** for a value computed from other facts,
+   * - a **resolver** for work a constraint requires,
+   * - a **source** (`publish`) or a resolver for data that comes back from
+   *   async work, such as a fetch or a socket message.
+   *
+   * An effect wakes only for the facts its *last* run read. A short-circuit
+   * such as `facts.a || facts.b` skips reading `b` while `a` is truthy, so a
+   * change to `b` alone does not wake it. Read both up front, or declare
+   * `deps`, when the body acts on both.
+   *
+   * After a history navigation (`goBack`, `goForward`, `goTo`, `replay`,
+   * `import`) the effect runs again for the restored facts it depends on, so
+   * what it shows the outside world matches the rewound state. Set
+   * `onNavigate: "skip"` to opt out.
    */
   run(
-    facts: Facts<S>,
-    prev: InferSchema<S> | null,
+    facts: EffectFacts<S>,
+    prevFacts: Readonly<InferSchema<S>> | null,
     derived: Derived,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
@@ -188,6 +204,17 @@ export interface EffectDef<
    * @example on: { phase: "red", elapsed: { $gte: 30 } }
    */
   on?: FactPredicate<InferSchema<S>>;
+  /**
+   * What the effect does when a history navigation (`goBack`, `goForward`,
+   * `goTo`, `replay`, `import`) restores facts it depends on.
+   *
+   * - `"rerun"` (default): run again, so what the effect shows the outside
+   *   world (a canvas, the DOM, a document title) matches the restored state.
+   * - `"skip"`: stay quiet. Use it for effects that record acts rather than
+   *   mirror state, such as analytics or an audit log, where replaying a
+   *   timeline must not report it twice.
+   */
+  onNavigate?: "rerun" | "skip";
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }

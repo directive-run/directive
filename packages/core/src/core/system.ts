@@ -344,16 +344,30 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   // Transform modules to flat format with prefixed keys
   // auth.token → auth::token internally
   // Process in dependency order (determined above)
+  /**
+   * The flattened module each namespace produced.
+   *
+   * `prefixModuleDefinition` keeps `mod.id`, so the flattened id is NOT the
+   * namespace — one module definition registered under two namespaces yields
+   * two entries sharing an id. Unregistering by id therefore tears down
+   * whichever came first. Holding the exact object per namespace is what makes
+   * removal unambiguous.
+   */
+  const flatByNamespace = new Map<string, object>();
+
   const flatModules = orderedNamespaces
     .map((namespace) => {
       const mod = modulesMap[namespace];
       if (!mod) return null; // TypeScript guard - should never happen
 
-      return prefixModuleDefinition({
+      const flat = prefixModuleDefinition({
         mod,
         namespace,
         snapshotModulesSet,
       });
+      flatByNamespace.set(namespace, flat);
+
+      return flat;
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
@@ -817,8 +831,71 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       // Update namespace keys map
       namespaceKeysMap.set(namespace, collectNamespaceKeys(namespace, mod));
 
+      flatByNamespace.set(namespace, flat);
+
       // Delegate to engine's registerModule
-      (engine as any).registerModule(flat);
+      try {
+        (engine as any).registerModule(flat);
+      } catch (error) {
+        // Roll the namespace bookkeeping back. The engine validates schema
+        // keys, blocked properties and collisions, so a rejected registration
+        // is ordinary. Without this the name was claimed but not registered:
+        // unregistering it threw "no such module", registering it again threw
+        // "already exists", and there was no way back short of destroying the
+        // system.
+        moduleNamespaces.delete(namespace);
+        delete (modulesMap as Record<string, ModuleDef<ModuleSchema>>)[
+          namespace
+        ];
+        moduleNamesCache.names = null;
+        namespaceKeysMap.delete(namespace);
+        flatByNamespace.delete(namespace);
+        throw error;
+      }
+    },
+
+    async unregisterModule(namespace: string): Promise<void> {
+      if (!moduleNamespaces.has(namespace)) {
+        throw new Error(
+          `[Directive] Cannot unregister module "${namespace}": no such module namespace.`,
+        );
+      }
+      const mod = (
+        modulesMap as Record<string, ModuleDef<ModuleSchema> | undefined>
+      )[namespace];
+      if (!mod) {
+        // The namespace set and the module map are written together, so this
+        // is unreachable rather than merely unlikely — and saying so beats a
+        // non-null assertion that would read as a guess.
+        throw new Error(
+          `[Directive] Module namespace "${namespace}" is registered but has no definition.`,
+        );
+      }
+
+      // The exact flattened object, never an id — see `flatByNamespace`. No
+      // string fallback: falling back would quietly reinstate the ambiguous
+      // lookup this map exists to remove, and it would do so precisely in the
+      // case where the map is out of step and the answer is least trustworthy.
+      const flat = flatByNamespace.get(namespace);
+      if (!flat) {
+        throw new Error(
+          `[Directive] Module namespace "${namespace}" has no flattened definition. This is an internal inconsistency; please report it.`,
+        );
+      }
+
+      // Engine first. It holds the live definitions and the in-flight work, so
+      // the namespace must stay resolvable until the drain completes —
+      // removing it here would strand a resolver mid-abort with no way for the
+      // engine to attribute what it was tearing down.
+      await (engine as any).unregisterModule(flat);
+
+      flatByNamespace.delete(namespace);
+      moduleNamespaces.delete(namespace);
+      delete (modulesMap as Record<string, ModuleDef<ModuleSchema>>)[namespace];
+      // Invalidate cached module names so the proxies stop offering a
+      // namespace that no longer resolves to anything.
+      moduleNamesCache.names = null;
+      namespaceKeysMap.delete(namespace);
     },
   } as any;
 
@@ -1270,6 +1347,12 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         hooks: moduleDef.hooks,
         history: moduleDef.history,
       });
+    },
+
+    async unregisterModule(moduleId: string): Promise<void> {
+      // No namespace bookkeeping in single-module mode — the engine holds the
+      // whole module set, so this is a straight delegation.
+      await (engine as any).unregisterModule(moduleId);
     },
   } as any;
 

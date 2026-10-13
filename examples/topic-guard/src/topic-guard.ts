@@ -143,18 +143,17 @@ export const topicGuardModule = createModule("topic-guard", {
       messages.push({ role: "user", text, blocked: false });
       facts.messages = messages;
 
-      // Run guardrails
+      // Run guardrails. The log entry is written here, with the result,
+      // because effects cannot write facts.
       const keywordResult = checkKeywordGuardrail(text);
-      if (keywordResult.blocked) {
-        facts.lastGuardrailResult = keywordResult;
-        facts.isProcessing = true;
-        facts.input = "";
-
-        return;
-      }
-
-      const classifierResult = checkTopicClassifier(text, facts.allowedTopics);
-      facts.lastGuardrailResult = classifierResult;
+      const result = keywordResult.blocked
+        ? keywordResult
+        : checkTopicClassifier(text, facts.allowedTopics);
+      facts.lastGuardrailResult = result;
+      facts.guardrailLog = [
+        ...facts.guardrailLog,
+        { timestamp: Date.now(), input: text, result },
+      ];
       facts.isProcessing = true;
       facts.input = "";
     },
@@ -261,33 +260,6 @@ export const topicGuardModule = createModule("topic-guard", {
         });
         context.facts.messages = messages;
         context.facts.isProcessing = false;
-      },
-    },
-  },
-
-  // ============================================================================
-  // Effects
-  // ============================================================================
-
-  effects: {
-    logGuardrailResult: {
-      deps: ["lastGuardrailResult"],
-      run: (facts) => {
-        const result = facts.lastGuardrailResult;
-        if (!result) {
-          return;
-        }
-
-        const lastUserMsg = [...facts.messages]
-          .reverse()
-          .find((m) => m.role === "user");
-        const log = [...facts.guardrailLog];
-        log.push({
-          timestamp: Date.now(),
-          input: lastUserMsg?.text ?? "",
-          result,
-        });
-        facts.guardrailLog = log;
       },
     },
   },

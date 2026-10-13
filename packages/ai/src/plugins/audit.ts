@@ -742,6 +742,11 @@ export function createAuditTrail(
               key: c.key,
               value: c.value,
               prev: c.prev,
+              // Carried through. Dropping it left this trail unable to tell a
+              // write the program made from one a history navigation replayed
+              // or a plugin hydrated — the distinction core stamps precisely
+              // so a record can keep it.
+              origin: c.origin,
             })),
           }).catch(console.error);
         },

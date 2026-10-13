@@ -1,5 +1,141 @@
 # @directive-run/mcp
 
+## 0.6.28
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.34.1
+  - @directive-run/sandbox@0.4.27
+  - @directive-run/claude-plugin@1.34.1
+
+## 0.6.27
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.34.0
+  - @directive-run/sandbox@0.4.26
+  - @directive-run/claude-plugin@1.34.0
+
+## 0.6.26
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.33.1
+  - @directive-run/sandbox@0.4.25
+  - @directive-run/claude-plugin@1.33.1
+
+## 0.6.25
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.33.0
+  - @directive-run/sandbox@0.4.24
+  - @directive-run/claude-plugin@1.33.0
+
+## 0.6.24
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.32.0
+  - @directive-run/sandbox@0.4.23
+  - @directive-run/claude-plugin@1.32.0
+
+## 0.6.23
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.31.3
+  - @directive-run/sandbox@0.4.22
+  - @directive-run/claude-plugin@1.31.3
+
+## 0.6.22
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.31.2
+  - @directive-run/sandbox@0.4.21
+  - @directive-run/claude-plugin@1.31.2
+
+## 0.6.21
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.31.1
+  - @directive-run/sandbox@0.4.20
+  - @directive-run/claude-plugin@1.31.1
+
+## 0.6.20
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.31.0
+  - @directive-run/sandbox@0.4.19
+  - @directive-run/claude-plugin@1.31.0
+
+## 0.6.19
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.30.0
+  - @directive-run/sandbox@0.4.18
+  - @directive-run/claude-plugin@1.30.0
+
+## 0.6.18
+
+### Patch Changes
+
+- Updated dependencies [[`33967c0`](https://github.com/directive-run/directive/commit/33967c091f63eaa410cede624208078d059b7e5c)]:
+  - @directive-run/scaffold@0.2.3
+  - @directive-run/knowledge@1.29.5
+  - @directive-run/claude-plugin@1.29.5
+  - @directive-run/sandbox@0.4.17
+
+## 0.6.17
+
+### Patch Changes
+
+- Updated dependencies [[`1c2355f`](https://github.com/directive-run/directive/commit/1c2355feccba001f2b195d9b2a3aa06865ba6aff)]:
+  - @directive-run/knowledge@1.29.4
+  - @directive-run/claude-plugin@1.29.4
+  - @directive-run/sandbox@0.4.16
+
+## 0.6.16
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.29.3
+  - @directive-run/claude-plugin@1.29.3
+  - @directive-run/sandbox@0.4.15
+
+## 0.6.15
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.29.2
+  - @directive-run/claude-plugin@1.29.2
+  - @directive-run/sandbox@0.4.14
+
+## 0.6.14
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.29.1
+  - @directive-run/sandbox@0.4.13
+  - @directive-run/claude-plugin@1.29.1
+
 ## 0.6.13
 
 ### Patch Changes

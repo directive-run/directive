@@ -11,7 +11,7 @@ Sources sit on the same lifecycle plane as effects but mount once per system ins
 | You're subscribing to an external event stream (WebSocket, Supabase realtime, browser `addEventListener`, polling timer) | You're updating an external system based on fact changes (logging, DOM mutation, analytics ping) |
 | The subscription is **mount-once** for the system's lifetime | You need to re-run when a fact changes (`deps` or `on` predicate) |
 | You want to publish events INTO the system | You only need to react to fact changes |
-| You don't read facts inside the handler | You read facts (`facts.someValue`) inside `run` |
+| `attach` doesn't read facts – a `key` / `active` gate may, to decide *whether* to subscribe | You read facts (`facts.someValue`) inside `run` |
 
 If you're hand-rolling `useEffect(() => { const ch = supabase.channel(...).subscribe(); return () => ch.unsubscribe(); }, [])` in React and dispatching `sys.events.X(payload)` from the callback — that's the signature pattern sources replace. Move the subscription into the module declaration; the React hook collapses to `useFact` reads.
 
@@ -22,11 +22,11 @@ Do I need to subscribe to an external event stream?
 ├── Yes
 │   │
 │   ├─ Does the subscription depend on a fact (e.g. "subscribe when status = active")?
-│   │  ├── Yes → Use `effect` with `deps` or `on` predicate. Effects re-run when facts change.
+│   │  ├── Yes → Use `source` with a `key` / `active` gate (see "Gated / keyed sources").
 │   │  └── No  → Use `source`. Mount once at system.start(); tear down at system.stop().
 │   │
 │   ├─ Does the subscription need to read facts inside the callback?
-│   │  ├── Yes → Consider hoisting the fact read up + using `effect`. Sources never read facts.
+│   │  ├── Yes → Read them in the gate and pass what attach needs as the key. `attach` itself never reads facts.
 │   │  └── No  → Use `source`. Pass any static config via closure.
 │   │
 │   └─ Do I need to publish events INTO the system from external input?
@@ -45,10 +45,10 @@ let connected: WebSocket | null = null;
 effects: {
   socket: {
     deps: ["shouldConnect"],
-    // `derived` is the third argument to run(), after facts and prev. Read it
+    // `derived` is the third argument to run(), after facts and prevFacts. Read it
     // rather than reaching back through `system.derive` — that is the
     // single-module accessor and resolves a module NAME once composed.
-    run: (_facts, _prev, derived) => {
+    run: (_facts, _prevFacts, derived) => {
       const shouldConnect = derived.shouldConnect;
       if (shouldConnect === (connected !== null)) {
         return; // The value did not move — leave the socket alone.
@@ -215,17 +215,20 @@ Source lifecycle is fully observable. Subscribe via `system.observe()`:
 ```typescript
 const unsub = system.observe((event) => {
   switch (event.type) {
-    case 'source.attach': console.log(`${event.moduleId}::${event.id} attached`); break;
-    case 'source.publish': console.log(`${event.id} → ${event.eventName}`); break;
-    case 'source.detach': console.log(`${event.moduleId}::${event.id} detached`); break;
+    case 'source.attach': console.log(`${event.moduleId}/${event.localId} attached`); break;
+    case 'source.publish': console.log(`${event.moduleId}/${event.localId} → ${event.eventName}`); break;
+    case 'source.drop': console.warn(`${event.moduleId}/${event.localId} dropped ${event.eventName}: ${event.reason}`); break;
+    case 'source.detach': console.log(`${event.moduleId}/${event.localId} detached`); break;
     case 'source.error':
-      console.error(`${event.moduleId}::${event.id} ${event.phase} threw:`, event.error);
+      console.error(`${event.moduleId}/${event.localId} ${event.phase} threw:`, event.error);
       break;
   }
 });
 ```
 
-`system.inspect().sources` lists the declared sources + `system.inspect().attachedSourceCount` reports how many are currently bound.
+`event.id` is the source's id in the system – prefixed in a namespaced system (`loop::boot`). `event.localId` is the id the module declared (`boot`); use it with `moduleId` for labels. Building `${event.moduleId}::${event.id}` yourself prints `loop::loop::boot`.
+
+`system.inspect().sources` lists the declared sources (`id`, `moduleId`, `localId`, counters such as `publishCount` / `dropCount` / `lastDropReason`) + `system.inspect().attachedSourceCount` reports how many are currently bound.
 
 ### Pipe `source.*` to OpenTelemetry
 
@@ -299,6 +302,74 @@ Coalesce-dropped publishes bump `dropCount` + record
 verify the debouncing is firing on the right sources. The strategy
 is per-source (uniform across event names from that source) —
 splitting strategies per event name requires two source declarations.
+
+## Gated / keyed sources — `key` / `active`
+
+A source may gate and re-key its subscription lifecycle on module facts.
+`attach` still cannot read facts and the source still writes none — the
+gate is a separate PURE fact read that decides whether, and under what
+identity, the transport is subscribed.
+
+- `key(facts) => string | null` — `null` detaches; a non-null string
+  attaches under that key; a CHANGED string tears the old subscription
+  down BEFORE attaching the new one (a "re-key"). The resolved key flows
+  to `attach` as its 3rd arg, `ctx.key`.
+- `active(facts) => boolean` — sugar for a simple on/off gate, normalized
+  to `key: f => active(f) ? "__on__" : null`. Declaring BOTH `key` and
+  `active` throws a dev error at registration.
+- `gateLingerMs` — hysteresis on a falling / re-key edge: wait this long
+  before tearing the old subscription down, and cancel if the key returns
+  to its prior value within the window. Default `0` (immediate).
+
+```typescript
+sources: {
+  gameChannel: {
+    key: (facts) => (facts.gameId ? `game:${facts.gameId}` : null),
+    gateLingerMs: 2000, // survive a 2s gameId flap without thrashing the socket
+    attach: (publish, _reportError, ctx) => {
+      const channel = supabase.channel(ctx!.key)
+        .on("postgres_changes", { event: "*", table: "moves" },
+          (p) => publish("MOVE", p.new))
+        .subscribe();
+      return () => channel.unsubscribe();
+    },
+  },
+}
+```
+
+The gate is evaluated on the post-commit effects plane (after each
+reconcile) and once at `system.start()`. It runs behind the same replay /
+time-travel guard effects use: replay re-derives the key value but NEVER
+re-attaches the transport (the attach act + published events remain
+non-replayable inputs). A gate that throws or returns a
+non-`(string | null)` value fails closed — treated as `null`, reported via
+`source.error` with `phase: "gate"`, and surfaced on
+`inspect().sources[i].lastError`. An in-flight publish that lands after a
+gate closes is counted as a drop with `lastDropReason: "gate-closed"`.
+
+This replaces the old "re-subscribe when a fact changes → tear the module
+down and re-register it" workaround: declare a `key` instead.
+
+Gate facts are typed from the module schema, and they are read-only: a write
+throws and is reported as a `phase: "gate"` error.
+
+## Sources in a namespaced system — `createSystem({ modules })`
+
+A source belongs to its module, so in a namespaced system everything about it
+is scoped to that module's namespace:
+
+| Surface | What you write | What the system sees |
+|---|---|---|
+| `publish("START")` | the module's own event name | `loop::START` – the module's own handler runs |
+| `publish("other::PING")` or `publish("loop::START")` | a name containing `::` | dropped as `cross-module-event` under that name – a source publishes only its own module's events. Development warns once per source: drop your own prefix, or dispatch the other module's event from a handler or resolver |
+| `key` / `active` gate | `facts.running` | the module's own facts, read-only |
+| gate, module with `crossModuleDeps` | `facts.self.running`, `facts.auth.token` | same scoping as a constraint |
+| source id | `boot` | `loop::boot` in `inspect()`, plugin hooks, observation events, the audit ledger and OTel |
+
+- **`localId`.** `inspect().sources[i].localId` and every `source.*` observation event carry the id the module declared (`boot`). It equals `id` in a single-module system.
+- **Factory modules.** Ids are per namespace, so one factory module registered twice (`{ a: room("a"), b: room("b") }`) gets two independent sources instead of a definition collision.
+- **Unknown events are drops.** A publish with no handler is counted in `dropCount` with `lastDropReason: "unknown-event"` and fires `source.drop` – in production too. It is not counted in `publishCount`.
+- **Gates see only their module.** A gate has no flat `facts["loop::running"]` form – that read is `undefined`. In a module with `crossModuleDeps`, a bare `facts.running` warns with the `facts.self.running` spelling.
 
 ## Async-aware teardown — `system.stopAsync()` + DO `onEvict`
 

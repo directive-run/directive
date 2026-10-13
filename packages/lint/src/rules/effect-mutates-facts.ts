@@ -30,7 +30,7 @@ export const rule: ExecutableRule = {
     category: "effect",
     title: "Effect mutates facts",
     explanation:
-      "Effects are observers, not mutators. Writing to facts inside an effect re-enters the reconciliation cycle and creates infinite loops. Move the mutation into a constraint + resolver or into an event handler.",
+      "Effects are observers, not mutators. The facts an effect receives are read-only: a write throws in development and is ignored in production. Move the mutation into an event handler, a derivation, or a constraint + resolver; for data arriving from outside, use a source.",
     badExample: `effects: {
   bumpCount: {
     run: (facts) => {

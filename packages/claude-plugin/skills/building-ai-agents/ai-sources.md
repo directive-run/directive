@@ -366,7 +366,7 @@ const system = createSystem({
   monitoring-only deployments where the source's transport is already
   trusted and you want to page on every match without modifying state.
 
-The plugin scans `pii`-tagged facts auto-detected via `meta.byTag("pii")`,
+The plugin scans `pii`-tagged facts, asking `meta.carriesTag("fact", key, "pii")` per write,
 plus any `includeKeys` you list explicitly. The built-in regex matches
 SSN, credit card, and email; pass a `customDetector` for domain-specific
 patterns (internal account numbers, partner IDs).

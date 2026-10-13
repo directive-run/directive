@@ -65,15 +65,15 @@ function replaceAtPath(
 /**
  * Walk a predicate spec and replace operands at PII-tagged fact paths
  * with `"[redacted]"`. Returns the input as-is when redaction is
- * disabled (`capturePII: true`) or no PII tags are registered;
+ * disabled (`capturePII: true`);
  * otherwise returns a deep clone with the leaf values rewritten.
  */
 export function redactWhenSpec(
   spec: unknown,
   capturePII: boolean,
-  piiTaggedFacts: ReadonlySet<string>,
+  carriesPII: (factPath: string) => boolean,
 ): unknown {
-  if (capturePII || piiTaggedFacts.size === 0) return spec;
+  if (capturePII) return spec;
   if (spec === null || typeof spec !== "object") return spec;
 
   // Deep-clone so we don't mutate the user's source predicate. JSON
@@ -89,13 +89,13 @@ export function redactWhenSpec(
 
   walkPredicate(cloned, {
     operator(factPath, op, _operand, operandPath) {
-      if (!piiTaggedFacts.has(factPath)) return;
+      if (!carriesPII(factPath)) return;
       // Navigate cloned tree to operandPath and replace value.
       replaceAtPath(cloned, operandPath, "[redacted]");
       void op;
     },
     literal(factPath) {
-      if (!piiTaggedFacts.has(factPath)) return;
+      if (!carriesPII(factPath)) return;
       // Replace bare-value leaf at this factPath.
       replaceAtPath(cloned, factPath, "[redacted]");
     },

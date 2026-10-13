@@ -11,6 +11,7 @@
 
 import isDevelopment from "#is-development";
 import { TIMEOUT_MARKER, withTimeout } from "../utils/utils.js";
+import { noteFailureAfterSatisfied } from "./errors.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -185,6 +186,40 @@ export interface ResolversManager<_S extends Schema> {
    */
   isResolving(requirementId: string): boolean;
   /**
+   * Start a pass: what each running resolver wrote so far becomes "this
+   * pass's writes", and new writes are recorded for the next pass. Called by
+   * the engine at the same point it takes the pass's changed keys.
+   *
+   * @internal
+   */
+  beginPass(): void;
+  /**
+   * Changes the run resolving `requirementId` made through its own
+   * `ctx.facts` that belong to the current pass, counted per key. Only
+   * writes that changed a value are counted. `null` when nothing runs for
+   * it or it changed nothing.
+   *
+   * @internal
+   */
+  passWritesFor(requirementId: string): ReadonlyMap<string, number> | null;
+  /**
+   * Mark the run resolving `requirementId` as having satisfied its
+   * requirement with its own write. It keeps running and completes as
+   * usual, but is not retried if it then throws, and if the requirement is
+   * dispatched again while it runs, it is aborted and its later writes are
+   * discarded.
+   *
+   * @internal
+   */
+  markSatisfied(requirementId: string): void;
+  /**
+   * Whether any run is going that could write through its own `ctx.facts`.
+   * The engine counts changes per pass only while this is true.
+   *
+   * @internal
+   */
+  hasLiveRuns(): boolean;
+  /**
    * Immediately flush all pending batch queues, executing their resolvers.
    */
   processBatches(): void;
@@ -219,6 +254,17 @@ export interface ResolversManager<_S extends Schema> {
    * @param id - The resolver definition ID to remove.
    */
   unregisterDefinition(id: string): void;
+  /**
+   * RFC 0002: wait for every execution belonging to one of `resolverIds` to
+   * settle. Call after aborting them — this waits for work to stop, it does
+   * not stop it. Rejections are absorbed: a resolver that fails on the way out
+   * has already been reported through the normal error path, and a module
+   * being unregistered should not resurface it as an unhandled rejection.
+   */
+  drainResolvers(
+    resolverIds: readonly string[],
+    timeoutMs?: number,
+  ): Promise<void>;
   /**
    * Execute a resolver with a given requirement object.
    *
@@ -338,7 +384,7 @@ export interface CreateResolversOptions<S extends Schema> {
     dropped: number,
   ) => void;
   /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
-  onResolutionComplete?: () => void;
+  onResolutionComplete?: (satisfied?: boolean) => void;
   /**
    * Called when a resolver invokes `ctx.requeue()` for one of its owning
    * requirements. The engine uses this to drop the requirement from its
@@ -349,6 +395,9 @@ export interface CreateResolversOptions<S extends Schema> {
 }
 
 /** Default retry policy */
+/** Where a run's write record is kept on its AbortController. */
+const RUN_RECORD = Symbol("directive.resolverRun");
+
 const DEFAULT_RETRY: RetryPolicy = {
   attempts: 1,
   backoff: "none",
@@ -357,6 +406,14 @@ const DEFAULT_RETRY: RetryPolicy = {
 };
 
 /** Default batch config */
+/**
+ * How long {@link ResolversManager.drainResolvers} waits before giving up.
+ *
+ * Generous on purpose: the wait only happens during an unregister, and cutting
+ * a well-behaved slow resolver short would report a clean teardown as a hang.
+ */
+const DRAIN_TIMEOUT_MS = 10_000;
+
 const DEFAULT_BATCH: BatchConfig = {
   enabled: false,
   windowMs: 50,
@@ -491,10 +548,16 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
 function validateDefinitions<S extends Schema>(
   definitions: ResolversDef<S>,
 ): void {
-  if (!isDevelopment) {
-    return;
+  // A positive dev block, not an early return on `!isDevelopment`, so a
+  // bundler that folds the check to `false` removes it (see tsup.config.ts).
+  if (isDevelopment) {
+    validateEachDefinition(definitions);
   }
+}
 
+function validateEachDefinition<S extends Schema>(
+  definitions: ResolversDef<S>,
+): void {
   for (const [id, def] of Object.entries(definitions)) {
     if (!def.resolve && !def.resolveBatch && !def.resolveBatchWithResults) {
       throw new Error(
@@ -553,6 +616,17 @@ export function createResolversManager<S extends Schema>(
 
   // Active resolver states by requirement ID
   const inflight = new Map<string, ResolverState>();
+  /**
+   * Live executions, keyed by requirement id and cleared only when the promise
+   * settles. `inflight` is not a substitute: `abort()` removes the inflight
+   * slot the moment it fires, while the resolver body keeps running until it
+   * observes the signal. Draining a module (RFC 0002) has to wait for the
+   * latter, so the promise is held here until it is genuinely finished.
+   */
+  const running = new Map<
+    string,
+    { resolverId: string; promise: Promise<void> }
+  >();
 
   // Completed/failed statuses (kept for inspection) - LRU cleanup
   const statuses = new Map<string, ResolverStatus>();
@@ -583,6 +657,10 @@ export function createResolversManager<S extends Schema>(
   const batchInflight = new Map<string, BatchInflightState>();
   const reqToBatch = new Map<string, Set<string>>();
   let nextBatchInstanceId = 0;
+  /** Distinct from `nextBatchInstanceId`: keys the drain map, not the abort map. */
+  let nextBatchRunId = 0;
+  /** Per-execution key for the drain map. Requirement ids are not unique. */
+  let nextRunId = 0;
 
   // Resolver index by requirement type for O(1) lookup (populated lazily)
   // Capped to prevent unbounded growth with dynamic requirement types (e.g., FETCH_USER_${id})
@@ -905,6 +983,115 @@ export function createResolversManager<S extends Schema>(
    * @param baseline - Optional pre-dispatch facts snapshot, threaded into
    *   `createBoundFacts` to defeat the sibling-clobber race.
    */
+  /**
+   * What one run (one controller: a single resolver run or one batch) has
+   * written through its own `ctx.facts`. The engine reads `pass` when a
+   * requirement disappears while its run is going: if the run's own writes
+   * are the only change to what the constraint reads, the run satisfied it.
+   */
+  interface RunRecord {
+    /** Created on the first write, so a run that writes nothing costs no map. */
+    current: Map<string, number> | null;
+    pass: Map<string, number> | null;
+    satisfied: boolean;
+    /** Superseded: a newer run owns the requirement, later writes are dropped. */
+    discard: boolean;
+  }
+  /**
+   * Each run's record lives on its controller under a private symbol: a
+   * property read is cheaper than a WeakMap lookup on the resolver hot path.
+   */
+  const runRecords = {
+    get(controller: AbortController): RunRecord | undefined {
+      return (controller as unknown as Record<symbol, RunRecord | undefined>)[
+        RUN_RECORD
+      ];
+    },
+    set(controller: AbortController, record: RunRecord): void {
+      (controller as unknown as Record<symbol, RunRecord>)[RUN_RECORD] = record;
+    },
+  };
+  const liveRuns = new Set<RunRecord>();
+
+  function runRecordFor(controller: AbortController): RunRecord {
+    let record = runRecords.get(controller);
+    if (!record) {
+      record = {
+        current: null,
+        pass: null,
+        satisfied: false,
+        discard: false,
+      };
+      runRecords.set(controller, record);
+      liveRuns.add(record);
+    }
+
+    return record;
+  }
+
+  function endRun(controller: AbortController): void {
+    const record = runRecords.get(controller);
+    if (record) {
+      liveRuns.delete(record);
+    }
+  }
+
+  /**
+   * The error a satisfied run reports when it fails afterwards (throws or
+   * times out). Treated like any other failure, as RFC 0003 treats a
+   * cancel: the signal is aborted and the error is its one outcome, but its
+   * writes still land, so a `finally` that clears a loading flag runs to
+   * effect. Only a superseded run's writes are dropped: a newer run for the
+   * same requirement owns the facts then.
+   */
+  function failAfterSatisfied(
+    controller: AbortController,
+    error: unknown,
+  ): Error {
+    controller.abort();
+    const normalized =
+      error instanceof Error ? error : new Error(String(error));
+    // Only the development warning reads this mark.
+    if (isDevelopment) {
+      noteFailureAfterSatisfied(normalized);
+    }
+
+    return normalized;
+  }
+
+  /** `ctx.facts` for one run: counts the changes it makes, drops them once discarded. */
+  function recordRunWrites(target: Facts<S>, record: RunRecord): Facts<S> {
+    const count = (key: string) => {
+      if (record.current === null) {
+        record.current = new Map();
+      }
+      record.current.set(key, (record.current.get(key) ?? 0) + 1);
+    };
+
+    return new Proxy(target, {
+      set(t, key, value) {
+        if (record.discard) {
+          return true;
+        }
+        if (typeof key === "string" && !Object.is(Reflect.get(t, key), value)) {
+          count(key);
+        }
+
+        return Reflect.set(t, key, value);
+      },
+      deleteProperty(t, key) {
+        if (record.discard) {
+          return true;
+        }
+        if (typeof key === "string" && Reflect.has(t, key)) {
+          count(key);
+        }
+
+        return Reflect.deleteProperty(t, key);
+      },
+    });
+  }
+
   function createContext(
     signal: AbortSignal,
     requirementIds: readonly string[],
@@ -934,7 +1121,7 @@ export function createResolversManager<S extends Schema>(
             }
           }
         : undefined;
-    const ctxFacts =
+    const baseFacts =
       binding && controller
         ? createBoundFacts(
             binding,
@@ -944,6 +1131,10 @@ export function createResolversManager<S extends Schema>(
             onClobberSuppressedForCtx,
           )
         : facts;
+    const ctxFacts =
+      controller && requirementIds.length > 0
+        ? recordRunWrites(baseFacts, runRecordFor(controller))
+        : baseFacts;
     return {
       facts: ctxFacts,
       signal,
@@ -1186,6 +1377,11 @@ export function createResolversManager<S extends Schema>(
       if (controller.signal.aborted) {
         return;
       }
+      // Satisfied by its own write while waiting to retry: nothing is left
+      // to retry for. The failure is reported once.
+      if (attempt > 1 && runRecords.get(controller)?.satisfied) {
+        break;
+      }
 
       updateInflightAttempt(req.id, attempt, startedAt);
 
@@ -1198,10 +1394,28 @@ export function createResolversManager<S extends Schema>(
           controller,
           baseline,
         );
+        // Canceled or superseded: that was its one outcome.
+        if (controller.signal.aborted) {
+          return;
+        }
         recordSuccess(resolverId, req, startedAt);
 
         return;
       } catch (error) {
+        const record = runRecords.get(controller);
+        if (record?.discard) {
+          return;
+        }
+        if (record?.satisfied) {
+          // It already satisfied its requirement; there is nothing left to
+          // retry for. Reported once, and anything it writes later dropped.
+          lastError = failAfterSatisfied(controller, error);
+          break;
+        }
+        // Canceled while it ran: the cancellation was its outcome.
+        if (controller.signal.aborted) {
+          return;
+        }
         const outcome = await processRetryError(
           error,
           attempt,
@@ -1257,6 +1471,10 @@ export function createResolversManager<S extends Schema>(
       timeout,
       `Batch resolver "${resolverId}" timed out after ${timeout}ms`,
     );
+
+    if (ctx.signal.aborted) {
+      return "done";
+    }
 
     if (results.length !== requirements.length) {
       throw new Error(
@@ -1321,6 +1539,10 @@ export function createResolversManager<S extends Schema>(
       `Batch resolver "${resolverId}" timed out after ${timeout}ms`,
     );
 
+    // Canceled or superseded: that was its one outcome.
+    if (ctx.signal.aborted) {
+      return;
+    }
     for (const req of requirements) {
       recordSuccess(resolverId, req, startedAt);
     }
@@ -1447,6 +1669,9 @@ export function createResolversManager<S extends Schema>(
       if (controller.signal.aborted) {
         return null;
       }
+      if (attempt > 1 && runRecords.get(controller)?.satisfied) {
+        break;
+      }
 
       try {
         const outcome = await executeBatchAttempt(
@@ -1464,6 +1689,16 @@ export function createResolversManager<S extends Schema>(
           return null;
         }
       } catch (error) {
+        const record = runRecords.get(controller);
+        if (record?.discard) {
+          return null;
+        }
+        if (record?.satisfied) {
+          return failAfterSatisfied(controller, error);
+        }
+        if (controller.signal.aborted) {
+          return null;
+        }
         const outcome = await processRetryError(
           error,
           attempt,
@@ -1540,6 +1775,7 @@ export function createResolversManager<S extends Schema>(
         controller,
       );
     } finally {
+      endRun(controller);
       batchInflight.delete(batchInstanceId);
       for (const r of requirements) {
         const owners = reqToBatch.get(r.id);
@@ -1585,6 +1821,46 @@ export function createResolversManager<S extends Schema>(
   }
 
   /** Add a requirement to a batch */
+  /**
+   * The requirement is back while a batch that satisfied it is still going.
+   * That batch stops owning it, so the new batch is its only owner. A batch
+   * left owning nothing is aborted with its later writes dropped, as a
+   * superseded single run is.
+   */
+  function supersedeSatisfiedBatches(req: RequirementWithId): void {
+    const owners = reqToBatch.get(req.id);
+    if (!owners) {
+      return;
+    }
+    for (const batchInstanceId of [...owners]) {
+      const batchState = batchInflight.get(batchInstanceId);
+      const record = batchState
+        ? runRecords.get(batchState.controller)
+        : undefined;
+      if (!batchState || !record?.satisfied) {
+        continue;
+      }
+      owners.delete(batchInstanceId);
+      batchState.requirementIds.delete(req.id);
+      if (batchState.requirementIds.size === 0) {
+        record.discard = true;
+        batchState.controller.abort();
+        endRun(batchState.controller);
+        batchInflight.delete(batchInstanceId);
+        statuses.set(req.id, {
+          state: "canceled",
+          requirementId: req.id,
+          canceledAt: Date.now(),
+        });
+        cleanupStatuses();
+        onCancel?.(batchState.resolverId, req);
+      }
+    }
+    if (owners.size === 0) {
+      reqToBatch.delete(req.id);
+    }
+  }
+
   function addToBatch(
     resolverId: string,
     req: RequirementWithId,
@@ -1597,6 +1873,7 @@ export function createResolversManager<S extends Schema>(
 
     const batchConfig = { ...DEFAULT_BATCH, ...def.batch };
     const batch = ensureBatch(resolverId);
+    supersedeSatisfiedBatches(req);
 
     // Enforce hard cap to prevent OOM from unbounded accumulation
     const effectiveMax = batchConfig.maxSize || DEFAULT_MAX_QUEUE_SIZE;
@@ -1650,9 +1927,18 @@ export function createResolversManager<S extends Schema>(
     batch.timer = null;
 
     // Execute batch
-    executeBatch(resolverId, requirements, baseline).then(() => {
-      onResolutionComplete?.();
-    });
+    const batchKey = `batch-run-${nextBatchRunId++}`;
+    const execution = executeBatch(resolverId, requirements, baseline)
+      .then(() => {
+        onResolutionComplete?.();
+      })
+      .finally(() => {
+        running.delete(batchKey);
+      });
+    // Tracked so `drainResolvers` waits for a batch too. Without this the
+    // drain returned instantly for batched resolvers, and the orphaned batch's
+    // late writes landed on whatever instance had taken the name next.
+    running.set(batchKey, { resolverId, promise: execution });
   }
 
   const manager: ResolversManager<S> = {
@@ -1660,9 +1946,27 @@ export function createResolversManager<S extends Schema>(
       req: RequirementWithId,
       options?: { factsBaseline?: Readonly<Record<string, unknown>> },
     ): void {
-      // Already resolving?
-      if (inflight.has(req.id)) {
-        return;
+      // Already resolving? A run that satisfied this requirement with its own
+      // write and is still going is superseded: the requirement is back, so
+      // a fresh run handles it, and the old one is aborted with its later
+      // writes dropped so it cannot overwrite the new run's result.
+      const current = inflight.get(req.id);
+      if (current) {
+        const record = runRecords.get(current.controller);
+        if (!record?.satisfied) {
+          return;
+        }
+        record.discard = true;
+        current.controller.abort();
+        endRun(current.controller);
+        inflight.delete(req.id);
+        statuses.set(req.id, {
+          state: "canceled",
+          requirementId: req.id,
+          canceledAt: Date.now(),
+        });
+        cleanupStatuses();
+        onCancel?.(current.resolverId, current.originalRequirement);
       }
 
       // Find resolver
@@ -1707,7 +2011,15 @@ export function createResolversManager<S extends Schema>(
       onStart?.(resolverId, req);
 
       // Execute asynchronously
-      executeResolve(
+      //
+      // Keyed by a per-execution id, NOT by `req.id`. The RFC-0003 bound path
+      // deliberately detaches a running resolver so the requirement can
+      // re-dispatch if its constraint flips true again — which means two live
+      // executions can share one requirement id. Keying on `req.id` let the
+      // first one's cleanup delete the second one's entry, so a drain found
+      // nothing and returned while the work was still running.
+      const runKey = `run-${nextRunId++}`;
+      const execution = executeResolve(
         resolverId,
         req,
         controller,
@@ -1716,11 +2028,61 @@ export function createResolversManager<S extends Schema>(
         // Only fire onResolutionComplete if we're the first to clean up.
         // If abort() already removed us from inflight, skip to avoid
         // spurious double-notifications.
-        const wasInflight = inflight.delete(req.id);
+        endRun(controller);
+        // Only this run's own slot: after a supersede the slot holds the
+        // run that replaced it.
+        const wasInflight = inflight.get(req.id) === state;
         if (wasInflight) {
-          onResolutionComplete?.();
+          inflight.delete(req.id);
+          onResolutionComplete?.(
+            runRecords.get(controller)?.satisfied === true,
+          );
         }
+        running.delete(runKey);
       });
+      // Tracked separately from `inflight` because abort() removes the inflight
+      // slot immediately, and a caller draining the module needs to wait for
+      // the work to actually stop — an aborted resolver is still running until
+      // its promise settles. Set synchronously; the `.finally` above cannot
+      // run before this line, since callbacks are queued as microtasks.
+      running.set(runKey, { resolverId, promise: execution });
+    },
+
+    async drainResolvers(
+      resolverIds: readonly string[],
+      timeoutMs = DRAIN_TIMEOUT_MS,
+    ): Promise<void> {
+      const ids = new Set(resolverIds);
+      const waits: Promise<unknown>[] = [];
+      for (const entry of running.values()) {
+        if (ids.has(entry.resolverId)) {
+          waits.push(entry.promise.catch(() => undefined));
+        }
+      }
+      if (waits.length === 0) return;
+
+      // Bounded. A resolver that ignores its abort signal and never settles
+      // would otherwise hang the caller forever, with no way out — and the
+      // resolvers most likely to ignore a signal are the long-running ones
+      // this timeout exists for. Detaching has already happened by now, so
+      // giving up on the wait leaks nothing beyond the orphaned work itself.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), timeoutMs);
+      });
+      try {
+        const outcome = await Promise.race([
+          Promise.all(waits).then(() => "drained" as const),
+          timedOut,
+        ]);
+        if (outcome === "timeout" && isDevelopment) {
+          console.warn(
+            `[Directive] Timed out after ${timeoutMs}ms waiting for resolvers to finish: ${[...ids].join(", ")}. They were detached and aborted; one of them is not observing its abort signal.`,
+          );
+        }
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
     },
 
     abort(requirementId: string): void {
@@ -1728,6 +2090,7 @@ export function createResolversManager<S extends Schema>(
       const state = inflight.get(requirementId);
       if (state) {
         state.controller.abort();
+        endRun(state.controller);
         inflight.delete(requirementId);
 
         statuses.set(requirementId, {
@@ -1790,6 +2153,7 @@ export function createResolversManager<S extends Schema>(
           const batchState = batchInflight.get(batchInstanceId);
           if (!batchState) continue;
           batchState.controller.abort();
+          endRun(batchState.controller);
           for (const id of batchState.requirementIds) {
             statuses.set(id, {
               state: "canceled",
@@ -1853,6 +2217,7 @@ export function createResolversManager<S extends Schema>(
       // canceled, and clears the lookup index.
       for (const [, state] of batchInflight) {
         state.controller.abort();
+        endRun(state.controller);
         for (const id of state.requirementIds) {
           statuses.set(id, {
             state: "canceled",
@@ -1902,6 +2267,64 @@ export function createResolversManager<S extends Schema>(
 
     isResolving(requirementId: string): boolean {
       return inflight.has(requirementId);
+    },
+
+    beginPass(): void {
+      if (liveRuns.size === 0) {
+        return;
+      }
+      for (const record of liveRuns) {
+        const done = record.pass;
+        record.pass = record.current;
+        if (done !== null) {
+          done.clear();
+        }
+        record.current = done;
+      }
+    },
+
+    passWritesFor(requirementId: string): ReadonlyMap<string, number> | null {
+      const single = inflight.get(requirementId);
+      if (single) {
+        const record = runRecords.get(single.controller);
+
+        return record?.pass && record.pass.size > 0 ? record.pass : null;
+      }
+      const owners = reqToBatch.get(requirementId);
+      if (owners && owners.size === 1) {
+        for (const batchInstanceId of owners) {
+          const batchState = batchInflight.get(batchInstanceId);
+          const record = batchState
+            ? runRecords.get(batchState.controller)
+            : undefined;
+
+          return record?.pass && record.pass.size > 0 ? record.pass : null;
+        }
+      }
+
+      return null;
+    },
+
+    hasLiveRuns(): boolean {
+      return liveRuns.size > 0;
+    },
+
+    markSatisfied(requirementId: string): void {
+      const single = inflight.get(requirementId);
+      if (single) {
+        runRecordFor(single.controller).satisfied = true;
+
+        return;
+      }
+      const owners = reqToBatch.get(requirementId);
+      if (owners) {
+        for (const batchInstanceId of owners) {
+          const batchState = batchInflight.get(batchInstanceId);
+          if (batchState) {
+            runRecordFor(batchState.controller).satisfied = true;
+          }
+        }
+      }
     },
 
     processBatches(): void {
@@ -1957,6 +2380,16 @@ export function createResolversManager<S extends Schema>(
             canceledAt: Date.now(),
           });
           onCancel?.(id, state.originalRequirement);
+        }
+      }
+
+      // And any in-flight BATCH using it. Aborting only `inflight` left a live
+      // batch running with `signal.aborted === false`, so the one guarantee a
+      // batched resolver is sold on — that unregistering stops it — did not
+      // hold for exactly the resolvers most likely to be doing real work.
+      for (const [, batchState] of batchInflight) {
+        if (batchState.resolverId === id) {
+          batchState.controller.abort();
         }
       }
 

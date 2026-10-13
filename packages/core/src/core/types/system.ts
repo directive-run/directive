@@ -362,8 +362,11 @@ export interface SystemInspection {
    * rows; both must stay in lockstep.
    */
   sources: Array<{
+    /** Source id in the system (`ns::name` in a namespaced system). */
     id: string;
     moduleId: string;
+    /** The id the module declared (`name`), without the namespace. */
+    localId: string;
     meta?: DefinitionMeta;
     /** True while the source's attach succeeded and its unsubscribe is held. */
     attached: boolean;
@@ -406,7 +409,7 @@ export interface SystemInspection {
      * failures).
      */
     lastError: {
-      phase: "attach" | "cleanup" | "runtime";
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       message: string;
       at: number;
     } | null;
@@ -717,7 +720,7 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
 export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
     facts: Readonly<InferSchema<M["facts"]>>,
-    prev: InferSchema<M["facts"]> | null,
+    prevFacts: Readonly<InferSchema<M["facts"]>> | null,
     derived: InferDerivations<M>,
   ) => void | (() => void) | Promise<undefined | (() => void)>;
   /**
@@ -736,6 +739,11 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
    * `run()` fires. Mutually exclusive with `deps`.
    */
   on?: FactPredicate<InferSchema<M["facts"]>>;
+  /**
+   * What the effect does when a history navigation restores facts it depends
+   * on: `"rerun"` (default) or `"skip"`. See `EffectDef.onNavigate`.
+   */
+  onNavigate?: "rerun" | "skip";
   meta?: DefinitionMeta;
 }
 
@@ -771,31 +779,57 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   meta?: DefinitionMeta;
 }
 
-/** Result from bulk meta queries (byCategory, byTag). */
+/**
+ * The seven things a system holds metadata for — the same seven the lookups on
+ * {@link MetaAccessor} are named after.
+ *
+ * Spelled `kind` rather than `type` wherever it appears, because a requirement's
+ * `type` is a different thing: that one is the string a resolver matches on.
+ * Two questions, two words.
+ */
+export type DefinitionKind =
+  | "module"
+  | "fact"
+  | "event"
+  | "constraint"
+  | "resolver"
+  | "effect"
+  | "derivation";
+
+/**
+ * The four kinds `register` / `assign` / `unregister` / `call` operate on.
+ * Facts, events and modules are declared in a module and never registered
+ * individually at runtime.
+ */
+export type DynamicDefinitionKind = Extract<
+  DefinitionKind,
+  "constraint" | "resolver" | "derivation" | "effect"
+>;
+
+/** One definition returned by {@link MetaAccessor.byTag}. */
 export interface MetaMatch {
-  type:
-    | "module"
-    | "fact"
-    | "event"
-    | "constraint"
-    | "resolver"
-    | "effect"
-    | "derivation";
+  /** Which of the seven kinds this is. */
+  kind: DefinitionKind;
+  /** The fact key, event name, module id, or definition id. */
   id: string;
+  /** The definition's frozen metadata. */
   meta: DefinitionMeta;
   /**
-   * Whether this match's tags were written on the definition or picked up from
-   * what it reads. Absent means authored, which is every type but `derivation`.
+   * Whether the tag that matched was written on this definition or picked up
+   * from what it reads.
    *
-   * A derivation of a tagged fact appears as its own match with
-   * `via: "inherited"`, so a consumer acting on the tag — a redactor, an audit
-   * filter — can tell a claim someone made from one the graph inferred, and
-   * still act on both.
+   * Always present, both values named, so a consumer never has to read meaning
+   * into an absent field. A redactor acts on every match; a stricter audit
+   * filters to `"authored"` and sees only claims a person made.
+   *
+   * A derivation that both authors a tag and inherits a different one appears
+   * as two matches, one per origin — one field cannot describe a mixed answer,
+   * and collapsing them would lose whichever half came second.
    */
-  via?: "inherited";
+  tagOrigin: "authored" | "inherited";
 }
 
-/** O(1) accessor for definition metadata. */
+/** Metadata lookups, tag queries, and change notification. */
 export interface MetaAccessor {
   /** Get metadata for a module by ID. */
   module(id: string): DefinitionMeta | undefined;
@@ -811,24 +845,71 @@ export interface MetaAccessor {
   effect(id: string): DefinitionMeta | undefined;
   /** Get metadata for a derivation by ID. */
   derivation(id: string): DefinitionMeta | undefined;
-  /** Find all definitions matching a category across all types. */
-  byCategory(category: string): MetaMatch[];
-  /** Find all definitions matching a tag across all types. */
-  byTag(tag: string): MetaMatch[];
   /**
-   * A counter that moves whenever the set `byTag` and `byCategory` search can
-   * have changed — today, when a module is registered.
+   * Every definition carrying this tag.
    *
-   * Both of those walk every definition in the system, so anything consulting
-   * them per fact write caches the result. Compare this number against the one
-   * held alongside the cache and rebuild only when it has moved; the comparison
-   * is O(1) where the rebuild is O(definitions).
+   * Walks every definition in the system. Narrow with `kind` when you only want
+   * one — a guardrail screening fact writes otherwise pays to walk the
+   * constraints, resolvers and derivations it immediately discards.
    *
-   * Only equality is meaningful. The starting value, the step, and whether it
-   * moves for a change that turns out not to affect a given tag are all
-   * unspecified — a spurious rebuild is correct, a skipped one is not.
+   * Read the answer as "every value carrying this tag in the state the system
+   * is in", not "every value that ever could". A derivation that branches on a
+   * fact reports the branch the current state takes.
+   *
+   * For a membership question about one definition, use {@link carriesTag} — it
+   * is O(1) for a fact and needs no walk.
    */
-  revision(): number;
+  byTag(tag: string, options?: { kind?: DefinitionKind }): MetaMatch[];
+  /**
+   * Does one definition carry this tag?
+   *
+   * `undefined` means **could not answer** — the walk a derivation needs threw,
+   * or the definition is not known. It is deliberately a third state rather
+   * than `false`, because a consumer that treats "I could not look" as "nothing
+   * to redact" is the failure this whole surface exists to prevent. Default it
+   * to the safe side: screen, redact, escalate.
+   *
+   * O(1) for a fact — tags are fixed at registration and the runtime keeps its
+   * own copy. For a derivation it forces that node's upstream cone and nothing
+   * else.
+   */
+  carriesTag(
+    kind: DefinitionKind,
+    id: string,
+    tag: string,
+  ): boolean | undefined;
+  /**
+   * Call `listener` when the answer to a tag query can have changed.
+   *
+   * Same shape and same promise as `system.subscribe`: no values out, an
+   * unsubscribe returned, and a callback that means *read again* — never that
+   * the answer differs. Deliberately generous: a wake you did not need is
+   * correct, a wake you did not get is not.
+   *
+   * Pass the tags you hold an answer for and you are woken only for those; pass
+   * none and you are woken for any metadata change.
+   *
+   * `{ immediate: true }` calls the listener once before returning, so the
+   * first build and every rebuild are one call site. Every defect this surface
+   * has had was a set built at startup and never rebuilt; writing that
+   * correctly should not take two calls.
+   *
+   * What it does not cover: a derivation's inherited tags follow what its last
+   * computation read, so a body that branches on a fact can change what
+   * `byTag` reports with no notification. Ask {@link carriesTag} on the fact
+   * change you already watch.
+   *
+   * @returns unsubscribe
+   */
+  subscribe(
+    listener: () => void,
+    options?: { immediate?: boolean },
+  ): () => void;
+  subscribe(
+    tags: readonly string[],
+    listener: () => void,
+    options?: { immediate?: boolean },
+  ): () => void;
 }
 
 // ============================================================================
@@ -882,7 +963,29 @@ export type PredicateOverlapProof =
 
 /** Typed events emitted by system.observe(). */
 export type ObservationEvent =
-  | { type: "fact.change"; key: string; prev: unknown; next: unknown }
+  | {
+      type: "fact.change";
+      key: string;
+      prev: unknown;
+      next: unknown;
+      /**
+       * Where the write came from — `"authored"`, `"restore"` or `"hydrate"`.
+       * See {@link FactOrigin}.
+       *
+       * Always present. `"authored"` is spelled out rather than left as the
+       * absence of a value, because a predicate written as "no origin means
+       * the program did it" silently reclassifies every row the day another
+       * origin is added.
+       *
+       * Stamped against each write as it is made, not read from a flag when
+       * the batch is reported — a batch can hold writes of more than one
+       * origin, and a single label taken at the end describes none of them.
+       *
+       * A replayed write is recorded rather than dropped, so this decides how
+       * an entry is filed and never whether it exists.
+       */
+      origin: import("./facts.js").FactOrigin;
+    }
   | {
       type: "constraint.evaluate";
       id: string;
@@ -1031,11 +1134,31 @@ export type ObservationEvent =
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   /**
+   * An effect tried to write a fact and was refused. Fires in every build;
+   * production drops the write, so this is its only trace there. `key` is a
+   * dotted path for a nested mutation (`"pos.x"`).
+   */
+  | { type: "effect.write-blocked"; id: string; key: string }
+  /**
    * Source attached at `system.start()` (or at registerModule when the
    * system was already running). Carries the source id + the module that
    * declared it so plugins can attribute per-module sources.
    */
-  | { type: "source.attach"; id: string; moduleId: string }
+  /**
+   * RFC 0002: a module joined or left a live system. Replay reconstructs the
+   * dynamic topology from these, so they carry the module boundary that a
+   * stream of individual definition events cannot express.
+   */
+  | { type: "module.registered"; id: string }
+  | { type: "module.unregistered"; id: string }
+  | {
+      type: "source.attach";
+      /** Source id in the system (`ns::name` in a namespaced system). */
+      id: string;
+      moduleId: string;
+      /** The id the module declared (`name`), without the namespace. */
+      localId: string;
+    }
   /**
    * A source published an event into the system's event queue. Fires
    * BEFORE the event handler runs; pair with `fact.change` events to
@@ -1045,6 +1168,8 @@ export type ObservationEvent =
       type: "source.publish";
       id: string;
       moduleId: string;
+      localId: string;
+      /** The dispatched event name – `ns::EVENT` in a namespaced system. */
       eventName: string;
     }
   /**
@@ -1055,16 +1180,19 @@ export type ObservationEvent =
    * - `"post-destroy"` / `"post-stop"` — leaked transport firing after teardown
    * - `"blocked-event-name"` / `"invalid-event-name"` — engine guard probe
    * - `"coalesced"` — manager debounced a same-event publish within one microtask
+   * - `"gate-closed"` — the source's gate closed before the publish landed
+   * - `"unknown-event"` — no handler is registered for the event name
    */
   | {
       type: "source.drop";
       id: string;
       moduleId: string;
+      localId: string;
       eventName: string;
       reason: import("./sources.js").SourceDropReason;
     }
   /** Source detached at `system.stop()` (reverse-registration order). */
-  | { type: "source.detach"; id: string; moduleId: string }
+  | { type: "source.detach"; id: string; moduleId: string; localId: string }
   /**
    * Source `attach` / unsubscribe threw, OR the source called the
    * `reportError` callback that `attach` received as its second
@@ -1077,7 +1205,8 @@ export type ObservationEvent =
       type: "source.error";
       id: string;
       moduleId: string;
-      phase: "attach" | "cleanup" | "runtime";
+      localId: string;
+      phase: "attach" | "cleanup" | "runtime" | "gate";
       error: unknown;
     }
   | { type: "derivation.compute"; id: string; value: unknown }
@@ -1116,6 +1245,28 @@ export type ObservationEvent =
       kind: "redact" | "alert" | "detect";
       count: number;
       category?: string;
+    }
+  /**
+   * A guardrail reporting what it is covering, not what it caught.
+   *
+   * `guardrail.blocked` fires on a match, so a guardrail that is screening
+   * nothing and a guardrail that is screening everything cleanly produce
+   * identical evidence: silence. That is the failure this whole area keeps
+   * having — a set built once and never rebuilt reports exactly as a set with
+   * nothing to report.
+   *
+   * Emitted when a guardrail starts and whenever the answer it works from
+   * changes, so a dashboard where this is absent, or where `reason` is
+   * `"unanswerable"`, is a screen that has stopped covering rather than a
+   * quiet one. Carries a digest of the covered keys rather than their names —
+   * key names are the thing being protected.
+   */
+  | {
+      type: "guardrail.coverage";
+      plugin: string;
+      screenedCount: number;
+      screenedDigest: string;
+      reason: "start" | "tags-changed" | "unanswerable";
     }
   | { type: "reconcile.start" }
   | {
@@ -1201,6 +1352,22 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
       kind: "redact" | "alert" | "detect",
       count: number,
       category?: string,
+    ): void;
+    /**
+     * Report what a guardrail covers, rather than what it caught.
+     *
+     * `guardrailBlocked` fires on a match, which makes a guardrail that is
+     * covering nothing look exactly like one with nothing to report. Call this
+     * when a guardrail starts and whenever the set it works from changes, so
+     * the difference is observable without a per-write metric.
+     *
+     * Pass a digest of the covered keys, not the keys themselves.
+     */
+    guardrailCoverage(
+      plugin: string,
+      screenedCount: number,
+      screenedDigest: string,
+      reason: "start" | "tags-changed" | "unanswerable",
     ): void;
     /**
      * v1.23.0 — plugin authoring surface for emitting the

@@ -387,10 +387,10 @@ export function generateModule(
     code += "\n  effects: {\n";
     code += "    logChange: {\n";
     code += `      deps: ["status"],\n`;
-    code += "      run: (facts, prev) => {\n";
-    code += "        if (prev && prev.status !== facts.status) {\n";
+    code += "      run: (facts, prevFacts) => {\n";
+    code += "        if (prevFacts && prevFacts.status !== facts.status) {\n";
     code +=
-      "          console.log(`Status: ${prev.status} → ${facts.status}`);\n";
+      "          console.log(`Status: ${prevFacts.status} → ${facts.status}`);\n";
     code += "        }\n";
     code += "      },\n";
     code += "    },\n";

@@ -733,6 +733,25 @@ export {
 } from "./checkpoint.js";
 
 /**
+ * A checkpoint store that survives the process.
+ *
+ * `InMemoryCheckpointStore` is a `Map` — every checkpoint dies with the
+ * isolate, which is right for a test and useless for what checkpoints
+ * exist for: a long run interrupted and resumed later, possibly
+ * elsewhere.
+ *
+ * ⚠ It takes a STRUCTURAL `CheckpointKv` (`get`/`put`/`delete`) rather
+ * than a platform SDK, so this package still has no Cloudflare, Deno or
+ * Node storage dependency. Cloudflare's `KVNamespace` satisfies it
+ * as-is.
+ */
+export {
+  KvCheckpointStore,
+  type CheckpointKv,
+  type KvCheckpointStoreOptions,
+} from "./checkpoint-kv.js";
+
+/**
  * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
  */
 // Breakpoints

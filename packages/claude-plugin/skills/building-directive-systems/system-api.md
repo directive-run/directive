@@ -188,19 +188,25 @@ inspection.events;      // [{ name: "increment", meta: { ... } }]
 // plugin. Counters reset at every system.start() cycle.
 inspection.sources;
 // [{
-//   id: "supabaseRealtime",
+//   id: "messages::supabaseRealtime", // prefixed in a namespaced system
 //   moduleId: "messages",
+//   localId: "supabaseRealtime",      // the id the module declared
 //   attached: true,
 //   attachedAt: 1709000000,
 //   detachedAt: null,
+//   // publishCount counts publishes a handler ran for.
 //   publishCount: 47,
 //   lastPublishAt: 1709000123,
-//   // dropCount counts publishes the engine's dispatch guard rejected
-//   // (post-stop, BLOCKED_PROPS event name, empty / non-string name).
+//   // dropCount counts publishes the engine rejected (post-stop,
+//   // BLOCKED_PROPS event name, empty / non-string name, no handler for
+//   // the event) or the manager coalesced / dropped after the gate closed.
 //   dropCount: 0,
 //   lastDropReason: null,        // | "post-destroy" | "post-stop"
 //                                 // | "blocked-event-name"
 //                                 // | "invalid-event-name"
+//                                 // | "unknown-event"
+//                                 // | "cross-module-event"
+//                                 // | "coalesced" | "gate-closed"
 //   lastDropAt: null,
 //   errorCount: 0,
 //   lastError: null,             // { phase, message (truncated), at } | null
@@ -251,11 +257,13 @@ system.meta.fact("email")?.tags;             // ["pii"]
 system.meta.module("auth")?.label;           // "Auth Module"
 
 // Bulk queries
-system.meta.byCategory("auth");  // MetaMatch[] — all auth definitions
-system.meta.byTag("pii");        // MetaMatch[] — all PII-tagged fields
+system.meta.byTag("pii");                       // MetaMatch[] — every match
+system.meta.byTag("pii", { kind: "fact" });     // just the facts
+system.meta.carriesTag("fact", "email", "pii"); // boolean | undefined, O(1)
+system.meta.subscribe(["pii"], rebuild, { immediate: true }); // -> unsubscribe
 ```
 
-Meta is frozen at registration (Object.create(null) + Object.freeze). Zero hot-path cost. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
+Meta is frozen at registration (Object.create(null) + Object.freeze). `label`, `description`, `category` and `color` are informational; `tags` and `tagBoundary` are not — they decide what gets redacted, and `carriesTag` is designed to be asked per fact write. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
 
 ## Observation Protocol
 
@@ -268,6 +276,18 @@ const unsub = system.observe((event: ObservationEvent) => {
   if (event.type === "constraint.evaluate") console.log(event.id, event.active);
   if (event.type === "resolver.complete") console.log(event.resolver, event.duration);
   if (event.type === "fact.change") console.log(event.key, event.prev, "→", event.next);
+});
+
+// Every fact.change carries an `origin`: "authored" (your program made the
+// write), "restore" (a history navigation replayed it) or "hydrate"
+// (initialFacts / hydrate / system.restore loaded stored state). It is stamped
+// at the write, so a batch holding writes of more than one origin reports each
+// correctly. It is NOT an authenticity signal — "authored" only means the write
+// did not arrive through a replay or hydration door.
+system.observe((event) => {
+  if (event.type === "fact.change" && event.origin === "authored") {
+    console.log("the program wrote", event.key);
+  }
 });
 
 // 23 event types: fact.change, constraint.evaluate/error,
@@ -425,6 +445,14 @@ system.registerModule("chat", chatModule); // adds module to running system
 ```
 
 See docs: https://directive.run/docs/advanced/runtime
+
+## Production Builds
+
+`@directive-run/core` publishes a second build under the `production` export condition, with every development check compiled out (dev warnings, dev-only validation and their message text). Bundlers that set the condition in a production build pick it with no configuration: webpack 5 (`mode: "production"`, so Next.js webpack builds too), Vite, and Rollup with `@rollup/plugin-node-resolve` (production unless `NODE_ENV` says otherwise). With esbuild, pass `--conditions=production`. Anything else gets the default build, whose dev check still folds away when `process.env.NODE_ENV` is defined as `"production"`, and which runs in production mode in a browser with no `process`.
+
+A third build sits under the `development` export condition, with every development check compiled on. Vite's dev server and webpack 5 in `mode: "development"` pick it, so a browser dev server gets the dev warnings and checks (such as an effect writing a fact throwing) even though the browser has no `process`. It ships unminified, so it reads directly in devtools. No build ships sourcemaps; the default build is unminified too, so Node stack traces read without one. With esbuild, pass `--conditions=development` for a dev bundle.
+
+The builds behave the same apart from the development checks. An SSR setup that externalizes packages can end up loading both (one through the server's own resolution, one through the client bundle); that is harmless and costs only the memory of a second copy.
 
 ## Common Mistakes
 

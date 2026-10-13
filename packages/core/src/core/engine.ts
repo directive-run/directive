@@ -35,20 +35,27 @@ import {
   type ErrorBoundaryManager,
   createErrorBoundaryManager,
 } from "./errors.js";
-import { createFacts } from "./facts.js";
+import { createFacts, isRunawayError } from "./facts.js";
+import { installHydrationScope } from "./internal-scopes.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
-import { type SourcesManager, createSourcesManager } from "./sources.js";
+import {
+  type SourcesManager,
+  createSourcesManager,
+  localSourceId,
+} from "./sources.js";
 import {
   BLOCKED_PROPS,
   derivationDepId,
   describeDep,
   isDerivationDep,
+  withoutTracking,
 } from "./tracking.js";
 import type {
   ConstraintsDef,
+  DefinitionKind,
   DerivationsDef,
   EffectsDef,
   EventsDef,
@@ -57,6 +64,7 @@ import type {
   MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
+  RequirementWithId,
   ResolverDef,
   ResolversDef,
   Schema,
@@ -68,6 +76,9 @@ import type {
 } from "./types.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 import type { SourceDef, SourcesDef } from "./types/sources.js";
+
+/** Separator between a module namespace and a local name (`loop::START`). */
+const SOURCE_NAMESPACE_SEPARATOR = "::";
 
 // ============================================================================
 // Engine Implementation
@@ -94,7 +105,6 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
  * copied for constraint evaluation, so nothing hands the key back to the phase
  * that raised it.
  */
-const EFFECT_RETRY_KEY = "*";
 
 /**
  * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
@@ -215,6 +225,39 @@ interface EngineState<_S extends Schema> {
  *
  * @internal
  */
+/**
+ * A schema type this package built, as opposed to a foreign validator.
+ *
+ * `t.string()` and friends are inert descriptors and safe to freeze. A Zod
+ * schema is also a supported fact type and is not: it mutates itself during
+ * validation, so freezing it breaks the first write it validates.
+ */
+/**
+ * Schema types this engine has already validated and frozen.
+ *
+ * Module-scoped so a module object handed to two systems is prepared once,
+ * without asking `Object.isFrozen` — which answers yes for a type the author
+ * froze themselves, and would then skip the tag validation.
+ */
+const preparedSchemaTypes = new WeakSet<object>();
+
+/** The diff of a pass where nothing was required before or after. */
+const NO_REQUIREMENT_CHANGES: {
+  readonly added: RequirementWithId[];
+  readonly removed: RequirementWithId[];
+} = Object.freeze({
+  added: Object.freeze([]) as unknown as RequirementWithId[],
+  removed: Object.freeze([]) as unknown as RequirementWithId[],
+});
+
+function isOwnSchemaType(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "_typeName" in (value as Record<string, unknown>)
+  );
+}
+
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
@@ -351,10 +394,29 @@ export function createEngine<S extends Schema>(
     const d = def as { meta?: DefinitionMeta };
     if (d.meta) d.meta = freezeMeta(d.meta)!;
   }
-  // Freeze fact/schema field _meta
+  // Freeze fact/schema field _meta, and the schema type holding it.
+  //
+  // Freezing only the meta object left the claim removable: the schema type is
+  // the same reference the module object holds, so `module.schema.facts.email
+  // ._meta = {}` untagged a live fact. Nothing noticed, because every consumer
+  // cached the tagged-key set at startup and the untag arrived too late to
+  // matter. Reading tags per write is the right design and makes that live, so
+  // the door closes here.
   for (const schemaType of Object.values(mergedSchema)) {
     const st = schemaType as { _meta?: DefinitionMeta };
+    // Idempotent, but only for types WE froze. `Object.isFrozen` cannot tell
+    // "we prepared this" from "the author froze it first", and skipping on the
+    // second would skip the tag validation this freeze exists to guarantee.
+    if (preparedSchemaTypes.has(st)) continue;
+    preparedSchemaTypes.add(st);
     if (st._meta) st._meta = freezeMeta(st._meta)!;
+    // Only the schema types this package builds. A Zod schema is a supported
+    // fact type and mutates itself while validating — v3 caches its shape onto
+    // the instance on first parse, v4 re-defines properties on it — so freezing
+    // one turns the first validated write into a TypeError.
+    if (isOwnSchemaType(st)) {
+      Object.freeze(st);
+    }
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -484,9 +546,65 @@ export function createEngine<S extends Schema>(
   const errorBoundary: ErrorBoundaryManager = createErrorBoundaryManager({
     config: config.errorBoundary,
     onError: (error) => pluginManager.emitError(error),
-    onRecovery: (error, strategy) =>
-      pluginManager.emitErrorRecovery(error, strategy),
+    onRecovery: (error, strategy) => {
+      if (strategy === "retry-later") {
+        ensureRetryLaterTimer();
+      }
+      pluginManager.emitErrorRecovery(error, strategy);
+    },
   });
+
+  /**
+   * Poll for due retry-later entries. Started when `retryLater` is
+   * configured, and otherwise the first time a retry-later strategy is
+   * chosen, so a strategy returned by a callback (or set without
+   * `retryLater`) still retries. Default delay 1000 ms, polled at most
+   * every 500 ms.
+   */
+  function ensureRetryLaterTimer(): void {
+    if (retryLaterTimer || !state.isRunning) {
+      return;
+    }
+    const intervalMs = Math.max(
+      config.errorBoundary?.retryLater?.delayMs ?? 1000,
+      250,
+    );
+    retryLaterTimer = setInterval(
+      () => {
+        const dueRetries = errorBoundary.processDueRetries();
+        // Nothing left to retry: stop polling until the next retry-later.
+        if (
+          errorBoundary.getRetryLaterManager().getPendingRetries().length === 0
+        ) {
+          stopRetryLaterTimer();
+        }
+
+        for (const entry of dueRetries) {
+          if (entry.callback) {
+            entry.callback();
+          } else {
+            // A constraint that threw is re-evaluated by name: a pass with
+            // no changed keys would otherwise carry its last answer forward
+            // and never ask it again.
+            if (entry.source === "constraint") {
+              constraintsManager.markDirty(entry.sourceId);
+            }
+            scheduleReconcile();
+          }
+        }
+      },
+      Math.min(intervalMs, 500),
+    );
+    // Polling must not keep a Node process alive on its own.
+    (retryLaterTimer as { unref?: () => void }).unref?.();
+  }
+
+  function stopRetryLaterTimer(): void {
+    if (retryLaterTimer !== null) {
+      clearInterval(retryLaterTimer);
+      retryLaterTimer = null;
+    }
+  }
 
   // Retry-later polling timer
   let retryLaterTimer: ReturnType<typeof setInterval> | null = null;
@@ -505,18 +623,301 @@ export function createEngine<S extends Schema>(
    * inside `onBatch`, which is where the announcement used to happen anyway —
    * so listeners still hear about a batch at exactly the same moment, having
    * become able to read the right values before that moment arrives.
+   *
+   * A begin/end pair rather than a hold that returns its release, because it
+   * is taken on every batch and every unbatched write. Each `begin` is
+   * matched by exactly one `end`; `derivationHolds` below keeps the pairing.
    */
-  let holdDerivationNotifications: () => () => void = () => () => {};
-  let releaseHold: (() => void) | null = null;
+  let beginDerivationHold: () => void = () => {};
+  let endDerivationHold: () => void = () => {};
 
+  /**
+   * Outstanding derivation-notification holds, innermost last.
+   *
+   * This was a single slot, which is wrong as soon as a batch can begin while
+   * another is still open — and one can: `onFactsBatch` is broadcast to plugins
+   * *before* the outer hold is released, so a plugin that writes in response to
+   * a batch opens a nested one from inside that window. The nested hold
+   * overwrote the outer one in the slot, the outer release closure was dropped
+   * on the floor, and the manager's depth counter never returned to zero. From
+   * then on every derivation notification was held forever: `watch`,
+   * `subscribe` and any framework hook built on them went silent for the life
+   * of the process, while the values themselves still read correctly on demand.
+   * Nothing threw, and the symptom looks like a bug in whatever renders.
+   *
+   * The manager already counts holds properly and its release is idempotent;
+   * only this side needed to stop forgetting them.
+   */
+  //
+  // Each entry is whether that hold has been released yet. The hold itself is
+  // `beginDerivationHold` / `endDerivationHold`, so a batch, and every effect
+  // runs in one, pushes a boolean instead of allocating a record and a
+  // release closure.
+  const derivationHolds: boolean[] = [];
+
+  /**
+   * How deep the stack was when each batch opened, so a batch can only ever
+   * unwind what it pushed.
+   */
+  const derivationHoldBase: number[] = [];
+
+  /**
+   * Release the innermost hold, once. Called from `onBatch`, which is after the
+   * batch's derivations have been invalidated and therefore the right moment to
+   * announce.
+   *
+   * It releases without popping. A batch that wrote something reaches here AND
+   * `onBatchEnd`; popping in both places meant one pop landed on whatever was
+   * underneath, so a batch nested inside another's flush released its parent's
+   * hold — announcing the parent early and then again when the parent finished.
+   */
   function releaseDerivationHold(): void {
-    releaseHold?.();
-    releaseHold = null;
+    const top = derivationHolds.length - 1;
+    if (top >= 0 && !derivationHolds[top]) {
+      derivationHolds[top] = true;
+      endDerivationHold();
+    }
   }
 
-  // Forward-declared so onChange/onBatch closures can check isRestoring.
-  // Assigned after createHistoryManager() below.
-  let historyRef: HistoryManager<S> | null = null;
+  /**
+   * Unwind to where this batch started, releasing anything still held.
+   *
+   * Called from `onBatchEnd`, which `store.batch` runs in a `finally`, so a
+   * throw anywhere in the batch still gives the hold back. Anything already
+   * released by `releaseDerivationHold` is skipped rather than released twice.
+   */
+  function unwindDerivationHolds(): void {
+    const base = derivationHoldBase.pop() ?? 0;
+    while (derivationHolds.length > base) {
+      const released = derivationHolds.pop();
+      if (released === false) {
+        endDerivationHold();
+      }
+    }
+  }
+
+  // Nothing forward-declares the history manager any more. Both fact paths
+  // used to ask it "are you rewinding?" — a single flag held up for the whole
+  // navigation, including the flush at the end where consumer code runs. Two
+  // sources of truth for one question, and the answer was wrong for every
+  // write that was not the manager's own. The scopes below are the only source
+  // now.
+
+  /**
+   * Non-zero while stored state is being loaded into the system rather than
+   * written by the program — `initialFacts`, `hydrate`, and a snapshot applied
+   * through `system.restore`.
+   *
+   * A counter rather than a flag because these paths nest.
+   */
+  let hydrationDepth = 0;
+  let restoreDepth = 0;
+
+  function withHydrationOrigin<T>(fn: () => T): T {
+    hydrationDepth++;
+    try {
+      return fn();
+    } finally {
+      hydrationDepth--;
+    }
+  }
+
+  function withRestoreOrigin(fn: () => void): void {
+    restoreDepth++;
+    try {
+      fn();
+    } finally {
+      restoreDepth--;
+    }
+  }
+
+  /**
+   * Non-zero for the whole of a history navigation, including the flush at the
+   * end where consumer code runs.
+   *
+   * Distinct from `restoreDepth`, which covers only the writes the manager
+   * makes. A write a listener makes while rewinding is the program's own — it
+   * is labelled `authored` and it reconciles — but the pass it schedules must
+   * not do two of the things an ordinary pass does. Taking a snapshot splices
+   * away every forward snapshot, so an undo followed by a reactive write kills
+   * redo. Re-evaluating gated sources opens a real transport, and replaying a
+   * timeline is not supposed to re-perform the acts in it.
+   *
+   * Read at the write, not at the reconcile: the pass runs in a microtask, by
+   * which time the navigation is over and the question can no longer be asked.
+   */
+  let navigationDepth = 0;
+
+  /**
+   * Writes made since the last pass, counted by where they came from.
+   *
+   * Counted rather than recorded by key. The first version kept a set of keys,
+   * and a key is not what needs identity here — a write is. Two writes to the
+   * same key in one pass, one from a navigation reaction and one ordinary,
+   * collapsed to a single entry in that set and the pass took whichever
+   * answer the set happened to hold. Both orders were wrong: a permission
+   * revoked on a key a rewind had touched kept its transport open, and an
+   * ordinary write sharing a key with a rewind lost its snapshot.
+   *
+   * A pass suppresses the navigation-unsafe work only when every write in it
+   * came from a navigation. One ordinary write is enough to require a snapshot
+   * and a gate evaluation, because failing to do either cannot be undone: the
+   * snapshot is simply not taken, and a quiescent system may never schedule
+   * another pass to attach the transport.
+   *
+   * Reset with `changedKeys`, and on stop and start — a navigation performed
+   * while the system is not running records writes that no pass will consume,
+   * and they would otherwise be counted against an unrelated later one.
+   */
+  let navigationWrites = 0;
+  let ordinaryWrites = 0;
+
+  function resetNavigationRecord(): void {
+    navigationWrites = 0;
+    ordinaryWrites = 0;
+  }
+
+  /**
+   * Keys a history navigation restored since the last pass.
+   *
+   * A restore needs no reconciling: its state was reconciled when captured. But
+   * effects mirror state to the outside world, and a canvas or document title
+   * left showing the pre-rewind state is wrong. So restored keys skip the
+   * changed set and wake effects alone, in a pass that does nothing a replay
+   * must not do: no snapshot, no gated-source re-attach, and no keys handed to
+   * constraints as changed.
+   */
+  const restoredKeys = new Set<string>();
+
+  /**
+   * Whether this write landed while effects were running, counted per write
+   * since the last pass began.
+   *
+   * A write during the effects phase (an event an effect dispatched, a captured
+   * `system.facts`, a caller writing while an async effect awaits) is carried
+   * into the next pass, so it wakes the effects that read it. That opens a
+   * feedback path: an effect that dispatches a change to its own dependency
+   * wakes itself, forever. These counters let the pass tell a chain of passes
+   * started only by effect-phase writes from ordinary work, and bound it.
+   */
+  let effectsPhaseOpen = false;
+  let effectPhaseWrites = 0;
+  let otherPhaseWrites = 0;
+  /** Consecutive passes started only by writes made during an effects phase. */
+  let effectChainLength = 0;
+  /** Consecutive "retry" attempts per failing effect, reset by ordinary work. */
+  const effectRetryAttempts = new Map<string, number>();
+  const MAX_EFFECT_RETRIES = 3;
+  /** A self-waking effect chain is cut after this many passes. */
+  const MAX_EFFECT_CHAIN = 100;
+
+  /**
+   * Keys written synchronously from inside an effect's body (an event it
+   * dispatched, a captured `system.facts`) since the last pass began. A write
+   * made while effects ran but from outside any of them, such as a caller
+   * writing while an async effect awaits, is not in here.
+   */
+  const effectOriginKeys = new Set<string>();
+  /** The keys the previous pass was started with, when it was part of a chain. */
+  let previousChainKeys: Set<string> | null = null;
+  /** Whether the previous pass took (or refreshed) a history snapshot. */
+  let lastPassSnapshotted = false;
+
+  /**
+   * Changes made in the current pass, counted per key, double-buffered like
+   * `changedKeys`. Compared with a resolver run's own counts to tell whether
+   * that run is the only thing that changed a key.
+   */
+  let writeCounts = new Map<string, number>();
+  let spareWriteCounts = new Map<string, number>();
+
+  function noteChangedKey(key: string): void {
+    state.changedKeys.add(key);
+    if (resolversManager.hasLiveRuns()) {
+      writeCounts.set(key, (writeCounts.get(key) ?? 0) + 1);
+    }
+    if (effectsPhaseOpen) {
+      effectPhaseWrites++;
+      if (effectsManager.runningEffect() !== null) {
+        effectOriginKeys.add(key);
+      }
+    } else {
+      otherPhaseWrites++;
+    }
+  }
+
+  /**
+   * Whether a dispatch is being made by an effect re-run for a history
+   * navigation, and which effect, when known. Warned once per effect.
+   */
+  let navigationEffectsOpen = false;
+  const warnedNavigationDispatch = new Set<string>();
+
+  function noteRestored(key: string): void {
+    restoredKeys.add(key);
+    scheduleReconcile();
+  }
+
+  function withNavigation(fn: () => void): void {
+    navigationDepth++;
+    try {
+      fn();
+    } finally {
+      navigationDepth--;
+    }
+  }
+
+  /**
+   * Records, at write time, that this key was written during a navigation.
+   * Returns whether it was.
+   */
+  function noteWrite(): boolean {
+    // A write an effect causes while re-running for a navigation belongs to the
+    // navigation: snapshotting it would splice away the redo stack.
+    if (navigationDepth === 0 && !navigationEffectsOpen) {
+      ordinaryWrites++;
+
+      return false;
+    }
+    navigationWrites++;
+
+    return true;
+  }
+
+  /**
+   * True when every key this pass is about was written during a navigation.
+   *
+   * The pass does the union of what its writes need: one ordinary write among
+   * them is enough to require a snapshot and a gate evaluation, because
+   * suppressing those is unrecoverable — the snapshot is gone and a quiescent
+   * system may never schedule another pass to attach the transport.
+   */
+  function passIsEntirelyNavigation(): boolean {
+    return navigationWrites > 0 && ordinaryWrites === 0;
+  }
+
+  /**
+   * Asked at each write where that write came from.
+   *
+   * Read per write, never per batch. A restore nested inside a wider batch has
+   * already put its flag down by the time that batch reports, so a label taken
+   * at report time describes the wrong thing in both directions: the replayed
+   * writes lose the mark, and any program write made while a restore was in
+   * flight gains it.
+   */
+  function currentFactOrigin(): import("./types/facts.js").FactOrigin {
+    // Scoped to the manager's own assignments. A flag covering the whole
+    // navigation would hand this label to writes a listener or an observer
+    // made of its own accord during the flush.
+    if (restoreDepth > 0) {
+      return "restore";
+    }
+    if (hydrationDepth > 0) {
+      return "hydrate";
+    }
+
+    return "authored";
+  }
 
   // Trace management (per-run reconciliation changelog, gated by config.trace)
   const traceManager = createTraceManager({
@@ -529,22 +930,62 @@ export function createEngine<S extends Schema>(
   const { store, facts } = createFacts<S>({
     schema: mergedSchema,
     onChange: (key, value, prev) => {
-      pluginManager.emitFactSet(key, value, prev);
-      // Invalidate derivations so they recompute on read
-      invalidateDerivation(key);
+      // Invalidate BEFORE announcing, so a plugin asking what a value carries
+      // is told about the write it is being notified of. The batched path
+      // already worked this way — `onWrite` invalidates at write time and the
+      // announcement waits for `onBatch` — so the two paths disagreed: a
+      // redactor got the right answer inside `system.batch()` and an answer
+      // one write stale outside it.
+      //
+      // Held across the announcement because invalidating flushes derivation
+      // listeners, which are `system.subscribe` / `system.watch` callbacks —
+      // consumer code. Without the hold they would run between the commit and
+      // the plugins, and a throw from one would skip `emitFactSet` entirely,
+      // taking the guardrail with it.
+      beginDerivationHold();
+      try {
+        invalidateDerivation(key);
+        pluginManager.emitFactSet(key, value, prev);
+      } finally {
+        endDerivationHold();
+      }
       // Track fact changes for trace
       if (traceEnabled) {
         traceManager.recordFactChange(String(key), prev, value);
       }
-      // During history restore, skip change tracking and reconciliation.
-      // The restored state is already reconciled; re-reconciling would create
-      // spurious snapshots that break undo/redo.
-      if (historyRef?.isRestoring) return;
+      // Decided by where this write came from, not by whether a restore is in
+      // flight somewhere. The two are different questions and the second gives
+      // the wrong answer for the writes that actually arrive here.
+      //
+      // `store.batch()` drops its depth counter before it flushes, so every
+      // listener that runs during a restore's flush writes on THIS path while
+      // the history manager still holds its flag up. Asking about the flag
+      // committed those writes and then dropped them from reconciliation: a
+      // constraint stopped enforcing for the life of the process, with the
+      // fact reading back correctly and no later write recovering it, because
+      // the key never reached the changed set.
+      //
+      // The restore's own writes are batched, so they are gated on the other
+      // path; what reaches here during a restore is a reaction to it, and a
+      // reaction is the program's own work.
+      if (currentFactOrigin() === "restore") {
+        noteRestored(String(key));
+
+        return;
+      }
+      // Asked unconditionally, and before the dispatch check. Behind it, a
+      // navigation driven from inside an event handler recorded nothing and
+      // its pass went on to snapshot and re-attach — the two things a replay
+      // must not do, reachable through `subscribe` calling `dispatch`, which
+      // is as ordinary as this codebase gets.
+      const duringNavigation = noteWrite();
       // Direct fact mutations (outside event dispatch) always create snapshots
-      if (dispatchDepth === 0) {
+      // — unless a navigation is in flight, where a new snapshot would splice
+      // away everything ahead of the point being rewound to.
+      if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
-      state.changedKeys.add(key);
+      noteChangedKey(String(key));
       scheduleReconcile();
     },
     onBatch: (changes) => {
@@ -570,14 +1011,39 @@ export function createEngine<S extends Schema>(
       // at which the announcement is released.
       invalidateManyDerivations(keys);
       releaseDerivationHold();
-      // During history restore, skip change tracking and reconciliation.
-      if (historyRef?.isRestoring) return;
+
+      // A replayed write needs no reconciliation — the state it restores was
+      // already reconciled when it was captured, and re-reconciling it makes
+      // spurious snapshots that break undo and redo.
+      //
+      // Decided per change rather than by asking whether a restore is in
+      // flight. A listener or observer can write its own value while one is,
+      // and that write is the program's: gated on the flag it was committed to
+      // the store and then never reconciled, so a rule that had become true
+      // stayed unsatisfied for the life of the process with nothing reporting
+      // it. Observers only reach this path at all because batched writes now
+      // announce, so the gap arrived with that arm.
+      const authored = changes.filter((change) => change.origin !== "restore");
+      if (authored.length !== changes.length) {
+        for (const change of changes) {
+          if (change.origin === "restore") {
+            noteRestored(change.key);
+          }
+        }
+      }
+      if (authored.length === 0) return;
+      let duringNavigation = false;
+      for (const _change of authored) {
+        if (noteWrite()) {
+          duringNavigation = true;
+        }
+      }
       // Resolver/effect batches (outside event dispatch) always create snapshots
-      if (dispatchDepth === 0) {
+      if (dispatchDepth === 0 && !duringNavigation) {
         shouldTakeSnapshot = true;
       }
-      for (const change of changes) {
-        state.changedKeys.add(change.key);
+      for (const change of authored) {
+        noteChangedKey(change.key);
       }
       scheduleReconcile();
     },
@@ -591,12 +1057,24 @@ export function createEngine<S extends Schema>(
       invalidateDerivation(key);
     },
     onBatchStart: () => {
-      releaseHold = holdDerivationNotifications();
+      derivationHoldBase.push(derivationHolds.length);
+      beginDerivationHold();
+      derivationHolds.push(false);
     },
+    onKeysRegistered: (entries) => {
+      const asSchema: Record<string, unknown> = {};
+      for (const [key, type] of entries) {
+        asSchema[key] = type;
+      }
+      recordFactTags(asSchema);
+      notifyMetaSubscribers();
+    },
+    originOf: currentFactOrigin,
     onBatchEnd: () => {
-      // Normally already released inside `onBatch`. This catches the batch that
-      // wrote nothing, where `onBatch` never runs.
-      releaseDerivationHold();
+      // Normally the hold was already released inside `onBatch`. This unwinds
+      // the frame either way, and covers the batch that wrote nothing — where
+      // `onBatch` never runs — and the batch that threw.
+      unwindDerivationHolds();
     },
   });
 
@@ -635,7 +1113,8 @@ export function createEngine<S extends Schema>(
   invalidateDerivation = (key: string) => derivationsManager.invalidate(key);
   invalidateManyDerivations = (keys: string[]) =>
     derivationsManager.invalidateMany(keys);
-  holdDerivationNotifications = () => derivationsManager.holdNotifications();
+  beginDerivationHold = () => derivationsManager.beginHold();
+  endDerivationHold = () => derivationsManager.endHold();
 
   // Create effects manager
   const effectsManager: EffectsManager<S> = createEffectsManager({
@@ -645,6 +1124,8 @@ export function createEngine<S extends Schema>(
     derived: derivationsManager.getProxy() as Record<string, unknown>,
     isDerivation: observeDerivationDepName,
     isFactKey: isFactKeyName,
+    // The trace is the only reader of `deps`.
+    wantsRunDeps: () => traceManager.currentTrace != null,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
@@ -655,6 +1136,9 @@ export function createEngine<S extends Schema>(
             ?.meta,
         });
       }
+    },
+    onWriteBlocked: (id, key) => {
+      if (hasPlugins()) pluginManager.emitEffectWriteBlocked(id, key);
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("effect", id, error);
@@ -673,9 +1157,19 @@ export function createEngine<S extends Schema>(
         effectsManager.disable(id);
       }
 
+      // Bounded. The retry is carried into the next pass, and an effect that
+      // fails every time would otherwise retry for as long as the process runs.
       if (strategy === "retry") {
-        state.changedKeys.add(EFFECT_RETRY_KEY);
-        scheduleReconcile();
+        const attempts = (effectRetryAttempts.get(id) ?? 0) + 1;
+        effectRetryAttempts.set(id, attempts);
+        if (attempts <= MAX_EFFECT_RETRIES) {
+          effectsManager.requestRerun(id);
+          scheduleReconcile();
+        } else if (isDevelopment) {
+          console.warn(
+            `[Directive] effect "${id}" failed ${MAX_EFFECT_RETRIES} retries in a row; it will run again on its next change.`,
+          );
+        }
       }
     },
   });
@@ -845,6 +1339,103 @@ export function createEngine<S extends Schema>(
   const pendingRequeueIds = new Set<string>();
 
   /**
+   * The writes of every run whose requirement disappeared in this pass,
+   * summed per key: those runs own the pass's changes jointly. `null` when
+   * none of them wrote anything.
+   */
+  function jointPassWrites(
+    removed: RequirementWithId[],
+  ): ReadonlyMap<string, number> | null {
+    let only: ReadonlyMap<string, number> | null = null;
+    let joint: Map<string, number> | null = null;
+    for (const req of removed) {
+      const own = resolversManager.passWritesFor(req.id);
+      if (own === null || own === only) {
+        continue;
+      }
+      if (only === null) {
+        only = own;
+        continue;
+      }
+      if (joint === null) {
+        joint = new Map(only);
+      }
+      for (const [key, n] of own) {
+        joint.set(key, (joint.get(key) ?? 0) + n);
+      }
+    }
+
+    return joint ?? only;
+  }
+
+  /**
+   * Whether the run still resolving `req` satisfied it: it wrote something
+   * this pass, and every change this pass to a fact the constraint reads
+   * (directly or through a derivation) came from the runs whose
+   * requirements disappeared in this pass. Anything else that touched what
+   * the constraint reads makes it an ordinary retraction, canceled as before.
+   */
+  function satisfiedByOwnWrite(
+    req: RequirementWithId,
+    passKeys: Set<string>,
+    passCounts: Map<string, number>,
+    joint: ReadonlyMap<string, number>,
+  ): boolean {
+    if (
+      !req.fromConstraint ||
+      resolversManager.passWritesFor(req.id) === null
+    ) {
+      return false;
+    }
+    const deps = constraintsManager.getDependencies(req.fromConstraint);
+    if (!deps) {
+      return false;
+    }
+    // Fact deps first, without allocating: the common case has no
+    // derivation in between.
+    let changed = 0;
+    let derivationIds: string[] | null = null;
+    for (const name of deps) {
+      if (isDerivationDep(name)) {
+        (derivationIds ??= []).push(derivationDepId(name));
+        continue;
+      }
+      if (!passKeys.has(name)) {
+        continue;
+      }
+      changed++;
+      if ((joint.get(name) ?? 0) !== (passCounts.get(name) ?? 0)) {
+        return false;
+      }
+    }
+    if (derivationIds !== null) {
+      const seen = new Set<string>();
+      while (derivationIds.length > 0) {
+        const id = derivationIds.pop()!;
+        if (seen.has(id)) {
+          continue;
+        }
+        seen.add(id);
+        const edges = derivationsManager.dependencyEdges(id);
+        for (const key of edges.facts) {
+          if (!passKeys.has(key)) {
+            continue;
+          }
+          changed++;
+          if ((joint.get(key) ?? 0) !== (passCounts.get(key) ?? 0)) {
+            return false;
+          }
+        }
+        for (const next of edges.derivations) {
+          derivationIds.push(next);
+        }
+      }
+    }
+
+    return changed > 0;
+  }
+
+  /**
    * Per-(constraintId, reason) sticky bit so `constraint.binding.disabled`
    * fires at most ONCE per pair across the lifetime of the registered
    * constraint. Without this, a hot async constraint that dispatches at
@@ -976,10 +1567,21 @@ export function createEngine<S extends Schema>(
         });
       }
     },
-    onResolutionComplete: () => {
-      // After a resolver completes, schedule another reconcile
+    onResolutionComplete: (satisfied) => {
+      // After a resolver completes, schedule another reconcile. A run that
+      // had already satisfied its requirement changed nothing a pass would
+      // act on by finishing, unless it left a requeue, a dirty constraint
+      // (`after` ordering) or a queued batch behind; otherwise only settle()
+      // needs to hear about it.
       notifySettlementChange();
-      scheduleReconcile();
+      if (
+        !satisfied ||
+        pendingRequeueIds.size > 0 ||
+        constraintsManager.hasDirty() ||
+        resolversManager.hasPendingBatches()
+      ) {
+        scheduleReconcile();
+      }
     },
     onRequeue: (requirementId: string) => {
       // ctx.requeue() opt-in: the resolver explicitly wants its owning
@@ -1015,6 +1617,8 @@ export function createEngine<S extends Schema>(
         historyOption: config.history,
         facts,
         store,
+        withRestoreOrigin,
+        withNavigation,
         onSnapshot: (snapshot) => {
           pluginManager.emitSnapshot(snapshot);
           notifyHistoryChange();
@@ -1025,7 +1629,6 @@ export function createEngine<S extends Schema>(
         },
       })
     : createDisabledHistory();
-  historyRef = historyManager;
 
   // Settlement listeners — notified when isSettled may have changed
   const settlementListeners = new Set<() => void>();
@@ -1056,6 +1659,8 @@ export function createEngine<S extends Schema>(
     readyPromise: null,
     readyResolve: null,
   };
+  /** The other half of `state.changedKeys`, swapped in at each pass. */
+  let spareChangedKeys = new Set<string>();
 
   // Dynamic definition registry (register, assign, unregister, call)
   const definitions = createDefinitionsRegistry({
@@ -1071,6 +1676,7 @@ export function createEngine<S extends Schema>(
     getState: () => state,
     scheduleReconcile,
     maxDeferredRegistrations: MAX_DEFERRED_REGISTRATIONS,
+    onDefinitionsChanged: () => notifyMetaSubscribers(),
   });
 
   /** Schedule a reconciliation on the next microtask */
@@ -1120,6 +1726,57 @@ export function createEngine<S extends Schema>(
       return;
     }
 
+    // A chain of passes each started only by writes made while effects ran is
+    // an effect waking itself. Cut it, say so, and drop what it carried, rather
+    // than spin until the process does.
+    const passFromEffects = effectPhaseWrites > 0 && otherPhaseWrites === 0;
+    if (passFromEffects) {
+      effectChainLength++;
+    } else {
+      effectChainLength = 0;
+      previousChainKeys = null;
+      if (otherPhaseWrites > 0) {
+        effectRetryAttempts.clear();
+      }
+    }
+    effectPhaseWrites = 0;
+    otherPhaseWrites = 0;
+    if (effectChainLength > MAX_EFFECT_CHAIN) {
+      // Drop only what the chain itself keeps writing: keys an effect wrote
+      // from its own body, and keys the previous pass of the chain was
+      // started with. A key written while effects ran but from outside them,
+      // the first time, is someone else's write and is kept.
+      const kept = new Set<string>();
+      for (const key of state.changedKeys) {
+        if (!effectOriginKeys.has(key) && !previousChainKeys?.has(key)) {
+          kept.add(key);
+        }
+      }
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...state.changedKeys].slice(0, 5).join(", ")}`,
+        );
+      }
+      state.changedKeys.clear();
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      derivationsManager.collectInvalidated(new Set());
+      resetNavigationRecord();
+      effectChainLength = 0;
+      reconcileDepth = 0;
+      if (kept.size > 0) {
+        for (const key of kept) {
+          state.changedKeys.add(key);
+        }
+        otherPhaseWrites = kept.size;
+        scheduleReconcile();
+      }
+      notifySettlementChange();
+
+      return;
+    }
+    effectOriginKeys.clear();
+
     state.isReconciling = true;
     notifySettlementChange();
 
@@ -1134,23 +1791,95 @@ export function createEngine<S extends Schema>(
       }
     }
 
+    // Asked once for this pass, of the keys the pass is actually about.
+    // Writes made during a navigation reconcile like any other, but a pass
+    // made up entirely of them must not snapshot over the redo stack or
+    // re-open a transport.
+    const followsNavigation =
+      passIsEntirelyNavigation() ||
+      (ordinaryWrites === 0 && restoredKeys.size > 0);
+    // Taken now, so a restore made while this pass awaits lands in the next.
+    let navigationKeys: Set<string> | null = null;
+    if (restoredKeys.size > 0) {
+      navigationKeys = new Set(restoredKeys);
+      restoredKeys.clear();
+    }
+
+    // The keys this pass is about, taken now. Anything written while the pass
+    // runs (during the effects phase or while constraints evaluate) stays in
+    // `changedKeys` and is picked up by the pass scheduled at the end. Clearing
+    // after the effects phase instead dropped those writes for good: an effect
+    // declared on the key never ran for it, and the first write after
+    // `start()` was lost the same way.
+    //
+    // Double-buffered rather than copied: the set writes have been landing in
+    // becomes this pass's keys, and the spare (last pass's keys, emptied)
+    // takes the writes from here on. Nothing keeps `passKeys` past the pass,
+    // and passes never overlap, so the spare is free to reuse.
+    const passKeys = state.changedKeys;
+    spareChangedKeys.clear();
+    state.changedKeys = spareChangedKeys;
+    spareChangedKeys = passKeys;
+    // Run attribution bookkeeping, only while a resolver run could write.
+    const passCounts = writeCounts;
+    if (writeCounts.size > 0 || resolversManager.hasLiveRuns()) {
+      spareWriteCounts.clear();
+      writeCounts = spareWriteCounts;
+      spareWriteCounts = passCounts;
+      resolversManager.beginPass();
+    }
+    if (passFromEffects) {
+      previousChainKeys = new Set(passKeys);
+    }
+    // Same lifetime, so the record can never be consumed by a later pass that
+    // has nothing to do with the navigation that set it.
+    resetNavigationRecord();
+    const ordinaryKeyCount = passKeys.size;
+
+    let snapshotted = false;
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
-      if (state.changedKeys.size > 0) {
-        if (snapshotEventNames === null || shouldTakeSnapshot) {
-          const keys = state.changedKeys;
-          const label =
-            keys.size <= 5
-              ? `facts-changed:${[...keys].join(",")}`
-              : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
-          historyManager.takeSnapshot(label);
+      if (passKeys.size > 0) {
+        // `followsNavigation` overrides both arms. Snapshotting here splices
+        // away every snapshot ahead of the point just rewound to, so a single
+        // reactive write during an undo destroys redo — and the default arm
+        // (`snapshotEventNames === null`) takes one unconditionally, so
+        // clearing the flag alone did not stop it.
+        if (
+          !followsNavigation &&
+          passFromEffects &&
+          (snapshotEventNames === null || shouldTakeSnapshot)
+        ) {
+          // These writes finish the pass that caused them, so they go into
+          // its snapshot instead of making their own. Otherwise undo lands on
+          // a state that never settled. Nothing to fold into when that pass
+          // took no snapshot, so none is taken.
+          if (lastPassSnapshotted) {
+            historyManager.refreshLatestSnapshot();
+            snapshotted = true;
+          }
+        } else if (
+          !followsNavigation &&
+          (snapshotEventNames === null || shouldTakeSnapshot)
+        ) {
+          snapshotted = true;
+          // The label is only built for a history that keeps it.
+          if (config.history) {
+            const keys = passKeys;
+            const label =
+              keys.size <= 5
+                ? `facts-changed:${[...keys].join(",")}`
+                : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
+            historyManager.takeSnapshot(label);
+          }
         }
         shouldTakeSnapshot = false;
       }
 
-      // Get snapshot for plugins
-      const snapshot = facts.$snapshot() as FactsSnapshot<S>;
-      pluginManager.emitReconcileStart(snapshot);
+      // Snapshot for plugins, built only when one is listening.
+      if (hasPlugins()) {
+        pluginManager.emitReconcileStart(facts.$snapshot() as FactsSnapshot<S>);
+      }
 
       // Note: Derivations are already invalidated immediately when facts change
       // (in the onChange/onBatch callbacks), so we don't need to do it here
@@ -1171,37 +1900,113 @@ export function createEngine<S extends Schema>(
       // nothing reads back stays stale — so pushing it meant re-walking the
       // whole downstream graph per write forever, while the set it fed is
       // drained once per pass regardless.
-      derivationsManager.collectInvalidated(state.changedKeys);
-      await effectsManager.runEffects(state.changedKeys);
-
-      // Again, because effects write facts.
       //
-      // The drain above happens before `runEffects` so an effect gated on a
-      // derivation is woken by it. But an effect that *writes* a fact
-      // invalidates whatever derivations read that fact, and those roots land
-      // after that drain has already run — so without this second call the
-      // announcement misses the constraint pass immediately below, the pass
-      // ends with `changedKeys` cleared, and nothing is scheduled to carry it.
-      // The derivation still reads correctly on pull; only the wakeup is lost,
-      // which is why it survived a snapshot assertion for so long.
+      // A pass that only carries a navigation drains into the restored keys
+      // instead, so a derivation the rewind moved wakes effects without being
+      // handed to constraints as a change.
+      derivationsManager.collectInvalidated(
+        navigationKeys !== null && ordinaryKeyCount === 0
+          ? navigationKeys
+          : passKeys,
+      );
+      effectsPhaseOpen = true;
+      navigationEffectsOpen = navigationKeys !== null;
+      try {
+        // Awaited only when an effect returned a promise. A pass whose
+        // effects are all synchronous then finishes without yielding, so
+        // `settle()` sees it done on its first check instead of falling back
+        // to a timer and a subscription every frame.
+        //
+        const effectsDone = effectsManager.runEffectsFast(
+          passKeys,
+          navigationKeys,
+        );
+        if (effectsDone !== undefined) {
+          await effectsDone;
+        }
+      } finally {
+        effectsPhaseOpen = false;
+        navigationEffectsOpen = false;
+      }
+
+      // RFC 0012: re-evaluate gated/keyed sources on the post-commit effects
+      // plane, immediately after effects, against the committed facts. Sits
+      // behind the same condition effects run behind, and additionally not at
+      // all when this pass was scheduled by a write made during a history
+      // navigation. Replay and time travel re-derive the key value but never
+      // re-attach a transport. The gate is a pure fact read; the attach act
+      // stays a non-replayable input.
       //
-      // Early-returns on an empty root set, so a reconcile in which no effect
-      // wrote anything pays one `Set.size` check.
-      derivationsManager.collectInvalidated(state.changedKeys);
+      // The restore's own writes do not reconcile at all. What reaches here is
+      // a write a listener made in reaction to one, which is the program's own
+      // work and does reconcile — so the exclusion has to be carried from the
+      // write rather than read from a flag that is down by now.
+      // Skipped when this pass was scheduled by a write made during a history
+      // navigation. Attaching is a real act against the outside world and a
+      // replay is not supposed to re-perform it.
+      if (!followsNavigation) {
+        sourcesManager.evaluateGated(
+          facts as unknown as Record<string, unknown>,
+        );
+      }
 
-      // Copy changed keys for constraint evaluation before clearing
-      const keysForConstraints = new Set(state.changedKeys);
+      // No second invalidation drain here. A write made while effects ran
+      // stays in `changedKeys`, and the derivations it invalidated stay
+      // pending; the pass scheduled at the end drains both, so effects and
+      // constraints reading them hear about it there.
 
-      // Clear changed keys
-      state.changedKeys.clear();
+      // A navigation restored state that was reconciled when it was captured,
+      // so its requirements are rebuilt from a full evaluation without
+      // dispatching anything. Without the rebuild, the requirement set from
+      // before the rewind stayed as the baseline: a later write that satisfied
+      // a constraint again looked like no change and its resolver never ran.
+      // Handing the evaluation an empty key set instead meant "evaluate all"
+      // and re-dispatched resolvers for the rewound state.
+      let currentRequirements: RequirementWithId[];
+      if (navigationKeys !== null) {
+        const restored = await constraintsManager.evaluate();
+        const restoredSet = new RequirementSet();
+        for (const req of restored) {
+          // A constraint that reads a key written in this same pass was just
+          // evaluated against that write, not against the restored state, so
+          // it cannot be part of the baseline. Left out, it is diffed as
+          // added below and dispatches, as the write deserves.
+          if (ordinaryKeyCount > 0 && req.fromConstraint) {
+            const deps = constraintsManager.getDependencies(req.fromConstraint);
+            if (deps && [...deps].some((dep) => passKeys.has(dep))) {
+              continue;
+            }
+          }
+          restoredSet.add(req);
+        }
+        state.previousRequirements = restoredSet;
+        currentRequirements =
+          ordinaryKeyCount > 0
+            ? await constraintsManager.evaluate(passKeys)
+            : restored;
+      } else {
+        // Evaluate constraints (pass changed keys for incremental evaluation).
+        // When no constraint reads a changed key, the answer is the last
+        // pass's requirements carried forward, and it comes back without a
+        // promise to await.
+        currentRequirements =
+          constraintsManager.evaluateUnaffected(passKeys) ??
+          (await constraintsManager.evaluate(passKeys));
+      }
 
-      // Evaluate constraints (pass changed keys for incremental evaluation)
-      const currentRequirements =
-        await constraintsManager.evaluate(keysForConstraints);
-      const currentSet = new RequirementSet();
-      for (const req of currentRequirements) {
-        currentSet.add(req);
-        pluginManager.emitRequirementCreated(req);
+      // Nothing required now or before: no set to build, nothing to diff,
+      // nothing to start or cancel.
+      const quiet =
+        currentRequirements.length === 0 &&
+        state.previousRequirements.size === 0;
+      const currentSet = quiet
+        ? state.previousRequirements
+        : new RequirementSet();
+      if (!quiet) {
+        for (const req of currentRequirements) {
+          currentSet.add(req);
+          pluginManager.emitRequirementCreated(req);
+        }
       }
 
       // Capture which constraints produced requirements for trace
@@ -1224,7 +2029,9 @@ export function createEngine<S extends Schema>(
       }
 
       // Diff with previous requirements
-      const { added, removed } = currentSet.diff(state.previousRequirements);
+      const { added, removed } = quiet
+        ? NO_REQUIREMENT_CHANGES
+        : currentSet.diff(state.previousRequirements);
 
       // Capture requirement diff for trace
       if (currentTrace) {
@@ -1252,10 +2059,25 @@ export function createEngine<S extends Schema>(
       // Cancelling a bound resolver would abort the signal and make a
       // signal-checking resolver bail early, losing those data writes (the
       // win-at-the-buzzer regression).
+      const joint = removed.length > 0 ? jointPassWrites(removed) : null;
       for (const req of removed) {
         const bound = req.fromConstraint
           ? getConstraintBinding(req.fromConstraint)
           : undefined;
+        if (
+          joint !== null &&
+          satisfiedByOwnWrite(req, passKeys, passCounts, joint)
+        ) {
+          // The run's own write, and nothing else, made its requirement go
+          // away: it satisfied it. It is not canceled; it finishes and
+          // reports completion. Decided from what it wrote, not from how far
+          // its promise has got, so the answer does not depend on timing.
+          // It stays in flight, so stop() aborts it and settle() waits for
+          // it; it is not retried; and if the requirement comes back while
+          // it runs, the new dispatch supersedes it.
+          resolversManager.markSatisfied(req.id);
+          continue;
+        }
         if (bound) {
           resolversManager.detach(req.id);
         } else {
@@ -1328,20 +2150,35 @@ export function createEngine<S extends Schema>(
       // here guarantees the NEXT reconcile diff treats them as fresh.
       // If the constraint no longer fires next pass, the ID simply won't
       // be in currentSet — there's no infinite-loop risk.
+      //
+      // Held while the requeuing resolver is still in flight. Applied
+      // earlier, the next pass re-dispatches a requirement whose resolver has
+      // not finished, the dispatch is dropped as a duplicate, and the requeue
+      // is lost for good. That used to be hidden by how many microtasks a
+      // pass took, which is not something to depend on: a resolver slower
+      // than those lost it all along. Its completion schedules a pass, and
+      // the requeue is applied at the end of that one.
       if (pendingRequeueIds.size > 0) {
+        let applied = false;
         for (const reqId of pendingRequeueIds) {
+          if (resolversManager.isResolving(reqId)) {
+            continue;
+          }
           state.previousRequirements.remove(reqId);
+          pendingRequeueIds.delete(reqId);
+          applied = true;
         }
-        pendingRequeueIds.clear();
         // Schedule a follow-up reconcile so the next diff sees the
         // re-emitted requirement as added. Without this, the system
         // could go quiescent if no other fact change is pending.
-        scheduleReconcile();
+        if (applied) {
+          scheduleReconcile();
+        }
       }
 
       // Build reconcile result (only if plugins are listening)
-      const inflightInfo = resolversManager.getInflightInfo();
       if (config.plugins && config.plugins.length > 0) {
+        const inflightInfo = resolversManager.getInflightInfo();
         // Build Map for O(1) lookups on canceled requirements
         const inflightMap =
           removed.length > 0
@@ -1376,6 +2213,7 @@ export function createEngine<S extends Schema>(
       }
 
       state.isReconciling = false;
+      lastPassSnapshotted = snapshotted;
 
       // Flush any deferred dynamic definition operations that were queued
       // during this reconciliation cycle
@@ -1418,44 +2256,98 @@ export function createEngine<S extends Schema>(
       // with something to say and no pass in which to say it.
       if (
         state.changedKeys.size > 0 ||
+        restoredKeys.size > 0 ||
+        effectsManager.hasPendingReruns() ||
         derivationsManager.pendingInvalidationCount() > 0
       ) {
         scheduleReconcile();
-      } else {
-        // The system reached quiet, so whatever chain of passes led here has
-        // ended and the runaway counter starts over.
-        //
-        // This is the only place it resets, and that is the whole point. It
-        // used to reset in this `finally` unconditionally, which made the
-        // ceiling above unreachable: re-entry is refused at the top of
-        // `reconcile`, so the counter went to one and back to zero every pass
-        // and never once approached fifty. A resolver feeding its own
-        // constraint span passes forever with no warning — the guard was there,
-        // it just could not fire.
-        //
-        // It reset on full settlement before that, and was moved because a
-        // long-running system under continuous change climbed toward the
-        // ceiling and tripped on legitimate work. Both readings are wrong for
-        // the same reason: neither distinguishes a pass that chained from the
-        // previous one from a pass that started fresh. The branch does. A
-        // circular chain never reaches this line; a busy system reaches it
-        // between changes.
-        reconcileDepth = 0;
       }
+
+      // Reset every pass, which leaves the ceiling above unreachable. That is
+      // deliberate, and it is a retreat from something worse.
+      //
+      // Resetting only on reaching quiet did make the ceiling reachable — and
+      // reachable by the wrong things. Ordinary bounded work chains passes
+      // without going quiet between them: a sixty-item queue drain trips at
+      // fifty-one, and so does cursor pagination, a backoff counter, or any
+      // constraint whose `require` varies with a fact its own resolver writes.
+      // On a trip, the branch above wipes `previousRequirements`, so the next
+      // diff treats every live requirement as new and re-dispatches it —
+      // including requirements that had nothing to do with the chain, whose
+      // resolvers had already completed. Measured: nine charge dispatches for
+      // one order, in production, with no signal, because the warning is
+      // development-only.
+      //
+      // Meanwhile the runaway it was meant to catch stayed invisible.
+      // `context.requeue()` reschedules without dirtying a fact, so every pass
+      // reached quiet and zeroed the counter: five thousand dispatches, no
+      // warning.
+      //
+      // So the reachable version fires on safe work, does damage when it fires,
+      // and still misses the dangerous work. Unreachable is strictly better
+      // until the instrument is right, and depth is the wrong instrument: the
+      // engine already holds every edge needed to name a cycle — requirement to
+      // resolver to written keys to constraint dependencies to constraint — and
+      // repeat-detection on `(constraintId, requirement key)` sees the async
+      // case a depth counter cannot. That is the fix, and it is a design, not
+      // an edit.
+      reconcileDepth = 0;
 
       notifySettlementChange();
     }
   }
 
-  /** Dispatch an event by name, handling snapshot flags and batching */
+  /** Sources already warned about a cross-module publish, per system. */
+  const warnedCrossModuleSources = new Set<string>();
+
+  /** Development: say why a source's `ns::EVENT` publish was dropped. */
+  function warnCrossModulePublish(
+    sourceId: string,
+    namespace: string,
+    eventName: string,
+  ): void {
+    if (warnedCrossModuleSources.has(sourceId)) {
+      return;
+    }
+    warnedCrossModuleSources.add(sourceId);
+    const ownPrefix = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}`;
+    const fix = eventName.startsWith(ownPrefix)
+      ? `Drop the "${ownPrefix}" prefix: publish("${eventName.slice(ownPrefix.length)}").`
+      : `Publish an event module "${namespace}" declares; to reach another module, have that event's handler or a resolver dispatch an event the other module owns.`;
+    console.warn(
+      `[Directive] Source "${sourceId}" published "${eventName}". A source publishes only its own module's events, so this is dropped (reason "cross-module-event"). ${fix}`,
+    );
+  }
+
+  /**
+   * Dispatch an event by name, handling snapshot flags and batching.
+   *
+   * @returns Whether a handler was registered for the event.
+   */
   function dispatchEventByName(
     eventName: string,
     payload?: Record<string, unknown>,
-  ): void {
+  ): boolean {
     const handler = mergedEvents[eventName];
+    if (isDevelopment && navigationEffectsOpen) {
+      const effectId = effectsManager.runningEffect() ?? "(unknown effect)";
+      if (!warnedNavigationDispatch.has(effectId)) {
+        warnedNavigationDispatch.add(effectId);
+        console.warn(
+          `[Directive] effect "${effectId}" dispatched "${eventName}" while re-running after a history navigation. An effect that dispatches records acts rather than mirroring state, and a rewind should not repeat them. Set onNavigate: "skip" on it.`,
+        );
+      }
+    }
     if (handler) {
       dispatchDepth++;
-      if (snapshotEventNames === null || snapshotEventNames.has(eventName)) {
+      // Not while rewinding. A handler dispatched from a listener reacting to
+      // a navigation would otherwise ask for a snapshot here, and taking one
+      // splices away everything ahead of the point being rewound to.
+      if (
+        navigationDepth === 0 &&
+        !navigationEffectsOpen &&
+        (snapshotEventNames === null || snapshotEventNames.has(eventName))
+      ) {
         shouldTakeSnapshot = true;
       }
       try {
@@ -1465,11 +2357,16 @@ export function createEngine<S extends Schema>(
       } finally {
         dispatchDepth--;
       }
-    } else if (isDevelopment) {
+
+      return true;
+    }
+    if (isDevelopment) {
       console.warn(
         `[Directive] Unknown event type "${eventName}". No handler is registered for this event. Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
       );
     }
+
+    return false;
   }
 
   // Create typed derive accessor using a Proxy
@@ -1523,7 +2420,7 @@ export function createEngine<S extends Schema>(
     const authored = derivationsManager.getMeta(
       id as keyof DerivationsDef<S>,
     ) as DefinitionMeta | undefined;
-    if (authored?.inheritsTags === false) {
+    if (authored?.tagBoundary === true) {
       return [];
     }
 
@@ -1551,7 +2448,7 @@ export function createEngine<S extends Schema>(
         const upstreamMeta = derivationsManager.getMeta(
           upstream as keyof DerivationsDef<S>,
         ) as DefinitionMeta | undefined;
-        if (upstreamMeta?.inheritsTags === false) {
+        if (upstreamMeta?.tagBoundary === true) {
           continue;
         }
         queue.push(upstream);
@@ -1567,49 +2464,121 @@ export function createEngine<S extends Schema>(
   }
 
   /**
-   * Bumped whenever the set `collectAllMeta` walks can have changed.
+   * The runtime's own copy of every fact's tags, built at registration.
+   *
+   * `carriesTag("fact", …)` is asked on every write by anything that redacts,
+   * so it reads from here rather than from the schema object — which a consumer
+   * holds a reference to. Tags decide what gets redacted; the answer should not
+   * come from somewhere the answer can be edited.
+   */
+  const factTagSets = new Map<string, ReadonlySet<string>>();
+  const EMPTY_TAGS: ReadonlySet<string> = new Set();
+
+  function recordFactTags(schema: Record<string, unknown>): void {
+    for (const key of Object.keys(schema)) {
+      const meta = (schema[key] as { _meta?: DefinitionMeta })?._meta;
+      const tags = meta?.tags;
+      // EVERY key, including untagged ones. Membership in this map is what
+      // separates "recorded, and carries nothing" from "not recorded yet" —
+      // and only the first of those is an answer. Recording tagged keys alone
+      // made an unrecorded key indistinguishable from an untagged one, so a
+      // key that reached the schema before its tags did read as definitively
+      // clean instead of unknown.
+      factTagSets.set(
+        key,
+        tags && tags.length > 0 ? new Set(tags) : EMPTY_TAGS,
+      );
+    }
+  }
+
+  recordFactTags(mergedSchema as Record<string, unknown>);
+
+  /**
+   * Told whenever the set `collectAllMeta` walks can have changed.
    *
    * Answering `byTag` means walking every definition in the system, which is
-   * why anything consulting it on a hot path caches the answer. Those caches
-   * had no way to learn they had gone stale short of re-walking — so they were
-   * built once and kept forever, and a fact registered by a later module was
-   * simply never in them. A guardrail screening tagged facts stopped screening
-   * the ones that arrived after it started, and reported nothing, because
-   * "not in the set" and "clean" are the same answer.
+   * why anything consulting it on a hot path used to cache the answer. Those
+   * caches had no way to learn they had gone stale short of re-walking — so
+   * they were built once and kept forever, and a fact registered by a later
+   * module was simply never in them. A guardrail screening tagged facts stopped
+   * screening the ones that arrived after it started, and reported nothing,
+   * because "not in the set" and "clean" are the same answer.
    *
-   * An integer they can compare per read costs nothing and makes the staleness
-   * observable.
+   * Pushing the signal instead of publishing a number to poll removes the whole
+   * shape: there is no marker to advance early, and no cache to leave empty.
    */
-  let metaRevision = 0;
+  const metaSubscribers = new Set<() => void>();
 
-  /** Collect all definitions with meta across all types (for byCategory/byTag). */
+  function notifyMetaSubscribers(): void {
+    // Snapshot: a listener that subscribes while being notified would
+    // otherwise be visited in the same pass, and one that does it every time
+    // never terminates.
+    for (const listener of [...metaSubscribers]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("[Directive] Metadata subscriber error:", { error });
+      }
+    }
+  }
+
+  /** Collect all definitions with meta across all types (for byTag). */
   function collectAllMeta(): MetaMatch[] {
+    // Fenced off the tracking stack. Walking the tag graph forces derivations
+    // to compute, and forcing goes through the same accessor a derivation body
+    // uses — which records a dependency when it runs inside a tracking frame.
+    // A plugin asking a metadata question from inside a constraint's `when` or
+    // an effect's batch would otherwise write every derivation into that
+    // reader's dependency set.
+    //
+    // Defensive: the mechanism is plain in `manager.get`, but six attempts to
+    // observe the symptom measured no growth, so this is inert if the path is
+    // unreachable and correct if it is not. Asking a question about the system
+    // is not reading a value from it either way.
+    return withoutTracking(() => collectAllMetaUnfenced());
+  }
+
+  function collectAllMetaUnfenced(): MetaMatch[] {
     const results: MetaMatch[] = [];
     for (const [id, meta] of moduleMeta) {
-      results.push({ type: "module", id, meta });
+      results.push({ kind: "module", id, meta, tagOrigin: "authored" });
     }
     for (const key of Object.keys(mergedSchema)) {
       const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })
         ?._meta;
-      if (meta) results.push({ type: "fact", id: key, meta });
+      if (meta)
+        results.push({ kind: "fact", id: key, meta, tagOrigin: "authored" });
     }
     for (const [name, meta] of eventMeta) {
-      results.push({ type: "event", id: name, meta });
+      results.push({ kind: "event", id: name, meta, tagOrigin: "authored" });
     }
     for (const [id, def] of Object.entries(mergedConstraints)) {
-      if (def.meta) results.push({ type: "constraint", id, meta: def.meta });
+      if (def.meta)
+        results.push({
+          kind: "constraint",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedResolvers)) {
-      if (def.meta) results.push({ type: "resolver", id, meta: def.meta });
+      if (def.meta)
+        results.push({
+          kind: "resolver",
+          id,
+          meta: def.meta,
+          tagOrigin: "authored",
+        });
     }
     for (const [id, def] of Object.entries(mergedEffects)) {
       const meta = (def as { meta?: DefinitionMeta }).meta;
-      if (meta) results.push({ type: "effect", id, meta });
+      if (meta)
+        results.push({ kind: "effect", id, meta, tagOrigin: "authored" });
     }
     for (const id of Object.keys(mergedDerive)) {
       const meta = derivationsManager.getMeta(id as keyof DerivationsDef<S>);
       if (meta) {
-        results.push({ type: "derivation", id, meta });
+        results.push({ kind: "derivation", id, meta, tagOrigin: "authored" });
       }
       // A derivation with no authored meta at all still carries whatever its
       // inputs are tagged with — that case is the whole point, since nobody
@@ -1617,12 +2586,12 @@ export function createEngine<S extends Schema>(
       const inherited = inheritedTagsFor(id);
       if (inherited.length > 0) {
         results.push({
-          type: "derivation",
+          kind: "derivation",
           id,
           meta: Object.freeze(
             Object.assign(Object.create(null), meta, { tags: inherited }),
           ),
-          via: "inherited",
+          tagOrigin: "inherited",
         });
       }
     }
@@ -1732,7 +2701,7 @@ export function createEngine<S extends Schema>(
         const authored = derivationsManager.getMeta(
           id as keyof DerivationsDef<S>,
         );
-        const inherited = inheritedTagsFor(id);
+        const inherited = withoutTracking(() => inheritedTagsFor(id));
         if (inherited.length === 0) {
           return authored;
         }
@@ -1743,14 +2712,111 @@ export function createEngine<S extends Schema>(
           }),
         );
       },
-      byCategory(category: string): MetaMatch[] {
-        return collectAllMeta().filter((m) => m.meta.category === category);
+      byTag(tag: string, options?: { kind?: DefinitionKind }): MetaMatch[] {
+        const wanted = options?.kind;
+
+        return collectAllMeta().filter(
+          (m) =>
+            (wanted === undefined || m.kind === wanted) &&
+            m.meta.tags?.includes(tag),
+        );
       },
-      byTag(tag: string): MetaMatch[] {
-        return collectAllMeta().filter((m) => m.meta.tags?.includes(tag));
+      carriesTag(
+        kind: DefinitionKind,
+        id: string,
+        tag: string,
+      ): boolean | undefined {
+        // Facts are the hot-path case: asked on every write by anything that
+        // redacts. Answered from the runtime's own copy, so it costs a map
+        // lookup and cannot be edited from outside.
+        if (kind === "fact") {
+          // Absent from the recorded map means the runtime has no answer,
+          // whether the key is unknown or merely arrived ahead of its tags.
+          // Reporting `false` there is how an untagged key and an
+          // unrecorded one became the same answer, which is the whole class
+          // of defect this accessor exists to avoid.
+          const recorded = factTagSets.get(id);
+
+          return recorded === undefined ? undefined : recorded.has(tag);
+        }
+
+        if (kind === "derivation") {
+          if (!Object.hasOwn(mergedDerive, id)) {
+            return undefined;
+          }
+          const authored = derivationsManager.getMeta(
+            id as keyof DerivationsDef<S>,
+          );
+          if (authored?.tags?.includes(tag)) {
+            return true;
+          }
+          // Walking a derivation means running it, and a body that throws must
+          // not decide what gets redacted. "Could not answer" is a third state
+          // for exactly this.
+          try {
+            return withoutTracking(() => inheritedTagsFor(id).includes(tag));
+          } catch {
+            return undefined;
+          }
+        }
+
+        // A switch rather than an object lookup: `kind` reaching
+        // `Object.prototype` through a literal would answer for the wrong thing.
+        switch (kind) {
+          case "module":
+            return moduleMeta.has(id)
+              ? (moduleMeta.get(id)?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "event":
+            return eventMeta.has(id)
+              ? (eventMeta.get(id)?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "constraint":
+            return Object.hasOwn(mergedConstraints, id)
+              ? (mergedConstraints[id]?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "resolver":
+            return Object.hasOwn(mergedResolvers, id)
+              ? (mergedResolvers[id]?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          case "effect":
+            return Object.hasOwn(mergedEffects, id)
+              ? ((
+                  mergedEffects[id] as { meta?: DefinitionMeta } | undefined
+                )?.meta?.tags?.includes(tag) ?? false)
+              : undefined;
+          default:
+            return undefined;
+        }
       },
-      revision(): number {
-        return metaRevision;
+      subscribe(
+        tagsOrListener: readonly string[] | (() => void),
+        listenerOrOptions?: (() => void) | { immediate?: boolean },
+        maybeOptions?: { immediate?: boolean },
+      ): () => void {
+        const listener =
+          typeof tagsOrListener === "function"
+            ? tagsOrListener
+            : (listenerOrOptions as () => void);
+        const options =
+          typeof tagsOrListener === "function"
+            ? (listenerOrOptions as { immediate?: boolean } | undefined)
+            : maybeOptions;
+
+        // The tag list narrows nothing today — every metadata change can move
+        // any tag's answer, and waking a listener that did not need it is the
+        // correct direction to be wrong in. It is accepted so consumers can say
+        // what they hold, and so this can narrow later without a signature
+        // change.
+        metaSubscribers.add(listener);
+
+        if (options?.immediate) {
+          listener();
+        }
+
+        return () => {
+          metaSubscribers.delete(listener);
+        };
       },
     },
 
@@ -1811,6 +2877,21 @@ export function createEngine<S extends Schema>(
           guardrailNotifyDepth -= 1;
         }
       },
+      guardrailCoverage(
+        plugin: string,
+        screenedCount: number,
+        screenedDigest: string,
+        reason: "start" | "tags-changed" | "unanswerable",
+      ): void {
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        pluginManager.emitGuardrailCoverage(
+          plugin,
+          screenedCount,
+          screenedDigest,
+          reason,
+        );
+      },
       clobberLoopDetected(event): void {
         if (state.isDestroyed) return;
         if (!hasPlugins()) return;
@@ -1861,7 +2942,100 @@ export function createEngine<S extends Schema>(
         onStop: () => observer({ type: "system.stop" }),
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
-          observer({ type: "fact.change", key, prev, next: value }),
+          // Unbatched writes announce synchronously inside `set()`, so reading
+          // the origin here *is* reading it at the write.
+          observer({
+            type: "fact.change",
+            key,
+            prev,
+            next: value,
+            origin: currentFactOrigin(),
+          }),
+        onFactsBatch: (changes: import("./types/facts.js").FactChange[]) => {
+          // Without this arm a write inside `system.batch()` reached no
+          // observer at all, while the identical write outside one was
+          // reported. Event handlers, effects, resolvers before their first
+          // await, `initialFacts`, `hydrate` and every history restore write
+          // through a batch — so a durable sink behind `observe()` was blind
+          // to most of the writes in a running system, and suppressing an
+          // entry took nothing more privileged than wrapping the write.
+          //
+          // Runs are coalesced, not grouped. Consecutive writes to a key from
+          // the same origin fold into one event carrying the first `prev` and
+          // the last value, so a body that writes a key in a loop produces one
+          // event rather than ten thousand. A change of origin cuts the run
+          // and starts a new event.
+          //
+          // Cut rather than grouped because replaying the events has to land
+          // on the value the facts actually hold — which is what a durable
+          // record is for, and what the timeline package does literally.
+          // Grouping by origin emitted one event per origin in first-touch
+          // order, so a batch that wrote a fact, rewound history, then wrote
+          // it again replayed the older value last and reconstructed a value
+          // the system never held.
+          //
+          // A key written and written back keeps its event. The pair reads
+          // `prev === next`, which looks like noise, but dropping it would be
+          // one more way for a batch to leave no trace.
+          type Emitted = {
+            key: string;
+            prev: unknown;
+            next: unknown;
+            origin: import("./types/facts.js").FactOrigin;
+          };
+          const emitted: Emitted[] = [];
+          const openForKey = new Map<string, Emitted>();
+          for (const change of changes) {
+            const next = change.type === "delete" ? undefined : change.value;
+            const open = openForKey.get(change.key);
+            if (open !== undefined && open.origin === change.origin) {
+              open.next = next;
+              continue;
+            }
+            // `change.prev` is the value the key held immediately before this
+            // write, which is the previous event's `next`. So the events chain
+            // and an auditor reading them in order never sees a value appear
+            // from nowhere.
+            const entry: Emitted = {
+              key: change.key,
+              prev: change.prev,
+              next,
+              origin: change.origin,
+            };
+            emitted.push(entry);
+            openForKey.set(change.key, entry);
+          }
+
+          // One try block for the batch, re-entered only after a throw.
+          //
+          // The whole hook runs inside a single try/catch in the plugin
+          // manager, so an unguarded loop lost every key after a throw — a
+          // one-row gap in a durable record became a whole-transaction gap.
+          // Guarding each call individually fixed that and cost 94% more wall
+          // clock at a hundred observers, because the guard is per call. The
+          // cursor gives the same isolation and pays for it only when
+          // something actually throws.
+          let index = 0;
+          while (index < emitted.length) {
+            try {
+              for (; index < emitted.length; index++) {
+                const { key, prev, next, origin } = emitted[index]!;
+                observer({ type: "fact.change", key, prev, next, origin });
+              }
+            } catch (error) {
+              // A guard the runtime raised to stop a runaway is not a
+              // consumer's throw. Logging it here would disarm the guard, and
+              // doing so per key would re-arm it once per key.
+              if (isRunawayError(error)) throw error;
+              const failedKey = emitted[index]?.key;
+              index++;
+              console.error(
+                `[Directive] Observer threw on fact "${failedKey}"; the remaining keys in this batch were still delivered.`,
+                error,
+              );
+            }
+          }
+        },
         onConstraintEvaluate: (
           id: string,
           active: boolean,
@@ -1966,24 +3140,62 @@ export function createEngine<S extends Schema>(
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
+        onEffectWriteBlocked: (id: string, key: string) =>
+          observer({ type: "effect.write-blocked", id, key }),
+        onModuleRegistered: (id: string) =>
+          observer({ type: "module.registered", id }),
+        onModuleUnregistered: (id: string) =>
+          observer({ type: "module.unregistered", id }),
         onSourceAttach: (id: string, moduleId: string) =>
-          observer({ type: "source.attach", id, moduleId }),
+          observer({
+            type: "source.attach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
-          observer({ type: "source.publish", id, moduleId, eventName }),
+          observer({
+            type: "source.publish",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+          }),
         onSourceDrop: (
           id: string,
           moduleId: string,
           eventName: string,
           reason: import("./types/sources.js").SourceDropReason,
-        ) => observer({ type: "source.drop", id, moduleId, eventName, reason }),
+        ) =>
+          observer({
+            type: "source.drop",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            eventName,
+            reason,
+          }),
         onSourceDetach: (id: string, moduleId: string) =>
-          observer({ type: "source.detach", id, moduleId }),
+          observer({
+            type: "source.detach",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+          }),
         onSourceError: (
           id: string,
           moduleId: string,
-          phase: "attach" | "cleanup" | "runtime",
+          phase: "attach" | "cleanup" | "runtime" | "gate",
           error: unknown,
-        ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        ) =>
+          observer({
+            type: "source.error",
+            id,
+            moduleId,
+            localId: localSourceId(id, moduleId),
+            phase,
+            error,
+          }),
         onGuardrailBlocked: (
           plugin: string,
           key: string,
@@ -1998,6 +3210,19 @@ export function createEngine<S extends Schema>(
             kind,
             count,
             ...(category !== undefined ? { category } : {}),
+          }),
+        onGuardrailCoverage: (
+          plugin: string,
+          screenedCount: number,
+          screenedDigest: string,
+          reason: "start" | "tags-changed" | "unanswerable",
+        ) =>
+          observer({
+            type: "guardrail.coverage",
+            plugin,
+            screenedCount,
+            screenedDigest,
+            reason,
           }),
         onClobberLoopDetected: (
           event: import("./types/system.js").ObservationEvent & {
@@ -2048,9 +3273,16 @@ export function createEngine<S extends Schema>(
 
       // Apply initialFacts/hydrate via callback
       // This ensures initialFacts are applied AFTER module init but BEFORE reconcile
+      //
+      // Marked as hydration rather than authored: these values were produced by
+      // an earlier run of the program, not by this one. Filed as first-party
+      // writes they are indistinguishable from what the program decided this
+      // time, which is the question anyone reading the record is asking.
       if (config.onAfterModuleInit) {
         store.batch(() => {
-          config.onAfterModuleInit!();
+          withHydrationOrigin(() => {
+            config.onAfterModuleInit!();
+          });
         });
       }
 
@@ -2100,6 +3332,17 @@ export function createEngine<S extends Schema>(
       }
 
       state.isRunning = true;
+      // A navigation performed while the system was not running recorded
+      // writes that no pass ever consumed; they would otherwise be counted
+      // against the first unrelated pass after this.
+      resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
@@ -2115,7 +3358,7 @@ export function createEngine<S extends Schema>(
       // store. `onAttach` plugin events fire from inside the manager (one
       // per successful attach), so the static-start path AND the
       // `registerModule` immediate-attach path emit consistently.
-      sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
+      sourcesManager.attachAll((sourceId, _moduleId, eventName, payload) => {
         // Guards parity with the system.dispatch path (engine.ts:1692):
         //   - drop publishes after `system.destroy()` (engine-wide invariant)
         //   - drop publishes after `system.stop()` and before the next
@@ -2139,38 +3382,61 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(eventName)) {
           return { accepted: false, reason: "blocked-event-name" };
         }
-        dispatchEventByName(
-          eventName,
+        // A namespaced source (id `ns::local`) publishes only its own
+        // module's events: the bare name is scoped here, and a name that
+        // already contains the separator is a cross-module publish – dropped
+        // under its original name, never dispatched.
+        let target = eventName;
+        const separatorIndex = sourceId.indexOf(SOURCE_NAMESPACE_SEPARATOR);
+        if (separatorIndex !== -1) {
+          const namespace = sourceId.slice(0, separatorIndex);
+          if (eventName.includes(SOURCE_NAMESPACE_SEPARATOR)) {
+            if (isDevelopment) {
+              warnCrossModulePublish(sourceId, namespace, eventName);
+            }
+
+            return { accepted: false, reason: "cross-module-event" };
+          }
+          target = `${namespace}${SOURCE_NAMESPACE_SEPARATOR}${eventName}`;
+        }
+        // A name with no handler is a drop, not a publish – otherwise the
+        // source's counters and `onPublish` report success for an event
+        // nothing ran (and production has no other signal at all).
+        const handled = dispatchEventByName(
+          target,
           (payload ?? {}) as Record<string, unknown>,
         );
-        return { accepted: true };
+        if (!handled) {
+          return {
+            accepted: false,
+            reason: "unknown-event",
+            eventName: target,
+          };
+        }
+
+        return { accepted: true, eventName: target };
       });
+
+      // RFC 0012: initial gated attach. `attachAll` above attached only the
+      // UNGATED sources; gated/keyed sources evaluate their `key`/`active`
+      // gate against the committed facts here so a source whose gate is
+      // already open at start attaches synchronously (before the first
+      // reconcile), and one whose gate is shut stays detached. Subsequent
+      // re-evaluation happens on the post-commit effects plane.
+      sourcesManager.evaluateGated(facts as unknown as Record<string, unknown>);
 
       // Emit start event
       pluginManager.emitStart(system);
 
       // Start retry-later polling timer if configured
-      if (config.errorBoundary?.retryLater && !retryLaterTimer) {
-        const intervalMs = Math.max(
-          config.errorBoundary.retryLater.delayMs ?? 1000,
-          250,
-        );
-
-        retryLaterTimer = setInterval(
-          () => {
-            const dueRetries = errorBoundary.processDueRetries();
-
-            for (const entry of dueRetries) {
-              if (entry.callback) {
-                entry.callback();
-              } else {
-                scheduleReconcile();
-              }
-            }
-          },
-          Math.min(intervalMs, 500),
-        );
+      if (config.errorBoundary?.retryLater) {
+        ensureRetryLaterTimer();
       }
+
+      // Anything outside the facts may have changed while stopped, and a
+      // `when` should not depend on it, but re-evaluating every constraint
+      // once on start costs one full pass and makes stop()/start() a reset.
+      constraintsManager.markAllDirty();
 
       // Initial reconcile (now that all modules are initialized)
       scheduleReconcile();
@@ -2179,6 +3445,14 @@ export function createEngine<S extends Schema>(
     stop(): void {
       if (!state.isRunning) return;
       state.isRunning = false;
+      resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
 
       // Stop retry-later timer
       if (retryLaterTimer !== null) {
@@ -2228,6 +3502,7 @@ export function createEngine<S extends Schema>(
       definitions.destroy();
       // Clean up meta Maps
       moduleMeta.clear();
+      metaSubscribers.clear();
       eventMeta.clear();
       // Drop any pending ctx.requeue() requests
       pendingRequeueIds.clear();
@@ -2241,6 +3516,14 @@ export function createEngine<S extends Schema>(
       // actually complete before the caller continues.
       if (!state.isRunning) return;
       state.isRunning = false;
+      resetNavigationRecord();
+      restoredKeys.clear();
+      effectPhaseWrites = 0;
+      otherPhaseWrites = 0;
+      effectChainLength = 0;
+      effectOriginKeys.clear();
+      previousChainKeys = null;
+      lastPassSnapshotted = false;
       if (retryLaterTimer !== null) {
         clearInterval(retryLaterTimer);
         retryLaterTimer = null;
@@ -2267,6 +3550,7 @@ export function createEngine<S extends Schema>(
       traceManager.destroy();
       definitions.destroy();
       moduleMeta.clear();
+      metaSubscribers.clear();
       eventMeta.clear();
       pendingRequeueIds.clear();
       pluginManager.emitDestroy(system);
@@ -2541,6 +3825,7 @@ export function createEngine<S extends Schema>(
         sources: sourcesManager.listDefinitions().map((row) => ({
           id: row.id,
           moduleId: row.moduleId,
+          localId: row.localId,
           meta: row.meta as DefinitionMeta | undefined,
           attached: row.attached,
           attachedAt: row.attachedAt,
@@ -3030,15 +4315,21 @@ export function createEngine<S extends Schema>(
         );
       }
 
+      // Restoring a serialized snapshot is hydration, not authorship — the
+      // same reasoning as `initialFacts`. Note this is `system.restore`, which
+      // is a different door from `history.restore`; the two used to disagree
+      // about what a restored write looked like in the record.
       store.batch(() => {
-        for (const [key, value] of Object.entries(snapshot.facts)) {
-          // Skip dangerous keys (defense in depth)
-          if (BLOCKED_PROPS.has(key)) continue;
-          store.set(
-            key as keyof InferSchema<S>,
-            value as InferSchema<S>[keyof InferSchema<S>],
-          );
-        }
+        withHydrationOrigin(() => {
+          for (const [key, value] of Object.entries(snapshot.facts)) {
+            // Skip dangerous keys (defense in depth)
+            if (BLOCKED_PROPS.has(key)) continue;
+            store.set(
+              key as keyof InferSchema<S>,
+              value as InferSchema<S>[keyof InferSchema<S>],
+            );
+          }
+        });
       });
     },
 
@@ -3216,12 +4507,23 @@ export function createEngine<S extends Schema>(
 
     // Merge into existing engine state
     Object.assign(mergedSchema, module.schema);
+    // Immediately after the merge, never later. A source registered by this
+    // same module attaches synchronously further down and can publish an event
+    // that writes one of these facts — so any statement between the key
+    // becoming visible and its tags being recorded is a window in which the
+    // fact exists and reads as untagged.
+    recordFactTags(module.schema as Record<string, unknown>);
     // Freeze fact/schema field _meta for new module
     for (const schemaType of Object.values(
       module.schema as Record<string, unknown>,
     )) {
       const st = schemaType as { _meta?: DefinitionMeta };
+      if (preparedSchemaTypes.has(st)) continue;
+      preparedSchemaTypes.add(st);
       if (st._meta) st._meta = freezeMeta(st._meta)!;
+      if (isOwnSchemaType(st)) {
+        Object.freeze(st);
+      }
     }
     if (module.events) {
       unwrapEventDefinitions(
@@ -3317,10 +4619,10 @@ export function createEngine<S extends Schema>(
     // Track the new module in config.modules for hooks
     config.modules.push(module as (typeof config.modules)[number]);
 
-    // The module's definitions and its schema are in place, so anything caching
-    // a `byTag` / `byCategory` answer is now looking at a stale one. Bumped
-    // before init and the hooks run, since both can read meta.
-    metaRevision++;
+    // The module's definitions and its schema are in place, so anything holding
+    // a tag answer is now holding a stale one. Told before init and the hooks
+    // run, since both can read meta.
+    notifyMetaSubscribers();
 
     // Run init within a batch
     if (module.init) {
@@ -3328,6 +4630,8 @@ export function createEngine<S extends Schema>(
         module.init!(facts as any);
       });
     }
+
+    pluginManager.emitModuleRegistered(module.id);
 
     // Call lifecycle hooks
     module.hooks?.onInit?.(system);
@@ -3338,9 +4642,253 @@ export function createEngine<S extends Schema>(
     }
   }
 
+  /**
+   * RFC 0002: remove a module from a live system.
+   *
+   * Teardown order is the reverse of registration and it is load-bearing.
+   * Sources go first so nothing new can arrive mid-teardown; resolvers next,
+   * because an in-flight one holds a facts proxy over keys that are about to
+   * stop existing; constraints before derivations so nothing re-derives a
+   * value on its way out; facts last.
+   *
+   * Cancellation is RFC 0002's Option C. Unregistering aborts in-flight
+   * resolvers AND detaches them, so a resolver watching `context.signal` stops
+   * promptly and one ignoring it merely writes nowhere. The returned promise
+   * settles once that work has actually finished, not merely once it was told
+   * to stop — those are different moments, and a caller registering a
+   * replacement instance under the same name needs the later one.
+   */
+  async function unregisterModule(
+    // A string only identifies a module when ids are unique, which is true in
+    // single-module mode and false in namespaced mode: `prefixModuleDefinition`
+    // keeps `mod.id`, so one module definition registered under two namespaces
+    // yields two entries with the same id. Passing the exact object removes the
+    // ambiguity — and tearing down the wrong module is not a failure anyone
+    // would catch quickly.
+    target: string | object,
+  ): Promise<void> {
+    const label =
+      typeof target === "string"
+        ? target
+        : ((target as { id?: string }).id ?? "<module>");
+
+    if (state.isDestroyed) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}" on a destroyed system.`,
+      );
+    }
+    if (state.isReconciling) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}" during reconciliation. Wait for the current reconciliation cycle to complete.`,
+      );
+    }
+
+    const found =
+      typeof target === "string"
+        ? config.modules.find((m) => (m as { id: string }).id === target)
+        : config.modules.find((m) => (m as object) === target);
+    if (!found) {
+      throw new Error(
+        `[Directive] Cannot unregister module "${label}": no such module is registered.`,
+      );
+    }
+    // Re-entrancy: two concurrent calls for the same module would both pass the
+    // lookup and both run the whole teardown, firing `onStop` twice and
+    // splicing twice. The second caller awaits the first instead.
+    const alreadyRunning = unregisterInFlight.get(found);
+    if (alreadyRunning) {
+      await alreadyRunning;
+
+      return;
+    }
+
+    const run = unregisterModuleInner(found, label);
+    unregisterInFlight.set(found, run);
+    try {
+      await run;
+    } finally {
+      unregisterInFlight.delete(found);
+    }
+  }
+
+  /** In-flight unregisters, keyed by the exact module object. */
+  const unregisterInFlight = new Map<object, Promise<void>>();
+
+  async function unregisterModuleInner(
+    found: object,
+    moduleId: string,
+  ): Promise<void> {
+    const module = found as unknown as {
+      id: string;
+      schema: Record<string, unknown>;
+      derive?: Record<string, unknown>;
+      events?: Record<string, unknown>;
+      effects?: Record<string, unknown>;
+      sources?: Record<string, unknown>;
+      constraints?: Record<string, unknown>;
+      resolvers?: Record<string, unknown>;
+      hooks?: { onStop?: (s: unknown) => void };
+    };
+
+    // 1. Sources — stop new input before anything it feeds is dismantled.
+    if (module.sources) {
+      sourcesManager.cleanupModule(moduleId);
+      for (const sourceId of Object.keys(module.sources)) {
+        delete mergedSources[sourceId];
+        delete sourceModuleIds[sourceId];
+        pluginManager.emitDefinitionUnregister("source", sourceId);
+      }
+    }
+
+    // 2. Resolvers — abort, then wait for the work to genuinely stop.
+    const resolverIds = module.resolvers ? Object.keys(module.resolvers) : [];
+    for (const resolverId of resolverIds) {
+      // `syncResolverKeys` published this resolver's `key` function as the
+      // dedupe identity for its requirement type. Left behind, a retired
+      // module's closure keeps deciding requirement identity for whatever
+      // registers that type next — including resolvers that declared no key
+      // of their own. Symmetric with the single-definition path.
+      const def = (module.resolvers as Record<string, unknown>)[resolverId] as {
+        key?: unknown;
+        requirement?: unknown;
+      };
+      if (def?.key && typeof def.requirement === "string") {
+        // Only when no surviving resolver still declares a key for this
+        // requirement type. `setRequirementKey` is last-write-wins across
+        // modules, so removing unconditionally stripped the dedupe identity
+        // from a module that was never touched — silently changing whether its
+        // requirements coalesce or run in parallel.
+        const stillOwned = Object.entries(
+          mergedResolvers as Record<string, unknown>,
+        ).some(([otherId, otherDef]) => {
+          if (otherId === resolverId) return false;
+          const other = otherDef as { key?: unknown; requirement?: unknown };
+
+          return Boolean(other?.key) && other.requirement === def.requirement;
+        });
+        if (!stillOwned) {
+          constraintsManager.removeRequirementKey(def.requirement);
+        }
+      }
+      resolversManager.unregisterDefinition(resolverId);
+      delete (mergedResolvers as Record<string, unknown>)[resolverId];
+      resolverIdToModule.delete(resolverId);
+      pluginManager.emitDefinitionUnregister("resolver", resolverId);
+    }
+    if (resolverIds.length > 0) {
+      await resolversManager.drainResolvers(resolverIds);
+    }
+
+    // 3. Constraints, effects, derivations.
+    if (module.constraints) {
+      for (const id of Object.keys(module.constraints)) {
+        constraintsManager.unregisterDefinition(id);
+        delete (mergedConstraints as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("constraint", id);
+      }
+    }
+    if (module.effects) {
+      for (const id of Object.keys(module.effects)) {
+        effectsManager.unregisterDefinition(id);
+        delete (mergedEffects as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("effect", id);
+      }
+    }
+    if (module.derive) {
+      for (const id of Object.keys(module.derive)) {
+        derivationsManager.unregisterDefinition(id);
+        delete (mergedDerive as Record<string, unknown>)[id];
+        pluginManager.emitDefinitionUnregister("derivation", id);
+      }
+    }
+
+    // 4. Events.
+    if (module.events) {
+      for (const name of Object.keys(module.events)) {
+        delete (mergedEvents as Record<string, unknown>)[name];
+        snapshotEventNames?.delete(name);
+        // Same untag hazard the fact tags carry, one step over: a retired
+        // event's meta answering `carriesTag("event", …)` would let an event
+        // registered later under the same name inherit tags it never declared.
+        eventMeta.delete(name);
+      }
+    }
+
+    // 5. Facts last — everything above could still have read them.
+    const factKeys = Object.keys(module.schema);
+    const factsStore = store as unknown as {
+      unregisterKeys(keys: readonly string[]): void;
+    };
+    factsStore.unregisterKeys(factKeys);
+    for (const key of factKeys) {
+      delete (mergedSchema as Record<string, unknown>)[key];
+      // Drop the tag record too. Leaving it behind would let a key registered
+      // again later inherit tags from the instance that retired — which is the
+      // untag hazard `recordFactTags` exists to prevent, running backwards.
+      factTagSets.delete(key);
+    }
+
+    moduleMeta.delete(moduleId);
+    // Re-found here, never captured before the awaits above. An index taken
+    // earlier goes stale the moment a concurrent unregister splices the array,
+    // and the result is that a live module gets removed while the intended one
+    // stays — silently, and with `onStop` firing on the wrong module.
+    const index = config.modules.indexOf(
+      found as (typeof config.modules)[number],
+    );
+    if (index !== -1) {
+      config.modules.splice(index, 1);
+    }
+
+    // Anything holding a tag answer is now holding a stale one.
+    notifyMetaSubscribers();
+
+    // Caught, not propagated. `onStop` runs after the module has already been
+    // torn down, so letting it throw would abandon the remaining bookkeeping
+    // and leave the name both un-unregisterable and un-re-registerable — a
+    // permanently dead namespace, caused by a hook that is only an observer.
+    try {
+      module.hooks?.onStop?.(system);
+    } catch (rawError) {
+      const error =
+        rawError instanceof Error ? rawError : new Error(String(rawError));
+      console.error(
+        `[Directive] Module "${moduleId}" hooks.onStop threw during unregister:`,
+        error,
+      );
+      // Reported, deliberately not routed through the error boundary: a
+      // configured `throw` strategy there would put the exception straight back
+      // on the path this catch exists to protect, and the teardown has already
+      // happened. `onStop` is an observer, so its failure is news rather than a
+      // reason to abandon the rest of the unregister.
+    }
+    pluginManager.emitDefinitionUnregister("module", moduleId);
+    pluginManager.emitModuleUnregistered(moduleId);
+
+    if (state.isRunning && !state.isReconciling) {
+      // Awaited, not scheduled. `registerModule` refuses to run during
+      // reconciliation, and a caller that immediately registers a replacement
+      // instance — the rotation this whole API exists for — would otherwise
+      // collide with a pass this very call had queued. Awaiting means that when
+      // the promise settles the name is genuinely free.
+      await reconcile();
+    }
+  }
+
   // Attach registerModule to system
   (system as unknown as Record<string, unknown>).registerModule =
     registerModule;
+  (system as unknown as Record<string, unknown>).unregisterModule =
+    unregisterModule;
+
+  // Hand first-party plugins the ability to mark their writes as hydration.
+  //
+  // Installed BEFORE `emitInit`, which runs the first plugin's `onInit`
+  // synchronously up to its first await. Installed after, the plugin at index
+  // zero saw nothing — and `plugins: [persistencePlugin()]` is the documented
+  // single-plugin shape, so the common arrangement was the broken one and the
+  // provenance of every restored value depended on array position.
+  installHydrationScope(system, withHydrationOrigin);
 
   // Initialize plugins.
   //

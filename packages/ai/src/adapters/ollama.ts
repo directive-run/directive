@@ -115,7 +115,7 @@ const OLLAMA_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OLLAMA_PRICING_AS_OF = "2026-08-14";
+export const OLLAMA_PRICING_AS_OF = "2026-08-15";
 
 export const OLLAMA_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OLLAMA_RATES,

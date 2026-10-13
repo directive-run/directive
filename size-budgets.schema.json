@@ -11,6 +11,40 @@
       "type": "string",
       "description": "Why these numbers are what they are, for whoever has to raise one."
     },
+    "_CONSUMERS_README": {
+      "type": "string",
+      "description": "Why the consumer-fixture numbers are what they are."
+    },
+    "consumers": {
+      "type": "array",
+      "description": "Consumer-fixture budgets enforced by scripts/size-consumer.ts: small real apps bundled for production, gzipped.",
+      "items": {
+        "type": "object",
+        "required": ["fixture", "gzBudget"],
+        "additionalProperties": false,
+        "properties": {
+          "fixture": {
+            "type": "string",
+            "description": "Path to a fixture app, relative to the repo root.",
+            "pattern": "^scripts/size-fixtures/.+\\.ts$"
+          },
+          "gzBudget": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Ceiling in bytes for the gzipped production bundle, at zlib's default level."
+          },
+          "noCondition": {
+            "type": "boolean",
+            "description": "Bundle without the production export condition, with only process.env.NODE_ENV defined. Guards the default build's dev-check fold."
+          },
+          "forbidden": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Dev-only text that must not appear in the production bundle."
+          }
+        }
+      }
+    },
     "budgets": {
       "type": "array",
       "minItems": 1,

@@ -81,7 +81,14 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   // ============================================================================
 
   /**
-   * Called when a single fact is set (not during batch).
+   * Called when a single fact is set **outside** a batch.
+   *
+   * Not a complete view of writes on its own, and the gap is larger than it
+   * sounds: event handlers, effects, resolvers before their first `await`,
+   * `initialFacts` and `hydrate` all write through a batch, so a plugin
+   * implementing only this hook misses most of what a running system does.
+   * Implement {@link Plugin.onFactsBatch} alongside it.
+   *
    * @param key - The fact key that changed
    * @param value - The new value
    * @param prev - The previous value (undefined if new)
@@ -97,7 +104,12 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
 
   /**
    * Called after a batch of fact changes completes.
-   * Use this instead of onFactSet for batched operations.
+   *
+   * Use this **in addition to** `onFactSet`, not instead of it — between them
+   * they cover every write. Each change carries an `origin` saying whether the
+   * program made it, a history navigation replayed it, or stored state was
+   * hydrated in.
+   *
    * @param changes - Array of all changes in the batch
    */
   onFactsBatch?: (changes: FactChange[]) => void;
@@ -334,6 +346,17 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    */
   onEffectError?: (id: string, error: unknown) => void;
 
+  /**
+   * Called when an effect tries to write a fact and the write is refused.
+   *
+   * Fires in every build. Development also throws with the fix in the message;
+   * production drops the write, so this is how a production build reports it.
+   *
+   * @param id - The effect ID
+   * @param key - The fact key, or a dotted path for a nested mutation
+   */
+  onEffectWriteBlocked?: (id: string, key: string) => void;
+
   // ============================================================================
   // Source Hooks
   // ============================================================================
@@ -398,7 +421,7 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onSourceError?: (
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup" | "runtime",
+    phase: "attach" | "cleanup" | "runtime" | "gate",
     error: unknown,
   ) => void;
 
@@ -442,6 +465,24 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
     kind: "redact" | "alert" | "detect",
     count: number,
     category?: string,
+  ) => void;
+
+  /**
+   * Called when a guardrail reports what it covers, rather than what it caught.
+   *
+   * `onGuardrailBlocked` fires on a match, so a guardrail covering nothing and
+   * one covering everything cleanly are indistinguishable — both are silent.
+   * This fires when a guardrail starts and whenever the answer it works from
+   * changes, which makes the difference visible without a per-write metric.
+   *
+   * `screenedDigest` is a digest of the covered keys, not the keys: their names
+   * are part of what is being protected.
+   */
+  onGuardrailCoverage?: (
+    plugin: string,
+    screenedCount: number,
+    screenedDigest: string,
+    reason: "start" | "tags-changed" | "unanswerable",
   ) => void;
 
   // ============================================================================
@@ -540,6 +581,22 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * @param id - The definition ID
    */
   onDefinitionUnregister?: (type: string, id: string) => void;
+  /**
+   * RFC 0002: a module was added to, or removed from, a live system.
+   *
+   * Distinct from the per-definition hooks above, which fire once per
+   * constraint, resolver, effect and so on. Replay needs the module-level
+   * boundary: a stream of individual definition events cannot say where one
+   * instance ended and the next began.
+   *
+   * These cover **dynamic** topology only. Modules a system was created with
+   * do not emit `onModuleRegistered` — they are part of the system's
+   * construction and a replay already has them from the `createSystem` config.
+   * The id is the module's namespace in a namespaced system, so instances
+   * built from one factory remain distinguishable.
+   */
+  onModuleRegistered?: (id: string) => void;
+  onModuleUnregistered?: (id: string) => void;
 
   /**
    * Called when a definition is manually invoked via `call()`.

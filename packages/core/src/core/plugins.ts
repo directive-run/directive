@@ -152,6 +152,7 @@ export interface PluginManager<_S extends Schema = any> {
   // Effect hooks
   emitEffectRun(id: string): void;
   emitEffectError(id: string, error: unknown): void;
+  emitEffectWriteBlocked(id: string, key: string): void;
 
   // Source hooks — inbound external event lifecycle (see SourceDef).
   // Mirrors the effect-shape so observation plugins (audit-ledger, devtools)
@@ -174,7 +175,7 @@ export interface PluginManager<_S extends Schema = any> {
   emitSourceError(
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup" | "runtime",
+    phase: "attach" | "cleanup" | "runtime" | "gate",
     error: unknown,
   ): void;
 
@@ -185,6 +186,12 @@ export interface PluginManager<_S extends Schema = any> {
     kind: "redact" | "alert" | "detect",
     count: number,
     category?: string,
+  ): void;
+  emitGuardrailCoverage(
+    plugin: string,
+    screenedCount: number,
+    screenedDigest: string,
+    reason: "start" | "tags-changed" | "unanswerable",
   ): void;
 
   // Clobber loop hooks (v1.23.0)
@@ -217,6 +224,9 @@ export interface PluginManager<_S extends Schema = any> {
   ): void;
   emitDefinitionUnregister(type: string, id: string): void;
   emitDefinitionCall(type: string, id: string, props?: unknown): void;
+  /** RFC 0002: module-level topology change, for replay reconstruction. */
+  emitModuleRegistered(id: string): void;
+  emitModuleUnregistered(id: string): void;
 
   // Trace hooks
   emitTraceComplete(run: TraceEntry): void;
@@ -418,6 +428,7 @@ export function createPluginManager<
     // Effect hooks
     emitEffectRun: broadcast("onEffectRun"),
     emitEffectError: broadcast("onEffectError"),
+    emitEffectWriteBlocked: broadcast("onEffectWriteBlocked"),
 
     // Source hooks
     emitSourceAttach: broadcast("onSourceAttach"),
@@ -428,6 +439,7 @@ export function createPluginManager<
 
     // Guardrail hooks (RFC 0010)
     emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
+    emitGuardrailCoverage: broadcast("onGuardrailCoverage"),
 
     // Clobber loop hooks (v1.23.0)
     emitClobberLoopDetected: broadcast("onClobberLoopDetected"),
@@ -446,6 +458,8 @@ export function createPluginManager<
     emitDefinitionAssign: broadcast("onDefinitionAssign"),
     emitDefinitionUnregister: broadcast("onDefinitionUnregister"),
     emitDefinitionCall: broadcast("onDefinitionCall"),
+    emitModuleRegistered: broadcast("onModuleRegistered"),
+    emitModuleUnregistered: broadcast("onModuleUnregistered"),
 
     // Trace hooks
     emitTraceComplete: broadcast("onTraceComplete"),

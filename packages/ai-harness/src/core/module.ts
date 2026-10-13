@@ -1201,9 +1201,13 @@ function buildModule(deps: HarnessChainDeps & { preset: PresetConfig }) {
       /** Announce a finished turn and what it did to the running total. */
       announceTurn: {
         deps: ["lastTurn"],
-        run: (facts, prev, derived) => {
+        run: (facts, prevFacts, derived) => {
           const record = facts.lastTurn;
-          if (record === null || prev === null || prev.lastTurn === record) {
+          if (
+            record === null ||
+            prevFacts === null ||
+            prevFacts.lastTurn === record
+          ) {
             return;
           }
 
@@ -1230,7 +1234,7 @@ function buildModule(deps: HarnessChainDeps & { preset: PresetConfig }) {
           // previous snapshot is what makes that a property of this one read
           // rather than a flag someone has to remember to reset.
           const previousFraction =
-            budgetUsd > 0 ? prev.spentUsd / budgetUsd : 0;
+            budgetUsd > 0 ? prevFacts.spentUsd / budgetUsd : 0;
           if (
             previousFraction < warningThreshold &&
             cost.fraction >= warningThreshold

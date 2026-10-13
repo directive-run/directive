@@ -647,10 +647,10 @@ export const heistModule = createModule("heist", {
 
   effects: {
     logStep: {
-      run: (facts, prev) => {
+      run: (facts, prevFacts) => {
         if (
-          prev &&
-          facts.currentStep !== prev.currentStep &&
+          prevFacts &&
+          facts.currentStep !== prevFacts.currentStep &&
           facts.currentStep > 0
         ) {
           const latest = facts.stepHistory[facts.stepHistory.length - 1];
@@ -666,8 +666,8 @@ export const heistModule = createModule("heist", {
 
     announceResult: {
       deps: ["achieved"],
-      run: (facts, prev) => {
-        if (facts.achieved && (!prev || !prev.achieved)) {
+      run: (facts, prevFacts) => {
+        if (facts.achieved && (!prevFacts || !prevFacts.achieved)) {
           console.log(
             `[Heist] Mission complete! ${facts.stepHistory.length} steps, ${facts.totalTokens} tokens`,
           );

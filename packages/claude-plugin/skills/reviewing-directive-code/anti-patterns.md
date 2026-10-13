@@ -69,7 +69,7 @@ constraints: {
 
 effects: {
   warn: {
-    run: (facts, prev) => {
+    run: (facts, prevFacts) => {
       if (system.derive.itemCount > 100) {
         console.warn("cart is large");
       }
@@ -78,7 +78,7 @@ effects: {
 },
 
 // CORRECT – derived is the second argument to when()/require(),
-// and the third to run(), after facts and prev
+// and the third to run(), after facts and prevFacts
 constraints: {
   trim: {
     when: (_facts, derived) => derived.itemCount > 100,
@@ -88,7 +88,7 @@ constraints: {
 
 effects: {
   warn: {
-    run: (facts, prev, derived) => {
+    run: (facts, prevFacts, derived) => {
       if (derived.itemCount > 100) {
         console.warn("cart is large");
       }
@@ -450,46 +450,39 @@ const gameModule = createModule('game', {
 
 See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
 
-## 22. Abbreviating Type Names (`*Def` instead of `*Definition`)
+## 22. Writing Facts From an Effect
 
 ```typescript
-// WRONG – `Def` is short for `Definition`. Same anti-pattern as `ctx`
-// → `context` (entry #6). Source code reads better with spelled-out
-// names; the minifier handles the bytes either way.
-import type { ModuleDef, SourceDef, ResolverDef } from "@directive-run/core";
+// WRONG – effects only talk to the outside world. The `facts` an effect
+// receives is read-only: this throws in development and is ignored in
+// production.
+effects: {
+  trackMoveTime: {
+    deps: ["moveCount"],
+    run: (facts) => {
+      facts.lastMoveTimestamp = Date.now();
+    },
+  },
+},
 
-// CORRECT – use the spelled-out aliases. `*Def` stays canonical in 1.x
-// for back-compat; consumers can migrate today.
-import type {
-  ModuleDefinition,
-  SourceDefinition,
-  ResolverDefinition,
-} from "@directive-run/core";
+// CORRECT – write it where the change happens (an event handler or the
+// resolver that bumps `moveCount`), or compute it as a derivation.
+events: {
+  move: (facts) => {
+    facts.moveCount += 1;
+    facts.lastMoveTimestamp = Date.now();
+  },
+},
 ```
 
-The `*Definition` aliases ship in 1.x via `export type { X as XDefinition }`
-in `packages/core/src/core/types/index.ts`, so generic forwarding +
-TS inference rules (mapped types, conditional distribution, tagged-
-union discrimination, barrel re-exports) match the canonical `*Def`
-form bit-for-bit. **2.0 swaps:** `*Definition` becomes canonical and
-`*Def` becomes the deprecated alias. Start writing `*Definition` in
-new code today so the 2.0 migration is a no-op.
+**Where the write belongs:**
 
-Per RFC 0006, this applies to:
+- A change caused by input → an **event handler**.
+- A value computed from other facts → a **derivation**.
+- Work a constraint requires → a **resolver**.
+- Data coming back from async work (a fetch, a socket message, a timer) → a **source** that publishes an event, or a resolver.
 
-- `ModuleDef` → `ModuleDefinition`
-- `ConstraintDef` / `ConstraintsDef` → `ConstraintDefinition` / `ConstraintsDefinition`
-- `ResolverDef` / `ResolversDef` → `ResolverDefinition` / `ResolversDefinition`
-- `DerivationDef` / `DerivationsDef` → `DerivationDefinition` / `DerivationsDefinition`
-- `EffectDef` / `EffectsDef` → `EffectDefinition` / `EffectsDefinition`
-- `EventsDef` → `EventsDefinition`
-- `SourceDef` / `SourcesDef` → `SourceDefinition` / `SourcesDefinition`
-- `SourcePublish` → `SourcePublishFn`, `SourceUnsubscribe` → `SourceUnsubscribeFn`
-- Plus all `Typed*Def`, `CrossModule*Def`, `Dynamic*Def` variants.
-
-`EffectCleanup`, `MetaAccessor`, `EventsAccessor`, `DeriveAccessor`,
-`Snapshot` are explicitly kept as-is (each has reasoning recorded in
-RFC 0006).
+**Conditional reads:** an effect wakes only for the facts its *last* run read. `facts.a || facts.b` skips reading `b` while `a` is truthy, so a change to `b` alone does not wake it. Read both up front, or declare `deps`.
 
 ## Quick Reference Checklist
 
@@ -507,6 +500,7 @@ Before generating any Directive code, verify:
 10. `await system.settle()` after `system.start()`
 11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
 12. Constraints and effects read their own derivations through the `derived` parameter, never through a closed-over `system.derive`
+13. Effects never write facts; the write goes in an event handler, derivation, resolver, or source
 
 ## See also
 
