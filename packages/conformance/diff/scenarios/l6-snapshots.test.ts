@@ -1,9 +1,8 @@
 /** L6: snapshot and restore. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L6 snapshots", () => {
+suite("L6 snapshots", () => {
   scenario(
     "snapshot and restore round-trip, with reconcile after restore",
     ({ core: { createModule, t } }) => ({

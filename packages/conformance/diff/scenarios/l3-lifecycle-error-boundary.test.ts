@@ -1,7 +1,6 @@
 /** L3: lifecycle, the error boundary strategies and plugins. */
 
-import { describe } from "vitest";
-import { type BuildContext, scenario } from "../scenario.js";
+import { type BuildContext, scenario, suite } from "../scenario.js";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,7 +64,7 @@ const underBoundary = (strategy: string) => (ctx: BuildContext) => ({
 });
 
 // Each scenario is written out (not looped) so the census can count them.
-describe("L3 lifecycle and the error boundary", () => {
+suite("L3 lifecycle and the error boundary", () => {
   scenario('error boundary: onResolverError "retry"', underBoundary("retry"), [
     ...goAndSettle,
   ]);

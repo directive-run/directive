@@ -26,13 +26,17 @@ import {
   CHECKS_PROJECT,
   DIFF_PROJECT,
   DIFF_TEST_ROOTS,
+  FUZZ_FLOOR,
   type JsonReport,
   census,
   checkAheadOfV1,
   checkConfig,
   checkDivergences,
+  checkFuzzRuns,
+  checkHooksFired,
   checkScenarioLayers,
   diffTestFiles,
+  pluginHooks,
   prodPorts,
 } from "../../lib/census.js";
 import { coreEntries } from "../../lib/core-entries.js";
@@ -287,38 +291,60 @@ describe("the differential project", () => {
     const entry = {
       id: "d1",
       scenario: "a constraint requires, a resolver satisfies",
-      path: "trace[3].event",
+      stream: "observe",
+      kind: "requirement.created",
+      step: 1,
+      op: "missing",
       reason: "v2 emits the event one step later, by design",
       approvedBy: "Jason",
       date: "2026-10-14",
     };
+    const rules = () =>
+      JSON.parse(readFileSync(join(copy, "layers.rules.json"), "utf8"));
 
-    it("accepts the committed scenario layers and divergences", () => {
+    it("accepts the committed scenario layers, divergences and hook list", () => {
       expect(checkScenarioLayers(copy)).toEqual([]);
       expect(checkDivergences(copy, new Set())).toEqual([]);
+      expect(
+        checkHooksFired(
+          copy,
+          new Set(pluginHooks(copy).filter((h) => h !== "onFactDelete")),
+        ),
+      ).toEqual([]);
     });
 
-    it("rejects a scenario file without a layer, or a layer for no file", () => {
-      const rules = JSON.parse(
-        readFileSync(join(copy, "layers.rules.json"), "utf8"),
+    it("rejects a scenario without a layer, a layer for no scenario, a bad layer", () => {
+      const edited = rules();
+      const titles = Object.keys(edited.scenarios);
+      const dropped = titles[0] as string;
+      const bad = titles[1] as string;
+      edited.scenarios = Object.fromEntries(
+        Object.entries(edited.scenarios).filter(([t]) => t !== dropped),
       );
-      rules.scenarios = Object.fromEntries(
-        Object.entries(rules.scenarios).filter(
-          ([file]) => file !== "diff/scenarios/l5-sources.test.ts",
-        ),
-      );
-      rules.scenarios["diff/scenarios/gone.test.ts"] = "L2";
-      rules.scenarios["diff/fuzz/fuzz.test.ts"] = "L99";
-      const text = withFile("layers.rules.json", JSON.stringify(rules), () =>
+      edited.scenarios[bad] = "L99";
+      edited.scenarios["a scenario that is gone"] = "L2";
+      const text = withFile("layers.rules.json", JSON.stringify(edited), () =>
         checkScenarioLayers(copy),
       );
-      expect(text).toMatch(/l5-sources\.test\.ts needs a layer/);
-      expect(text).toMatch(/fuzz\.test\.ts needs a layer/);
-      expect(text).toMatch(/names diff\/scenarios\/gone\.test\.ts/);
+      expect(text).toContain(`scenario "${dropped}"`);
+      expect(text).toContain(`scenario "${bad}"`);
+      expect(text).toMatch(/names "a scenario that is gone"/);
+    });
+
+    it("rejects a duplicated or computed scenario title", () => {
+      const file = "diff/scenarios/l0-facts-derivations.test.ts";
+      const text = readFileSync(join(copy, file), "utf8");
+      const first = text.match(/scenario\(\s*("[^"]+")/)?.[1] as string;
+      const duplicated = `${text}\nscenario(${first}, () => ({}), []);\nscenario(\`computed \${1}\`, () => ({}), []);\n`;
+      const out = withFile(file, duplicated, () => checkScenarioLayers(copy));
+      expect(out).toMatch(/is used twice/);
+      expect(out).toMatch(/needs a literal title/);
     });
 
     it("accepts a complete, used divergence", () => {
       expect(divergences([entry], ["d1"])).toBe("");
+      const { step: _s, op: _o, ...broad } = entry;
+      expect(divergences([broad], ["d1"])).toBe("");
     });
 
     it("rejects a stale divergence", () => {
@@ -330,27 +356,73 @@ describe("the differential project", () => {
         /d1 needs approvedBy/,
       );
       const { approvedBy: _, ...unsigned } = entry;
-      expect(divergences([unsigned], ["d1"])).toMatch(/must have exactly/);
+      expect(divergences([unsigned], ["d1"])).toMatch(/d1 must have/);
     });
 
-    it("rejects a malformed divergence", () => {
+    it("rejects a malformed divergence (index-keyed paths included)", () => {
       const text = divergences(
         [
-          { ...entry, path: "facts.n", reason: "x", date: "today" },
+          {
+            ...entry,
+            stream: "trace[3]",
+            kind: "",
+            step: 1.5,
+            op: "moved",
+            reason: "x",
+            date: "today",
+          },
           { ...entry, extra: true },
           entry,
         ],
         ["d1"],
       );
-      expect(text).toMatch(/path must start at "trace"/);
+      expect(text).toMatch(/stream must be one of/);
+      expect(text).toMatch(/needs the kind/);
+      expect(text).toMatch(/step must be an integer/);
+      expect(text).toMatch(/op must be missing, extra or changed/);
       expect(text).toMatch(/needs a reason/);
       expect(text).toMatch(/YYYY-MM-DD/);
-      expect(text).toMatch(/must have exactly/);
+      expect(text).toMatch(/d1 must have/);
       expect(text).toMatch(/duplicate id d1/);
       expect(divergences({ not: "an array" }, null)).toMatch(
         /must be an array/,
       );
     });
+
+    it("requires every hook to fire or be listed with a reason", () => {
+      const hooks = pluginHooks(copy);
+      expect(hooks).toHaveLength(46);
+      const fired = new Set(hooks.filter((h) => h !== "onFactDelete"));
+      const notFired = new Set([...fired].filter((h) => h !== "onSnapshot"));
+      expect(checkHooksFired(copy, notFired).join("\n")).toMatch(
+        /onSnapshot never fired/,
+      );
+      // Listed but fired: stale.
+      expect(checkHooksFired(copy, new Set(hooks)).join("\n")).toMatch(
+        /lists onFactDelete, which fired/,
+      );
+      const listed = withFile(
+        "diff/unfired-hooks.json",
+        JSON.stringify({
+          onFactDelete: { reason: "short", layer: "L0" },
+          onNotAHook: { reason: "a long enough reason", layer: "L0" },
+        }),
+        () => checkHooksFired(copy, fired),
+      );
+      expect(listed).toMatch(/onFactDelete needs a reason and a layer/);
+      expect(listed).toMatch(/names onNotAHook, which is not a hook/);
+    });
+  });
+
+  it("requires the fuzzer to run at least its floor", () => {
+    expect(checkFuzzRuns([{ seed: 1, runs: FUZZ_FLOOR }])).toEqual([]);
+    expect(checkFuzzRuns([])).toEqual([
+      "conformance:diff: the fuzzer reported no runs",
+    ]);
+    expect(checkFuzzRuns([{ seed: 1, runs: 0 }]).join("\n")).toMatch(
+      /ran 0 cases .* floor is 200/,
+    );
+    expect(checkFuzzRuns([{ seed: 1, runs: Number.NaN }])).toHaveLength(1);
   });
 
   it("fails the typecheck when PLUGIN_HOOKS misses a hook", () => {

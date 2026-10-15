@@ -21,6 +21,8 @@ import {
   checkAheadOfV1,
   checkConfig,
   checkDivergences,
+  checkFuzzRuns,
+  checkHooksFired,
   checkScenarioLayers,
 } from "../lib/census.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
@@ -40,8 +42,13 @@ failures.push(...checkConfig(config, repoRoot));
 
 const out = mkdtempSync(join(tmpdir(), "conformance-census-"));
 const reports: Record<string, JsonReport> = {};
-// The differential scenarios append each divergence id they used here.
-const divergenceLog = join(out, "divergences-used.txt");
+// The differential project logs here what a test cannot assert on its own:
+// divergences used, hooks fired, fuzz cases run (diff/scenario.ts).
+const diffLogs = join(out, "diff-logs");
+const readLines = (file: string) =>
+  existsSync(join(diffLogs, file))
+    ? readFileSync(join(diffLogs, file), "utf8").split("\n").filter(Boolean)
+    : [];
 try {
   for (const project of ALL_PROJECTS) {
     const file = join(out, `${project.replace(/:/g, "_")}.json`);
@@ -62,7 +69,7 @@ try {
         stdio: "inherit",
         env:
           project === DIFF_PROJECT
-            ? { ...process.env, DIFF_DIVERGENCE_LOG: divergenceLog }
+            ? { ...process.env, DIFF_LOG_DIR: diffLogs }
             : process.env,
       },
     );
@@ -76,12 +83,18 @@ try {
     }
   }
   failures.push(...census(repoRoot, reports));
-  const used = new Set(
-    existsSync(divergenceLog)
-      ? readFileSync(divergenceLog, "utf8").split("\n").filter(Boolean)
-      : [],
+  failures.push(
+    ...checkDivergences(
+      conformanceRoot,
+      new Set(readLines("divergences-used.txt")),
+    ),
   );
-  failures.push(...checkDivergences(conformanceRoot, used));
+  failures.push(
+    ...checkHooksFired(conformanceRoot, new Set(readLines("hooks-fired.txt"))),
+  );
+  failures.push(
+    ...checkFuzzRuns(readLines("fuzz.jsonl").map((l) => JSON.parse(l))),
+  );
 } finally {
   rmSync(out, { recursive: true, force: true });
 }
@@ -100,4 +113,10 @@ const total = Object.values(reports).reduce(
 );
 console.log(
   `[census] ${ALL_PROJECTS.length} projects, ${total} tests: every port ran in every engine, nothing skipped but aheadOfV1`,
+);
+const v2 = existsSync(join(repoRoot, "packages/core-next/src/index.ts"));
+console.log(
+  v2
+    ? "[census] v2: core-next compared in the diff project up to layers.rules.json `current`"
+    : "[census] v2: not compared — packages/core-next does not exist yet (Phase 1)",
 );

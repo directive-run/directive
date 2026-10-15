@@ -56,54 +56,122 @@ pnpm --filter @directive-run/conformance pin:v1         # after moving the direc
 
 The ported tests check what their authors thought to assert. The
 differential harness checks everything else: it runs the same definitions
-and steps on the reference engine and the engine under test and requires
-the two traces to be equal.
+and steps on the reference engine and every engine under test and requires
+the traces to agree.
 
 - `diff/record.ts` records, in order: every plugin hook with its arguments
   (the list in `diff/hooks.ts` is type-checked against each engine's
   `Plugin`, so a new hook cannot go unrecorded), every `observe()` event,
-  every store notification per fact and derivation, every console message,
-  each step and anything it threw, outside effects the scenario reports
+  every store notification per fact and derivation with the value a
+  subscriber reads at that moment, every console message (load-time ones
+  included), unhandled rejections, each step and anything it threw,
+  pending fake timers after destroy, outside effects the scenario reports
   (`external`), and at each `settle`/`checkpoint` all facts, every
   derivation's value and the whole `inspect()`.
-- `diff/normalize.ts` makes values comparable. Nothing nondeterministic is
-  stripped; the runner makes it deterministic instead: fake timers at time 0
-  (`Date`, `performance`, every timer), `Math.random` seeded per scenario,
-  and a fresh engine instance per run (1.35 dedupes some dev warnings per
-  process, so a reused instance would make a run depend on the runs before
-  it — `diff/self/tamper.test.ts` shows it). Error stacks and function names
-  are dropped from values because they name files and bundler renames, not
-  behaviour.
+- `diff/normalize.ts` makes values comparable. Errors keep their name,
+  message and every own property but `stack` (a DirectiveError's `source`,
+  `sourceId`, `context`, `recoverable`; `cause`, recursively). Nothing
+  nondeterministic is stripped; the runner makes it deterministic instead:
+  fake timers at time 0 (`Date`, `performance`, every timer) and console
+  capture installed before the engine loads, `Math.random` seeded per
+  scenario, step values copied per run, and a fresh engine instance per run
+  (1.35 dedupes some dev warnings per process, so a reused instance would
+  make a run depend on the runs before it — `diff/self/tamper.test.ts`
+  shows it).
+- `diff/compare.ts` compares stream by stream (hook, observe, notify,
+  console, error, external, state, timers), aligning each stream with a
+  longest common subsequence keyed by kind (hook name, event type, …), step
+  and phase (`sync`: inside the step's call; `async`: after it returned).
+  One inserted hook is one difference, not a cascade.
 - `diff/scenario.ts`: `scenario(name, build, steps)` runs the reference
-  twice (the two runs must match, or the scenario/recorder is not
-  deterministic — never approvable) and the engine under test once, and
-  prints the first divergent trace entry with context on a mismatch.
-- `diff/scenarios/l<N>-*.test.ts` are hand-written scenarios by layer;
-  `diff/fuzz/` generates random small systems and step sequences with
-  fast-check (fixed seed in CI, `DIFF_FUZZ_RUNS` / `DIFF_FUZZ_SEED` for
-  longer runs; failures shrink and print the seed and spec).
-- `diff/self/` proves the harness: both engines load (published 1.35.0 and
-  workspace source), each run gets a fresh instance, and injected faults — a
-  reordered hook, a missing observe event, a changed fact at a settle, an
-  extra store notification — fail a scenario and the fuzzer.
+  twice (the runs must match exactly, incidental parts included, or the
+  scenario/recorder is not deterministic — never approvable) and each
+  engine under test once, and prints each difference with context.
+- `diff/engines.ts`: the reference (`v1`, the published 1.35.0), `local`
+  (workspace source) and `v2` (`packages/core-next/src/index.ts`, once it
+  exists — until then the census prints why it is not compared). v2 runs a
+  scenario only at or below `current` in `layers.rules.json`; each scenario
+  has its own layer there under `scenarios`, and each fuzz case is placed by
+  the features it uses (`diff/fuzz/model.ts` `specLayer`).
+- `diff/scenarios/l<N>-*.test.ts` are hand-written scenarios by layer (one
+  per rung of the ladder, L0–L13). `diff/fuzz/` generates one- and
+  two-module systems (crossModuleDeps, retries, timeouts, cancels, throwing
+  derivations and effects, cleanups, every boundary strategy, sources,
+  history, trace) and step sequences (writes, batches, Dates, publishes,
+  stop/start/destroy mid-run, snapshot/restore, back/forward, a second
+  system in the same engine instance). PR CI runs the fixed seed for 200
+  cases — the census fails fewer (`lib/fuzz.ts` `FUZZ_FLOOR`) — and
+  `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a random seed
+  it prints; failures shrink and print the seed and spec.
+- `diff/self/` proves the harness. `tamper.test.ts` injects faults through
+  wrappers (a reordered, dropped, extra or moved event; a changed fact; a
+  leaked timer; a load-time warning; a stale read) and checks the
+  contract/advisory split. `faults.test.ts` runs faulted copies of core's
+  own source (`faults.ts`, from the slice-0.2 reviews: extra computes,
+  doubled hooks and resolver runs, notifications moved to a microtask,
+  reversed effects, stale reads during notification, off-by-one backoff
+  and timeout, skipped cleanups, wrong error fields, dropped inspect
+  fields, no warning dedupe) and requires a scenario or fuzz case to catch
+  each, after a control copy passes everything.
+- `diff/unfired-hooks.json` lists hooks no scenario can fire, with the
+  reason and layer; the census fails a hook that neither fires nor is
+  listed, and a listed hook that fires. Today: `onFactDelete`, which 1.35
+  never emits.
+- `pnpm --filter @directive-run/conformance diff:coverage [scenarios|fuzz|all]`
+  reports function coverage of `packages/core/src` and the hooks fired.
 
-Writing a scenario: `build({ core, external, handles })` returns
-`createSystem` options built with `core` (the engine being run), so the
-same code builds on both engines; report outside effects with `external`;
-stash handles (a source's `publish`) in `handles` for `run` steps. Steps:
-`start`, `stop`, `destroy`, `dispatch`, `set` (`ns.key` for a namespaced
-fact), `batch`, `advance` (fake ms), `tick` (microtasks only), `settle`,
-`checkpoint`, `snapshot`/`restore`, `back`/`forward`, and `run` (a labelled
-function). Give every scenario a literal title (the census counts them) and
-the file a layer in `layers.rules.json` `scenarios`.
+`record()` and `createRecorder()` are the reusable part (the public
+`record()` of the 2.0 testing story, B3, can start from them).
+`scenario()`, `runOn()` and `runScenario()` are internal: vitest-bound,
+and they patch process globals (timers, `Math.random`, console,
+`unhandledRejection`).
+
+Writing a scenario: `build({ core, plugins, external, handles })` returns
+`createSystem` options built with `core` and `plugins` (the engine being
+run and its `/plugins` entry), so the same code builds on every engine;
+report outside effects with `external`; stash handles (a source's
+`publish`) in `handles` for `run` steps. Steps: `start`, `stop`,
+`destroy`, `dispatch`, `set` (`ns.key` for a namespaced fact), `batch`,
+`advance` (fake ms), `tick` (microtasks only), `settle`, `checkpoint`,
+`snapshot`/`restore`, `back`/`forward`, and `run` (a labelled function).
+Pass `{ observeDerivations: false }` for a scenario about what a reader
+sees of a derivation nobody subscribes to (the recorder's own
+subscriptions would otherwise keep it fresh). Give every scenario a
+unique literal title (the census counts them) and a layer in
+`layers.rules.json` `scenarios`.
+
+### What the trace freezes
+
+| Part | Status | How it is compared |
+| --- | --- | --- |
+| Hook names, order within the hook stream, arguments | contract | exact |
+| `observe()` events: type, order within the stream, payload | contract | exact |
+| Store notifications: which id, order, the value read at that moment | contract | exact |
+| Sync vs async: whether an entry happens inside the step's call | contract | part of the alignment key |
+| Facts, derivation values and `inspect()` shape at each checkpoint | contract | exact, except the fields below |
+| `inspect()` `pendingInvalidations`, `observedDerivations`, `hitCount`, `lastActiveAt` | incidental | presence and type strict; value advisory |
+| Console messages: level and count | contract | exact |
+| Console wording | incidental | advisory |
+| Error name, message, own fields, cause | contract | exact (never the stack) |
+| Class names (`$class`) | incidental | presence strict; name advisory |
+| Pending timers after destroy | contract | exact |
+| Interleaving across streams (a hook vs an observe event) | incidental | advisory, printed when the streams agree |
+| How many microtask rounds a `tick` flushes | incidental | do not checkpoint mid-chain |
+
+Advisories are printed with the scenario and never fail it. Changing this
+table, or `diff/compare.ts`, changes the contract: it is an oracle change
+(label) and Jason's call (CODEOWNERS).
 
 **Divergences.** An intended difference between the engines goes in
-`diff/divergences.json`: `{ id, scenario, path, reason, approvedBy, date }`,
-where `path` is the trace path the report prints (a prefix covers
-everything under it). **Jason approves every entry; an agent never adds
-one.** The census fails an entry that is incomplete or unsigned, or that
-covered no difference in the run (stale). The file is part of the harness,
-so adding one needs `oracle:update` and the `oracle-change` label.
+`diff/divergences.json`, keyed by what differs, never by trace index:
+`{ id, scenario, stream, kind, reason, approvedBy, date }`, optionally
+narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed`) and
+`path` (inside the entry; a prefix covers everything under it). **Jason
+approves every entry; an agent never adds one, and never fills in
+`approvedBy`.** The census fails an entry that is incomplete or unsigned,
+or that covered no difference in the run (stale). The file is part of the
+harness, so adding one needs `oracle:update` and the `oracle-change`
+label, and CODEOWNERS puts it under Jason's review.
 
 ## Layers
 
@@ -196,6 +264,8 @@ the oracle now accepts that it did not before.
 | engine identity | A project resolves the wrong engine, or something mocks or wraps core | Fix `vitest.config.ts` or remove the mock |
 | census | The run skipped, filtered or dropped tests, the config changed, or a harness file differs from the lock | Undo the change, or make it deliberately (Changing the oracle) |
 | diff: "engines differ" | The engine under test behaves differently from 1.35 | Fix the engine; if the difference is intended, ask Jason to approve a `divergences.json` entry |
+| diff: a hook never fired | A plugin hook no scenario or fuzz case reaches | Add a scenario that fires it, or list it in `diff/unfired-hooks.json` with a reason |
+| diff: a source fault went unnoticed | A faulted copy of core passes every scenario | Add the scenario that would catch it |
 | diff: "not deterministic" | The reference run twice gave different traces: the scenario or recorder depends on something outside the run | Fix the scenario or the recorder; never a divergence |
 | diff: a stale divergence | An approved difference no longer occurs | Remove the entry |
 | oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |

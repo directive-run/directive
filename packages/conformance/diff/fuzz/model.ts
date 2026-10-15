@@ -2,35 +2,43 @@
  * Random small systems for the differential fuzzer.
  *
  * A `FuzzSpec` is plain data (so a failing case prints, shrinks and replays)
- * describing one module — numeric facts, derivations over facts and earlier
- * derivations, events, constraint → resolver pairs with delays, failures,
- * retries, timeouts and self-retracting writes, effects — plus a sequence of
- * steps. `toScenario()` turns it into a ScenarioDef that builds the same
- * module on whichever engine runs it.
+ * describing one or two modules — numeric facts and a Date fact,
+ * derivations over facts and earlier derivations (some throw), events,
+ * constraint → resolver pairs with delays, failures, retries, timeouts and
+ * self-retracting writes, effects (auto-tracked or with deps, some with a
+ * cleanup, some throwing), an optional source with an `active` gate, and
+ * system options (error boundary with every strategy including "throw",
+ * history, trace) — plus a sequence of steps that also stop, start and
+ * destroy the system mid-run, snapshot and restore, navigate history,
+ * batch writes, write Dates twice, publish from the source, and start a
+ * second system in the same engine instance.
+ *
+ * Every feature carries the layer that builds it (the plan's ladder);
+ * `specLayer()` is the highest one a case uses, so a v2 run compares only
+ * the cases its `current` layer covers. `toScenario()` turns a spec into a
+ * ScenarioDef that builds the same system on whichever engine runs it.
  */
 
 import fc from "fast-check";
 import type { BuildContext, ScenarioDef, Step } from "../scenario.js";
 
 export interface FuzzDerivation {
-  /** Facts summed. */
   facts: number[];
-  /** Earlier derivations added (by index, always lower than this one). */
   derived: number[];
-  /** Compare the sum against this threshold instead of returning it. */
   threshold: number | null;
+  /** Throws when its sum equals this value. */
+  throwsAt: number | null;
 }
 
 export interface FuzzConstraint {
-  /** Active while fact `fact` is at least `atLeast`. */
   fact: number;
   atLeast: number;
+  /** Module b only: also require module a's fact 0 to be at least this. */
+  crossAtLeast: number | null;
   priority: number;
-  /** The resolver writes `value` into fact `writes` (may be `fact`). */
   writes: number;
   value: number;
   delay: number;
-  /** The first `fails` attempts throw. */
   fails: number;
   retry: number;
   timeout: number | null;
@@ -38,43 +46,70 @@ export interface FuzzConstraint {
 
 export interface FuzzEffect {
   reads: number[];
-  /** Declare `deps` instead of auto-tracking. */
   explicitDeps: boolean;
+  cleanup: boolean;
+  /** Throws when the first fact it reads equals this value. */
+  throwsAt: number | null;
 }
 
-export type FuzzStep =
-  | { op: "dispatch"; event: number; value: number }
-  | { op: "set"; fact: number; value: number }
-  | { op: "advance"; ms: number }
-  | { op: "tick" }
-  | { op: "settle" };
-
-export interface FuzzSpec {
+export interface FuzzModule {
   facts: number;
+  date: boolean;
   derivations: FuzzDerivation[];
-  /** Event i writes its payload into fact `target`, or adds it. */
   events: Array<{ target: number; add: boolean }>;
   constraints: FuzzConstraint[];
   effects: FuzzEffect[];
-  boundary: "skip" | "retry" | "retry-later" | "disable" | null;
+  source: { gated: boolean } | null;
+}
+
+export type FuzzStep =
+  | { op: "dispatch"; module: number; event: number; value: number }
+  | { op: "set"; module: number; fact: number; value: number }
+  | { op: "date"; module: number; ms: number }
+  | { op: "batch"; module: number; writes: [number, number][] }
+  | { op: "publish"; event: "own" | "unknown" | "cross"; value: number }
+  | { op: "advance"; ms: number }
+  | { op: "tick" }
+  | { op: "settle" }
+  | { op: "stop" }
+  | { op: "start" }
+  | { op: "destroy" }
+  | { op: "snapshot" }
+  | { op: "restore" }
+  | { op: "back" }
+  | { op: "forward" }
+  | { op: "twin" };
+
+export type Boundary = "skip" | "retry" | "retry-later" | "disable" | "throw";
+
+export interface FuzzSpec {
+  modules: FuzzModule[];
+  boundary: Boundary | null;
+  history: boolean;
+  trace: boolean;
   steps: FuzzStep[];
 }
 
 const value = fc.integer({ min: -2, max: 6 });
 
-export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
-  return fc.integer({ min: 1, max: 4 }).chain((facts) => {
+function moduleArbitrary(cross: boolean): fc.Arbitrary<FuzzModule> {
+  return fc.integer({ min: 1, max: 3 }).chain((facts) => {
     const fact = fc.integer({ min: 0, max: facts - 1 });
     const factSet = fc.uniqueArray(fact, { minLength: 1, maxLength: facts });
 
     return fc.record({
       facts: fc.constant(facts),
+      date: fc.boolean(),
       derivations: fc
         .array(
           fc.record({
             facts: factSet,
             derivedSeed: fc.array(fc.nat(), { maxLength: 2 }),
             threshold: fc.option(value, { nil: null }),
+            throwsAt: fc.option(fc.integer({ min: 3, max: 8 }), {
+              nil: null,
+              freq: 4,
+            }),
           }),
           { maxLength: 3 },
         )
@@ -84,6 +119,7 @@ export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
             derived:
               i === 0 ? [] : [...new Set(d.derivedSeed.map((n) => n % i))],
             threshold: d.threshold,
+            throwsAt: d.throwsAt,
           })),
         ),
       events: fc.array(fc.record({ target: fact, add: fc.boolean() }), {
@@ -94,6 +130,9 @@ export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
         fc.record({
           fact,
           atLeast: fc.integer({ min: 0, max: 4 }),
+          crossAtLeast: cross
+            ? fc.option(fc.integer({ min: 0, max: 3 }), { nil: null })
+            : fc.constant(null),
           priority: fc.integer({ min: 0, max: 3 }),
           writes: fact,
           value,
@@ -105,8 +144,110 @@ export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
         { maxLength: 3 },
       ),
       effects: fc.array(
-        fc.record({ reads: factSet, explicitDeps: fc.boolean() }),
+        fc.record({
+          reads: factSet,
+          explicitDeps: fc.boolean(),
+          cleanup: fc.boolean(),
+          throwsAt: fc.option(fc.integer({ min: 3, max: 8 }), {
+            nil: null,
+            freq: 4,
+          }),
+        }),
         { maxLength: 2 },
+      ),
+      source: fc.option(fc.record({ gated: fc.boolean() }), {
+        nil: null,
+        freq: 2,
+      }),
+    });
+  });
+}
+
+const stepArbitrary = (modules: number) => {
+  const mod = fc.integer({ min: 0, max: modules - 1 });
+
+  return fc.oneof(
+    {
+      weight: 4,
+      arbitrary: fc.record({
+        op: fc.constant("dispatch" as const),
+        module: mod,
+        event: fc.nat(),
+        value,
+      }),
+    },
+    {
+      weight: 5,
+      arbitrary: fc.record({
+        op: fc.constant("set" as const),
+        module: mod,
+        fact: fc.nat(),
+        value,
+      }),
+    },
+    {
+      weight: 1,
+      arbitrary: fc.record({
+        op: fc.constant("date" as const),
+        module: mod,
+        ms: fc.integer({ min: 0, max: 3 }),
+      }),
+    },
+    {
+      weight: 2,
+      arbitrary: fc.record({
+        op: fc.constant("batch" as const),
+        module: mod,
+        writes: fc.array(fc.tuple(fc.nat(), value), {
+          minLength: 1,
+          maxLength: 3,
+        }),
+      }),
+    },
+    {
+      weight: 2,
+      arbitrary: fc.record({
+        op: fc.constant("publish" as const),
+        event: fc.constantFrom(
+          "own" as const,
+          "unknown" as const,
+          "cross" as const,
+        ),
+        value,
+      }),
+    },
+    {
+      weight: 3,
+      arbitrary: fc.record({
+        op: fc.constant("advance" as const),
+        ms: fc.constantFrom(1, 5, 25, 200, 1500),
+      }),
+    },
+    { weight: 2, arbitrary: fc.record({ op: fc.constant("tick" as const) }) },
+    { weight: 3, arbitrary: fc.record({ op: fc.constant("settle" as const) }) },
+    {
+      weight: 1,
+      arbitrary: fc.record({
+        op: fc.constantFrom(
+          "stop" as const,
+          "start" as const,
+          "destroy" as const,
+          "snapshot" as const,
+          "restore" as const,
+          "back" as const,
+          "forward" as const,
+          "twin" as const,
+        ),
+      }),
+    },
+  ) as fc.Arbitrary<FuzzStep>;
+};
+
+export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return fc.integer({ min: 1, max: 2 }).chain((count) =>
+    fc.record({
+      modules: fc.tuple(
+        ...Array.from({ length: count }, (_, i) => moduleArbitrary(i === 1)),
       ),
       boundary: fc.constantFrom(
         null,
@@ -114,156 +255,378 @@ export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
         "retry" as const,
         "retry-later" as const,
         "disable" as const,
+        "throw" as const,
       ),
-      steps: fc.array(
-        fc.oneof(
-          fc.record({
-            op: fc.constant("dispatch" as const),
-            event: fc.nat(),
-            value,
-          }),
-          fc.record({ op: fc.constant("set" as const), fact, value }),
-          fc.record({
-            op: fc.constant("advance" as const),
-            ms: fc.constantFrom(1, 5, 25, 200),
-          }),
-          fc.record({ op: fc.constant("tick" as const) }),
-          fc.record({ op: fc.constant("settle" as const) }),
-        ),
-        { minLength: 1, maxLength: 12 },
-      ),
-    });
-  });
+      history: fc.boolean(),
+      trace: fc.boolean(),
+      steps: fc.array(stepArbitrary(count), { minLength: 1, maxLength: 14 }),
+    }),
+  );
+}
+
+/** The highest layer (the plan's ladder) a case uses. */
+export function specLayer(spec: FuzzSpec): string {
+  let n = 0;
+  const use = (layer: number) => {
+    n = Math.max(n, layer);
+  };
+  if (spec.modules.length > 1) {
+    use(1);
+  }
+  for (const m of spec.modules) {
+    if (m.constraints.length > 0) {
+      use(2);
+    }
+    if (m.effects.some((e) => e.cleanup || e.explicitDeps)) {
+      use(4);
+    }
+    if (m.source) {
+      use(5);
+    }
+  }
+  if (spec.boundary) {
+    use(3);
+  }
+  if (spec.trace) {
+    use(9);
+  }
+  if (spec.history) {
+    use(8);
+  }
+  for (const s of spec.steps) {
+    if (["stop", "start", "destroy", "twin"].includes(s.op)) {
+      use(3);
+    } else if (s.op === "snapshot" || s.op === "restore") {
+      use(6);
+    } else if (s.op === "back" || s.op === "forward") {
+      use(8);
+    }
+  }
+
+  return `L${n}`;
 }
 
 const f = (i: number) => `f${i}`;
+const NAMES = ["a", "b"];
+
+function moduleDef(
+  { core: { createModule, t }, external, handles }: BuildContext,
+  m: FuzzModule,
+  index: number,
+  schemas: Record<string, unknown>[],
+) {
+  const id = NAMES[index] as string;
+  const cross = index === 1;
+  // With crossModuleDeps, a module's own facts sit under `self` in
+  // derivations, constraints and effects.
+  const own = (fs: any) => (cross ? fs.self : fs);
+  const facts: Record<string, unknown> = {};
+  for (let i = 0; i < m.facts; i++) {
+    facts[f(i)] = t.number();
+  }
+  if (m.date) {
+    facts.when = t.date();
+  }
+  const derivations: Record<string, unknown> = {};
+  const derive: Record<string, unknown> = {};
+  m.derivations.forEach((d, i) => {
+    derivations[`d${i}`] = d.threshold === null ? t.number() : t.boolean();
+    derive[`d${i}`] = (fs: any, derived: any) => {
+      let sum = 0;
+      for (const k of d.facts) {
+        sum += own(fs)[f(k)];
+      }
+      for (const k of d.derived) {
+        const v = derived[`d${k}`];
+        sum += typeof v === "boolean" ? Number(v) : v;
+      }
+      if (d.throwsAt !== null && sum === d.throwsAt) {
+        throw new Error(`${id}.d${i} throws at ${sum}`);
+      }
+
+      return d.threshold === null ? sum : sum > d.threshold;
+    };
+  });
+  const eventSchema: Record<string, unknown> = {};
+  const events: Record<string, unknown> = {};
+  m.events.forEach((e, i) => {
+    eventSchema[`e${i}`] = { v: t.number() };
+    events[`e${i}`] = (fs: any, payload: any) => {
+      fs[f(e.target)] = e.add ? fs[f(e.target)] + payload.v : payload.v;
+    };
+  });
+  const requirements: Record<string, unknown> = {};
+  const constraints: Record<string, unknown> = {};
+  const resolvers: Record<string, unknown> = {};
+  m.constraints.forEach((c, i) => {
+    let attempt = 0;
+    const type = `${id.toUpperCase()}${i}`;
+    requirements[type] = {};
+    constraints[`c${i}`] = {
+      priority: c.priority,
+      when: (fs: any) =>
+        own(fs)[f(c.fact)] >= c.atLeast &&
+        (c.crossAtLeast === null || fs.a.f0 >= c.crossAtLeast),
+      require: { type },
+    };
+    resolvers[`r${i}`] = {
+      requirement: type,
+      ...(c.retry > 0
+        ? {
+            retry: {
+              attempts: c.retry + 1,
+              backoff: "linear",
+              initialDelay: 2,
+            },
+          }
+        : {}),
+      ...(c.timeout === null ? {} : { timeout: c.timeout }),
+      resolve: async (_req: unknown, context: any) => {
+        attempt += 1;
+        const n = attempt;
+        external([`${id}.r${i}`, "start", n]);
+        context.signal?.addEventListener?.("abort", () =>
+          external([`${id}.r${i}`, "aborted", n]),
+        );
+        if (c.delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, c.delay));
+        }
+        if (n <= c.fails) {
+          throw new Error(`${id}.r${i} attempt ${n}`);
+        }
+        context.facts[f(c.writes)] = c.value;
+        external([`${id}.r${i}`, "wrote", n]);
+      },
+    };
+  });
+  const effects: Record<string, unknown> = {};
+  m.effects.forEach((e, i) => {
+    effects[`x${i}`] = {
+      ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
+      run: (fs: any) => {
+        const seen = e.reads.map((k) => own(fs)[f(k)]);
+        external([`${id}.x${i}`, seen]);
+        if (e.throwsAt !== null && seen[0] === e.throwsAt) {
+          throw new Error(`${id}.x${i} throws at ${seen[0]}`);
+        }
+        if (e.cleanup) {
+          return () => external([`${id}.x${i}`, "cleanup", seen]);
+        }
+
+        return undefined;
+      },
+    };
+  });
+  const sources: Record<string, unknown> = {};
+  if (m.source) {
+    sources.feed = {
+      ...(m.source.gated ? { active: (fs: any) => fs.f0 >= 1 } : {}),
+      attach: (publish: any, reportError: any) => {
+        handles.publish = publish;
+        handles.reportError = reportError;
+        external([`${id}.feed`, "attach"]);
+
+        return () => external([`${id}.feed`, "detach"]);
+      },
+    };
+  }
+  const schema = {
+    facts,
+    derivations,
+    events: eventSchema,
+    requirements,
+  };
+  schemas[index] = schema;
+
+  return createModule(id, {
+    schema,
+    ...(cross ? { crossModuleDeps: { a: schemas[0] } } : {}),
+    init: (fs: any) => {
+      for (let i = 0; i < m.facts; i++) {
+        fs[f(i)] = 0;
+      }
+      if (m.date) {
+        fs.when = new Date(0);
+      }
+    },
+    derive,
+    events,
+    constraints,
+    resolvers,
+    effects,
+    sources,
+  } as any);
+}
+
+function options(spec: FuzzSpec) {
+  return {
+    ...(spec.boundary === null
+      ? {}
+      : {
+          errorBoundary: {
+            onResolverError: spec.boundary,
+            onEffectError: spec.boundary === "throw" ? "skip" : spec.boundary,
+            onConstraintError: "skip",
+            onDerivationError: "skip",
+            retryLater: { delayMs: 50, maxRetries: 2 },
+          },
+        }),
+    ...(spec.history ? { history: { maxSnapshots: 20 } } : {}),
+    ...(spec.trace ? { trace: true } : {}),
+  };
+}
 
 function build(spec: FuzzSpec) {
-  return ({ core: { createModule, t }, external }: BuildContext) => {
-    const facts: Record<string, unknown> = {};
-    for (let i = 0; i < spec.facts; i++) {
-      facts[f(i)] = t.number();
-    }
-    const derivations: Record<string, unknown> = {};
-    const derive: Record<string, unknown> = {};
-    spec.derivations.forEach((d, i) => {
-      derivations[`d${i}`] = d.threshold === null ? t.number() : t.boolean();
-      derive[`d${i}`] = (fs: any, derived: any) => {
-        let sum = 0;
-        for (const k of d.facts) {
-          sum += fs[f(k)];
-        }
-        for (const k of d.derived) {
-          const v = derived[`d${k}`];
-          sum += typeof v === "boolean" ? Number(v) : v;
-        }
+  return (ctx: BuildContext) => {
+    const schemas: Record<string, unknown>[] = [];
+    const defs = spec.modules.map((m, i) => moduleDef(ctx, m, i, schemas));
+    ctx.handles.rebuild = () => {
+      const again: Record<string, unknown>[] = [];
+      const more = spec.modules.map((m, i) => moduleDef(ctx, m, i, again));
 
-        return d.threshold === null ? sum : sum > d.threshold;
-      };
-    });
-    const eventSchema: Record<string, unknown> = {};
-    const events: Record<string, unknown> = {};
-    spec.events.forEach((e, i) => {
-      eventSchema[`e${i}`] = { v: t.number() };
-      events[`e${i}`] = (fs: any, payload: any) => {
-        fs[f(e.target)] = e.add ? fs[f(e.target)] + payload.v : payload.v;
-      };
-    });
-    const requirements: Record<string, unknown> = {};
-    const constraints: Record<string, unknown> = {};
-    const resolvers: Record<string, unknown> = {};
-    spec.constraints.forEach((c, i) => {
-      let attempt = 0;
-      requirements[`R${i}`] = {};
-      constraints[`c${i}`] = {
-        priority: c.priority,
-        when: (fs: any) => fs[f(c.fact)] >= c.atLeast,
-        require: { type: `R${i}` },
-      };
-      resolvers[`r${i}`] = {
-        requirement: `R${i}`,
-        ...(c.retry > 0
-          ? {
-              retry: {
-                attempts: c.retry + 1,
-                backoff: "linear",
-                initialDelay: 2,
-              },
-            }
-          : {}),
-        ...(c.timeout === null ? {} : { timeout: c.timeout }),
-        resolve: async (_req: unknown, context: any) => {
-          attempt += 1;
-          const n = attempt;
-          external(["r", i, "start", n]);
-          if (c.delay > 0) {
-            await new Promise((resolve) => setTimeout(resolve, c.delay));
-          }
-          if (n <= c.fails) {
-            throw new Error(`r${i} attempt ${n}`);
-          }
-          context.facts[f(c.writes)] = c.value;
-          external(["r", i, "wrote", n]);
-        },
-      };
-    });
-    const effects: Record<string, unknown> = {};
-    spec.effects.forEach((e, i) => {
-      effects[`x${i}`] = {
-        ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
-        run: (fs: any) => external(["x", i, e.reads.map((k) => fs[f(k)])]),
-      };
-    });
-
-    return {
-      module: createModule("fz", {
-        schema: {
-          facts,
-          derivations,
-          events: eventSchema,
-          requirements,
-        },
-        init: (fs: any) => {
-          for (let i = 0; i < spec.facts; i++) {
-            fs[f(i)] = 0;
-          }
-        },
-        derive,
-        events,
-        constraints,
-        resolvers,
-        effects,
-      } as any),
-      ...(spec.boundary === null
-        ? {}
-        : {
-            errorBoundary: {
-              onResolverError: spec.boundary,
-              onEffectError: "skip",
-              onConstraintError: "skip",
-              onDerivationError: "skip",
-              retryLater: { delayMs: 50, maxRetries: 2 },
-            },
-          }),
+      return more.length === 1
+        ? { module: more[0], ...options(spec) }
+        : { modules: { a: more[0], b: more[1] }, ...options(spec) };
     };
+
+    return defs.length === 1
+      ? { module: defs[0], ...options(spec) }
+      : { modules: { a: defs[0], b: defs[1] }, ...options(spec) };
   };
 }
 
 function steps(spec: FuzzSpec): Step[] {
+  const multi = spec.modules.length > 1;
+  const mod = (i: number) =>
+    spec.modules[i % spec.modules.length] as FuzzModule;
+  const facts = (system: any, i: number) =>
+    multi
+      ? system.facts[NAMES[i % spec.modules.length] as string]
+      : system.facts;
   const out: Step[] = [{ op: "start" }];
   for (const s of spec.steps) {
+    const label = JSON.stringify(s);
     switch (s.op) {
-      case "dispatch":
+      case "dispatch": {
+        const m = mod(s.module);
+        const name = `e${s.event % m.events.length}`;
         out.push({
-          op: "dispatch",
-          event: { type: `e${s.event % spec.events.length}`, v: s.value },
+          op: "run",
+          label,
+          fn: (system) =>
+            multi
+              ? system.events[NAMES[s.module % 2] as string][name]({
+                  v: s.value,
+                })
+              : system.dispatch({ type: name, v: s.value }),
         });
         break;
+      }
       case "set":
-        out.push({ op: "set", key: f(s.fact), value: s.value });
+        out.push({
+          op: "run",
+          label,
+          fn: (system) => {
+            facts(system, s.module)[f(s.fact % mod(s.module).facts)] = s.value;
+          },
+        });
+        break;
+      case "date":
+        out.push({
+          op: "run",
+          label,
+          fn: (system) => {
+            if (mod(s.module).date) {
+              facts(system, s.module).when = new Date(s.ms);
+            }
+          },
+        });
+        break;
+      case "batch":
+        out.push({
+          op: "run",
+          label,
+          fn: (system) =>
+            system.batch(() => {
+              for (const [k, v] of s.writes) {
+                facts(system, s.module)[f(k % mod(s.module).facts)] = v;
+              }
+            }),
+        });
+        break;
+      case "publish":
+        out.push({
+          op: "run",
+          label,
+          fn: (_system, ctx) => {
+            const publish = ctx.handles.publish;
+            if (!publish) {
+              return;
+            }
+            if (s.event === "own") {
+              publish("e0", { v: s.value });
+            } else if (s.event === "unknown") {
+              publish("nope");
+            } else {
+              publish("b::e0", { v: s.value });
+            }
+          },
+        });
         break;
       case "advance":
         out.push({ op: "advance", ms: s.ms });
+        break;
+      case "snapshot":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => {
+            ctx.handles.snapshot = system.getSnapshot();
+          },
+        });
+        break;
+      case "restore":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => {
+            // Restore what the last snapshot step captured, if any.
+            if (ctx.handles.snapshot) {
+              system.restore(ctx.handles.snapshot);
+            }
+          },
+        });
+        break;
+      case "back":
+      case "forward":
+        out.push({
+          op: "run",
+          label,
+          fn: (system) => {
+            if (system.history) {
+              s.op === "back"
+                ? system.history.goBack()
+                : system.history.goForward();
+            }
+          },
+        });
+        break;
+      case "twin":
+        out.push({
+          op: "run",
+          label,
+          fn: async (_system, ctx) => {
+            // A second system from the same definitions, in the same engine
+            // instance: per-process state (warning dedupe) shows here.
+            const twin = ctx.core.createSystem(
+              ctx.handles.rebuild() as never,
+            ) as any;
+            twin.start();
+            await twin.settle();
+            ctx.external(["twin", twin.getSnapshot().facts]);
+            twin.destroy();
+          },
+        });
         break;
       default:
         out.push({ op: s.op });
@@ -275,5 +638,11 @@ function steps(spec: FuzzSpec): Step[] {
 }
 
 export function toScenario(spec: FuzzSpec, name = "fuzz"): ScenarioDef {
-  return { name, build: build(spec), steps: steps(spec), seed: 1 };
+  return {
+    name,
+    build: build(spec),
+    steps: steps(spec),
+    seed: 1,
+    layer: specLayer(spec),
+  };
 }

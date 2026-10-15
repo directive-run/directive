@@ -12,6 +12,7 @@
     "test:local": "vitest run --config vitest.config.ts --project conformance:local --project conformance:local:prod",
     "test:checks": "vitest run --config vitest.config.ts --project conformance:checks",
     "census": "tsx scripts/census.ts",
+    "diff:coverage": "tsx scripts/diff-coverage.ts",
     "oracle:guard": "tsx scripts/oracle-guard.ts",
     "oracle:update": "tsx scripts/oracle-update.ts",
     "pin:v1": "tsx scripts/pin-v1.ts",

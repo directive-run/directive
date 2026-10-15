@@ -1,9 +1,8 @@
 /** L8: history — back, forward, effects on navigation, export/import, changesets. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L8 history", () => {
+suite("L8 history", () => {
   scenario(
     "history: back, forward and effects re-run on navigation",
     ({ core: { createModule, t }, external }) => ({

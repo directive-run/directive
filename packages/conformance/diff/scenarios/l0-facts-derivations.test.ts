@@ -1,9 +1,8 @@
 /** L0: facts, derivations, events and batching. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L0 facts, derivations and events", () => {
+suite("L0 facts, derivations and events", () => {
   scenario(
     "derivation chain recomputes once per change",
     ({ core: { createModule, t } }) => ({
