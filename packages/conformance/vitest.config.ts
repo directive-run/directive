@@ -44,7 +44,7 @@ function prodFiles(): string[] {
   };
   walk(join(here, "tests"));
 
-  return out;
+  return out.sort();
 }
 
 const PROD = prodFiles();

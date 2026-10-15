@@ -9,7 +9,7 @@
     "dev": "pnpm -r dev",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "conformance": "pnpm --filter @directive-run/conformance check:expects && pnpm --filter @directive-run/conformance test",
+    "conformance": "pnpm --filter @directive-run/conformance check:expects && pnpm --filter @directive-run/conformance census && pnpm --filter @directive-run/conformance oracle:guard",
     "bench": "vitest bench",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

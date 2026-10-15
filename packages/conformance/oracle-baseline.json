@@ -1,0 +1,151 @@
+{
+  "pins": [
+    "tests/core/constraint-reevaluation.test.ts",
+    "tests/core/constraints.test.ts",
+    "tests/core/reconcile-timing-rules.test.ts",
+    "tests/core/requeue-after-resolver-finishes.test.ts",
+    "tests/core/requeue.test.ts",
+    "tests/core/resolver-loading-flag.test.ts",
+    "tests/core/resolver-outcomes.test.ts",
+    "tests/core/resolver-retracting-own-requirement.test.ts",
+    "tests/core/resolver-satisfied-by-own-write.test.ts",
+    "tests/core/settle-strands-invalidations.test.ts",
+    "tests/core/superseded-bodies-and-retry-timer.test.ts"
+  ],
+  "instruments": {
+    "tests/core/constraint-reevaluation.test.ts": ["option plugins"],
+    "tests/core/constraints.test.ts": [],
+    "tests/core/reconcile-timing-rules.test.ts": ["option plugins"],
+    "tests/core/requeue-after-resolver-finishes.test.ts": [],
+    "tests/core/requeue.test.ts": ["import flushMicrotasks"],
+    "tests/core/resolver-loading-flag.test.ts": [],
+    "tests/core/resolver-outcomes.test.ts": ["option plugins"],
+    "tests/core/resolver-retracting-own-requirement.test.ts": [
+      "option plugins"
+    ],
+    "tests/core/resolver-satisfied-by-own-write.test.ts": ["option plugins"],
+    "tests/core/settle-strands-invalidations.test.ts": ["member .inspect"],
+    "tests/core/superseded-bodies-and-retry-timer.test.ts": []
+  },
+  "allowAbove": {
+    "tests/core/constraint-reevaluation.test.ts": ["option error boundary"],
+    "tests/core/constraints.test.ts": [],
+    "tests/core/reconcile-timing-rules.test.ts": [
+      "member .history",
+      "option batch resolver",
+      "option history"
+    ],
+    "tests/core/requeue-after-resolver-finishes.test.ts": [],
+    "tests/core/requeue.test.ts": [],
+    "tests/core/resolver-loading-flag.test.ts": [
+      "option batch resolver",
+      "option error boundary"
+    ],
+    "tests/core/resolver-outcomes.test.ts": ["option batch resolver"],
+    "tests/core/resolver-retracting-own-requirement.test.ts": [],
+    "tests/core/resolver-satisfied-by-own-write.test.ts": [
+      "option batch resolver"
+    ],
+    "tests/core/settle-strands-invalidations.test.ts": [
+      "option effect deps",
+      "option effect prev"
+    ],
+    "tests/core/superseded-bodies-and-retry-timer.test.ts": [
+      "option error boundary"
+    ]
+  },
+  "layers": {
+    "tests/core/constraint-reevaluation.test.ts": {
+      "constraint re-evaluation > a when that threw is woken by the write that fixes it": "L2",
+      "constraint re-evaluation > an async when without deps is evaluated on every pass": "L2",
+      "constraint re-evaluation > retry-later re-evaluates the constraint that threw": "L3",
+      "constraint re-evaluation > start() re-evaluates every constraint": "L2",
+      "a resolver that fails after satisfying its requirement > passes on the original error": "L2"
+    },
+    "tests/core/constraints.test.ts": {
+      "basic evaluation > constraint with when returning true produces requirements": "L2",
+      "basic evaluation > constraint with when returning false produces no requirements": "L2",
+      "basic evaluation > requirements include type from the constraint's require": "L2",
+      "basic evaluation > evaluate with changedKeys only re-evaluates dirty constraints": "L2",
+      "priority ordering > higher priority constraints evaluate first": "L2",
+      "priority ordering > same-priority constraints maintain stable order": "L2",
+      "after dependencies > constraint with after waits until dependency resolves": "L2",
+      "after dependencies > markResolved unblocks dependent constraints": "L2",
+      "async constraints > async constraint with async: true evaluates correctly": "L2",
+      "async constraints > async constraint with timeout throws after timeout period": "L2",
+      "async constraints > async constraint with explicit deps registers those deps": "L2",
+      "cycle detection > circular after dependencies throw descriptive error": "L2",
+      "enable / disable > disable(id) prevents constraint evaluation": "L2",
+      "enable / disable > enable(id) re-enables constraint": "L2",
+      "enable / disable > isDisabled(id) returns correct state": "L2",
+      "error isolation > throwing when() function is caught and isolated": "L2",
+      "error isolation > throwing require() function is caught (F2 fix)": "L2",
+      "dynamic registration > registerDefinitions adds new constraints": "L2",
+      "dynamic registration > unregisterDefinition removes and cleans up": "L2",
+      "dynamic registration > assignDefinition replaces a constraint": "L2",
+      "normalize requirements > single requirement object is wrapped in array": "L2",
+      "normalize requirements > null/undefined require produces empty requirements": "L2",
+      "normalize requirements > array require passes through": "L2",
+      "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": "L2"
+    },
+    "tests/core/reconcile-timing-rules.test.ts": {
+      "a resolver whose own write retracts its requirement > `completes, never canceled (wait ${waitAfterWrite} microtasks${batched ? \", batched\" : \"\"}${viaDerivation ? \", via a derivation\" : \"\"})`": "L7",
+      "a resolver whose own write retracts its requirement > is still canceled when something else retracts the requirement": "L7",
+      "coalescing > gives each awaited write its own pass, effect run and snapshot": "L8",
+      "coalescing > does not change because an unrelated resolver is running": "L8",
+      "coalescing > does not change with how long the gap between writes is": "L8",
+      "coalescing > gives writes in one synchronous run a single pass": "L8"
+    },
+    "tests/core/requeue-after-resolver-finishes.test.ts": {
+      "ctx.requeue() while the requeuing resolver is still in flight > re-fires once the resolver finishes (macrotask after requeue)": "L2",
+      "ctx.requeue() while the requeuing resolver is still in flight > re-fires once the resolver finishes (a few microtasks after requeue)": "L2",
+      "ctx.requeue() while the requeuing resolver is still in flight > does not re-fire a requeue twice": "L2"
+    },
+    "tests/core/requeue.test.ts": {
+      "ctx.requeue() — explicit constraint re-trigger > re-fires the same constraint when ctx.requeue() is called": "L2",
+      "ctx.requeue() — explicit constraint re-trigger > WITHOUT ctx.requeue(), default suppression prevents re-fire (BC guarantee)": "L2",
+      "ctx.requeue() — explicit constraint re-trigger > ctx.requeue() supports a counted drain chain": "L2",
+      "ctx.requeue() — explicit constraint re-trigger > ctx.requeue() is a no-op when the constraint no longer fires": "L2"
+    },
+    "tests/core/resolver-loading-flag.test.ts": {
+      "a loading flag survives a failure after satisfying > satisfied, then timed out: the finally lands (L4)": "L7",
+      "a loading flag survives a failure after satisfying > a loading guard in when: timeout plus retry does not deadlock (L3)": "L7",
+      "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)": "L7",
+      "constraint errors > a require() that throws keeps what it read (H1)": "L2",
+      "constraint errors > retry-later retries with no retryLater config (H4)": "L3"
+    },
+    "tests/core/resolver-outcomes.test.ts": {
+      "resolver outcomes > a batch that satisfied its requirement is superseded when it returns": "L7",
+      "resolver outcomes > keyed runs that each write their own entry in one pass are both satisfied": "L2",
+      "resolver outcomes > a canceled run that returns normally reports only the cancel": "L2",
+      "resolver outcomes > a satisfied run that times out reports one error, not unmet, and its late write still lands": "L2"
+    },
+    "tests/core/resolver-retracting-own-requirement.test.ts": {
+      "a resolver whose own write retracts its requirement > `completes and is never canceled (${shape})`": "L2"
+    },
+    "tests/core/resolver-satisfied-by-own-write.test.ts": {
+      "a run that satisfied its own requirement > completes, is not canceled, and stays in flight until it finishes": "L2",
+      "a run that satisfied its own requirement > is aborted by stop(), and settle() does not hang after it": "L2",
+      "a run that satisfied its own requirement > is aborted by destroy()": "L2",
+      "a run that satisfied its own requirement > is not retried if it throws after satisfying": "L2",
+      "a run that satisfied its own requirement > is superseded when the requirement returns: its late write is dropped": "L2",
+      "a run that satisfied its own requirement > is canceled when something else also changed what the constraint reads": "L2",
+      "attribution is per run > a keyed sibling's write does not shield a run the user canceled": "L2",
+      "attribution is per run > one batch's write does not shield another batch of the same definition": "L7"
+    },
+    "tests/core/settle-strands-invalidations.test.ts": {
+      "an effect's write reaches a derivation-gated constraint > fires the constraint in the same settle": "L4",
+      "an effect's write reaches a derivation-gated constraint > settles without leaving an undelivered invalidation behind": "L4",
+      "an effect's write reaches a derivation-gated constraint > wakes a derivation-gated effect from an effect-phase write": "L4"
+    },
+    "tests/core/superseded-bodies-and-retry-timer.test.ts": {
+      "late writes from runs no longer in flight still land > a timed-out run's late write lands after its replacement (K2, resolver's job to guard)": "L2",
+      "late writes from runs no longer in flight still land > a detached bound run's writes land (M1)": "L2",
+      "late writes from runs no longer in flight still land > a detached bound run that checks its signal still writes (M1b)": "L2",
+      "late writes from runs no longer in flight still land > canceled, re-dispatched, new run guarded on loading: the old finally lands (M2)": "L2",
+      "late writes from runs no longer in flight still land > timed out, re-dispatched, new run guarded on loading: the old finally lands (M3)": "L2",
+      "the retry-later poller > stops polling once nothing is left to retry (K5)": "L3",
+      "the retry-later poller > does not keep the process alive": "L0"
+    }
+  }
+}

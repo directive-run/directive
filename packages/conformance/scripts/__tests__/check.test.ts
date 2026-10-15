@@ -283,6 +283,21 @@ describe("the conformance check", () => {
         '"./stub.ts"',
       ),
     });
-    expect(failures.join("\n")).toMatch(/tsconfig\.json paths must map/);
+    expect(failures.join("\n")).toMatch(/tsconfig\.json must be exactly/);
+  });
+
+  it("rejects a typecheck emptied by an exclude", () => {
+    const failures = tampered({
+      "packages/conformance/tsconfig.json": (text) =>
+        JSON.stringify({ ...JSON.parse(text), exclude: ["tests", "self"] }),
+    });
+    expect(failures.join("\n")).toMatch(/tsconfig\.json must be exactly/);
+  });
+
+  it("rejects strict turned off in the base config", () => {
+    const failures = tampered({
+      "tsconfig.base.json": replaceOnce('"strict": true', '"strict": false'),
+    });
+    expect(failures.join("\n")).toMatch(/must keep strict: true/);
   });
 });
