@@ -14,6 +14,7 @@
     "census": "tsx scripts/census.ts",
     "oracle:guard": "tsx scripts/oracle-guard.ts",
     "oracle:update": "tsx scripts/oracle-update.ts",
+    "pin:v1": "tsx scripts/pin-v1.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

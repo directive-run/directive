@@ -6,7 +6,7 @@
  * (the attack a reviewer used), and once without it as the control.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -56,33 +56,50 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function run(config: string) {
-  return spawnSync(
-    vitest,
-    [
-      "run",
-      "--config",
-      join(dir, config),
-      "--project",
-      "conformance:local",
-      "self/engine-identity.test.ts",
-    ],
-    {
-      cwd: conformance,
-      encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
-    },
-  );
+/**
+ * Async on purpose: a synchronous spawn blocks this worker's event loop for
+ * the whole child run, and vitest's worker RPC times out behind it.
+ */
+function run(
+  config: string,
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((done, failed) => {
+    const child = spawn(
+      vitest,
+      [
+        "run",
+        "--config",
+        join(dir, config),
+        "--project",
+        "conformance:local",
+        "self/engine-identity.test.ts",
+      ],
+      {
+        cwd: conformance,
+        env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => {
+      stdout += d;
+    });
+    child.stderr.on("data", (d) => {
+      stderr += d;
+    });
+    child.on("error", failed);
+    child.on("close", (status) => done({ status, stdout, stderr }));
+  });
 }
 
 describe("engine identity under a swapped engine", () => {
-  it("passes with the real setup (control)", () => {
-    const result = run("control.mjs");
+  it("passes with the real setup (control)", async () => {
+    const result = await run("control.mjs");
     expect(result.status, result.stdout + result.stderr).toBe(0);
   });
 
-  it("fails when a setup file mocks core with another engine", () => {
-    const result = run("swapped.mjs");
+  it("fails when a setup file mocks core with another engine", async () => {
+    const result = await run("swapped.mjs");
     expect(result.status).not.toBe(0);
     expect(result.stdout).toMatch(
       /× engine identity \(local, development\) > @directive-run\/core is the unmocked module/,

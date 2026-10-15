@@ -19,6 +19,7 @@ import {
   enginePackageDir,
 } from "../helpers/engine.js";
 import { coreEntries } from "../lib/core-entries.js";
+import { checkV1Pin } from "../lib/v1-pin.js";
 
 const build = process.env.DIRECTIVE_BUILD as "development" | "production";
 const which = engine();
@@ -82,6 +83,19 @@ describe(`engine identity (${which}, ${build})`, () => {
       expect(pkg.version).toBe(pinnedVersion());
     }
   });
+
+  if (which === "v1") {
+    it("is byte for byte the npm tarball the lockfile names", () => {
+      expect(
+        checkV1Pin({
+          pin: JSON.parse(readFileSync(join(root, "v1-pin.json"), "utf8")),
+          pinnedVersion: pinnedVersion(),
+          lockfile: readFileSync(resolve(root, "../../pnpm-lock.yaml"), "utf8"),
+          packageDir: v1Dir,
+        }),
+      ).toEqual([]);
+    });
+  }
 
   const files = expected();
   it("covers every published entry point", () => {

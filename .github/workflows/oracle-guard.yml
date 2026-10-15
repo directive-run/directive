@@ -1,0 +1,51 @@
+name: Oracle guard
+
+# Rules for changing the conformance oracle (packages/conformance/lib/guard.ts):
+# a PR that changes the harness needs the `oracle-change` label, and a PR that
+# touches packages/core-next may not also touch the conformance harness.
+#
+# Why pull_request_target, and why it is safe here:
+# - The guard must not run the PR's own code, or a PR could rewrite the rules
+#   that judge it. pull_request_target runs this workflow, and the checkout
+#   below, from the BASE branch.
+# - The head is only ever read as data through the API: its changed-file
+#   list, the labels in the event payload, and pnpm-lock.yaml as text. It is
+#   never checked out, installed, or executed.
+# - The token is read-only (permissions below) and no secrets are used, so
+#   there is nothing for a fork's PR to exfiltrate.
+# - labeled/unlabeled re-run the guard when the label is added or removed.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  oracle-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The base branch, never the PR head.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # The base's own lockfile; no lifecycle scripts.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - run: pnpm --filter @directive-run/conformance oracle:guard --pr
+        env:
+          GH_TOKEN: ${{ github.token }}
