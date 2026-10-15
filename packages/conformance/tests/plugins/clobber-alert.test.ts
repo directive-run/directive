@@ -2,9 +2,9 @@
 // Do not edit by hand: change the original and re-run the port.
 
 import { createModule, createSystem, t } from "@directive-run/core";
-import type { ClobberSummaryEvent } from "@directive-run/core";
 import {
   type ClobberAlertEvent,
+  type ClobberSummaryEvent,
   clobberAlertPlugin,
 } from "@directive-run/core/plugins";
 import { flushMicrotasks } from "@directive-run/core/testing";

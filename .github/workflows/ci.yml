@@ -92,11 +92,16 @@ jobs:
           git diff --exit-code packages/claude-plugin/skills/
 
   # The 2.0 oracle: core's black-box tests, run against the published 1.35.0
-  # (the reference) and the workspace engine. Non-blocking while Phase 0 lands;
-  # it becomes a required check at the Phase 0 gate, when core-next joins it.
+  # (the reference) and the workspace engine, plus the check that the ports
+  # are faithful and its tamper tests. The suite's typecheck runs in
+  # build-and-test with every other package.
   conformance:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # TODO(2.0 Phase 0 gate): remove continue-on-error and make this job a
+    # required check once Jason signs off the Phase 0 gate (frozen-contract
+    # list + WHITE-BOX.md fates), before any core-next code lands.
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

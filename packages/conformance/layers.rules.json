@@ -1,0 +1,424 @@
+{
+  "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0–L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
+  "current": null,
+  "rules": {
+    "tests/core/tracking.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/tracking-frame-kind.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/derivations.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/derivation-deps.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/derivation-dep-wake-rate.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/derivation-hold-reentrancy.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/derive-reach-back-warning.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/docs-derivations-example.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/exotic-facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/frozen-facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/fact-set-listener-isolation.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/watched-set-shrinks.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/nullable-equality.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/schema-builders.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/schema-freeze-scope.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/system-facts-derived.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/perf-correctness.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/module.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/multi-module-correctness.prod.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/dep-namespace-injective.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/effect-readonly-facts.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/effect-readonly-facts-production.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/data-forms.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/data-forms-namespaced.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/constraints.test.ts": {
+      "rule": "L2",
+      "pin": true
+    },
+    "tests/core/constraint-disable.test.ts": {
+      "rule": "L2"
+    },
+    "tests/core/constraint-reevaluation.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins"],
+      "allowAbove": {
+        "option error boundary": "retry-later is an error-boundary strategy (L3)"
+      }
+    },
+    "tests/core/derived-in-constraints-effects.test.ts": {
+      "rule": "L2"
+    },
+    "tests/core/resolvers.test.ts": {
+      "rule": "L2"
+    },
+    "tests/core/resolver-outcomes.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins"],
+      "allowAbove": {
+        "option batch resolver": "batched resolvers are L7; the batch half of this rule cannot run before batching exists"
+      }
+    },
+    "tests/core/resolver-satisfied-by-own-write.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins"],
+      "allowAbove": {
+        "option batch resolver": "batched resolvers are L7; the batch half of this rule cannot run before batching exists"
+      }
+    },
+    "tests/core/resolver-retracting-own-requirement.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins"]
+    },
+    "tests/core/resolver-loading-flag.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "allowAbove": {
+        "option batch resolver": "batched resolvers are L7; the batch half of this rule cannot run before batching exists",
+        "option error boundary": "retry-later is an error-boundary strategy (L3)"
+      }
+    },
+    "tests/core/requeue.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["import flushMicrotasks"]
+    },
+    "tests/core/requeue-after-resolver-finishes.test.ts": {
+      "rule": "L2",
+      "pin": true
+    },
+    "tests/core/reconcile-timing-rules.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "allowAbove": {
+        "option batch resolver": "batched resolvers are L7; the batch half of this rule cannot run before batching exists",
+        "option history": "the coalescing tests count history snapshots per pass; no L2 coalescing test exists yet (WHITE-BOX.md gap)",
+        "member .history": "same as option history"
+      },
+      "instruments": ["option plugins"]
+    },
+    "tests/core/reconcile-depth-guard.test.ts": {
+      "rule": "L2"
+    },
+    "tests/core/superseded-bodies-and-retry-timer.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "allowAbove": {
+        "option error boundary": "retry-later is an error-boundary strategy (L3)"
+      }
+    },
+    "tests/core/settle-strands-invalidations.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["member .inspect"],
+      "allowAbove": {
+        "option effect deps": "the invalidation under test comes from an effect with deps (L4)",
+        "option effect prev": "the effects under test read prev (L4), the same layer as effect deps"
+      }
+    },
+    "tests/core/engine.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/system.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/system-async-lifecycle.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/error-boundary.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/plugins.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/round-1-findings.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/round-2-criticals.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/ssr.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/clock.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/timer.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/effect-deps-startup.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/effect-reconcile-boundaries.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/sources.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/restore-flush-reconcile.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/snapshot-events.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/nested-mutation-checks.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/nested-mutation-checks.production.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/nested-mutation-snapshot.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/schema-introspection.test.ts": {
+      "rule": "L6"
+    },
+    "tests/plugins/persistence.test.ts": {
+      "rule": "L6"
+    },
+    "tests/plugins/hydration-scope.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/batch-resolve-fallback.test.ts": {
+      "rule": "L7"
+    },
+    "tests/core/batched-read-your-write.test.ts": {
+      "rule": "L7"
+    },
+    "tests/core/batched-resolver-retracting-own-requirement.test.ts": {
+      "rule": "L7"
+    },
+    "tests/utils/history.test.ts": {
+      "rule": "L8"
+    },
+    "tests/core/history-clone-integrity.test.ts": {
+      "rule": "L8"
+    },
+    "tests/core/effect-navigation-rerun.test.ts": {
+      "rule": "L8"
+    },
+    "tests/core/navigation-side-effects.test.ts": {
+      "rule": "L8"
+    },
+    "tests/core/trace.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/observe.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/observe-batched-writes.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/observe-stream-reconstructs.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/meta-query-does-not-watch.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/meta-query-timing.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/fact-tags-immutable.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/fact-tags-recorded.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/derivation-tag-inheritance.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/fact-origin-at-write.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/notify-guardrail-blocked.test.ts": {
+      "rule": "L9"
+    },
+    "tests/core/dynamic-definitions.test.ts": {
+      "rule": "L10"
+    },
+    "tests/core/unregister-module.test.ts": {
+      "rule": "L10"
+    },
+    "tests/core/predicate-codegen.test.ts": {
+      "rule": "L11"
+    },
+    "tests/core/predicate-hash.test.ts": {
+      "rule": "L11"
+    },
+    "tests/core/predict.test.ts": {
+      "rule": "L11"
+    },
+    "tests/core/doctor.test.ts": {
+      "rule": "L11"
+    },
+    "tests/core/rules-diff.test.ts": {
+      "rule": "L11"
+    },
+    "tests/core/replay-under.test.ts": {
+      "rule": "L11"
+    },
+    "tests/plugins/audit-ledger.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/audit-ledger-batched-writes.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/audit-ledger-forgery.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/audit-ledger-latch.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/audit-ledger-payloads.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/audit-ledger-rotation.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/circuit-breaker.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/clobber-alert.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/clobber-loop.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/devtools.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/devtools-when-explain.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/docs-snippet-compiles.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/logging.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/observability-agent-metrics.test.ts": {
+      "rule": "L12"
+    },
+    "tests/plugins/performance.test.ts": {
+      "rule": "L12"
+    },
+    "tests/utils/snapshot-signing.test.ts": {
+      "rule": "L12"
+    },
+    "tests/utils/testing.test.ts": {
+      "rule": "L13"
+    },
+    "tests/utils/testing-utils.test.ts": {
+      "rule": "L13"
+    },
+    "tests/utils/testing-sees-batched-writes.test.ts": {
+      "rule": "L13"
+    },
+    "tests/adapters/worker.test.ts": {
+      "rule": "L13"
+    },
+    "tests/adapters/worker-set-fact.test.ts": {
+      "rule": "L13"
+    },
+    "tests/adapters/worker-mirrors-batched-writes.test.ts": {
+      "rule": "L13"
+    },
+    "tests/package/dist-types.test.ts": {
+      "rule": "L13"
+    },
+    "tests/core/derivations-without-schema.test-d.ts": {
+      "rule": "L1"
+    }
+  },
+  "inferred": [
+    "tests/core/tracking-frame-kind.test.ts",
+    "tests/core/derivation-deps.test.ts",
+    "tests/core/derivation-dep-wake-rate.test.ts",
+    "tests/core/derive-reach-back-warning.test.ts",
+    "tests/core/docs-derivations-example.test.ts",
+    "tests/core/exotic-facts.test.ts",
+    "tests/core/frozen-facts.test.ts",
+    "tests/core/fact-set-listener-isolation.test.ts",
+    "tests/core/watched-set-shrinks.test.ts",
+    "tests/core/schema-freeze-scope.test.ts",
+    "tests/core/system-facts-derived.test.ts",
+    "tests/core/perf-correctness.test.ts",
+    "tests/core/dep-namespace-injective.test.ts",
+    "tests/core/data-forms-namespaced.test.ts",
+    "tests/core/constraint-disable.test.ts",
+    "tests/core/derived-in-constraints-effects.test.ts",
+    "tests/core/resolvers.test.ts",
+    "tests/core/resolver-retracting-own-requirement.test.ts",
+    "tests/core/requeue.test.ts",
+    "tests/core/requeue-after-resolver-finishes.test.ts",
+    "tests/core/reconcile-depth-guard.test.ts",
+    "tests/core/system-async-lifecycle.test.ts",
+    "tests/core/clock.test.ts",
+    "tests/core/timer.test.ts",
+    "tests/core/effect-reconcile-boundaries.test.ts",
+    "tests/plugins/hydration-scope.test.ts",
+    "tests/core/batched-read-your-write.test.ts",
+    "tests/core/history-clone-integrity.test.ts",
+    "tests/core/derivation-tag-inheritance.test.ts",
+    "tests/core/fact-origin-at-write.test.ts"
+  ],
+  "notes": {
+    "multi-module-correctness": "The plan puts multi-module-correctness in L1 and its source parts in L5. Only the .prod file is black-box; the main file imports createCrossModuleFactsProxy and is white-box (see WHITE-BOX.md), so its split waits for that triage.",
+    "effects": "The plan's L4 names effects and effects-lazy-prev-facts; both are white-box (derivationDep, declaresPrevFacts). L4 has only two black-box files until they are rewritten.",
+    "predicate": "predicate and predicate-describe (L11) and sweep-under are white-box."
+  },
+  "instrumentNotes": {
+    "option plugins": "observes resolver outcomes through plugin hooks (onResolverComplete/Cancel/Error); L2 must expose them",
+    "member .inspect": "reads requirement state through system.inspect(); L2 must expose it",
+    "import flushMicrotasks": "a one-line microtask flush from /testing; L2 tests need it before the testing subpath (L13) exists"
+  }
+}

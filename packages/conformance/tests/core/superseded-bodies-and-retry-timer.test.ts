@@ -14,7 +14,7 @@ import { engineDistEntry } from "../../helpers/engine.js";
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { describe, expect, it, vi } from "vitest";

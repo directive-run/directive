@@ -1,4 +1,5 @@
 {
+  "tests/package/dist-types.test.ts": "packages/core/__tests__/dist-types.test.ts",
   "tests/adapters/worker-mirrors-batched-writes.test.ts": "packages/core/src/adapters/__tests__/worker-mirrors-batched-writes.test.ts",
   "tests/adapters/worker-set-fact.test.ts": "packages/core/src/adapters/__tests__/worker-set-fact.test.ts",
   "tests/adapters/worker.test.ts": "packages/core/src/adapters/__tests__/worker.test.ts",
@@ -16,6 +17,7 @@
   "tests/core/derivation-deps.test.ts": "packages/core/src/core/__tests__/derivation-deps.test.ts",
   "tests/core/derivation-hold-reentrancy.test.ts": "packages/core/src/core/__tests__/derivation-hold-reentrancy.test.ts",
   "tests/core/derivation-tag-inheritance.test.ts": "packages/core/src/core/__tests__/derivation-tag-inheritance.test.ts",
+  "tests/core/derivations-without-schema.test-d.ts": "packages/core/src/core/__tests__/derivations-without-schema.test-d.ts",
   "tests/core/derivations.test.ts": "packages/core/src/core/__tests__/derivations.test.ts",
   "tests/core/derive-reach-back-warning.test.ts": "packages/core/src/core/__tests__/derive-reach-back-warning.test.ts",
   "tests/core/derived-in-constraints-effects.test.ts": "packages/core/src/core/__tests__/derived-in-constraints-effects.test.ts",
