@@ -1,5 +1,11 @@
 # @directive-run/core
 
+## 1.35.1
+
+### Patch Changes
+
+- [#174](https://github.com/directive-run/directive/pull/174) [`7eb552d`](https://github.com/directive-run/directive/commit/7eb552d071036804b116527d4ef8458b6c838111) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Export `ClobberSummaryEvent` from `@directive-run/core/plugins`. It is the parameter type of `clobberAlertPlugin({ onSummary })`, which could not be named without reaching into an internal module.
+
 ## 1.35.0
 
 ### Minor Changes

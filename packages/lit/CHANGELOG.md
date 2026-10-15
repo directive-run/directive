@@ -1,5 +1,7 @@
 # @directive-run/lit
 
+## 1.35.1
+
 ## 1.35.0
 
 ### Minor Changes

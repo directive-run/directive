@@ -1,5 +1,13 @@
 # @directive-run/example-counter-svelte
 
+## 0.0.73
+
+### Patch Changes
+
+- Updated dependencies [[`7eb552d`](https://github.com/directive-run/directive/commit/7eb552d071036804b116527d4ef8458b6c838111)]:
+  - @directive-run/core@1.35.1
+  - @directive-run/svelte@1.35.1
+
 ## 0.0.72
 
 ### Patch Changes
