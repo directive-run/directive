@@ -6,7 +6,7 @@
  * proves the run was. A green run that quietly skipped, filtered or dropped
  * tests fails here:
  *
- * - config: the vitest config has exactly the five projects, each with the
+ * - config: the vitest config has exactly the six projects, each with the
  *   expected root, includes, excludes, setup file, env and core aliases, and
  *   nothing else (no extra setup files, global setup, server deps or mocks);
  * - files: every port ran in every engine project that should run it, and the
@@ -14,7 +14,11 @@
  * - tests: every test passed, except exactly the aheadOfV1 tests on v1, which
  *   were skipped; nothing is todo; every statically named test ran under its
  *   name, and each file ran the same tests on v1 and local;
- * - aheadOfV1.json: one entry per test, each with a reason, no wildcards.
+ * - aheadOfV1.json: one entry per test, each with a reason, no wildcards;
+ * - the differential project: every diff/ file ran, every scenario under
+ *   its literal title, nothing skipped; every scenario file has a layer;
+ *   every divergences.json entry is complete, signed off and still covers
+ *   a difference the run found (none stale).
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -29,8 +33,9 @@ export const ENGINE_PROJECTS = [
   "conformance:local",
   "conformance:local:prod",
 ] as const;
+export const DIFF_PROJECT = "conformance:diff";
 export const CHECKS_PROJECT = "conformance:checks";
-export const ALL_PROJECTS = [...ENGINE_PROJECTS, CHECKS_PROJECT];
+export const ALL_PROJECTS = [...ENGINE_PROJECTS, DIFF_PROJECT, CHECKS_PROJECT];
 
 export interface JsonReport {
   testResults: Array<{
@@ -155,7 +160,14 @@ function expectedAlias(
 }
 
 const sameJson = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
+  JSON.stringify(a, keepRegExp) === JSON.stringify(b, keepRegExp);
+
+/** JSON.stringify drops a RegExp to `{}`; compare its source and flags. */
+function keepRegExp(_key: string, value: unknown): unknown {
+  return value instanceof RegExp
+    ? `RegExp(${value.source}/${value.flags})`
+    : value;
+}
 
 /** Problems with the loaded vitest config, against what the census expects. */
 export function checkConfig(
@@ -187,6 +199,26 @@ export function checkConfig(
   for (const project of projects) {
     const test = project.test ?? {};
     const name = test.name as string;
+    if (name === DIFF_PROJECT) {
+      const want = {
+        test: {
+          name,
+          root: conformanceRoot,
+          environment: "node",
+          include: ["diff/**/*.test.ts"],
+          testTimeout: 120_000,
+          server: {
+            deps: {
+              inline: [/[\\/]directive-v1[\\/]/, /@directive-run\+core@/],
+            },
+          },
+        },
+      };
+      if (!sameJson(project, want)) {
+        fail(`${name} differs from ${JSON.stringify(want, keepRegExp)}`);
+      }
+      continue;
+    }
     if (name === CHECKS_PROJECT) {
       const want = {
         test: {
@@ -269,20 +301,23 @@ export function census(
   const checkFiles = walk(join(conformanceRoot, "scripts/__tests__"))
     .filter((f) => f.endsWith(".test.ts"))
     .map((f) => relative(conformanceRoot, f));
+  const diffFiles = diffTestFiles(conformanceRoot);
   // One per entry point, four shared, and the v1 tarball check on v1.
   const identityTests = (project: string) =>
     coreEntries(repoRoot).length +
     (project.startsWith("conformance:v1") ? 5 : 4);
 
   const project = new Project({ useInMemoryFileSystem: true });
-  const staticCount = (rel: string) =>
+  const declared = (rel: string, roots?: string[]) =>
     staticTests(
       project.createSourceFile(
         `/${rel}`,
         readFileSync(join(conformanceRoot, rel), "utf8"),
         { overwrite: true },
       ),
-    ).length;
+      roots,
+    );
+  const staticCount = (rel: string) => declared(rel).length;
 
   /** project → file → test names (with status). */
   const ran = new Map<string, Map<string, [string, string][]>>();
@@ -311,10 +346,12 @@ export function census(
     const expected =
       name === CHECKS_PROJECT
         ? checkFiles
-        : [
-            ...runnable.filter((f) => (isProd ? prod.has(f) : !prod.has(f))),
-            ...selfFiles,
-          ];
+        : name === DIFF_PROJECT
+          ? diffFiles
+          : [
+              ...runnable.filter((f) => (isProd ? prod.has(f) : !prod.has(f))),
+              ...selfFiles,
+            ];
     for (const file of expected) {
       if (!files.has(file)) {
         fail(`${name}: ${file} did not run`);
@@ -373,6 +410,22 @@ export function census(
             `${name}: ${file} ran ${names.length} tests, expected ${identityTests(name)}`,
           );
         }
+      } else if (name === DIFF_PROJECT) {
+        // Every scenario and test is written with a literal title (no loops,
+        // no templates), so each one must have run under its own name.
+        const tests = declared(file, DIFF_TEST_ROOTS);
+        for (const t of tests) {
+          if (t.dynamic) {
+            fail(`${file}: "${t.key}" has a computed title; write it out`);
+          } else if (!names.includes(t.key)) {
+            fail(`${name}: ${file} > "${t.key}" did not run`);
+          }
+        }
+        if (names.length !== tests.length) {
+          fail(
+            `${name}: ${file} ran ${names.length} tests, declares ${tests.length}`,
+          );
+        }
       } else if (name === CHECKS_PROJECT) {
         if (names.length !== staticCount(file)) {
           fail(
@@ -404,6 +457,129 @@ export function census(
       if (other && !sameJson(l, r)) {
         fail(`${file}: ${a} and ${b} ran different tests`);
       }
+    }
+  }
+
+  return failures;
+}
+
+/** Calls that register a test in diff/: `it`, `test` and `scenario`. */
+export const DIFF_TEST_ROOTS = ["it", "test", "scenario"];
+
+/** Test files of the differential project, relative to packages/conformance. */
+export function diffTestFiles(conformanceRoot: string): string[] {
+  return walk(join(conformanceRoot, "diff"))
+    .filter((f) => f.endsWith(".test.ts"))
+    .map((f) => relative(conformanceRoot, f))
+    .sort();
+}
+
+const LAYER = /^L(?:[0-9]|1[0-3])$/;
+
+/**
+ * layers.rules.json `scenarios`: every differential scenario and fuzz file
+ * has a layer, so a v2 run can skip what is above `current`. The harness's
+ * own self tests (diff/self/) always run and take no layer.
+ */
+export function checkScenarioLayers(conformanceRoot: string): string[] {
+  const failures: string[] = [];
+  const rules = readJson<{ scenarios?: Record<string, unknown> }>(
+    join(conformanceRoot, "layers.rules.json"),
+  );
+  const placed = rules.scenarios ?? {};
+  const files = diffTestFiles(conformanceRoot).filter(
+    (f) => !f.startsWith("diff/self/"),
+  );
+  for (const file of files) {
+    const layer = placed[file];
+    if (typeof layer !== "string" || !LAYER.test(layer)) {
+      failures.push(
+        `layers.rules.json: scenario file ${file} needs a layer (L0–L13) in \`scenarios\``,
+      );
+    }
+  }
+  for (const file of Object.keys(placed)) {
+    if (!files.includes(file)) {
+      failures.push(
+        `layers.rules.json: \`scenarios\` names ${file}, which is not a scenario file`,
+      );
+    }
+  }
+
+  return failures;
+}
+
+export interface DivergenceEntry {
+  id: string;
+  scenario: string;
+  path: string;
+  reason: string;
+  approvedBy: string;
+  date: string;
+}
+
+const DIVERGENCE_KEYS = [
+  "approvedBy",
+  "date",
+  "id",
+  "path",
+  "reason",
+  "scenario",
+];
+
+/**
+ * diff/divergences.json: each entry is an intended difference between the
+ * engines, signed off by a person (Jason — never an agent). `used` is the
+ * set of ids the run reported covering at least one difference, or null
+ * when not known: an entry that covers nothing is stale and fails, so the
+ * file can only describe differences that still exist.
+ */
+export function checkDivergences(
+  conformanceRoot: string,
+  used: Set<string> | null,
+): string[] {
+  const failures: string[] = [];
+  const fail = (m: string) => failures.push(`diff/divergences.json: ${m}`);
+  let entries: unknown;
+  try {
+    entries = readJson(join(conformanceRoot, "diff/divergences.json"));
+  } catch {
+    return ["diff/divergences.json: missing or not JSON"];
+  }
+  if (!Array.isArray(entries)) {
+    return ["diff/divergences.json: must be an array"];
+  }
+  const ids = new Set<string>();
+  for (const [i, raw] of entries.entries()) {
+    const e = (raw ?? {}) as Partial<DivergenceEntry>;
+    const label = typeof e.id === "string" && e.id ? e.id : `entry ${i}`;
+    if (!sameJson(Object.keys(e).sort(), DIVERGENCE_KEYS)) {
+      fail(`${label} must have exactly ${DIVERGENCE_KEYS.join(", ")}`);
+    }
+    if (typeof e.id !== "string" || !e.id) {
+      fail(`entry ${i} needs an id`);
+    } else if (ids.has(e.id)) {
+      fail(`duplicate id ${e.id}`);
+    } else {
+      ids.add(e.id);
+    }
+    if (typeof e.scenario !== "string" || !e.scenario) {
+      fail(`${label} needs the scenario it applies to`);
+    }
+    if (typeof e.path !== "string" || !/^trace(\[|$)/.test(e.path)) {
+      fail(`${label} path must start at "trace"`);
+    }
+    if (typeof e.reason !== "string" || e.reason.trim().length < 10) {
+      fail(`${label} needs a reason`);
+    }
+    if (typeof e.approvedBy !== "string" || !e.approvedBy.trim()) {
+      fail(`${label} needs approvedBy (the person who signed it off)`);
+    }
+    if (typeof e.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
+      fail(`${label} needs a YYYY-MM-DD date`);
+    }
+    if (used && typeof e.id === "string" && e.id && !used.has(e.id)) {
+      fail(`${label} covers no difference in this run (stale); remove it`);
     }
   }
 

@@ -78,3 +78,39 @@ export function coreEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
 
   return out;
 }
+
+/** The installed `directive-v1` package (the published reference). */
+export const v1PackageDir = resolve(here, "../node_modules/directive-v1");
+
+/**
+ * The reference engine's entry points for one build condition, read from the
+ * installed package's own exports: `@directive-run/core[/sub]` → the file the
+ * published package serves for it. Shared by the vitest config and the
+ * differential harness, which loads both engines into one process.
+ */
+export function v1Entries(
+  condition: "development" | "production",
+): CoreEntry[] {
+  const pkg = JSON.parse(
+    readFileSync(join(v1PackageDir, "package.json"), "utf8"),
+  );
+  const out: CoreEntry[] = [];
+  for (const [subpath, target] of Object.entries(
+    pkg.exports as Record<string, Record<string, { import?: string }>>,
+  )) {
+    const file = target[condition]?.import;
+    if (!file) {
+      throw new Error(`directive-v1 has no ${condition} build for ${subpath}`);
+    }
+    out.push({
+      subpath,
+      specifier:
+        subpath === "."
+          ? "@directive-run/core"
+          : `@directive-run/core/${subpath.replace(/^\.\//, "")}`,
+      file: join(v1PackageDir, file),
+    });
+  }
+
+  return out;
+}

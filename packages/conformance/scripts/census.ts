@@ -9,16 +9,19 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   ALL_PROJECTS,
+  DIFF_PROJECT,
   type JsonReport,
   census,
   checkAheadOfV1,
   checkConfig,
+  checkDivergences,
+  checkScenarioLayers,
 } from "../lib/census.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
 import { checkLock } from "../lib/harness.js";
@@ -29,6 +32,7 @@ const failures: string[] = [];
 
 failures.push(...checkLock(conformanceRoot));
 failures.push(...checkAheadOfV1(conformanceRoot));
+failures.push(...checkScenarioLayers(conformanceRoot));
 const config = (
   await import(pathToFileURL(join(conformanceRoot, "vitest.config.ts")).href)
 ).default;
@@ -36,6 +40,8 @@ failures.push(...checkConfig(config, repoRoot));
 
 const out = mkdtempSync(join(tmpdir(), "conformance-census-"));
 const reports: Record<string, JsonReport> = {};
+// The differential scenarios append each divergence id they used here.
+const divergenceLog = join(out, "divergences-used.txt");
 try {
   for (const project of ALL_PROJECTS) {
     const file = join(out, `${project.replace(/:/g, "_")}.json`);
@@ -51,7 +57,14 @@ try {
         "--reporter=json",
         `--outputFile.json=${file}`,
       ],
-      { cwd: conformanceRoot, stdio: "inherit" },
+      {
+        cwd: conformanceRoot,
+        stdio: "inherit",
+        env:
+          project === DIFF_PROJECT
+            ? { ...process.env, DIFF_DIVERGENCE_LOG: divergenceLog }
+            : process.env,
+      },
     );
     if (result.status !== 0) {
       failures.push(`${project}: vitest exited ${result.status}`);
@@ -63,6 +76,12 @@ try {
     }
   }
   failures.push(...census(repoRoot, reports));
+  const used = new Set(
+    existsSync(divergenceLog)
+      ? readFileSync(divergenceLog, "utf8").split("\n").filter(Boolean)
+      : [],
+  );
+  failures.push(...checkDivergences(conformanceRoot, used));
 } finally {
   rmSync(out, { recursive: true, force: true });
 }

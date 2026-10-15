@@ -8,6 +8,7 @@ than one engine:
 | `conformance:v1`, `conformance:v1:prod` | the published release pinned by the `directive-v1` npm alias (now `@directive-run/core@1.35.0`), development and production builds. The reference. |
 | `conformance:local`, `conformance:local:prod` | the workspace's `packages/core` source |
 | `conformance:v2` (commented slot) | core-next, from Phase 1 |
+| `conformance:diff` | differential scenarios: both engines in one process, traces compared (`diff/`) |
 | `conformance:checks` | the tamper tests for `check-expects` |
 
 ```bash
@@ -41,7 +42,7 @@ pnpm --filter @directive-run/conformance pin:v1         # after moving the direc
   `aheadOfV1.json` tests on v1; nothing is todo; every named test ran; v1
   and local ran the same tests; the self and tamper tests ran in full. It
   also verifies `harness.lock.json`.
-- `harness.lock.json` pins the sha256 of every harness file (config, helpers,
+- `harness.lock.json` pins the sha256 of every harness file (config, helpers, diff/,
   self tests, lib, scripts, tsconfig, package.json, `aheadOfV1.json`,
   `oracle-baseline.json`). Any harness edit needs `oracle:update`, and a PR
   that changes the lock needs the `oracle-change` label.
@@ -50,6 +51,59 @@ pnpm --filter @directive-run/conformance pin:v1         # after moving the direc
 - `tsconfig.json` typechecks the ports against workspace source, so ported
   `expectTypeOf` and `@ts-expect-error` lines are enforced. `noUnusedLocals`
   is off: a declared rewrite can leave an original's helper unused.
+
+## Differential scenarios (`diff/`)
+
+The ported tests check what their authors thought to assert. The
+differential harness checks everything else: it runs the same definitions
+and steps on the reference engine and the engine under test and requires
+the two traces to be equal.
+
+- `diff/record.ts` records, in order: every plugin hook with its arguments
+  (the list in `diff/hooks.ts` is type-checked against each engine's
+  `Plugin`, so a new hook cannot go unrecorded), every `observe()` event,
+  every store notification per fact and derivation, every console message,
+  each step and anything it threw, outside effects the scenario reports
+  (`external`), and at each `settle`/`checkpoint` all facts, every
+  derivation's value and the whole `inspect()`.
+- `diff/normalize.ts` makes values comparable. Nothing nondeterministic is
+  stripped; the runner makes it deterministic instead: fake timers at time 0
+  (`Date`, `performance`, every timer), `Math.random` seeded per scenario,
+  and a fresh engine instance per run (1.35 dedupes some dev warnings per
+  process, so a reused instance would make a run depend on the runs before
+  it — `diff/self/tamper.test.ts` shows it). Error stacks and function names
+  are dropped from values because they name files and bundler renames, not
+  behaviour.
+- `diff/scenario.ts`: `scenario(name, build, steps)` runs the reference
+  twice (the two runs must match, or the scenario/recorder is not
+  deterministic — never approvable) and the engine under test once, and
+  prints the first divergent trace entry with context on a mismatch.
+- `diff/scenarios/l<N>-*.test.ts` are hand-written scenarios by layer;
+  `diff/fuzz/` generates random small systems and step sequences with
+  fast-check (fixed seed in CI, `DIFF_FUZZ_RUNS` / `DIFF_FUZZ_SEED` for
+  longer runs; failures shrink and print the seed and spec).
+- `diff/self/` proves the harness: both engines load (published 1.35.0 and
+  workspace source), each run gets a fresh instance, and injected faults — a
+  reordered hook, a missing observe event, a changed fact at a settle, an
+  extra store notification — fail a scenario and the fuzzer.
+
+Writing a scenario: `build({ core, external, handles })` returns
+`createSystem` options built with `core` (the engine being run), so the
+same code builds on both engines; report outside effects with `external`;
+stash handles (a source's `publish`) in `handles` for `run` steps. Steps:
+`start`, `stop`, `destroy`, `dispatch`, `set` (`ns.key` for a namespaced
+fact), `batch`, `advance` (fake ms), `tick` (microtasks only), `settle`,
+`checkpoint`, `snapshot`/`restore`, `back`/`forward`, and `run` (a labelled
+function). Give every scenario a literal title (the census counts them) and
+the file a layer in `layers.rules.json` `scenarios`.
+
+**Divergences.** An intended difference between the engines goes in
+`diff/divergences.json`: `{ id, scenario, path, reason, approvedBy, date }`,
+where `path` is the trace path the report prints (a prefix covers
+everything under it). **Jason approves every entry; an agent never adds
+one.** The census fails an entry that is incomplete or unsigned, or that
+covered no difference in the run (stale). The file is part of the harness,
+so adding one needs `oracle:update` and the `oracle-change` label.
 
 ## Layers
 
@@ -86,7 +140,7 @@ deliberate act, made visible on the pull request:
 
 - **`oracle-change` label for any harness change.** The harness is the
   package's own (`vitest.config.ts`, `tsconfig.json`, `package.json`,
-  `helpers/`, `self/`, `lib/`, `scripts/`, `layers.rules.json`,
+  `helpers/`, `self/`, `lib/`, `diff/`, `scripts/`, `layers.rules.json`,
   `aheadOfV1.json`, `v1-pin.json`, `oracle-baseline.json`,
   `harness.lock.json`) plus what decides how it runs from outside:
   `.github/workflows/*.yml`, the root `package.json`, `pnpm-workspace.yaml`,
@@ -141,6 +195,9 @@ the oracle now accepts that it did not before.
 | both fail | The port or the test is broken | Fix the original in core, re-port |
 | engine identity | A project resolves the wrong engine, or something mocks or wraps core | Fix `vitest.config.ts` or remove the mock |
 | census | The run skipped, filtered or dropped tests, the config changed, or a harness file differs from the lock | Undo the change, or make it deliberately (Changing the oracle) |
+| diff: "engines differ" | The engine under test behaves differently from 1.35 | Fix the engine; if the difference is intended, ask Jason to approve a `divergences.json` entry |
+| diff: "not deterministic" | The reference run twice gave different traces: the scenario or recorder depends on something outside the run | Fix the scenario or the recorder; never a divergence |
+| diff: a stale divergence | An approved difference no longer occurs | Remove the entry |
 | oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |
 | Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together | Label it if the change is deliberate; split engine and oracle PRs |
 

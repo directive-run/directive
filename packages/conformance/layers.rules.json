@@ -1,6 +1,18 @@
 {
   "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0–L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
   "current": null,
+  "$scenarios": "Differential scenario files (diff/) and the layer each one needs. On v2 the diff project runs only files at or below `current`; diff/self/ always runs. Checked by the census (lib/census.ts checkScenarioLayers).",
+  "scenarios": {
+    "diff/scenarios/l0-facts-derivations.test.ts": "L0",
+    "diff/scenarios/l1-modules.test.ts": "L1",
+    "diff/scenarios/l2-constraints-resolvers.test.ts": "L2",
+    "diff/scenarios/l3-lifecycle-error-boundary.test.ts": "L3",
+    "diff/scenarios/l4-effects.test.ts": "L4",
+    "diff/scenarios/l5-sources.test.ts": "L5",
+    "diff/scenarios/l6-snapshots.test.ts": "L6",
+    "diff/scenarios/l8-history.test.ts": "L8",
+    "diff/fuzz/fuzz.test.ts": "L4"
+  },
   "rules": {
     "tests/core/tracking.test.ts": {
       "rule": "L0"
