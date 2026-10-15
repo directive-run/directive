@@ -16,6 +16,7 @@ pnpm conformance                                 # check-expects, census, oracle
 pnpm --filter @directive-run/conformance typecheck
 pnpm --filter @directive-run/conformance port    # re-copy after core's tests change
 pnpm --filter @directive-run/conformance oracle:update  # after changing the harness
+pnpm --filter @directive-run/conformance pin:v1         # after moving the directive-v1 alias
 ```
 
 ## What each piece does
@@ -29,8 +30,10 @@ pnpm --filter @directive-run/conformance oracle:update  # after changing the har
   verbatim, no stray files. `scripts/__tests__/check.test.ts` tampers with a
   copy of the repo in each of those ways and proves the check fails.
 - `self/engine-identity.test.ts` runs in every engine project and proves the
-  project loads the engine it claims (the pinned npm version, or the
-  workspace source), for every entry point.
+  project loads the engine it claims, for every entry point: each export is
+  the unmocked module at the expected file (no setup-file mock or wrapper),
+  the built entry and declarations are where they should be, and on v1 the
+  installed package is byte for byte the npm tarball the lockfile names.
 - `scripts/census.ts` (`lib/census.ts`) runs every project with a JSON
   reporter and proves the run was complete: the vitest config is exactly the
   expected one (projects, includes, setup file, aliases, nothing extra);
@@ -65,29 +68,66 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
 - Files in the `internals` category are skipped on v2 until WHITE-BOX.md
   triage moves them out. On v2, tests above `current` are skipped too.
 
+## Threat model
+
+The oracle has to resist **accidental** weakening: an agent or a person who,
+while making some other change in the same pull request, edits the harness
+until a failing engine goes green — narrows an include, adds a setup file,
+skips a test, loosens a rule. Every such edit is made to fail loudly or to
+need a visible label. It does **not** try to stop a maintainer with write
+access who means to weaken it: such a person can relabel, change branch
+protection or edit the workflows on main. That is a review problem, not a
+tooling one.
+
 ## Changing the oracle
 
 The harness and the correctness baseline are the oracle. Changing them is a
 deliberate act, made visible on the pull request:
 
-- **`oracle-change` label.** A PR that changes `harness.lock.json` or
-  `oracle-baseline.json` fails the `oracle-guard` CI job unless it carries
-  the label. CI reads the labels from the pull_request event payload;
-  adding or removing the label re-runs the job.
+- **`oracle-change` label for any harness change.** The harness is the
+  package's own (`vitest.config.ts`, `tsconfig.json`, `package.json`,
+  `helpers/`, `self/`, `lib/`, `scripts/`, `layers.rules.json`,
+  `aheadOfV1.json`, `v1-pin.json`, `oracle-baseline.json`,
+  `harness.lock.json`) plus what decides how it runs from outside:
+  `.github/workflows/*.yml`, the root `package.json`, `pnpm-workspace.yaml`,
+  `.npmrc`, and the `pnpm-lock.yaml` entries that resolve `directive-v1` and
+  vitest (`lib/lockfile.ts`; other lockfile changes do not count). A PR
+  touching any of it fails the **Oracle guard** workflow without the label.
+- **The guard never runs the PR's code.** `.github/workflows/oracle-guard.yml`
+  uses `pull_request_target`: the workflow and the scripts it runs come from
+  the base branch. The head is read only as data through the GitHub API (the
+  changed-file list, the labels in the event payload, `pnpm-lock.yaml` as
+  text) and is never checked out, installed or executed. The token is
+  read-only and no secrets are used. A PR therefore cannot rewrite the rule
+  that judges it; a change to the guard takes effect from the PR after it
+  merges.
 - **The correctness baseline only tightens.** `oracle-baseline.json` records
   every pinned file, its instruments and allowAbove reasons, and the layer of
   every test in a pinned file. Without regenerating it, pins and instruments
   may only grow, allowAbove may only shrink, and no correctness test may
-  move up a layer. Regenerating it changes the lock, so it needs the label.
+  move up a layer.
+- **The lock catches what the label misses locally.** `harness.lock.json` is
+  checked by the census and the tree-mode guard, so an edit made without
+  `oracle:update` fails `pnpm conformance` before it reaches a PR.
 - **Engine and oracle land separately.** A PR that touches
-  `packages/core-next/**` and any harness file (`vitest.config.ts`,
-  `helpers/`, `self/`, `lib/`, `scripts/`, `layers.rules.json`,
-  `aheadOfV1.json`, `tsconfig.json`, the lock or the baseline) fails, label or
-  not. Ported `tests/` may change alongside the engine.
+  `packages/core-next/**` and any of the package's harness files fails, label
+  or not. Ported `tests/` may change alongside the engine.
 
 To change the harness: edit, run `oracle:update`, run `pnpm conformance`,
 open the PR with the `oracle-change` label, and say in the description what
 the oracle now accepts that it did not before.
+
+## What main enforces today, and after the Phase 0 gate
+
+- **Today:** the `conformance` job runs on every push with
+  `continue-on-error: true`, so a red oracle is visible but does not block a
+  merge. The Oracle guard workflow runs on every PR but is not a required
+  check. Nothing here changes repository settings.
+- **At the Phase 0 gate (Jason's decision):** make `conformance` and
+  `Oracle guard` required status checks on main, decide whether
+  `enforce_admins` applies to them, and remove `continue-on-error` from the
+  `conformance` job (the TODO in ci.yml). Until then the guarantees above
+  hold only as far as people respect a red check.
 
 ## When it fails
 
@@ -101,13 +141,16 @@ the oracle now accepts that it did not before.
 | both fail | The port or the test is broken | Fix the original in core, re-port |
 | engine identity | A project resolves the wrong engine, or something mocks or wraps core | Fix `vitest.config.ts` or remove the mock |
 | census | The run skipped, filtered or dropped tests, the config changed, or a harness file differs from the lock | Undo the change, or make it deliberately (Changing the oracle) |
-| oracle-guard | The baseline loosened, the lock changed without the label, or engine and harness changed together | See Changing the oracle |
+| oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |
+| Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together | Label it if the change is deliberate; split engine and oracle PRs |
 
 ## The v1 pin rule
 
 - Each release moves the pin. The PR right after a release publishes bumps
-  the `directive-v1` alias in `package.json` to that version and empties
-  `aheadOfV1.json` of what it shipped. (Not the Version Packages PR itself:
+  the `directive-v1` alias in `package.json` to that version, runs
+  `pin:v1` (which downloads the tarball, checks it against the lockfile
+  integrity and records every file's hash in `v1-pin.json`) and empties
+  `aheadOfV1.json` of what it shipped. It carries the `oracle-change` label. (Not the Version Packages PR itself:
   the version must exist on npm before the frozen lockfile can pin it.)
 - `aheadOfV1.json` lists, by port path and test name, tests whose behaviour no
   release has shipped yet, each with a reason. No wildcards. v1 skips exactly

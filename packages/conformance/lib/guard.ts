@@ -6,8 +6,12 @@
  *    layer of every test in a pinned file. Without regenerating the baseline,
  *    pins and instruments may only grow, allowAbove may only shrink, and no
  *    pinned test may move to a higher layer.
- * 2. Regenerating the baseline or the harness lock needs the `oracle-change`
- *    label on the pull request.
+ * 2. A pull request that changes any harness file needs the `oracle-change`
+ *    label. The harness is the conformance package's own (lib/harness.ts,
+ *    including its lock and this baseline) plus what decides how it runs
+ *    from outside: the workflows, the root package.json, pnpm-workspace.yaml,
+ *    .npmrc, and the pnpm-lock.yaml entries that resolve directive-v1 and
+ *    vitest (lib/lockfile.ts).
  * 3. A pull request that touches packages/core-next may not also touch the
  *    harness: the oracle changes in its own pull request, never alongside the
  *    engine it judges.
@@ -15,7 +19,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LOCK_FILE, isHarnessPath } from "./harness.js";
+import { isHarnessPath } from "./harness.js";
+import { oracleLockHash } from "./lockfile.js";
 
 export const BASELINE_FILE = "oracle-baseline.json";
 export const LABEL = "oracle-change";
@@ -126,29 +131,55 @@ export function checkBaseline(conformanceRoot: string): string[] {
   return failures;
 }
 
-/** Pull-request rules over the changed paths (repo-relative) and labels. */
+/** Repo-level files that decide how the suite runs. */
+function isOutsideHarness(path: string): boolean {
+  return (
+    /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path) ||
+    path === "package.json" ||
+    path === "pnpm-workspace.yaml" ||
+    path === ".npmrc"
+  );
+}
+
+function isConformanceHarness(path: string): boolean {
+  return path.startsWith(PREFIX) && isHarnessPath(path.slice(PREFIX.length));
+}
+
+/**
+ * Pull-request rules over the changed paths (repo-relative), the labels, and
+ * pnpm-lock.yaml at the base and head when the PR changes it.
+ */
 export function checkPullRequest(
   changedFiles: string[],
   labels: string[],
+  lockfile?: { base: string; head: string },
 ): string[] {
   const failures: string[] = [];
-  const harness = changedFiles.filter(
-    (f) => f.startsWith(PREFIX) && isHarnessPath(f.slice(PREFIX.length)),
-  );
+  const conformance = changedFiles.filter(isConformanceHarness);
   const engine = changedFiles.filter((f) =>
     f.startsWith("packages/core-next/"),
   );
-  if (engine.length > 0 && harness.length > 0) {
+  if (engine.length > 0 && conformance.length > 0) {
     failures.push(
-      `this PR changes packages/core-next and the conformance harness (${harness.join(", ")}); land oracle changes in their own PR`,
+      `this PR changes packages/core-next and the conformance harness (${conformance.join(", ")}); land oracle changes in their own PR`,
     );
   }
-  const oracle = changedFiles.filter(
-    (f) => f === `${PREFIX}${LOCK_FILE}` || f === `${PREFIX}${BASELINE_FILE}`,
-  );
-  if (oracle.length > 0 && !labels.includes(LABEL)) {
+
+  const harness = [...conformance, ...changedFiles.filter(isOutsideHarness)];
+  if (changedFiles.includes("pnpm-lock.yaml")) {
+    if (!lockfile) {
+      failures.push(
+        "pnpm-lock.yaml changed but its base and head were not provided",
+      );
+    } else if (
+      oracleLockHash(lockfile.base) !== oracleLockHash(lockfile.head)
+    ) {
+      harness.push("pnpm-lock.yaml (directive-v1 / vitest entries)");
+    }
+  }
+  if (harness.length > 0 && !labels.includes(LABEL)) {
     failures.push(
-      `this PR changes ${oracle.join(", ")}; that changes the oracle and needs the ${LABEL} label`,
+      `this PR changes the oracle (${harness.join(", ")}) and needs the ${LABEL} label`,
     );
   }
 

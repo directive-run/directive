@@ -18,8 +18,13 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { check } from "../../lib/check.js";
+
+// Each case does seconds of synchronous work (a full re-classification).
+// Yield a macrotask after each, so vitest's worker RPC is answered between
+// cases instead of timing out behind a run of them.
+afterEach(() => new Promise<void>((resolve) => setImmediate(resolve)));
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 let copy: string;

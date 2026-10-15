@@ -269,7 +269,10 @@ export function census(
   const checkFiles = walk(join(conformanceRoot, "scripts/__tests__"))
     .filter((f) => f.endsWith(".test.ts"))
     .map((f) => relative(conformanceRoot, f));
-  const identityTests = coreEntries(repoRoot).length + 4;
+  // One per entry point, four shared, and the v1 tarball check on v1.
+  const identityTests = (project: string) =>
+    coreEntries(repoRoot).length +
+    (project.startsWith("conformance:v1") ? 5 : 4);
 
   const project = new Project({ useInMemoryFileSystem: true });
   const staticCount = (rel: string) =>
@@ -365,9 +368,9 @@ export function census(
           );
         }
       } else if (file.startsWith("self/")) {
-        if (names.length !== identityTests) {
+        if (names.length !== identityTests(name)) {
           fail(
-            `${name}: ${file} ran ${names.length} tests, expected ${identityTests}`,
+            `${name}: ${file} ran ${names.length} tests, expected ${identityTests(name)}`,
           );
         }
       } else if (name === CHECKS_PROJECT) {

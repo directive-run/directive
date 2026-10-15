@@ -16,6 +16,7 @@ const ROOT_FILES = [
   "package.json",
   "aheadOfV1.json",
   "oracle-baseline.json",
+  "v1-pin.json",
 ];
 
 /** Directories whose every file belongs to the harness. */

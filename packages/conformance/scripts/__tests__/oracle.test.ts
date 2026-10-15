@@ -18,7 +18,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   ALL_PROJECTS,
   CHECKS_PROJECT,
@@ -31,6 +31,12 @@ import {
 import { coreEntries } from "../../lib/core-entries.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
+import { checkV1Pin } from "../../lib/v1-pin.js";
+
+// Each case does seconds of synchronous work (a full re-classification).
+// Yield a macrotask after each, so vitest's worker RPC is answered between
+// cases instead of timing out behind a run of them.
+afterEach(() => new Promise<void>((resolve) => setImmediate(resolve)));
 
 const conformance = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const repoRoot = join(conformance, "../..");
@@ -73,7 +79,11 @@ function cleanReports(): Record<string, JsonReport> {
     file(
       "self/engine-identity.test.ts",
       Array.from(
-        { length: coreEntries().length + 4 },
+        {
+          length:
+            coreEntries().length +
+            (engine.startsWith("conformance:v1") ? 5 : 4),
+        },
         (_, i) => `engine identity (${engine}) > case ${i}`,
       ),
     );
@@ -324,6 +334,7 @@ describe("the harness lock", () => {
       "package.json",
       "aheadOfV1.json",
       "oracle-baseline.json",
+      "v1-pin.json",
       "harness.lock.json",
     ]) {
       cpSync(join(conformance, f), join(copy, f), { recursive: true });
@@ -489,17 +500,86 @@ describe("the oracle guard", () => {
     ).toBe("");
   });
 
-  it("needs the label to change the baseline or the lock", () => {
-    const changed = ["packages/conformance/harness.lock.json"];
-    expect(checkPullRequest(changed, []).join("\n")).toMatch(
-      /needs the oracle-change label/,
-    );
-    expect(checkPullRequest(changed, ["oracle-change"])).toEqual([]);
+  it("needs the label for any harness change, lock untouched or not", () => {
+    for (const path of [
+      // The reviewer's attack: a stubbed census and a swap setup file, with
+      // the lock left alone.
+      "packages/conformance/scripts/census.ts",
+      "packages/conformance/helpers/zz-setup.ts",
+      "packages/conformance/harness.lock.json",
+      "packages/conformance/oracle-baseline.json",
+      "packages/conformance/layers.rules.json",
+      "packages/conformance/v1-pin.json",
+      ".github/workflows/ci.yml",
+      ".github/workflows/oracle-guard.yml",
+      "package.json",
+      "pnpm-workspace.yaml",
+      ".npmrc",
+    ]) {
+      expect(checkPullRequest([path], []).join("\n"), path).toMatch(
+        /needs the oracle-change label/,
+      );
+      expect(checkPullRequest([path], ["oracle-change"]), path).toEqual([]);
+    }
+  });
+
+  it("does not need the label for ports, docs or other packages", () => {
     expect(
-      checkPullRequest(["packages/conformance/oracle-baseline.json"], []).join(
-        "\n",
+      checkPullRequest(
+        [
+          "packages/conformance/tests/core/clock.test.ts",
+          "packages/conformance/README.md",
+          "packages/conformance/layers.json",
+          "packages/core/src/core/engine.ts",
+          "packages/react/package.json",
+        ],
+        [],
       ),
-    ).toMatch(/needs the oracle-change label/);
+    ).toEqual([]);
+  });
+
+  describe("pnpm-lock.yaml", () => {
+    const base = readFileSync(join(repoRoot, "pnpm-lock.yaml"), "utf8");
+    const changed = ["pnpm-lock.yaml"];
+    const edit = (from: string, to: string) => {
+      const head = base.replace(from, to);
+      expect(head).not.toBe(base);
+
+      return checkPullRequest(changed, [], { base, head }).join("\n");
+    };
+
+    it("needs the label when the release the alias resolves changes", () => {
+      expect(
+        edit(
+          "  '@directive-run/core@1.35.0':\n    resolution: {integrity: sha512-",
+          "  '@directive-run/core@1.35.0':\n    resolution: {integrity: sha512-X",
+        ),
+      ).toMatch(/pnpm-lock\.yaml \(directive-v1 \/ vitest entries\)/);
+    });
+
+    it("needs the label when vitest moves", () => {
+      expect(edit("\n  vitest@3.2.7:\n", "\n  vitest@3.2.8:\n")).toMatch(
+        /needs the oracle-change label/,
+      );
+    });
+
+    it("needs the label for an override", () => {
+      expect(
+        edit(
+          "\nimporters:\n",
+          "\noverrides:\n  '@directive-run/core': 1.34.1\n\nimporters:\n",
+        ),
+      ).toMatch(/needs the oracle-change label/);
+    });
+
+    it("does not need it for an unrelated package", () => {
+      expect(
+        edit(
+          "  '@emnapi/runtime@1.11.3':\n    resolution: {integrity: sha512-",
+          "  '@emnapi/runtime@1.11.3':\n    resolution: {integrity: sha512-X",
+        ),
+      ).toBe("");
+    });
   });
 
   it("keeps engine and oracle changes in separate PRs, label or not", () => {
@@ -527,5 +607,69 @@ describe("the oracle guard", () => {
         [],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("the v1 pin", () => {
+  let copy: string;
+  const pin = () => readJson(join(conformance, "v1-pin.json"));
+  const lockfile = readFileSync(join(repoRoot, "pnpm-lock.yaml"), "utf8");
+  beforeAll(() => {
+    copy = mkdtempSync(join(tmpdir(), "conformance-v1-"));
+    cpSync(join(conformance, "node_modules/directive-v1"), copy, {
+      recursive: true,
+      dereference: true,
+    });
+  });
+  afterAll(() => rmSync(copy, { recursive: true, force: true }));
+  const check = (overrides: Partial<Parameters<typeof checkV1Pin>[0]> = {}) =>
+    checkV1Pin({
+      pin: pin(),
+      pinnedVersion: pin().version,
+      lockfile,
+      packageDir: copy,
+      ...overrides,
+    }).join("\n");
+
+  it("accepts the installed release", () => {
+    expect(check()).toBe("");
+  });
+
+  it("rejects a patched file", () => {
+    const file = join(copy, "dist/development/index.js");
+    const before = readFileSync(file, "utf8");
+    writeFileSync(file, `${before}\n// patched\n`);
+    try {
+      expect(check()).toMatch(
+        /dist\/development\/index\.js differs from the npm tarball/,
+      );
+    } finally {
+      writeFileSync(file, before);
+    }
+  });
+
+  it("rejects an added file", () => {
+    const file = join(copy, "dist/extra.js");
+    writeFileSync(file, "export {};\n");
+    try {
+      expect(check()).toMatch(/dist\/extra\.js is not in the npm tarball/);
+    } finally {
+      rmSync(file);
+    }
+  });
+
+  it("rejects a lockfile that resolves a different tarball", () => {
+    expect(
+      check({
+        lockfile: lockfile.replace(
+          "  '@directive-run/core@1.35.0':\n    resolution: {integrity: sha512-",
+          "  '@directive-run/core@1.35.0':\n    resolution: {integrity: sha512-X",
+        ),
+      }),
+    ).toMatch(/pnpm-lock\.yaml records sha512-X/);
+  });
+
+  it("rejects an alias moved without re-pinning", () => {
+    expect(check({ pinnedVersion: "1.36.0" })).toMatch(/run pin:v1/);
   });
 });

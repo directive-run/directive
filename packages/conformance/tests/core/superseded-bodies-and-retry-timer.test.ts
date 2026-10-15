@@ -17,9 +17,11 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createModule, createSystem, t } from "@directive-run/core";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Drive fake time forward, running every timer and microtask it releases. */
+const advance = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 const here = dirname(fileURLToPath(import.meta.url));
 
 function loadSystem(
@@ -64,6 +66,15 @@ function loadSystem(
 }
 
 describe("late writes from runs no longer in flight still land", () => {
+  // Fake timers: the cases race resolver bodies against timeouts by a few
+  // milliseconds, which real timers lose under load.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("a timed-out run's late write lands after its replacement (K2, resolver's job to guard)", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     let n = 0;
@@ -77,11 +88,11 @@ describe("late writes from runs no longer in flight still land", () => {
       },
     });
     system.facts.go = true;
-    await sleep(20);
+    await advance(20);
     system.facts.done = false;
-    await sleep(20);
+    await advance(20);
     expect(system.facts.data).toBe("r2");
-    await sleep(60);
+    await advance(60);
     // Run 1 timed out and left; its late write lands. Guard with
     // context.signal.aborted (it is aborted) or abortOn.
     expect(system.facts.data).toBe("r1");
@@ -102,11 +113,11 @@ describe("late writes from runs no longer in flight still land", () => {
       { when: (facts: any) => facts.go, abortOn: ["status"] },
     );
     system.facts.go = true;
-    await sleep(5);
+    await advance(5);
     system.facts.go = false;
-    await sleep(5);
+    await advance(5);
     system.facts.go = true;
-    await sleep(60);
+    await advance(60);
     expect(system.facts.log).toEqual([2, 1]);
     expect(n).toBe(2);
     system.destroy();
@@ -128,11 +139,11 @@ describe("late writes from runs no longer in flight still land", () => {
       { when: (facts: any) => facts.go, abortOn: ["status"] },
     );
     system.facts.go = true;
-    await sleep(5);
+    await advance(5);
     system.facts.go = false;
-    await sleep(5);
+    await advance(5);
     system.facts.go = true;
-    await sleep(60);
+    await advance(60);
     expect(system.facts.data).toBe("won-by-1");
     system.destroy();
   });
@@ -165,11 +176,11 @@ describe("late writes from runs no longer in flight still land", () => {
   it("canceled, re-dispatched, new run guarded on loading: the old finally lands (M2)", async () => {
     const { system, runs } = guardedOnLoading();
     system.facts.go = true;
-    await sleep(2);
+    await advance(2);
     system.facts.go = false;
-    await sleep(2);
+    await advance(2);
     system.facts.go = true;
-    await sleep(60);
+    await advance(60);
     expect(system.facts.loading).toBe(false);
     expect(system.facts.data).toBe("d1");
     expect(runs()).toBe(2);
@@ -180,11 +191,11 @@ describe("late writes from runs no longer in flight still land", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const { system, runs } = guardedOnLoading({ timeout: 5 });
     system.facts.go = true;
-    await sleep(10);
+    await advance(10);
     system.facts.go = false;
-    await sleep(0);
+    await advance(0);
     system.facts.go = true;
-    await sleep(60);
+    await advance(60);
     expect(system.facts.loading).toBe(false);
     expect(system.facts.data).toBe("d1");
     expect(runs()).toBe(2);
