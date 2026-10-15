@@ -1065,6 +1065,25 @@ importers:
         specifier: ^3.2.6
         version: 3.2.7(@types/node@25.9.5)(happy-dom@20.11.2)(lightningcss@1.31.1)(sass@1.51.0)
 
+  packages/conformance:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      directive-v1:
+        specifier: npm:@directive-run/core@1.35.0
+        version: '@directive-run/core@1.35.0'
+      ts-morph:
+        specifier: ^27.0.2
+        version: 27.0.2
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.12
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.7(@types/node@26.2.0)(happy-dom@20.11.2)(lightningcss@1.31.1)(sass@1.51.0)
+
   packages/core:
     devDependencies:
       '@types/node':
@@ -1786,6 +1805,10 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@directive-run/core@1.35.0':
+    resolution: {integrity: sha512-r7VqLOw8QLNZTyFiBlCHSnjkyP2nOxinjCwsvm0MgA3SMq4KPyi6d04o7VbVjXZGDG6aa/WYETsZr3hll47ALg==}
+    engines: {node: '>=18'}
 
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
@@ -5762,6 +5785,8 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@directive-run/core@1.35.0': {}
 
   '@emnapi/runtime@1.11.3':
     dependencies:
