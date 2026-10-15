@@ -29,7 +29,10 @@ const layers = read("layers.json").files as Record<
   { category: string; tests: Record<string, TestLayer> }
 >;
 const current = read("layers.rules.json").current as string | null;
-const ahead = read("aheadOfV1.json").tests as Record<string, string[] | "*">;
+const ahead = read("aheadOfV1.json").tests as Record<
+  string,
+  Record<string, string>
+>;
 
 const index = (layer: string) => Number(layer.slice(1));
 
@@ -88,8 +91,8 @@ beforeEach((ctx) => {
 
   const which = engine();
   if (which === "v1") {
-    const skip = ahead[file];
-    if (skip === "*" || skip?.includes(name)) {
+    // One entry per test, with a reason; the census rejects anything else.
+    if (Object.hasOwn(ahead[file] ?? {}, name)) {
       ctx.skip();
     }
   } else if (which === "v2") {

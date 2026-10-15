@@ -14,7 +14,8 @@
  *    - assertions: every `expect`/`assert` call of the original, verbatim.
  * 4. Pinned correctness files: no test above its rule except through a
  *    feature listed in `allowAbove`.
- * 5. tsconfig.json paths map exactly core's entry points to their sources.
+ * 5. tsconfig.json is exactly the expected file: full include, core paths
+ *    to their sources, strict from the base config.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -305,28 +306,37 @@ export function check(repoRoot: string): CheckResult {
     }
   }
 
-  // 5. The typecheck resolves core exactly as the published entry points.
-  const tsconfig = readJson(join(conformanceRoot, "tsconfig.json")) as
-    | { compilerOptions?: { paths?: Record<string, string[]> } }
+  // 5. The typecheck covers the whole suite and resolves core exactly as the
+  // published entry points. The whole file is compared, so an `exclude`, a
+  // narrowed `include` or a relaxed `strict` fails as surely as a bad path.
+  const tsconfig = readJson(join(conformanceRoot, "tsconfig.json"));
+  const want = {
+    extends: "../../tsconfig.base.json",
+    compilerOptions: {
+      noEmit: true,
+      declaration: false,
+      declarationMap: false,
+      sourceMap: false,
+      noUnusedLocals: false,
+      types: ["node"],
+      paths: Object.fromEntries(
+        coreEntries(repoRoot).map((e) => [
+          e.specifier,
+          [relative(conformanceRoot, e.file)],
+        ]),
+      ),
+    },
+    include: ["tests", "self", "helpers", "lib", "scripts", "vitest.config.ts"],
+  };
+  if (!sameJson(tsconfig, want)) {
+    fail(`tsconfig.json must be exactly ${JSON.stringify(want)}`);
+  }
+  const base = readJson(join(repoRoot, "tsconfig.base.json")) as
+    | { compilerOptions?: { strict?: boolean } }
     | undefined;
-  const paths = tsconfig?.compilerOptions?.paths ?? {};
-  const want = Object.fromEntries(
-    coreEntries(repoRoot).map((e) => [
-      e.specifier,
-      [relative(conformanceRoot, e.file)],
-    ]),
-  );
-  if (!sameJson(sortKeys(paths), sortKeys(want))) {
-    fail(
-      `tsconfig.json paths must map core's entry points to their sources: ${JSON.stringify(want)}`,
-    );
+  if (base?.compilerOptions?.strict !== true) {
+    fail("tsconfig.base.json must keep strict: true");
   }
 
   return { failures, files, assertions: assertionCount };
-}
-
-function sortKeys(o: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(o).sort(([a], [b]) => a.localeCompare(b)),
-  );
 }

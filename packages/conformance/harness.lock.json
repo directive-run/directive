@@ -1,0 +1,31 @@
+{
+  "$comment": "sha256 of every harness file (lib/harness.ts). Regenerate with `pnpm --filter @directive-run/conformance oracle:update`; a PR that changes this file needs the oracle-change label.",
+  "files": {
+    "aheadOfV1.json": "908c4c52eb380fd335000c7bf01fcf13c56025a092ea00f8da2094a1b60c2d49",
+    "helpers/engine.ts": "d18e0f01d1c8d743c9ab75a9cad3ad9fd8e695657a77e3fa1a0670420b487505",
+    "helpers/layer-gate.ts": "bb30ae05e31250686550f1936bd0700c5a1ac1f97b7ad9df62d9fe4f5f73fe92",
+    "lib/census.ts": "036cbeec64fc29c11b95296053e9e9de361c3cbddcb6cb71496f309932358a66",
+    "lib/check.ts": "e3b5a5cdf4d173ea80315f855c437b20c9a6e4749bc0354fb985c1a10fd0e4be",
+    "lib/classify.ts": "c6954bf97157f5c0c759960e4fe548ef724bea28464cb0596f9095a827d7bbdc",
+    "lib/core-entries.ts": "01dc2a712a41ba6165770a22ab6699337dc9810c0d0c21e0a430ac115582c053",
+    "lib/guard.ts": "964ea6d693447a875842661efe5a63977a538f1edba23e94dce50add8535247d",
+    "lib/harness.ts": "ffb5d72b375aa7de0ed128b5a892da97364cf661000902b851b3ea4fd2313c67",
+    "lib/imports.ts": "2f8d9b61feffa72e85bb8a90b6ea73dadac33ea5edc240f76b627f5d0d73ca19",
+    "lib/layers.ts": "b5110fb1fce6b14f20ff3557754a03b601df87f8e6dc15c7add22432a5909a3a",
+    "lib/rewrites.ts": "dfc048b56b9a61de160b3f79e7fec572adf4dab3174d37dc629241c3751ac95d",
+    "lib/tests.ts": "4e46d4d3bcb8e1dc13ba0fd96fd7cb0625c97f3639ab2845dfd7e47a8eb7d789",
+    "oracle-baseline.json": "62611ad847a2b9c16a754cfad7838faee4506d6fa02d6dd3fdf789ee56846a6a",
+    "package.json": "e9441a180be152bac08a5ebd0861ca47897e683ea63e0409936f1f856fbb1b8f",
+    "scripts/__tests__/check.test.ts": "e64fca25d87331f2da83a8f8a420191716e0bc230e1aabe072ed55b838e910e6",
+    "scripts/__tests__/engine-swap.test.ts": "38752365cbcd54ce7f6d0d3187631cf5cc32e41d71819e7993186d08cd165b03",
+    "scripts/__tests__/oracle.test.ts": "58c1eb53e5d80e401c79eade305e8281801017c1e0a3804e8c79ba162a47bb23",
+    "scripts/census.ts": "eb69abaf7c1bff491dc07cae414a961eb8f04c6a10b238183aacddc54abccc15",
+    "scripts/check-expects.ts": "b3c3d909d7175f9d69f28cd6375013b4a740f25e483f3e28d398458aef3952d1",
+    "scripts/oracle-guard.ts": "d01abd7476c0a9868d4a81f8d5d38f76dbf33e8d3611c23559f89cf7705f8a53",
+    "scripts/oracle-update.ts": "de4dec0b59240ccef6f117479ea542fd33e32b5c15da4f838aed7cbea338ad5e",
+    "scripts/port.ts": "4db287d40ac72b44fe0bcf17475ba56df7c1ffcb3ed870e5a7a7c4b32a2dbd8a",
+    "self/engine-identity.test.ts": "e701cfad9ac1123955155d70dc2344473ed81595c482509a9e9e1bef45a5c72d",
+    "tsconfig.json": "56575d872896cc88f12ec4bde9ff3cab9c9dc2caeb646eb87e15d92678623d88",
+    "vitest.config.ts": "47232a1ae46e16cafb0507db821e5524fa3087a26eb672b6d7634fc38e15c880"
+  }
+}

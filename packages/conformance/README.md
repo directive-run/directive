@@ -12,9 +12,10 @@ than one engine:
 
 ```bash
 pnpm --filter @directive-run/core build          # two tests use the built package
-pnpm conformance                                 # check-expects, then every project
+pnpm conformance                                 # check-expects, census, oracle guard
 pnpm --filter @directive-run/conformance typecheck
 pnpm --filter @directive-run/conformance port    # re-copy after core's tests change
+pnpm --filter @directive-run/conformance oracle:update  # after changing the harness
 ```
 
 ## What each piece does
@@ -30,6 +31,19 @@ pnpm --filter @directive-run/conformance port    # re-copy after core's tests ch
 - `self/engine-identity.test.ts` runs in every engine project and proves the
   project loads the engine it claims (the pinned npm version, or the
   workspace source), for every entry point.
+- `scripts/census.ts` (`lib/census.ts`) runs every project with a JSON
+  reporter and proves the run was complete: the vitest config is exactly the
+  expected one (projects, includes, setup file, aliases, nothing extra);
+  every port ran in every engine project; nothing was skipped except the
+  `aheadOfV1.json` tests on v1; nothing is todo; every named test ran; v1
+  and local ran the same tests; the self and tamper tests ran in full. It
+  also verifies `harness.lock.json`.
+- `harness.lock.json` pins the sha256 of every harness file (config, helpers,
+  self tests, lib, scripts, tsconfig, package.json, `aheadOfV1.json`,
+  `oracle-baseline.json`). Any harness edit needs `oracle:update`, and a PR
+  that changes the lock needs the `oracle-change` label.
+- `scripts/oracle-guard.ts` (`lib/guard.ts`) enforces the rules for changing
+  the oracle, below.
 - `tsconfig.json` typechecks the ports against workspace source, so ported
   `expectTypeOf` and `@ts-expect-error` lines are enforced. `noUnusedLocals`
   is off: a declared rewrite can leave an original's helper unused.
@@ -51,6 +65,30 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
 - Files in the `internals` category are skipped on v2 until WHITE-BOX.md
   triage moves them out. On v2, tests above `current` are skipped too.
 
+## Changing the oracle
+
+The harness and the correctness baseline are the oracle. Changing them is a
+deliberate act, made visible on the pull request:
+
+- **`oracle-change` label.** A PR that changes `harness.lock.json` or
+  `oracle-baseline.json` fails the `oracle-guard` CI job unless it carries
+  the label. CI reads the labels from the pull_request event payload;
+  adding or removing the label re-runs the job.
+- **The correctness baseline only tightens.** `oracle-baseline.json` records
+  every pinned file, its instruments and allowAbove reasons, and the layer of
+  every test in a pinned file. Without regenerating it, pins and instruments
+  may only grow, allowAbove may only shrink, and no correctness test may
+  move up a layer. Regenerating it changes the lock, so it needs the label.
+- **Engine and oracle land separately.** A PR that touches
+  `packages/core-next/**` and any harness file (`vitest.config.ts`,
+  `helpers/`, `self/`, `lib/`, `scripts/`, `layers.rules.json`,
+  `aheadOfV1.json`, `tsconfig.json`, the lock or the baseline) fails, label or
+  not. Ported `tests/` may change alongside the engine.
+
+To change the harness: edit, run `oracle:update`, run `pnpm conformance`,
+open the PR with the `oracle-change` label, and say in the description what
+the oracle now accepts that it did not before.
+
 ## When it fails
 
 | What fails | What it means | What to do |
@@ -61,7 +99,9 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
 | local fails, v1 passes | A 1.x regression in the workspace | Fix core |
 | v1 fails on a newly ported test, local passes | The behaviour is in the workspace but not in a release | Add the test to `aheadOfV1.json` (pin it behind) |
 | both fail | The port or the test is broken | Fix the original in core, re-port |
-| engine identity | A project resolves the wrong engine | Fix `vitest.config.ts` |
+| engine identity | A project resolves the wrong engine, or something mocks or wraps core | Fix `vitest.config.ts` or remove the mock |
+| census | The run skipped, filtered or dropped tests, the config changed, or a harness file differs from the lock | Undo the change, or make it deliberately (Changing the oracle) |
+| oracle-guard | The baseline loosened, the lock changed without the label, or engine and harness changed together | See Changing the oracle |
 
 ## The v1 pin rule
 
@@ -70,6 +110,8 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
   `aheadOfV1.json` of what it shipped. (Not the Version Packages PR itself:
   the version must exist on npm before the frozen lockfile can pin it.)
 - `aheadOfV1.json` lists, by port path and test name, tests whose behaviour no
-  release has shipped yet. v1 skips them; local still runs them.
+  release has shipped yet, each with a reason. No wildcards. v1 skips exactly
+  these (the census fails if one passes or anything else is skipped); local
+  still runs them. It is a harness file, so changes carry the label.
 
 Never published. Do not edit `tests/` or `layers.json` by hand.

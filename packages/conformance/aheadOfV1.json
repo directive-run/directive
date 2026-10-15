@@ -1,4 +1,4 @@
 {
-  "$comment": "Ported tests whose behaviour is in the workspace but in no release yet. conformance:v1 skips them; keyed by port path, then test name as layers.json spells it, or \"*\" for the whole file. Empty it in the release PR that bumps the directive-v1 alias past the change. See README: the v1-pin rule.",
+  "$comment": "Ported tests whose behaviour is in the workspace but in no release yet. conformance:v1 skips exactly these; the census fails if v1 skips anything else or if one of these passes. Shape: { port path: { test name as layers.json spells it: reason } }. No wildcards. Editing this file changes the harness lock, so a PR needs the oracle-change label. See README: the v1 pin rule.",
   "tests": {}
 }

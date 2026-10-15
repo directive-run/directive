@@ -11,6 +11,9 @@
     "test:v1": "vitest run --config vitest.config.ts --project conformance:v1 --project conformance:v1:prod",
     "test:local": "vitest run --config vitest.config.ts --project conformance:local --project conformance:local:prod",
     "test:checks": "vitest run --config vitest.config.ts --project conformance:checks",
+    "census": "tsx scripts/census.ts",
+    "oracle:guard": "tsx scripts/oracle-guard.ts",
+    "oracle:update": "tsx scripts/oracle-update.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

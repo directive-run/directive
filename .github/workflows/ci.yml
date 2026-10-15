@@ -8,6 +8,9 @@ name: CI
 on:
   push:
   pull_request:
+    # labeled/unlabeled re-run the oracle guard when `oracle-change` is
+    # added or removed; the other jobs skip same-repo pull requests anyway.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 # A branch push and its pull request would otherwise both fire for the same
 # commit. Same-repo work is covered by `push`; `pull_request` is left to do
@@ -115,10 +118,42 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # One test spawns a child process that imports the engine's built entry.
+      # Two tests use the built package: one imports the engine's ESM entry
+      # in a child process, one typechecks against its declarations.
       - run: pnpm --filter @directive-run/core build
 
-      - run: pnpm conformance
+      # Three independent steps. check-expects proves the ports are faithful;
+      # the census runs every project and proves the run was complete (and
+      # verifies the harness lock, so a neutered check-expects is caught);
+      # the guard proves the correctness baseline only tightened.
+      - run: pnpm --filter @directive-run/conformance check:expects
+      - run: pnpm --filter @directive-run/conformance census
+      - run: pnpm --filter @directive-run/conformance oracle:guard
+
+  # Pull requests only, including same-repo ones: reads the PR's labels and
+  # changed files from the event payload. Changing harness.lock.json or
+  # oracle-baseline.json needs the `oracle-change` label; touching
+  # packages/core-next together with the conformance harness always fails.
+  oracle-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The guard diffs the PR's base and head commits.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @directive-run/conformance oracle:guard
 
   e2e:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
