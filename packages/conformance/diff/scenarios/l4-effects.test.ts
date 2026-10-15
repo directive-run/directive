@@ -1,9 +1,8 @@
 /** L4: effects — deps, prev, cleanup, auto-tracking and errors. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L4 effects", () => {
+suite("L4 effects", () => {
   scenario(
     "effects: deps, prev, cleanup and auto-tracking",
     ({ core: { createModule, t }, external }) => ({

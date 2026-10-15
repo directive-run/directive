@@ -10,8 +10,10 @@
  * - object keys are sorted, so key order never decides equality (Map and
  *   Set keep insertion order, which is observable);
  * - `undefined`, `NaN`, `±Infinity`, `-0` and bigints get tagged forms;
- * - an Error becomes `{ name, message, code }` — never its stack, which
- *   names the file it was thrown from and so differs between engines;
+ * - an Error becomes `{ $error: { name, message, ...every own property } }`
+ *   (a DirectiveError's source, sourceId, context, recoverable; `cause`,
+ *   recursively) — never its stack, which names the file it was thrown
+ *   from and so differs between engines;
  * - a function becomes `{ $fn: true }` — never its name, which a bundler
  *   may rename (`createSystem2`);
  * - Date, Map, Set, typed arrays and class instances get tagged forms;
@@ -34,16 +36,33 @@ export interface NormalizeOptions {
   markers?: Map<object, string>;
 }
 
-function errorFields(error: Error): Json {
-  const code = (error as { code?: unknown }).code;
-
-  return {
-    $error: {
-      name: error.name,
-      message: error.message,
-      code: typeof code === "string" || typeof code === "number" ? code : null,
-    },
+/**
+ * An error's name, message and every own property but `stack` — so a
+ * DirectiveError's source, sourceId, context, recoverable and a `cause`
+ * chain are all compared — walked like any other value (cycle-safe).
+ */
+function errorFields(
+  error: Error,
+  walk: (v: unknown) => Json,
+): Record<string, Json> {
+  const out: Record<string, Json> = {
+    name: error.name,
+    message: error.message,
   };
+  for (const key of Object.getOwnPropertyNames(error).sort()) {
+    if (key === "stack" || key === "name" || key === "message") {
+      continue;
+    }
+    let value: unknown;
+    try {
+      value = (error as unknown as Record<string, unknown>)[key];
+    } catch (thrown) {
+      value = { $throws: String(thrown) };
+    }
+    out[key] = walk(value);
+  }
+
+  return out;
 }
 
 export function normalize(value: unknown, options: NormalizeOptions = {}) {
@@ -92,7 +111,7 @@ export function normalize(value: unknown, options: NormalizeOptions = {}) {
     stack.add(obj);
     try {
       if (obj instanceof Error) {
-        return errorFields(obj);
+        return { $error: errorFields(obj, (v) => walk(v, depth + 1)) };
       }
       if (obj instanceof Date) {
         return {

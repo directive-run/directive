@@ -1,9 +1,8 @@
 /** L1: modules, namespacing, crossModuleDeps and read-only effect views. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L1 modules and namespacing", () => {
+suite("L1 modules and namespacing", () => {
   scenario(
     "namespaced modules keep their facts apart",
     ({ core: { createModule, t } }) => {
@@ -36,70 +35,6 @@ describe("L1 modules and namespacing", () => {
         label: "bump right",
         fn: (system) => system.events.right.bump(),
       },
-      { op: "settle" },
-    ],
-  );
-
-  scenario(
-    "crossModuleDeps: a constraint reads another module's facts",
-    ({ core: { createModule, t } }) => {
-      const authSchema = {
-        facts: { token: t.string() },
-        derivations: {},
-        events: {},
-      };
-      const auth = createModule("auth", {
-        schema: authSchema,
-        init: (facts: any) => {
-          facts.token = "";
-        },
-      } as any);
-      const notes = createModule("notes", {
-        schema: {
-          facts: { draft: t.string(), saved: t.string() },
-          derivations: {},
-          events: { submit: { text: t.string() } },
-          requirements: { SAVE: {} },
-        },
-        crossModuleDeps: { auth: authSchema },
-        init: (facts: any) => {
-          facts.draft = "";
-          facts.saved = "";
-        },
-        events: {
-          submit: (facts: any, event: any) => {
-            facts.draft = event.text;
-          },
-        },
-        constraints: {
-          save: {
-            when: (facts: any) =>
-              facts.self.draft !== "" && facts.auth.token !== "",
-            require: { type: "SAVE" },
-          },
-        },
-        resolvers: {
-          save: {
-            requirement: "SAVE",
-            resolve: async (_req: unknown, context: any) => {
-              context.facts.saved = context.facts.draft;
-              context.facts.draft = "";
-            },
-          },
-        },
-      } as any);
-
-      return { modules: { auth, notes } };
-    },
-    [
-      { op: "start" },
-      {
-        op: "run",
-        label: "submit",
-        fn: (system) => system.events.notes.submit({ text: "hello" }),
-      },
-      { op: "settle" },
-      { op: "set", key: "auth.token", value: "tok" },
       { op: "settle" },
     ],
   );

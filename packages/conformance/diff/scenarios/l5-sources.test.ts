@@ -1,9 +1,8 @@
 /** L5: sources — attach, publish, gates, drops and detach. */
 
-import { describe } from "vitest";
-import { scenario } from "../scenario.js";
+import { scenario, suite } from "../scenario.js";
 
-describe("L5 sources", () => {
+suite("L5 sources", () => {
   scenario(
     "sources: attach, publish, active gate and detach",
     ({ core: { createModule, t }, external, handles }) => ({

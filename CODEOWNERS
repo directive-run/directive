@@ -6,3 +6,10 @@
 # owners listed below.
 
 * @jasoncomes
+
+# The 2.0 oracle's approved engine differences and the trace contract.
+# Every entry in divergences.json is Jason's sign-off; agents never add one
+# (packages/conformance/README.md, "Divergences" and "What the trace freezes").
+/packages/conformance/diff/divergences.json @jasoncomes
+/packages/conformance/diff/compare.ts @jasoncomes
+/packages/conformance/diff/unfired-hooks.json @jasoncomes

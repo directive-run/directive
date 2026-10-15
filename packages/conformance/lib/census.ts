@@ -23,9 +23,13 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { Project } from "ts-morph";
+import { Node, Project } from "ts-morph";
 import { coreEntries } from "./core-entries.js";
+import { FUZZ_FLOOR as FLOOR } from "./fuzz.js";
 import { staticTests } from "./tests.js";
+
+/** The fewest fuzz cases a differential run may execute (lib/fuzz.ts). */
+export const FUZZ_FLOOR = FLOOR;
 
 export const ENGINE_PROJECTS = [
   "conformance:v1",
@@ -476,10 +480,41 @@ export function diffTestFiles(conformanceRoot: string): string[] {
 
 const LAYER = /^L(?:[0-9]|1[0-3])$/;
 
+/** Every `scenario(title, …)` title in diff/, with its file. */
+export function scenarioTitles(
+  conformanceRoot: string,
+): Array<{ file: string; title: string; dynamic: boolean }> {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const out: Array<{ file: string; title: string; dynamic: boolean }> = [];
+  for (const file of diffTestFiles(conformanceRoot)) {
+    const sf = project.createSourceFile(
+      `/${file}`,
+      readFileSync(join(conformanceRoot, file), "utf8"),
+      { overwrite: true },
+    );
+    for (const t of staticTests(sf, ["scenario"])) {
+      const title = t.call.getArguments()[0];
+      const literal =
+        title &&
+        (Node.isStringLiteral(title) ||
+          Node.isNoSubstitutionTemplateLiteral(title));
+      out.push({
+        file,
+        title: literal ? title.getLiteralText() : (title?.getText() ?? ""),
+        dynamic: !literal,
+      });
+    }
+  }
+
+  return out;
+}
+
 /**
- * layers.rules.json `scenarios`: every differential scenario and fuzz file
- * has a layer, so a v2 run can skip what is above `current`. The harness's
- * own self tests (diff/self/) always run and take no layer.
+ * layers.rules.json `scenarios`: every differential scenario, by its title,
+ * has a layer, so a v2 run can skip what is above `current`. Titles are
+ * unique (a scenario's name is its key in divergences too). The fuzzer
+ * places each generated case by the features it uses; diff/self/ always
+ * runs.
  */
 export function checkScenarioLayers(conformanceRoot: string): string[] {
   const failures: string[] = [];
@@ -487,21 +522,28 @@ export function checkScenarioLayers(conformanceRoot: string): string[] {
     join(conformanceRoot, "layers.rules.json"),
   );
   const placed = rules.scenarios ?? {};
-  const files = diffTestFiles(conformanceRoot).filter(
-    (f) => !f.startsWith("diff/self/"),
-  );
-  for (const file of files) {
-    const layer = placed[file];
+  const titles = scenarioTitles(conformanceRoot);
+  const seen = new Set<string>();
+  for (const { file, title, dynamic } of titles) {
+    if (dynamic) {
+      failures.push(`${file}: scenario ${title} needs a literal title`);
+      continue;
+    }
+    if (seen.has(title)) {
+      failures.push(`${file}: scenario title "${title}" is used twice`);
+    }
+    seen.add(title);
+    const layer = placed[title];
     if (typeof layer !== "string" || !LAYER.test(layer)) {
       failures.push(
-        `layers.rules.json: scenario file ${file} needs a layer (L0–L13) in \`scenarios\``,
+        `layers.rules.json: scenario "${title}" (${file}) needs a layer (L0–L13) in \`scenarios\``,
       );
     }
   }
-  for (const file of Object.keys(placed)) {
-    if (!files.includes(file)) {
+  for (const title of Object.keys(placed)) {
+    if (!seen.has(title)) {
       failures.push(
-        `layers.rules.json: \`scenarios\` names ${file}, which is not a scenario file`,
+        `layers.rules.json: \`scenarios\` names "${title}", which is not a scenario`,
       );
     }
   }
@@ -512,27 +554,46 @@ export function checkScenarioLayers(conformanceRoot: string): string[] {
 export interface DivergenceEntry {
   id: string;
   scenario: string;
-  path: string;
+  stream: string;
+  kind: string;
+  engine?: string;
+  step?: number;
+  op?: string;
+  path?: string;
   reason: string;
   approvedBy: string;
   date: string;
 }
 
-const DIVERGENCE_KEYS = [
+const DIVERGENCE_REQUIRED = [
   "approvedBy",
   "date",
   "id",
-  "path",
+  "kind",
   "reason",
   "scenario",
+  "stream",
+];
+const DIVERGENCE_OPTIONAL = ["engine", "op", "path", "step"];
+const STREAMS = [
+  "hook",
+  "observe",
+  "notify",
+  "console",
+  "error",
+  "external",
+  "state",
+  "timers",
 ];
 
 /**
  * diff/divergences.json: each entry is an intended difference between the
- * engines, signed off by a person (Jason — never an agent). `used` is the
- * set of ids the run reported covering at least one difference, or null
- * when not known: an entry that covers nothing is stale and fails, so the
- * file can only describe differences that still exist.
+ * engines, signed off by a person (Jason — never an agent), keyed by what
+ * differs (scenario, stream, kind; optionally engine, step, op, path) and
+ * never by trace index. `used` is the set of ids the run reported covering
+ * at least one difference, or null when not known: an entry that covers
+ * nothing is stale and fails, so the file can only describe differences
+ * that still exist.
  */
 export function checkDivergences(
   conformanceRoot: string,
@@ -553,8 +614,16 @@ export function checkDivergences(
   for (const [i, raw] of entries.entries()) {
     const e = (raw ?? {}) as Partial<DivergenceEntry>;
     const label = typeof e.id === "string" && e.id ? e.id : `entry ${i}`;
-    if (!sameJson(Object.keys(e).sort(), DIVERGENCE_KEYS)) {
-      fail(`${label} must have exactly ${DIVERGENCE_KEYS.join(", ")}`);
+    const keys = Object.keys(e);
+    const missing = DIVERGENCE_REQUIRED.filter((k) => !keys.includes(k));
+    const unknown = keys.filter(
+      (k) =>
+        !DIVERGENCE_REQUIRED.includes(k) && !DIVERGENCE_OPTIONAL.includes(k),
+    );
+    if (missing.length > 0 || unknown.length > 0) {
+      fail(
+        `${label} must have ${DIVERGENCE_REQUIRED.join(", ")} (optionally ${DIVERGENCE_OPTIONAL.join(", ")})`,
+      );
     }
     if (typeof e.id !== "string" || !e.id) {
       fail(`entry ${i} needs an id`);
@@ -566,8 +635,20 @@ export function checkDivergences(
     if (typeof e.scenario !== "string" || !e.scenario) {
       fail(`${label} needs the scenario it applies to`);
     }
-    if (typeof e.path !== "string" || !/^trace(\[|$)/.test(e.path)) {
-      fail(`${label} path must start at "trace"`);
+    if (typeof e.stream !== "string" || !STREAMS.includes(e.stream)) {
+      fail(`${label} stream must be one of ${STREAMS.join(", ")}`);
+    }
+    if (typeof e.kind !== "string" || !e.kind) {
+      fail(`${label} needs the kind of entry it covers`);
+    }
+    if (e.step !== undefined && !Number.isInteger(e.step)) {
+      fail(`${label} step must be an integer`);
+    }
+    if (
+      e.op !== undefined &&
+      !["missing", "extra", "changed"].includes(e.op as string)
+    ) {
+      fail(`${label} op must be missing, extra or changed`);
     }
     if (typeof e.reason !== "string" || e.reason.trim().length < 10) {
       fail(`${label} needs a reason`);
@@ -584,4 +665,83 @@ export function checkDivergences(
   }
 
   return failures;
+}
+
+/** The plugin hooks, read from diff/hooks.ts (the list the recorder installs). */
+export function pluginHooks(conformanceRoot: string): string[] {
+  const text = readFileSync(join(conformanceRoot, "diff/hooks.ts"), "utf8");
+  const block = text.match(/PLUGIN_HOOKS = \[([\s\S]*?)\] as const/);
+
+  return block
+    ? [...(block[1] as string).matchAll(/"(on\w+)"/g)].map(
+        (m) => m[1] as string,
+      )
+    : [];
+}
+
+/**
+ * Every plugin hook fires somewhere in the differential run (a scenario or
+ * the fuzzer), or is listed in diff/unfired-hooks.json with a reason and the
+ * layer that will fire it. A listed hook that fired is stale.
+ */
+export function checkHooksFired(
+  conformanceRoot: string,
+  fired: Set<string>,
+): string[] {
+  const failures: string[] = [];
+  const hooks = pluginHooks(conformanceRoot);
+  if (hooks.length === 0) {
+    return ["diff/hooks.ts: cannot read PLUGIN_HOOKS"];
+  }
+  const unfired = readJson<
+    Record<string, { reason?: unknown; layer?: unknown }>
+  >(join(conformanceRoot, "diff/unfired-hooks.json"));
+  for (const hook of hooks) {
+    const listed = unfired[hook];
+    if (fired.has(hook)) {
+      if (listed) {
+        failures.push(
+          `diff/unfired-hooks.json lists ${hook}, which fired; remove it`,
+        );
+      }
+    } else if (!listed) {
+      failures.push(
+        `${hook} never fired in a differential scenario or the fuzzer; add a scenario or list it in diff/unfired-hooks.json`,
+      );
+    } else if (
+      typeof listed.reason !== "string" ||
+      listed.reason.trim().length < 10 ||
+      typeof listed.layer !== "string" ||
+      !LAYER.test(listed.layer)
+    ) {
+      failures.push(
+        `diff/unfired-hooks.json: ${hook} needs a reason and a layer`,
+      );
+    }
+  }
+  for (const hook of Object.keys(unfired)) {
+    if (!hooks.includes(hook)) {
+      failures.push(
+        `diff/unfired-hooks.json names ${hook}, which is not a hook`,
+      );
+    }
+  }
+
+  return failures;
+}
+
+/** The fuzzer ran, at least FUZZ_FLOOR cases. */
+export function checkFuzzRuns(
+  runs: Array<{ seed: number; runs: number }>,
+): string[] {
+  if (runs.length === 0) {
+    return ["conformance:diff: the fuzzer reported no runs"];
+  }
+
+  return runs
+    .filter((r) => !(r.runs >= FUZZ_FLOOR))
+    .map(
+      (r) =>
+        `conformance:diff: the fuzzer ran ${r.runs} cases (seed ${r.seed}); the floor is ${FUZZ_FLOOR}`,
+    );
 }

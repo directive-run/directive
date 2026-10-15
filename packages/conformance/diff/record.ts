@@ -4,7 +4,8 @@
  *
  * - every plugin hook, in call order, with its arguments (`hook`);
  * - every `system.observe()` event (`observe`);
- * - every store notification, per fact key and derivation (`notify`);
+ * - every store notification, per fact key and derivation, with the value
+ *   the subscriber reads at that moment (`notify`);
  * - at each checkpoint, every fact, every derivation's value and the whole
  *   `inspect()` result (`state`);
  * - whatever the scenario's own definitions report about the outside world,
@@ -30,12 +31,16 @@ import { type Json, normalize } from "./normalize.js";
 export type TraceEntry =
   | { k: "hook"; hook: HookName; args: Json[] }
   | { k: "observe"; event: Json }
-  | { k: "notify"; id: string }
+  | { k: "notify"; id: string; value: Json }
   | { k: "state"; label: string; facts: Json; derived: Json; inspect: Json }
   | { k: "external"; data: Json }
   | { k: "console"; level: string; args: Json[] }
   | { k: "unhandled"; error: Json }
   | { k: "step"; i: number; step: Json }
+  /** The step's call returned; what follows happened after it (async). */
+  | { k: "async"; i: number }
+  /** Fake timers and intervals still scheduled (after destroy: leaks). */
+  | { k: "timers"; at: string; pending: number }
   | { k: "threw"; where: string; error: Json };
 
 /** The parts of a system the recorder touches (both engines satisfy it). */
@@ -64,6 +69,8 @@ export interface Recorder {
 
 export interface RecordOptions {
   recorder: Recorder;
+  /** Subscribe to derivations too (default true; see record()). */
+  derivations?: boolean;
 }
 
 interface Internal extends Recorder {
@@ -182,12 +189,31 @@ export function record(
     }),
   );
   // One subscription per id, in a fixed order, so a notification names
-  // what changed.
-  for (const id of [...factKeys(system), ...derivationIds(system)]) {
+  // what changed. Subscribing to a derivation observes it, which changes
+  // when it recomputes; `derivations: false` leaves derivations unobserved
+  // so a scenario can test what an outside reader sees of a lazy one.
+  const derivations = derivationIds(system);
+  const ids = [
+    ...factKeys(system),
+    ...(opts.derivations === false ? [] : derivations),
+  ];
+  for (const id of ids) {
+    const isDerivation = derivations.includes(id);
     try {
       rec.unsubscribe.push(
         system.subscribe([id], () => {
-          rec.trace.push({ k: "notify", id });
+          // What a subscriber reads while being notified: a derivation that
+          // is stale here, or a fact not yet written, is a glitch.
+          let value: Json;
+          try {
+            value = normalize(
+              isDerivation ? system.read(id) : system.getSnapshot().facts[id],
+              { markers: rec.markers },
+            );
+          } catch (error) {
+            value = { $throws: normalize(error) };
+          }
+          rec.trace.push({ k: "notify", id, value });
         }),
       );
     } catch (error) {

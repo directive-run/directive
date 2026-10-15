@@ -1,0 +1,6 @@
+{
+  "onFactDelete": {
+    "reason": "1.35 never emits it: the engine has no emitFactDelete call, so a deleted fact reports through onFactSet / onFactsBatch (type \"delete\"). Recorded by the \"a fact delete\" scenario; a 2.0 that emits it shows up there as a difference to decide on.",
+    "layer": "L0"
+  }
+}

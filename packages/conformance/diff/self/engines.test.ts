@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { coreEntries, v1PackageDir } from "../../lib/core-entries.js";
-import { engines } from "../engines.js";
+import { type EngineHandle, engines } from "../engines.js";
 import { PLUGIN_HOOKS } from "../hooks.js";
 import { createRecorder } from "../record.js";
 
@@ -25,7 +25,7 @@ function pinnedVersion(): string {
 
 describe("differential engines", () => {
   it("loads the published reference and the workspace source", () => {
-    const [v1, local] = engines();
+    const [v1, local] = engines() as [EngineHandle, EngineHandle];
     const pkg = JSON.parse(
       readFileSync(join(v1PackageDir, "package.json"), "utf8"),
     );
@@ -38,7 +38,7 @@ describe("differential engines", () => {
   });
 
   it("gives every run a fresh, distinct instance of each engine", async () => {
-    const [v1, local] = engines();
+    const [v1, local] = engines() as [EngineHandle, EngineHandle];
     const a = await v1.load();
     const b = await v1.load();
     const c = await local.load();

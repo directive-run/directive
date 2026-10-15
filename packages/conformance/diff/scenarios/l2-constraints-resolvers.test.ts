@@ -4,8 +4,7 @@
  * keyed runs, exhausted retries.
  */
 
-import { describe } from "vitest";
-import { type BuildContext, scenario } from "../scenario.js";
+import { type BuildContext, scenario, suite } from "../scenario.js";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -55,7 +54,7 @@ function loader(
   } as any);
 }
 
-describe("L2 constraints, requirements and resolvers", () => {
+suite("L2 constraints, requirements and resolvers", () => {
   scenario(
     "a constraint requires, a resolver satisfies",
     (ctx) => ({ module: loader(ctx) }),
