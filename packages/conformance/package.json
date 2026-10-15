@@ -9,15 +9,19 @@
     "check:expects": "tsx scripts/check-expects.ts",
     "test": "vitest run --config vitest.config.ts",
     "test:v1": "vitest run --config vitest.config.ts --project conformance:v1 --project conformance:v1:prod",
-    "test:local": "vitest run --config vitest.config.ts --project conformance:local --project conformance:local:prod"
+    "test:local": "vitest run --config vitest.config.ts --project conformance:local --project conformance:local:prod",
+    "test:checks": "vitest run --config vitest.config.ts --project conformance:checks",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@directive-run/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^25.2.0",
     "directive-v1": "npm:@directive-run/core@1.35.0",
     "ts-morph": "^27.0.2",
     "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
     "vitest": "^3.2.6"
   }
 }

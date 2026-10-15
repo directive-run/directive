@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noUnusedLocals": false,
+    "types": ["node"],
+    "paths": {
+      "@directive-run/core": ["../core/src/index.ts"],
+      "@directive-run/core/plugins": ["../core/src/plugins/index.ts"],
+      "@directive-run/core/testing": ["../core/src/utils/testing.ts"],
+      "@directive-run/core/adapter-utils": ["../core/src/adapter-utils.ts"],
+      "@directive-run/core/worker": ["../core/src/adapters/worker.ts"],
+      "@directive-run/core/migration": ["../core/src/utils/migration.ts"],
+      "@directive-run/core/internals": ["../core/src/internals.ts"]
+    }
+  },
+  "include": ["tests", "self", "helpers", "lib", "scripts", "vitest.config.ts"]
+}

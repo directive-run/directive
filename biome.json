@@ -137,6 +137,12 @@
           }
         }
       }
+    },
+    {
+      "include": ["packages/conformance/tests/**"],
+      "linter": {
+        "enabled": false
+      }
     }
   ]
 }

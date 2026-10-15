@@ -70,6 +70,7 @@ export {
   clobberAlertPlugin,
   type ClobberAlertPluginOptions,
   type ClobberAlertEvent,
+  type ClobberSummaryEvent,
 } from "./clobber-alert.js";
 export {
   clobberLoopPlugin,

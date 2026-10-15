@@ -20,10 +20,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import { coreEntries, coreRoot } from "./core-entries.js";
+import { coreEntries, defaultRepoRoot } from "./lib/core-entries.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const v1Root = dirname(resolve(here, "node_modules/directive-v1/package.json"));
+const v1Root = resolve(here, "node_modules/directive-v1");
+const coreRoot = join(defaultRepoRoot, "packages/core");
 
 /** Ported tests that flip the dev flag by mocking `#is-development`. */
 function prodFiles(): string[] {
@@ -48,6 +49,8 @@ function prodFiles(): string[] {
 
 const PROD = prodFiles();
 const TESTS = ["tests/**/*.test.ts"];
+/** Runs in every engine project: proves the project tests what it claims. */
+const SELF = ["self/**/*.test.ts"];
 
 type Alias = Array<{ find: RegExp; replacement: string }>;
 
@@ -104,21 +107,24 @@ function localAlias(): Alias {
 function project(
   name: string,
   engine: "v1" | "local" | "v2",
+  build: "development" | "production",
   alias: Alias,
   include: string[],
   exclude: string[],
 ) {
   return {
-    extends: false as const,
     resolve: { alias },
     test: {
       name,
       root: here,
       globals: true,
       environment: "node",
-      include,
+      include: [...include, ...SELF],
       exclude,
-      env: { DIRECTIVE_ENGINE: engine },
+      // Fails a test layers.json cannot place; skips aheadOfV1 on v1 and,
+      // on v2, internals files and tests above `current`.
+      setupFiles: ["helpers/layer-gate.ts"],
+      env: { DIRECTIVE_ENGINE: engine, DIRECTIVE_BUILD: build },
     },
   };
 }
@@ -126,14 +132,54 @@ function project(
 export default defineConfig({
   test: {
     projects: [
-      project("conformance:v1", "v1", v1Alias("development"), TESTS, PROD),
-      project("conformance:v1:prod", "v1", v1Alias("production"), PROD, []),
-      project("conformance:local", "local", localAlias(), TESTS, PROD),
-      project("conformance:local:prod", "local", localAlias(), PROD, []),
-      // Phase 1 adds core-next. Same tests, its own alias, and a layer filter
-      // from layers.json so only the layers built so far are expected to pass:
-      // project("conformance:v2", "v2", v2Alias(), layerFiles(), PROD),
-      // project("conformance:v2:prod", "v2", v2Alias("production"), layerProd(), []),
+      project(
+        "conformance:v1",
+        "v1",
+        "development",
+        v1Alias("development"),
+        TESTS,
+        PROD,
+      ),
+      project(
+        "conformance:v1:prod",
+        "v1",
+        "production",
+        v1Alias("production"),
+        PROD,
+        [],
+      ),
+      project(
+        "conformance:local",
+        "local",
+        "development",
+        localAlias(),
+        TESTS,
+        PROD,
+      ),
+      project(
+        "conformance:local:prod",
+        "local",
+        "production",
+        localAlias(),
+        PROD,
+        [],
+      ),
+      // Phase 1 adds core-next. Same tests and the same setup file, which on
+      // v2 skips every test above layers.rules.json `current` and every file
+      // in the `internals` category (layers.json) until WHITE-BOX.md triage
+      // moves it out. The engine-identity self test needs a v2 branch too.
+      // project("conformance:v2", "v2", "development", v2Alias("development"), TESTS, PROD),
+      // project("conformance:v2:prod", "v2", "production", v2Alias("production"), PROD, []),
+      {
+        test: {
+          name: "conformance:checks",
+          root: here,
+          environment: "node",
+          include: ["scripts/__tests__/**/*.test.ts"],
+          // Each tamper case copies the repo slice and re-runs the check.
+          testTimeout: 120_000,
+        },
+      },
     ],
   },
 });

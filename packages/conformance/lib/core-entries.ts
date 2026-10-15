@@ -1,7 +1,7 @@
 /**
  * Core's public entry points, derived from its own build config and exports.
  *
- * Shared by the port script and the vitest config, so the two can never
+ * Shared by the port, the check and the vitest config, so they can never
  * disagree about which specifier maps to which source file. Derived, not
  * hand-written: a new core subpath is picked up without anyone remembering.
  */
@@ -11,7 +11,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const coreRoot = resolve(here, "../core");
+
+/** The repository this package lives in. */
+export const defaultRepoRoot = resolve(here, "../../..");
 
 export interface CoreEntry {
   /** `@directive-run/core` or `@directive-run/core/<subpath>`. */
@@ -33,7 +35,8 @@ const PREFERENCE = [
   "@directive-run/core/internals",
 ];
 
-export function coreEntries(): CoreEntry[] {
+export function coreEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
+  const coreRoot = join(repoRoot, "packages/core");
   const tsup = readFileSync(join(coreRoot, "tsup.config.ts"), "utf8");
   const block = tsup.match(/const entry = \{([\s\S]*?)\};/);
   if (!block) {
