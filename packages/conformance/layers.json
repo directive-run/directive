@@ -1,0 +1,220 @@
+{
+  "$comment": "Which ported tests each 2.0 layer must pass (plan: ~/Desktop/directive-size-plan/2.0-PLAN.md, L0–L13). `current` is the highest layer core-next has built; null until Phase 1. conformance:v2 runs every layer <= current. Files listed under `inferred` were not named in the plan's layer table and were placed by what they exercise; review them at the Phase 0 gate. Tests in the `internals` category (see classification.json) need triage before they count toward v2: their layer is where the behaviour lives, not a promise that core-next exports the same managers.",
+  "current": null,
+  "layers": {
+    "L0": {
+      "title": "Graph, scheduler, facts, derivations, basic effects, events, batch",
+      "files": [
+        "tests/core/tracking.test.ts",
+        "tests/core/tracking-frame-kind.test.ts",
+        "tests/core/derivations.test.ts",
+        "tests/core/derivation-deps.test.ts",
+        "tests/core/derivation-dep-wake-rate.test.ts",
+        "tests/core/derivation-hold-reentrancy.test.ts",
+        "tests/core/derive-reach-back-warning.test.ts",
+        "tests/core/docs-derivations-example.test.ts",
+        "tests/core/facts.test.ts",
+        "tests/core/exotic-facts.test.ts",
+        "tests/core/frozen-facts.test.ts",
+        "tests/core/fact-set-listener-isolation.test.ts",
+        "tests/core/watched-set-shrinks.test.ts",
+        "tests/core/nullable-equality.test.ts",
+        "tests/core/schema-builders.test.ts",
+        "tests/core/schema-freeze-scope.test.ts",
+        "tests/core/system-facts-derived.test.ts",
+        "tests/core/perf-correctness.test.ts"
+      ]
+    },
+    "L1": {
+      "title": "Modules, namespacing, compiled accessors, read-only + prev views, crossModuleDeps",
+      "files": [
+        "tests/core/module.test.ts",
+        "tests/core/multi-module-correctness.prod.test.ts",
+        "tests/core/dep-namespace-injective.test.ts",
+        "tests/core/effect-readonly-facts.test.ts",
+        "tests/core/effect-readonly-facts-production.test.ts",
+        "tests/core/data-forms.test.ts",
+        "tests/core/data-forms-namespaced.test.ts"
+      ]
+    },
+    "L2": {
+      "title": "Constraints → requirements → resolvers with every 1.35 rule",
+      "files": [
+        "tests/core/constraints.test.ts",
+        "tests/core/constraint-disable.test.ts",
+        "tests/core/constraint-reevaluation.test.ts",
+        "tests/core/derived-in-constraints-effects.test.ts",
+        "tests/core/resolvers.test.ts",
+        "tests/core/resolver-outcomes.test.ts",
+        "tests/core/resolver-satisfied-by-own-write.test.ts",
+        "tests/core/resolver-retracting-own-requirement.test.ts",
+        "tests/core/resolver-loading-flag.test.ts",
+        "tests/core/requeue.test.ts",
+        "tests/core/requeue-after-resolver-finishes.test.ts",
+        "tests/core/reconcile-timing-rules.test.ts",
+        "tests/core/reconcile-depth-guard.test.ts",
+        "tests/core/superseded-bodies-and-retry-timer.test.ts",
+        "tests/core/settle-strands-invalidations.test.ts"
+      ]
+    },
+    "L3": {
+      "title": "Lifecycle, error boundary, one hook stream, plugins API, clock/timer",
+      "files": [
+        "tests/core/engine.test.ts",
+        "tests/core/system.test.ts",
+        "tests/core/system-async-lifecycle.test.ts",
+        "tests/core/error-boundary.test.ts",
+        "tests/core/plugins.test.ts",
+        "tests/core/round-1-findings.test.ts",
+        "tests/core/round-2-criticals.test.ts",
+        "tests/core/ssr.test.ts",
+        "tests/core/clock.test.ts",
+        "tests/core/timer.test.ts"
+      ]
+    },
+    "L4": {
+      "title": "Full effects: deps/on, prev, skip-tracking, sync reconcile fast path",
+      "files": [
+        "tests/core/effect-deps-startup.test.ts",
+        "tests/core/effect-reconcile-boundaries.test.ts"
+      ]
+    },
+    "L5": {
+      "title": "source(): attach, key/active gates, linger, coalesce, onEvict, module-scoped publish",
+      "files": ["tests/core/sources.test.ts"]
+    },
+    "L6": {
+      "title": "Snapshot/restore/hydrate, dev-only validation, t.* refine/transform/brand, persistence plugin",
+      "files": [
+        "tests/core/restore-flush-reconcile.test.ts",
+        "tests/core/snapshot-events.test.ts",
+        "tests/core/nested-mutation-checks.test.ts",
+        "tests/core/nested-mutation-checks.production.test.ts",
+        "tests/core/nested-mutation-snapshot.test.ts",
+        "tests/core/schema-introspection.test.ts",
+        "tests/plugins/persistence.test.ts",
+        "tests/plugins/hydration-scope.test.ts"
+      ]
+    },
+    "L7": {
+      "title": "Batch resolvers",
+      "files": [
+        "tests/core/batch-resolve-fallback.test.ts",
+        "tests/core/batched-read-your-write.test.ts",
+        "tests/core/batched-resolver-retracting-own-requirement.test.ts"
+      ]
+    },
+    "L8": {
+      "title": "history(): goBack/Forward/goTo, replay, export/import, changesets, pause, onNavigate",
+      "files": [
+        "tests/utils/history.test.ts",
+        "tests/core/history-clone-integrity.test.ts",
+        "tests/core/effect-navigation-rerun.test.ts",
+        "tests/core/navigation-side-effects.test.ts"
+      ]
+    },
+    "L9": {
+      "title": "trace() + introspect(): observe, inspect, explain, meta, notify, tags, origins",
+      "files": [
+        "tests/core/trace.test.ts",
+        "tests/core/observe.test.ts",
+        "tests/core/observe-batched-writes.test.ts",
+        "tests/core/observe-stream-reconstructs.test.ts",
+        "tests/core/meta-query-does-not-watch.test.ts",
+        "tests/core/meta-query-timing.test.ts",
+        "tests/core/fact-tags-immutable.test.ts",
+        "tests/core/fact-tags-recorded.test.ts",
+        "tests/core/derivation-tag-inheritance.test.ts",
+        "tests/core/fact-origin-at-write.test.ts",
+        "tests/core/notify-guardrail-blocked.test.ts"
+      ]
+    },
+    "L10": {
+      "title": "dynamic(): register/assign/unregister/call, registerModule, evict",
+      "files": [
+        "tests/core/dynamic-definitions.test.ts",
+        "tests/core/unregister-module.test.ts"
+      ]
+    },
+    "L11": {
+      "title": "Predicates DSL + compilers, describe/hash/rules-diff/doctor/predict/replay/sweep",
+      "files": [
+        "tests/core/predicate-codegen.test.ts",
+        "tests/core/predicate-hash.test.ts",
+        "tests/core/predict.test.ts",
+        "tests/core/doctor.test.ts",
+        "tests/core/rules-diff.test.ts",
+        "tests/core/replay-under.test.ts"
+      ]
+    },
+    "L12": {
+      "title": "Plugins, clobber alert/loop, signed/distributable snapshots",
+      "files": [
+        "tests/plugins/audit-ledger.test.ts",
+        "tests/plugins/audit-ledger-batched-writes.test.ts",
+        "tests/plugins/audit-ledger-forgery.test.ts",
+        "tests/plugins/audit-ledger-latch.test.ts",
+        "tests/plugins/audit-ledger-payloads.test.ts",
+        "tests/plugins/audit-ledger-rotation.test.ts",
+        "tests/plugins/circuit-breaker.test.ts",
+        "tests/plugins/clobber-alert.test.ts",
+        "tests/plugins/clobber-loop.test.ts",
+        "tests/plugins/devtools.test.ts",
+        "tests/plugins/devtools-when-explain.test.ts",
+        "tests/plugins/docs-snippet-compiles.test.ts",
+        "tests/plugins/logging.test.ts",
+        "tests/plugins/observability-agent-metrics.test.ts",
+        "tests/plugins/performance.test.ts",
+        "tests/utils/snapshot-signing.test.ts"
+      ]
+    },
+    "L13": {
+      "title": "Subpaths: testing, migration, worker, adapter-utils, internals",
+      "files": [
+        "tests/utils/testing.test.ts",
+        "tests/utils/testing-utils.test.ts",
+        "tests/utils/testing-sees-batched-writes.test.ts",
+        "tests/adapters/worker.test.ts",
+        "tests/adapters/worker-set-fact.test.ts",
+        "tests/adapters/worker-mirrors-batched-writes.test.ts"
+      ]
+    }
+  },
+  "inferred": [
+    "tests/core/tracking-frame-kind.test.ts",
+    "tests/core/derivation-deps.test.ts",
+    "tests/core/derivation-dep-wake-rate.test.ts",
+    "tests/core/derive-reach-back-warning.test.ts",
+    "tests/core/docs-derivations-example.test.ts",
+    "tests/core/exotic-facts.test.ts",
+    "tests/core/frozen-facts.test.ts",
+    "tests/core/fact-set-listener-isolation.test.ts",
+    "tests/core/watched-set-shrinks.test.ts",
+    "tests/core/schema-freeze-scope.test.ts",
+    "tests/core/system-facts-derived.test.ts",
+    "tests/core/perf-correctness.test.ts",
+    "tests/core/dep-namespace-injective.test.ts",
+    "tests/core/data-forms-namespaced.test.ts",
+    "tests/core/constraint-disable.test.ts",
+    "tests/core/derived-in-constraints-effects.test.ts",
+    "tests/core/resolvers.test.ts",
+    "tests/core/resolver-retracting-own-requirement.test.ts",
+    "tests/core/requeue.test.ts",
+    "tests/core/requeue-after-resolver-finishes.test.ts",
+    "tests/core/reconcile-depth-guard.test.ts",
+    "tests/core/system-async-lifecycle.test.ts",
+    "tests/core/clock.test.ts",
+    "tests/core/timer.test.ts",
+    "tests/core/effect-reconcile-boundaries.test.ts",
+    "tests/plugins/hydration-scope.test.ts",
+    "tests/core/batched-read-your-write.test.ts",
+    "tests/core/history-clone-integrity.test.ts",
+    "tests/core/derivation-tag-inheritance.test.ts",
+    "tests/core/fact-origin-at-write.test.ts"
+  ],
+  "notes": {
+    "multi-module-correctness": "The plan puts multi-module-correctness in L1 and its source parts in L5. Only the .prod file is black-box; the main file imports createCrossModuleFactsProxy and is white-box (see WHITE-BOX.md), so its split waits for that triage.",
+    "effects": "The plan's L4 names effects and effects-lazy-prev-facts; both are white-box (derivationDep, declaresPrevFacts). L4 has only two black-box files until they are rewritten.",
+    "predicate": "predicate and predicate-describe (L11) and sweep-under are white-box."
+  }
+}

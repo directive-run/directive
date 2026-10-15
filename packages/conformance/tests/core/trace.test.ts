@@ -1,0 +1,826 @@
+// Ported from packages/core/src/core/__tests__/trace.test.ts by packages/conformance/scripts/port.ts.
+// Do not edit by hand: change the original and re-run the port.
+
+import { createModule, createSystem, t } from "@directive-run/core";
+import type { TraceEntry } from "@directive-run/core";
+import { describe, expect, it, vi } from "vitest";
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function createTestModule() {
+  return createModule("test", {
+    schema: {
+      facts: {
+        count: t.number(),
+        label: t.string(),
+      },
+      derivations: {
+        doubled: t.number(),
+      },
+      events: {
+        increment: {},
+        setLabel: { label: t.string() },
+      },
+      requirements: {
+        LOAD_DATA: { source: t.string() },
+      },
+    },
+    init: (facts) => {
+      facts.count = 0;
+      facts.label = "";
+    },
+    events: {
+      increment: (facts) => {
+        facts.count = (facts.count as number) + 1;
+      },
+      setLabel: (facts, { label }) => {
+        facts.label = label;
+      },
+    },
+    derive: {
+      doubled: (facts) => (facts.count as number) * 2,
+    },
+    effects: {
+      log: {
+        deps: ["count"],
+        run: (facts) => {
+          // Side effect that reads count
+          void facts.count;
+        },
+      },
+    },
+    constraints: {
+      needsData: {
+        priority: 10,
+        when: (facts) => (facts.count as number) > 5,
+        require: { type: "LOAD_DATA", source: "api" },
+      },
+    },
+    resolvers: {
+      loadData: {
+        requirement: "LOAD_DATA",
+        resolve: async (req, context) => {
+          context.facts.label = `loaded from ${req.source}`;
+        },
+      },
+    },
+  });
+}
+
+function createSystemWithHistory(opts?: { maxRuns?: number }) {
+  const mod = createTestModule();
+
+  return createSystem({
+    module: mod,
+    trace: opts?.maxRuns ? { maxRuns: opts.maxRuns } : true,
+  });
+}
+
+// ============================================================================
+// Trace Tests
+// ============================================================================
+
+describe("Trace", () => {
+  // -----------------------------------------------------------------------
+  // 1. Disabled by default
+  // -----------------------------------------------------------------------
+  it("returns null when trace is not enabled", () => {
+    const mod = createTestModule();
+    const system = createSystem({ module: mod });
+    system.start();
+
+    expect(system.trace).toBeNull();
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 2. Basic trace creation
+  // -----------------------------------------------------------------------
+  it("creates a trace entry on fact change", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    const history = system.trace!;
+    expect(history.length).toBeGreaterThanOrEqual(1);
+
+    const lastRun = history[history.length - 1]!;
+    expect(lastRun.status).toBe("settled");
+    expect(lastRun.factChanges.length).toBeGreaterThanOrEqual(1);
+
+    const countChange = lastRun.factChanges.find((fc) => fc.key === "count");
+    expect(countChange).toBeDefined();
+    expect(countChange!.newValue).toBe(1);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 3. Derivation tracking with deps (E12)
+  // -----------------------------------------------------------------------
+  it("tracks derivation recomputation with dependency edges", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 3;
+    await system.settle();
+
+    const history = system.trace!;
+    const lastRun = history[history.length - 1]!;
+
+    const derivEntry = lastRun.derivationsRecomputed.find(
+      (d) => typeof d === "object" && d.id === "doubled",
+    );
+
+    if (derivEntry && typeof derivEntry === "object") {
+      expect(derivEntry.deps).toBeDefined();
+      expect(Array.isArray(derivEntry.deps)).toBe(true);
+    }
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 4. Constraint + requirement tracking
+  // -----------------------------------------------------------------------
+  it("tracks constraints and requirements when triggered", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    // Set count > 5 to trigger the constraint
+    system.facts.count = 10;
+    await system.settle();
+
+    const history = system.trace!;
+    const triggeringRun = history.find((r) =>
+      r.constraintsHit.some((c) => c.id === "needsData"),
+    );
+
+    expect(triggeringRun).toBeDefined();
+    expect(triggeringRun!.constraintsHit[0]!.priority).toBe(10);
+    expect(triggeringRun!.requirementsAdded.length).toBeGreaterThanOrEqual(1);
+    expect(triggeringRun!.requirementsAdded[0]!.type).toBe("LOAD_DATA");
+    expect(triggeringRun!.requirementsAdded[0]!.fromConstraint).toBe(
+      "needsData",
+    );
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 5. Async resolver attribution
+  // -----------------------------------------------------------------------
+  it("attributes async resolver completion to the correct trace", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 10;
+    await system.settle();
+
+    const history = system.trace!;
+
+    // Find the trace that started the resolver
+    const traceWithResolver = history.find(
+      (r) => r.resolversStarted.length > 0,
+    );
+
+    expect(traceWithResolver).toBeDefined();
+    expect(traceWithResolver!.resolversCompleted.length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(traceWithResolver!.resolversCompleted[0]!.resolver).toBe("loadData");
+    expect(
+      traceWithResolver!.resolversCompleted[0]!.duration,
+    ).toBeGreaterThanOrEqual(0);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 6. Resolver error attribution
+  // -----------------------------------------------------------------------
+  it("attributes resolver errors to the correct trace", async () => {
+    const mod = createModule("err", {
+      schema: {
+        facts: { trigger: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { FAIL_REQ: {} },
+      },
+      init: (facts) => {
+        facts.trigger = false;
+      },
+      constraints: {
+        fail: {
+          when: (facts) => facts.trigger === true,
+          require: { type: "FAIL_REQ" },
+        },
+      },
+      resolvers: {
+        failResolver: {
+          requirement: "FAIL_REQ",
+          resolve: async () => {
+            throw new Error("intentional failure");
+          },
+        },
+      },
+    });
+
+    const system = createSystem({
+      module: mod,
+      trace: true,
+    });
+    system.start();
+    await system.settle();
+
+    system.facts.trigger = true;
+    await system.settle();
+
+    const history = system.trace!;
+    const errRun = history.find((r) => r.resolversErrored.length > 0);
+
+    expect(errRun).toBeDefined();
+    expect(errRun!.resolversErrored[0]!.error).toContain("intentional failure");
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 7. Multi-resolver trace stays pending
+  // -----------------------------------------------------------------------
+  it("keeps trace pending while multiple resolvers are inflight", async () => {
+    const resolvers: { a: (() => void) | null; b: (() => void) | null } = {
+      a: null,
+      b: null,
+    };
+
+    const mod = createModule("multi", {
+      schema: {
+        facts: { go: t.boolean(), result: t.string() },
+        derivations: {},
+        events: {},
+        requirements: {
+          REQ_A: {},
+          REQ_B: {},
+        },
+      },
+      init: (facts) => {
+        facts.go = false;
+        facts.result = "";
+      },
+      constraints: {
+        triggerA: {
+          when: (facts) => facts.go === true,
+          require: { type: "REQ_A" },
+        },
+        triggerB: {
+          when: (facts) => facts.go === true,
+          require: { type: "REQ_B" },
+        },
+      },
+      resolvers: {
+        handleA: {
+          requirement: "REQ_A",
+          resolve: async (_req, context) => {
+            await new Promise<void>((r) => {
+              resolvers.a = r;
+            });
+            context.facts.result = "A done";
+          },
+        },
+        handleB: {
+          requirement: "REQ_B",
+          resolve: async (_req, context) => {
+            await new Promise<void>((r) => {
+              resolvers.b = r;
+            });
+            context.facts.result = "B done";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({
+      module: mod,
+      trace: true,
+    });
+    system.start();
+    await system.settle();
+
+    system.facts.go = true;
+    // Let microtasks flush so reconcile runs and resolvers start
+    await new Promise((r) => setTimeout(r, 50));
+
+    const history = system.trace!;
+    const pendingRun = history.find(
+      (r) => r.resolversStarted.length >= 2 && r.status === "pending",
+    );
+
+    expect(pendingRun).toBeDefined();
+
+    // Resolve both
+    resolvers.a?.();
+    resolvers.b?.();
+    await system.settle();
+
+    // Now the trace should be settled
+    const updatedHistory = system.trace!;
+    const settledRun = updatedHistory.find(
+      (r) => r.resolversStarted.length >= 2 && r.status === "settled",
+    );
+
+    expect(settledRun).toBeDefined();
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 8. Ring buffer eviction
+  // -----------------------------------------------------------------------
+  it("evicts old runs when maxRuns is exceeded", async () => {
+    const system = createSystemWithHistory({ maxRuns: 3 });
+    system.start();
+    await system.settle();
+
+    // Create 5 runs
+    for (let i = 1; i <= 5; i++) {
+      system.facts.count = i;
+      await system.settle();
+    }
+
+    const history = system.trace!;
+    expect(history.length).toBeLessThanOrEqual(3);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 9. Ring buffer eviction cleanup
+  // -----------------------------------------------------------------------
+  it("cleans up maps when pending runs are evicted", async () => {
+    // This is a structural test — we verify no errors after heavy eviction
+    const system = createSystemWithHistory({ maxRuns: 2 });
+    system.start();
+    await system.settle();
+
+    for (let i = 1; i <= 10; i++) {
+      system.facts.count = i;
+      await system.settle();
+    }
+
+    // System should still be functional
+    system.facts.count = 100;
+    await system.settle();
+
+    const history = system.trace!;
+    expect(history.length).toBeLessThanOrEqual(2);
+    expect(
+      history[history.length - 1]!.factChanges.some(
+        (fc) => fc.newValue === 100,
+      ),
+    ).toBe(true);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 10. Empty trace filtering
+  // -----------------------------------------------------------------------
+  it("skips traces with no activity", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    const initialLength = system.trace!.length;
+
+    // Setting same value should not create a new trace with activity
+    await system.settle();
+
+    // Length should not increase for empty reconciles
+    expect(system.trace!.length).toBe(initialLength);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 11. pending → settled transition
+  // -----------------------------------------------------------------------
+  it("transitions from pending to settled when resolver completes", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 10; // triggers constraint → resolver
+    await system.settle();
+
+    const history = system.trace!;
+    const resolverRun = history.find((r) => r.resolversStarted.length > 0);
+
+    if (resolverRun) {
+      expect(resolverRun.status).toBe("settled");
+      expect(resolverRun.duration).toBeGreaterThan(0);
+    }
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 12. onTraceComplete plugin hook
+  // -----------------------------------------------------------------------
+  it("calls onTraceComplete plugin hook with finalized trace entry", async () => {
+    const onTraceComplete = vi.fn();
+    const mod = createTestModule();
+    const system = createSystem({
+      module: mod,
+      trace: true,
+      plugins: [{ name: "test-plugin", onTraceComplete }],
+    });
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    expect(onTraceComplete).toHaveBeenCalled();
+    const entry = onTraceComplete.mock.calls[
+      onTraceComplete.mock.calls.length - 1
+    ]![0] as TraceEntry;
+    expect(entry.status).toBe("settled");
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 13. inspect() includes trace
+  // -----------------------------------------------------------------------
+  it("includes trace in inspect() when enabled", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    const inspection = system.inspect();
+    expect(inspection.trace).toBeDefined();
+    expect(Array.isArray(inspection.trace)).toBe(true);
+    expect(inspection.trace!.length).toBeGreaterThanOrEqual(1);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 14. destroy() cleanup
+  // -----------------------------------------------------------------------
+  it("cleans up trace state on destroy", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    expect(system.trace!.length).toBeGreaterThan(0);
+
+    system.destroy();
+
+    // After destroy, internal arrays are cleared
+    // The cached getter may return an old snapshot, but no new data accumulates
+  });
+
+  // -----------------------------------------------------------------------
+  // 15. fromConstraint on requirementsRemoved (E3)
+  // -----------------------------------------------------------------------
+  it("includes fromConstraint on removed requirements", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    // Trigger constraint
+    system.facts.count = 10;
+    await system.settle();
+
+    // Un-trigger constraint
+    system.facts.count = 0;
+    await system.settle();
+
+    const history = system.trace!;
+    const removalRun = history.find((r) => r.requirementsRemoved.length > 0);
+
+    if (removalRun) {
+      expect(removalRun.requirementsRemoved[0]!.fromConstraint).toBeDefined();
+      expect(removalRun.requirementsRemoved[0]!.fromConstraint).toBe(
+        "needsData",
+      );
+    }
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. Derivation entries have correct shape (E12)
+  // -----------------------------------------------------------------------
+  it("derivation entries use object format with id and deps", async () => {
+    // Derivations only appear in trace when recomputed during the reconcile cycle.
+    // Since derivations are lazy (recomputed on read), they only show up when
+    // an effect or constraint reads them during reconcile.
+    // This test verifies the TYPE shape is correct by checking any trace that
+    // happens to track derivation recomputes.
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    // Subscribe to derivation — this forces reads during reconcile notifications
+    const unsub = system.subscribe(["doubled"], () => {});
+    system.facts.count = 5;
+    await system.settle();
+    unsub();
+
+    const history = system.trace!;
+    // If any trace captured derivations, verify shape
+    const traceWithDeriv = history.find(
+      (r) => r.derivationsRecomputed.length > 0,
+    );
+
+    if (traceWithDeriv) {
+      const entry = traceWithDeriv.derivationsRecomputed[0]!;
+      expect(typeof entry).toBe("object");
+      expect(entry.id).toBe("doubled");
+      expect(Array.isArray(entry.deps)).toBe(true);
+    }
+
+    // The type system ensures entries are { id: string; deps: string[] }
+    // Even if no derivations were captured in the trace, the array accepts that shape
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 17. Causal chain generation (Part 6)
+  // -----------------------------------------------------------------------
+  it("generates causal chain on settled traces", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    const history = system.trace!;
+    const lastRun = history[history.length - 1]!;
+
+    expect(lastRun.causalChain).toBeDefined();
+    expect(typeof lastRun.causalChain).toBe("string");
+    expect(lastRun.causalChain!.length).toBeGreaterThan(0);
+    expect(lastRun.causalChain).toContain("count changed");
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 18. Effect tracking with triggeredBy deps (E12)
+  // -----------------------------------------------------------------------
+  it("tracks effects with triggeredBy dependency arrays", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 2;
+    await system.settle();
+
+    const history = system.trace!;
+    const runWithEffect = history.find((r) => r.effectsRun.length > 0);
+
+    expect(runWithEffect).toBeDefined();
+    const effect = runWithEffect!.effectsRun[0]!;
+    expect(typeof effect).toBe("object");
+    expect(effect.id).toBeDefined();
+    expect(Array.isArray(effect.triggeredBy)).toBe(true);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 19. Constraint deps tracked (E12)
+  // -----------------------------------------------------------------------
+  it("includes dependency arrays on constraint hit entries", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 10;
+    await system.settle();
+
+    const history = system.trace!;
+    const runWithConstraint = history.find((r) => r.constraintsHit.length > 0);
+
+    expect(runWithConstraint).toBeDefined();
+    const constraint = runWithConstraint!.constraintsHit[0]!;
+    expect(constraint.deps).toBeDefined();
+    expect(Array.isArray(constraint.deps)).toBe(true);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 20. Cached getter returns same reference on repeat access
+  // -----------------------------------------------------------------------
+  it("returns cached array on repeat access without changes (E1)", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    const ref1 = system.trace;
+    const ref2 = system.trace;
+
+    // Same reference when no changes
+    expect(ref1).toBe(ref2);
+
+    system.destroy();
+  });
+
+  // -----------------------------------------------------------------------
+  // 21. Deep copy in inspect
+  // -----------------------------------------------------------------------
+  it("returns deep-copied trace from inspect()", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    system.facts.count = 1;
+    await system.settle();
+
+    const inspection = system.inspect();
+    const entry = inspection.trace![0]!;
+
+    // Mutating the returned data should not affect the internal state
+    entry.factChanges.push({ key: "fake", oldValue: 0, newValue: 1 });
+
+    const inspection2 = system.inspect();
+    const entry2 = inspection2.trace![0]!;
+
+    // The mutation should not have persisted
+    expect(entry2.factChanges.find((fc) => fc.key === "fake")).toBeUndefined();
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// Fields the trace records that nothing was reading
+// ============================================================================
+
+/**
+ * Four of the thirteen fields on a trace entry could be blanked with the whole
+ * suite still green: `derivationsRecomputed`, `requirementsRemoved`,
+ * `effectErrors` and `anomalies`. The other nine were checked somewhere. These
+ * close the gap.
+ *
+ * A trace is a debugging surface, so an empty field and a field that was never
+ * populated look identical to the person reading it — which is the failure
+ * being guarded against here more than any crash.
+ */
+describe("Trace fields", () => {
+  it("records which derivations recomputed, with their dependencies", async () => {
+    // The derivation needs a reader. One nothing watches is never recomputed,
+    // so it would be absent from this list for a reason that has nothing to do
+    // with the field being recorded correctly.
+    const mod = createModule("derived", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { doubled: t.number() },
+        requirements: { BIG: {} },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      derive: { doubled: (facts) => facts.count * 2 },
+      constraints: {
+        big: { when: (_facts, d) => d.doubled > 100, require: { type: "BIG" } },
+      },
+      resolvers: { big: { requirement: "BIG", resolve: async () => {} } },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.count = 4;
+    await system.settle();
+
+    const recomputed = system
+      .trace!.flatMap((entry) => entry.derivationsRecomputed)
+      .find((d) => d.id === "doubled" && d.newValue === 8);
+
+    expect(recomputed).toBeDefined();
+    expect(recomputed?.deps).toContain("count");
+
+    system.destroy();
+  });
+
+  it("records a requirement going away, and which constraint it came from", async () => {
+    const system = createSystemWithHistory();
+    system.start();
+    await system.settle();
+
+    // Above the threshold: the constraint is active and emits its requirement.
+    system.facts.count = 10;
+    await system.settle();
+
+    const added = system
+      .trace!.flatMap((entry) => entry.requirementsAdded)
+      .find((r) => r.type === "LOAD_DATA");
+    expect(added).toBeDefined();
+
+    // Back below it: the requirement is no longer wanted.
+    system.facts.count = 0;
+    await system.settle();
+
+    const removed = system
+      .trace!.flatMap((entry) => entry.requirementsRemoved)
+      .find((r) => r.type === "LOAD_DATA");
+
+    expect(removed).toBeDefined();
+    expect(removed?.fromConstraint).toBe("needsData");
+  });
+
+  it("records an effect that threw", async () => {
+    const mod = createModule("boom", {
+      schema: { facts: { n: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      effects: {
+        explode: {
+          deps: ["n"],
+          run: (facts) => {
+            if (facts.n > 0) {
+              throw new Error("effect blew up");
+            }
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.n = 1;
+    await system.settle();
+
+    const errors = system.trace!.flatMap((entry) => entry.effectErrors);
+    const explode = errors.find((e) => e.id === "explode");
+
+    expect(explode).toBeDefined();
+    expect(explode?.error).toContain("effect blew up");
+
+    system.destroy();
+  });
+
+  it("flags a run where a resolver errored", async () => {
+    const mod = createModule("failing", {
+      schema: {
+        facts: { n: t.number() },
+        requirements: { WORK: {} },
+      },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      constraints: {
+        needsWork: { when: (facts) => facts.n > 0, require: { type: "WORK" } },
+      },
+      resolvers: {
+        work: {
+          requirement: "WORK",
+          resolve: async () => {
+            throw new Error("resolver failed");
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod, trace: true });
+    system.start();
+    await system.settle();
+
+    system.facts.n = 1;
+    await system.settle();
+
+    const flagged = system.trace!.find(
+      (entry) => entry.anomalies && entry.anomalies.length > 0,
+    );
+
+    expect(flagged).toBeDefined();
+    expect(flagged?.anomalies?.join(" ")).toContain("errored");
+
+    system.destroy();
+  });
+});

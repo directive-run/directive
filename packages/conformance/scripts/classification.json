@@ -1,0 +1,1185 @@
+[
+  {
+    "file": "__tests__/dev-mode-bundle.test.ts",
+    "category": "packaging",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": [
+      "Reads core's dist/ files and package.json to check what each build ships. A packaging test for the 1.x build, not engine behaviour; 2.0 gets its own size and dev-text gates."
+    ]
+  },
+  {
+    "file": "adapters/__tests__/worker-mirrors-batched-writes.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "adapters/__tests__/worker-set-fact.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "adapters/__tests__/worker.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/batch-resolve-fallback.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/batched-read-your-write.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/batched-resolver-retracting-own-requirement.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/clock.test.ts",
+    "category": "black-box",
+    "cases": 15,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/constraint-disable.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/constraint-reevaluation.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/constraints.test.ts",
+    "category": "internals",
+    "cases": 24,
+    "internals": [],
+    "internalsValues": ["createConstraintsManager", "createFacts"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/data-forms-namespaced.test.ts",
+    "category": "black-box",
+    "cases": 15,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/data-forms.test.ts",
+    "category": "black-box",
+    "cases": 12,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/dep-namespace-injective.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derivation-dep-wake-rate.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derivation-deps.test.ts",
+    "category": "black-box",
+    "cases": 19,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derivation-hold-reentrancy.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derivation-tag-inheritance.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derivations.test.ts",
+    "category": "internals",
+    "cases": 27,
+    "internals": [],
+    "internalsValues": ["createDerivationsManager", "createFacts"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derive-reach-back-warning.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/derived-in-constraints-effects.test.ts",
+    "category": "black-box",
+    "cases": 12,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/docs-derivations-example.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/doctor.test.ts",
+    "category": "black-box",
+    "cases": 24,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/dynamic-definitions.test.ts",
+    "category": "black-box",
+    "cases": 44,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effect-deps-startup.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effect-navigation-rerun.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effect-readonly-facts-production.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effect-readonly-facts.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effect-reconcile-boundaries.test.ts",
+    "category": "black-box",
+    "cases": 18,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effects-lazy-prev-facts.test.ts",
+    "category": "white-box",
+    "cases": 12,
+    "internals": ["declaresPrevFacts from ../effects.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/effects.test.ts",
+    "category": "white-box",
+    "cases": 53,
+    "internals": ["derivationDep from ../tracking.js"],
+    "internalsValues": ["createEffectsManager", "createFacts"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/engine.test.ts",
+    "category": "black-box",
+    "cases": 84,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/error-boundary.test.ts",
+    "category": "internals",
+    "cases": 22,
+    "internals": [],
+    "internalsValues": ["createErrorBoundaryManager"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/exotic-facts.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/fact-origin-at-write.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/fact-set-listener-isolation.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/fact-tags-immutable.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/fact-tags-recorded.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/facts-nested-proxy-layering.test.ts",
+    "category": "white-box",
+    "cases": 3,
+    "internals": ["DEV_PROXY_TARGET from ../facts.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/facts.test.ts",
+    "category": "black-box",
+    "cases": 107,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/frozen-facts.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/history-clone-integrity.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/meta-query-does-not-watch.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/meta-query-timing.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/meta.test.ts",
+    "category": "white-box",
+    "cases": 52,
+    "internals": [
+      "freezeMeta from ../types/meta",
+      "isDerivationWithMeta from ../types/meta"
+    ],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/module.test.ts",
+    "category": "black-box",
+    "cases": 37,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/multi-module-correctness.prod.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/multi-module-correctness.test.ts",
+    "category": "white-box",
+    "cases": 35,
+    "internals": ["createCrossModuleFactsProxy from ../system-proxies.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/navigation-side-effects.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/nested-mutation-checks.production.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/nested-mutation-checks.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/nested-mutation-snapshot.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/notify-guardrail-blocked.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/nullable-equality.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/observe-batched-writes.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/observe-stream-reconstructs.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/observe.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/perf-correctness.test.ts",
+    "category": "internals",
+    "cases": 17,
+    "internals": [],
+    "internalsValues": [
+      "createConstraintsManager",
+      "createDerivationsManager",
+      "createEffectsManager",
+      "createFacts",
+      "createFactsStore",
+      "createResolversManager"
+    ],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/plugins.test.ts",
+    "category": "internals",
+    "cases": 41,
+    "internals": [],
+    "internalsValues": ["createPluginManager"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/predicate-codegen.test.ts",
+    "category": "black-box",
+    "cases": 73,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/predicate-describe.test.ts",
+    "category": "white-box",
+    "cases": 55,
+    "internals": [
+      "NUMBER_FORMAT_CACHE_LIMIT from ../predicate-describe.js",
+      "_clearNumberFormatCache from ../predicate-describe.js",
+      "_getNumberFormatCacheSize from ../predicate-describe.js",
+      "getNumberFormat from ../predicate-describe.js"
+    ],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/predicate-hash.test.ts",
+    "category": "black-box",
+    "cases": 10,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/predicate.test.ts",
+    "category": "white-box",
+    "cases": 149,
+    "internals": [
+      "attributeError from ../../utils/utils.js",
+      "freezeSpec from ../../utils/utils.js",
+      "MAX_PREDICATE_DEPTH from ../predicate.js",
+      "isEmptyOrConfigPredicate from ../predicate.js",
+      "walkPredicate from ../predicate.js"
+    ],
+    "internalsValues": ["dangerousRegex"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/predict.test.ts",
+    "category": "black-box",
+    "cases": 18,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/reconcile-depth-guard.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/reconcile-timing-rules.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/replay-under.test.ts",
+    "category": "black-box",
+    "cases": 36,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/requeue-after-resolver-finishes.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/requeue.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/requirements.test.ts",
+    "category": "white-box",
+    "cases": 32,
+    "internals": ["createRequirementWithId from ../requirements.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/resolver-loading-flag.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/resolver-outcomes.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/resolver-retracting-own-requirement.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/resolver-satisfied-by-own-write.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/resolvers.test.ts",
+    "category": "internals",
+    "cases": 71,
+    "internals": [],
+    "internalsValues": ["createFacts", "createResolversManager"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/restore-flush-reconcile.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/round-1-findings.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/round-2-criticals.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/rules-diff.test.ts",
+    "category": "black-box",
+    "cases": 26,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/schema-builders.test.ts",
+    "category": "black-box",
+    "cases": 89,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/schema-freeze-scope.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/schema-introspection.test.ts",
+    "category": "black-box",
+    "cases": 28,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/settle-strands-invalidations.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/snapshot-events.test.ts",
+    "category": "black-box",
+    "cases": 17,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/sources.test.ts",
+    "category": "internals",
+    "cases": 81,
+    "internals": [],
+    "internalsValues": ["createSourcesManager"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/ssr.test.ts",
+    "category": "black-box",
+    "cases": 13,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/superseded-bodies-and-retry-timer.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": [
+      "environment rewrite: The child-process exit test imports core's built ESM entry by a path relative to the test file. The copy asks the engine under test for its dist entry instead."
+    ]
+  },
+  {
+    "file": "core/__tests__/sweep-under.test.ts",
+    "category": "white-box",
+    "cases": 20,
+    "internals": ["dynamic import ../sweep-under.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/system-async-lifecycle.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/system-facts-derived.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/system-module-transform.test.ts",
+    "category": "white-box",
+    "cases": 66,
+    "internals": ["prefixModuleDefinition from ../system-module-transform.js"],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [
+      "PrefixModuleOptions from ../system-module-transform.js"
+    ],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/system-proxies.test.ts",
+    "category": "white-box",
+    "cases": 98,
+    "internals": [
+      "SEPARATOR from ../system-proxies.js",
+      "createCrossModuleFactsProxy from ../system-proxies.js",
+      "createModuleDeriveProxy from ../system-proxies.js",
+      "createModuleFactsProxy from ../system-proxies.js",
+      "createNamespacedDeriveProxy from ../system-proxies.js",
+      "createNamespacedEventsProxy from ../system-proxies.js",
+      "createNamespacedFactsProxy from ../system-proxies.js",
+      "denormalizeFlatKeys from ../system-proxies.js",
+      "toInternalKey from ../system-proxies.js"
+    ],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/system.test.ts",
+    "category": "black-box",
+    "cases": 75,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/timer.test.ts",
+    "category": "black-box",
+    "cases": 27,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/trace.test.ts",
+    "category": "black-box",
+    "cases": 25,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/tracking-frame-kind.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/tracking.test.ts",
+    "category": "internals",
+    "cases": 13,
+    "internals": [],
+    "internalsValues": [
+      "getCurrentDeps",
+      "isTracking",
+      "trackAccess",
+      "withTracking",
+      "withoutTracking"
+    ],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/unregister-module.test.ts",
+    "category": "black-box",
+    "cases": 25,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "core/__tests__/watched-set-shrinks.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-batched-writes.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-forgery.test.ts",
+    "category": "black-box",
+    "cases": 10,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-latch.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-payload-shapes.test.ts",
+    "category": "white-box",
+    "cases": 5,
+    "internals": ["asRecorded from ../audit-ledger/hash.js"],
+    "internalsValues": ["stableStringify"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-payloads.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger-rotation.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/audit-ledger.test.ts",
+    "category": "black-box",
+    "cases": 46,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/circuit-breaker.test.ts",
+    "category": "black-box",
+    "cases": 80,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/clobber-alert.test.ts",
+    "category": "black-box",
+    "cases": 16,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": ["ClobberSummaryEvent from ../clobber-alert.js"],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/clobber-loop.test.ts",
+    "category": "black-box",
+    "cases": 18,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/devtools-helpers.test.ts",
+    "category": "white-box",
+    "cases": 44,
+    "internals": [
+      "CircularBuffer from ../devtools-types.js",
+      "FLOW from ../devtools-types.js",
+      "MAX_RECORDED_EVENTS from ../devtools-types.js",
+      "MAX_RECORDED_SNAPSHOTS from ../devtools-types.js",
+      "MAX_TIMELINE_ENTRIES from ../devtools-types.js",
+      "S from ../devtools-types.js",
+      "cloneViaJSON from ../devtools-types.js",
+      "createDepGraph from ../devtools-types.js",
+      "createPerfMetrics from ../devtools-types.js",
+      "createRecordingState from ../devtools-types.js",
+      "createTimelineState from ../devtools-types.js",
+      "formatValue from ../devtools-types.js",
+      "isDevMode from ../devtools-types.js",
+      "truncate from ../devtools-types.js",
+      "validateMaxEvents from ../devtools-types.js"
+    ],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/devtools-when-explain.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/devtools.test.ts",
+    "category": "black-box",
+    "cases": 60,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/docs-snippet-compiles.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/hydration-scope.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/logging.test.ts",
+    "category": "black-box",
+    "cases": 56,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/observability-agent-metrics.test.ts",
+    "category": "black-box",
+    "cases": 11,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/performance.test.ts",
+    "category": "black-box",
+    "cases": 34,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "plugins/__tests__/persistence.test.ts",
+    "category": "black-box",
+    "cases": 35,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/history.test.ts",
+    "category": "internals",
+    "cases": 39,
+    "internals": [],
+    "internalsValues": [
+      "createFactsProxy",
+      "createFactsStore",
+      "createDisabledHistory",
+      "createHistoryManager"
+    ],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/license.test.ts",
+    "category": "white-box",
+    "cases": 15,
+    "internals": [
+      "generateNonce from ../license.js",
+      "validateLicenseKey from ../license.js"
+    ],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/snapshot-signing.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/testing-sees-batched-writes.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/testing-utils.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "utils/__tests__/testing.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  }
+]

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(root, "packages");
@@ -159,6 +159,9 @@ export default defineConfig({
       "packages/**/*.test.tsx",
       "packages/**/*.spec.ts",
     ],
+    // The conformance suite runs each test against several engines and needs
+    // its own resolution per engine: `pnpm conformance`.
+    exclude: [...configDefaults.exclude, "packages/conformance/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

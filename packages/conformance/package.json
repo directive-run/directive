@@ -1,0 +1,23 @@
+{
+  "name": "@directive-run/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Black-box conformance suite for @directive-run/core: the same tests run against the published 1.35 engine (the reference) and the in-repo engine, and later core-next.",
+  "type": "module",
+  "scripts": {
+    "port": "tsx scripts/port.ts",
+    "check:expects": "tsx scripts/check-expects.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "test:v1": "vitest run --config vitest.config.ts --project conformance:v1 --project conformance:v1:prod",
+    "test:local": "vitest run --config vitest.config.ts --project conformance:local --project conformance:local:prod"
+  },
+  "dependencies": {
+    "@directive-run/core": "workspace:*"
+  },
+  "devDependencies": {
+    "directive-v1": "npm:@directive-run/core@1.35.0",
+    "ts-morph": "^27.0.2",
+    "tsx": "^4.21.0",
+    "vitest": "^3.2.6"
+  }
+}
