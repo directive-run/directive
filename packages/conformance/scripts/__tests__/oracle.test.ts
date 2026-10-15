@@ -6,6 +6,7 @@
  * Lock and guard cases tamper with a copy of the harness.
  */
 
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   mkdtempSync,
@@ -18,19 +19,26 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Project } from "ts-morph";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   ALL_PROJECTS,
   CHECKS_PROJECT,
+  DIFF_PROJECT,
+  DIFF_TEST_ROOTS,
   type JsonReport,
   census,
   checkAheadOfV1,
   checkConfig,
+  checkDivergences,
+  checkScenarioLayers,
+  diffTestFiles,
   prodPorts,
 } from "../../lib/census.js";
 import { coreEntries } from "../../lib/core-entries.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
+import { staticTests } from "../../lib/tests.js";
 import { checkV1Pin } from "../../lib/v1-pin.js";
 
 // Each case does seconds of synchronous work (a full re-classification).
@@ -89,7 +97,7 @@ function cleanReports(): Record<string, JsonReport> {
     );
   const out: Record<string, JsonReport> = {};
   for (const name of ALL_PROJECTS) {
-    if (name === CHECKS_PROJECT) {
+    if (name === CHECKS_PROJECT || name === DIFF_PROJECT) {
       continue;
     }
     const isProd = name.endsWith(":prod");
@@ -100,6 +108,21 @@ function cleanReports(): Record<string, JsonReport> {
       ],
     };
   }
+  const declared = new Project({ useInMemoryFileSystem: true });
+  out[DIFF_PROJECT] = {
+    testResults: diffTestFiles(conformance).map((rel) =>
+      file(
+        rel,
+        staticTests(
+          declared.createSourceFile(
+            `/${rel}`,
+            readFileSync(join(conformance, rel), "utf8"),
+          ),
+          DIFF_TEST_ROOTS,
+        ).map((t) => t.key),
+      ),
+    ),
+  };
   out[CHECKS_PROJECT] = {
     testResults: walk(join(conformance, "scripts/__tests__"))
       .filter((f) => f.endsWith(".test.ts"))
@@ -186,6 +209,181 @@ describe("the census", () => {
     expect(census(repoRoot, reports).join("\n")).toMatch(
       /conformance:checks: .* ran \d+ tests, expected/,
     );
+  });
+});
+
+describe("the differential project", () => {
+  const diffFile = (reports: Record<string, JsonReport>, suffix: string) =>
+    reports[DIFF_PROJECT]?.testResults.find((f) =>
+      f.name.endsWith(suffix),
+    ) as JsonReport["testResults"][number];
+
+  it("fails when a scenario file did not run", () => {
+    const reports = cleanReports();
+    const diff = reports[DIFF_PROJECT] as JsonReport;
+    diff.testResults = diff.testResults.filter(
+      (f) => !f.name.endsWith("l2-constraints-resolvers.test.ts"),
+    );
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /conformance:diff: diff\/scenarios\/l2-constraints-resolvers\.test\.ts did not run/,
+    );
+  });
+
+  it("fails when a scenario was skipped", () => {
+    const reports = cleanReports();
+    const first = diffFile(reports, "l0-facts-derivations.test.ts")
+      .assertionResults[0] as { status: string };
+    first.status = "skipped";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /conformance:diff: .*l0-facts-derivations\.test\.ts > .* was skipped/,
+    );
+  });
+
+  it("fails when a scenario is missing or renamed", () => {
+    const reports = cleanReports();
+    const results = diffFile(reports, "l2-constraints-resolvers.test.ts")
+      .assertionResults as Array<{ title: string }>;
+    (results[0] as { title: string }).title = "renamed";
+    results.pop();
+    const text = census(repoRoot, reports).join("\n");
+    expect(text).toMatch(/l2-constraints-resolvers\.test\.ts > .* did not run/);
+    expect(text).toMatch(/ran \d+ tests, declares \d+/);
+  });
+
+  it("fails when the fuzzer or the harness self tests did not run", () => {
+    const reports = cleanReports();
+    const diff = reports[DIFF_PROJECT] as JsonReport;
+    diff.testResults = diff.testResults.filter(
+      (f) => !f.name.includes("/diff/fuzz/") && !f.name.includes("/diff/self/"),
+    );
+    const text = census(repoRoot, reports).join("\n");
+    expect(text).toMatch(/diff\/fuzz\/fuzz\.test\.ts did not run/);
+    expect(text).toMatch(/diff\/self\/tamper\.test\.ts did not run/);
+  });
+
+  describe("in a copy", () => {
+    let copy: string;
+    beforeAll(() => {
+      copy = mkdtempSync(join(tmpdir(), "conformance-diff-"));
+      for (const f of ["diff", "layers.rules.json"]) {
+        cpSync(join(conformance, f), join(copy, f), { recursive: true });
+      }
+    });
+    afterAll(() => rmSync(copy, { recursive: true, force: true }));
+    const withFile = (rel: string, text: string, run: () => string[]) => {
+      const path = join(copy, rel);
+      const before = readFileSync(path, "utf8");
+      writeFileSync(path, text);
+      try {
+        return run().join("\n");
+      } finally {
+        writeFileSync(path, before);
+      }
+    };
+    const divergences = (entries: unknown, used: string[] | null) =>
+      withFile("diff/divergences.json", JSON.stringify(entries), () =>
+        checkDivergences(copy, used ? new Set(used) : null),
+      );
+    const entry = {
+      id: "d1",
+      scenario: "a constraint requires, a resolver satisfies",
+      path: "trace[3].event",
+      reason: "v2 emits the event one step later, by design",
+      approvedBy: "Jason",
+      date: "2026-10-14",
+    };
+
+    it("accepts the committed scenario layers and divergences", () => {
+      expect(checkScenarioLayers(copy)).toEqual([]);
+      expect(checkDivergences(copy, new Set())).toEqual([]);
+    });
+
+    it("rejects a scenario file without a layer, or a layer for no file", () => {
+      const rules = JSON.parse(
+        readFileSync(join(copy, "layers.rules.json"), "utf8"),
+      );
+      rules.scenarios = Object.fromEntries(
+        Object.entries(rules.scenarios).filter(
+          ([file]) => file !== "diff/scenarios/l5-sources.test.ts",
+        ),
+      );
+      rules.scenarios["diff/scenarios/gone.test.ts"] = "L2";
+      rules.scenarios["diff/fuzz/fuzz.test.ts"] = "L99";
+      const text = withFile("layers.rules.json", JSON.stringify(rules), () =>
+        checkScenarioLayers(copy),
+      );
+      expect(text).toMatch(/l5-sources\.test\.ts needs a layer/);
+      expect(text).toMatch(/fuzz\.test\.ts needs a layer/);
+      expect(text).toMatch(/names diff\/scenarios\/gone\.test\.ts/);
+    });
+
+    it("accepts a complete, used divergence", () => {
+      expect(divergences([entry], ["d1"])).toBe("");
+    });
+
+    it("rejects a stale divergence", () => {
+      expect(divergences([entry], [])).toMatch(/d1 covers no difference/);
+    });
+
+    it("rejects a divergence nobody signed off", () => {
+      expect(divergences([{ ...entry, approvedBy: " " }], ["d1"])).toMatch(
+        /d1 needs approvedBy/,
+      );
+      const { approvedBy: _, ...unsigned } = entry;
+      expect(divergences([unsigned], ["d1"])).toMatch(/must have exactly/);
+    });
+
+    it("rejects a malformed divergence", () => {
+      const text = divergences(
+        [
+          { ...entry, path: "facts.n", reason: "x", date: "today" },
+          { ...entry, extra: true },
+          entry,
+        ],
+        ["d1"],
+      );
+      expect(text).toMatch(/path must start at "trace"/);
+      expect(text).toMatch(/needs a reason/);
+      expect(text).toMatch(/YYYY-MM-DD/);
+      expect(text).toMatch(/must have exactly/);
+      expect(text).toMatch(/duplicate id d1/);
+      expect(divergences({ not: "an array" }, null)).toMatch(
+        /must be an array/,
+      );
+    });
+  });
+
+  it("fails the typecheck when PLUGIN_HOOKS misses a hook", () => {
+    // Type-level: diff/hooks.ts asserts the list equals each engine's
+    // Plugin hooks. Drop one and the compiler must refuse it.
+    const dir = mkdtempSync(join(conformance, "node_modules/.hooks-tamper-"));
+    try {
+      writeFileSync(
+        join(dir, "hooks.ts"),
+        readFileSync(join(conformance, "diff/hooks.ts"), "utf8").replace(
+          '  "onTraceComplete",\n',
+          "",
+        ),
+      );
+      writeFileSync(
+        join(dir, "tsconfig.json"),
+        JSON.stringify({
+          extends: relative(dir, join(conformance, "tsconfig.json")),
+          include: [],
+          files: ["hooks.ts"],
+        }),
+      );
+      const tsc = spawnSync(
+        join(conformance, "node_modules/.bin/tsc"),
+        ["--noEmit", "-p", join(dir, "tsconfig.json")],
+        { encoding: "utf8" },
+      );
+      // One error per engine's assertion.
+      expect(tsc.status).not.toBe(0);
+      expect(tsc.stdout.match(/hooks\.ts\(\d+,\d+\): error/g)).toHaveLength(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -302,6 +500,28 @@ describe("the vitest config", () => {
     ).toMatch(/conformance:local aliases differ/);
   });
 
+  it("rejects a diff project that stops inlining v1 or narrows its include", () => {
+    const diff = (c: Config) =>
+      c.test.projects.find(
+        (p) => p.test.name === DIFF_PROJECT,
+      ) as Config["test"]["projects"][number];
+    expect(
+      tamper((c) => {
+        diff(c).test.server = { deps: { inline: [/@directive-run\+core@/] } };
+      }),
+    ).toMatch(/conformance:diff differs/);
+    expect(
+      tamper((c) => {
+        diff(c).test.include = ["diff/scenarios/**/*.test.ts"];
+      }),
+    ).toMatch(/conformance:diff differs/);
+    expect(
+      tamper((c) => {
+        diff(c).test.setupFiles = ["helpers/zz-setup.ts"];
+      }),
+    ).toMatch(/conformance:diff differs/);
+  });
+
   it("rejects server deps or a dropped project", () => {
     expect(
       tamper((c) => {
@@ -329,6 +549,7 @@ describe("the harness lock", () => {
       "self",
       "lib",
       "scripts",
+      "diff",
       "vitest.config.ts",
       "tsconfig.json",
       "package.json",

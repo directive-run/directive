@@ -17,13 +17,12 @@
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import { coreEntries, defaultRepoRoot } from "./lib/core-entries.js";
+import { coreEntries, defaultRepoRoot, v1Entries } from "./lib/core-entries.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const v1Root = resolve(here, "node_modules/directive-v1");
 const coreRoot = join(defaultRepoRoot, "packages/core");
 
 /** Ported tests that flip the dev flag by mocking `#is-development`. */
@@ -60,27 +59,16 @@ function exact(specifier: string): RegExp {
 
 /** `@directive-run/core[/sub]` → the published 1.35 build for `condition`. */
 function v1Alias(condition: "development" | "production"): Alias {
-  const pkg = JSON.parse(readFileSync(join(v1Root, "package.json"), "utf8"));
-  const subpaths: Alias = [];
-  const roots: Alias = [];
-  for (const [subpath, target] of Object.entries(
-    pkg.exports as Record<string, Record<string, { import?: string }>>,
-  )) {
-    const file = target[condition]?.import;
-    if (!file) {
-      throw new Error(`directive-v1 has no ${condition} build for ${subpath}`);
-    }
-    const specifier =
-      subpath === "."
-        ? "@directive-run/core"
-        : `@directive-run/core/${subpath.replace(/^\.\//, "")}`;
-    (subpath === "." ? roots : subpaths).push({
-      find: exact(specifier),
-      replacement: join(v1Root, file),
-    });
-  }
+  const entries = v1Entries(condition);
 
-  return [...subpaths, ...roots];
+  return [
+    ...entries
+      .filter((e) => e.subpath !== ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+    ...entries
+      .filter((e) => e.subpath === ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+  ];
 }
 
 /** `@directive-run/core[/sub]` → the workspace's core source. */
@@ -170,6 +158,24 @@ export default defineConfig({
       // moves it out. The engine-identity self test needs a v2 branch too.
       // project("conformance:v2", "v2", "development", v2Alias("development"), TESTS, PROD),
       // project("conformance:v2:prod", "v2", "production", v2Alias("production"), PROD, []),
+      // Differential scenarios: each loads both engines by file (diff/engines.ts)
+      // and compares their traces, so it needs no core alias.
+      {
+        test: {
+          name: "conformance:diff",
+          root: here,
+          environment: "node",
+          include: ["diff/**/*.test.ts"],
+          testTimeout: 120_000,
+          // Transform the published package instead of letting Node load it,
+          // so vi.resetModules() gives every run a fresh instance of it too.
+          server: {
+            deps: {
+              inline: [/[\\/]directive-v1[\\/]/, /@directive-run\+core@/],
+            },
+          },
+        },
+      },
       {
         test: {
           name: "conformance:checks",

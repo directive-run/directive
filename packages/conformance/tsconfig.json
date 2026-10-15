@@ -17,5 +17,13 @@
       "@directive-run/core/internals": ["../core/src/internals.ts"]
     }
   },
-  "include": ["tests", "self", "helpers", "lib", "scripts", "vitest.config.ts"]
+  "include": [
+    "tests",
+    "self",
+    "helpers",
+    "lib",
+    "scripts",
+    "diff",
+    "vitest.config.ts"
+  ]
 }

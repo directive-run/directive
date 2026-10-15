@@ -61,12 +61,19 @@ function isBlock(call: CallExpression, roots: string[]): boolean {
   if (call.getExpression().getText().endsWith(".todo")) {
     return true;
   }
+  // `scenario(title, build, steps)`: build may be any expression.
+  if (root === "scenario") {
+    return call.getArguments().length >= 3;
+  }
 
   return !!fn && (Node.isArrowFunction(fn) || Node.isFunctionExpression(fn));
 }
 
-export function isTestCall(call: CallExpression): boolean {
-  return isBlock(call, ["it", "test"]);
+export function isTestCall(
+  call: CallExpression,
+  roots: string[] = ["it", "test"],
+): boolean {
+  return isBlock(call, roots);
 }
 
 export function isDescribeCall(call: CallExpression): boolean {
@@ -84,11 +91,19 @@ function title(call: CallExpression): { text: string; dynamic: boolean } {
   return { text: arg.getText(), dynamic: true };
 }
 
-export function staticTests(sf: SourceFile): StaticTest[] {
+/**
+ * `roots` names the calls that register a test. Ported tests use `it` and
+ * `test`; differential files also register through `scenario(name, build,
+ * steps)`, whose second argument is the build function.
+ */
+export function staticTests(
+  sf: SourceFile,
+  roots: string[] = ["it", "test"],
+): StaticTest[] {
   const out: StaticTest[] = [];
   const seen = new Map<string, number>();
   for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
-    if (!isTestCall(call)) {
+    if (!isTestCall(call, roots)) {
       continue;
     }
     const describes = call

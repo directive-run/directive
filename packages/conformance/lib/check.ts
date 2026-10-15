@@ -326,7 +326,15 @@ export function check(repoRoot: string): CheckResult {
         ]),
       ),
     },
-    include: ["tests", "self", "helpers", "lib", "scripts", "vitest.config.ts"],
+    include: [
+      "tests",
+      "self",
+      "helpers",
+      "lib",
+      "scripts",
+      "diff",
+      "vitest.config.ts",
+    ],
   };
   if (!sameJson(tsconfig, want)) {
     fail(`tsconfig.json must be exactly ${JSON.stringify(want)}`);
