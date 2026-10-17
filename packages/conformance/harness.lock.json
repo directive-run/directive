@@ -11,7 +11,7 @@
     "diff/hooks.ts": "e8082c4f10ef20de04f1b78dcb9c38835acf01cf4e218fbe0eed029e985f4195",
     "diff/normalize.ts": "22e70d3786783ae06d7bf5458f27b917c4e0aa2b92981f352b74efda65e6640b",
     "diff/record.ts": "43a63331ec265f7dee5d2b7c6828e786b80758c07d1a7c5c3e2f076884c9f153",
-    "diff/scenario.ts": "b0371d8854a83ede3e4cbf9658da4f3dcad626a6467f493cd57860be00188242",
+    "diff/scenario.ts": "122fdad026b42cd21b2c49f3e0263a85c0fe7f112b41d1f64ff3f381f9b9b784",
     "diff/scenarios/l0-facts-derivations.test.ts": "06a1ab004eaae0b38090a9e68bfedeffb5ceebcc4a949dd4a5041693a8ef02ca",
     "diff/scenarios/l0-isolation-glitches.test.ts": "1a61f9ba07771e96241b815d4030ef3a2304a957d28d6819a4e587309dbcd0b2",
     "diff/scenarios/l0-timers-clock.test.ts": "58e16b5da201047ef78a21f1dc95a9fb5cba908f22400ab52c9bb2985691a512",
