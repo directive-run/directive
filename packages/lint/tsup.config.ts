@@ -18,7 +18,8 @@ export default defineConfig([
     format: ["esm", "cjs"],
     dts: true,
     sourcemap: true,
-    clean: true,
+    // No `clean`: these configs build in parallel and cleaning in one races
+    // the others (it deleted a .d.ts in CI). `build` cleans dist first.
     splitting: false,
     treeshake: false,
     target: "es2022",

@@ -60,7 +60,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
     "test": "cd ../.. && vitest run packages/lint/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",

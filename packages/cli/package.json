@@ -55,7 +55,7 @@
   "llms": "./dist/llms.txt",
   "files": ["dist"],
   "scripts": {
-    "build": "tsup && tsx scripts/generate-llms-txt.ts",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup && tsx scripts/generate-llms-txt.ts",
     "test": "cd ../.. && vitest run packages/cli/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",

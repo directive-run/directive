@@ -31,7 +31,7 @@
   },
   "files": ["dist", "presets", "README.md"],
   "scripts": {
-    "build": "tsup",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
     "dev": "tsup --watch",
     "test": "cd ../.. && vitest run packages/ai-harness/",
     "typecheck": "tsc --noEmit",
