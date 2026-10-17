@@ -72,6 +72,16 @@ async function withFixedClock<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function atTime<T>(now: number, fn: () => Promise<T>): Promise<T> {
+  const real = Date.now;
+  Date.now = () => now;
+  try {
+    return await fn();
+  } finally {
+    Date.now = real;
+  }
+}
+
 function memoryStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
 
@@ -218,12 +228,42 @@ async function read(
       wrongSecret: await reader.core.verifySnapshotSignature(signed, "other", {
         ignoreExpiry: true,
       }),
+      // Reads that must FAIL: a changed data value, a changed signature byte,
+      // and (clock past expiresAt, ignoreExpiry unset) an expired signature.
+      changedData: await reader.core.verifySnapshotSignature(
+        { ...signed, data: { ...signed.data, count: signed.data.count + 1 } },
+        SECRET,
+        { ignoreExpiry: true },
+      ),
+      changedSignature: await reader.core.verifySnapshotSignature(
+        {
+          ...signed,
+          signature: `${signed.signature[0] === "a" ? "b" : "a"}${signed.signature.slice(1)}`,
+        },
+        SECRET,
+        { ignoreExpiry: true },
+      ),
+      freshWithoutIgnoreExpiry: await reader.core.verifySnapshotSignature(
+        signed,
+        SECRET,
+      ),
+      expired: await atTime(signed.expiresAt + 1000, () =>
+        reader.core.verifySnapshotSignature(signed, SECRET),
+      ),
     };
 
     // Audit ledger: the chain verifies, and a ledger resumed from it keeps
     // the chain going.
+    const entries = JSON.parse(goldens["audit-ledger.golden"]);
+    const tampered = reader.core.memorySink();
+    entries.forEach((entry: any, i: number) => {
+      tampered.write(i === 1 ? { ...entry, next: "tampered" } : entry);
+    });
+    const tamperedVerify = reader.core
+      .createAuditLedger({ sink: tampered })
+      .verify();
     const sink = reader.core.memorySink();
-    for (const entry of JSON.parse(goldens["audit-ledger.golden"])) {
+    for (const entry of entries) {
       sink.write(entry);
     }
     const ledger = reader.core.createAuditLedger({ sink });
@@ -236,7 +276,7 @@ async function read(
     system.facts.count = 99;
     await system.settle();
     system.destroy();
-    out.ledger = { before, after: ledger.verify() };
+    out.ledger = { before, after: ledger.verify(), tampered: tamperedVerify };
 
     return out;
   });
@@ -248,20 +288,77 @@ export function readGoldens(dir: string): Goldens {
   ) as Goldens;
 }
 
-const same = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
+/** Deep equality that keeps Date, Map and Set distinct (JSON.stringify does not). */
+export function same(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  if (typeof a !== "object" || typeof b !== "object" || !a || !b) {
+    return false;
+  }
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) {
+    return false;
+  }
+  if (a instanceof Date) {
+    return a.getTime() === (b as Date).getTime();
+  }
+  if (a instanceof Map) {
+    const mb = b as Map<unknown, unknown>;
+
+    return (
+      a.size === mb.size &&
+      [...a].every(([k, v]) => mb.has(k) && same(v, mb.get(k)))
+    );
+  }
+  if (a instanceof Set) {
+    const sb = b as Set<unknown>;
+
+    return a.size === sb.size && [...a].every((v) => sb.has(v));
+  }
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+
+  return (
+    ka.length === kb.length &&
+    ka.every(
+      (k) =>
+        Object.hasOwn(b, k) &&
+        same(
+          (a as Record<string, unknown>)[k],
+          (b as Record<string, unknown>)[k],
+        ),
+    )
+  );
+}
+
+/** Goldens whose exact bytes are signed or hashed: any byte change breaks verification. */
+export const BYTE_IDENTICAL: readonly GoldenName[] = [
+  "signed-snapshot.golden",
+  "audit-ledger.golden",
+];
+
+/** An approved change to what a reader makes of a golden part (api-changes.json `goldenChanges`). */
+export interface GoldenChange {
+  part: string;
+  reason: string;
+  approvedBy: string;
+  date: string;
+}
 
 /**
  * Problems with the goldens in `dir`:
  * - each file is still exactly what 1.35.0 writes for the script;
- * - the workspace writes the same bytes for the same script;
- * - the workspace reads what 1.35.0 wrote exactly as 1.35.0 does, and 1.35.0
- *   reads what the workspace wrote exactly as it reads its own output.
+ * - the workspace writes the same bytes for the signed snapshot and the audit
+ *   chain; history and persistence bytes may differ, but 1.35.0 must read them
+ *   as it reads its own, unless `goldenChanges` lists the part with approvedBy;
+ * - the workspace reads what 1.35.0 wrote exactly as 1.35.0 does, including
+ *   the reads that must fail (tampered, expired).
  */
 export async function checkGoldens(
   dir: string,
   v1: Engine,
   local: Engine,
+  goldenChanges: readonly GoldenChange[] = [],
 ): Promise<string[]> {
   const failures: string[] = [];
   const golden = readGoldens(dir);
@@ -271,7 +368,7 @@ export async function checkGoldens(
     if (golden[f] !== fromV1[f]) {
       failures.push(`golden ${f} is not what 1.35.0 writes`);
     }
-    if (golden[f] !== fromLocal[f]) {
+    if (BYTE_IDENTICAL.includes(f) && golden[f] !== fromLocal[f]) {
       failures.push(`the workspace writes a different ${f} than 1.35.0`);
     }
   }
@@ -284,18 +381,38 @@ export async function checkGoldens(
         `the workspace reads 1.35.0's ${part} differently: ${JSON.stringify(localReadsV1[part])} vs ${JSON.stringify(expected[part])}`,
       );
     }
-    if (!same(v1ReadsLocal[part], expected[part])) {
+    const approved = goldenChanges.some(
+      (c) => c.part === part && c.approvedBy.trim() !== "",
+    );
+    if (!approved && !same(v1ReadsLocal[part], expected[part])) {
       failures.push(
         `1.35.0 reads the workspace's ${part} differently: ${JSON.stringify(v1ReadsLocal[part])} vs ${JSON.stringify(expected[part])}`,
       );
     }
   }
   const sanity = expected as {
-    signed: { valid: boolean; wrongSecret: boolean };
-    ledger: { before: { valid: boolean }; after: { valid: boolean } };
+    signed: Record<string, boolean>;
+    ledger: {
+      before: { valid: boolean };
+      after: { valid: boolean };
+      tampered: { valid: boolean };
+    };
   };
   if (!sanity.signed.valid || sanity.signed.wrongSecret) {
     failures.push("1.35.0 does not verify its own signed snapshot");
+  }
+  if (
+    sanity.signed.changedData ||
+    sanity.signed.changedSignature ||
+    sanity.signed.expired ||
+    !sanity.signed.freshWithoutIgnoreExpiry
+  ) {
+    failures.push(
+      `1.35.0 accepts a tampered or expired snapshot, or rejects a fresh one: ${JSON.stringify(sanity.signed)}`,
+    );
+  }
+  if (sanity.ledger.tampered.valid) {
+    failures.push("1.35.0 verifies a tampered audit chain");
   }
   if (!sanity.ledger.before.valid || !sanity.ledger.after.valid) {
     failures.push(

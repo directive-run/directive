@@ -24,23 +24,38 @@ pinned by `harness.lock.json`.
    entry kind, a hook). Members are never renamed or removed.
 4. **New behaviour is a feature value**, opted into by an option, not a
    change to what existing config does.
-5. Adding an export is a minor change and needs no approval. Removing or
-   changing one needs an entry in `api-changes.json`, signed by Jason.
+5. Adding an export is a minor change, but it must be listed in
+   `api-changes.json` (`kind: "add"`) or the check fails: the 2.0 surface has
+   to carry it. Adding a hook (or any other export) is allowed only through
+   such an entry. An addition may sit as `approvedBy: null, status:
+   "pending-gate"`; it passes, and the census prints it under "pending
+   approvals" until Jason signs it at the Phase 0 gate. Removing or changing
+   an export needs an entry with a non-null `approvedBy`, always.
+6. Not in 1.35: `KERNEL_VERSION`, `kernel.has(cap)` and `hasFeature(system,
+   feature)` are planned for core-next and are not part of this contract.
 
 ## What is checked
 
 | Contract | Check | Files |
 | --- | --- | --- |
-| Public API of every entry point, from built `.d.ts` | `api-surface.test.ts` | `api-surface.json` (from 1.35.0), `api-changes.json` |
+| Public API of every entry point, from built `.d.ts`, plus every declaration an export refers to transitively, exported or not (`#ref:<module>:<name>` keys) | `api-surface.test.ts` | `api-surface.json` (from 1.35.0, sorted, deterministic), `api-changes.json` |
 | A system satisfies 1.35.0's `adapter-utils` `SystemLike` | `types.test.ts` | `types/check.ts` (a) |
 | The 46 Plugin hook names, and their signatures | `types.test.ts` | `types/frozen.ts`, `types/check.ts` (b) |
 | `ObservationEvent` types and each payload | `types.test.ts` | `types/frozen.ts`, `types/check.ts` (c) |
 | `inspect()` return shape | `types.test.ts` | `types/check.ts` (d) |
 | History export, persistence saved data, signed snapshot, audit-ledger chain | `golden.test.ts` | `golden/` (written by 1.35.0) |
 
-The goldens are checked both ways: the workspace reads what 1.35.0 wrote
-exactly as 1.35.0 does and writes the same bytes for the same script, and
-1.35.0 reads what the workspace writes.
+The goldens are checked both ways. The workspace reads what 1.35.0 wrote
+exactly as 1.35.0 does, including reads that must fail (a tampered audit
+entry, a changed snapshot value or signature byte, an expired signature
+with `ignoreExpiry` unset). Byte-identical output is required only for the
+signed or hashed goldens (signed snapshot, audit chain). For history and
+persistence the requirement is that 1.35.0 reads the workspace's output
+exactly as it reads its own; a format change that breaks that needs a
+`goldenChanges` entry in `api-changes.json` (`part`, `reason`, `approvedBy`,
+`date`), signed by Jason. (1.35 facts are JSON-only: Date, Map and Set are
+rejected with a warning, so the scripts carry none; the comparison itself
+keeps them distinct.)
 
 To approve an API change: Jason adds `{ entry, name, change, reason,
 approvedBy, date }` to `api-changes.json`, then `oracle:update`, with the

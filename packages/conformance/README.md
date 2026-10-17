@@ -182,17 +182,21 @@ the evolution rules and the frozen write-log record. They run in the
 `harness.lock.json`.
 
 - `api-surface.test.ts`: the public API of every entry point, printed from
-  the built `.d.ts`, equals `api-surface.json` (written from the published
-  1.35.0). Additions pass and are printed; a removed or changed export fails
-  unless `api-changes.json` lists it, signed by Jason (stale entries fail).
+  the built `.d.ts`, plus every declaration an export reaches (`#ref:` keys), equals
+  `api-surface.json` (written from the published 1.35.0). Any difference,
+  addition included, must be listed in `api-changes.json`; removals and
+  changes need Jason's `approvedBy`, additions may be `pending-gate` (the
+  census prints them). Stale entries fail.
 - `types.test.ts`: compiles `types/check.ts` against 1.35.0's and the
   workspace's built declarations: `SystemLike`, the 46 hook names
   (`types/frozen.ts`) and signatures, every `ObservationEvent` type and
   payload, the `inspect()` shape.
 - `golden.test.ts`: `golden/` holds what 1.35.0 writes for one script
   (history export, persistence data, signed snapshot, audit chain). Each
-  must still be 1.35.0's output, the workspace must write the same bytes and
-  read each as 1.35.0 does, and 1.35.0 must read the workspace's output.
+  must still be 1.35.0's output; the workspace must read each as 1.35.0 does
+  (tampered and expired reads must fail), write the same bytes for the
+  signed snapshot and audit chain, and 1.35.0 must read the workspace's
+  history and persistence output as it reads its own.
 
 Each test file also tampers with a copy (a removed export, a renamed hook, a
 changed golden byte, an engine that reads or writes differently) and
