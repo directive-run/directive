@@ -227,6 +227,11 @@ const FAKED = [
 
 /** Captured before any run installs fake timers. */
 const realSetImmediate = globalThis.setImmediate;
+const realSetTimeout = globalThis.setTimeout;
+const realNow = Date.now.bind(Date);
+
+/** Real wall-clock budget for work that settles off the fake clock. */
+const REAL_ASYNC_BUDGET_MS = 2000;
 
 const CONSOLE_LEVELS = ["log", "info", "warn", "error", "debug"] as const;
 
@@ -281,8 +286,13 @@ async function drive(promise: Promise<unknown>, rec: Recorder, where: string) {
       // Nothing scheduled on the fake clock: the promise waits on real
       // async work (WebCrypto in snapshot signing). Give the real event
       // loop a bounded number of turns before calling it stalled.
-      for (let turn = 0; turn < 100 && !done; turn++) {
-        await new Promise<void>((resolve) => realSetImmediate(resolve));
+      // Bounded by real time, not turn count: WebCrypto runs on the
+      // threadpool and its latency grows under CI load.
+      const deadline = realNow() + REAL_ASYNC_BUDGET_MS;
+      for (let turn = 0; !done && realNow() < deadline; turn++) {
+        await new Promise<void>((resolve) =>
+          turn < 100 ? realSetImmediate(resolve) : realSetTimeout(resolve, 1),
+        );
         await flushMicrotasks(5);
       }
       if (done) {
