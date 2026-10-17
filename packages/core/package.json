@@ -12,7 +12,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/core"
   },
   "homepage": "https://directive.run",
@@ -47,7 +47,6 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "development": {
         "import": "./dist/development/index.js",
         "require": "./dist/development/index.cjs"
@@ -56,11 +55,16 @@
         "import": "./dist/production/index.js",
         "require": "./dist/production/index.cjs"
       },
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./internals": {
-      "types": "./dist/internals.d.ts",
       "development": {
         "import": "./dist/development/internals.js",
         "require": "./dist/development/internals.cjs"
@@ -69,11 +73,16 @@
         "import": "./dist/production/internals.js",
         "require": "./dist/production/internals.cjs"
       },
-      "require": "./dist/internals.cjs",
-      "import": "./dist/internals.js"
+      "require": {
+        "types": "./dist/internals.d.cts",
+        "default": "./dist/internals.cjs"
+      },
+      "import": {
+        "types": "./dist/internals.d.ts",
+        "default": "./dist/internals.js"
+      }
     },
     "./plugins": {
-      "types": "./dist/plugins/index.d.ts",
       "development": {
         "import": "./dist/development/plugins/index.js",
         "require": "./dist/development/plugins/index.cjs"
@@ -82,11 +91,16 @@
         "import": "./dist/production/plugins/index.js",
         "require": "./dist/production/plugins/index.cjs"
       },
-      "require": "./dist/plugins/index.cjs",
-      "import": "./dist/plugins/index.js"
+      "require": {
+        "types": "./dist/plugins/index.d.cts",
+        "default": "./dist/plugins/index.cjs"
+      },
+      "import": {
+        "types": "./dist/plugins/index.d.ts",
+        "default": "./dist/plugins/index.js"
+      }
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
       "development": {
         "import": "./dist/development/testing.js",
         "require": "./dist/development/testing.cjs"
@@ -95,11 +109,16 @@
         "import": "./dist/production/testing.js",
         "require": "./dist/production/testing.cjs"
       },
-      "require": "./dist/testing.cjs",
-      "import": "./dist/testing.js"
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      },
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
     },
     "./migration": {
-      "types": "./dist/migration.d.ts",
       "development": {
         "import": "./dist/development/migration.js",
         "require": "./dist/development/migration.cjs"
@@ -108,11 +127,16 @@
         "import": "./dist/production/migration.js",
         "require": "./dist/production/migration.cjs"
       },
-      "require": "./dist/migration.cjs",
-      "import": "./dist/migration.js"
+      "require": {
+        "types": "./dist/migration.d.cts",
+        "default": "./dist/migration.cjs"
+      },
+      "import": {
+        "types": "./dist/migration.d.ts",
+        "default": "./dist/migration.js"
+      }
     },
     "./adapter-utils": {
-      "types": "./dist/adapter-utils.d.ts",
       "development": {
         "import": "./dist/development/adapter-utils.js",
         "require": "./dist/development/adapter-utils.cjs"
@@ -121,11 +145,16 @@
         "import": "./dist/production/adapter-utils.js",
         "require": "./dist/production/adapter-utils.cjs"
       },
-      "require": "./dist/adapter-utils.cjs",
-      "import": "./dist/adapter-utils.js"
+      "require": {
+        "types": "./dist/adapter-utils.d.cts",
+        "default": "./dist/adapter-utils.cjs"
+      },
+      "import": {
+        "types": "./dist/adapter-utils.d.ts",
+        "default": "./dist/adapter-utils.js"
+      }
     },
     "./worker": {
-      "types": "./dist/worker.d.ts",
       "development": {
         "import": "./dist/development/worker.js",
         "require": "./dist/development/worker.cjs"
@@ -134,8 +163,14 @@
         "import": "./dist/production/worker.js",
         "require": "./dist/production/worker.cjs"
       },
-      "require": "./dist/worker.cjs",
-      "import": "./dist/worker.js"
+      "require": {
+        "types": "./dist/worker.d.cts",
+        "default": "./dist/worker.cjs"
+      },
+      "import": {
+        "types": "./dist/worker.d.ts",
+        "default": "./dist/worker.js"
+      }
     }
   },
   "files": ["dist"],
