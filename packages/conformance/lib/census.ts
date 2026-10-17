@@ -229,7 +229,7 @@ export function checkConfig(
           name,
           root: conformanceRoot,
           environment: "node",
-          include: ["scripts/__tests__/**/*.test.ts"],
+          include: ["scripts/__tests__/**/*.test.ts", "contracts/**/*.test.ts"],
           testTimeout: 120_000,
         },
       };
@@ -302,7 +302,10 @@ export function census(
   const selfFiles = walk(join(conformanceRoot, "self"))
     .filter((f) => f.endsWith(".test.ts"))
     .map((f) => relative(conformanceRoot, f));
-  const checkFiles = walk(join(conformanceRoot, "scripts/__tests__"))
+  const checkFiles = [
+    ...walk(join(conformanceRoot, "scripts/__tests__")),
+    ...walk(join(conformanceRoot, "contracts")),
+  ]
     .filter((f) => f.endsWith(".test.ts"))
     .map((f) => relative(conformanceRoot, f));
   const diffFiles = diffTestFiles(conformanceRoot);

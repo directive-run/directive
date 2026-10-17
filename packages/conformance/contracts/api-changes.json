@@ -1,0 +1,4 @@
+{
+  "$comment": "Approved removals or changes to the frozen 1.35 public API (contracts/api-surface.json). Each entry: { entry, name, change: removed|changed, reason, approvedBy, date }. Jason approves every entry; an agent never adds one or fills in approvedBy. Additions need no entry.",
+  "changes": []
+}

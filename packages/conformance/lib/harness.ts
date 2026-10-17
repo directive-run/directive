@@ -20,7 +20,7 @@ const ROOT_FILES = [
 ];
 
 /** Directories whose every file belongs to the harness. */
-const DIRS = ["helpers", "self", "lib", "diff"];
+const DIRS = ["helpers", "self", "lib", "diff", "contracts"];
 
 /** scripts/: code only; its JSON is generated and checked by check-expects. */
 const SCRIPTS = /^scripts\/.*\.ts$/;

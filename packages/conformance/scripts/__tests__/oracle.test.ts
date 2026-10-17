@@ -128,7 +128,10 @@ function cleanReports(): Record<string, JsonReport> {
     ),
   };
   out[CHECKS_PROJECT] = {
-    testResults: walk(join(conformance, "scripts/__tests__"))
+    testResults: [
+      ...walk(join(conformance, "scripts/__tests__")),
+      ...walk(join(conformance, "contracts")),
+    ]
       .filter((f) => f.endsWith(".test.ts"))
       .map((f) => relative(conformance, f))
       .map((rel) => {
@@ -622,6 +625,7 @@ describe("the harness lock", () => {
       "lib",
       "scripts",
       "diff",
+      "contracts",
       "vitest.config.ts",
       "tsconfig.json",
       "package.json",

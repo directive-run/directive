@@ -24,6 +24,8 @@
     "lib",
     "scripts",
     "diff",
+    "contracts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["contracts/types"]
 }

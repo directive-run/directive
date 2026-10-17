@@ -333,8 +333,11 @@ export function check(repoRoot: string): CheckResult {
       "lib",
       "scripts",
       "diff",
+      "contracts",
       "vitest.config.ts",
     ],
+    // Compiled against built declarations by contracts/lib/types.ts instead.
+    exclude: ["contracts/types"],
   };
   if (!sameJson(tsconfig, want)) {
     fail(`tsconfig.json must be exactly ${JSON.stringify(want)}`);
