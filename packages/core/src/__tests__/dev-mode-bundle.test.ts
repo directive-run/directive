@@ -230,8 +230,14 @@ describe("isDevelopment bundle shape", () => {
     for (const [subpath, target] of Object.entries(pkg.exports)) {
       for (const condition of ["development", "production"] as const) {
         expect(target[condition], `${subpath} ${condition}`).toEqual({
-          import: file(target.import).replace("./dist/", `./dist/${condition}/`),
-          require: file(target.require).replace("./dist/", `./dist/${condition}/`),
+          import: file(target.import).replace(
+            "./dist/",
+            `./dist/${condition}/`,
+          ),
+          require: file(target.require).replace(
+            "./dist/",
+            `./dist/${condition}/`,
+          ),
         });
         // A condition must come before import/require to win.
         const keys = Object.keys(target);
