@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/el"
   },
   "homepage": "https://directive.run",
@@ -38,24 +38,44 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./jsx-runtime": {
-      "types": "./dist/jsx-runtime.d.ts",
-      "require": "./dist/jsx-runtime.cjs",
-      "import": "./dist/jsx-runtime.js"
+      "require": {
+        "types": "./dist/jsx-runtime.d.cts",
+        "default": "./dist/jsx-runtime.cjs"
+      },
+      "import": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      }
     },
     "./jsx-dev-runtime": {
-      "types": "./dist/jsx-runtime.d.ts",
-      "require": "./dist/jsx-runtime.cjs",
-      "import": "./dist/jsx-runtime.js"
+      "require": {
+        "types": "./dist/jsx-runtime.d.cts",
+        "default": "./dist/jsx-runtime.cjs"
+      },
+      "import": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      }
     },
     "./htm": {
-      "types": "./dist/htm.d.ts",
-      "require": "./dist/htm.cjs",
-      "import": "./dist/htm.js"
+      "require": {
+        "types": "./dist/htm.d.cts",
+        "default": "./dist/htm.cjs"
+      },
+      "import": {
+        "types": "./dist/htm.d.ts",
+        "default": "./dist/htm.js"
+      }
     }
   },
   "files": ["dist"],

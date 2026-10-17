@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/timeline"
   },
   "homepage": "https://directive.run",
@@ -35,19 +35,34 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./reporter": {
-      "types": "./dist/reporter.d.ts",
-      "require": "./dist/reporter.cjs",
-      "import": "./dist/reporter.js"
+      "require": {
+        "types": "./dist/reporter.d.cts",
+        "default": "./dist/reporter.cjs"
+      },
+      "import": {
+        "types": "./dist/reporter.d.ts",
+        "default": "./dist/reporter.js"
+      }
     },
     "./matchers": {
-      "types": "./dist/matchers.d.ts",
-      "require": "./dist/matchers.cjs",
-      "import": "./dist/matchers.js"
+      "require": {
+        "types": "./dist/matchers.d.cts",
+        "default": "./dist/matchers.cjs"
+      },
+      "import": {
+        "types": "./dist/matchers.d.ts",
+        "default": "./dist/matchers.js"
+      }
     }
   },
   "files": ["dist", "README.md", "CHANGELOG.md"],

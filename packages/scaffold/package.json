@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/scaffold"
   },
   "homepage": "https://directive.run/docs/ide-integration",
@@ -27,9 +27,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "files": ["dist"],

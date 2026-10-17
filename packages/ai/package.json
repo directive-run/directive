@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/ai"
   },
   "homepage": "https://directive.run",
@@ -45,64 +45,124 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "require": "./dist/testing.cjs",
-      "import": "./dist/testing.js"
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      },
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
     },
     "./anthropic": {
-      "types": "./dist/anthropic.d.ts",
-      "require": "./dist/anthropic.cjs",
-      "import": "./dist/anthropic.js"
+      "require": {
+        "types": "./dist/anthropic.d.cts",
+        "default": "./dist/anthropic.cjs"
+      },
+      "import": {
+        "types": "./dist/anthropic.d.ts",
+        "default": "./dist/anthropic.js"
+      }
     },
     "./openai": {
-      "types": "./dist/openai.d.ts",
-      "require": "./dist/openai.cjs",
-      "import": "./dist/openai.js"
+      "require": {
+        "types": "./dist/openai.d.cts",
+        "default": "./dist/openai.cjs"
+      },
+      "import": {
+        "types": "./dist/openai.d.ts",
+        "default": "./dist/openai.js"
+      }
     },
     "./ollama": {
-      "types": "./dist/ollama.d.ts",
-      "require": "./dist/ollama.cjs",
-      "import": "./dist/ollama.js"
+      "require": {
+        "types": "./dist/ollama.d.cts",
+        "default": "./dist/ollama.cjs"
+      },
+      "import": {
+        "types": "./dist/ollama.d.ts",
+        "default": "./dist/ollama.js"
+      }
     },
     "./gemini": {
-      "types": "./dist/gemini.d.ts",
-      "require": "./dist/gemini.cjs",
-      "import": "./dist/gemini.js"
+      "require": {
+        "types": "./dist/gemini.d.cts",
+        "default": "./dist/gemini.cjs"
+      },
+      "import": {
+        "types": "./dist/gemini.d.ts",
+        "default": "./dist/gemini.js"
+      }
     },
     "./multi-agent": {
-      "types": "./dist/multi-agent.d.ts",
-      "require": "./dist/multi-agent.cjs",
-      "import": "./dist/multi-agent.js"
+      "require": {
+        "types": "./dist/multi-agent.d.cts",
+        "default": "./dist/multi-agent.cjs"
+      },
+      "import": {
+        "types": "./dist/multi-agent.d.ts",
+        "default": "./dist/multi-agent.js"
+      }
     },
     "./predicate": {
-      "types": "./dist/predicate.d.ts",
-      "require": "./dist/predicate.cjs",
-      "import": "./dist/predicate.js"
+      "require": {
+        "types": "./dist/predicate.d.cts",
+        "default": "./dist/predicate.cjs"
+      },
+      "import": {
+        "types": "./dist/predicate.d.ts",
+        "default": "./dist/predicate.js"
+      }
     },
     "./guardrails": {
-      "types": "./dist/guardrails.d.ts",
-      "require": "./dist/guardrails.cjs",
-      "import": "./dist/guardrails.js"
+      "require": {
+        "types": "./dist/guardrails.d.cts",
+        "default": "./dist/guardrails.cjs"
+      },
+      "import": {
+        "types": "./dist/guardrails.d.ts",
+        "default": "./dist/guardrails.js"
+      }
     },
     "./devtools": {
-      "types": "./dist/devtools.d.ts",
-      "require": "./dist/devtools.cjs",
-      "import": "./dist/devtools.js"
+      "require": {
+        "types": "./dist/devtools.d.cts",
+        "default": "./dist/devtools.cjs"
+      },
+      "import": {
+        "types": "./dist/devtools.d.ts",
+        "default": "./dist/devtools.js"
+      }
     },
     "./evals": {
-      "types": "./dist/evals.d.ts",
-      "require": "./dist/evals.cjs",
-      "import": "./dist/evals.js"
+      "require": {
+        "types": "./dist/evals.d.cts",
+        "default": "./dist/evals.cjs"
+      },
+      "import": {
+        "types": "./dist/evals.d.ts",
+        "default": "./dist/evals.js"
+      }
     },
     "./mcp": {
-      "types": "./dist/mcp.d.ts",
-      "require": "./dist/mcp.cjs",
-      "import": "./dist/mcp.js"
+      "require": {
+        "types": "./dist/mcp.d.cts",
+        "default": "./dist/mcp.cjs"
+      },
+      "import": {
+        "types": "./dist/mcp.d.ts",
+        "default": "./dist/mcp.js"
+      }
     }
   },
   "files": ["dist"],

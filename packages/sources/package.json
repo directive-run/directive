@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive",
+    "url": "git+https://github.com/directive-run/directive.git",
     "directory": "packages/sources"
   },
   "homepage": "https://directive.run",
@@ -36,19 +36,34 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./supabase": {
-      "types": "./dist/supabase.d.ts",
-      "require": "./dist/supabase.cjs",
-      "import": "./dist/supabase.js"
+      "require": {
+        "types": "./dist/supabase.d.cts",
+        "default": "./dist/supabase.cjs"
+      },
+      "import": {
+        "types": "./dist/supabase.d.ts",
+        "default": "./dist/supabase.js"
+      }
     },
     "./cloudflare": {
-      "types": "./dist/cloudflare.d.ts",
-      "require": "./dist/cloudflare.cjs",
-      "import": "./dist/cloudflare.js"
+      "require": {
+        "types": "./dist/cloudflare.d.cts",
+        "default": "./dist/cloudflare.cjs"
+      },
+      "import": {
+        "types": "./dist/cloudflare.d.ts",
+        "default": "./dist/cloudflare.js"
+      }
     }
   },
   "files": ["dist", "README.md", "CHANGELOG.md"],
