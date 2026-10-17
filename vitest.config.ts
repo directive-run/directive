@@ -116,11 +116,7 @@ function buildAlias(): Array<{ find: RegExp; replacement: string }> {
     }
 
     for (const [subpath, target] of Object.entries(pkg.exports ?? {})) {
-      const dist =
-        typeof target === "string"
-          ? target
-          : ((target as { import?: string; default?: string })?.import ??
-            (target as { default?: string })?.default);
+      const dist = runtimeTarget(target);
       // Only code entry points. A package may also export an asset — the CLI
       // ships a generated `llms.txt` — which has no source module to alias.
       if (
@@ -147,6 +143,31 @@ function buildAlias(): Array<{ find: RegExp; replacement: string }> {
 
   // Subpaths first so the more specific pattern is tried first.
   return [...subpaths, ...roots];
+}
+
+/**
+ * Resolve an `exports` condition value to its runtime file: a string is itself;
+ * an object resolves through `import`, then `default`, recursing through nested
+ * conditions. `types` and the dev/prod build conditions are never the target.
+ */
+function runtimeTarget(target: unknown): string | undefined {
+  if (typeof target === "string") {
+    return target;
+  }
+  if (!target || typeof target !== "object") {
+    return undefined;
+  }
+  const t = target as Record<string, unknown>;
+  for (const key of ["import", "default", "require"]) {
+    if (key in t) {
+      const found = runtimeTarget(t[key]);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export default defineConfig({

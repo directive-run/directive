@@ -12,6 +12,31 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Resolve an `exports` condition value to its runtime file: a string is itself;
+ * an object resolves through `import`, then `default`, recursing through nested
+ * conditions. `types` and the dev/prod build conditions are never the target.
+ */
+function runtimeTarget(target: unknown): string | undefined {
+  if (typeof target === "string") {
+    return target;
+  }
+  if (!target || typeof target !== "object") {
+    return undefined;
+  }
+  const t = target as Record<string, unknown>;
+  for (const key of ["import", "default", "require"]) {
+    if (key in t) {
+      const found = runtimeTarget(t[key]);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 /** The repository this package lives in. */
 export const defaultRepoRoot = resolve(here, "../../..");
 
@@ -52,9 +77,9 @@ export function coreEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
   const pkg = JSON.parse(readFileSync(join(coreRoot, "package.json"), "utf8"));
   const out: CoreEntry[] = [];
   for (const [subpath, target] of Object.entries(
-    pkg.exports as Record<string, { import?: string }>,
+    pkg.exports as Record<string, unknown>,
   )) {
-    const dist = target.import;
+    const dist = runtimeTarget(target);
     if (!dist) {
       continue;
     }
