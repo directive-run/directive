@@ -217,17 +217,21 @@ describe("isDevelopment bundle shape", () => {
         {
           development?: { import: string; require: string };
           production?: { import: string; require: string };
-          import: string;
-          require: string;
+          import: string | { default: string };
+          require: string | { default: string };
         }
       >;
     };
+    // A condition value is a file or `{ types, default }`; the runtime file
+    // is the string itself or its `default`.
+    const file = (v: string | { default: string }) =>
+      typeof v === "string" ? v : v.default;
 
     for (const [subpath, target] of Object.entries(pkg.exports)) {
       for (const condition of ["development", "production"] as const) {
         expect(target[condition], `${subpath} ${condition}`).toEqual({
-          import: target.import.replace("./dist/", `./dist/${condition}/`),
-          require: target.require.replace("./dist/", `./dist/${condition}/`),
+          import: file(target.import).replace("./dist/", `./dist/${condition}/`),
+          require: file(target.require).replace("./dist/", `./dist/${condition}/`),
         });
         // A condition must come before import/require to win.
         const keys = Object.keys(target);

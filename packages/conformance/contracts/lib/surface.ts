@@ -61,12 +61,16 @@ export function declarationEntries(pkgDir: string): Record<string, string> {
   const pkg = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
   const out: Record<string, string> = {};
   for (const [subpath, target] of Object.entries(
-    pkg.exports as Record<string, { types?: string }>,
+    pkg.exports as Record<
+      string,
+      { types?: string; import?: { types?: string } }
+    >,
   )) {
-    if (!target.types) {
+    const types = target.types ?? target.import?.types;
+    if (!types) {
       throw new Error(`export ${subpath} of ${pkgDir} has no types`);
     }
-    out[subpath] = join(pkgDir, target.types);
+    out[subpath] = join(pkgDir, types);
   }
 
   return out;
