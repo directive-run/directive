@@ -181,7 +181,9 @@ export default defineConfig({
           name: "conformance:checks",
           root: here,
           environment: "node",
-          include: ["scripts/__tests__/**/*.test.ts"],
+          // Tamper tests for the checks, and the frozen 1.35 contracts
+          // (contracts/STABILITY.md) with their own tamper cases.
+          include: ["scripts/__tests__/**/*.test.ts", "contracts/**/*.test.ts"],
           // Each tamper case copies the repo slice and re-runs the check.
           testTimeout: 120_000,
         },

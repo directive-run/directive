@@ -173,6 +173,33 @@ or that covered no difference in the run (stale). The file is part of the
 harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review.
 
+## Frozen 1.35 contracts (`contracts/`)
+
+What 2.0 must keep, as checks: see `contracts/STABILITY.md` for the tiers,
+the evolution rules and the frozen write-log record. They run in the
+`conformance:checks` project (core must be built: two of them read
+`packages/core/dist`), and every file under `contracts/` is in
+`harness.lock.json`.
+
+- `api-surface.test.ts`: the public API of every entry point, printed from
+  the built `.d.ts`, equals `api-surface.json` (written from the published
+  1.35.0). Additions pass and are printed; a removed or changed export fails
+  unless `api-changes.json` lists it, signed by Jason (stale entries fail).
+- `types.test.ts`: compiles `types/check.ts` against 1.35.0's and the
+  workspace's built declarations: `SystemLike`, the 46 hook names
+  (`types/frozen.ts`) and signatures, every `ObservationEvent` type and
+  payload, the `inspect()` shape.
+- `golden.test.ts`: `golden/` holds what 1.35.0 writes for one script
+  (history export, persistence data, signed snapshot, audit chain). Each
+  must still be 1.35.0's output, the workspace must write the same bytes and
+  read each as 1.35.0 does, and 1.35.0 must read the workspace's output.
+
+Each test file also tampers with a copy (a removed export, a renamed hook, a
+changed golden byte, an engine that reads or writes differently) and
+expects the check to fail. `pnpm --filter @directive-run/conformance
+contracts:freeze` rewrites the snapshot and goldens from `directive-v1`;
+run it only when the v1 pin moves, then `oracle:update`.
+
 ## Layers
 
 `layers.rules.json` (hand-written) gives each file the layer whose behaviour
@@ -208,7 +235,7 @@ deliberate act, made visible on the pull request:
 
 - **`oracle-change` label for any harness change.** The harness is the
   package's own (`vitest.config.ts`, `tsconfig.json`, `package.json`,
-  `helpers/`, `self/`, `lib/`, `diff/`, `scripts/`, `layers.rules.json`,
+  `helpers/`, `self/`, `lib/`, `diff/`, `contracts/`, `scripts/`, `layers.rules.json`,
   `aheadOfV1.json`, `v1-pin.json`, `oracle-baseline.json`,
   `harness.lock.json`) plus what decides how it runs from outside:
   `.github/workflows/*.yml`, the root `package.json`, `pnpm-workspace.yaml`,
