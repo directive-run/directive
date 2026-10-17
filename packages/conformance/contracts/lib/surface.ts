@@ -8,25 +8,47 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { Project, ts } from "ts-morph";
+import { join, relative } from "node:path";
+import { Node, Project, SymbolFlags, SyntaxKind, ts } from "ts-morph";
 
 /** subpath → export name → printed declaration(s). */
 export type Surface = Record<string, Record<string, string>>;
 
 export type ChangeKind = "added" | "removed" | "changed";
 
-/** One approved difference from the frozen surface (contracts/api-changes.json). */
-export interface ApiChange {
+/** An approved removal or change of a frozen export. */
+export interface ApiRemovalOrChange {
   entry: string;
   name: string;
-  /** Additions need no entry: adding is a minor change. */
   change: "removed" | "changed";
   reason: string;
   /** Filled in by Jason, never by an agent. */
   approvedBy: string;
   date: string;
 }
+
+/**
+ * A listed addition. New exports must be listed (the 2.0 surface has to carry
+ * them). `approvedBy: null` with `status: "pending-gate"` passes but is
+ * printed as a pending approval until Jason signs it at the Phase 0 gate.
+ */
+export interface ApiAddition {
+  kind: "add";
+  /** "<entry> <name>", e.g. "./plugins ClobberSummaryEvent". */
+  export: string;
+  reason: string;
+  approvedBy: string | null;
+  status?: "pending-gate";
+  date?: string;
+}
+
+export type ApiChange = ApiRemovalOrChange | ApiAddition;
+
+const isAdd = (c: ApiChange): c is ApiAddition =>
+  (c as ApiAddition).kind === "add";
+
+/** Referenced-but-unexported declarations are snapshotted under this prefix. */
+export const REF_PREFIX = "#ref:";
 
 export interface SurfaceDiff {
   entry: string;
@@ -50,6 +72,10 @@ export function declarationEntries(pkgDir: string): Record<string, string> {
   return out;
 }
 
+/** File name without the chunk hash the bundler appends. */
+const moduleName = (file: string, pkgDir: string) =>
+  relative(pkgDir, file).replace(/-[A-Za-z0-9_-]{8}(?=\.d\.c?ts$)/, "");
+
 /** The surface of the built package in `pkgDir` (its `dist/` must exist). */
 export function extractSurface(pkgDir: string): Surface {
   const entries = declarationEntries(pkgDir);
@@ -58,25 +84,83 @@ export function extractSurface(pkgDir: string): Surface {
     compilerOptions: { strict: true, skipLibCheck: true },
   });
   const printer = ts.createPrinter({ removeComments: true });
+  const distDir = join(pkgDir, "dist");
+  const print = (node: Node) =>
+    `${node.getKindName()} ${printer.printNode(
+      ts.EmitHint.Unspecified,
+      node.compilerNode,
+      node.getSourceFile().compilerNode,
+    )}`;
+  const isTopLevel = (node: Node) => {
+    const parent = node.getParent();
+    if (Node.isVariableDeclaration(node)) {
+      return Node.isSourceFile(
+        parent?.getParent()?.getParent() as Node | undefined,
+      );
+    }
+
+    return Node.isSourceFile(parent);
+  };
   const surface: Surface = {};
   for (const subpath of Object.keys(entries).sort()) {
     const sf = project.addSourceFileAtPath(entries[subpath] as string);
     project.resolveSourceFileDependencies();
     const names: Record<string, string> = {};
     const exported = sf.getExportedDeclarations();
+    const exportedNodes = new Set<Node>();
+    const queue: Node[] = [];
+    const visited = new Set<Node>();
     for (const name of [...exported.keys()].sort()) {
-      names[name] = (exported.get(name) ?? [])
-        .map(
-          (node) =>
-            `${node.getKindName()} ${printer.printNode(
-              ts.EmitHint.Unspecified,
-              node.compilerNode,
-              node.getSourceFile().compilerNode,
-            )}`,
-        )
-        .join("\n");
+      const nodes = exported.get(name) ?? [];
+      names[name] = nodes.map(print).join("\n");
+      for (const n of nodes) {
+        exportedNodes.add(n);
+        queue.push(n);
+      }
     }
-    surface[subpath] = names;
+    // Transitively snapshot every declaration an export refers to, whether or
+    // not it is exported: its shape is part of the contract.
+    const refs = new Map<string, string[]>();
+    while (queue.length > 0) {
+      const node = queue.pop() as Node;
+      if (visited.has(node)) {
+        continue;
+      }
+      visited.add(node);
+      for (const id of node.getDescendantsOfKind(SyntaxKind.Identifier)) {
+        let sym = id.getSymbol();
+        if (sym?.hasFlags(SymbolFlags.Alias)) {
+          sym = sym.getAliasedSymbol() ?? sym;
+        }
+        for (const decl of sym?.getDeclarations() ?? []) {
+          const file = decl.getSourceFile().getFilePath();
+          if (
+            !file.startsWith(distDir) ||
+            !isTopLevel(decl) ||
+            exportedNodes.has(decl) ||
+            visited.has(decl)
+          ) {
+            continue;
+          }
+          const key = `${REF_PREFIX}${moduleName(file, pkgDir)}:${sym?.getName()}`;
+          const printed = print(decl);
+          const list = refs.get(key) ?? [];
+          if (!list.includes(printed)) {
+            list.push(printed);
+          }
+          refs.set(key, list);
+          queue.push(decl);
+        }
+      }
+    }
+    for (const [key, list] of refs) {
+      names[key] = list.sort().join("\n");
+    }
+    surface[subpath] = Object.fromEntries(
+      Object.keys(names)
+        .sort()
+        .map((k) => [k, names[k] as string]),
+    );
   }
 
   return surface;
@@ -91,6 +175,16 @@ export function diffSurface(frozen: Surface, actual: Surface): SurfaceDiff[] {
     const names = new Set([...Object.keys(a), ...Object.keys(b)]);
     for (const name of [...names].sort()) {
       if (!(name in b)) {
+        // A once-unexported type that is now exported moved, it did not go.
+        const promoted = name.startsWith(REF_PREFIX)
+          ? b[name.slice(name.lastIndexOf(":") + 1)]
+          : undefined;
+        if (promoted !== undefined) {
+          if (promoted !== a[name]) {
+            out.push({ entry, name, change: "changed" });
+          }
+          continue;
+        }
         out.push({ entry, name, change: "removed" });
       } else if (!(name in a)) {
         out.push({ entry, name, change: "added" });
@@ -106,11 +200,24 @@ export function diffSurface(frozen: Surface, actual: Surface): SurfaceDiff[] {
 const changeKey = (d: { entry: string; name: string; change: string }) =>
   `${d.entry} ${d.name} (${d.change})`;
 
+/** Additions listed with no signature yet, for the census to print. */
+export function pendingApprovals(changes: readonly ApiChange[]): string[] {
+  return changes
+    .filter((c) => c.approvedBy === null || c.approvedBy === "")
+    .map((c) =>
+      isAdd(c)
+        ? `add ${c.export}: ${c.reason}`
+        : `${c.change} ${c.entry} ${c.name}: ${c.reason}`,
+    );
+}
+
 /**
  * Problems: every removed or changed export must be listed in
- * api-changes.json, and every listed change must be complete, signed
- * (approvedBy) and still occur. Additions pass (semver minor); the 2.0 surface
- * still has to carry them, so the test prints them.
+ * api-changes.json, signed (approvedBy); every added export must be listed
+ * too (kind "add"), signed or `status: "pending-gate"` with approvedBy null;
+ * and every listed entry must still occur. Referenced-but-unexported
+ * declarations (`#ref:` keys) are held to the same removed/changed rule; a new
+ * one needs no entry (the export that reaches it is what changed).
  */
 export function checkSurface(
   frozen: Surface,
@@ -118,17 +225,43 @@ export function checkSurface(
   changes: readonly ApiChange[],
 ): string[] {
   const failures: string[] = [];
-  const listed = new Map(changes.map((c) => [changeKey(c), c]));
+  const listed = new Map<string, ApiChange>();
   for (const c of changes) {
-    for (const field of ["reason", "approvedBy", "date"] as const) {
-      if (typeof c[field] !== "string" || c[field].trim() === "") {
-        failures.push(`api-changes.json: ${changeKey(c)} has no ${field}`);
+    const key = isAdd(c) ? `${c.export} (added)` : changeKey(c);
+    listed.set(key, c);
+    if (typeof c.reason !== "string" || c.reason.trim() === "") {
+      failures.push(`api-changes.json: ${key} has no reason`);
+    }
+    const signed =
+      typeof c.approvedBy === "string" && c.approvedBy.trim() !== "";
+    if (isAdd(c)) {
+      if (!signed && !(c.approvedBy === null && c.status === "pending-gate")) {
+        failures.push(
+          `api-changes.json: ${key} has no approvedBy and is not pending-gate`,
+        );
+      }
+    } else {
+      if (!signed) {
+        failures.push(`api-changes.json: ${key} has no approvedBy`);
+      }
+      if (typeof c.date !== "string" || c.date.trim() === "") {
+        failures.push(`api-changes.json: ${key} has no date`);
       }
     }
   }
   const seen = new Set<string>();
   for (const d of diffSurface(frozen, actual)) {
     if (d.change === "added") {
+      if (d.name.startsWith(REF_PREFIX)) {
+        continue;
+      }
+      const key = `${d.entry} ${d.name} (added)`;
+      seen.add(key);
+      if (!listed.has(key)) {
+        failures.push(
+          `public API ${key} is new since 1.35 and is not listed in contracts/api-changes.json`,
+        );
+      }
       continue;
     }
     seen.add(changeKey(d));

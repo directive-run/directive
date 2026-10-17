@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defaultRepoRoot } from "../lib/core-entries.js";
-import { type Engine, checkGoldens, loadEngine } from "./lib/golden.js";
+import { type Engine, checkGoldens, loadEngine, same } from "./lib/golden.js";
 
 const goldenDir = join(
   defaultRepoRoot,
@@ -87,5 +87,45 @@ describe("golden files", () => {
     expect(failures.join("\n")).toMatch(
       /1\.35\.0 reads the workspace's signed differently/,
     );
+  });
+
+  it("an engine that accepts tampered or expired signatures fails the check", async () => {
+    const drifted: Engine = {
+      ...local,
+      core: { ...local.core, verifySnapshotSignature: async () => true },
+    };
+    const failures = await checkGoldens(goldenDir, v1, drifted);
+    expect(failures.join("\n")).toMatch(
+      /the workspace reads 1\.35\.0's signed differently/,
+    );
+  });
+
+  it("an engine whose audit verify accepts a tampered chain fails the check", async () => {
+    const drifted: Engine = {
+      ...local,
+      core: {
+        ...local.core,
+        createAuditLedger: (...args: unknown[]) => {
+          const ledger = local.core.createAuditLedger(...args);
+
+          return { ...ledger, verify: () => ({ valid: true }) };
+        },
+      },
+    };
+    const failures = await checkGoldens(goldenDir, v1, drifted);
+    expect(failures.join("\n")).toMatch(
+      /the workspace reads 1\.35\.0's ledger differently/,
+    );
+  });
+
+  it("same() tells Date, Map and Set apart where JSON cannot", () => {
+    expect(same(new Date(1), new Date(2))).toBe(false);
+    expect(same(new Date(1), new Date(1))).toBe(true);
+    expect(same(new Map([["a", 1]]), new Map([["a", 2]]))).toBe(false);
+    expect(same(new Map([["a", 1]]), {})).toBe(false);
+    expect(same(new Set([1]), new Set([2]))).toBe(false);
+    expect(same(new Set([1]), new Set([1]))).toBe(true);
+    expect(same({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
+    expect(same({ a: undefined }, {})).toBe(false);
   });
 });

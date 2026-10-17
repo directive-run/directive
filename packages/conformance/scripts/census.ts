@@ -114,6 +114,26 @@ const total = Object.values(reports).reduce(
 console.log(
   `[census] ${ALL_PROJECTS.length} projects, ${total} tests: every port ran in every engine, nothing skipped but aheadOfV1`,
 );
+{
+  const apiChanges = JSON.parse(
+    readFileSync(join(conformanceRoot, "contracts/api-changes.json"), "utf8"),
+  ).changes as {
+    approvedBy: string | null;
+    reason: string;
+    export?: string;
+    entry?: string;
+    name?: string;
+  }[];
+  const pending = apiChanges.filter((c) => !c.approvedBy);
+  if (pending.length > 0) {
+    console.log(
+      `[census] pending approvals (Jason signs at the Phase 0 gate): ${pending.length}`,
+    );
+    for (const c of pending) {
+      console.log(`  - ${c.export ?? `${c.entry} ${c.name}`}: ${c.reason}`);
+    }
+  }
+}
 const v2 = existsSync(join(repoRoot, "packages/core-next/src/index.ts"));
 console.log(
   v2

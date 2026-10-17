@@ -1,4 +1,13 @@
 {
-  "$comment": "Approved removals or changes to the frozen 1.35 public API (contracts/api-surface.json). Each entry: { entry, name, change: removed|changed, reason, approvedBy, date }. Jason approves every entry; an agent never adds one or fills in approvedBy. Additions need no entry.",
-  "changes": []
+  "$comment": "Every difference from the frozen 1.35 public API (contracts/api-surface.json) must be listed. Removals/changes: { entry, name, change: removed|changed, reason, approvedBy, date }. Additions: { kind: \"add\", export: \"<entry> <name>\", reason, approvedBy, status? }; approvedBy may be null only with status \"pending-gate\" (signed by Jason at the Phase 0 gate). An agent never fills in approvedBy. goldenChanges: approved changes to how a golden part (history|persistence) reads: { part, reason, approvedBy, date }.",
+  "changes": [
+    {
+      "kind": "add",
+      "export": "./plugins ClobberSummaryEvent",
+      "reason": "1.x patch: public onSummary param type",
+      "approvedBy": null,
+      "status": "pending-gate"
+    }
+  ],
+  "goldenChanges": []
 }
