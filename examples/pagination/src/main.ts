@@ -67,7 +67,7 @@ function renderItems(items: ListItem[]): void {
         { className: "pg-item" },
         el(
           "span",
-          { className: "pg-item-category", style: `background: ${color}` } as any,
+          { className: "pg-item-category", style: `background: ${color}` },
           item.category,
         ),
         el("span", { className: "pg-item-title" }, item.title),

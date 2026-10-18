@@ -163,7 +163,7 @@ function render(): void {
 
     const itemEl = el(
       "div",
-      { className: classNames.join(" ") } as any,
+      { className: classNames.join(" ") },
       el("input", {
         type: "checkbox",
         className: "ou-todo-checkbox",
@@ -174,7 +174,7 @@ function render(): void {
           action: "toggle",
           id: item.id,
         },
-      } as any),
+      }),
       el("span", { className: "ou-todo-text" }, item.text),
       el(
         "button",
@@ -186,7 +186,7 @@ function render(): void {
             action: "delete",
             id: item.id,
           },
-        } as any,
+        },
         "\u{1F5D1}",
       ),
     );

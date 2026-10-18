@@ -133,7 +133,7 @@ function renderCard(
         {
           className: "dl-loading-msg",
           style: "color: var(--brand-text-faint); font-style: italic;",
-        } as any,
+        },
         "Waiting to start",
       ),
     );
@@ -171,7 +171,7 @@ function renderCard(
         {
           className: "dl-btn retry-btn",
           dataset: { testid: retryTestId, resource: resourceKey },
-        } as any,
+        },
         "Retry",
       ),
     );

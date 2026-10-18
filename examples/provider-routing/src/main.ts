@@ -52,7 +52,7 @@ function renderProvider(
     circuitBadge(state),
     el(
       "span",
-      { style: "font-size:0.55rem;color:var(--brand-text-dim)" } as any,
+      { style: "font-size:0.55rem;color:var(--brand-text-dim)" },
       `${stats.callCount} calls, ${stats.errorCount} err, $${stats.totalCost}`,
     ),
   );

@@ -113,7 +113,7 @@ function render(): void {
           {
             className: `sc-item${overstock ? " sc-item-overstock" : ""}`,
             dataset: { itemId: item.id },
-          } as any,
+          },
           el("div", { className: `sc-item-icon sc-icon-${item.image}` }),
           el(
             "div",
@@ -141,7 +141,7 @@ function render(): void {
                 className: "sc-qty-btn",
                 dataset: { action: "decrease", id: item.id },
                 disabled: item.quantity <= 1,
-              } as any,
+              },
               "-",
             ),
             el("span", { className: "sc-qty-value" }, `${item.quantity}`),
@@ -151,7 +151,7 @@ function render(): void {
                 className: "sc-qty-btn",
                 dataset: { action: "increase", id: item.id },
                 disabled: item.quantity >= item.maxStock,
-              } as any,
+              },
               "+",
             ),
           ),
@@ -162,7 +162,7 @@ function render(): void {
               className: "sc-remove-btn",
               dataset: { action: "remove", id: item.id },
               title: "Remove item",
-            } as any,
+            },
             "\u00D7",
           ),
         );

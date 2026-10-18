@@ -6,5 +6,5 @@
  */
 
 export { el } from "./el.js";
-export type { ElChild } from "./el.js";
+export type { ElChild, ElProps } from "./el.js";
 export { bind, bindText, mount } from "./bind.js";
