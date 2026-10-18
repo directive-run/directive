@@ -7,7 +7,7 @@
  * Run: tsx scripts/validate-knowledge.ts
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { log } from "../../../scripts/lib/log";
@@ -17,6 +17,7 @@ const PKG_ROOT = join(__dirname, "..");
 const CORE_DIR = join(PKG_ROOT, "core");
 const AI_DIR = join(PKG_ROOT, "ai");
 const API_SKELETON = join(PKG_ROOT, "api-skeleton.md");
+const PACKAGES_DIR = join(PKG_ROOT, "..");
 
 // Known symbols that aren't in the API exports (language built-ins, etc.)
 const KNOWN_EXCEPTIONS = new Set([
@@ -44,6 +45,12 @@ const KNOWN_EXCEPTIONS = new Set([
   "console",
   "process",
   "fetch",
+  // React built-ins and illustrative identifiers used in examples
+  "useEffect",
+  "useState",
+  "useContext",
+  "userId",
+  "userMessage",
   "setTimeout",
   "setInterval",
   "require",
@@ -133,6 +140,71 @@ const KNOWN_EXCEPTIONS = new Set([
   "createLatencySimulator",
 ]);
 
+/**
+ * The skeleton only lists each package's root entry, so subpath exports
+ * (testing utilities, React hooks, `t.*` builders) never appear in it. Derive
+ * the rest from the workspace source itself: every declared name in a
+ * package's non-test source, plus the members of the `t` schema builder.
+ */
+function collectSourceSymbols(): Set<string> {
+  const symbols = new Set<string>();
+  const declPattern =
+    /\b(?:function|const|let|class|interface|type|enum)\s+([A-Za-z_]\w*)/g;
+
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "node_modules" || entry === "__tests__") {
+        continue;
+      }
+
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+      } else if (/\.tsx?$/.test(entry) && !/\.(test|spec)\./.test(entry)) {
+        const text = readFileSync(full, "utf-8");
+        for (const m of text.matchAll(declPattern)) {
+          symbols.add(m[1] as string);
+        }
+
+        // Interface members and object keys (option names, test-system methods)
+        for (const m of text.matchAll(
+          /^[ \t]+(?:readonly )?([A-Za-z_]\w*)\??(?:\(|:|<)/gm,
+        )) {
+          symbols.add(m[1] as string);
+        }
+
+        const tBlock = text.match(/export const t = \{([\s\S]*?)\n\};/);
+        if (tBlock) {
+          for (const m of (tBlock[1] as string).matchAll(
+            /^ {2}([A-Za-z_]\w*)\b/gm,
+          )) {
+            symbols.add(`t.${m[1]}`);
+          }
+        }
+      }
+    }
+  };
+
+  for (const pkg of readdirSync(PACKAGES_DIR)) {
+    const src = join(PACKAGES_DIR, pkg, "src");
+    try {
+      walk(src);
+    } catch {
+      // package without a src dir
+    }
+  }
+
+  return symbols;
+}
+
+/**
+ * Lines that name a symbol in order to say it does not exist ("`t.map` does
+ * not exist", "the hallucinated ones", "NOT `x`") are the knowledge base doing
+ * its job, so they are not checked against the API.
+ */
+const NEGATION_PATTERN =
+  /\b(?:do(?:es)? not exist|(?:do|does)n['\u2019]t exist|hallucinated|there is no|no separate|NOT|WRONG|never exist)\b|\(not\b/;
+
 function getKnowledgeFiles(): Array<{ name: string; content: string }> {
   const files: Array<{ name: string; content: string }> = [];
 
@@ -168,7 +240,11 @@ function main() {
     }
   }
 
-  log.reads(["api-skeleton.md"]);
+  for (const sym of collectSourceSymbols()) {
+    apiSymbols.add(sym);
+  }
+
+  log.reads(["api-skeleton.md", "packages/*/src"]);
   log.item(`${apiSymbols.size} symbols`);
 
   // Check each knowledge file
@@ -191,6 +267,16 @@ function main() {
     while ((ref = refPattern.exec(file.content)) !== null) {
       const symbol = ref[1];
       if (!symbol || KNOWN_EXCEPTIONS.has(symbol)) {
+        continue;
+      }
+
+      const lineStart = file.content.lastIndexOf("\n", ref.index) + 1;
+      const lineEnd = file.content.indexOf("\n", ref.index);
+      const line = file.content.slice(
+        lineStart,
+        lineEnd === -1 ? undefined : lineEnd,
+      );
+      if (NEGATION_PATTERN.test(line)) {
         continue;
       }
 
