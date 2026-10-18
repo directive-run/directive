@@ -993,11 +993,11 @@ export const system = createSystem({
 
 import {
   type ModuleSchema,
-  type RecoveryStrategy,
   createModule,
   createSystem,
   t,
 } from "@directive-run/core";
+import type { RecoveryStrategy } from "@directive-run/core/internals";
 import {
   type CircuitState,
   createCircuitBreaker,

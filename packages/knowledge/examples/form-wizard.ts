@@ -102,7 +102,7 @@ export const wizardModule = createModule("wizard", {
     },
 
     step2Valid: (facts) => {
-      return facts.plan !== "";
+      return facts.plan.length > 0;
     },
 
     currentStepValid: (facts, derived) => {
