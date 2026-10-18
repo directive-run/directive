@@ -62,6 +62,12 @@ jobs:
 
       - run: pnpm -r --filter './packages/*' typecheck
 
+      # Blocking: exits non-zero when a knowledge file names an API symbol
+      # that no package declares (drift between the AI-assistant docs and
+      # the code).
+      - name: Validate knowledge files
+        run: pnpm --filter @directive-run/knowledge validate
+
       # Bundle-size budgets enforce the lean adapter promise. Fails when a
       # gzipped published entry busts the budget in `size-budgets.json`; raise
       # the budget intentionally when shipping a deliberate new feature.
@@ -162,6 +168,36 @@ jobs:
       - run: pnpm check:packages
 
       - run: pnpm smoke:install
+
+  # Every example must keep compiling against the workspace packages, so an
+  # API change cannot silently strand the examples. Blocking.
+  examples:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Same reason as the build-and-test job: the build needs
+      # api-reference.json on disk before it runs.
+      - name: Fetch api-reference.json from the newest release carrying it
+        run: .github/scripts/fetch-api-reference.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: pnpm -r --filter './packages/*' build
+
+      - name: Type-check examples
+        run: pnpm -r --no-bail --filter './examples/*' typecheck
 
   e2e:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository

@@ -13,7 +13,7 @@ What do you need?
 ├── Save / restore orchestrator state → orchestrator.checkpoint() / restore()
 ├── Span emission to OTel             → createOtelPlugin({ serviceName })
 ├── Ship metrics + traces to backend  → createOTLPExporter({ endpoint })
-└── DevTools panel + websocket export → createDevtoolsServer + createDevtoolsExport
+└── DevTools panel + websocket export → createDevToolsServer + connectDevTools
 ```
 
 ## `createDebugTimeline(options?)`
@@ -201,16 +201,18 @@ The exporter maps Directive events to GenAI semantic conventions. The exact mapp
 
 ## DevTools server (live websocket export)
 
-For browser-based devtools panels, pair `createDebugTimeline` with `createDevtoolsServer` (also from `@directive-run/ai/devtools`) — same data the in-process listener gets, streamed over a WebSocket.
+For browser-based devtools panels, pair `createDebugTimeline` with `createDevToolsServer` (also from `@directive-run/ai/devtools`) — same data the in-process listener gets, streamed over a WebSocket.
 
 ```typescript
-import { createDebugTimeline, createDevtoolsServer } from "@directive-run/ai/devtools";
+import { createDebugTimeline, createDevToolsServer, createWsTransport } from "@directive-run/ai/devtools";
 
 const timeline = createDebugTimeline({ maxEvents: 5000 });
-const server = createDevtoolsServer({ timeline, port: 9229 });
+const server = createDevToolsServer({
+  transport: createWsTransport(9229),
+  timeline,
+});
 
-server.start();
-// Connect a devtools UI to ws://localhost:9229
+// Connect a devtools UI to ws://localhost:9229; server.close() shuts it down
 ```
 
 ## Anti-patterns
@@ -320,7 +322,7 @@ timeline.subscribe((e) => {
 | `orchestrator.resumeBreakpoint(id, mods?)` / `cancelBreakpoint(id, reason?)` | Resolve a paused breakpoint |
 | `createOtelPlugin(config)` | Plugin that emits spans for orchestrator activity |
 | `createOTLPExporter(config)` | Returns `{ exportMetrics, exportTraces }` for OTel backends |
-| `createDevtoolsServer({ timeline, port })` | WebSocket-bridged timeline for browser devtools |
+| `createDevToolsServer({ transport, timeline })` | WebSocket-bridged timeline for browser devtools |
 
 ## See also
 
