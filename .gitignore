@@ -73,6 +73,7 @@ temp/
 docs/IDEAS.md
 docs/AE-AUDIT-*.md
 docs/SESSION-HANDOFF-*.md
+docs/desktop-inbox/
 docs/SHIP-RECOVERY*.md
 
 # Generated at build time by packages/mcp/scripts/build-package-registry.ts.

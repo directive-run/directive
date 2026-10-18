@@ -76,6 +76,9 @@ jobs:
       # the budget intentionally when shipping a deliberate new feature.
       - run: pnpm size
 
+      # Ratchet: no new `as any` casts on system objects in packages/ai/src.
+      - run: pnpm check:ai-casts
+
       - name: Check knowledge freshness
         # Soft-warns instead of failing CI. The check IS valuable for
         # catching mid-cycle drift (someone edited a source export

@@ -25,6 +25,7 @@
     "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
     "check:packages": "tsx scripts/check-packages.ts",
     "smoke:install": "tsx scripts/install-smoke.ts",
+    "check:ai-casts": "tsx scripts/check-ai-system-casts.ts",
     "size": "npx tsx scripts/size-check.ts && npx tsx scripts/size-consumer.ts",
     "mirror-concepts": "npx tsx scripts/mirror-concepts.ts",
     "mirror-concepts:check": "npx tsx scripts/mirror-concepts.ts --dry-run"
