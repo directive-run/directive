@@ -1,0 +1,160 @@
+name: Bench
+
+# Benchmark history for @directive-run/core.
+#
+#   push to main  -> run the benches, append the result to the `bench-data`
+#                    branch (data dir `core/`). That branch is the history.
+#   pull_request  -> run the same benches, compare against the latest stored
+#                    result, and comment when anything is >130% of it.
+#
+# Report-only: `fail-on-alert` is false until the 2.0 ratio gates replace it.
+# Runner timing is noisy, so a single alert is a prompt to look, not a verdict.
+#
+# First run: `bench-data` does not exist yet. The action cannot create it
+# (it fetches the branch and fails if absent), so the main-push job creates
+# an empty orphan branch first, only if missing, using GITHUB_TOKEN. A PR that
+# opens before the first main run skips the comparison instead of failing.
+#
+# Only GITHUB_TOKEN is used; no external service or extra secret.
+#
+# Permissions are per job. The main job needs `contents: write` to push the
+# history. The PR job never pushes, but the action posts its alert as a
+# commit comment, which GitHub also gates behind `contents: write`; it gets
+# `pull-requests: write` as well. Fork PRs always get a read-only token, so the
+# comparison step there is allowed to fail without failing the job.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/core/**"
+      - "scripts/bench-to-json.ts"
+      - ".github/workflows/bench.yml"
+  pull_request:
+    paths:
+      - "packages/core/**"
+      - "scripts/bench-to-json.ts"
+      - ".github/workflows/bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BENCH_BRANCH: bench-data
+
+jobs:
+  # Records history. Serialised: two pushes racing on `bench-data` would make
+  # the second fail on a non-fast-forward.
+  record:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: bench-record
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The benches import core from source, so no build step is needed.
+      - name: Run benchmarks
+        run: pnpm bench --run packages/core/src/__benchmarks__ --outputJson bench-raw.json
+
+      - name: Convert to customSmallerIsBetter
+        run: pnpm exec tsx scripts/bench-to-json.ts bench-raw.json bench-result.json
+
+      # Create the history branch once, as an empty orphan commit, if absent.
+      - name: Ensure bench-data branch exists
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          if git ls-remote --exit-code --heads origin "$BENCH_BRANCH" > /dev/null; then
+            echo "$BENCH_BRANCH exists"
+          else
+            empty_tree=$(git hash-object -t tree /dev/null)
+            root=$(git commit-tree "$empty_tree" -m "bench: initialise history branch")
+            git push origin "$root:refs/heads/$BENCH_BRANCH"
+          fi
+
+      - name: Store benchmark history
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: "@directive-run/core"
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          gh-pages-branch: bench-data
+          benchmark-data-dir-path: core
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: false
+          fail-on-alert: false
+
+  # Compares a PR against stored history. Never pushes.
+  compare:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: bench-compare-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run benchmarks
+        run: pnpm bench --run packages/core/src/__benchmarks__ --outputJson bench-raw.json
+
+      - name: Convert to customSmallerIsBetter
+        run: pnpm exec tsx scripts/bench-to-json.ts bench-raw.json bench-result.json
+
+      - name: Is there history to compare against?
+        id: history
+        run: |
+          if git ls-remote --exit-code --heads origin "$BENCH_BRANCH" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No $BENCH_BRANCH branch yet; skipping comparison until the first main run."
+          fi
+
+      # continue-on-error: a fork PR's token is read-only, so posting the alert
+      # comment can fail there. That must not fail the PR.
+      - name: Compare against stored history
+        if: steps.history.outputs.exists == 'true'
+        continue-on-error: true
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: "@directive-run/core"
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          gh-pages-branch: bench-data
+          benchmark-data-dir-path: core
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          save-data-file: false
+          comment-on-alert: true
+          alert-threshold: "130%"
+          fail-on-alert: false
