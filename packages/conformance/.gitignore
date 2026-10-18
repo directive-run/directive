@@ -1,0 +1,5 @@
+.stryker-tmp/
+.stryker-cache/
+reports/
+stryker-setup-*.js
+vitest.stryker.config.ts.timestamp-*

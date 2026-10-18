@@ -75,7 +75,7 @@
     "lib/tests.ts": "9d5b9229181cc57581442e4a45c2903582be947f046a43ef5ac8e886b1069723",
     "lib/v1-pin.ts": "e285d2de69ed87dcc4c8a007fd3d817040ba403fc81380b7f3c9326194574fbf",
     "oracle-baseline.json": "62611ad847a2b9c16a754cfad7838faee4506d6fa02d6dd3fdf789ee56846a6a",
-    "package.json": "5b9792b18c7929fc7f1989d6ea5d16c7c511c4dba6afaf60f7fa1d532366c84f",
+    "package.json": "b79a6dfb437592de0779ef196fb35d31ddebd4987addd69d925a1345932e905b",
     "scripts/__tests__/check.test.ts": "6d6c6eead949df59f585b22c4fcc022afd3009400c78afaee6068e400e444e5c",
     "scripts/__tests__/engine-swap.test.ts": "e603d825737b89fddbd48fcad18cbd6475613b7a7059c48fdd4ac2ff134f6cb6",
     "scripts/__tests__/oracle.test.ts": "6cdf8fdb368b0688a1699ffe4a5a111ac76d656775d9848b622b9d07b1aedbb5",
