@@ -3,8 +3,8 @@
 `scripts/port.ts` copies a core test only when every import resolves to
 something `@directive-run/core` publishes. The files below either do not
 qualify or lean on `/internals`. This file proposes a fate for each.
-**Nothing here is decided** — the fates are confirmed at the Phase 0 gate,
-and no core test is deleted or rewritten before then.
+Jason approved these fates at the Phase 0 gate on 2026-10-18. A retire still
+waits until its black-box replacements pass on v1.
 
 `scripts/classification.json` holds the exact imports; `pnpm conformance`
 fails if it drifts from what core's tests actually import.
@@ -20,7 +20,7 @@ fails if it drifts from what core's tests actually import.
 - **retire** — tests a 1.x implementation detail 2.0 removes. A file retires
   only after the black-box tests named for it below exist and pass on v1.
 
-## White-box (14 files, 639 cases)
+## White-box (13 files, 624 cases)
 
 | File (`packages/core/src/…`) | Cases | Internal imports | Proposed fate | Layer |
 | --- | ---: | --- | --- | --- |
@@ -37,7 +37,7 @@ fails if it drifts from what core's tests actually import.
 | `core/__tests__/facts-nested-proxy-layering.test.ts` | 3 | `DEV_PROXY_TARGET` | **retire** with the dev Proxy layering; keep its intent as a black-box nested-write case | L1 |
 | `plugins/__tests__/audit-ledger-payload-shapes.test.ts` | 5 | `asRecorded` | **unit** for the audit-ledger plugin | L12 |
 | `plugins/__tests__/devtools-helpers.test.ts` | 44 | 15 devtools internals (buffers, limits, formatters) | **unit** for the devtools plugin | L12 |
-| `utils/__tests__/license.test.ts` | 15 | `generateNonce`, `validateLicenseKey` | **Jason, at the Phase 0 gate** — see below | — |
+| `utils/__tests__/license.test.ts` | 15 | `generateNonce`, `validateLicenseKey` | **deleted at the Phase 0 gate (option a)** — see below | — |
 
 ### Black-box replacements required before a retire
 
@@ -63,10 +63,10 @@ only once these exist as public tests and pass on v1:
 
 `src/utils/license.ts` validates `dk_live_` keys offline against an embedded
 RSA public key. Nothing in core imports it: it is dead code that ships in the
-source tree. Options for the Phase 0 gate (not acted on here):
-
-- **(a)** Delete it, and its test, from 1.x.
-- **(b)** Move it to a Directive Cloud package that owns licensing.
+source tree. Decided at the Phase 0 gate on 2026-10-18: **option (a)**, delete
+it and its test from 1.x. The file was unreachable from every entry point, so
+it never shipped in the published package. (Option (b), moving it to a
+Directive Cloud package, was not taken.)
 
 ## Packaging (1 file, 7 cases)
 

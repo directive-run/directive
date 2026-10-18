@@ -1156,18 +1156,6 @@
     "notes": []
   },
   {
-    "file": "src/utils/__tests__/license.test.ts",
-    "category": "white-box",
-    "cases": 15,
-    "internals": [
-      "generateNonce from ../license.js",
-      "validateLicenseKey from ../license.js"
-    ],
-    "internalsValues": [],
-    "typeOnlyNonPublic": [],
-    "notes": []
-  },
-  {
     "file": "src/utils/__tests__/snapshot-signing.test.ts",
     "category": "black-box",
     "cases": 6,

@@ -56,3 +56,10 @@ pnpm changeset pre exit
 The Version Packages PR is opened with `GITHUB_TOKEN`, so CI does not run on
 it. Using a GitHub App token for that step needs a credential and is not part
 of this change.
+
+Because of that, main now requires its checks with `enforce_admins` on, and the
+Version Packages PR has none. To merge it, a human closes and reopens the PR
+(or pushes an empty commit to its branch), which triggers CI. As a second
+guard, `release.yml` re-runs build, typecheck, tests and the package checks
+(`check:packages`, `smoke:install`) before the publish step, so a publish
+refuses if any of them fail.
