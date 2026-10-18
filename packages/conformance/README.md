@@ -316,3 +316,5 @@ the oracle now accepts that it did not before.
   still runs them. It is a harness file, so changes carry the label.
 
 Never published. Do not edit `tests/` or `layers.json` by hand.
+
+Phase 0 gate decisions (targets, frozen contracts, the four 1.35 bugs): [`contracts/GATE-0.md`](contracts/GATE-0.md).

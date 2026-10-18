@@ -77,6 +77,16 @@ jobs:
 
       - run: pnpm test -- --run
 
+      # Re-verify before publishing. The Version Packages PR is opened with
+      # GITHUB_TOKEN, so CI may not have run on it. Build and tests ran above;
+      # these are the package checks ci.yml's package-checks job runs
+      # (publint, attw, install smoke). Any failure stops the release here.
+      - name: Package checks (publint, attw)
+        run: pnpm check:packages
+
+      - name: Install smoke test
+        run: pnpm smoke:install
+
       # Release lines must not cross. `next` carries the prerelease line and
       # must be in changesets pre mode (.changeset/pre.json); `main` is the
       # stable line and must not be. Either mismatch would publish a stable
