@@ -38,6 +38,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Major-aware API reference selection test
+        run: scripts/__tests__/fetch-api-reference.test.sh
+
       # Must precede the build. The knowledge package builds api-skeleton.md
       # from docs/generated/api-reference.json, which lives in the sibling
       # directive-docs repo — absent on a runner that checks out this
