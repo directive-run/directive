@@ -161,7 +161,7 @@ export function buildGoalNodes(): Record<string, GoalNode> {
 
   for (const agent of Object.values(AGENTS)) {
     nodes[agent.id] = {
-      agent: agent.id,
+      handler: agent.id,
       produces: agent.produces,
       requires: agent.requires.length > 0 ? agent.requires : undefined,
       buildInput: (facts) => {

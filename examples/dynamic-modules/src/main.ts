@@ -26,6 +26,15 @@ let system = createSystem({
 });
 system.start();
 
+// FIXME(directive): registerModule() does not widen the system's static type,
+// so events of runtime-registered modules need a local cast.
+function dynamicEvents(): Record<
+  string,
+  Record<string, (payload?: Record<string, unknown>) => void>
+> {
+  return system.events as unknown as ReturnType<typeof dynamicEvents>;
+}
+
 // ============================================================================
 // Subscription Management
 // ============================================================================
@@ -42,7 +51,7 @@ function setupSubscriptions(): void {
 
   const loaded = system.facts.dashboard.loadedModules;
   for (const ns of loaded) {
-    unsubs.push(system.subscribeModule(ns, render));
+    unsubs.push(system.subscribeModule(ns as "dashboard", render));
   }
 }
 
@@ -180,14 +189,14 @@ function renderCounterWidget(): void {
 
   // Wire up controls after appending
   incrementBtn.addEventListener("click", () => {
-    system.events.counter.increment();
+    dynamicEvents().counter.increment();
   });
   decrementBtn.addEventListener("click", () => {
-    system.events.counter.decrement();
+    dynamicEvents().counter.decrement();
   });
   stepInput.addEventListener("input", (e) => {
     const value = Number((e.target as HTMLInputElement).value);
-    system.events.counter.setStep({ value });
+    dynamicEvents().counter.setStep({ value });
   });
 }
 
@@ -262,10 +271,10 @@ function renderWeatherWidget(): void {
 
   // Wire up controls
   cityInput.addEventListener("input", () => {
-    system.events.weather.setCity({ value: cityInput.value });
+    dynamicEvents().weather.setCity({ value: cityInput.value });
   });
   refreshBtn.addEventListener("click", () => {
-    system.events.weather.refresh();
+    dynamicEvents().weather.refresh();
   });
 
   // Focus management: re-focus if user was typing
@@ -324,7 +333,7 @@ function renderDiceWidget(): void {
   widgetsArea.appendChild(card);
 
   rollBtn.addEventListener("click", () => {
-    system.events.dice.roll();
+    dynamicEvents().dice.roll();
   });
 }
 

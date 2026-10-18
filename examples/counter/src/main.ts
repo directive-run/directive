@@ -1,4 +1,4 @@
-import { bind, el, mount } from "@directive-run/el";
+import { bindText, el } from "@directive-run/el";
 import { system } from "./module.js";
 
 system.start();
@@ -8,7 +8,7 @@ const app = el(
   {
     style:
       "font-family: system-ui; max-width: 400px; margin: 40px auto; text-align: center;",
-  },
+  } as any,
   [
     el("h1", {}, ["Counter"]),
     el(
@@ -16,19 +16,19 @@ const app = el(
       {
         id: "count",
         style: "font-size: 3rem; font-weight: bold; margin: 20px 0;",
-      },
+      } as any,
       ["0"],
     ),
-    el("p", { id: "doubled", style: "color: #666; margin-bottom: 20px;" }, [
+    el("p", { id: "doubled", style: "color: #666; margin-bottom: 20px;" } as any, [
       "Doubled: 0",
     ]),
-    el("div", { style: "display: flex; gap: 8px; justify-content: center;" }, [
+    el("div", { style: "display: flex; gap: 8px; justify-content: center;" } as any, [
       el(
         "button",
         {
           onclick: () => system.events.decrement(),
           style: "padding: 8px 20px; font-size: 1rem;",
-        },
+        } as any,
         ["-"],
       ),
       el(
@@ -36,7 +36,7 @@ const app = el(
         {
           onclick: () => system.events.reset(),
           style: "padding: 8px 20px; font-size: 1rem;",
-        },
+        } as any,
         ["Reset"],
       ),
       el(
@@ -44,7 +44,7 @@ const app = el(
         {
           onclick: () => system.events.increment(),
           style: "padding: 8px 20px; font-size: 1rem;",
-        },
+        } as any,
         ["+"],
       ),
     ]),
@@ -53,27 +53,27 @@ const app = el(
       {
         id: "status",
         style: "margin-top: 16px; color: #999; font-size: 0.85rem;",
-      },
+      } as any,
       [""],
     ),
   ],
 );
 
-mount(app, document.getElementById("app")!);
+document.getElementById("app")!.replaceChildren(app);
 
 // Bind reactive updates
-bind(system, document.getElementById("count")!, (s) => {
-  return `${s.facts.count}`;
+bindText(system, document.getElementById("count")!, (facts) => {
+  return `${facts.count}`;
 });
 
-bind(system, document.getElementById("doubled")!, (s) => {
-  return `Doubled: ${s.derive.doubled}`;
+bindText(system, document.getElementById("doubled")!, (_facts, derived) => {
+  return `Doubled: ${derived.doubled}`;
 });
 
-bind(system, document.getElementById("status")!, (s) => {
-  if (s.facts.count < 0) {
+bindText(system, document.getElementById("status")!, (facts) => {
+  if (facts.count < 0) {
     return "Constraint fired: clamping to zero...";
   }
 
-  return s.facts.count === 0 ? "Try clicking + or -" : "";
+  return facts.count === 0 ? "Try clicking + or -" : "";
 });

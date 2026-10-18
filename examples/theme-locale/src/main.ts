@@ -154,7 +154,7 @@ function render(): void {
       {
         className: "tl-preview-header",
         style: `color: ${themeColors.accent}; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;`,
-      },
+      } as any,
       `${translations.greeting}!`,
     ),
     el(
@@ -168,7 +168,7 @@ function render(): void {
           {
             className: "tl-preview-label",
             style: `color: ${themeColors.muted};`,
-          },
+          } as any,
           translations.settings,
         ),
         el("span", { className: "tl-preview-icon" }, "\u2699"),
@@ -181,7 +181,7 @@ function render(): void {
           {
             className: "tl-preview-label",
             style: `color: ${themeColors.muted};`,
-          },
+          } as any,
           translations.theme,
         ),
         el(
@@ -198,7 +198,7 @@ function render(): void {
           {
             className: "tl-preview-label",
             style: `color: ${themeColors.muted};`,
-          },
+          } as any,
           translations.language,
         ),
         el("span", { className: "tl-preview-icon" }, locale.toUpperCase()),
@@ -211,7 +211,7 @@ function render(): void {
           {
             className: "tl-preview-label",
             style: `color: ${themeColors.muted};`,
-          },
+          } as any,
           translations.sidebar,
         ),
         el(
