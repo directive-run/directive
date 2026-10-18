@@ -2,6 +2,7 @@
   "$comment": "sha256 of every harness file (lib/harness.ts). Regenerate with `pnpm --filter @directive-run/conformance oracle:update`; a PR that changes this file needs the oracle-change label.",
   "files": {
     "aheadOfV1.json": "908c4c52eb380fd335000c7bf01fcf13c56025a092ea00f8da2094a1b60c2d49",
+    "contracts/PACKAGES-2.0.md": "29d3f2db4bbf2233df392c7e1769fdb109913f49732fd268a25a930014245a6d",
     "contracts/STABILITY.md": "f13b90d09eaa0cd3c5c23e7af0b5478a4feed3e99f8e72864172d33c74434670",
     "contracts/api-changes.json": "5b76f7a0e52eeb52e105ca36186de74cee50967c90469a4811996e442e2fdb22",
     "contracts/api-surface.json": "b5018b9d0733186d94ed2b7756896723737005224c59e616562eeb72cbbd9b33",
