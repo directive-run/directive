@@ -5,8 +5,8 @@
       "kind": "add",
       "export": "./plugins ClobberSummaryEvent",
       "reason": "1.x patch: public onSummary param type",
-      "approvedBy": null,
-      "status": "pending-gate"
+      "approvedBy": "jasoncomes",
+      "date": "2026-10-18"
     }
   ],
   "goldenChanges": []
