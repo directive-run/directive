@@ -87,7 +87,9 @@ jobs:
             echo "::error title=next is not in pre mode::.changeset/pre.json is missing on the next branch. See RELEASING.md, 'Starting the 2.0 prerelease line'."
             exit 1
           fi
-          if [ "${GITHUB_REF_NAME}" = "main" ] && [ -f .changeset/pre.json ]; then
+          # `changeset pre exit` leaves pre.json with mode "exit" until `changeset version`
+          # consumes it, so only mode "pre" means main is still in pre mode.
+          if [ "${GITHUB_REF_NAME}" = "main" ] && [ -f .changeset/pre.json ] && [ "$(jq -r .mode .changeset/pre.json)" = "pre" ]; then
             echo "::error title=main is in pre mode::.changeset/pre.json exists on main; publishing would tag prereleases. Exit pre mode first."
             exit 1
           fi
@@ -194,7 +196,7 @@ jobs:
         run: |
           set -e
           if [ "${GITHUB_REF_NAME}" = "next" ]; then
-            latest=$(npm view @directive-run/core dist-tags.latest)
+            latest=$(npm view @directive-run/core dist-tags.latest || true)
             if [ "$latest" != "$BEFORE" ]; then
               echo "::error title=latest moved on next::latest was ${BEFORE} before this run and is ${latest} now. A next publish must never touch latest."
               exit 1
@@ -208,7 +210,7 @@ jobs:
           want=$(echo "$PUBLISHED" | jq -r '[.[] | select(.name == "@directive-run/core")][0].version // empty')
           if [ -z "$want" ]; then
             # Core was not part of this publish: latest must simply not have moved to a prerelease.
-            latest=$(npm view @directive-run/core dist-tags.latest)
+            latest=$(npm view @directive-run/core dist-tags.latest || true)
             case "$latest" in
               *-*) echo "::error title=latest is a prerelease::latest=${latest}"; exit 1;;
             esac
@@ -217,7 +219,7 @@ jobs:
           fi
           latest=""
           for attempt in $(seq 1 30); do
-            latest=$(npm view @directive-run/core dist-tags.latest)
+            latest=$(npm view @directive-run/core dist-tags.latest || true)
             if [ "$latest" = "$want" ]; then
               echo "Verify: latest=${latest} matches published ${want}"
               exit 0
@@ -280,15 +282,19 @@ jobs:
         run: |
           # Attach to core's release for this tree's version, so the asset's
           # tag carries the tree's major (fetch-api-reference.sh selects by
-          # tag major). Fall back to the newest release if core has none.
+          # tag major). Fall back only to the newest release of the SAME major:
+          # never attach this tree's docs to another major's release.
           VERSION=$(node -p "require('./packages/core/package.json').version")
+          MAJOR="${VERSION%%.*}"
           TAG="@directive-run/core@${VERSION}"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+            TAG=$(gh release list --limit 100 --json tagName -q '.[].tagName' | grep -E "@${MAJOR}\.[0-9]+\.[0-9]+" | head -1 || true)
           fi
-          if [ -n "$TAG" ]; then
-            gh release upload "$TAG" docs-artifacts/* --clobber || true
+          if [ -z "$TAG" ]; then
+            echo "::error title=No release for major ${MAJOR}::Found no release tagged @${MAJOR}.x.y to attach docs to."
+            exit 1
           fi
+          gh release upload "$TAG" docs-artifacts/* --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
