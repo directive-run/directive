@@ -23,7 +23,6 @@
  * ```
  */
 
-import path from "node:path";
 import { cosineSimilarity } from "./guardrails/semantic-cache.js";
 import type { EmbedderFn, Embedding } from "./guardrails/semantic-cache.js";
 
@@ -238,7 +237,12 @@ export interface JSONFileStoreOptions {
  * Resolves the path, rejects `..` segments, and (if baseDir is provided)
  * ensures the resolved path is inside the base directory.
  */
-function validateFilePath(filePath: string, baseDir?: string): string {
+async function validateFilePath(
+  filePath: string,
+  baseDir?: string,
+): Promise<string> {
+  // Dynamic import keeps node:path out of browser bundles of this package.
+  const path = await import("node:path");
   const resolved = path.resolve(filePath);
 
   // Defense in depth: reject paths that still contain ".." after resolution
@@ -270,7 +274,7 @@ function validateFilePath(filePath: string, baseDir?: string): string {
  */
 export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
   const { filePath, mapEntry, ttlMs = 0, baseDir } = options;
-  const resolvedPath = validateFilePath(filePath, baseDir);
+  let resolvedPath: string | null = null;
   let cached: RAGChunk[] | null = null;
   let cachedAt = 0;
 
@@ -279,9 +283,13 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
       return cached;
     }
 
+    // Validated outside the try so path-escape errors reject, not get swallowed.
+    resolvedPath ??= await validateFilePath(filePath, baseDir);
+    const safePath = resolvedPath;
+
     try {
       const fs = await import("node:fs");
-      const data = await fs.promises.readFile(resolvedPath, "utf-8");
+      const data = await fs.promises.readFile(safePath, "utf-8");
       const raw = JSON.parse(data) as Record<string, unknown>[];
 
       cached = mapEntry ? raw.map(mapEntry) : (raw as unknown as RAGChunk[]);
@@ -294,7 +302,7 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
         process.env?.NODE_ENV === "development"
       ) {
         console.warn(
-          `[Directive] JSONFileStore: failed to load ${resolvedPath}:`,
+          `[Directive] JSONFileStore: failed to load ${safePath}:`,
           err,
         );
       }
