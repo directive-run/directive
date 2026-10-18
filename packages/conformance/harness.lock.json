@@ -4,7 +4,7 @@
     "aheadOfV1.json": "908c4c52eb380fd335000c7bf01fcf13c56025a092ea00f8da2094a1b60c2d49",
     "contracts/PACKAGES-2.0.md": "29d3f2db4bbf2233df392c7e1769fdb109913f49732fd268a25a930014245a6d",
     "contracts/STABILITY.md": "f13b90d09eaa0cd3c5c23e7af0b5478a4feed3e99f8e72864172d33c74434670",
-    "contracts/api-changes.json": "5b76f7a0e52eeb52e105ca36186de74cee50967c90469a4811996e442e2fdb22",
+    "contracts/api-changes.json": "760aa80c7222939e50e152f9c29276555fc40af9f1b15413671236e6da5b01b8",
     "contracts/api-surface.json": "b5018b9d0733186d94ed2b7756896723737005224c59e616562eeb72cbbd9b33",
     "contracts/api-surface.test.ts": "d94e13fc9ba4ba6467deda05aa772b8d6514d5a69fb82ba7956d7ed944abbebc",
     "contracts/golden.test.ts": "d254b13bfa861402ccb446290d0fd6f2f413ee1a487c9385312ff0bf0d9cf99a",
