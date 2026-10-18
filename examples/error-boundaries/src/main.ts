@@ -4,7 +4,7 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
-import type { RecoveryStrategy } from "@directive-run/core";
+import type { RecoveryStrategy } from "@directive-run/core/internals";
 
 import { el } from "@directive-run/el";
 

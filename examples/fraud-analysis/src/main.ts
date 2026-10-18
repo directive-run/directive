@@ -194,7 +194,7 @@ function renderSignals(signals: EnrichmentSignal[]): DocumentFragment | null {
             el("div", {
               className: "fraud-signal-bar-fill",
               style: `width: ${s.risk}%; background: ${signalColor(s.risk)};`,
-            }),
+            } as any),
           ),
           el("span", { className: "fraud-signal-score" }, String(s.risk)),
         ),
@@ -372,7 +372,7 @@ function render(): void {
       el("div", { className: "fraud-metric-label" }, "Dispositions"),
       el(
         "div",
-        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" },
+        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" } as any,
         "No cases",
       ),
     );
@@ -456,7 +456,7 @@ function render(): void {
         {
           className: "fraud-empty",
           style: "padding: 0.5rem 0; font-size: 0.6rem;",
-        },
+        } as any,
         "No activity yet",
       ),
     );
@@ -482,7 +482,7 @@ function render(): void {
     checkpointsEl.replaceChildren(
       el(
         "div",
-        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" },
+        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" } as any,
         "No checkpoints saved",
       ),
     );

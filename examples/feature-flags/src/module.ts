@@ -125,7 +125,7 @@ export const featureFlagsModule = createModule("feature-flags", {
     toggleFlag: (facts, { flag, enabled }) => {
       const key = flag as keyof typeof facts;
       if (key in facts && typeof facts[key] === "boolean") {
-        (facts as Record<string, boolean>)[key] = enabled;
+        (facts as unknown as Record<string, boolean>)[key] = enabled;
       }
     },
 

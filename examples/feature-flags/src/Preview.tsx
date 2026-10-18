@@ -1,8 +1,8 @@
-import type { createSystem } from "@directive-run/core";
+import type { SingleModuleSystem } from "@directive-run/core";
 import { useDerived, useFact } from "@directive-run/react";
 import type { featureFlagsModule } from "./module";
 
-type System = ReturnType<typeof createSystem<typeof featureFlagsModule.schema>>;
+type System = SingleModuleSystem<typeof featureFlagsModule.schema>;
 
 interface PreviewCardProps {
   title: string;
