@@ -100,6 +100,20 @@ describe("el()", () => {
   // Children
   // ============================================================================
 
+  describe("style prop", () => {
+    it("accepts a string and sets cssText", () => {
+      const d = el("div", { style: "color: red; margin-top: 4px" });
+      expect(d.style.color).toBe("red");
+      expect(d.style.marginTop).toBe("4px");
+    });
+
+    it("accepts a partial style object", () => {
+      const d = el("div", { style: { color: "blue", display: "flex" } });
+      expect(d.style.color).toBe("blue");
+      expect(d.style.display).toBe("flex");
+    });
+  });
+
   describe("children", () => {
     it("appends a string child as text node", () => {
       const p = el("p", {}, "Hello world");

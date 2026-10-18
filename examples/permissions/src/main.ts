@@ -134,7 +134,7 @@ function render(): void {
               {
                 className: "pm-article-action edit",
                 dataset: { articleId: article.id, action: "edit" },
-              } as any,
+              },
               "Edit",
             ),
           );
@@ -147,7 +147,7 @@ function render(): void {
               {
                 className: "pm-article-action publish",
                 dataset: { articleId: article.id, action: "publish" },
-              } as any,
+              },
               "Publish",
             ),
           );
@@ -160,7 +160,7 @@ function render(): void {
               {
                 className: "pm-article-action delete",
                 dataset: { articleId: article.id, action: "delete" },
-              } as any,
+              },
               "Delete",
             ),
           );

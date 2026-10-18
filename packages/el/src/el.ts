@@ -79,6 +79,12 @@ function sanitizeProps<T>(props: Partial<T>): Partial<T> {
   return clean as Partial<T>;
 }
 
+/** Props for `el()`: element properties, with `style` as a string or partial style object. */
+export type ElProps<K extends keyof HTMLElementTagNameMap> = Omit<
+  Partial<HTMLElementTagNameMap[K]>,
+  "style"
+> & { style?: string | Partial<CSSStyleDeclaration> };
+
 /**
  * Create a typed DOM element with optional props and children.
  *
@@ -100,21 +106,27 @@ function sanitizeProps<T>(props: Partial<T>): Partial<T> {
  */
 export function el<K extends keyof HTMLElementTagNameMap>(
   type: K,
-  propsOrChild?: Partial<HTMLElementTagNameMap[K]> | ElChild,
+  propsOrChild?: ElProps<K> | ElChild,
   ...children: ElChild[]
 ): HTMLElementTagNameMap[K] {
-  let props: Partial<HTMLElementTagNameMap[K]> | undefined;
+  let props: ElProps<K> | undefined;
 
   if (isProps(propsOrChild)) {
-    props = propsOrChild as Partial<HTMLElementTagNameMap[K]>;
+    props = propsOrChild as ElProps<K>;
   } else if (propsOrChild !== undefined) {
     children = [propsOrChild as ElChild, ...children];
   }
 
-  const element = Object.assign(
-    document.createElement(type),
-    props ? sanitizeProps(props) : props,
-  );
+  const element = document.createElement(type);
+  if (props) {
+    const { style, ...rest } = sanitizeProps(props) as ElProps<K>;
+    Object.assign(element, rest);
+    if (typeof style === "string") {
+      element.style.cssText = style;
+    } else if (style && typeof style === "object") {
+      Object.assign(element.style, style);
+    }
+  }
 
   appendChildren(element, children);
 
