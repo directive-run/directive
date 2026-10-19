@@ -166,5 +166,213 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
+  },
+  {
+    "line": 252,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: redactErrors is a createFactsStore option; the engine never passes it, so it is always false through any system."
+  },
+  {
+    "line": 252,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: the redactErrors branch is unreachable because the engine never passes redactErrors."
+  },
+  {
+    "line": 253,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: '[redacted]' is only returned when redactErrors is set, which the engine never does."
+  },
+  {
+    "line": 359,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: validate:false is never passed by the engine; in production validateValue is not called at all (set() guards on isDevelopment)."
+  },
+  {
+    "line": 447,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onChange(change.key, change.value, change.prev)",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onChange, so the optional call never sees undefined."
+  },
+  {
+    "line": 543,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onWrite(key as string)",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onWrite."
+  },
+  {
+    "line": 564,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onWrite(key as string)",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onWrite."
+  },
+  {
+    "line": 540,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies originOf."
+  },
+  {
+    "line": 561,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies originOf."
+  },
+  {
+    "line": 540,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
+  },
+  {
+    "line": 561,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
+  },
+  {
+    "line": 718,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
+  },
+  {
+    "line": 681,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onKeysRegistered(added.map(k => [k, newSchema[k]] as const))",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onKeysRegistered."
+  },
+  {
+    "line": 651,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: registerKeys is reached only from registerModule, which already throws on __proto__/constructor/prototype fact keys before calling it (checked: 'Security: ... dangerous key')."
+  },
+  {
+    "line": 561,
+    "col": 19,
+    "mutator": "LogicalOperator",
+    "replacement": "originOf?.() && \"authored\"",
+    "reason": "not-observable",
+    "note": "A batched delete is stamped with the origin at write time; a history restore only writes keys present in the snapshot (a key written later survives goBack), so no delete is ever made with origin 'restore' through the public API."
+  },
+  {
+    "line": 885,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
+    "line": 885,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
+    "line": 894,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
+    "line": 571,
+    "col": 25,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Nested batches would also open and close an engine derivation-hold frame; the frames are balanced by unwindDerivationHolds and the outer hold still covers the nested span, so notification timing is unchanged (a nested-batch derivation-subscriber test does not distinguish it)."
+  },
+  {
+    "line": 754,
+    "col": 3,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Static initializer mutant: the harness runs only 2 tests against it. The registry-symbol test in blackbox-facts.test.ts fails when the key is changed (verified by hand)."
+  },
+  {
+    "line": 1053,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "In the `has` trap a symbol that skips the symbol branch reaches store.has(symbol), which is false for any symbol, the same answer as the early return."
+  },
+  {
+    "line": 220,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "isZodSchema is only called with a truthy schema entry (validateValue returns on a falsy one first), so v !== null is always true."
+  },
+  {
+    "line": 332,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "i <= validators.length",
+    "reason": "equivalent",
+    "note": "validators[validators.length] is undefined and the loop skips non-function entries."
+  },
+  {
+    "line": 326,
+    "col": 54,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "An empty validators array makes the loop below run zero times, the same as returning early."
+  },
+  {
+    "line": 359,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: validate is always true in development (the engine never passes validate:false) and validateValue is never called in production."
+  },
+  {
+    "line": 971,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Blocked names (__proto__, constructor, prototype) can never be stored as facts (set and registerKeys refuse them), so store.get returns undefined, the same as the early return."
   }
 ]

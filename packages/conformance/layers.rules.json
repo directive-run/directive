@@ -145,6 +145,15 @@
     "tests/core/mutants-facts-production.test.ts": {
       "rule": "L0"
     },
+    "tests/core/blackbox-facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-facts-proxy.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-facts-production.test.ts": {
+      "rule": "L0"
+    },
     "tests/core/mutants-effects.test.ts": {
       "rule": "L4"
     },
