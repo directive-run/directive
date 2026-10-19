@@ -94,6 +94,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            packages/conformance/scripts/mutation-score.ts
+            packages/conformance/mutation-triage
+          sparse-checkout-cone-mode: false
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -104,29 +111,6 @@ jobs:
           path: reports
           merge-multiple: true
 
+      # Report-only: no --check. The script appends the table to the job summary.
       - name: Print scores
-        shell: node {0}
-        run: |
-          const fs = require("fs");
-          const rows = [];
-          const total = { killed: 0, survived: 0, noCov: 0, timeout: 0 };
-          for (const f of fs.readdirSync("reports").filter((n) => n.endsWith(".json")).sort()) {
-            const r = JSON.parse(fs.readFileSync(`reports/${f}`, "utf8"));
-            const c = { Killed: 0, Survived: 0, NoCoverage: 0, Timeout: 0 };
-            for (const file of Object.values(r.files)) {
-              for (const m of file.mutants) {
-                if (m.status in c) c[m.status]++;
-              }
-            }
-            const det = c.Killed + c.Timeout;
-            const denom = det + c.Survived + c.NoCoverage;
-            total.killed += c.Killed; total.timeout += c.Timeout;
-            total.survived += c.Survived; total.noCov += c.NoCoverage;
-            rows.push(`| ${f.replace(".json", "")} | ${denom} | ${det} | ${c.Survived} | ${c.NoCoverage} | ${denom ? ((100 * det) / denom).toFixed(1) : "-"}% |`);
-          }
-          const det = total.killed + total.timeout;
-          const denom = det + total.survived + total.noCov;
-          rows.push(`| **all** | ${denom} | ${det} | ${total.survived} | ${total.noCov} | ${denom ? ((100 * det) / denom).toFixed(1) : "-"}% |`);
-          const out = ["## Mutation score by shard (report-only)", "", "| shard | mutants | killed | survived | no coverage | score |", "|---|---|---|---|---|---|", ...rows].join("\n");
-          console.log(out);
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out + "\n");
+        run: npx --yes tsx@4.21.0 packages/conformance/scripts/mutation-score.ts reports
