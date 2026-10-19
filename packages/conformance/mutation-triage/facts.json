@@ -1,0 +1,170 @@
+[
+  {
+    "line": 239,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "getExpectedType is only called from validateZod, after isZodSchema already held; the guard is always true there."
+  },
+  {
+    "line": 304,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "when _lastFailedIndex is not a number the second operand (undefined >= 0) is false anyway."
+  },
+  {
+    "line": 552,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted on the line above."
+  },
+  {
+    "line": 612,
+    "col": 17,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 612,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 613,
+    "col": 15,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 669,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys.add in registerKeys only matters to toObject via map.has; set() adds the key when a value is first written."
+  },
+  {
+    "line": 706,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted just before."
+  },
+  {
+    "line": 718,
+    "col": 19,
+    "mutator": "LogicalOperator",
+    "replacement": "originOf?.() && \"authored\"",
+    "reason": "not-observable",
+    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
+    "line": 718,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
+    "reason": "not-observable",
+    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
+    "line": 721,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onWrite(key)",
+    "reason": "not-observable",
+    "note": "the engine always supplies onWrite; reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
+    "line": 765,
+    "col": 36,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "unwrapDevProxies is only reached after structuredClone failed, which a null fact never does."
+  },
+  {
+    "line": 812,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
+  },
+  {
+    "line": 971,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a blocked name reads undefined from the map anyway; the early return only skips a tracked read of a key that cannot exist."
+  },
+  {
+    "line": 1053,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1053,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1057,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1057,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1083,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
+  },
+  {
+    "line": 1091,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
+  },
+  {
+    "line": 1074,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
+  }
+]

@@ -2790,6 +2790,270 @@
         }
       }
     },
+    "tests/core/mutants-facts-production.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "the facts store in production > does not validate, even when asked to": {
+          "layer": "L0",
+          "by": ["import createFacts", "import createFactsStore", "import t"]
+        },
+        "the facts store in production > defaults to no validation and no unknown-key warning": {
+          "layer": "L0",
+          "by": ["import createFacts", "import createFactsStore", "import t"]
+        },
+        "the facts store in production > neither warns about non-JSON values nor wraps nested objects": {
+          "layer": "L0",
+          "by": ["import createFacts", "import createFactsStore", "import t"]
+        }
+      }
+    },
+    "tests/core/mutants-facts-system.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "fact store behaviour seen through a system > re-derives when a derivation asks whether a fact exists": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "fact store behaviour seen through a system > stops delivering a batch to an observer once its own write runs away": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "fact store behaviour seen through a system > reports an unregistered module's facts as deletions, with their previous values": {
+          "layer": "L10",
+          "by": ["member .unregisterModule"]
+        },
+        "fact store behaviour seen through a system > keeps a nested object, Date and Map in history when the fact holds read-back wrappers": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "fact store behaviour seen through a system > keeps a cyclic object fact in history": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        }
+      }
+    },
+    "tests/core/mutants-facts.test.ts": {
+      "category": "internals",
+      "rule": "L0",
+      "tests": {
+        "validation message previews > shows a JSON preview of an object value": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > falls back to String() when the value has no JSON form": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > truncates the preview to 100 characters": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > survives a value that cannot be serialized": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > labels null and arrays distinctly from other objects": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > redacts the value when redactErrors is on, and only then": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > names which validator failed past the first, with a 1-based index": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "validation message previews > reports the failing array element, then forgets it": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "option defaults > validates and throws on unknown keys by default in development": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "option defaults > only warns about unknown keys when the schema is a bare type assertion": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "option defaults > honours explicit strictKeys and validate settings": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "option defaults > accepts values that pass validation": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "schemas written with a safeParse method > validates through safeParse and reports the lower-cased type name": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > only strips a leading Zod from the type name": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > reports an unknown type when the definition carries no name": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > prefers an explicit _typeName": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > falls back from error.message to the first issue to a default": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > redacts the value in a safeParse failure when asked": {
+          "layer": "L0",
+          "by": ["import createFactsStore"]
+        },
+        "schemas written with a safeParse method > \"does not treat an object with %s as one\"": {
+          "layer": "L0",
+          "by": ["import createFactsStore"],
+          "dynamic": true
+        },
+        "notification coalescing > allows exactly 100 deferred rounds and then throws": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "notification coalescing > names the flush when the loop starts inside a batch": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "notification coalescing > recovers after a runaway loop": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "notification coalescing > defers a write made by a listener during a batch flush until the listeners finish": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "notification coalescing > notifies subscribeAll for a deferred write as well as the first": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "notification coalescing > does not call onBatch for a batch that wrote nothing": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "batch hooks > fires onBatchStart and onBatchEnd once for nested batches, end after onBatch": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "batch hooks > still fires onBatchEnd when the batch body throws": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "batch hooks > reports onWrite at the moment of an in-batch write, set or delete": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "delete > is deferred inside a batch and reported with its previous value and origin": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "delete > stamps the origin asked for at the moment of the write": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "delete > notifies synchronously, with the previous value, outside a batch": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "subscriptions > keeps every listener of a key, and only unsubscribes the one asked": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "subscriptions > tolerates unsubscribing twice and resubscribing afterwards": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "subscriptions > subscribeAll's unsubscribe stops further calls": {
+          "layer": "L0",
+          "by": ["import createFactsStore", "import t"]
+        },
+        "facts proxy traps > refuses to assign the internal accessors and symbols": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > refuses to delete the internal accessors and symbols": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > reports the accessors but no symbols or blocked names via `in`": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > describes its own properties consistently with get/has": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > cannot be redefined or reparented": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > enumerates schema keys live, including keys added later": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > passes snapshot reads through without a subscription": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "facts proxy traps > builds a proxy from a bare store": {
+          "layer": "L0",
+          "by": [
+            "import createFacts",
+            "import createFactsProxy",
+            "import createFactsStore",
+            "import t"
+          ]
+        },
+        "development nested-mutation warnings > warns once for a mutation two levels down, naming the path": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > does not warn for a symbol-keyed write": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > hands back the same wrapper for the same nested object": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > does not stack wrappers when a read value is written straight back": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > hides blocked property names on nested objects": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > returns null and symbol-keyed objects untouched": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > still warns for a null-prototype object": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > still warns for a read-only but configurable property": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > leaves a frozen container's nested values readable": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        },
+        "development nested-mutation warnings > leaves Map, Set and Date nested values with their methods": {
+          "layer": "L0",
+          "by": ["import createFacts", "import t"]
+        }
+      }
+    },
     "tests/core/navigation-side-effects.test.ts": {
       "category": "black-box",
       "rule": "L8",

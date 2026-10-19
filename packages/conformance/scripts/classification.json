@@ -458,6 +458,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/mutants-facts-production.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/mutants-facts-system.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/mutants-facts.test.ts",
+    "category": "internals",
+    "cases": 52,
+    "internals": [],
+    "internalsValues": ["createFacts", "createFactsProxy", "createFactsStore"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/navigation-side-effects.test.ts",
     "category": "black-box",
     "cases": 7,
