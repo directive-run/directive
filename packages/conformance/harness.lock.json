@@ -84,11 +84,13 @@
     "scripts/census.ts": "d185e415f6563b1aa5170da3f3e6f303d73e9b719a5ebc695c27aa193dad862b",
     "scripts/check-expects.ts": "b3c3d909d7175f9d69f28cd6375013b4a740f25e483f3e28d398458aef3952d1",
     "scripts/diff-coverage.ts": "da99cdf59e55edbb84b60e80c90c0f4670bd79c3c872ba60d34161c16808cb9a",
+    "scripts/mutation-score.ts": "36c21254fcf0a20068b4e8078b36a32a5c89a767377020c2225168a97d0d6509",
     "scripts/oracle-guard.ts": "fcab2517dd94f1669228c9ddddf6c480ae7004604edd95b2f85932c236e23848",
     "scripts/oracle-update.ts": "de4dec0b59240ccef6f117479ea542fd33e32b5c15da4f838aed7cbea338ad5e",
     "scripts/pin-v1.ts": "5776aab3692e11272cf7ac166213798c4aec80a9fe43e16c9f019bb0005ee970",
     "scripts/port.ts": "4db287d40ac72b44fe0bcf17475ba56df7c1ffcb3ed870e5a7a7c4b32a2dbd8a",
     "self/engine-identity.test.ts": "01ffeda17bc7ec1b7f295a9b05b3b7ed7b48985fceabf691fe4ae9a3e4803673",
+    "self/mutation-score.test.ts": "61521886a51857b48ddbcd9c7502b18cacf7dd14f4e55a62ef6ea058ddf5a7c0",
     "tsconfig.json": "d5b4851238c86a90955cef94f62df985445f19a688116e63c61fd47d449c53b5",
     "v1-pin.json": "72d7116e4ce09d9540fb2aecdc2e4a3011ab8875c1ece7c273b81a3659c36204",
     "vitest.config.ts": "224236cb650eaffc1a60afa1d418563151c506a5c26d20167d401fad942a433f"
