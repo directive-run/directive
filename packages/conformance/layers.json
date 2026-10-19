@@ -147,6 +147,540 @@
         }
       }
     },
+    "tests/core/blackbox-effects-production.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "effects in production > drops a write to facts, reports it to plugins, and does not throw": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "effects in production > drops a write quietly when nobody is listening": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "effects in production > does not check for an in-place mutation, sync, async or via call()": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "effects in production > hands prev and derived through untouched": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "effects in production > does not warn about an async effect that read nothing": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "effects in production > a retried failing effect does not warn when the retries run out": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        }
+      }
+    },
+    "tests/core/blackbox-effects-readonly.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "the facts an effect reads through > a write names the effect and the key, is reported, and is dropped": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the facts an effect reads through > is also refused after an await": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the facts an effect reads through > is refused from a cleanup too": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the facts an effect reads through > the store behind it refuses set and delete and reports them": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the facts an effect reads through > the store behind it still reads, batches and subscribes": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "the facts an effect reads through > reads see live values": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the facts an effect reads through > is a different object from system.facts": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts and derived are read-only in development > writing prevFacts names it": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts and derived are read-only in development > writing derived names it": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts and derived are read-only in development > derived is readable, and the first run's prevFacts is null, not a view": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts and derived are read-only in development > prevFacts and derived reads leave no complaint behind": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > is reported to plugins, naming the effect and the path": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > is reported when it happens after an await": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > is reported for an auto-tracked effect": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > is reported for an async auto-tracked effect": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > is reported for a call()": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "an in-place change to a nested fact > is reported when an auto-tracked run happens through the stable path": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > a nested read leaves no complaint behind": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an in-place change to a nested fact > two overlapping async runs of one effect both finish quietly": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a reported write reaches the error boundary too > the boundary's callback sees the effect id": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        }
+      }
+    },
+    "tests/core/blackbox-effects.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "an effect that can read prevFacts is handed them > `when it has ${label}`": {
+          "layer": "L3",
+          "by": ["option plugins"],
+          "dynamic": true
+        },
+        "an effect that can read prevFacts is handed them > `with explicit deps, when it has ${label}`": {
+          "layer": "L3",
+          "by": ["option plugins"],
+          "dynamic": true
+        },
+        "an effect that can read prevFacts is handed them > when run is not a function the system still starts": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an effect that can read prevFacts is handed them > a namespaced effect gets prev when its own run takes it": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an effect that can read prevFacts is handed them > a namespaced effect that ignores prev still runs": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "prevFacts values > is null on the first run and the previous pass's facts after": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts values > an effect registered later sees the facts as they were at registration": {
+          "layer": "L10",
+          "by": ["member .effects.register"]
+        },
+        "prevFacts values > a reader registered after the last one left is backfilled": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "prevFacts values > a data gate on $changed works although the body reads no prev": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts values > a data gate registered later fires only for a real change": {
+          "layer": "L10",
+          "by": ["member .effects.register"]
+        },
+        "prevFacts values > is refreshed after a pass whose effects are async": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "prevFacts values > is refreshed after a pass in which an effect threw": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > every enabled effect runs once at start, and a disabled one waits": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > explicit deps run for their own changes and not for others": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > an auto-tracked effect runs only for what it read": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > an auto-tracked effect that read nothing runs on every change": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > a disabled effect is skipped, enabling brings it back": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > an effect disabled by an earlier one in the same pass does not run": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > a disabled effect drops the derivations it pinned": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > an async effect makes settle() wait for it": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > an async auto-tracked effect makes settle() wait for it too": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > a synchronous effect has finished by the time the write settles": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "which effects run > system.effects.call runs the effect now, even without a change": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "which effects run > call on a disabled effect does nothing": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "which effects run > call on an unknown effect names it": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "which effects run > call reports a throw and an async rejection, and does not reject": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "which effects run > a run reports itself to plugins and names the effect on the stack": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "declared dependencies > a derivation name runs the effect when the derivation changes": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "declared dependencies > a derivation registered after the effect is picked up": {
+          "layer": "L10",
+          "by": ["member .derive.register", "member .effects.register"]
+        },
+        "declared dependencies > one of several unresolved names becoming a derivation is enough": {
+          "layer": "L10",
+          "by": ["member .derive.register", "member .effects.register"]
+        },
+        "declared dependencies > an unresolved name never makes the effect run for unrelated changes": {
+          "layer": "L10",
+          "by": ["member .effects.register"]
+        },
+        "declared dependencies > a fact name among unresolved ones keeps working": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "declared dependencies > an empty deps array means the effect never runs for a change": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "data-form on > rejects a value that is not a predicate, by what it is": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "data-form on > freezes the spec it was given": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "data-form on > fires only when the gate holds, and only for changes to its facts": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "data-form on > keeps the predicate's facts as its deps whatever the body reads": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "data-form on > swapping to a function-form effect drops the old gate": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "data-form on > swapping a function-form effect for a gated one installs the gate": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "data-form on > unregistering a gated effect drops its gate": {
+          "layer": "L10",
+          "by": ["member .effects.register", "member .effects.unregister"]
+        },
+        "cleanup > runs before the next run, once, and not again": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > an auto-tracked effect's cleanup is stored too": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > an async effect's cleanup is stored when it settles": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > an async auto-tracked effect's cleanup is stored when it settles": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > stop() runs every pending cleanup, once": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > destroy() runs pending cleanups": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > a cleanup that throws is reported and the effect still re-runs": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > an async effect settling after stop() has its cleanup called at once": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > an auto-tracked effect settling after stop() is cleaned up at once": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > a late cleanup that throws is reported, and needs no listener": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > before stop(), a settling effect's cleanup is kept, not called": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > a returned value that is not a function is not kept as a cleanup": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "cleanup > call stores a cleanup from a sync and from an async effect": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "cleanup > replacing a definition cleans up the old one first": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "cleanup > assign on an unknown effect says so": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "cleanup > unregistering cleans up, and the effect no longer runs": {
+          "layer": "L10",
+          "by": [
+            "member .effects.isDynamic",
+            "member .effects.listDynamic",
+            "member .effects.register",
+            "member .effects.unregister"
+          ]
+        },
+        "cleanup > unregistering an unknown effect is a no-op": {
+          "layer": "L10",
+          "by": ["member .effects.unregister"]
+        },
+        "cleanup > registering an id twice is refused": {
+          "layer": "L10",
+          "by": ["member .effects.register"]
+        },
+        "cleanup > a static effect cannot be unregistered": {
+          "layer": "L10",
+          "by": ["member .effects.unregister"]
+        },
+        "a throwing effect > is reported to plugins and the console, naming the effect": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a throwing effect > is routed to the error boundary's callback with the error and id": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > does not stop the others, and is reported after every body has run": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > is reported before an async neighbour settles": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > an async rejection is reported": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a throwing effect > an async auto-tracked rejection is reported": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a throwing effect > does not need a plugin or a boundary": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "a throwing effect > the disable strategy stops the effect until it is enabled again": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > the retry strategy runs it again, a bounded number of times": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > the retry strategy recovers when the retry succeeds": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "a throwing effect > an auto-tracked effect re-tracks what it reads after an error": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > picks up a new conditional read after many identical runs": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > an effect whose reads change from run to run keeps following them": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > a stable effect still reacts after the system sat idle": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > an explicitly declared effect keeps its deps through an error": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > an effect reading a derivation reruns when it changes": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > warns once when an async effect read nothing before its first await": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > does not warn about an async effect that did read something": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > does not warn about a synchronous effect that read nothing": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > does not warn about an async effect with declared deps": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "auto-tracking > each async effect that read nothing is warned about separately": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "what a run tells the trace > lists declared deps, with derivations as derive.<id>": {
+          "layer": "L9",
+          "by": ["member .trace"]
+        },
+        "what a run tells the trace > an auto-tracked effect starts with none and then lists what it read": {
+          "layer": "L9",
+          "by": ["member .trace"]
+        },
+        "what a run tells the trace > call reports its deps too, and none when none are known": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "what a run tells the trace > records an effect error in the trace": {
+          "layer": "L9",
+          "by": ["member .trace"]
+        },
+        "what a run tells the trace > works with no plugins and no trace": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "effects after a history navigation > re-runs a mirroring effect and sits out an onNavigate skip one": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a history navigation > an onNavigate skip effect still runs for a real change": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "effects after a history navigation > a real change right after a navigation wakes both": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > `when it has ${label}`": {
+          "layer": "L3",
+          "by": ["option plugins"],
+          "dynamic": true
+        },
+        "an effect that cannot read prevFacts costs no snapshot > when run is not a function at all it is treated as a reader": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > a data gate makes the snapshot even though the body ignores it": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > unregistering the last reader stops the copying": {
+          "layer": "L10",
+          "by": ["member .effects.register", "member .effects.unregister"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > assigning a non-reader over the last reader stops the copying": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > a reader assigned over a non-reader is backfilled": {
+          "layer": "L10",
+          "by": ["member .effects.assign"]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > a module registered later brings its effects, and a reader is backfilled": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "more behaviour of the run loop > a data gate with $changed ignores a write that left that fact alone": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "more behaviour of the run loop > call on an unknown effect says it does not exist": {
+          "layer": "L10",
+          "by": ["member .effects.call"]
+        },
+        "more behaviour of the run loop > settle waits for every async effect, whichever finishes last": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "more behaviour of the run loop > an effect that reads nothing and opts out of navigation sits a rewind out": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "more behaviour of the run loop > an effect that fails after being unregistered is not run again": {
+          "layer": "L10",
+          "by": ["member .effects.register", "member .effects.unregister"]
+        }
+      }
+    },
     "tests/core/clock.test.ts": {
       "category": "black-box",
       "rule": "L3",

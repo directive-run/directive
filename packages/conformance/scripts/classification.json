@@ -77,6 +77,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/blackbox-effects-production.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/blackbox-effects-readonly.test.ts",
+    "category": "black-box",
+    "cases": 20,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/blackbox-effects.test.ts",
+    "category": "black-box",
+    "cases": 107,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/clock.test.ts",
     "category": "black-box",
     "cases": 15,
