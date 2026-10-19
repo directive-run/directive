@@ -53,7 +53,7 @@
     "mutator": "LogicalOperator",
     "replacement": "state?.isStale && true",
     "reason": "not-observable",
-    "note": "isStale on the manager has no caller reachable from the public API."
+    "note": "internals-only: isStale on the manager has no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 929,
@@ -61,7 +61,7 @@
     "mutator": "OptionalChaining",
     "replacement": "state.isStale",
     "reason": "not-observable",
-    "note": "isStale on the manager has no caller reachable from the public API."
+    "note": "internals-only: isStale on the manager has no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 929,
@@ -69,7 +69,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "isStale on the manager has no caller reachable from the public API."
+    "note": "internals-only: isStale on the manager has no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 967,
@@ -77,7 +77,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 968,
@@ -85,7 +85,7 @@
     "mutator": "UpdateOperator",
     "replacement": "invalidationDepth--",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 969,
@@ -93,7 +93,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 971,
@@ -101,7 +101,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 972,
@@ -109,7 +109,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 972,
@@ -117,7 +117,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 972,
@@ -125,7 +125,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 975,
@@ -133,7 +133,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 976,
@@ -141,7 +141,7 @@
     "mutator": "UpdateOperator",
     "replacement": "invalidationDepth++",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 977,
@@ -149,7 +149,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 990,
@@ -157,7 +157,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 991,
@@ -165,7 +165,7 @@
     "mutator": "UpdateOperator",
     "replacement": "invalidationDepth--",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 992,
@@ -173,7 +173,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 993,
@@ -181,7 +181,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 994,
@@ -189,7 +189,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 995,
@@ -197,7 +197,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "state.isStale",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 995,
@@ -205,7 +205,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 995,
@@ -213,7 +213,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 995,
@@ -221,7 +221,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 996,
@@ -229,7 +229,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 997,
@@ -237,7 +237,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 999,
@@ -245,7 +245,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 1002,
@@ -253,7 +253,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 1003,
@@ -261,7 +261,7 @@
     "mutator": "UpdateOperator",
     "replacement": "invalidationDepth++",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 1004,
@@ -269,7 +269,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "not-observable",
-    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+    "note": "internals-only: holdNotifications and invalidateAll have no caller reachable from the public API; the engine never calls it, only /internals does"
   },
   {
     "line": 1023,
@@ -309,7 +309,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1140,
@@ -317,7 +317,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1141,
@@ -325,7 +325,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1142,
@@ -333,7 +333,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1144,
@@ -341,7 +341,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1145,
@@ -349,7 +349,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1246,
@@ -474,14 +474,6 @@
   {
     "line": 249,
     "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "typeof raw !== \"object\" && raw === null",
-    "reason": "equivalent",
-    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
-  },
-  {
-    "line": 249,
-    "col": 7,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
@@ -492,14 +484,6 @@
     "col": 7,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
-  },
-  {
-    "line": 249,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "(typeof raw !== \"object\" || raw === null) && !Object.hasOwn(raw, \"compute\")",
     "reason": "equivalent",
     "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
   },
@@ -840,14 +824,6 @@
     "note": "A symbol key falls through to the definitions lookup and returns undefined either way."
   },
   {
-    "line": 1021,
-    "col": 11,
-    "mutator": "OptionalChaining",
-    "replacement": "listenerSet.delete",
-    "reason": "equivalent",
-    "note": "listenerSet is always defined for an id that was subscribed."
-  },
-  {
     "line": 1023,
     "col": 15,
     "mutator": "ConditionalExpression",
@@ -925,7 +901,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1140,
@@ -933,7 +909,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+    "note": "internals-only: allInvalidated is set only by invalidateAll, which has no public caller; the engine never calls it, only /internals does"
   },
   {
     "line": 1150,
@@ -1190,5 +1166,173 @@
     "replacement": "true",
     "reason": "not-observable",
     "note": "Root bookkeeping reset when nothing is watched; no public read distinguishes retained roots from cleared ones."
+  },
+  {
+    "line": 927,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "internals-only: the manager isStale has no caller outside derivations.ts and no public path"
+  },
+  {
+    "line": 957,
+    "col": 40,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 958,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 1034,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "internals-only: the manager getDependencies has no caller outside derivations.ts and no public path"
+  },
+  {
+    "line": 1036,
+    "col": 62,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "internals-only: the manager getDependencies has no caller outside derivations.ts and no public path"
+  },
+  {
+    "line": 1037,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "internals-only: the manager getDependencies has no caller outside derivations.ts and no public path"
+  },
+  {
+    "line": 430,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onInvalidate(id)",
+    "reason": "not-observable",
+    "note": "internals-only: the engine always supplies the invalidation hook; an absent hook is reachable only by constructing the manager through /internals"
+  },
+  {
+    "line": 589,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, error)",
+    "reason": "not-observable",
+    "note": "internals-only: the engine always supplies the error hook; an absent hook is reachable only by constructing the manager through /internals"
+  },
+  {
+    "line": 583,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "internals-only: the engine always supplies the compute hook; an absent hook is reachable only by constructing the manager through /internals"
+  },
+  {
+    "line": 761,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer"
+  },
+  {
+    "line": 761,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer"
+  },
+  {
+    "line": 743,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onInvalidate(id)",
+    "reason": "not-observable",
+    "note": "internals-only: the engine always supplies the invalidation hook; an absent hook is reachable only by constructing the manager through /internals"
+  },
+  {
+    "line": 944,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 948,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 953,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 954,
+    "col": 41,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 956,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 963,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "the write path marks each derivation stale as it writes and releases the hold itself; invalidate and invalidateMany are catch-alls whose flush and walk find nothing left to do"
+  },
+  {
+    "line": 1219,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "the engine stores the function in the shared definitions map before calling registerDefinitions, so the function branch installs what is already there"
+  },
+  {
+    "line": 1219,
+    "col": 28,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "the engine stores the function in the shared definitions map before calling registerDefinitions, so the function branch installs what is already there"
+  },
+  {
+    "line": 481,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "internals-only: message text of an unknown-derivation guard the engine never reaches (it rejects unknown ids first)"
   }
 ]

@@ -77,6 +77,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/blackbox-derivations.test.ts",
+    "category": "black-box",
+    "cases": 19,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/blackbox-tracking-warnings.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/blackbox-tracking.test.ts",
+    "category": "black-box",
+    "cases": 18,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/clock.test.ts",
     "category": "black-box",
     "cases": 15,

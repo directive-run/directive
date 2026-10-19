@@ -147,6 +147,201 @@
         }
       }
     },
+    "tests/core/blackbox-derivations.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a derivation is cached until something it read changes > reads twice with one compute": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation is cached until something it read changes > composed derivations share one compute of their input": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation that reads itself > throws on read and recovers once the cycle is gone": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation that reads itself > two derivations reading each other throw rather than hang": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a throwing derivation > rethrows to the reader, reports to plugins, and recovers": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a throwing derivation > keeps working for the dependants of a recovered derivation": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "subscribing to derivations > unsubscribing twice is harmless and stays unsubscribed": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "subscribing to derivations > one unsubscribe leaves the other listener of the same derivation": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "subscribing to derivations > a new listener on a fully unsubscribed derivation is heard": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the derived parameter is a read-only record > refuses to define properties, in either style": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the derived parameter is a read-only record > refuses to change its prototype and has none": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the derived parameter is a read-only record > refuses assignment and deletion": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the derived parameter is a read-only record > answers nothing for prototype-chain names or symbols": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the derived parameter is a read-only record > lists the derivation names and reports them as real properties": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "system.derive is a read-only record too > answers nothing for prototype-chain names": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "registering and replacing derivations at runtime > rejects a null or non-object compute": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "registering and replacing derivations at runtime > a function-valued entry and an object-form entry both run": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "registering and replacing derivations at runtime > replacing a derivation wakes its subscribers and dependants with fresh values": {
+          "layer": "L10",
+          "by": ["member .derive.assign"]
+        },
+        "registering and replacing derivations at runtime > a derivation registered after start is computed and tracked": {
+          "layer": "L10",
+          "by": ["member .derive.register", "member .derive.unregister"]
+        }
+      }
+    },
+    "tests/core/blackbox-tracking-warnings.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "assigning an untrackable value warns once per path and kind > `names a ${label}`": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"],
+          "dynamic": true
+        },
+        "assigning an untrackable value warns once per path and kind > names a File when the runtime has one": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "assigning an untrackable value warns once per path and kind > does not warn for values that round-trip as JSON": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "assigning an untrackable value warns once per path and kind > does not repeat a warning for the same path and kind": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "assigning an untrackable value warns once per path and kind > warns again for the same path with a different kind": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "assigning an untrackable value warns once per path and kind > warns for each distinct path": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "the warning memory is bounded and forgets the oldest first > lets an evicted path warn again, and keeps a recent one quiet": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        }
+      }
+    },
+    "tests/core/blackbox-tracking.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a derivation depends on what its body reads > recomputes for a fact it read and stays put for one it did not": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation depends on what its body reads > drops a dependency its branch no longer reads": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation depends on what its body reads > picks up a dependency a branch starts reading": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "tracking nests: each body gets its own dependencies > an outer body depends on its own reads and on the inner derivation": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "tracking nests: each body gets its own dependencies > the inner derivation does not inherit the outer body's reads": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "tracking nests: each body gets its own dependencies > reads after a nested derivation still count for the outer body": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "tracking nests: each body gets its own dependencies > a three-step chain stays fresh from the bottom": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "reads that are not dependencies > a metadata question does not make its subject a dependency": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "reads that are not dependencies > reads after a metadata question are still tracked": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "reads that are not dependencies > an effect reading after a metadata question keeps its other reads": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "effects track what they read > runs again for a fact it read and reads the new value": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "effects track what they read > runs again when a derivation it read changes": {
+          "layer": "L4",
+          "by": ["option effect prev"]
+        },
+        "effects track what they read > a tracked effect stays quiet for a fact it never read": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "two systems keep their tracking apart > a write in one never reaches a derivation in the other": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "two systems keep their tracking apart > a derivation in one system reading the other system is not a dependency": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a derivation reports its dependencies readably > names a derivation it read without the internal separator": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "reads outside any body are plain reads > returns current values and records nothing": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the prototype guard on facts > answers nothing for prototype-chain names": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
     "tests/core/clock.test.ts": {
       "category": "black-box",
       "rule": "L3",

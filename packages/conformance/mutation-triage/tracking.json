@@ -1,0 +1,210 @@
+[
+  {
+    "line": 36,
+    "col": 35,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 45,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "internals-only: getCurrentDeps has no caller outside tracking.ts, so no public path reads the current dependency set directly"
+  },
+  {
+    "line": 47,
+    "col": 10,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "internals-only: getCurrentDeps has no caller outside tracking.ts, so no public path reads the current dependency set directly"
+  },
+  {
+    "line": 47,
+    "col": 10,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "internals-only: getCurrentDeps has no caller outside tracking.ts, so no public path reads the current dependency set directly"
+  },
+  {
+    "line": 47,
+    "col": 10,
+    "mutator": "EqualityOperator",
+    "replacement": "len !== 0",
+    "reason": "not-observable",
+    "note": "internals-only: getCurrentDeps has no caller outside tracking.ts, so no public path reads the current dependency set directly"
+  },
+  {
+    "line": 47,
+    "col": 38,
+    "mutator": "ArithmeticOperator",
+    "replacement": "len + 1",
+    "reason": "not-observable",
+    "note": "internals-only: getCurrentDeps has no caller outside tracking.ts, so no public path reads the current dependency set directly"
+  },
+  {
+    "line": 274,
+    "col": 11,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 274,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 274,
+    "col": 25,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 274,
+    "col": 40,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 347,
+    "col": 46,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  },
+  {
+    "line": 384,
+    "col": 43,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the fallback hint text appears only inside the development warning message, and every kind has a hint"
+  },
+  {
+    "line": 396,
+    "col": 51,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "internals-only: the warning-memory reset is exported only through /internals"
+  },
+  {
+    "line": 397,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "internals-only: the warning-memory reset is exported only through /internals"
+  },
+  {
+    "line": 378,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "the oldest entry is never undefined once the memory holds its maximum; deleting undefined is a no-op"
+  },
+  {
+    "line": 384,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "nonJsonHints[valueType] && \"a JSON-roundtrippable value\"",
+    "reason": "dev-only",
+    "note": "the fallback hint text appears only inside the development warning message, and every kind has a hint"
+  },
+  {
+    "line": 311,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "the guard only avoids a ReferenceError where the runtime has no File global; with File present the two forms behave the same"
+  },
+  {
+    "line": 311,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "the guard only avoids a ReferenceError where the runtime has no File global; with File present the two forms behave the same"
+  },
+  {
+    "line": 73,
+    "col": 10,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "isTracking is read only before a derivation read records itself; outside any frame trackAccess does nothing and the frame kind is null, so answering true there changes nothing"
+  },
+  {
+    "line": 73,
+    "col": 10,
+    "mutator": "EqualityOperator",
+    "replacement": "depStack.length >= 0",
+    "reason": "equivalent",
+    "note": "isTracking is read only before a derivation read records itself; outside any frame trackAccess does nothing and the frame kind is null, so answering true there changes nothing"
+  },
+  {
+    "line": 184,
+    "col": 38,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "static initializer: Stryker attributes a module-level mutant to the two tests running at module load, so no black-box test can be selected against it (harness limit, not a missing behaviour)"
+  },
+  {
+    "line": 348,
+    "col": 9,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  },
+  {
+    "line": 349,
+    "col": 8,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  },
+  {
+    "line": 350,
+    "col": 8,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  },
+  {
+    "line": 351,
+    "col": 9,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  },
+  {
+    "line": 352,
+    "col": 18,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "the hint text appears only inside the development warning message"
+  }
+]
