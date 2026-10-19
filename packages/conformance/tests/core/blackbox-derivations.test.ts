@@ -391,3 +391,12 @@ describe("registering and replacing derivations at runtime", () => {
     system.stop();
   });
 });
+
+describe("reading a derivation that does not exist", () => {
+  it("throws a message that names the problem", () => {
+    const system = sys(counterModule({ d: (f: Any) => f.n }));
+
+    expect(() => system.read("nope")).toThrow(/Unknown derivation/);
+    system.stop();
+  });
+});

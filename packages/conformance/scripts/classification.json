@@ -79,7 +79,7 @@
   {
     "file": "src/core/__tests__/blackbox-derivations.test.ts",
     "category": "black-box",
-    "cases": 19,
+    "cases": 20,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

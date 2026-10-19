@@ -226,6 +226,10 @@
         "registering and replacing derivations at runtime > a derivation registered after start is computed and tracked": {
           "layer": "L10",
           "by": ["member .derive.register", "member .derive.unregister"]
+        },
+        "reading a derivation that does not exist > throws a message that names the problem": {
+          "layer": "L3",
+          "by": ["option plugins"]
         }
       }
     },
@@ -258,7 +262,7 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "the warning memory is bounded and forgets the oldest first > lets an evicted path warn again, and keeps a recent one quiet": {
+        "the warning memory is bounded > stops growing: far more unique paths than any sane bound do not all stay remembered": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         }

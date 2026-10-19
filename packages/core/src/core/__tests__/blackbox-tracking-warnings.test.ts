@@ -157,9 +157,12 @@ describe("assigning an untrackable value warns once per path and kind", () => {
   });
 });
 
-describe("the warning memory is bounded and forgets the oldest first", () => {
-  it("lets an evicted path warn again, and keeps a recent one quiet", () => {
-    const N = 1100;
+describe("the warning memory is bounded", () => {
+  it("stops growing: far more unique paths than any sane bound do not all stay remembered", () => {
+    // The exact size is a 1.x implementation detail. The contract is only
+    // that memory is bounded: after many unique paths the oldest are
+    // forgotten (they warn again) while the newest stay quiet.
+    const N = 12000;
     const facts: Record<string, ReturnType<typeof t.any>> = {};
     for (let i = 0; i < N; i++) {
       facts[`bounded${i}`] = t.any();
@@ -183,15 +186,9 @@ describe("the warning memory is bounded and forgets the oldest first", () => {
     system.facts[`bounded${N - 2}`] = new Date(-2);
     expect(warn).not.toHaveBeenCalled();
 
-    // The memory holds the last 1000 paths: the oldest of them is still
-    // quiet, the one just before it was forgotten.
-    system.facts[`bounded${N - 1000}`] = new Date(-3);
-    expect(warn).not.toHaveBeenCalled();
-    system.facts[`bounded${N - 1001}`] = new Date(-4);
-    expect(warn).toHaveBeenCalledTimes(1);
-    // And the very first path was forgotten long ago.
+    // The very first path was forgotten long ago, so it warns again.
     system.facts.bounded0 = new Date(-5);
-    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(1);
     system.stop();
   });
 });
