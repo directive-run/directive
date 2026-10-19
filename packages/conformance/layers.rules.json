@@ -160,6 +160,15 @@
     "tests/core/mutants-effects-production.test.ts": {
       "rule": "L4"
     },
+    "tests/core/blackbox-effects.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/blackbox-effects-readonly.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/blackbox-effects-production.test.ts": {
+      "rule": "L4"
+    },
     "tests/core/frozen-facts.test.ts": {
       "rule": "L0"
     },

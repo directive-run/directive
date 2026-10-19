@@ -47,7 +47,8 @@ must PASS:
 
 `scripts/mutation-score.ts` takes Stryker JSON reports (files or directories)
 and prints, per file, killed (+timeout), survived, no coverage, the raw score
-and the gate score. The gate score is killed / all non-ignored mutants. A
+and the gate score. The gate score is killed / all non-ignored mutants, less those triaged
+`equivalent` or `internals-only` (below). A
 mutant is ignored as message text when it is a `StringLiteral` mutant on a
 line that builds an `Error`/`TypeError`/`RangeError`, calls `console.`,
 `warn(` or `devWarn`, or has a `message:` key, or whose original literal
@@ -57,10 +58,17 @@ triage file.
 
 Triage files live at `packages/conformance/mutation-triage/<basename>.json`:
 `[{ "line": n, "col": n, "mutator": "...", "replacement": "...", "reason":
-"equivalent|dev-only|not-observable|perf-only|v1-bug", "note": "..." }]`, matched to
-report mutants by line + col + mutator + replacement (the report's own
-numbers). No survivor stays unexplained: kill it with a conformance scenario
-or triage it with a reason.
+"equivalent|internals-only|dev-only|not-observable|perf-only|v1-bug", "note": "..." }]`,
+matched to report mutants by line + col + mutator + replacement (the report's
+own numbers). No survivor stays unexplained: kill it with a conformance
+scenario or triage it with a reason.
+
+Two reasons leave the score, as in standard mutation scoring: `equivalent`
+(no test of any kind could tell the mutant from the original) and
+`internals-only` (the code is reached only through `/internals`, which 2.0
+need not reproduce; the note names why no public path reaches it). Every
+other reason stays in the denominator, so triage cannot lift a file over 80%.
+A reviewer verifies each excluded entry before it merges.
 
 | Layer | Files in `packages/core/src/core/` |
 |---|---|
