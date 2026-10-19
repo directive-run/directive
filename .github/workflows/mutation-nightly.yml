@@ -97,6 +97,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
+            packages/conformance/package.json
             packages/conformance/scripts/mutation-score.ts
             packages/conformance/mutation-triage
           sparse-checkout-cone-mode: false
