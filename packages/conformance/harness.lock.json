@@ -85,7 +85,7 @@
     "scripts/census.ts": "d185e415f6563b1aa5170da3f3e6f303d73e9b719a5ebc695c27aa193dad862b",
     "scripts/check-expects.ts": "b3c3d909d7175f9d69f28cd6375013b4a740f25e483f3e28d398458aef3952d1",
     "scripts/diff-coverage.ts": "da99cdf59e55edbb84b60e80c90c0f4670bd79c3c872ba60d34161c16808cb9a",
-    "scripts/mutation-score.ts": "8c0709561a82472dcf3cf7d9e6ede933cde60fcd5829e6159a4ff222c716c1b2",
+    "scripts/mutation-score.ts": "328277a09967ac89eb5b624556cf3ef751f86bec2485f1298cc6c9ee84ab2157",
     "scripts/oracle-guard.ts": "fcab2517dd94f1669228c9ddddf6c480ae7004604edd95b2f85932c236e23848",
     "scripts/oracle-update.ts": "de4dec0b59240ccef6f117479ea542fd33e32b5c15da4f838aed7cbea338ad5e",
     "scripts/pin-v1.ts": "5776aab3692e11272cf7ac166213798c4aec80a9fe43e16c9f019bb0005ee970",

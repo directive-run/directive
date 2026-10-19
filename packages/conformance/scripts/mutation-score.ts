@@ -191,7 +191,11 @@ export function scoreFile(
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
-    pass: gateScore >= GATE && unexplained.length === 0,
+    // A file whose every counted mutant was excluded has proved nothing.
+    pass:
+      gateScore >= GATE &&
+      unexplained.length === 0 &&
+      !(denom === 0 && excluded > 0),
   };
 }
 
