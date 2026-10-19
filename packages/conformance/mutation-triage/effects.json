@@ -264,22 +264,6 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
-    "line": 830,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "internals-only",
-    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
-  },
-  {
-    "line": 830,
-    "col": 15,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "internals-only",
-    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
-  },
-  {
     "line": 835,
     "col": 5,
     "mutator": "CallExpression",

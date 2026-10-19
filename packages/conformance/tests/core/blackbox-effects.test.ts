@@ -2359,9 +2359,9 @@ describe("more behaviour of the run loop", () => {
     const { system } = build({});
     await system.start();
 
-    expect(() => system.effects.isEnabled("ghost")).toThrow();
-    expect(() => system.effects.disable("ghost")).toThrow();
-    expect(() => system.effects.enable("ghost")).toThrow();
+    expect(() => system.effects.isEnabled("ghost")).toThrow(/Unknown effect/);
+    expect(() => system.effects.disable("ghost")).toThrow(/Unknown effect/);
+    expect(() => system.effects.enable("ghost")).toThrow(/Unknown effect/);
     await system.destroy();
   });
 
