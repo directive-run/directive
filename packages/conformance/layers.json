@@ -681,6 +681,399 @@
         }
       }
     },
+    "tests/core/blackbox-readonly-module-create.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "tests": {
+        "what createModule hands back > keeps the id, schema, init, meta and history it was given": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "what createModule hands back > fills in empty derive and events when none are given": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule hands back > leaves the optional parts undefined when they are not given": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "what createModule hands back > passes derive, events, effects, constraints, resolvers and hooks through": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "what createModule hands back > keeps crossModuleDeps when given": {
+          "layer": "L1",
+          "by": ["import createModule", "option crossModuleDeps"]
+        },
+        "what createModule hands back > builds a working module": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "what createModule hands back > a module factory makes one module per name": {
+          "layer": "L1",
+          "by": ["import createModuleFactory"]
+        },
+        "what createModule hands back > a module factory keeps crossModuleDeps": {
+          "layer": "L1",
+          "by": ["import createModuleFactory", "option crossModuleDeps"]
+        },
+        "definitions createModule refuses, in every build > \"a fact named %s\"": {
+          "layer": "L1",
+          "by": ["import createModule"],
+          "dynamic": true
+        },
+        "definitions createModule refuses, in every build > a fact named after a crossModuleDeps namespace": {
+          "layer": "L1",
+          "by": ["import createModule", "option crossModuleDeps"]
+        },
+        "definitions createModule refuses, in every build > a fact that is not named after a namespace is fine": {
+          "layer": "L1",
+          "by": ["import createModule", "option crossModuleDeps"]
+        },
+        "definitions createModule refuses, in every build > an explicitly undefined crossModuleDeps is the same as none": {
+          "layer": "L1",
+          "by": ["import createModule", "option crossModuleDeps"]
+        },
+        "definitions createModule refuses, in every build > a fact name with spaces is an ordinary name": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "definitions createModule refuses, in every build > a module with no facts at all": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "definitions createModule refuses, in every build > \"an abortOn entry %s\"": {
+          "layer": "L2",
+          "by": ["option constraints"],
+          "dynamic": true
+        },
+        "definitions createModule refuses, in every build > \"a bind entry %s\"": {
+          "layer": "L2",
+          "by": ["option constraints"],
+          "dynamic": true
+        },
+        "definitions createModule refuses, in every build > an ordinary abortOn and bind are fine": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "definitions createModule refuses, in every build > constraints that are empty or have no abortOn or bind are fine": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "definitions createModule refuses, in every build > a fact key carrying the unit separator": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "definitions createModule refuses, in every build > a derivation name carrying the unit separator": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a module id that is not a non-empty string": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a module id that is not kebab-case": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > module ids that are fine": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a missing schema": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a schema without facts": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > facts declared directly under schema": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > facts declared directly, among other things": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a schema without facts and nothing that looks like one": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > a derivation with no declaration, and a declaration with no derivation": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > derivations that line up": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > an event with no declaration, and a declaration with no handler": {
+          "layer": "L1",
+          "by": ["import createModule"]
+        },
+        "what createModule warns about in development > history.snapshotEvents naming an event the schema does not declare": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "what createModule warns about in development > history.snapshotEvents naming an event when no events are declared": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "what createModule warns about in development > an empty history.snapshotEvents": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "what createModule warns about in development > history.snapshotEvents that are all declared": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "what createModule warns about in development > history.snapshotEvents with no schema at all warns instead of throwing": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "what createModule warns about in development > a resolver for a requirement the schema does not declare": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        },
+        "what createModule warns about in development > a resolver for a requirement when none are declared": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        },
+        "what createModule warns about in development > resolvers whose requirement is declared, or not named by a string": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        },
+        "what createModule warns about in development > resolvers with no schema at all do not throw": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        },
+        "what createModule warns about in development > a well-formed module warns about nothing": {
+          "layer": "L8",
+          "by": ["option history"]
+        }
+      }
+    },
+    "tests/core/blackbox-readonly-module-production.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "tests": {
+        "createModule in production > does not warn about a badly formed module": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "createModule in production > still refuses what is structurally wrong": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "createModule in production > still hands back the module": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "the facts an effect reads through, in production > a delete and a definition are dropped quietly, and reported": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "the facts an effect reads through, in production > it cannot be made non-extensible or re-prototyped": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "the facts an effect reads through, in production > it lists, tests and describes keys": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "the facts an effect reads through, in production > null, primitive and nested values read as stored": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "the facts an effect reads through, in production > a nested change is not checked for": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        }
+      }
+    },
+    "tests/core/blackbox-readonly-module-view.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "tests": {
+        "an in-place change to a nested fact names where it happened > a deep property": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > the second of two sibling objects": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > an array element, deep inside": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > an element pushed onto an array": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a key added next to existing keys": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a key removed from among others": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > the only key removed": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > one key swapped for another, so the count stays the same": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a key that held undefined swapped for another": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > an object held under the second object key of a Map": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a getter swapped for another": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > an accessor is not run just by being read": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > the prototype replaced": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a Date moved": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > the first changed fact is the one named, however many changed": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a change to a later fact is found when an earlier one is untouched": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "an in-place change to a nested fact names where it happened > a change to an earlier fact is found when a later one is untouched": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Map value under a string key": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Map value under a number key": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Map value under an object key names its position": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > an object held inside a Map": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Map key replaced by another, so the size stays the same": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Map that grew": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Set element replaced by another": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Set of numbers or strings, left alone, raises nothing": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "Map and Set facts > a Set that shrank": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "what reading leaves behind > reading values of every kind, then changing nothing, raises nothing": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "what reading leaves behind > a null fact reads as null": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "what reading leaves behind > a change inside a cycle is still found, once": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "what reading leaves behind > a change is reported for its own run only": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "what reading leaves behind > a fact is judged against what the run first saw, on every run": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > a wide object": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > a long array": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > a large Map": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > a large Set": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > an object with many accessors": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > reading a large collection and changing nothing raises nothing": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "values too large to check are left alone > a large fact does not stop a small one being checked": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > a delete is refused and reported": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > defining a property is refused and reported": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > it cannot be made non-extensible or re-prototyped, and says so": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > it lists, tests and describes keys like the facts do": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > previous facts and derivations cannot be written, and name themselves": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        },
+        "the facts view itself > a nested change in previous facts is found": {
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
+        }
+      }
+    },
     "tests/core/clock.test.ts": {
       "category": "black-box",
       "rule": "L3",

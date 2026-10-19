@@ -1,0 +1,10 @@
+[
+  {
+    "line": 289,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "An early return for a module with no facts; without it the reserved-name loop runs over zero fact keys and throws nothing."
+  }
+]

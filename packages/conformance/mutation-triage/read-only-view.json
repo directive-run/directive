@@ -1,0 +1,146 @@
+[
+  {
+    "line": 115,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "budget.left <= 0",
+    "reason": "perf-only",
+    "note": "Budget boundary: a value that uses the last unit of the record budget is left unchecked instead of checked. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 128,
+    "col": 5,
+    "mutator": "UpdateOperator",
+    "replacement": "budget.left++",
+    "reason": "perf-only",
+    "note": "A Date costs one budget unit; with ++ it costs none, which only shows with thousands of Dates under one fact. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 130,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Date budget exhaustion check; only reached with a Date recorded after the budget is spent. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 130,
+    "col": 12,
+    "mutator": "EqualityOperator",
+    "replacement": "budget.left <= 0",
+    "reason": "perf-only",
+    "note": "Date budget boundary. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 154,
+    "col": 31,
+    "mutator": "EqualityOperator",
+    "replacement": "value.length > budget.left",
+    "reason": "perf-only",
+    "note": "An array exactly as long as the remaining budget is walked instead of skipped. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 155,
+    "col": 19,
+    "mutator": "UnaryOperator",
+    "replacement": "+1",
+    "reason": "perf-only",
+    "note": "After giving up on a long array the budget is set to a positive number instead of exhausted, so a later fact in the same run is still recorded. Needs a fact sized to the budget. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 164,
+    "col": 11,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "`held` is read only when the descriptor has a value (the `push` branch); the accessor branch never uses it and records descriptor.get ?? descriptor.set directly, so the accessor-shaped literal is dead."
+  },
+  {
+    "line": 171,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "budget.left <= 0",
+    "reason": "perf-only",
+    "note": "Accessor budget boundary. The record budget is the internal constant NODE_BUDGET; this mutant moves an exact boundary of it (or its shared counter), so only a value sized to that constant tells it apart. No behaviour a caller can rely on."
+  },
+  {
+    "line": 191,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "slotPath is called only for kind map (firstChange line 247, whose Set value is always undefined so never differs) or for a recorded child; a Set's children are always null (child(undefined)) and a Date has no slots. So it is never called with kind set or date, and the object kind returns before this line."
+  },
+  {
+    "line": 197,
+    "col": 10,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "equivalent",
+    "note": "The kind-set path template of slotPath. slotPath is never called with kind set or date (a Set's value is always undefined so never differs, and a Set has no recorded children), so the line is unreachable."
+  },
+  {
+    "line": 207,
+    "col": 12,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "`present` becomes undefined, which the caller's `!current.present` treats exactly like false; `value` is not read when absent."
+  },
+  {
+    "line": 261,
+    "col": 41,
+    "mutator": "OptionalChaining",
+    "replacement": "removed.key",
+    "reason": "equivalent",
+    "note": "This branch runs only when the key count changed, so either a key was added or a recorded key is gone; with nothing added `removed` is always found, so `removed?.` never sees undefined."
+  },
+  {
+    "line": 261,
+    "col": 57,
+    "mutator": "StringLiteral",
+    "replacement": "\"Stryker was here!\"",
+    "reason": "equivalent",
+    "note": "Fallback for a `removed` that has no key; unreachable for the reason above, and a recorded key is never nullish."
+  },
+  {
+    "line": 332,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "Only differs for a symbol-keyed read that returns a recordable object. No public read returns one: the facts proxy answers symbol keys with undefined except the internal DEV_PROXY_TARGET symbol, which is not exported."
+  },
+  {
+    "line": 387,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "Differs only when `recorded` is null, which is production. takeMutation is called only from development-gated code (effects, sources, dependency views), so the null case is reached only by calling the internal helper directly; with a non-null empty map the loop does nothing and returns null either way."
+  },
+  {
+    "line": 387,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "recorded === null && recorded.size === 0",
+    "reason": "internals-only",
+    "note": "Same as the null check above: differs only for a null `recorded` (production), which no public path calls takeMutation on."
+  },
+  {
+    "line": 387,
+    "col": 32,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "An empty record: the loop below has nothing to visit and the result is the same null."
+  },
+  {
+    "line": 387,
+    "col": 53,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "Skipping the early return changes nothing for an empty record; for a null record (production) it would throw, and no public path calls takeMutation there."
+  }
+]
