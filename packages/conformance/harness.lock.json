@@ -80,6 +80,7 @@
     "package.json": "b79a6dfb437592de0779ef196fb35d31ddebd4987addd69d925a1345932e905b",
     "scripts/__tests__/check.test.ts": "6d6c6eead949df59f585b22c4fcc022afd3009400c78afaee6068e400e444e5c",
     "scripts/__tests__/engine-swap.test.ts": "e603d825737b89fddbd48fcad18cbd6475613b7a7059c48fdd4ac2ff134f6cb6",
+    "scripts/__tests__/mutation-score.test.ts": "e35c50a3b64a501c5c100ced79042f04a96ca37dcad4e7b04f828b7d3fdeebd4",
     "scripts/__tests__/oracle.test.ts": "6cdf8fdb368b0688a1699ffe4a5a111ac76d656775d9848b622b9d07b1aedbb5",
     "scripts/census.ts": "d185e415f6563b1aa5170da3f3e6f303d73e9b719a5ebc695c27aa193dad862b",
     "scripts/check-expects.ts": "b3c3d909d7175f9d69f28cd6375013b4a740f25e483f3e28d398458aef3952d1",
@@ -90,7 +91,6 @@
     "scripts/pin-v1.ts": "5776aab3692e11272cf7ac166213798c4aec80a9fe43e16c9f019bb0005ee970",
     "scripts/port.ts": "4db287d40ac72b44fe0bcf17475ba56df7c1ffcb3ed870e5a7a7c4b32a2dbd8a",
     "self/engine-identity.test.ts": "01ffeda17bc7ec1b7f295a9b05b3b7ed7b48985fceabf691fe4ae9a3e4803673",
-    "self/mutation-score.test.ts": "132eb3e1a826daeeea0b104f62ea88a3a358c6c740a63197c8f9a36d34b0b0e0",
     "tsconfig.json": "d5b4851238c86a90955cef94f62df985445f19a688116e63c61fd47d449c53b5",
     "v1-pin.json": "72d7116e4ce09d9540fb2aecdc2e4a3011ab8875c1ece7c273b81a3659c36204",
     "vitest.config.ts": "224236cb650eaffc1a60afa1d418563151c506a5c26d20167d401fad942a433f"

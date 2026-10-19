@@ -9,7 +9,7 @@ import {
   formatTable,
   isMessageText,
   scoreFile,
-} from "../scripts/mutation-score.js";
+} from "../mutation-score.js";
 
 const source = [
   'throw new Error("bad thing");', // 1: message line
