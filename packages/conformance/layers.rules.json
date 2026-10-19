@@ -136,6 +136,15 @@
     "tests/core/exotic-facts.test.ts": {
       "rule": "L0"
     },
+    "tests/core/mutants-facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/mutants-facts-system.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/mutants-facts-production.test.ts": {
+      "rule": "L0"
+    },
     "tests/core/frozen-facts.test.ts": {
       "rule": "L0"
     },
