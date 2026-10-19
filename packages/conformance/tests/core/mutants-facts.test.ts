@@ -783,6 +783,7 @@ describe("development nested-mutation warnings", () => {
     const { f, warn } = make({ inner: { x: 1 } });
     f.doc = { ...f.doc };
     f.doc = { ...f.doc };
+    // biome-ignore lint/correctness/noSelfAssign: writing a read value straight back is the case under test
     f.doc = f.doc;
     warn.mockClear();
 

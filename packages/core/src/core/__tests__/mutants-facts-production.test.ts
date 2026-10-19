@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("#is-development", () => ({ default: false }));
 
 const { t } = await import("../../index.js");
-const { createFacts, createFactsStore } = await import("../../internals.js");
+const internals = await import("../../internals.js");
+const { createFacts, createFactsStore } = internals;
 
 describe("the facts store in production", () => {
   it("does not validate, even when asked to", () => {

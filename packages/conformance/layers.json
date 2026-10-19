@@ -2796,15 +2796,15 @@
       "tests": {
         "the facts store in production > does not validate, even when asked to": {
           "layer": "L0",
-          "by": ["import createFacts", "import createFactsStore", "import t"]
+          "by": ["import t"]
         },
         "the facts store in production > defaults to no validation and no unknown-key warning": {
           "layer": "L0",
-          "by": ["import createFacts", "import createFactsStore", "import t"]
+          "by": ["import t"]
         },
         "the facts store in production > neither warns about non-JSON values nor wraps nested objects": {
           "layer": "L0",
-          "by": ["import createFacts", "import createFactsStore", "import t"]
+          "by": ["import t"]
         }
       }
     },

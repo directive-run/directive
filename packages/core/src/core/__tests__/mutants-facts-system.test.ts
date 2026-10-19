@@ -99,7 +99,9 @@ describe("fact store behaviour seen through a system", () => {
       Extract<ObservationEvent, { type: "fact.change" }>
     >;
     expect(deletions).toHaveLength(2);
-    expect(deletions.map((e) => [e.key, e.prev, e.next, e.origin]).sort()).toEqual([
+    expect(
+      deletions.map((e) => [e.key, e.prev, e.next, e.origin]).sort(),
+    ).toEqual([
       ["gone::a", 7, undefined, "authored"],
       ["gone::b", "x", undefined, "authored"],
     ]);

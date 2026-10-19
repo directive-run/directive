@@ -142,8 +142,12 @@ describe("validation message previews", () => {
     expect(messageOf(() => store.set("n", "x" as never))).not.toContain(
       "validator",
     );
-    expect(messageOf(() => store.set("n", 0))).toContain("(validator 2 failed)");
-    expect(messageOf(() => store.set("n", 9))).toContain("(validator 3 failed)");
+    expect(messageOf(() => store.set("n", 0))).toContain(
+      "(validator 2 failed)",
+    );
+    expect(messageOf(() => store.set("n", 9))).toContain(
+      "(validator 3 failed)",
+    );
   });
 
   it("reports the failing array element, then forgets it", () => {
@@ -269,9 +273,9 @@ describe("schemas written with a safeParse method", () => {
         zodLike({ safeParse: () => ({ success: false, error }) }),
       ).set.bind(null, "k", "x");
 
-    expect(messageOf(fail({ message: "m1", issues: [{ message: "i1" }] }))).toMatch(
-      /\. m1$/,
-    );
+    expect(
+      messageOf(fail({ message: "m1", issues: [{ message: "i1" }] })),
+    ).toMatch(/\. m1$/);
     expect(messageOf(fail({ issues: [{ message: "i1" }] }))).toMatch(/\. i1$/);
     expect(messageOf(fail({ issues: [] }))).toMatch(/\. Validation failed$/);
     expect(messageOf(fail({}))).toMatch(/\. Validation failed$/);
@@ -293,7 +297,10 @@ describe("schemas written with a safeParse method", () => {
     ["no parse", { parse: undefined }],
     ["a non-function parse", { parse: 1 }],
   ])("does not treat an object with %s as one", (_label, override) => {
-    const schemaEntry = { ...zodLike(), ...override } as Record<string, unknown>;
+    const schemaEntry = { ...zodLike(), ...override } as Record<
+      string,
+      unknown
+    >;
     for (const key of Object.keys(override)) {
       if (override[key as keyof typeof override] === undefined) {
         delete schemaEntry[key];
@@ -709,7 +716,11 @@ describe("facts proxy traps", () => {
   it("passes snapshot reads through without a subscription", () => {
     const { facts, store } = make();
     store.set("n", 4);
-    const snap = (facts as unknown as { $snapshot(): { get(k: string): unknown; has(k: string): boolean } }).$snapshot();
+    const snap = (
+      facts as unknown as {
+        $snapshot(): { get(k: string): unknown; has(k: string): boolean };
+      }
+    ).$snapshot();
 
     expect(snap.get("n")).toBe(4);
     expect(snap.has("n")).toBe(true);
@@ -717,7 +728,10 @@ describe("facts proxy traps", () => {
   });
 
   it("builds a proxy from a bare store", () => {
-    const store = createFactsStore({ schema: { n: t.number() }, validate: false });
+    const store = createFactsStore({
+      schema: { n: t.number() },
+      validate: false,
+    });
     const facts = createFactsProxy(store, { n: t.number() });
     (facts as unknown as { n: number }).n = 2;
 
@@ -766,6 +780,7 @@ describe("development nested-mutation warnings", () => {
     const { f, warn } = make({ inner: { x: 1 } });
     f.doc = { ...f.doc };
     f.doc = { ...f.doc };
+    // biome-ignore lint/correctness/noSelfAssign: writing a read value straight back is the case under test
     f.doc = f.doc;
     warn.mockClear();
 
