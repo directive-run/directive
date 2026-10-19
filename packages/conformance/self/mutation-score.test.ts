@@ -41,12 +41,12 @@ function mut(
 const file: ReportFile = {
   source,
   mutants: [
-    mut(1, 16, 25, "Survived"), // message text -> ignored
-    mut(2, 10, 21, "Survived"), // space in literal -> ignored
-    mut(3, 10, 16, "Killed"),
-    mut(4, 4, 9, "Timeout", "EqualityOperator", "x >= 1"),
-    mut(5, 4, 9, "Survived", "EqualityOperator", "y >= 2"),
-    mut(5, 4, 9, "Ignored", "EqualityOperator", "y < 2"), // not counted
+    mut(1, 17, 26, "Survived"), // message text -> ignored
+    mut(2, 11, 22, "Survived"), // space in literal -> ignored
+    mut(3, 11, 17, "Killed"),
+    mut(4, 5, 10, "Timeout", "EqualityOperator", "x >= 1"),
+    mut(5, 5, 10, "Survived", "EqualityOperator", "y >= 2"),
+    mut(5, 5, 10, "Ignored", "EqualityOperator", "y < 2"), // not counted
   ],
 };
 
@@ -72,15 +72,15 @@ describe("mutation-score", () => {
     const big: ReportFile = {
       source,
       mutants: [
-        ...Array.from({ length: 4 }, () => mut(3, 10, 16, "Killed")),
-        mut(5, 4, 9, "Survived", "EqualityOperator", "y >= 2"),
+        ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+        mut(5, 5, 10, "Survived", "EqualityOperator", "y >= 2"),
       ],
     };
     expect(scoreFile("a.ts", big, []).pass).toBe(false);
     const triaged = scoreFile("a.ts", big, [
       {
         line: 5,
-        col: 4,
+        col: 5,
         mutator: "EqualityOperator",
         replacement: "y >= 2",
         reason: "equivalent",

@@ -76,7 +76,8 @@ function offsetOf(source: string, line: number, column: number): number {
     off = nl + 1;
   }
 
-  return off + column;
+  // Stryker locations are 1-based for both line and column.
+  return off + column - 1;
 }
 
 /** True when the mutant only changes message text, not behaviour. */
@@ -255,6 +256,17 @@ function main(): void {
       process.env.GITHUB_STEP_SUMMARY,
       `## Mutation score by file (report-only)\n\n${out}\n`,
     );
+  }
+  const missing = (only ?? []).filter(
+    (name) => !rows.some((r) => basename(r.file) === name),
+  );
+  if (rows.length === 0 || missing.length > 0) {
+    console.error(
+      rows.length === 0
+        ? "mutation-score: no mutated files found in the reports"
+        : `mutation-score: not in any report: ${missing.join(", ")}`,
+    );
+    process.exit(1);
   }
   if (check && rows.some((r) => !r.pass)) {
     process.exit(1);
