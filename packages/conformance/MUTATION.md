@@ -11,6 +11,11 @@ behaviour the oracle does not pin down.
 `vitest.stryker.config.ts` keeps only `conformance:local` and
 `conformance:local:prod`. Those alias `@directive-run/core` to core's `src/`
 (see `lib/core-entries.ts`), so a mutant written into `src/` is what runs.
+It also leaves out every file in the `internals` category (layers.json).
+`conformance:v2` skips those, so a mutant only they kill is a behaviour the
+2.0 oracle does not pin. Every kill the score counts comes from a test that
+also runs on v2. To kill a mutant, write a black-box test; an `/internals`
+test still documents 1.35 but does not move the gate.
 Stryker runs `inPlace` from the repo root (the engine is outside this package)
 and restores the files afterwards. Run it on a clean checkout.
 
