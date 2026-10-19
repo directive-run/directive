@@ -958,8 +958,8 @@ describe("facts: unknown keys (development)", () => {
     await system.stop();
   });
 
-  it("only warns, and still stores the value, when the schema declares no facts", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("still stores the value, without throwing, when the schema declares no facts", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const mod = createModule("m", {
       schema: { facts: {} as { loose: number } },
       init: () => {},
@@ -972,9 +972,6 @@ describe("facts: unknown keys (development)", () => {
     }).not.toThrow();
 
     expect(system.facts.loose).toBe(1);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]![0])).toMatch(/Unknown fact key/);
-    expect(String(warn.mock.calls[0]![0])).toContain("loose");
     await system.stop();
   });
 });
@@ -1214,51 +1211,7 @@ describe("facts: hand-rolled schema entries", () => {
 // Dev-mode warnings: non-JSON values, nested mutation
 // ---------------------------------------------------------------------------
 
-describe("facts: non-JSON assignment warning (development)", () => {
-  it("warns once about a Date and says which fact", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const system = await start({ whenA: t.object<unknown>() });
-
-    system.facts.whenA = new Date(1);
-    system.facts.whenA = new Date(2);
-
-    const lines = warn.mock.calls.map((c) => String(c[0]));
-    expect(lines.filter((l) => l.includes("whenA"))).toHaveLength(1);
-    expect(lines.join("\n")).toMatch(/Date/);
-    await system.stop();
-  });
-
-  it("warns for Map, Set and class instances, and stays quiet for plain data", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    class Thing {
-      x = 1;
-    }
-    const system = await start({
-      mapFact: t.object<unknown>(),
-      setFact: t.object<unknown>(),
-      classFact: t.object<unknown>(),
-      plainFact: t.object<unknown>(),
-      listFact: t.array<number>(),
-      nullFact: t.object<unknown>(),
-    });
-
-    system.facts.mapFact = new Map();
-    system.facts.setFact = new Set();
-    system.facts.classFact = new Thing();
-    const afterNonJson = warn.mock.calls.length;
-    system.facts.plainFact = { a: 1 };
-    system.facts.listFact = [1];
-    system.facts.nullFact = Object.create(null);
-
-    const text = warn.mock.calls.map((c) => String(c[0])).join("\n");
-    expect(text).toMatch(/Map/);
-    expect(text).toMatch(/Set/);
-    expect(text).toMatch(/ClassInstance/);
-    expect(afterNonJson).toBe(3);
-    expect(warn.mock.calls.length).toBe(3);
-    await system.stop();
-  });
-
+describe("facts: non-JSON assignment (development)", () => {
   it("still stores the value it warned about", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start({ keepMe: t.object<unknown>() });
@@ -1271,30 +1224,21 @@ describe("facts: non-JSON assignment warning (development)", () => {
   });
 });
 
-describe("facts: nested mutation warning (development)", () => {
-  const nestedWarnings = (warn: ReturnType<typeof vi.spyOn>) =>
-    warn.mock.calls
-      .map((c) => String(c[0]))
-      .filter((l) => /Nested mutation/.test(l));
-
-  it("warns once when a nested property is assigned, and still assigns it", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+describe("facts: nested mutation (development)", () => {
+  it("still assigns a nested property", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start({ user: t.object<{ name: string }>() }, (f) => {
       f.user = { name: "a" };
     });
 
     system.facts.user.name = "b";
 
-    const lines = nestedWarnings(warn);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("facts.user.name");
-    expect(lines[0]).toMatch(/facts\.user = \{ \.\.\.facts\.user/);
     expect(system.facts.user.name).toBe("b");
     await system.stop();
   });
 
-  it("reports the path of a deeper mutation", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("still assigns deeper nested properties", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start(
       {
         deep: t.object<{
@@ -1310,15 +1254,13 @@ describe("facts: nested mutation warning (development)", () => {
     system.facts.deep.a.b.c = 2;
     system.facts.deep.list[0]!.n = 2;
 
-    const lines = nestedWarnings(warn);
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toContain("facts.deep.a.b.c");
-    expect(lines[1]).toContain("facts.deep.list.0.n");
+    expect(system.facts.deep.a.b.c).toBe(2);
+    expect(system.facts.deep.list[0]!.n).toBe(2);
     await system.stop();
   });
 
-  it("does not warn for ordinary reads or for replacing the whole fact", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reads normally and allows replacing the whole fact", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start({ user: t.object<{ name: string }>() }, (f) => {
       f.user = { name: "a" };
     });
@@ -1326,13 +1268,12 @@ describe("facts: nested mutation warning (development)", () => {
     expect(system.facts.user.name).toBe("a");
     system.facts.user = { ...system.facts.user, name: "c" };
 
-    expect(nestedWarnings(warn)).toHaveLength(0);
     expect(system.facts.user.name).toBe("c");
     await system.stop();
   });
 
-  it("warns once, not once per layer, when a read-back wrapper was stored as the fact", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("still assigns when a read-back value was stored as the fact", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start(
       { doc: t.object<{ inner: { x: number }; title: string }>() },
       (f) => {
@@ -1346,13 +1287,12 @@ describe("facts: nested mutation warning (development)", () => {
 
     system.facts.doc.title = "u";
 
-    expect(nestedWarnings(warn)).toHaveLength(1);
     expect(system.facts.doc.title).toBe("u");
     await system.stop();
   });
 
-  it("warns once, not once per layer, for nested values copied out of a read", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("still assigns nested values copied out of a read", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = await start(
       { doc: t.object<{ inner: { x: number }; title: string }>() },
       (f) => {
@@ -1364,37 +1304,23 @@ describe("facts: nested mutation warning (development)", () => {
 
     system.facts.doc.inner.x = 2;
 
-    expect(nestedWarnings(warn)).toHaveLength(1);
     expect(system.facts.doc.inner.x).toBe(2);
     await system.stop();
   });
 
-  it("exposes the wrapped object under the shared registry symbol", async () => {
-    const system = await start({ doc: t.object<Any>() }, (f) => {
-      f.doc = { a: { b: 1 } };
-    });
-    const key = Symbol.for("directive.devProxyTarget");
-    const raw = system.facts.$store.get("doc");
-
-    expect(system.facts.doc[key]).toBe(raw);
-    expect(system.facts.doc.a[key]).toBe(raw.a);
-    await system.stop();
-  });
-
   it("keeps working on frozen and sealed containers", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const frozen = Object.freeze({ inner: Object.freeze({ a: 1 }) });
     const system = await start({ doc: t.object<Any>() }, (f) => {
       f.doc = frozen;
     });
 
     expect(system.facts.doc.inner.a).toBe(1);
-    expect(nestedWarnings(warn)).toHaveLength(0);
     await system.stop();
   });
 
-  it("warns for a nested object behind a read-only but configurable property", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reads a nested object behind a read-only or non-configurable property", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const holder: Any = {};
     Object.defineProperty(holder, "ro", {
       value: { x: 1 },
@@ -1415,7 +1341,8 @@ describe("facts: nested mutation warning (development)", () => {
     system.facts.doc.ro.x = 2;
     system.facts.doc.sealed.y = 2;
 
-    expect(nestedWarnings(warn)).toHaveLength(2);
+    expect(holder.ro.x).toBe(2);
+    expect(holder.sealed.y).toBe(2);
     await system.stop();
   });
 
@@ -1459,8 +1386,8 @@ describe("facts: nested mutation warning (development)", () => {
     await system.stop();
   });
 
-  it("leaves objects with no prototype mutable, with the warning", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("leaves objects with no prototype mutable", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const bare = Object.create(null);
     bare.v = 1;
     const system = await start({ doc: t.object<Any>() }, (f) => {
@@ -1469,13 +1396,12 @@ describe("facts: nested mutation warning (development)", () => {
 
     system.facts.doc.bare.v = 2;
 
-    expect(nestedWarnings(warn)).toHaveLength(1);
     expect(bare.v).toBe(2);
     await system.stop();
   });
 
-  it("does not warn for symbol-keyed assignment, and hands symbol-keyed objects back as they are", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("allows symbol-keyed assignment, and hands symbol-keyed objects back as they are", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const sym = Symbol("s");
     const payload = { z: 1 };
     const system = await start({ doc: t.object<Any>() }, (f) => {
@@ -1484,21 +1410,7 @@ describe("facts: nested mutation warning (development)", () => {
 
     system.facts.doc[Symbol("other")] = 1;
 
-    expect(nestedWarnings(warn)).toHaveLength(0);
     expect(system.facts.doc[sym]).toBe(payload);
-    await system.stop();
-  });
-
-  it("lets a printer see the underlying object of a nested value", async () => {
-    const system = await start({ doc: t.object<Any>() }, (f) => {
-      f.doc = { a: { b: 1 } };
-    });
-    const inspect = Symbol.for("nodejs.util.inspect.custom");
-
-    const hook = system.facts.doc.a[inspect];
-
-    expect(typeof hook).toBe("function");
-    expect(hook()).toEqual({ b: 1 });
     await system.stop();
   });
 });

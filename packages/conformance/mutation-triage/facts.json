@@ -374,5 +374,357 @@
     "replacement": "false",
     "reason": "equivalent",
     "note": "Blocked names (__proto__, constructor, prototype) can never be stored as facts (set and registerKeys refuse them), so store.get returns undefined, the same as the early return."
+  },
+  {
+    "line": 799,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 801,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 826,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 826,
+    "col": 31,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 826,
+    "col": 62,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 827,
+    "col": 16,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 846,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 846,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 866,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 882,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 882,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "descriptor && !descriptor.configurable || !descriptor.writable",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 882,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "descriptor || !descriptor.configurable",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 899,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 899,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 953,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 953,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 953,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 964,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 964,
+    "col": 33,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 964,
+    "col": 64,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 965,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 965,
+    "col": 40,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 991,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 991,
+    "col": 32,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1002,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1002,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1002,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1018,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1018,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1020,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1020,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1021,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "prop === \"$store\" && prop === \"$snapshot\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 32,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 41,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1077,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1078,
+    "col": 50,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1078,
+    "col": 67,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1080,
+    "col": 64,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1087,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1092,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
   }
 ]

@@ -88,7 +88,7 @@
   {
     "file": "src/core/__tests__/blackbox-facts-proxy.test.ts",
     "category": "black-box",
-    "cases": 17,
+    "cases": 13,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -97,7 +97,7 @@
   {
     "file": "src/core/__tests__/blackbox-facts.test.ts",
     "category": "black-box",
-    "cases": 89,
+    "cases": 84,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

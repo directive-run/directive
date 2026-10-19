@@ -189,23 +189,11 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts proxy: property access > returns nothing for symbols other than the inspection hook": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts proxy: property access > offers an inspection hook that yields the current values": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts proxy: property access > does not make a derivation depend on a fact merely by inspecting facts": {
+        "facts proxy: property access > reads unknown symbols as undefined": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
         "facts proxy: assignment refused > throws when assigning a symbol key": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts proxy: assignment refused > reports a refused symbol assignment or deletion as a failure": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
@@ -233,15 +221,11 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts proxy: reflection > lists the schema's keys, enumerable and writable": {
+        "facts proxy: reflection > lists the schema's keys": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts proxy: reflection > describes the reserved accessors as hidden and read-only": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts proxy: reflection > refuses to define properties or change the prototype": {
+        "facts proxy: reflection > refuses to define properties": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
@@ -447,7 +431,7 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: unknown keys (development) > only warns, and still stores the value, when the schema declares no facts": {
+        "facts: unknown keys (development) > still stores the value, without throwing, when the schema declares no facts": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
@@ -491,71 +475,55 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: non-JSON assignment warning (development) > warns once about a Date and says which fact": {
+        "facts: non-JSON assignment (development) > still stores the value it warned about": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: non-JSON assignment warning (development) > warns for Map, Set and class instances, and stays quiet for plain data": {
+        "facts: nested mutation (development) > still assigns a nested property": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: non-JSON assignment warning (development) > still stores the value it warned about": {
+        "facts: nested mutation (development) > still assigns deeper nested properties": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > warns once when a nested property is assigned, and still assigns it": {
+        "facts: nested mutation (development) > reads normally and allows replacing the whole fact": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > reports the path of a deeper mutation": {
+        "facts: nested mutation (development) > still assigns when a read-back value was stored as the fact": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > does not warn for ordinary reads or for replacing the whole fact": {
+        "facts: nested mutation (development) > still assigns nested values copied out of a read": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > warns once, not once per layer, when a read-back wrapper was stored as the fact": {
+        "facts: nested mutation (development) > keeps working on frozen and sealed containers": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > warns once, not once per layer, for nested values copied out of a read": {
+        "facts: nested mutation (development) > reads a nested object behind a read-only or non-configurable property": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > exposes the wrapped object under the shared registry symbol": {
+        "facts: nested mutation (development) > returns null properties and primitives untouched": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > keeps working on frozen and sealed containers": {
+        "facts: nested mutation (development) > hides prototype-pollution keys on nested values": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > warns for a nested object behind a read-only but configurable property": {
+        "facts: nested mutation (development) > leaves Map, Set and Date usable inside a fact": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > returns null properties and primitives untouched": {
+        "facts: nested mutation (development) > leaves objects with no prototype mutable": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "facts: nested mutation warning (development) > hides prototype-pollution keys on nested values": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts: nested mutation warning (development) > leaves Map, Set and Date usable inside a fact": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts: nested mutation warning (development) > leaves objects with no prototype mutable, with the warning": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts: nested mutation warning (development) > does not warn for symbol-keyed assignment, and hands symbol-keyed objects back as they are": {
-          "layer": "L1",
-          "by": ["import createModule", "import createSystem"]
-        },
-        "facts: nested mutation warning (development) > lets a printer see the underlying object of a nested value": {
+        "facts: nested mutation (development) > allows symbol-keyed assignment, and hands symbol-keyed objects back as they are": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
