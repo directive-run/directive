@@ -8,6 +8,14 @@
     "note": "Static module-level constant evaluated at load; the symbol key is only a shared name between wrapper and reader, and Stryker cannot attribute a per-test failure to a static mutant."
   },
   {
+    "line": 383,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "A wrapper that ignores the recorded answer is judged by its own arity, which is always 3, so it only costs an unneeded snapshot copy."
+  },
+  {
     "line": 386,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -80,28 +88,68 @@
     "note": "A string used only in a message or an error-attribution label; the observable behaviour (throw / report) is unchanged."
   },
   {
+    "line": 501,
+    "col": 3,
+    "mutator": "OptionalChaining",
+    "replacement": "onBlocked(effectId, path)",
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
+  },
+  {
     "line": 584,
     "col": 20,
     "mutator": "ArrowFunction",
     "replacement": "() => undefined",
-    "reason": "equivalent",
-    "note": "A default predicate that returns undefined or false is the same absence; the default isFactKey only decides which names are re-asked, with identical results."
+    "reason": "internals-only",
+    "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
   },
   {
     "line": 585,
     "col": 17,
     "mutator": "ArrowFunction",
     "replacement": "() => undefined",
-    "reason": "equivalent",
-    "note": "A default predicate that returns undefined or false is the same absence; the default isFactKey only decides which names are re-asked, with identical results."
+    "reason": "internals-only",
+    "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
   },
   {
     "line": 585,
     "col": 23,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "A default predicate that returns undefined or false is the same absence; the default isFactKey only decides which names are re-asked, with identical results."
+    "reason": "internals-only",
+    "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
+  },
+  {
+    "line": 587,
+    "col": 20,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "internals-only",
+    "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
+  },
+  {
+    "line": 587,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
+  },
+  {
+    "line": 594,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Without the early return the dependency list is built even when no trace reads it; nothing public sees it."
+  },
+  {
+    "line": 594,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Without the early return the dependency list is built even when no trace reads it; nothing public sees it."
   },
   {
     "line": 641,
@@ -110,6 +158,14 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "In a production build the checked view records nothing, so running the check there finds nothing."
+  },
+  {
+    "line": 644,
+    "col": 31,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "runChecks always holds an entry for a run that reaches the check, except a second overlapping run, whose empty-array fallback has no observable difference."
   },
   {
     "line": 648,
@@ -162,16 +218,16 @@
   {
     "line": 815,
     "col": 9,
-    "mutator": "LogicalOperator",
-    "replacement": "state.rawDeps === null && pending === null",
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
     "line": 815,
     "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
+    "mutator": "LogicalOperator",
+    "replacement": "state.rawDeps === null && pending === null",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
@@ -208,6 +264,22 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
+    "line": 830,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
+  },
+  {
+    "line": 830,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
+  },
+  {
     "line": 835,
     "col": 5,
     "mutator": "CallExpression",
@@ -228,14 +300,6 @@
     "col": 11,
     "mutator": "LogicalOperator",
     "replacement": "def.on === null && typeof def.on !== \"object\"",
-    "reason": "equivalent",
-    "note": "isPredicate has already rejected anything that is not a plain object or array, so this second guard cannot fire."
-  },
-  {
-    "line": 871,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
     "reason": "equivalent",
     "note": "isPredicate has already rejected anything that is not a plain object or array, so this second guard cannot fire."
   },
@@ -312,12 +376,20 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 986,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(state.id, error)",
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
+  },
+  {
     "line": 1004,
     "col": 11,
     "mutator": "OptionalChaining",
     "replacement": "onError(state.id, error)",
-    "reason": "not-observable",
-    "note": "Defensive handling of a late non-function or throwing cleanup after stop; only the already-tested paths are reachable."
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
   },
   {
     "line": 1006,
@@ -339,7 +411,7 @@
     "line": 1046,
     "col": 9,
     "mutator": "ConditionalExpression",
-    "replacement": "true",
+    "replacement": "false",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -347,7 +419,7 @@
     "line": 1046,
     "col": 9,
     "mutator": "ConditionalExpression",
-    "replacement": "false",
+    "replacement": "true",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -443,7 +515,7 @@
     "line": 1064,
     "col": 7,
     "mutator": "ConditionalExpression",
-    "replacement": "false",
+    "replacement": "true",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -451,7 +523,7 @@
     "line": 1064,
     "col": 7,
     "mutator": "ConditionalExpression",
-    "replacement": "true",
+    "replacement": "false",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -507,7 +579,7 @@
     "line": 1073,
     "col": 9,
     "mutator": "ConditionalExpression",
-    "replacement": "false",
+    "replacement": "true",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -515,7 +587,7 @@
     "line": 1073,
     "col": 9,
     "mutator": "ConditionalExpression",
-    "replacement": "true",
+    "replacement": "false",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -576,18 +648,26 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
-    "line": 1187,
-    "col": 9,
-    "mutator": "BooleanLiteral",
-    "replacement": "state.hasExplicitDeps",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "line": 1184,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, error)",
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
   },
   {
     "line": 1187,
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+  },
+  {
+    "line": 1187,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "state.hasExplicitDeps",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
@@ -616,20 +696,12 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
-    "line": 1238,
-    "col": 30,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[\"Stryker was here\"]",
-    "reason": "equivalent",
-    "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
-  },
-  {
-    "line": 1240,
-    "col": 61,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[\"Stryker was here\"]",
-    "reason": "equivalent",
-    "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
+    "line": 1214,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onRun(id, runDeps(state))",
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
   },
   {
     "line": 1265,
@@ -688,14 +760,6 @@
     "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
   },
   {
-    "line": 1276,
-    "col": 9,
-    "mutator": "EqualityOperator",
-    "replacement": "sink.length >= 0",
-    "reason": "equivalent",
-    "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
-  },
-  {
     "line": 1310,
     "col": 27,
     "mutator": "ConditionalExpression",
@@ -744,92 +808,180 @@
     "note": "Navigation and rerun set handling: an empty or absent set selects the same effects as the guarded path."
   },
   {
-    "line": 1331,
-    "col": 20,
+    "line": 1356,
+    "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "Navigation and rerun set handling: an empty or absent set selects the same effects as the guarded path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
-    "line": 1331,
-    "col": 44,
+    "line": 1356,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!state.enabled && !def",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1356,
+    "col": 33,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "equivalent",
-    "note": "Navigation and rerun set handling: an empty or absent set selects the same effects as the guarded path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1360,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1365,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1365,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1367,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1367,
     "col": 18,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1367,
+    "col": 18,
+    "mutator": "LogicalOperator",
+    "replacement": "state.depsStable || state.dependencies",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1367,
     "col": 58,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1368,
     "col": 28,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1374,
+    "col": 21,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1375,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1384,
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1384,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1384,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "pending === undefined",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1384,
+    "col": 32,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1394,
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1394,
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1394,
     "col": 9,
     "mutator": "EqualityOperator",
     "replacement": "pending === undefined",
-    "reason": "equivalent",
-    "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1394,
     "col": 32,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "equivalent",
-    "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1404,
     "col": 29,
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
-    "reason": "equivalent",
-    "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1420,
@@ -872,20 +1024,92 @@
     "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
   },
   {
+    "line": 1431,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1432,
+    "col": 29,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1433,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
     "line": 1435,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1435,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1435,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
   },
   {
     "line": 1438,
     "col": 11,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "perf-only",
-    "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1439,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1444,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "internals-only: runEffects/runAll/the awaited run helpers are exported on the manager but the engine calls only runEffectsFast and callOne, so there is no public path."
+  },
+  {
+    "line": 1475,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Treating a fact name as a derivation adds a made-up id to the observed set, which matches no derivation and changes nothing."
+  },
+  {
+    "line": 1490,
+    "col": 57,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "definitions is the engine's merged effects object, already holding the new entries; the loop's assignment is redundant and state is created lazily."
   },
   {
     "line": 1492,
@@ -894,6 +1118,22 @@
     "replacement": ";",
     "reason": "equivalent",
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
+  },
+  {
+    "line": 1498,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
+  },
+  {
+    "line": 1498,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "internals-only: the engine rejects an unknown effect id (disable/enable/assign) before the manager is asked, so the manager's own guard has no public path."
   },
   {
     "line": 1506,
@@ -952,11 +1192,51 @@
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
   },
   {
+    "line": 1540,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A stale id in pendingReruns is cleared by the next selection, which only visits defined effects; the cost is one empty pass."
+  },
+  {
+    "line": 1545,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "A retry also calls scheduleReconcile, so the extra check at the end of a pass never decides whether a rerun happens."
+  },
+  {
+    "line": 1546,
+    "col": 14,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "A retry also calls scheduleReconcile, so the extra check at the end of a pass never decides whether a rerun happens."
+  },
+  {
+    "line": 1567,
+    "col": 76,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "callOne's dependency list reaches only the trace, and a trace exists only while a pass is running, which a call() from outside never is."
+  },
+  {
     "line": 1575,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+  },
+  {
+    "line": 1583,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, error)",
+    "reason": "internals-only",
+    "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
   }
 ]
