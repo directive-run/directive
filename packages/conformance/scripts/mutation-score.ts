@@ -46,7 +46,13 @@ export interface TriageEntry {
   col: number;
   mutator: string;
   replacement: string;
-  reason: "equivalent" | "dev-only" | "not-observable" | "perf-only" | "v1-bug";
+  reason:
+    | "equivalent"
+    | "internals-only"
+    | "dev-only"
+    | "not-observable"
+    | "perf-only"
+    | "v1-bug";
   note?: string;
 }
 
@@ -57,11 +63,22 @@ export interface FileScore {
   noCoverage: number;
   ignored: number;
   triaged: number;
+  excluded: number;
   rawScore: number;
   gateScore: number;
   unexplained: Mutant[];
   pass: boolean;
 }
+
+/**
+ * Triage reasons that leave the score: no test can kill an equivalent mutant,
+ * and code only `/internals` reaches is not part of what 2.0 must reproduce.
+ * Every other reason stays in the denominator.
+ */
+const EXCLUDED = new Set<TriageEntry["reason"]>([
+  "equivalent",
+  "internals-only",
+]);
 
 const MESSAGE_LINE =
   /\b(Error|TypeError|RangeError)\(|console\.|warn\(|devWarn|message\s*:/;
@@ -107,14 +124,15 @@ export function scoreFile(
   data: ReportFile,
   triage: TriageEntry[],
 ): FileScore {
-  const triaged = new Set(
-    triage.map((t) => key(t.line, t.col, t.mutator, t.replacement)),
+  const triaged = new Map(
+    triage.map((t) => [key(t.line, t.col, t.mutator, t.replacement), t.reason]),
   );
   let killed = 0;
   let survived = 0;
   let noCoverage = 0;
   let ignored = 0;
   let triagedCount = 0;
+  let excluded = 0;
   let raw = 0;
   let rawKilled = 0;
   const unexplained: Mutant[] = [];
@@ -136,18 +154,24 @@ export function scoreFile(
       killed++;
       continue;
     }
-    if (m.status === "Survived") {
-      survived++;
-    } else {
-      noCoverage++;
-    }
     const k = key(
       m.location.start.line,
       m.location.start.column,
       m.mutatorName,
       m.replacement ?? "",
     );
-    if (triaged.has(k)) {
+    const reason = triaged.get(k);
+    if (reason !== undefined && EXCLUDED.has(reason)) {
+      triagedCount++;
+      excluded++;
+      continue;
+    }
+    if (m.status === "Survived") {
+      survived++;
+    } else {
+      noCoverage++;
+    }
+    if (reason !== undefined) {
       triagedCount++;
     } else {
       unexplained.push(m);
@@ -163,10 +187,15 @@ export function scoreFile(
     noCoverage,
     ignored,
     triaged: triagedCount,
+    excluded,
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
-    pass: gateScore >= GATE && unexplained.length === 0,
+    // A file whose every counted mutant was excluded has proved nothing.
+    pass:
+      gateScore >= GATE &&
+      unexplained.length === 0 &&
+      !(denom === 0 && excluded > 0),
   };
 }
 
@@ -219,12 +248,12 @@ export function scoreReports(
 export function formatTable(rows: FileScore[]): string {
   const pct = (n: number): string => `${n.toFixed(1)}%`;
   const lines = [
-    "| file | killed | survived | noCoverage | ignored (msg) | triaged | raw | gate | result |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| file | killed | survived | noCoverage | ignored (msg) | triaged | excluded | raw | gate | result |",
+    "|---|---|---|---|---|---|---|---|---|---|",
   ];
   for (const r of rows) {
     lines.push(
-      `| ${basename(r.file)} | ${r.killed} | ${r.survived} | ${r.noCoverage} | ${r.ignored} | ${r.triaged} | ${pct(r.rawScore)} | ${pct(r.gateScore)} | ${r.pass ? "PASS" : "FAIL"} |`,
+      `| ${basename(r.file)} | ${r.killed} | ${r.survived} | ${r.noCoverage} | ${r.ignored} | ${r.triaged} | ${r.excluded} | ${pct(r.rawScore)} | ${pct(r.gateScore)} | ${r.pass ? "PASS" : "FAIL"} |`,
     );
   }
 
