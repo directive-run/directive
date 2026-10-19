@@ -1,0 +1,1066 @@
+[
+  {
+    "line": 388,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "State exists for every defined derivation, so the missing-state guard is defensive and unreachable through the public API."
+  },
+  {
+    "line": 420,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "State exists for every defined derivation, so the missing-state guard is defensive and unreachable through the public API."
+  },
+  {
+    "line": 480,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 509,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 866,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 874,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 929,
+    "col": 14,
+    "mutator": "LogicalOperator",
+    "replacement": "state?.isStale && true",
+    "reason": "not-observable",
+    "note": "isStale on the manager has no caller reachable from the public API."
+  },
+  {
+    "line": 929,
+    "col": 14,
+    "mutator": "OptionalChaining",
+    "replacement": "state.isStale",
+    "reason": "not-observable",
+    "note": "isStale on the manager has no caller reachable from the public API."
+  },
+  {
+    "line": 929,
+    "col": 32,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "isStale on the manager has no caller reachable from the public API."
+  },
+  {
+    "line": 967,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 968,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "invalidationDepth--",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 969,
+    "col": 22,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 971,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 972,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 972,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 972,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 975,
+    "col": 20,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 976,
+    "col": 9,
+    "mutator": "UpdateOperator",
+    "replacement": "invalidationDepth++",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 977,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 990,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 991,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "invalidationDepth--",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 992,
+    "col": 24,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 993,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 994,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 995,
+    "col": 15,
+    "mutator": "BooleanLiteral",
+    "replacement": "state.isStale",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 995,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 995,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 995,
+    "col": 31,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 996,
+    "col": 29,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 997,
+    "col": 32,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 999,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 1002,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 1003,
+    "col": 9,
+    "mutator": "UpdateOperator",
+    "replacement": "invalidationDepth++",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 1004,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "holdNotifications and invalidateAll have no caller reachable from the public API."
+  },
+  {
+    "line": 1023,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dropping an emptied listener set only frees memory."
+  },
+  {
+    "line": 1024,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dropping an emptied listener set only frees memory."
+  },
+  {
+    "line": 1076,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "With nothing observed the loop finds nothing, so returning early changes nothing."
+  },
+  {
+    "line": 1089,
+    "col": 22,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "retainObserved's return value is ignored by the engine."
+  },
+  {
+    "line": 1118,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1140,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1141,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1142,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1144,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1145,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1221,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
+  },
+  {
+    "line": 1222,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
+  },
+  {
+    "line": 1246,
+    "col": 40,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 1256,
+    "col": 14,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1257,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1258,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1267,
+    "col": 40,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 264,
+    "col": 41,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A non-object, non-template compute reaches memoizePredicate or the final throw with the same error either way."
+  },
+  {
+    "line": 283,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Setting an undefined meta entry reads back as no meta, same as not setting it."
+  },
+  {
+    "line": 369,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dropping an emptied dependency set only frees memory; no public read distinguishes it."
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Dropping an emptied dependency set only frees memory; no public read distinguishes it."
+  },
+  {
+    "line": 370,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dropping an emptied dependency set only frees memory; no public read distinguishes it."
+  },
+  {
+    "line": 388,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "State exists for every defined derivation, so the missing-state guard is defensive and unreachable through the public API."
+  },
+  {
+    "line": 420,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "State exists for every defined derivation, so the missing-state guard is defensive and unreachable through the public API."
+  },
+  {
+    "line": 436,
+    "col": 39,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "equivalent",
+    "note": "visited is only consulted to stop cycles, and the walk skips already-stale nodes regardless."
+  },
+  {
+    "line": 463,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The map entry is removed by the dependents' own relink on recompute, so deleting it here changes nothing readable."
+  },
+  {
+    "line": 249,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
+  },
+  {
+    "line": 249,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof raw !== \"object\" && raw === null",
+    "reason": "equivalent",
+    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
+  },
+  {
+    "line": 249,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
+  },
+  {
+    "line": 249,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
+  },
+  {
+    "line": 249,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "(typeof raw !== \"object\" || raw === null) && !Object.hasOwn(raw, \"compute\")",
+    "reason": "equivalent",
+    "note": "Function-valued entries return early on either branch; the guard operands overlap so no input changes the outcome except null, which is covered by line 250."
+  },
+  {
+    "line": 529,
+    "col": 31,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 529,
+    "col": 31,
+    "mutator": "EqualityOperator",
+    "replacement": "state.dependencies.size >= 0",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 529,
+    "col": 31,
+    "mutator": "EqualityOperator",
+    "replacement": "state.dependencies.size <= 0",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 480,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 492,
+    "col": 19,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "depsStable true on an empty dependency set is ignored by the fast-path guard."
+  },
+  {
+    "line": 509,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 486,
+    "col": 16,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "DerivationState.compute is never called; it is a dead field."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 529,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "state.dependencies.size >= 0",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "state.dependencies.size > 0 || setsEqual(deps, state.dependencies)",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 565,
+    "col": 57,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 566,
+    "col": 32,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 563,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 564,
+    "col": 11,
+    "mutator": "UpdateOperator",
+    "replacement": "state.stableRunCount--",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 565,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 565,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 565,
+    "col": 15,
+    "mutator": "EqualityOperator",
+    "replacement": "state.stableRunCount < STABLE_THRESHOLD",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 565,
+    "col": 15,
+    "mutator": "EqualityOperator",
+    "replacement": "state.stableRunCount > STABLE_THRESHOLD",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 602,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 729,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A repeat visit hits the isStale check and stops, so the visited set is redundant for outcomes."
+  },
+  {
+    "line": 561,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "state.dependencies.size <= 0",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 568,
+    "col": 16,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Dependency-stability fast path only skips re-tracking; values and public dependency reads are identical either way."
+  },
+  {
+    "line": 597,
+    "col": 63,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 598,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 758,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A symbol key falls through to the definitions lookup and returns undefined either way."
+  },
+  {
+    "line": 615,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 607,
+    "col": 12,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 810,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 810,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof prop === \"symbol\" && BLOCKED_PROPS.has(prop)",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 810,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 810,
+    "col": 64,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof prop === \"symbol\" && BLOCKED_PROPS.has(prop)",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 841,
+    "col": 64,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+  },
+  {
+    "line": 862,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 858,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 615,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "setsEqual only short-circuits relinking and stability counting; results are identical when it always says unequal."
+  },
+  {
+    "line": 758,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A symbol key falls through to the definitions lookup and returns undefined either way."
+  },
+  {
+    "line": 1021,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "listenerSet.delete",
+    "reason": "equivalent",
+    "note": "listenerSet is always defined for an id that was subscribed."
+  },
+  {
+    "line": 1023,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Dropping an emptied listener set only frees memory."
+  },
+  {
+    "line": 1048,
+    "col": 25,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Placeholder entries in the empty result are not read by any public caller."
+  },
+  {
+    "line": 1048,
+    "col": 42,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Placeholder entries in the empty result are not read by any public caller."
+  },
+  {
+    "line": 729,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A repeat visit hits the isStale check and stops, so the visited set is redundant for outcomes."
+  },
+  {
+    "line": 732,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "A repeat visit hits the isStale check and stops, so the visited set is redundant for outcomes."
+  },
+  {
+    "line": 1058,
+    "col": 31,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Placeholder entries in the empty result are not read by any public caller."
+  },
+  {
+    "line": 1059,
+    "col": 37,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Placeholder entries in the empty result are not read by any public caller."
+  },
+  {
+    "line": 1076,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "With nothing observed the loop finds nothing, so returning early changes nothing."
+  },
+  {
+    "line": 911,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Outside a tracking context trackAccess and the frame-kind check do nothing."
+  },
+  {
+    "line": 1118,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1140,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "allInvalidated is set only by invalidateAll, which has no public caller."
+  },
+  {
+    "line": 1150,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "An empty roots set yields an empty queue, so the early return is redundant."
+  },
+  {
+    "line": 1150,
+    "col": 41,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "An empty roots set yields an empty queue, so the early return is redundant."
+  },
+  {
+    "line": 1179,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "The early exit only bounds the walk; the collected set is the same without it."
+  },
+  {
+    "line": 1179,
+    "col": 15,
+    "mutator": "EqualityOperator",
+    "replacement": "++reached > watched",
+    "reason": "perf-only",
+    "note": "The early exit only bounds the walk; the collected set is the same without it."
+  },
+  {
+    "line": 1179,
+    "col": 15,
+    "mutator": "UpdateOperator",
+    "replacement": "--reached",
+    "reason": "perf-only",
+    "note": "The early exit only bounds the walk; the collected set is the same without it."
+  },
+  {
+    "line": 1179,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "The early exit only bounds the walk; the collected set is the same without it."
+  },
+  {
+    "line": 1225,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
+  },
+  {
+    "line": 1221,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
+  },
+  {
+    "line": 1221,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
+  },
+  {
+    "line": 1246,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  },
+  {
+    "line": 1253,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1253,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1253,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof fn !== \"function\"",
+    "reason": "not-observable",
+    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+  },
+  {
+    "line": 1267,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+  }
+]

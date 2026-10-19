@@ -458,6 +458,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/mutants-derivations.test.ts",
+    "category": "black-box",
+    "cases": 31,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/navigation-side-effects.test.ts",
     "category": "black-box",
     "cases": 7,

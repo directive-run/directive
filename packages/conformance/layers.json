@@ -2790,6 +2790,132 @@
         }
       }
     },
+    "tests/core/mutants-derivations.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "derivations: object-form definitions > freezes a predicate spec and a template spec at registration": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: object-form definitions > rejects a compute that is neither function, template nor predicate": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: object-form definitions > registers object-form derivations at runtime with their meta": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "derivations: object-form definitions > assign swaps the function and drops the old meta": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "derivations: object-form definitions > assign on a missing derivation throws": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: subscriptions > delivers to every subscriber, and unsubscribing one leaves the rest": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: subscriptions > a throwing subscriber is reported and does not stop the others": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: subscriptions > a subscriber that keeps re-invalidating trips the loop guard at 100": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: assign > assigning over a derivation nobody has read yet just works": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: assign > notifies subscribers and recomputes dependents": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "derivations: assign > announces the invalidation once per valid-to-stale edge": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "derivations: assign > wakes a constraint that gates on the replaced derivation": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "derivations: assign > leaves notification batching intact afterwards": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: unregister > recomputes and notifies dependents, and forgets the removed one": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "derivations: unregister > leaves no phantom dependent behind for a watcher to be told about": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: unregister > answers membership checks fresh after a definition goes away": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: the derived parameter behaves like a read-only record > answers membership, descriptors and mutation attempts": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: only outside readers make a derivation watched > a derivation read only by another derivation is not watched": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: only outside readers make a derivation watched > a derivation read through system.derive from a body is not watched": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: only outside readers make a derivation watched > a membership test from a constraint makes the name watched": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: only outside readers make a derivation watched > a membership test inside a derivation does not": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: only outside readers make a derivation watched > nothing pending when nothing is watched; one thing when one is": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: waking constraints that read derivations > wakes only the watcher whose derivation moved": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "derivations: call() recomputes every time > keeps returning fresh values after many consecutive calls": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: meta for unknown names > a name that is not a derivation carries no tags and does not throw": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "derivations: unregister housekeeping > removing a derivation nobody has read is clean": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "derivations: unregister housekeeping > keeps notification batching intact after removing a depended-on one": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "derivations: unregister housekeeping > a removed derivation stops counting as watched at once": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "derivations: odd definitions > an object-form entry with no compute is tolerated at registration": {
+          "layer": "L9",
+          "by": ["option meta"]
+        }
+      }
+    },
     "tests/core/navigation-side-effects.test.ts": {
       "category": "black-box",
       "rule": "L8",
