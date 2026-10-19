@@ -115,6 +115,9 @@
     "tests/core/derivation-deps.test.ts": {
       "rule": "L0"
     },
+    "tests/core/mutants-derivations.test.ts": {
+      "rule": "L0"
+    },
     "tests/core/derivation-dep-wake-rate.test.ts": {
       "rule": "L0"
     },
