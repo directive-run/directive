@@ -352,52 +352,36 @@
     "note": "allInvalidated is set only by invalidateAll, which has no public caller."
   },
   {
-    "line": 1221,
-    "col": 26,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
-  },
-  {
-    "line": 1222,
-    "col": 13,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "not-observable",
-    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
-  },
-  {
     "line": 1246,
     "col": 40,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "Unreachable: the engine's applyAssign/applyUnregister reject an unknown id (assign throws 'does not exist'; unregister of a non-dynamic id warns and returns) before the manager is called, so this guard never sees a missing id through the public API."
   },
   {
     "line": 1256,
     "col": 14,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1257,
     "col": 9,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1258,
     "col": 9,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1267,
@@ -405,7 +389,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "Unreachable: the engine's applyAssign/applyUnregister reject an unknown id (assign throws 'does not exist'; unregister of a non-dynamic id warns and returns) before the manager is called, so this guard never sees a missing id through the public API."
   },
   {
     "line": 264,
@@ -1000,60 +984,36 @@
     "note": "The early exit only bounds the walk; the collected set is the same without it."
   },
   {
-    "line": 1225,
-    "col": 11,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "not-observable",
-    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
-  },
-  {
-    "line": 1221,
-    "col": 15,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
-  },
-  {
-    "line": 1221,
-    "col": 15,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Replacing a live key through registerModule is not reachable: module derivations are namespaced and a duplicate module id is rejected."
-  },
-  {
     "line": 1246,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "Unreachable: the engine's applyAssign/applyUnregister reject an unknown id (assign throws 'does not exist'; unregister of a non-dynamic id warns and returns) before the manager is called, so this guard never sees a missing id through the public API."
   },
   {
     "line": 1253,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1253,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1253,
     "col": 11,
     "mutator": "EqualityOperator",
     "replacement": "typeof fn !== \"function\"",
-    "reason": "not-observable",
-    "note": "In 1.35 an object-form assign is overwritten by the engine with the raw object, so this branch cannot produce a working derivation."
+    "reason": "v1-bug",
+    "note": "v1-bug: system.derive.assign(id, {compute, meta}) throws on read in 1.35 because engine-definitions.ts applyAssign stores the raw object in the merged map over the manager's unwrapped function. The broken behaviour is deliberately not pinned; revisit when applyAssign is fixed."
   },
   {
     "line": 1267,
@@ -1061,6 +1021,174 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "Unreachable: the engine's applyAssign/applyUnregister reject an unknown id (assign throws 'does not exist'; unregister of a non-dynamic id warns and returns) before the manager is called, so this guard never sees a missing id through the public API."
+  },
+  {
+    "line": 510,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Unknown-derivation guard in computeDerivation; every caller has already checked the definition exists. Message text only."
+  },
+  {
+    "line": 1248,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Message text of an unreachable guard (the engine throws the same-purpose error first)."
+  },
+  {
+    "line": 271,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Error-message / tracking-frame label string; no public behaviour reads it."
+  },
+  {
+    "line": 280,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Reached only when fn is undefined, which leaves the definition untouched and stores no meta for a compute-less entry."
+  },
+  {
+    "line": 471,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "pendingNotifications is flushed synchronously before unregister returns, so nothing is left pending for this delete to clear."
+  },
+  {
+    "line": 547,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Error-message / tracking-frame label string; no public behaviour reads it."
+  },
+  {
+    "line": 554,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Error-message / tracking-frame label string; no public behaviour reads it."
+  },
+  {
+    "line": 672,
+    "col": 29,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "equivalent",
+    "note": "Error-message / tracking-frame label string; no public behaviour reads it."
+  },
+  {
+    "line": 675,
+    "col": 143,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Error-message / tracking-frame label string; no public behaviour reads it."
+  },
+  {
+    "line": 810,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "typeof comparison against a string that is never a typeof result; the branch is never taken either way."
+  },
+  {
+    "line": 758,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "typeof comparison against a string that is never a typeof result; the branch is never taken either way."
+  },
+  {
+    "line": 841,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "typeof comparison against a string that is never a typeof result; the branch is never taken either way."
+  },
+  {
+    "line": 671,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "++iterations >= MAX_FLUSH_ITERATIONS",
+    "reason": "equivalent",
+    "note": "Boundary of the runaway-loop bound (>= vs >): one extra or one fewer iteration; the public contract is only that it throws a bounded loop error."
+  },
+  {
+    "line": 1221,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Registration replace/new split: a new key is lazily initialised on first read and invalidating a key with no state is a no-op, so the alternate branches are indistinguishable publicly."
+  },
+  {
+    "line": 1229,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Registration replace/new split: a new key is lazily initialised on first read and invalidating a key with no state is a no-op, so the alternate branches are indistinguishable publicly."
+  },
+  {
+    "line": 1234,
+    "col": 16,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Registration replace/new split: a new key is lazily initialised on first read and invalidating a key with no state is a no-op, so the alternate branches are indistinguishable publicly."
+  },
+  {
+    "line": 1235,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "Registration replace/new split: a new key is lazily initialised on first read and invalidating a key with no state is a no-op, so the alternate branches are indistinguishable publicly."
+  },
+  {
+    "line": 1239,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "Registration replace/new split: a new key is lazily initialised on first read and invalidating a key with no state is a no-op, so the alternate branches are indistinguishable publicly."
+  },
+  {
+    "line": 1253,
+    "col": 25,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "typeof comparison against a string that is never a typeof result; the branch is never taken either way."
+  },
+  {
+    "line": 1134,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Root bookkeeping reset when nothing is watched; no public read distinguishes retained roots from cleared ones."
+  },
+  {
+    "line": 1135,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Root bookkeeping reset when nothing is watched; no public read distinguishes retained roots from cleared ones."
   }
 ]

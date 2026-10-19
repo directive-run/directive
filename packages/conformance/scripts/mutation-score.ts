@@ -46,7 +46,7 @@ export interface TriageEntry {
   col: number;
   mutator: string;
   replacement: string;
-  reason: "equivalent" | "dev-only" | "not-observable" | "perf-only";
+  reason: "equivalent" | "dev-only" | "not-observable" | "perf-only" | "v1-bug";
   note?: string;
 }
 

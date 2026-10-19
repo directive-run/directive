@@ -460,7 +460,7 @@
   {
     "file": "src/core/__tests__/mutants-derivations.test.ts",
     "category": "black-box",
-    "cases": 31,
+    "cases": 37,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

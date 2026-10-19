@@ -52,7 +52,7 @@ triage file.
 
 Triage files live at `packages/conformance/mutation-triage/<basename>.json`:
 `[{ "line": n, "col": n, "mutator": "...", "replacement": "...", "reason":
-"equivalent|dev-only|not-observable|perf-only", "note": "..." }]`, matched to
+"equivalent|dev-only|not-observable|perf-only|v1-bug", "note": "..." }]`, matched to
 report mutants by line + col + mutator + replacement (the report's own
 numbers). No survivor stays unexplained: kill it with a conformance scenario
 or triage it with a reason.

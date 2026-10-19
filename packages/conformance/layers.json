@@ -2822,7 +2822,7 @@
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
-        "derivations: subscriptions > a subscriber that keeps re-invalidating trips the loop guard at 100": {
+        "derivations: subscriptions > a subscriber that keeps re-invalidating trips the loop guard": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
@@ -2913,6 +2913,31 @@
         "derivations: odd definitions > an object-form entry with no compute is tolerated at registration": {
           "layer": "L9",
           "by": ["option meta"]
+        },
+        "derivations: replacing a live name through registerModule > the new definition wins, the old meta goes, and everyone is told": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "derivations: replacing a live name through registerModule > the old dependencies stop mattering and the new ones take over": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "derivations: a body whose reads change shape stays fresh > \"after %i runs on one branch, then a flip\"": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"],
+          "dynamic": true
+        },
+        "derivations: housekeeping on replace and remove > a replacement without meta still drops the previous meta": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "derivations: housekeeping on replace and remove > an unregistered name leaves no meta and no old subscriber behind": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "derivations: housekeeping on replace and remove > entries that are not definitions at all are tolerated at registration": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
         }
       }
     },
