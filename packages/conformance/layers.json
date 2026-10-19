@@ -2941,6 +2941,760 @@
         }
       }
     },
+    "tests/core/mutants-effects-production.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "effects in production > drops a write to facts, reports it, and does not throw": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "effects in production > drops a write quietly when nobody is listening": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "effects in production > does not check for an in-place mutation, sync, async or via callOne": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "effects in production > hands prevFacts and derived through untouched": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "effects in production > does not warn about an async effect that read nothing": {
+          "layer": "L0",
+          "by": ["import t"]
+        }
+      }
+    },
+    "tests/core/mutants-effects.test.ts": {
+      "category": "internals",
+      "rule": "L4",
+      "tests": {
+        "an effect that can read prevFacts gets a snapshot > `when it has ${label}`": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ],
+          "dynamic": true
+        },
+        "an effect that can read prevFacts gets a snapshot > when run is not a function at all": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "an effect that can read prevFacts gets a snapshot > a wrapper that says it reads prevFacts overrides its own arity": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "an effect that cannot read prevFacts costs no snapshot > `when it has ${label}`": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ],
+          "dynamic": true
+        },
+        "an effect that cannot read prevFacts costs no snapshot > a wrapper that says it does not read prevFacts overrides its arity": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > is null on the first run and the previous pass's facts after": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > is refreshed after a pass run through runEffectsFast, sync or async": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > is refreshed after runAll": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > an effect registered later sees the facts as they were at registration": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > registering another reader does not refresh an existing snapshot": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > a data gate reads prevFacts even when the effect body does not": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts values > unregistering the last reader stops copying": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "the facts an effect reads through > a write names the effect and the key, and is reported": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "the facts an effect reads through > a refused write still says why when nobody is listening": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "the facts an effect reads through > the store behind it refuses set and delete and reports them": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "the facts an effect reads through > the store behind it still reads, batches and subscribes": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "the facts an effect reads through > reads see live values": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > writing prevFacts names it": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > writing derived names it": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > derived is readable and the first run's prevFacts is null, not a view": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > an in-place mutation of a nested fact is reported to onError": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > an in-place mutation after an await is reported too": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > an in-place mutation by an auto-tracked effect is reported": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > two overlapping async runs of one effect both finish quietly": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "prevFacts and derived are read-only in development > callOne reports an in-place mutation": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "onRun > reports declared deps by default, derivations as derive.<id>": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "onRun > reports nothing when the caller says it will not read them": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "onRun > reports an empty list on the first run of an auto-tracked effect": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "onRun > works without a callback": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "onRun > callOne reports its dependencies, empty when none are known": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "declared dependencies > a name that becomes a derivation later is picked up": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "declared dependencies > one of several unresolved names becoming known is enough": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "declared dependencies > a name that is a fact is not rewritten": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "declared dependencies > reports derivations among collectObservedDerivations, not facts": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "declared dependencies > an auto-tracked effect's derivation reads are collected once it has run": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "data-form on > rejects a value that is not a predicate, by name": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "data-form on > freezes the spec it was given": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "data-form on > fires only when the gate holds, and only for changes to its facts": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "data-form on > keeps the predicate's facts as its deps whatever the body reads": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "data-form on > swapping to a function-form effect drops the old gate": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > runs before the next run, once, and not again": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > an auto-tracked effect's cleanup is stored too": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > an async effect's cleanup is stored when it settles": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > an async auto-tracked effect's cleanup is stored when it settles": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > a cleanup that throws is reported and the effect still re-runs": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > a cleanup that throws with nobody listening does not escape": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > an effect settling after cleanupAll has its cleanup called at once": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > a late cleanup that throws is reported": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > before cleanupAll, a settling effect's cleanup is kept, not called": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > callOne stores a cleanup from a sync and from an async effect": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > replacing a definition cleans up the old one first": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "cleanup > unregistering cleans up, and the effect no longer runs": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > is reported through onError and console.error, in the awaited path": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > does not need an onError": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > does not stop the others, and is reported after every body has run": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > is reported before an async neighbour settles": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > an async rejection in the fast path is reported": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "a throwing effect > callOne reports a sync throw, an async rejection and nothing more": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > runEffects waits for an async effect, declared or auto-tracked": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > runEffectsFast waits for every async effect, and only async ones make it return a promise": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > an effect disabled by an earlier one in the same pass does not run": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > a disabled effect is skipped, enabling brings it back": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > runs only effects whose deps changed; with no deps known, on any change": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > an auto-tracked effect that read nothing runs on every change": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > an auto-tracked effect re-runs only for what it read": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > runAll runs every enabled effect regardless of deps": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "which effects run > runningEffect names the effect on the stack and nothing after": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "unknown effects > callOne says which one": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "unknown effects > assignDefinition says which one": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "unknown effects > asking about one that was never defined throws": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "unknown effects > registerDefinitions adds effects that then run": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "requestRerun > runs the effect on the next pass whatever changed, once": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "requestRerun > ignores an unknown effect": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "requestRerun > does not wake a disabled effect": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "requestRerun > works through the fast path as well": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "navigation keys > wake effects like a change": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "navigation keys > combine with ordinary changes": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "navigation keys > onNavigate skip sits out a pure navigation but not a real change": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "navigation keys > an empty set changes nothing": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > picks up a new conditional read after many identical runs": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > runAll re-tracks after the reads have settled": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > an effect whose reads change from run to run is always re-tracked on a rerun": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > an error resets what it knew, so the next run re-tracks": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > an explicitly declared effect keeps its deps through an error": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > warns once when an async effect read nothing before its first await": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "auto-tracking > does not warn about a synchronous effect that read nothing": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "more run behaviour > an effect disabled by an earlier one is skipped in the awaited pass too": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "more run behaviour > a returned value that is not a function is not kept as a cleanup": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "more run behaviour > a late cleanup that throws needs no onError": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        },
+        "more run behaviour > swapping in an effect that reads prevFacts gives it a snapshot": {
+          "layer": "L0",
+          "by": [
+            "import createEffectsManager",
+            "import createFacts",
+            "import t"
+          ]
+        }
+      }
+    },
     "tests/core/mutants-facts-production.test.ts": {
       "category": "black-box",
       "rule": "L0",

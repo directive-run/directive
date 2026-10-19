@@ -467,6 +467,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/mutants-effects-production.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/mutants-effects.test.ts",
+    "category": "internals",
+    "cases": 90,
+    "internals": [],
+    "internalsValues": ["createEffectsManager", "createFacts"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/mutants-facts-production.test.ts",
     "category": "black-box",
     "cases": 3,

@@ -145,6 +145,12 @@
     "tests/core/mutants-facts-production.test.ts": {
       "rule": "L0"
     },
+    "tests/core/mutants-effects.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/mutants-effects-production.test.ts": {
+      "rule": "L4"
+    },
     "tests/core/frozen-facts.test.ts": {
       "rule": "L0"
     },
