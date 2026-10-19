@@ -83,12 +83,33 @@ describe("mutation-score", () => {
         col: 5,
         mutator: "EqualityOperator",
         replacement: "y >= 2",
-        reason: "equivalent",
+        reason: "not-observable",
       },
     ]);
     expect(triaged.gateScore).toBe(80);
     expect(triaged.triaged).toBe(1);
     expect(triaged.pass).toBe(true);
     expect(formatTable([triaged])).toContain("PASS");
+  });
+  it("leaves equivalent and internals-only mutants out of the score; other triage stays in", () => {
+    const entry = (reason: "equivalent" | "internals-only" | "perf-only") => ({
+      line: 5,
+      col: 5,
+      mutator: "EqualityOperator",
+      replacement: "y >= 2",
+      reason,
+    });
+    for (const reason of ["equivalent", "internals-only"] as const) {
+      const s = scoreFile("a.ts", file, [entry(reason)]);
+      expect([s.killed, s.survived, s.excluded, s.triaged]).toEqual([
+        2, 0, 1, 1,
+      ]);
+      expect(s.gateScore).toBe(100);
+      expect(s.pass).toBe(true);
+    }
+    const kept = scoreFile("a.ts", file, [entry("perf-only")]);
+    expect([kept.survived, kept.excluded, kept.triaged]).toEqual([1, 0, 1]);
+    expect(kept.gateScore).toBeCloseTo(66.666, 2);
+    expect(kept.pass).toBe(false);
   });
 });
