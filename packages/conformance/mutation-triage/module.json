@@ -5,6 +5,6 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
-    "note": "An early return for a module with no facts; without it the reserved-name loop runs over zero fact keys and throws nothing."
+    "note": "Removing the early return for a module with no facts survives quickly (not a timeout): the reserved-name loop then runs over zero fact keys and throws nothing, so the outcome is identical."
   }
 ]

@@ -72,6 +72,22 @@
     "note": "slotPath is called only for kind map (firstChange line 247, whose Set value is always undefined so never differs) or for a recorded child; a Set's children are always null (child(undefined)) and a Date has no slots. So it is never called with kind set or date, and the object kind returns before this line."
   },
   {
+    "line": 192,
+    "col": 39,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: the exact path text for a Map key (`.get(...)`) is a diagnostic detail the oracle only matches by the fact name."
+  },
+  {
+    "line": 192,
+    "col": 54,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: the exact path text for a Map key (`.get(...)`) is a diagnostic detail the oracle only matches by the fact name."
+  },
+  {
     "line": 197,
     "col": 10,
     "mutator": "StringLiteral",
@@ -110,6 +126,86 @@
     "replacement": "true",
     "reason": "internals-only",
     "note": "Only differs for a symbol-keyed read that returns a recordable object. DEV_PROXY_TARGET is Symbol.for(\"directive.devProxyTarget\"), so it is reachable without an import, but reading it through an effect and then writing a fact does not kill the mutant; no public read returns a recordable object under a symbol key."
+  },
+  {
+    "line": 350,
+    "col": 25,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 351,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 353,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 355,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 356,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 358,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 368,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 368,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 379,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
+  },
+  {
+    "line": 380,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "proxy mechanics, not a 2.0 contract: 2.0 uses compiled accessors at L1, so the oracle does not pin Proxy trap results (throw vs false, extensibility, prototype, descriptors)."
   },
   {
     "line": 387,

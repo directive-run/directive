@@ -1394,7 +1394,7 @@
           "layer": "L4",
           "by": ["option effect deps"]
         },
-        "the facts an effect reads through, in production > it lists, tests and describes keys": {
+        "the facts an effect reads through, in production > it lists and tests keys": {
           "layer": "L4",
           "by": ["option effect deps"]
         },
@@ -1572,11 +1572,11 @@
           "layer": "L4",
           "by": ["option effect deps", "option effect prev"]
         },
-        "the facts view itself > it cannot be made non-extensible or re-prototyped, and says so": {
+        "the facts view itself > it cannot be made non-extensible or re-prototyped": {
           "layer": "L4",
           "by": ["option effect deps", "option effect prev"]
         },
-        "the facts view itself > it lists, tests and describes keys like the facts do": {
+        "the facts view itself > it lists and tests keys like the facts do": {
           "layer": "L4",
           "by": ["option effect deps", "option effect prev"]
         },
