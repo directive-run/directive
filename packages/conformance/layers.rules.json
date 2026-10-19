@@ -103,6 +103,15 @@
     "observe subscribed late sees only what follows; unsubscribe is idempotent": "L9"
   },
   "rules": {
+    "tests/core/blackbox-tracking.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-tracking-warnings.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-derivations.test.ts": {
+      "rule": "L0"
+    },
     "tests/core/tracking.test.ts": {
       "rule": "L0"
     },
@@ -143,6 +152,15 @@
       "rule": "L0"
     },
     "tests/core/mutants-facts-production.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-facts.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-facts-proxy.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/blackbox-facts-production.test.ts": {
       "rule": "L0"
     },
     "tests/core/mutants-effects.test.ts": {

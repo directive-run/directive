@@ -109,7 +109,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "internals-only",
-    "note": "Only differs for a symbol-keyed read that returns a recordable object. No public read returns one: the facts proxy answers symbol keys with undefined except the internal DEV_PROXY_TARGET symbol, which is not exported."
+    "note": "Only differs for a symbol-keyed read that returns a recordable object. DEV_PROXY_TARGET is Symbol.for(\"directive.devProxyTarget\"), so it is reachable without an import, but reading it through an effect and then writing a fact does not kill the mutant; no public read returns a recordable object under a symbol key."
   },
   {
     "line": 387,
