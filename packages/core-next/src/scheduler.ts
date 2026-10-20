@@ -9,18 +9,20 @@
  * Lanes:
  * - `sync`: flushes before `request` returns.
  * - `micro`: one microtask per tick.
- * - `frame`: the host's next frame (`requestAnimationFrame` when present).
- * - `idle`: the host's idle time (`requestIdleCallback` when present).
+ * - `frame`: the host's next frame (a 16 ms host timeout by default; pass
+ *   {@link browserHosts} for `requestAnimationFrame`).
+ * - `idle`: the host's idle time (a 0 ms host timeout by default;
+ *   {@link browserHosts} gives `requestIdleCallback`).
  * - `manual`: only on an explicit {@link Scheduler.flush}.
  *
  * Every host function is injectable, and the defaults are looked up when
  * {@link createScheduler} runs, never at import time. There is no module-level
  * mutable state.
  *
- * A lane flush runs in named {@link PHASES}: for each phase in order, every
- * waiting system's handlers for that phase run (registration order), then
- * each system settles (its `flush`). A system with no phase handlers settles
- * exactly once per lane flush.
+ * A target requested again while its lane is flushing (from its own flush or
+ * anyone else's) flushes again in the lane's next pass, so work queued by a
+ * late step of a flush always gets another pass. Phases are not a scheduler
+ * concern: see `withPhases` (phases.ts), which runs them inside one settle.
  *
  * @module
  */
@@ -37,17 +39,6 @@ export const LANES: readonly Lane[] = [
   "manual",
 ];
 
-/** The ordered phases of one lane flush. */
-export const PHASES = [
-  "input",
-  "simulate",
-  "constraints",
-  "resolvers",
-  "render",
-] as const;
-
-export type Phase = (typeof PHASES)[number];
-
 /** Something a scheduler flushes: a system or kernel. */
 export interface SchedulerTarget {
   /** Settle: run whatever this target has queued (graph effects and so on). */
@@ -60,9 +51,9 @@ export type HostCallback = (cb: () => void) => void;
 export interface SchedulerOptions {
   /** Defaults to `queueMicrotask`, else a resolved promise. */
   micro?: HostCallback;
-  /** Defaults to `requestAnimationFrame`, else a 16 ms host timeout. */
+  /** Defaults to a 16 ms host timeout. */
   frame?: HostCallback;
-  /** Defaults to `requestIdleCallback`, else a 0 ms host timeout. */
+  /** Defaults to a 0 ms host timeout. */
   idle?: HostCallback;
   /** Most passes one lane flush may take before it throws. Default 100. */
   maxPasses?: number;
@@ -74,24 +65,18 @@ export interface Scheduler {
    * Idempotent. {@link request} registers on first use.
    */
   register(target: SchedulerTarget): number;
-  /** Forget a target: drop its pending requests and phase handlers. */
+  /** Forget a target: drop its pending requests. */
   unregister(target: SchedulerTarget): void;
   /** Ask for `target` to flush on `lane`. */
   request(lane: Lane, target: SchedulerTarget): void;
   /**
    * Flush `lane` now (every lane, in {@link LANES} order, when omitted).
    * With `only`, flush just that target and leave the others waiting.
-   * Errors are collected; the first is rethrown once the lane drains.
+   * Errors are collected; the first is rethrown once the lane drains. A lane
+   * that needs more than `maxPasses` passes throws and drops what still
+   * waits on it; later requests flush normally.
    */
   flush(lane?: Lane, only?: SchedulerTarget): void;
-  /**
-   * Run `fn` in `phase` whenever `target` flushes. Returns a remover.
-   */
-  phase(
-    phase: Phase,
-    target: SchedulerTarget,
-    fn: (lane: Lane) => void,
-  ): () => void;
   /** True when anything waits on `lane` (any lane when omitted). */
   pending(lane?: Lane): boolean;
 }
@@ -101,44 +86,45 @@ interface Entry {
   target: SchedulerTarget;
   /** Lanes this entry waits on, one bit per {@link LANES} index. */
   mask: number;
-  /**
-   * Lanes whose running pass has this entry and has yet to settle it for the
-   * last time. A request on such a lane is already covered by that settle.
-   */
-  busy: number;
-  /** Phase handlers, by phase index. */
-  handlers: Array<Array<(lane: Lane) => void> | undefined>;
 }
 
 const laneBit = (lane: Lane): number => 1 << LANES.indexOf(lane);
 
-function hostTimeout(ms: number): HostCallback {
+const hostTimeout =
+  (ms: number): HostCallback =>
+  (cb) =>
+    (globalThis as any).setTimeout(cb, ms);
+
+/**
+ * `requestAnimationFrame` / `requestIdleCallback` hosts for the `frame` and
+ * `idle` lanes, looked up when called (falling back to host timeouts).
+ * Opt-in: `createScheduler({ ...browserHosts() })`.
+ */
+export function browserHosts(): Pick<SchedulerOptions, "frame" | "idle"> {
   const g = globalThis as any;
 
-  return (cb) => g.setTimeout(cb, ms);
+  return {
+    frame: g.requestAnimationFrame
+      ? (cb) => g.requestAnimationFrame(cb)
+      : hostTimeout(16),
+    idle: g.requestIdleCallback
+      ? (cb) => g.requestIdleCallback(cb)
+      : hostTimeout(0),
+  };
 }
 
 /** Create a scheduler. Share it between systems to flush them together. */
 export function createScheduler(options: SchedulerOptions = {}): Scheduler {
   const g = globalThis as any;
-  const micro: HostCallback =
-    options.micro ??
-    (g.queueMicrotask
-      ? (cb) => g.queueMicrotask(cb)
-      : (cb) => Promise.resolve().then(cb));
   const host: Record<Lane, HostCallback | undefined> = {
     sync: undefined,
-    micro,
-    frame:
-      options.frame ??
-      (g.requestAnimationFrame
-        ? (cb) => g.requestAnimationFrame(cb)
-        : hostTimeout(16)),
-    idle:
-      options.idle ??
-      (g.requestIdleCallback
-        ? (cb) => g.requestIdleCallback(cb)
-        : hostTimeout(0)),
+    micro:
+      options.micro ??
+      (g.queueMicrotask
+        ? (cb) => g.queueMicrotask(cb)
+        : (cb) => Promise.resolve().then(cb)),
+    frame: options.frame ?? hostTimeout(16),
+    idle: options.idle ?? hostTimeout(0),
     manual: undefined,
   };
   const maxPasses = options.maxPasses ?? 100;
@@ -159,7 +145,7 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
   const entry = (target: SchedulerTarget): Entry => {
     let e = entries.get(target);
     if (!e) {
-      e = { index: next++, target, mask: 0, busy: 0, handlers: [] };
+      e = { index: next++, target, mask: 0 };
       entries.set(target, e);
     }
 
@@ -178,10 +164,7 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
         let batch: Entry[];
         if (only) {
           const e = entries.get(only);
-          batch = e && e.mask & bit ? [e] : [];
-          if (batch.length) {
-            queue.splice(queue.indexOf(e!), 1);
-          }
+          batch = e && e.mask & bit ? queue.splice(queue.indexOf(e), 1) : [];
         } else {
           batch = queue.splice(0);
         }
@@ -189,46 +172,24 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
           break;
         }
         if (pass >= maxPasses) {
+          // Drop what still waits, so the targets are not wedged: a later
+          // request queues them again.
+          for (const e of batch) {
+            e.mask &= ~bit;
+          }
           throw Error(`[Directive] ${lane} lane did not settle`);
         }
         batch.sort((a, b) => a.index - b.index);
         for (const e of batch) {
+          // Cleared just before its flush: a request from here on (its own
+          // flush included) queues it for the next pass.
           e.mask &= ~bit;
-          e.busy |= bit;
-        }
-        for (let p = 0; p < PHASES.length; p++) {
-          let ran = false;
-          for (const e of batch) {
-            const list = e.handlers[p];
-            if (list?.length) {
-              ran = true;
-              for (const fn of list.slice()) {
-                try {
-                  fn(lane);
-                } catch (err) {
-                  if (error === queue) {
-                    error = err;
-                  }
-                }
-              }
-            }
-          }
-          // Settle after each phase that did work, so the next phase sees a
-          // settled graph. With no handlers this is skipped until the end.
-          const last = p === PHASES.length - 1;
-          if (ran || last) {
-            for (const e of batch) {
-              if (last) {
-                e.busy &= ~bit;
-              }
-              if (entries.get(e.target) === e) {
-                try {
-                  e.target.flush(lane);
-                } catch (err) {
-                  if (error === queue) {
-                    error = err;
-                  }
-                }
+          if (entries.get(e.target) === e) {
+            try {
+              e.target.flush(lane);
+            } catch (err) {
+              if (error === queue) {
+                error = err;
               }
             }
           }
@@ -275,20 +236,15 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
     request(lane, target) {
       const bit = laneBit(lane);
       const e = entry(target);
-      if (e.busy & bit) {
-        return;
-      }
       if (!(e.mask & bit)) {
         e.mask |= bit;
         waiting[lane].push(e);
       }
-      if (lane === "sync") {
-        // A running sync flush picks this up in its next pass.
-        if (!(running & bit)) {
-          flushLane(lane);
-        }
-      } else {
+      if (lane !== "sync") {
         arm(lane);
+      } else if (!(running & bit)) {
+        // A running sync flush picks this up in its next pass.
+        flushLane(lane);
       }
     },
     flush(lane, only) {
@@ -310,21 +266,6 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
       if (error !== entries) {
         throw error;
       }
-    },
-    phase(phase, target, fn) {
-      const p = PHASES.indexOf(phase);
-      if (p < 0) {
-        throw Error(`[Directive] Unknown phase "${phase}"`);
-      }
-      const list = (entry(target).handlers[p] ??= []);
-      list.push(fn);
-
-      return () => {
-        const i = list.indexOf(fn);
-        if (i >= 0) {
-          list.splice(i, 1);
-        }
-      };
     },
     pending(lane) {
       return lane

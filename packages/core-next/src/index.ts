@@ -11,15 +11,10 @@ export type {
   NodeOptions,
   TrackOptions,
 } from "./graph.js";
-export {
-  LANES,
-  PHASES,
-  createScheduler,
-} from "./scheduler.js";
+export { LANES, browserHosts, createScheduler } from "./scheduler.js";
 export type {
   HostCallback,
   Lane,
-  Phase,
   Scheduler,
   SchedulerOptions,
   SchedulerTarget,
@@ -34,12 +29,15 @@ export type {
 } from "./clock.js";
 export { KERNEL_VERSION, createKernel, serializeEvent } from "./kernel.js";
 export type {
-  Ctx,
   EventKind,
   Hooks,
   Kernel,
   KernelEvent,
+  KernelFeatures,
   KernelOptions,
   Listener,
-  SnapshotPart,
 } from "./kernel.js";
+export { PHASES, withPhases } from "./phases.js";
+export type { Ctx, Phase, Phases } from "./phases.js";
+export { withSnapshot } from "./snapshot.js";
+export type { Snapshot, SnapshotPart } from "./snapshot.js";

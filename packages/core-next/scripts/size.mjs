@@ -34,12 +34,24 @@ const BUDGET = 1800;
 console.log(
   `graph.ts: ${code.length} B min, ${gz} B min+gzip (budget ${BUDGET} B, esbuild ${version} via tsup)`,
 );
-// The L0b modules: reported, not budgeted yet. Each bundles what it imports
-// (kernel.ts pulls in the graph, scheduler and clock), so "kernel.ts" is the
-// whole L0 runtime.
-for (const name of ["scheduler.ts", "clock.ts", "kernel.ts"]) {
+// The L0b runtime: reported, not budgeted yet. Each entry bundles what it
+// imports, tree-shaken, so "kernel (default)" is what `createKernel` alone
+// costs and "kernel (all features)" adds every opt-in piece.
+const src = new URL("../src/", import.meta.url).pathname;
+const bundles = {
+  "scheduler.ts": 'export { createScheduler } from "./scheduler.ts";',
+  "kernel (default)": 'export { createKernel } from "./kernel.ts";',
+  "kernel (all features)": [
+    'export { createKernel } from "./kernel.ts";',
+    'export { createVirtualClock, createRng } from "./clock.ts";',
+    'export { browserHosts } from "./scheduler.ts";',
+    'export { withPhases } from "./phases.ts";',
+    'export { withSnapshot } from "./snapshot.ts";',
+  ].join("\n"),
+};
+for (const [name, contents] of Object.entries(bundles)) {
   const out = await build({
-    entryPoints: [new URL(`../src/${name}`, import.meta.url).pathname],
+    stdin: { contents, resolveDir: src, loader: "ts" },
     bundle: true,
     minify: true,
     format: "esm",
@@ -50,7 +62,7 @@ for (const name of ["scheduler.ts", "clock.ts", "kernel.ts"]) {
   });
   const bytes = out.outputFiles[0].contents;
   console.log(
-    `${name}: ${bytes.length} B min, ${gzipSync(bytes, { level: 9 }).length} B min+gzip${name === "kernel.ts" ? " (bundles graph, scheduler, clock)" : ""}`,
+    `${name}: ${bytes.length} B min, ${gzipSync(bytes, { level: 9 }).length} B min+gzip`,
   );
 }
 const dist = new URL("../dist/index.js", import.meta.url).pathname;

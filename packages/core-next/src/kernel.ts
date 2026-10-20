@@ -2,15 +2,23 @@
  * The kernel: what every layer and feature is written against (L0b).
  *
  * A {@link Kernel} bundles one reactive graph with the services it runs on:
- * a {@link Scheduler} (possibly shared), a {@link Clock}, a seeded
- * {@link Rng}, one event stream ({@link Hooks}), per-phase context
- * extenders, snapshot contributors and an open feature registry
- * ({@link Kernel.define} / {@link Kernel.has}). The graph's flushes go
+ * a {@link Scheduler} (possibly shared), a {@link Clock} (real time by
+ * default; pass `createVirtualClock()` for deterministic time), an optional
+ * seeded {@link Rng}, one event stream ({@link Hooks}), settle and dispose
+ * hooks, and a typed feature registry ({@link KernelFeatures},
+ * {@link Kernel.define} / {@link Kernel.feature}). The graph's flushes go
  * through the scheduler on the kernel's lane (`micro` by default; `sync`
  * settles before the write returns).
  *
+ * Opt-in pieces plug in through the registry and stay out of the default
+ * bundle: `withPhases` (phases.ts: ordered phases and per-phase ctx),
+ * `withSnapshot` (snapshot.ts), `createVirtualClock` and `createRng`
+ * (clock.ts), `browserHosts` (scheduler.ts).
+ *
  * A child kernel (`parent`) shares its parent's scheduler, clock and event
- * sink, gets its own graph, and is disposed with its parent.
+ * sink, gets its own graph and, when the parent has an rng, a child rng
+ * forked purely from the parent's seed and the child's creation ordinal. It
+ * is disposed with its parent.
  *
  * Nothing here is module-level state: two kernels share only what they are
  * given.
@@ -18,21 +26,16 @@
  * @module
  */
 
-import {
-  type Clock,
-  type Rng,
-  createRng,
-  createVirtualClock,
-} from "./clock.js";
-import { type Graph, createGraph } from "./graph.js";
+import { type Clock, type Rng, createClock } from "./clock.js";
+import { type Graph, type ReactiveNode, createGraph } from "./graph.js";
+import type { Phases } from "./phases.js";
 import {
   type Lane,
-  PHASES,
-  type Phase,
   type Scheduler,
   type SchedulerTarget,
   createScheduler,
 } from "./scheduler.js";
+import type { Snapshot } from "./snapshot.js";
 
 /** Bumped when the kernel interface changes incompatibly. */
 export const KERNEL_VERSION = 1;
@@ -58,31 +61,41 @@ export type Listener = (event: KernelEvent) => void;
 export interface Hooks {
   /** Emit a record. Fields in `data` are copied onto it. */
   emit(at: EventKind, data?: Record<string, unknown>): void;
-  /** Listen to every record on the sink. Returns an unsubscribe. */
+  /**
+   * Listen to every record on the sink. Returns an unsubscribe. Removed when
+   * the kernel that added it is disposed.
+   */
   on(fn: Listener): () => void;
 }
 
-/** The wire form of a record: `{v: 1, ...event}`. */
+/** The wire form of a record: `{...event, v: 1}` (`v` always wins). */
 export function serializeEvent(event: KernelEvent): string {
-  return JSON.stringify({ v: 1, ...event });
+  return JSON.stringify({ ...event, v: 1 });
 }
 
-/** A part of a snapshot, contributed by a layer or feature. */
-export interface SnapshotPart<T = unknown> {
-  dump(): T;
-  load(data: T): void;
+/**
+ * Typed feature members. A feature adds its member by merging into this
+ * interface (`declare module` … `interface KernelFeatures { name: Api }`),
+ * so {@link Kernel.feature} returns it typed.
+ */
+export interface KernelFeatures {
+  /** Added by `withPhases`. */
+  phases: Phases;
+  /** Added by `withSnapshot`. */
+  snapshot: Snapshot;
 }
 
-/** Context object built for user functions in one phase. */
-export type Ctx = Record<string, unknown>;
+type FeatureOf<K extends string> = K extends keyof KernelFeatures
+  ? KernelFeatures[K]
+  : unknown;
 
 export interface KernelOptions {
   /** Shared with every system it serves. Defaults to a new one. */
   scheduler?: Scheduler;
-  /** Defaults to a virtual clock at 0 (deterministic). */
+  /** Defaults to the parent's, else a real clock ({@link createClock}). */
   clock?: Clock;
-  /** A generator or a seed. Defaults to a seed derived from the id. */
-  rng?: Rng | number;
+  /** Defaults to a fork of the parent's rng, else none. */
+  rng?: Rng;
   /** The lane graph effects flush on. Default `micro`. */
   lane?: Lane;
   /** Share scheduler, clock and event sink with this kernel. */
@@ -96,52 +109,49 @@ export interface Kernel {
   readonly id: number;
   readonly version: number;
   readonly parent: Kernel | null;
-  readonly children: Kernel[];
+  readonly children: readonly Kernel[];
   readonly graph: Graph;
   readonly scheduler: Scheduler;
   readonly clock: Clock;
-  readonly rng: Rng;
+  readonly rng: Rng | undefined;
   readonly lane: Lane;
   readonly hooks: Hooks;
-  readonly ctx: {
-    /** Add members to the ctx of `phase`. Returns a remover. */
-    extend(phase: Phase, fn: (ctx: Ctx) => void): () => void;
-    /** Build a ctx for `phase`: `base` with every extender applied in order. */
-    make<T extends Ctx>(phase: Phase, base: T): T;
-  };
-  readonly snapshot: {
-    /** Register a part under a unique id. */
-    contribute<T>(id: string, part: SnapshotPart<T>): void;
-    /** Every part's data, by id, in contribution order. */
-    dump(): Record<string, unknown>;
-    /** Load the parts present in `data`. */
-    load(data: Record<string, unknown>): void;
-  };
+  /** True once {@link dispose} ran. */
+  readonly disposed: boolean;
   /** Feature members defined so far. */
   readonly features: Readonly<Record<string, unknown>>;
   /** Define a feature member. Throws if `member` is taken. */
-  define(member: string, value: unknown): void;
+  define<K extends string>(member: K, value: FeatureOf<K>): void;
+  /** A defined feature member. Throws if it is not defined. */
+  feature<K extends string>(member: K): FeatureOf<K>;
   /** True for a built-in capability or a defined member. */
   has(cap: string): boolean;
-  /** Run `fn` in `phase` each time this kernel flushes. */
-  phase(phase: Phase, fn: (lane: Lane) => void): () => void;
+  /**
+   * Run `fn` in every settle of this kernel, before the graph's effects run.
+   * Graph writes made in `fn` are settled by that same graph flush. Returns
+   * a remover.
+   */
+  onSettle(fn: (lane: Lane) => void): () => void;
+  /** Run `fn` when this kernel is disposed. Returns a remover. */
+  onDispose(fn: () => void): () => void;
+  /**
+   * Ask for a settle on `lane` (the kernel's lane when omitted). Asked during
+   * a settle, it runs another one in the lane's next pass.
+   */
+  request(lane?: Lane): void;
   /** Flush this kernel now on `lane` (every lane when omitted). */
   flush(lane?: Lane): void;
-  /** Dispose children, leave the scheduler, emit `dispose`. Idempotent. */
+  /**
+   * Dispose children, run dispose hooks, clear this kernel's timers (its id
+   * as owner), dispose its root effects, remove its listeners, leave the
+   * scheduler and emit `dispose`. Idempotent. Afterwards writes never
+   * schedule a flush, and request / flush do nothing.
+   */
   dispose(): void;
 }
 
 /** Capabilities every kernel of this version has. */
-const BUILTIN = [
-  "graph",
-  "scheduler",
-  "clock",
-  "rng",
-  "hooks",
-  "ctx",
-  "snapshot",
-  "phases",
-];
+const BUILTIN = ["graph", "scheduler", "clock", "hooks"];
 
 interface Sink {
   seq: number;
@@ -150,37 +160,99 @@ interface Sink {
 
 /** Hooks carry their sink build-privately, so a child can share it. */
 type SinkHooks = Hooks & { sink_: Sink };
+/** A kernel's child counter, build-private. */
+type Internal = Kernel & { n_: number };
+
+const remove = <T>(list: T[], item: T): void => {
+  const i = list.indexOf(item);
+  if (i >= 0) {
+    list.splice(i, 1);
+  }
+};
+
+const adder =
+  <T>(list: T[]) =>
+  (item: T): (() => void) => {
+    list.push(item);
+
+    return () => remove(list, item);
+  };
 
 /** Create a kernel. */
 export function createKernel(options: KernelOptions = {}): Kernel {
-  const parent = options.parent ?? null;
+  const parent = (options.parent ?? null) as Internal | null;
   const scheduler = options.scheduler ?? parent?.scheduler ?? createScheduler();
-  const clock = options.clock ?? parent?.clock ?? createVirtualClock();
+  const clock = options.clock ?? parent?.clock ?? createClock();
   const sink: Sink = parent
     ? (parent.hooks as SinkHooks).sink_
     : { seq: 0, listeners: [] };
   const lane = options.lane ?? parent?.lane ?? "micro";
+  const ordinal = parent ? parent.n_++ : 0;
+  const rng = options.rng ?? parent?.rng?.fork(ordinal);
+  const settlers: Array<(lane: Lane) => void> = [];
+  const disposers: Array<() => void> = [];
+  const mine: Listener[] = [];
+  const roots: ReactiveNode<any>[] = [];
+  const children: Kernel[] = [];
+  const features: Record<string, unknown> = Object.create(null);
+  let disposed = false;
+  /** In a settle: graph writes are covered by its closing graph flush. */
+  let settling = false;
+
   const target: SchedulerTarget = {
-    flush: (l) => {
-      hooks.emit("flush", { lane: l });
-      graph.flush();
+    flush(l) {
+      // The target marks "no error": user code can never throw it.
+      let error: unknown = target;
+      settling = true;
+      try {
+        hooks.emit("flush", { lane: l });
+      } catch (e) {
+        error = e;
+      }
+      for (const fn of settlers.slice()) {
+        try {
+          fn(l);
+        } catch (e) {
+          if (error === target) {
+            error = e;
+          }
+        }
+      }
+      // L2: the pre-commit interceptor runs here, after the settlers and
+      // before the graph's effects see the writes.
+      settling = false;
+      try {
+        graph.flush();
+      } catch (e) {
+        if (error === target) {
+          error = e;
+        }
+      }
+      if (error !== target) {
+        throw error;
+      }
     },
   };
   const id = scheduler.register(target);
-  const seed = options.rng;
-  const rng =
-    typeof seed === "function"
-      ? seed
-      : createRng(
-          seed ??
-            (parent
-              ? (parent.rng() * 4294967296) | 0
-              : Math.imul(id + 1, 0x9e3779b1)),
-        );
   const graph = createGraph({
-    schedule: () => scheduler.request(lane, target),
+    schedule: () => {
+      if (!disposed && !settling) {
+        scheduler.request(lane, target);
+      }
+    },
     maxRuns: options.maxRuns,
   });
+  // Track root effects so dispose can stop them. Owned effects go with
+  // their owner.
+  const effect = graph.effect.bind(graph);
+  graph.effect = ((fn, o) => {
+    const node = effect(fn, o);
+    if (!node.parent) {
+      roots.push(node);
+    }
+
+    return node;
+  }) as Graph["effect"];
 
   const hooks: SinkHooks = {
     sink_: sink,
@@ -212,121 +284,101 @@ export function createKernel(options: KernelOptions = {}): Kernel {
       }
     },
     on(fn) {
+      if (disposed) {
+        return () => {};
+      }
       sink.listeners.push(fn);
+      mine.push(fn);
 
       return () => {
-        const i = sink.listeners.indexOf(fn);
-        if (i >= 0) {
-          sink.listeners.splice(i, 1);
-        }
+        remove(sink.listeners, fn);
+        remove(mine, fn);
       };
     },
   };
 
-  const extenders: Array<Array<(ctx: Ctx) => void>> = [];
-  const parts = new Map<string, SnapshotPart<any>>();
-  const features: Record<string, unknown> = Object.create(null);
-  let disposed = false;
-
-  const kernel: Kernel = {
+  const kernel: Internal = {
     id,
     version: KERNEL_VERSION,
     parent,
-    children: [],
+    children,
     graph,
     scheduler,
     clock,
     rng,
     lane,
     hooks,
-    ctx: {
-      extend(phase, fn) {
-        const list = (extenders[phaseIndex(phase)] ??= []);
-        list.push(fn);
-
-        return () => {
-          const i = list.indexOf(fn);
-          if (i >= 0) {
-            list.splice(i, 1);
-          }
-        };
-      },
-      make(phase, base) {
-        for (const fn of extenders[phaseIndex(phase)] ?? []) {
-          fn(base);
-        }
-
-        return base;
-      },
-    },
-    snapshot: {
-      contribute(key, part) {
-        if (parts.has(key)) {
-          throw Error(`[Directive] Snapshot part "${key}" already exists`);
-        }
-        parts.set(key, part);
-      },
-      dump() {
-        const out: Record<string, unknown> = {};
-        for (const [key, part] of parts) {
-          out[key] = part.dump();
-        }
-
-        return out;
-      },
-      load(data) {
-        for (const [key, part] of parts) {
-          if (key in data) {
-            part.load(data[key]);
-          }
-        }
-      },
+    get disposed() {
+      return disposed;
     },
     features,
+    n_: 0,
     define(member, value) {
       if (member in features || BUILTIN.includes(member)) {
         throw Error(`[Directive] Feature member "${member}" already defined`);
       }
       features[member] = value;
     },
-    has: (cap) => BUILTIN.includes(cap) || cap in features,
-    phase: (phase, fn) => scheduler.phase(phase, target, fn),
-    flush: (l) => scheduler.flush(l, target),
+    feature(member) {
+      if (!(member in features)) {
+        throw Error(`[Directive] Feature member "${member}" is not defined`);
+      }
+
+      return features[member] as never;
+    },
+    has: (cap) =>
+      BUILTIN.includes(cap) || cap in features || (cap === "rng" && !!rng),
+    onSettle: adder(settlers),
+    onDispose: adder(disposers),
+    request(l) {
+      if (!disposed) {
+        scheduler.request(l ?? lane, target);
+      }
+    },
+    flush(l) {
+      if (!disposed) {
+        scheduler.flush(l, target);
+      }
+    },
     dispose() {
       if (disposed) {
         return;
       }
       disposed = true;
-      for (const child of kernel.children.splice(0)) {
-        child.dispose();
+      let error: unknown = target;
+      const run = (fn: () => void): void => {
+        try {
+          fn();
+        } catch (e) {
+          if (error === target) {
+            error = e;
+          }
+        }
+      };
+      for (const child of children.slice()) {
+        run(() => child.dispose());
+      }
+      for (const fn of disposers.splice(0)) {
+        run(fn);
+      }
+      clock.clearOwner(id);
+      for (const node of roots.splice(0)) {
+        run(() => graph.dispose(node));
       }
       scheduler.unregister(target);
       if (parent) {
-        const siblings = parent.children;
-        const i = siblings.indexOf(kernel);
-        if (i >= 0) {
-          siblings.splice(i, 1);
-        }
+        remove(parent.children as Kernel[], kernel);
       }
-      hooks.emit("dispose");
+      run(() => hooks.emit("dispose"));
+      for (const fn of mine.splice(0)) {
+        remove(sink.listeners, fn);
+      }
+      if (error !== target) {
+        throw error;
+      }
     },
   };
-  kernel.snapshot.contribute("rng", {
-    dump: () => rng.state,
-    load: (state: number) => {
-      rng.state = state;
-    },
-  });
-  parent?.children.push(kernel);
+  (parent?.children as Kernel[] | undefined)?.push(kernel);
 
   return kernel;
-}
-
-function phaseIndex(phase: Phase): number {
-  const i = PHASES.indexOf(phase);
-  if (i < 0) {
-    throw Error(`[Directive] Unknown phase "${phase}"`);
-  }
-
-  return i;
 }

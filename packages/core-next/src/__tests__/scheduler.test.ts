@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   type HostCallback,
   type Lane,
-  PHASES,
   type SchedulerTarget,
   createScheduler,
 } from "../scheduler.js";
@@ -223,58 +222,6 @@ describe("sharing", () => {
     h.s.request("manual", target(log, "c"));
     expect(() => h.s.flush("manual")).toThrow("first");
     expect(log).toEqual(["c:manual"]);
-  });
-});
-
-describe("phases", () => {
-  it("runs phases in order across systems, then settles", () => {
-    const log: string[] = [];
-    const h = hosts();
-    const a = target(log, "a");
-    const b = target(log, "b");
-    h.s.register(a);
-    h.s.register(b);
-    // Register out of phase order to prove order comes from PHASES.
-    for (const p of [...PHASES].reverse()) {
-      h.s.phase(p, b, () => log.push(`b.${p}`));
-      h.s.phase(p, a, () => log.push(`a.${p}`));
-    }
-    h.s.request("manual", b);
-    h.s.request("manual", a);
-    h.s.flush("manual");
-    const expected: string[] = [];
-    for (const p of PHASES) {
-      expected.push(`a.${p}`, `b.${p}`, "a:manual", "b:manual");
-    }
-    expect(log).toEqual(expected);
-  });
-
-  it("the phase order contract", () => {
-    expect(PHASES).toEqual([
-      "input",
-      "simulate",
-      "constraints",
-      "resolvers",
-      "render",
-    ]);
-  });
-
-  it("a target with no handlers settles once; removers work", () => {
-    const log: string[] = [];
-    const h = hosts();
-    const a = target(log, "a");
-    const off = h.s.phase("input", a, () => log.push("in"));
-    off();
-    h.s.request("manual", a);
-    h.s.flush("manual");
-    expect(log).toEqual(["a:manual"]);
-  });
-
-  it("rejects an unknown phase", () => {
-    const { s } = hosts();
-    expect(() => s.phase("bogus" as any, { flush() {} }, () => {})).toThrow(
-      /Unknown phase/,
-    );
   });
 });
 

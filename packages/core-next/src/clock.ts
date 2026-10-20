@@ -1,18 +1,18 @@
 /**
  * Time and randomness, injected (L0b).
  *
- * A {@link Clock} owns its timers as data: a min-heap of
- * `{deadline, owner, kind, seq}` records ordered by deadline, then by `seq`
- * (creation order), so ties always fire the same way. Callbacks live beside
- * the records, never in them, so {@link Clock.timers} is plain data a
- * snapshot can keep.
+ * A {@link Clock} owns its timers as data: `{deadline, owner, kind, seq}`
+ * records, fired by deadline, then by `seq` (creation order), so ties always
+ * fire the same way. Callbacks live beside the records, never in them, so
+ * {@link Clock.timers} is plain data a snapshot can keep.
  *
+ * - {@link createClock}: real time (the default a kernel uses). Each timer
+ *   gets its own host timer. Host functions are looked up when the clock is
+ *   created.
  * - {@link createVirtualClock}: time moves only on {@link Clock.advanceTo}.
- *   It never touches a host timer.
- * - {@link createClock}: real time, one host timer armed for the earliest
- *   deadline. Host functions are looked up when the clock is created.
+ *   It never touches a host timer. Opt-in: import it to use it.
  *
- * {@link createRng}: a seeded PRNG whose whole state is one number.
+ * {@link createRng}: a seeded PRNG whose whole state is one number. Opt-in.
  *
  * No `process.env` reads and no module-level mutable state.
  *
@@ -41,67 +41,96 @@ export interface Clock {
   /** The earliest pending deadline, or `undefined` when none. */
   nextDeadline(): number | undefined;
   /**
-   * Fire every timer due at or before `t`, earliest first (ties by `seq`),
-   * including timers they set that also fall due. A virtual clock then sits
-   * at `t`; it never moves backwards. Errors are collected and the first is
-   * rethrown after the due timers ran.
+   * Fire timers due at or before `t`, earliest first (ties by `seq`). Errors
+   * are collected and the first is rethrown after the due timers ran.
+   *
+   * A virtual clock also fires timers they set that fall due, then sits at
+   * `t` (it never moves backwards). Timers set for the deadline being fired
+   * run in a further pass at that deadline; a deadline that needs more than
+   * 1,000 passes throws, leaving time at that deadline and the timer pending.
+   * A real clock fires only timers that existed when it was called; timers
+   * they set run on their own host timers.
    */
   advanceTo(t: number): void;
   /** Schedule `fn` after `ms`. Returns the timer's `seq`, its id. */
   setTimeout(fn: () => void, ms: number, options?: TimerOptions): number;
   clearTimeout(seq: number): void;
+  /** Clear every timer set with this `owner`. */
+  clearOwner(owner: number): void;
   /** Pending timers, in firing order. Plain data. */
   timers(): TimerRecord[];
 }
 
 interface Timer extends TimerRecord {
   fn: () => void;
+  /** Host handle (real clock only). */
+  h_?: unknown;
 }
 
 const before = (a: Timer, b: Timer): boolean =>
   a.deadline < b.deadline || (a.deadline === b.deadline && a.seq < b.seq);
 
-/** The heap and timer table both clocks share. */
-function timerCore(getNow: () => number, onChange: () => void) {
+const order = (list: Iterable<Timer>): Timer[] =>
+  [...list].sort((a, b) => (before(a, b) ? -1 : 1));
+
+const record = ({ deadline, owner, kind, seq }: Timer): TimerRecord => ({
+  deadline,
+  owner,
+  kind,
+  seq,
+});
+
+const make = (
+  seq: number,
+  at: number,
+  fn: () => void,
+  ms: number,
+  options?: TimerOptions,
+): Timer => ({
+  deadline: at + Math.max(0, ms),
+  owner: options?.owner ?? 0,
+  kind: options?.kind ?? "timeout",
+  seq,
+  fn,
+});
+
+/** Most passes one virtual deadline may take (timers setting 0 ms timers). */
+const MAX_PASSES = 1000;
+
+/**
+ * A clock that moves only when told to. Starts at `start` (default 0). Its
+ * timers sit in a min-heap.
+ */
+export function createVirtualClock(start = 0): Clock {
+  let now = start;
+  let seq = 0;
   const heap: Timer[] = [];
   const live = new Map<number, Timer>();
-  let seq = 0;
 
-  const push = (t: Timer): void => {
-    let i = heap.push(t) - 1;
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (!before(heap[i]!, heap[p]!)) {
-        break;
-      }
-      [heap[i], heap[p]] = [heap[p]!, heap[i]!];
-      i = p;
-    }
+  const swap = (i: number, j: number): void => {
+    [heap[i], heap[j]] = [heap[j]!, heap[i]!];
   };
-  const pop = (): Timer => {
-    const top = heap[0]!;
+  const pop = (): void => {
     const last = heap.pop()!;
-    if (heap.length) {
-      heap[0] = last;
-      for (let i = 0; ; ) {
-        const l = 2 * i + 1;
-        const r = l + 1;
-        let m = i;
-        if (l < heap.length && before(heap[l]!, heap[m]!)) {
-          m = l;
-        }
-        if (r < heap.length && before(heap[r]!, heap[m]!)) {
-          m = r;
-        }
-        if (m === i) {
-          break;
-        }
-        [heap[i], heap[m]] = [heap[m]!, heap[i]!];
-        i = m;
-      }
+    if (!heap.length) {
+      return;
     }
-
-    return top;
+    heap[0] = last;
+    for (let i = 0; ; ) {
+      const l = 2 * i + 1;
+      let m = i;
+      if (l < heap.length && before(heap[l]!, heap[m]!)) {
+        m = l;
+      }
+      if (l + 1 < heap.length && before(heap[l + 1]!, heap[m]!)) {
+        m = l + 1;
+      }
+      if (m === i) {
+        return;
+      }
+      swap(i, m);
+      i = m;
+    }
   };
   /** Drop cleared timers sitting at the top. */
   const head = (): Timer | undefined => {
@@ -113,34 +142,35 @@ function timerCore(getNow: () => number, onChange: () => void) {
   };
 
   return {
-    head,
+    now: () => now,
     nextDeadline: () => head()?.deadline,
-    set(fn: () => void, ms: number, options?: TimerOptions): number {
-      const t: Timer = {
-        deadline: getNow() + Math.max(0, ms),
-        owner: options?.owner ?? 0,
-        kind: options?.kind ?? "timeout",
-        seq: ++seq,
-        fn,
-      };
-      live.set(t.seq, t);
-      push(t);
-      onChange();
-
-      return t.seq;
-    },
-    clear(id: number): void {
-      if (live.delete(id)) {
-        onChange();
-      }
-    },
-    /** Fire due timers; `step` moves virtual time to each deadline. */
-    run(t: number, step: (deadline: number) => void): void {
+    advanceTo(t) {
       let error: unknown = heap;
+      /** The deadline being fired, and the last `seq` of its current pass. */
+      let at = Number.NaN;
+      let mark = 0;
+      let passes = 0;
       for (let top = head(); top && top.deadline <= t; top = head()) {
+        if (top.deadline !== at) {
+          at = top.deadline;
+          mark = seq;
+          passes = 0;
+        } else if (top.seq > mark) {
+          // Set while this deadline fired: the next pass.
+          mark = seq;
+          if (++passes >= MAX_PASSES) {
+            if (error === heap) {
+              error = Error(`[Directive] timers at ${at} did not settle`);
+            }
+            t = at;
+            break;
+          }
+        }
         pop();
         live.delete(top.seq);
-        step(top.deadline);
+        if (at > now) {
+          now = at;
+        }
         try {
           top.fn();
         } catch (e) {
@@ -149,55 +179,41 @@ function timerCore(getNow: () => number, onChange: () => void) {
           }
         }
       }
+      if (t > now) {
+        now = t;
+      }
       if (error !== heap) {
         throw error;
       }
     },
-    timers(): TimerRecord[] {
-      return [...live.values()]
-        .sort((a, b) => (before(a, b) ? -1 : 1))
-        .map(({ deadline, owner, kind, seq }) => ({
-          deadline,
-          owner,
-          kind,
-          seq,
-        }));
+    setTimeout(fn, ms, options) {
+      const timer = make(++seq, now, fn, ms, options);
+      live.set(seq, timer);
+      let i = heap.push(timer) - 1;
+      for (let p = (i - 1) >> 1; i > 0 && before(heap[i]!, heap[p]!); ) {
+        swap(i, p);
+        i = p;
+        p = (i - 1) >> 1;
+      }
+
+      return seq;
     },
-  };
-}
-
-/** A clock that moves only when told to. Starts at `start` (default 0). */
-export function createVirtualClock(start = 0): Clock {
-  let now = start;
-  const core = timerCore(
-    () => now,
-    () => {},
-  );
-
-  return {
-    now: () => now,
-    nextDeadline: core.nextDeadline,
-    advanceTo(t) {
-      try {
-        core.run(t, (d) => {
-          if (d > now) {
-            now = d;
-          }
-        });
-      } finally {
-        if (t > now) {
-          now = t;
+    clearTimeout: (id) => {
+      live.delete(id);
+    },
+    clearOwner(owner) {
+      for (const [id, timer] of live) {
+        if (timer.owner === owner) {
+          live.delete(id);
         }
       }
     },
-    setTimeout: core.set,
-    clearTimeout: core.clear,
-    timers: core.timers,
+    timers: () => order(live.values()).map(record),
   };
 }
 
 export interface RealClockOptions {
-  /** Defaults to `Date.now`. */
+  /** Defaults to `performance.now` when present, else `Date.now`. */
   now?: () => number;
   /** Host timer pair. Defaults to the global `setTimeout`/`clearTimeout`. */
   setTimer?: (cb: () => void, ms: number) => unknown;
@@ -205,62 +221,85 @@ export interface RealClockOptions {
 }
 
 /**
- * Real time. Keeps the same timer heap and arms one host timer for the
- * earliest deadline; when it fires, due timers run via `advanceTo(now())`.
+ * Real time: each timer is a record plus its own host timer. Host functions
+ * are looked up when the clock is created.
  */
 export function createClock(options: RealClockOptions = {}): Clock {
   const g = globalThis as any;
-  const now = options.now ?? (() => Date.now());
+  const perf = g.performance;
+  const now =
+    options.now ?? (perf?.now ? () => perf.now() : () => g.Date.now());
   const setTimer =
     options.setTimer ?? ((cb: () => void, ms: number) => g.setTimeout(cb, ms));
   const clearTimer = options.clearTimer ?? ((h: unknown) => g.clearTimeout(h));
-  let handle: unknown;
-  let armedFor: number | undefined;
-  let firing = false;
-
-  const rearm = (): void => {
-    const d = core.nextDeadline();
-    if (d === armedFor) {
-      return;
-    }
-    if (armedFor !== undefined) {
-      clearTimer(handle);
-    }
-    armedFor = d;
-    if (d !== undefined) {
-      handle = setTimer(
-        () => {
-          armedFor = undefined;
-          clock.advanceTo(now());
-        },
-        Math.max(0, d - now()),
-      );
+  const live = new Map<number, Timer>();
+  let seq = 0;
+  const clear = (id: number): void => {
+    const timer = live.get(id);
+    if (timer) {
+      live.delete(id);
+      clearTimer(timer.h_);
     }
   };
-  const core = timerCore(now, () => {
-    // Re-arming during a run waits for the run to finish.
-    if (!firing) {
-      rearm();
-    }
-  });
-  const clock: Clock = {
+
+  return {
     now,
-    nextDeadline: core.nextDeadline,
+    nextDeadline() {
+      let d: number | undefined;
+      for (const { deadline } of live.values()) {
+        if (d === undefined || deadline < d) {
+          d = deadline;
+        }
+      }
+
+      return d;
+    },
     advanceTo(t) {
-      firing = true;
-      try {
-        core.run(t, () => {});
-      } finally {
-        firing = false;
-        rearm();
+      let error: unknown = live;
+      for (const timer of order(live.values())) {
+        if (timer.deadline > t) {
+          break;
+        }
+        if (live.has(timer.seq)) {
+          clear(timer.seq);
+          try {
+            timer.fn();
+          } catch (e) {
+            if (error === live) {
+              error = e;
+            }
+          }
+        }
+      }
+      if (error !== live) {
+        throw error;
       }
     },
-    setTimeout: core.set,
-    clearTimeout: core.clear,
-    timers: core.timers,
-  };
+    setTimeout(fn, ms, options) {
+      const id = ++seq;
+      const timer = make(id, now(), fn, ms, options);
+      live.set(id, timer);
+      timer.h_ = setTimer(
+        () => {
+          if (live.delete(id)) {
+            fn();
+          }
+        },
+        Math.max(0, ms),
+      );
 
-  return clock;
+      return id;
+    },
+    clearTimeout: clear,
+    clearOwner(owner) {
+      for (const timer of [...live.values()]) {
+        if (timer.owner === owner) {
+          clear(timer.seq);
+        }
+      }
+    },
+    timers: () => order(live.values()).map(record),
+  };
 }
 
 /** A seeded PRNG: `rng()` returns a float in [0, 1). */
@@ -268,10 +307,27 @@ export interface Rng {
   (): number;
   /** The whole generator state. Save it and assign it back to replay. */
   state: number;
+  /** The seed it was created with. */
+  readonly seed: number;
+  /**
+   * A child generator for ordinal `n`, seeded purely from this generator's
+   * seed and `n`: it never draws from this one, so creating children in any
+   * number never changes this sequence.
+   */
+  fork(n: number): Rng;
+  /** Snapshot part: the state. */
+  dump(): number;
+  load(state: number): void;
 }
 
-/** A seeded mulberry32 generator. Same seed, same sequence, any host. */
+/**
+ * A seeded mulberry32 generator. Same seed, same sequence, any host. The
+ * seed must be an integer; it is reduced to 32 bits.
+ */
 export function createRng(seed = 1): Rng {
+  if (!Number.isInteger(seed)) {
+    throw TypeError(`[Directive] rng seed must be an integer, got ${seed}`);
+  }
   const rng = (() => {
     let t = (rng.state = (rng.state + 0x6d2b79f5) | 0);
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -279,7 +335,21 @@ export function createRng(seed = 1): Rng {
 
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }) as Rng;
-  rng.state = seed | 0;
+  const s = seed | 0;
+  rng.state = s;
+  (rng as { seed: number }).seed = s;
+  rng.fork = (n) => {
+    // A 32-bit mix of (seed, n): pure, so a child's seed is reproducible.
+    let h =
+      Math.imul(s ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(n + 1, 0xc2b2ae35);
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+
+    return createRng((h ^ (h >>> 15)) | 0);
+  };
+  rng.dump = () => rng.state;
+  rng.load = (state) => {
+    rng.state = state;
+  };
 
   return rng;
 }

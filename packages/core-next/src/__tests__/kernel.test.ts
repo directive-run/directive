@@ -6,7 +6,9 @@ import {
   createKernel,
   serializeEvent,
 } from "../kernel.js";
+import { withPhases } from "../phases.js";
 import { type HostCallback, createScheduler } from "../scheduler.js";
+import { withSnapshot } from "../snapshot.js";
 
 function manualMicro() {
   const cbs: Array<() => void> = [];
@@ -102,16 +104,19 @@ describe("graph wiring", () => {
     expect(new Set(order).size).toBe(500);
   });
 
-  it("phase handlers run around the graph settle", () => {
+  it("phase handlers run before the graph settle; effects run once at the end", () => {
     const k = createKernel({ lane: "manual" });
     const s = k.graph.signal(0);
     const log: string[] = [];
     k.graph.effect(() => log.push(`effect ${k.graph.read(s)}`));
-    k.phase("render", () => log.push(`render ${k.graph.read(s)}`));
-    k.phase("input", () => k.graph.write(s, 5));
+    const phases = withPhases(k);
+    phases.on("render", () => log.push(`render ${k.graph.read(s)}`));
+    phases.on("input", () => k.graph.write(s, 5));
     k.graph.write(s, 1);
     k.flush("manual");
-    expect(log).toEqual(["effect 0", "effect 5", "render 5"]);
+    expect(log).toEqual(["effect 0", "render 5", "effect 5"]);
+    expect(withPhases(k)).toBe(phases);
+    expect(k.feature("phases")).toBe(phases);
   });
 });
 
@@ -169,54 +174,66 @@ describe("hooks", () => {
 describe("kernel services", () => {
   it("ctx.extend applies extenders per phase, in order", () => {
     const k = createKernel();
-    k.ctx.extend("constraints", (ctx) => {
-      ctx.a = 1;
+    const { ctx } = withPhases(k);
+    ctx.extend("constraints", (c) => {
+      c.a = 1;
     });
-    const off = k.ctx.extend("constraints", (ctx) => {
-      ctx.b = (ctx.a as number) + 1;
+    const off = ctx.extend("constraints", (c) => {
+      c.b = (c.a as number) + 1;
     });
-    k.ctx.extend("render", (ctx) => {
-      ctx.r = true;
+    ctx.extend("render", (c) => {
+      c.r = true;
     });
-    expect(k.ctx.make("constraints", {})).toEqual({ a: 1, b: 2 });
+    expect(ctx.make("constraints", {})).toEqual({ a: 1, b: 2 });
     off();
-    expect(k.ctx.make("constraints", { z: 0 })).toEqual({ z: 0, a: 1 });
-    expect(() => k.ctx.extend("nope" as any, () => {})).toThrow();
+    expect(ctx.make("constraints", { z: 0 })).toEqual({ z: 0, a: 1 });
+    expect(() => ctx.extend("nope" as any, () => {})).toThrow(/Unknown phase/);
   });
 
-  it("snapshot parts dump and load; rng is a built-in part", () => {
-    const k = createKernel({ rng: 7 });
+  it("snapshot parts dump and load; the rng is a part", () => {
+    const k = createKernel({ rng: createRng(7) });
+    const snapshot = withSnapshot(k);
     let n = 3;
-    k.snapshot.contribute("n", {
+    snapshot.contribute("n", {
       dump: () => n,
       load: (v: number) => {
         n = v;
       },
     });
-    expect(() => k.snapshot.contribute("n", { dump() {}, load() {} })).toThrow(
+    expect(() => snapshot.contribute("n", { dump() {}, load() {} })).toThrow(
       /already exists/,
     );
-    const snap = k.snapshot.dump();
+    const snap = snapshot.dump();
     expect(Object.keys(snap)).toEqual(["rng", "n"]);
-    const before = [k.rng(), k.rng()];
+    const before = [k.rng!(), k.rng!()];
     n = 9;
-    k.snapshot.load(JSON.parse(JSON.stringify(snap)));
+    snapshot.load(JSON.parse(JSON.stringify(snap)));
     expect(n).toBe(3);
-    expect([k.rng(), k.rng()]).toEqual(before);
+    expect([k.rng!(), k.rng!()]).toEqual(before);
+    expect(withSnapshot(k)).toBe(snapshot);
   });
 
-  it("define / has / version", () => {
+  it("define / feature / has / version", () => {
     const k = createKernel();
     expect(k.version).toBe(KERNEL_VERSION);
     expect(k.has("scheduler")).toBe(true);
+    expect(k.has("rng")).toBe(false);
+    expect(createKernel({ rng: createRng() }).has("rng")).toBe(true);
     expect(k.has("history")).toBe(false);
     const api = { undo() {} };
     k.define("history", api);
     expect(k.has("history")).toBe(true);
     expect(k.features.history).toBe(api);
+    expect(k.feature("history")).toBe(api);
+    expect(() => k.feature("nope")).toThrow(/not defined/);
     expect(() => k.define("history", {})).toThrow(/already defined/);
     expect(() => k.define("graph", {})).toThrow(/already defined/);
     expect(k.has("toString")).toBe(false);
+  });
+
+  it("uses a real clock by default", () => {
+    const k = createKernel();
+    expect(Math.abs(k.clock.now() - performance.now())).toBeLessThan(1000);
   });
 });
 
@@ -243,7 +260,7 @@ describe("isolation and trees", () => {
 
   it("a child shares scheduler, clock and sink; has its own graph and rng", () => {
     const h = manualMicro();
-    const parent = createKernel({ scheduler: h.scheduler, rng: 5 });
+    const parent = createKernel({ scheduler: h.scheduler, rng: createRng(5) });
     const child = createKernel({ parent });
     expect(child.parent).toBe(parent);
     expect(parent.children).toEqual([child]);
@@ -260,9 +277,9 @@ describe("isolation and trees", () => {
       [child.id, 1],
       [parent.id, 2],
     ]);
-    // The child's seed is drawn from the parent's rng: deterministic.
-    const again = createKernel({ parent: createKernel({ rng: 5 }) });
-    expect(again.rng.state).toBe(child.rng.state);
+    // The child's seed is forked from the parent's seed: deterministic.
+    const again = createKernel({ parent: createKernel({ rng: createRng(5) }) });
+    expect(again.rng!.state).toBe(child.rng!.state);
   });
 
   it("disposing a parent disposes its children and leaves the scheduler", () => {
@@ -298,7 +315,7 @@ function program(seed: number): string {
     idle: (cb) => clock.setTimeout(cb, 50, { kind: "idle" }),
   });
   const lanes = ["sync", "micro", "frame", "idle", "manual"] as const;
-  const root = createKernel({ scheduler, clock, rng: seed });
+  const root = createKernel({ scheduler, clock, rng: createRng(seed) });
   const kernels = [root];
   for (let i = 0; i < 3; i++) {
     kernels.push(
@@ -314,7 +331,7 @@ function program(seed: number): string {
     const s = k.graph.signal(0);
     const d = k.graph.computed(() => k.graph.read(s) * 2);
     k.graph.effect(() => {
-      k.hooks.emit("saw", { d: k.graph.read(d), r: k.rng() });
+      k.hooks.emit("saw", { d: k.graph.read(d), r: k.rng!() });
     });
 
     return s;

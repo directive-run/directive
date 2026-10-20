@@ -107,7 +107,7 @@ describe("virtual clock", () => {
 });
 
 describe("real clock", () => {
-  it("arms one host timer for the earliest deadline and fires through it", () => {
+  it("gives each timer its own host timer; records stay plain data", () => {
     let now = 100;
     const armed: Array<{ cb: () => void; ms: number; live: boolean }> = [];
     const c = createClock({
@@ -123,20 +123,51 @@ describe("real clock", () => {
       },
     });
     const log: string[] = [];
-    c.setTimeout(() => log.push("late"), 50);
+    c.setTimeout(() => log.push("late"), 50, { owner: 2, kind: "x" });
     c.setTimeout(() => log.push("early"), 10);
-    const live = () => armed.filter((h) => h.live);
-    expect(live().map((h) => h.ms)).toEqual([10]);
+    expect(armed.map((h) => h.ms)).toEqual([50, 10]);
+    expect(c.nextDeadline()).toBe(110);
+    expect(c.timers()).toEqual([
+      { deadline: 110, owner: 0, kind: "timeout", seq: 2 },
+      { deadline: 150, owner: 2, kind: "x", seq: 1 },
+    ]);
     now = 110;
-    live()[0]!.live = false;
-    armed.at(-1)!.cb();
+    armed[1]!.cb();
     expect(log).toEqual(["early"]);
-    expect(live().map((h) => h.ms)).toEqual([40]);
+    // advanceTo fires what is due and clears its host timer.
     now = 150;
-    live()[0]!.live = false;
-    armed.at(-1)!.cb();
+    c.advanceTo(150);
     expect(log).toEqual(["early", "late"]);
-    expect(live()).toEqual([]);
+    expect(armed[0]!.live).toBe(false);
+    armed[0]!.cb();
+    expect(log).toEqual(["early", "late"]);
+    expect(c.timers()).toEqual([]);
+  });
+
+  it("clearOwner clears that owner's timers and their host timers", () => {
+    const handles: Array<{ live: boolean }> = [];
+    const c = createClock({
+      setTimer: () => {
+        const h = { live: true };
+        handles.push(h);
+
+        return h;
+      },
+      clearTimer: (h) => {
+        (h as { live: boolean }).live = false;
+      },
+    });
+    c.setTimeout(() => {}, 5, { owner: 1 });
+    c.setTimeout(() => {}, 5, { owner: 2 });
+    c.clearOwner(1);
+    expect(c.timers().map((t) => t.owner)).toEqual([2]);
+    expect(handles.map((h) => h.live)).toEqual([false, true]);
+  });
+
+  it("defaults to performance.now when present", () => {
+    const c = createClock();
+    const p = performance.now();
+    expect(Math.abs(c.now() - p)).toBeLessThan(1000);
   });
 
   it("works with real host timers by default", async () => {
@@ -160,6 +191,22 @@ describe("rng", () => {
     a.state = saved;
     expect([a(), a()]).toEqual(next);
     expect(createRng(124)()).not.toBe(seqA[0]);
+  });
+
+  it("rejects non-integer seeds and reduces to 32 bits", () => {
+    expect(() => createRng(1.5)).toThrow(/integer/);
+    expect(() => createRng(Number.NaN)).toThrow(/integer/);
+    expect(createRng(2 ** 32 + 7).seed).toBe(7);
+  });
+
+  it("forks children purely from seed and ordinal", () => {
+    const a = createRng(9);
+    const before = a.state;
+    const c0 = a.fork(0);
+    expect(a.state).toBe(before);
+    expect(a.fork(0).seed).toBe(c0.seed);
+    expect(a.fork(1).seed).not.toBe(c0.seed);
+    expect(createRng(10).fork(0).seed).not.toBe(c0.seed);
   });
 
   it("stays in [0, 1)", () => {
