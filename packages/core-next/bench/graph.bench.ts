@@ -1,4 +1,8 @@
 /**
+ * QUICK / DEV-ONLY. Both libraries share one vitest process, adapter closures and
+ * a fixed order, which skews ratios by up to 0.3-0.4x. For any number you act on
+ * (the 2.0 gate), use `pnpm --filter @directive-run/core-next bench:fair`.
+ *
  * The core-next graph against alien-signals, on js-reactivity-benchmark-style
  * workloads (the "kairo" set plus create/dispose and a batched write burst).
  *
