@@ -1,4 +1,6 @@
 // Gzip size of the graph module: bundled alone, minified, gzip level 9.
+// Private members end in `_` and are mangled exactly as the tsup build
+// mangles them (`mangleProps` in tsup.config.ts), so this is the shipped size.
 // Run from the package: `pnpm --filter @directive-run/core-next size`.
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
@@ -12,6 +14,7 @@ const result = await build({
   target: "es2022",
   write: false,
   logLevel: "silent",
+  mangleProps: /_$/,
 });
 const code = result.outputFiles[0].contents;
 const gz = gzipSync(code, { level: 9 }).length;
