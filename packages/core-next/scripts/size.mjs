@@ -34,6 +34,25 @@ const BUDGET = 1800;
 console.log(
   `graph.ts: ${code.length} B min, ${gz} B min+gzip (budget ${BUDGET} B, esbuild ${version} via tsup)`,
 );
+// The L0b modules: reported, not budgeted yet. Each bundles what it imports
+// (kernel.ts pulls in the graph, scheduler and clock), so "kernel.ts" is the
+// whole L0 runtime.
+for (const name of ["scheduler.ts", "clock.ts", "kernel.ts"]) {
+  const out = await build({
+    entryPoints: [new URL(`../src/${name}`, import.meta.url).pathname],
+    bundle: true,
+    minify: true,
+    format: "esm",
+    target: "es2022",
+    write: false,
+    logLevel: "silent",
+    mangleProps: /_$/,
+  });
+  const bytes = out.outputFiles[0].contents;
+  console.log(
+    `${name}: ${bytes.length} B min, ${gzipSync(bytes, { level: 9 }).length} B min+gzip${name === "kernel.ts" ? " (bundles graph, scheduler, clock)" : ""}`,
+  );
+}
 const dist = new URL("../dist/index.js", import.meta.url).pathname;
 if (existsSync(dist)) {
   // The build is not minified; minify it the same way to compare like for
