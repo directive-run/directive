@@ -7,15 +7,19 @@
  * source's subscriber list. Links are reused across runs, so a node whose
  * dependencies do not change allocates nothing when it re-runs.
  *
- * Push-pull with version counters:
+ * Push-pull with marks:
  * - A write bumps the signal's `version` and pushes marks downstream: direct
  *   subscribers get `DIRTY`, everything further down gets `CHECK` (maybe
  *   stale). Effects reached by the walk are queued.
  * - Reading a marked computed pulls: it walks its dependencies in the order
- *   they were read, brings each marked one up to date first, and recomputes
- *   only if some dependency's version differs from the version its link
- *   recorded. A computed whose value is unchanged (per its `equals`) keeps
- *   its version, so nothing below it re-runs.
+ *   they were read and brings each marked one up to date first. A computed
+ *   that recomputes to a new value marks its `CHECK` subscribers `DIRTY` on
+ *   the spot, so the walk never compares versions: a `CHECK` node whose
+ *   dependencies all came back clean is clean. A computed whose value is
+ *   unchanged (per its `equals`) marks nothing, so nothing below it re-runs.
+ *
+ * Invariant the walk relies on: a stale node's subscribers are stale too, and
+ * a node one of whose dependencies changed since it last ran is `DIRTY`.
  * - Effects flush after the write (or at the end of the outermost batch), each
  *   pulling the same way, so an effect never sees a half-updated graph.
  *
@@ -38,7 +42,7 @@ export const Flags = {
   Effect: 2,
   /** A direct dependency changed: must recompute or re-run. */
   Dirty: 4,
-  /** Something upstream changed: check dependency versions before use. */
+  /** Something upstream changed: refresh stale dependencies before use. */
   Check: 8,
   /** The node's function is running now. Reading it again is a cycle. */
   Running: 16,
@@ -57,16 +61,21 @@ export const Flags = {
   Errored: 512,
 } as const;
 
-const COMPUTED = 1;
-const EFFECT = 2;
-const DIRTY = 4;
-const CHECK = 8;
-const RUNNING = 16;
-const DISPOSED = 32;
-const STATIC = 64;
-const HAS_VALUE = 128;
-const ERRORED = 512;
-const STALE = DIRTY | CHECK;
+// The same bits as numeric literals for the hot paths: a const enum is
+// inlined at every use, where a module-level const is a variable load.
+// biome-ignore lint/suspicious/noConstEnum: internal, never exported.
+const enum F {
+  Computed = 1,
+  Effect = 2,
+  Dirty = 4,
+  Check = 8,
+  Running = 16,
+  Disposed = 32,
+  Static = 64,
+  HasValue = 128,
+  Errored = 512,
+  Stale = Dirty | Check,
+}
 
 /** Per-node equality. Return true when the new value counts as unchanged. */
 export type Equals<T> = (previous: T, next: T) => boolean;
@@ -104,7 +113,7 @@ export interface GraphOptions {
 
 const never = () => false;
 
-/** An edge: `target` read `source` and saw `source.version === version`. */
+/** An edge: `target` read `source`. */
 export class Link {
   /** Next dependency of `target`, in read order. */
   nextDep: Link | null = null;
@@ -114,9 +123,6 @@ export class Link {
   constructor(
     public source: ReactiveNode,
     public target: ReactiveNode,
-    public version: number,
-    /** The target's run id when this link was last read. */
-    public seen: number,
   ) {}
 }
 
@@ -130,14 +136,20 @@ export class ReactiveNode<T = any> {
   version = 0;
   /** First dependency, in read order. */
   deps: Link | null = null;
-  /** During a run: the last dependency confirmed so far. */
+  /**
+   * During a run: the last dependency confirmed so far. During a pull walk
+   * (never at the same time): the next dependency to check.
+   */
   cursor: Link | null = null;
   subs: Link | null = null;
   subsTail: Link | null = null;
-  /** Pull-walk position (see {@link Graph.refresh}). */
-  check: Link | null = null;
   /** Id of the current or most recent run, for de-duplicating reads. */
   run = 0;
+  /**
+   * Run id of the last node that tracked this one. Run ids only grow, so a
+   * stamp below a running node's id proves that run has not read this node.
+   */
+  stamp = 0;
   /** The effect that created this effect, if any. */
   parent: ReactiveNode | null = null;
   /** Effects created while this effect ran: disposed before it re-runs. */
@@ -171,18 +183,20 @@ export class Graph {
   private depth = 0;
   private flushing = false;
   private flushSeq = 0;
-  private queue: ReactiveNode[] = [];
+  /** Effects to run, and how many: slots past `qn` are stale. */
+  private queue: Array<ReactiveNode | null> = [];
+  private qn = 0;
   /** Pull stack and its height, shared by nested pulls. */
   private ps: ReactiveNode[] = [];
   private psp = 0;
   /** Mark (push) and release work stacks. Neither walk calls user code. */
   private ms: Array<Link | null> = [];
   private rs: Link[] = [];
-  private readonly sched: (graph: Graph) => void;
+  private readonly sched: ((graph: Graph) => void) | undefined;
   private readonly maxRuns: number;
 
   constructor(options: GraphOptions = {}) {
-    this.sched = options.schedule ?? ((g) => g.flush());
+    this.sched = options.schedule;
     this.maxRuns = options.maxRuns ?? 100;
   }
 
@@ -203,7 +217,7 @@ export class Graph {
   ): ReactiveNode<T> {
     return new ReactiveNode<T>(
       ++this.ids,
-      COMPUTED | DIRTY | (options?.static ? STATIC : 0),
+      F.Computed | F.Dirty | (options?.static ? F.Static : 0),
       undefined as T,
       fn as (previous: T) => T,
       eq(options),
@@ -224,7 +238,7 @@ export class Graph {
   ): ReactiveNode<T> {
     const node = new ReactiveNode<T>(
       ++this.ids,
-      EFFECT | (options?.static ? STATIC : 0),
+      F.Effect | (options?.static ? F.Static : 0),
       undefined as T,
       fn as (previous: T) => T,
       never,
@@ -251,15 +265,17 @@ export class Graph {
    */
   read<T>(node: ReactiveNode<T>): T {
     const flags = node.flags;
-    if (flags & STALE) {
+    if (flags & F.Dirty) {
+      this.exec(node);
+    } else if (flags & F.Check) {
       this.refresh(node);
-    } else if (flags & RUNNING) {
+    } else if (flags & F.Running) {
       throw cycle();
     }
     if (this.active) {
       this.track(node);
     }
-    if (node.flags & ERRORED) {
+    if (node.flags & F.Errored) {
       throw node.value;
     }
 
@@ -283,10 +299,8 @@ export class Graph {
   touch(node: ReactiveNode): void {
     node.version++;
     if (node.subs) {
-      this.mark(node.subs);
-      if (!this.depth && !this.flushing && this.queue.length) {
-        this.sched(this);
-      }
+      this.mark(node);
+      this.kick();
     }
   }
 
@@ -296,9 +310,15 @@ export class Graph {
     try {
       return fn();
     } finally {
-      if (!--this.depth && !this.flushing && this.queue.length) {
-        this.sched(this);
-      }
+      this.depth--;
+      this.kick();
+    }
+  }
+
+  /** Flush (or schedule a flush) if effects wait and nothing holds them. */
+  private kick(): void {
+    if (!this.depth && !this.flushing && this.qn) {
+      this.sched ? this.sched(this) : this.flush();
     }
   }
 
@@ -327,11 +347,11 @@ export class Graph {
    * Computeds that lose their last subscriber this way release theirs too.
    */
   dispose(node: ReactiveNode): void {
-    if (node.flags & EFFECT) {
-      node.flags |= DISPOSED;
+    if (node.flags & F.Effect) {
+      node.flags |= F.Disposed;
       this.teardown(node);
     } else {
-      node.flags |= DIRTY;
+      node.flags |= F.Dirty;
     }
     const deps = node.deps;
     node.deps = node.cursor = null;
@@ -355,11 +375,12 @@ export class Graph {
     let i = 0;
     try {
       // The try sits outside the loop; an error resumes at the next effect.
-      while (i < queue.length) {
+      while (i < this.qn) {
         try {
-          for (; i < queue.length; i++) {
+          for (; i < this.qn; i++) {
             const node = queue[i]!;
-            if (node.flags & DISPOSED || !(node.flags & STALE)) {
+            queue[i] = null;
+            if (node.flags & F.Disposed || !(node.flags & F.Stale)) {
               continue;
             }
             if (node.flushId !== id) {
@@ -367,14 +388,14 @@ export class Graph {
               node.runs = 0;
             }
             if (++node.runs > this.maxRuns) {
-              node.flags &= ~STALE;
+              node.flags &= ~F.Stale;
               throw cycle();
             }
             // Owners run before the effects they own, outermost first. Each
-            // owner is brought up to date in turn (a CHECK owner whose inputs
+            // owner is brought up to date in turn (a F.Check owner whose inputs
             // did not change does not re-run, but one below it may); a re-run
             // may dispose this effect or bring it up to date.
-            if (node.parent && !this.ancestors(node)) {
+            if (!this.ancestors(node, node.parent)) {
               continue;
             }
             this.refresh(node);
@@ -388,7 +409,7 @@ export class Graph {
         }
       }
     } finally {
-      queue.length = 0;
+      this.qn = 0;
       this.flushing = false;
     }
     if (failed) {
@@ -397,26 +418,21 @@ export class Graph {
   }
 
   /**
-   * Refresh `node`'s stale owners from the outermost down. Returns false once
-   * `node` is disposed or no longer stale, so the caller skips it. Owner
-   * chains are short, so walking up from `node` for each level is cheap.
+   * Refresh `node`'s stale owners from the outermost down (`p` starts at its
+   * parent). Returns false once `node` is disposed or no longer stale, so the
+   * caller skips it. Owner chains are as deep as effect nesting in user code.
    */
-  private ancestors(node: ReactiveNode): boolean {
-    let levels = 0;
-    for (let p = node.parent; p; p = p.parent) {
-      levels++;
+  private ancestors(node: ReactiveNode, p: ReactiveNode | null): boolean {
+    if (!p) {
+      return true;
     }
-    for (; levels > 0; levels--) {
-      let p = node.parent!;
-      for (let i = 1; i < levels; i++) {
-        p = p.parent!;
-      }
-      if (p.flags & STALE && !(p.flags & DISPOSED)) {
-        this.refresh(p);
-        if (node.flags & DISPOSED || !(node.flags & STALE)) {
-          return false;
-        }
-      }
+    if (!this.ancestors(node, p.parent)) {
+      return false;
+    }
+    if (p.flags & F.Stale && !(p.flags & F.Disposed)) {
+      this.refresh(p);
+
+      return !(node.flags & F.Disposed) && !!(node.flags & F.Stale);
     }
 
     return true;
@@ -431,23 +447,30 @@ export class Graph {
     }
     const next = prev ? prev.nextDep : sub.deps;
     if (next && next.source === dep) {
-      next.version = dep.version;
-      next.seen = sub.run;
       sub.cursor = next;
+      dep.stamp = sub.run;
 
       return;
     }
-    // Already read earlier in this run (A, B, A): one link is enough. A node
-    // disposed during its own run tracks nothing more: dispose freed its
-    // links and nothing would free new ones.
-    const tail = dep.subsTail;
-    if (
-      (tail && tail.target === sub && tail.seen === sub.run) ||
-      sub.flags & DISPOSED
-    ) {
+    // A node disposed during its own run tracks nothing more: dispose freed
+    // its links and nothing would free new ones.
+    if (sub.flags & F.Disposed) {
       return;
     }
-    const link = new Link(dep, sub, dep.version, sub.run);
+    // Read earlier in this run (A, B, A or A, C(reads A), A): one link is
+    // enough. Only scan when something read `dep` during this run.
+    if (prev && dep.stamp >= sub.run) {
+      for (let l = sub.deps!; ; l = l.nextDep!) {
+        if (l.source === dep) {
+          return;
+        }
+        if (l === prev) {
+          break;
+        }
+      }
+    }
+    dep.stamp = sub.run;
+    const link = new Link(dep, sub);
     link.nextDep = next;
     if (prev) {
       prev.nextDep = link;
@@ -455,6 +478,7 @@ export class Graph {
       sub.deps = link;
     }
     sub.cursor = link;
+    const tail = dep.subsTail;
     link.prevSub = tail;
     if (tail) {
       tail.nextSub = link;
@@ -465,48 +489,52 @@ export class Graph {
   }
 
   /**
-   * Push marks from a changed signal's subscriber list: `DIRTY` on direct
-   * subscribers, `CHECK` below them. Queues every effect reached.
+   * Push marks from a changed signal: `DIRTY` on its direct subscribers,
+   * `CHECK` below them. Queues every effect reached. Only a node with more
+   * subscribers to visit is stacked, so a chain walks without the stack.
    */
-  private mark(start: Link): void {
+  private mark(source: ReactiveNode): void {
     const stack = this.ms;
     let sp = 0;
-    let link: Link | null = start;
-    let flag = DIRTY;
+    let link: Link | null = source.subs;
     for (;;) {
       while (link) {
         const target: ReactiveNode = link.target;
         const flags = target.flags;
-        if (!(flags & STALE)) {
-          target.flags = flags | flag;
-          if (flags & EFFECT) {
-            this.queue.push(target);
+        const next: Link | null = link.nextSub;
+        const direct = link.source === source;
+        if (!(flags & F.Stale)) {
+          target.flags = flags | (direct ? F.Dirty : F.Check);
+          if (flags & F.Effect) {
+            this.queue[this.qn++] = target;
           } else if (target.subs) {
-            stack[sp++] = link.nextSub;
+            if (next) {
+              stack[sp++] = next;
+            }
             link = target.subs;
-            flag = CHECK;
             continue;
           }
-        } else if (flag === DIRTY) {
-          target.flags = flags | DIRTY;
+        } else if (direct) {
+          target.flags = flags | F.Dirty;
         }
-        link = link.nextSub;
+        link = next;
       }
       if (!sp) {
         break;
       }
       link = stack[--sp]!;
-      flag = sp ? CHECK : DIRTY;
     }
   }
 
   /**
    * Pull: bring a stale computed or effect up to date. Walks dependencies in
-   * read order with an explicit stack; recomputes a node only once one of its
-   * dependencies has a version its link did not record.
+   * read order with an explicit stack, refreshing each stale one first. A
+   * dependency that recomputes to a new value marks this node `DIRTY` (see
+   * {@link exec}), and a `DIRTY` node re-runs; a `CHECK` node whose
+   * dependencies all came back clean is clean.
    */
   private refresh(node: ReactiveNode): void {
-    if (node.flags & DIRTY) {
+    if (node.flags & F.Dirty) {
       this.exec(node);
 
       return;
@@ -515,35 +543,38 @@ export class Graph {
     const base = this.psp;
     let sp = base;
     stack[sp++] = node;
-    node.check = node.deps;
+    node.cursor = node.deps;
     try {
       while (sp > base) {
         const top = stack[sp - 1]!;
-        if (top.flags & DIRTY) {
+        if (top.flags & F.Dirty) {
           this.psp = sp;
           this.exec(top);
           sp--;
           continue;
         }
-        const link = top.check;
+        const link = top.cursor;
         if (!link) {
-          top.flags &= ~CHECK;
+          top.flags &= ~F.Check;
           sp--;
           continue;
         }
+        top.cursor = link.nextDep;
         const dep = link.source;
-        // A dependency still running is up the call stack: its result
-        // depends on this pull, which depends on it.
-        if (dep.flags & RUNNING) {
-          throw cycle();
-        }
-        if (dep.flags & STALE) {
-          stack[sp++] = dep;
-          dep.check = dep.deps;
-        } else if (dep.version !== link.version) {
-          top.flags |= DIRTY;
-        } else {
-          top.check = link.nextDep;
+        const flags = dep.flags;
+        if (flags & (F.Stale | F.Running)) {
+          // A dependency still running is up the call stack: its result
+          // depends on this pull, which depends on it.
+          if (flags & F.Running) {
+            throw cycle();
+          }
+          if (flags & F.Dirty) {
+            this.psp = sp;
+            this.compute(dep);
+          } else {
+            stack[sp++] = dep;
+            dep.cursor = dep.deps;
+          }
         }
       }
     } finally {
@@ -553,7 +584,7 @@ export class Graph {
 
   /** Run a computed or effect's function. */
   private exec(node: ReactiveNode): void {
-    if (node.flags & EFFECT) {
+    if (node.flags & F.Effect) {
       this.runEffect(node);
     } else {
       this.compute(node);
@@ -561,20 +592,17 @@ export class Graph {
   }
 
   /**
-   * Recompute a derivation. Bumps its version only when the result differs
-   * (per `equals`); a thrown error is stored as the result.
+   * Recompute a derivation. A computed owns nothing: cleanups and effects
+   * created inside it must not attach to whichever effect pulled it. The
+   * result (or thrown error) bumps the version only when it differs per
+   * `equals`, and then marks `CHECK` subscribers `DIRTY`.
    */
   private compute(node: ReactiveNode): void {
     const flags = node.flags;
-    if (flags & RUNNING) {
-      throw cycle();
-    }
-    // A computed owns nothing: cleanups and effects created inside it must
-    // not attach to whichever effect happened to pull it.
     const prevOwner = this.owner;
-    this.owner = null;
     const prev = this.active;
-    const retrack = this.begin(node, flags);
+    const tracked = this.begin(node, flags);
+    this.owner = null;
     let value: any;
     let failed = false;
     try {
@@ -584,18 +612,25 @@ export class Graph {
       failed = true;
     }
     this.owner = prevOwner;
-    this.end(node, retrack, prev);
+    this.end(node, tracked, prev);
     if (
       failed ||
-      !(flags & HAS_VALUE) ||
-      flags & ERRORED ||
+      !(flags & F.HasValue) ||
+      flags & F.Errored ||
       !node.equals(node.value, value)
     ) {
       node.value = value;
       node.version++;
       node.flags = failed
-        ? node.flags | HAS_VALUE | ERRORED
-        : (node.flags | HAS_VALUE) & ~ERRORED;
+        ? node.flags | F.HasValue | F.Errored
+        : (node.flags | F.HasValue) & ~F.Errored;
+      // Subscribers waiting on a check now know: this input changed.
+      for (let l = node.subs; l; l = l.nextSub) {
+        const target = l.target;
+        if (target.flags & F.Check) {
+          target.flags |= F.Dirty;
+        }
+      }
     }
   }
 
@@ -604,68 +639,63 @@ export class Graph {
    * returns, never inside it.
    */
   private runEffect(node: ReactiveNode): void {
-    const flags = node.flags;
-    if (flags & RUNNING) {
-      throw cycle();
-    }
     if (node.children || node.cleanups) {
       this.teardown(node);
     }
     const prevOwner = this.owner;
+    const prev = this.active;
+    const tracked = this.begin(node, node.flags);
     this.owner = node;
     this.depth++;
-    const prev = this.active;
-    const retrack = this.begin(node, flags);
     try {
       node.value = node.fn!(node.value);
-      node.flags |= HAS_VALUE;
+      node.flags |= F.HasValue;
     } finally {
       this.owner = prevOwner;
-      this.end(node, retrack, prev);
-      if (!--this.depth && !this.flushing && this.queue.length) {
-        this.sched(this);
-      }
+      this.end(node, tracked, prev);
+      this.depth--;
+      this.kick();
     }
   }
 
-  /** Start a run: clear stale marks, open tracking. Returns whether it tracks. */
+  /**
+   * Start a run: clear stale marks, open tracking. A static node tracks on
+   * its first successful run only. Returns whether this run tracks.
+   */
   private begin(node: ReactiveNode, flags: number): boolean {
-    const retrack = !(
-      flags & STATIC &&
-      flags & HAS_VALUE &&
-      !(flags & ERRORED)
+    if (flags & F.Running) {
+      throw cycle();
+    }
+    const tracked = !(
+      flags & F.Static &&
+      flags & F.HasValue &&
+      !(flags & F.Errored)
     );
-    node.flags = (flags & ~STALE) | RUNNING;
+    node.flags = (flags & ~F.Stale) | F.Running;
     node.cursor = null;
     node.run = ++this.seq;
-    this.active = retrack ? node : null;
+    this.active = tracked ? node : null;
 
-    return retrack;
+    return tracked;
   }
 
   /** Finish a run: restore the reader, drop dependencies this run skipped. */
   private end(
     node: ReactiveNode,
-    retrack: boolean,
+    tracked: boolean,
     prev: ReactiveNode | null,
   ): void {
     this.active = prev;
-    node.flags &= ~RUNNING;
-    if (retrack) {
-      const cursor = node.cursor;
-      const stale = cursor ? cursor.nextDep : node.deps;
-      if (stale) {
-        if (cursor) {
-          cursor.nextDep = null;
-        } else {
-          node.deps = null;
-        }
-        this.release(stale);
+    node.flags &= ~F.Running;
+    const cursor = node.cursor;
+    const stale = cursor ? cursor.nextDep : node.deps;
+    if (tracked && stale) {
+      if (cursor) {
+        cursor.nextDep = null;
+      } else {
+        node.deps = null;
       }
-    } else {
-      for (let l = node.deps; l; l = l.nextDep) {
-        l.version = l.source.version;
-      }
+      this.release(stale);
     }
   }
 
@@ -690,8 +720,8 @@ export class Graph {
         } else {
           dep.subsTail = prevSub;
         }
-        if (!dep.subs && dep.flags & COMPUTED && dep.deps) {
-          dep.flags |= DIRTY;
+        if (!dep.subs && dep.flags & F.Computed && dep.deps) {
+          dep.flags |= F.Dirty;
           stack[sp++] = dep.deps;
           dep.deps = null;
         }
