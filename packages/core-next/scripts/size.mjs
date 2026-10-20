@@ -15,4 +15,12 @@ const result = await build({
 });
 const code = result.outputFiles[0].contents;
 const gz = gzipSync(code, { level: 9 }).length;
-console.log(`graph.ts: ${code.length} B min, ${gz} B min+gzip`);
+// Budget approved for the graph module. `--check` exits non-zero above it.
+const BUDGET = 1800;
+console.log(
+  `graph.ts: ${code.length} B min, ${gz} B min+gzip (budget ${BUDGET} B)`,
+);
+if (process.argv.includes("--check") && gz > BUDGET) {
+  console.error(`graph.ts is ${gz - BUDGET} B over the ${BUDGET} B budget`);
+  process.exit(1);
+}

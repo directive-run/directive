@@ -636,3 +636,123 @@ describe("review fixes (PR #199)", () => {
     expect(seen).toEqual([1, 2, 3]);
   });
 });
+
+describe("perf restructure (L0a2)", () => {
+  it("keeps one link for A, C(reads A), A", () => {
+    const g = createGraph();
+    const a = g.signal(1);
+    const c = g.computed(() => g.read(a) * 2);
+    const x = g.computed(() => g.read(a) + g.read(c) + g.read(a));
+    expect(g.read(x)).toBe(4);
+    expect(links(x).map((l) => l.source)).toEqual([a, c]);
+    // a's subscribers: x once, c once.
+    expect(subCount(a)).toBe(2);
+    g.write(a, 2);
+    expect(g.read(x)).toBe(8);
+    expect(links(x).map((l) => l.source)).toEqual([a, c]);
+    expect(subCount(a)).toBe(2);
+  });
+
+  it("keeps one link per dependency when reads interleave across runs", () => {
+    const g = createGraph();
+    const head = g.signal(0);
+    const even = g.computed(() => g.read(head) * 2);
+    const odd = g.computed(() => -g.read(head));
+    const pick = g.computed(() => {
+      let s = 0;
+      for (let i = 0; i < 5; i++) {
+        s += g.read(head) % 2 ? g.read(odd) : g.read(even);
+      }
+
+      return s;
+    });
+    for (let i = 0; i < 4; i++) {
+      g.write(head, i);
+      g.read(pick);
+      expect(links(pick)).toHaveLength(2);
+    }
+  });
+
+  it("re-runs a CHECK node whose input was refreshed by another reader first", () => {
+    const g = createGraph();
+    const s = g.signal(1);
+    const mid = g.computed(() => g.read(s) + 1);
+    const top = g.computed(() => g.read(mid) * 10);
+    expect(g.read(top)).toBe(20);
+    g.write(s, 2);
+    // Pull mid on its own: it changes, and must mark top DIRTY on the spot.
+    expect(g.read(mid)).toBe(3);
+    expect(g.read(top)).toBe(30);
+  });
+
+  it("stops below an unchanged computed", () => {
+    const g = createGraph();
+    const s = g.signal(1);
+    const parity = g.computed(() => g.read(s) % 2);
+    const fn = vi.fn(() => g.read(parity));
+    const below = g.computed(fn);
+    g.read(below);
+    g.write(s, 3);
+    expect(g.read(below)).toBe(1);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("onCleanup inside untracked inside a computed attaches to nothing", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const cleanup = vi.fn();
+    const c = g.computed(() => {
+      g.untracked(() => g.onCleanup(cleanup));
+
+      return g.read(s);
+    });
+    const outer = g.effect(() => {
+      g.read(c);
+    });
+    g.write(s, 1);
+    g.dispose(outer);
+    expect(cleanup).not.toHaveBeenCalled();
+  });
+
+  it("runs cleanups newest first and stops at one that throws", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const calls: string[] = [];
+    g.effect(() => {
+      g.read(s);
+      g.onCleanup(() => calls.push("a"));
+      g.onCleanup(() => {
+        calls.push("b");
+        throw new Error("cleanup");
+      });
+    });
+    expect(() => g.write(s, 1)).toThrow("cleanup");
+    expect(calls).toEqual(["b"]);
+  });
+
+  it("resets the write-loop counter between flushes", () => {
+    const g = createGraph({ maxRuns: 3 });
+    const s = g.signal(0);
+    let runs = 0;
+    g.effect(() => {
+      g.read(s);
+      runs++;
+    });
+    for (let i = 1; i <= 10; i++) {
+      g.write(s, i);
+    }
+    expect(runs).toBe(11);
+  });
+
+  it("a static computed keeps its first-run links and still sees changes", () => {
+    const g = createGraph();
+    const a = g.signal(1);
+    const b = g.signal(2);
+    const sum = g.computed(() => g.read(a) + g.read(b), { static: true });
+    expect(g.read(sum)).toBe(3);
+    const before = links(sum);
+    g.write(b, 5);
+    expect(g.read(sum)).toBe(6);
+    expect(links(sum)).toEqual(before);
+  });
+});

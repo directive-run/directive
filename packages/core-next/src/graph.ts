@@ -42,7 +42,7 @@ export const Flags = {
   Effect: 2,
   /** A direct dependency changed: must recompute or re-run. */
   Dirty: 4,
-  /** Something upstream changed: refresh stale dependencies before use. */
+  /** Something upstream changed: pull stale dependencies before use. */
   Check: 8,
   /** The node's function is running now. Reading it again is a cycle. */
   Running: 16,
@@ -115,15 +115,24 @@ const never = () => false;
 
 /** An edge: `target` read `source`. */
 export class Link {
+  declare source: ReactiveNode;
+  declare target: ReactiveNode;
   /** Next dependency of `target`, in read order. */
-  nextDep: Link | null = null;
-  prevSub: Link | null = null;
+  declare nextDep: Link | null;
+  declare prevSub: Link | null;
   nextSub: Link | null = null;
 
   constructor(
-    public source: ReactiveNode,
-    public target: ReactiveNode,
-  ) {}
+    source: ReactiveNode,
+    target: ReactiveNode,
+    nextDep: Link | null,
+    prevSub: Link | null,
+  ) {
+    this.source = source;
+    this.target = target;
+    this.nextDep = nextDep;
+    this.prevSub = prevSub;
+  }
 }
 
 /**
@@ -157,16 +166,27 @@ export class ReactiveNode<T = any> {
   cleanups: Array<() => void> | null = null;
   /** Runs in the current flush, for write-loop detection. */
   runs = 0;
-  flushId = 0;
+
+  /** Unique within its graph. */
+  declare readonly id: number;
+  declare flags: number;
+  declare value: T;
+  declare fn: ((previous: T) => T) | null;
+  declare equals: Equals<T>;
 
   constructor(
-    /** Unique within its graph. */
-    public readonly id: number,
-    public flags: number,
-    public value: T,
-    public fn: ((previous: T) => T) | null,
-    public equals: Equals<T>,
-  ) {}
+    id: number,
+    flags: number,
+    value: T,
+    fn: ((previous: T) => T) | null,
+    equals: Equals<T>,
+  ) {
+    this.id = id;
+    this.flags = flags;
+    this.value = value;
+    this.fn = fn;
+    this.equals = equals;
+  }
 }
 
 /**
@@ -178,31 +198,32 @@ export class Graph {
   active: ReactiveNode | null = null;
   /** The effect currently running, which owns cleanups and child effects. */
   owner: ReactiveNode | null = null;
-  private ids = 0;
+  /** Node ids and run ids share one counter: both only need to grow. */
   private seq = 0;
   private depth = 0;
-  private flushing = false;
-  private flushSeq = 0;
+  private busy = false;
   /** Effects to run, and how many: slots past `qn` are stale. */
   private queue: Array<ReactiveNode | null> = [];
   private qn = 0;
   /** Pull stack and its height, shared by nested pulls. */
   private ps: ReactiveNode[] = [];
   private psp = 0;
-  /** Mark (push) and release work stacks. Neither walk calls user code. */
+  /**
+   * Work stack shared by the mark (push) and release walks. Neither calls
+   * user code or the other, so they never overlap.
+   */
   private ms: Array<Link | null> = [];
-  private rs: Link[] = [];
   private readonly sched: ((graph: Graph) => void) | undefined;
-  private readonly maxRuns: number;
+  private readonly max: number;
 
   constructor(options: GraphOptions = {}) {
     this.sched = options.schedule;
-    this.maxRuns = options.maxRuns ?? 100;
+    this.max = options.maxRuns ?? 100;
   }
 
   /** A writable source node. */
   signal<T>(value: T, options?: NodeOptions<T>): ReactiveNode<T> {
-    return new ReactiveNode(++this.ids, 0, value, null, eq(options));
+    return new ReactiveNode(++this.seq, 0, value, null, eq(options));
   }
 
   /**
@@ -216,7 +237,7 @@ export class Graph {
     options?: NodeOptions<T> & TrackOptions,
   ): ReactiveNode<T> {
     return new ReactiveNode<T>(
-      ++this.ids,
+      ++this.seq,
       F.Computed | F.Dirty | (options?.static ? F.Static : 0),
       undefined as T,
       fn as (previous: T) => T,
@@ -237,7 +258,7 @@ export class Graph {
     options?: TrackOptions,
   ): ReactiveNode<T> {
     const node = new ReactiveNode<T>(
-      ++this.ids,
+      ++this.seq,
       F.Effect | (options?.static ? F.Static : 0),
       undefined as T,
       fn as (previous: T) => T,
@@ -268,7 +289,7 @@ export class Graph {
     if (flags & F.Dirty) {
       this.exec(node);
     } else if (flags & F.Check) {
-      this.refresh(node);
+      this.pull(node);
     } else if (flags & F.Running) {
       throw cycle();
     }
@@ -317,7 +338,7 @@ export class Graph {
 
   /** Flush (or schedule a flush) if effects wait and nothing holds them. */
   private kick(): void {
-    if (!this.depth && !this.flushing && this.qn) {
+    if (!this.depth && !this.busy && this.qn) {
       this.sched ? this.sched(this) : this.flush();
     }
   }
@@ -349,13 +370,13 @@ export class Graph {
   dispose(node: ReactiveNode): void {
     if (node.flags & F.Effect) {
       node.flags |= F.Disposed;
-      this.teardown(node);
+      this.clean(node);
     } else {
       node.flags |= F.Dirty;
     }
     const deps = node.deps;
     node.deps = node.cursor = null;
-    this.release(deps);
+    this.drop(deps);
   }
 
   /**
@@ -364,53 +385,47 @@ export class Graph {
    * rethrown after the queue drains.
    */
   flush(): void {
-    if (this.flushing) {
+    if (this.busy) {
       return;
     }
-    this.flushing = true;
+    this.busy = true;
     const queue = this.queue;
-    const id = ++this.flushSeq;
     let failed = false;
     let error: unknown;
-    let i = 0;
     try {
-      // The try sits outside the loop; an error resumes at the next effect.
-      while (i < this.qn) {
+      for (let i = 0; i < this.qn; i++) {
+        const node = queue[i]!;
         try {
-          for (; i < this.qn; i++) {
-            const node = queue[i]!;
-            queue[i] = null;
-            if (node.flags & F.Disposed || !(node.flags & F.Stale)) {
-              continue;
-            }
-            if (node.flushId !== id) {
-              node.flushId = id;
-              node.runs = 0;
-            }
-            if (++node.runs > this.maxRuns) {
-              node.flags &= ~F.Stale;
-              throw cycle();
-            }
-            // Owners run before the effects they own, outermost first. Each
-            // owner is brought up to date in turn (a F.Check owner whose inputs
-            // did not change does not re-run, but one below it may); a re-run
-            // may dispose this effect or bring it up to date.
-            if (!this.ancestors(node, node.parent)) {
-              continue;
-            }
-            this.refresh(node);
+          if (!live(node)) {
+            continue;
+          }
+          if (++node.runs > this.max) {
+            node.flags &= ~F.Stale;
+            throw cycle();
+          }
+          // Owners run before the effects they own, outermost first. Each
+          // owner is brought up to date in turn (a CHECK owner whose inputs
+          // did not change does not re-run, but one below it may); a re-run
+          // may dispose this effect or bring it up to date.
+          if (this.owners(node, node.parent)) {
+            this.pull(node);
           }
         } catch (e) {
+          // Keep the first error; the next effect still runs.
           if (!failed) {
             failed = true;
             error = e;
           }
-          i++;
         }
       }
     } finally {
+      // Every effect that ran this flush is in the queue: reset its count.
+      for (let j = 0; j < this.qn; j++) {
+        queue[j]!.runs = 0;
+        queue[j] = null;
+      }
       this.qn = 0;
-      this.flushing = false;
+      this.busy = false;
     }
     if (failed) {
       throw error;
@@ -422,17 +437,17 @@ export class Graph {
    * parent). Returns false once `node` is disposed or no longer stale, so the
    * caller skips it. Owner chains are as deep as effect nesting in user code.
    */
-  private ancestors(node: ReactiveNode, p: ReactiveNode | null): boolean {
+  private owners(node: ReactiveNode, p: ReactiveNode | null): boolean {
     if (!p) {
       return true;
     }
-    if (!this.ancestors(node, p.parent)) {
+    if (!this.owners(node, p.parent)) {
       return false;
     }
-    if (p.flags & F.Stale && !(p.flags & F.Disposed)) {
-      this.refresh(p);
+    if (live(p)) {
+      this.pull(p);
 
-      return !(node.flags & F.Disposed) && !!(node.flags & F.Stale);
+      return live(node);
     }
 
     return true;
@@ -470,16 +485,14 @@ export class Graph {
       }
     }
     dep.stamp = sub.run;
-    const link = new Link(dep, sub);
-    link.nextDep = next;
+    const tail = dep.subsTail;
+    const link = new Link(dep, sub, next, tail);
     if (prev) {
       prev.nextDep = link;
     } else {
       sub.deps = link;
     }
     sub.cursor = link;
-    const tail = dep.subsTail;
-    link.prevSub = tail;
     if (tail) {
       tail.nextSub = link;
     } else {
@@ -533,12 +546,7 @@ export class Graph {
    * {@link exec}), and a `DIRTY` node re-runs; a `CHECK` node whose
    * dependencies all came back clean is clean.
    */
-  private refresh(node: ReactiveNode): void {
-    if (node.flags & F.Dirty) {
-      this.exec(node);
-
-      return;
-    }
+  private pull(node: ReactiveNode): void {
     const stack = this.ps;
     const base = this.psp;
     let sp = base;
@@ -582,15 +590,6 @@ export class Graph {
     }
   }
 
-  /** Run a computed or effect's function. */
-  private exec(node: ReactiveNode): void {
-    if (node.flags & F.Effect) {
-      this.runEffect(node);
-    } else {
-      this.compute(node);
-    }
-  }
-
   /**
    * Recompute a derivation. A computed owns nothing: cleanups and effects
    * created inside it must not attach to whichever effect pulled it. The
@@ -601,7 +600,7 @@ export class Graph {
     const flags = node.flags;
     const prevOwner = this.owner;
     const prev = this.active;
-    const tracked = this.begin(node, flags);
+    this.begin(node, flags);
     this.owner = null;
     let value: any;
     let failed = false;
@@ -612,18 +611,17 @@ export class Graph {
       failed = true;
     }
     this.owner = prevOwner;
-    this.end(node, tracked, prev);
+    this.end(node, prev);
     if (
       failed ||
-      !(flags & F.HasValue) ||
-      flags & F.Errored ||
+      // No value yet, or the last result was an error: always a change.
+      (flags & (F.HasValue | F.Errored)) !== F.HasValue ||
       !node.equals(node.value, value)
     ) {
       node.value = value;
       node.version++;
-      node.flags = failed
-        ? node.flags | F.HasValue | F.Errored
-        : (node.flags | F.HasValue) & ~F.Errored;
+      node.flags =
+        ((node.flags | F.HasValue) & ~F.Errored) | (failed ? F.Errored : 0);
       // Subscribers waiting on a check now know: this input changed.
       for (let l = node.subs; l; l = l.nextSub) {
         const target = l.target;
@@ -635,16 +633,21 @@ export class Graph {
   }
 
   /**
-   * Run an effect. It runs as a batch: what it writes is flushed after it
-   * returns, never inside it.
+   * Run a computed or effect's function. An effect runs as a batch: what it
+   * writes is flushed after it returns, never inside it.
    */
-  private runEffect(node: ReactiveNode): void {
+  private exec(node: ReactiveNode): void {
+    if (!(node.flags & F.Effect)) {
+      this.compute(node);
+
+      return;
+    }
     if (node.children || node.cleanups) {
-      this.teardown(node);
+      this.clean(node);
     }
     const prevOwner = this.owner;
     const prev = this.active;
-    const tracked = this.begin(node, node.flags);
+    this.begin(node, node.flags);
     this.owner = node;
     this.depth++;
     try {
@@ -652,7 +655,7 @@ export class Graph {
       node.flags |= F.HasValue;
     } finally {
       this.owner = prevOwner;
-      this.end(node, tracked, prev);
+      this.end(node, prev);
       this.depth--;
       this.kick();
     }
@@ -662,29 +665,24 @@ export class Graph {
    * Start a run: clear stale marks, open tracking. A static node tracks on
    * its first successful run only. Returns whether this run tracks.
    */
-  private begin(node: ReactiveNode, flags: number): boolean {
+  private begin(node: ReactiveNode, flags: number): void {
     if (flags & F.Running) {
       throw cycle();
     }
-    const tracked = !(
-      flags & F.Static &&
-      flags & F.HasValue &&
-      !(flags & F.Errored)
-    );
+    const tracked =
+      (flags & (F.Static | F.HasValue | F.Errored)) !== (F.Static | F.HasValue);
     node.flags = (flags & ~F.Stale) | F.Running;
     node.cursor = null;
     node.run = ++this.seq;
     this.active = tracked ? node : null;
-
-    return tracked;
   }
 
-  /** Finish a run: restore the reader, drop dependencies this run skipped. */
-  private end(
-    node: ReactiveNode,
-    tracked: boolean,
-    prev: ReactiveNode | null,
-  ): void {
+  /**
+   * Finish a run: restore the reader, drop dependencies this run skipped.
+   * The run tracked if `active` is still the node (every reader restores it).
+   */
+  private end(node: ReactiveNode, prev: ReactiveNode | null): void {
+    const tracked = this.active === node;
     this.active = prev;
     node.flags &= ~F.Running;
     const cursor = node.cursor;
@@ -695,7 +693,7 @@ export class Graph {
       } else {
         node.deps = null;
       }
-      this.release(stale);
+      this.drop(stale);
     }
   }
 
@@ -703,8 +701,8 @@ export class Graph {
    * Unsubscribe `link` and every dependency after it. A computed left with
    * no subscribers releases its own dependencies and goes dirty.
    */
-  private release(link: Link | null): void {
-    const stack = this.rs;
+  private drop(link: Link | null): void {
+    const stack = this.ms;
     let sp = 0;
     for (;;) {
       while (link) {
@@ -735,31 +733,28 @@ export class Graph {
   }
 
   /** Dispose an effect's children and run its cleanups, untracked. */
-  private teardown(node: ReactiveNode): void {
+  private clean(node: ReactiveNode): void {
     const children = node.children;
     const cleanups = node.cleanups;
-    if (!children?.length && !cleanups?.length) {
-      return;
-    }
     const prev = this.active;
     this.active = null;
     try {
-      if (children) {
-        for (let i = children.length - 1; i >= 0; i--) {
-          this.dispose(children[i]!);
-        }
-        children.length = 0;
+      // Newest first. Popping leaves only what has not run if one throws.
+      while (children?.length) {
+        this.dispose(children.pop()!);
       }
-      if (cleanups) {
-        for (let i = cleanups.length - 1; i >= 0; i--) {
-          cleanups[i]!();
-        }
-        cleanups.length = 0;
+      while (cleanups?.length) {
+        cleanups.pop()!();
       }
     } finally {
       this.active = prev;
     }
   }
+}
+
+/** An effect that still has to run: stale and not disposed. */
+function live(node: ReactiveNode): boolean {
+  return !(node.flags & F.Disposed) && !!(node.flags & F.Stale);
 }
 
 function eq<T>(options?: NodeOptions<T>): Equals<T> {
@@ -769,7 +764,7 @@ function eq<T>(options?: NodeOptions<T>): Equals<T> {
 }
 
 function cycle(): Error {
-  return new Error("[Directive] Cycle detected in the reactive graph");
+  return new Error("[Directive] Cycle detected");
 }
 
 /**

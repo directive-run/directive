@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit",
     "bench": "cd ../.. && vitest bench --run packages/core-next/",
     "size": "node scripts/size.mjs",
+    "size:check": "node scripts/size.mjs --check",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
