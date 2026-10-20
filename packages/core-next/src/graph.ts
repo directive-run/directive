@@ -244,7 +244,11 @@ export class Graph {
     return node;
   }
 
-  /** Read a node's current value, tracking it if a node is running. */
+  /**
+   * Read a node's current value, tracking it if a node is running. The node
+   * must belong to this graph: reading another graph's node is unsupported
+   * (it is neither tracked correctly nor kept up to date).
+   */
   read<T>(node: ReactiveNode<T>): T {
     const flags = node.flags;
     if (flags & STALE) {
@@ -268,6 +272,15 @@ export class Graph {
       return;
     }
     node.value = value;
+    this.touch(node);
+  }
+
+  /**
+   * Report a change to a signal without replacing its value, for a value
+   * mutated in place. Bumps the version and notifies subscribers exactly as
+   * {@link write} does, skipping the `equals` check.
+   */
+  touch(node: ReactiveNode): void {
     node.version++;
     if (node.subs) {
       this.mark(node.subs);
@@ -357,21 +370,12 @@ export class Graph {
               node.flags &= ~STALE;
               throw cycle();
             }
-            // An owner runs before the effects it owns; re-running it may
-            // dispose this one.
-            if (node.parent) {
-              let stale: ReactiveNode | null = null;
-              for (let p: ReactiveNode | null = node.parent; p; p = p.parent) {
-                if (p.flags & STALE) {
-                  stale = p;
-                }
-              }
-              if (stale) {
-                this.refresh(stale);
-              }
-              if (!(node.flags & STALE) || node.flags & DISPOSED) {
-                continue;
-              }
+            // Owners run before the effects they own, outermost first. Each
+            // owner is brought up to date in turn (a CHECK owner whose inputs
+            // did not change does not re-run, but one below it may); a re-run
+            // may dispose this effect or bring it up to date.
+            if (node.parent && !this.ancestors(node)) {
+              continue;
             }
             this.refresh(node);
           }
@@ -392,6 +396,32 @@ export class Graph {
     }
   }
 
+  /**
+   * Refresh `node`'s stale owners from the outermost down. Returns false once
+   * `node` is disposed or no longer stale, so the caller skips it. Owner
+   * chains are short, so walking up from `node` for each level is cheap.
+   */
+  private ancestors(node: ReactiveNode): boolean {
+    let levels = 0;
+    for (let p = node.parent; p; p = p.parent) {
+      levels++;
+    }
+    for (; levels > 0; levels--) {
+      let p = node.parent!;
+      for (let i = 1; i < levels; i++) {
+        p = p.parent!;
+      }
+      if (p.flags & STALE && !(p.flags & DISPOSED)) {
+        this.refresh(p);
+        if (node.flags & DISPOSED || !(node.flags & STALE)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   /** Record that the active node read `dep`, reusing a link when possible. */
   private track(dep: ReactiveNode): void {
     const sub = this.active!;
@@ -407,9 +437,14 @@ export class Graph {
 
       return;
     }
-    // Already read earlier in this run (A, B, A): one link is enough.
+    // Already read earlier in this run (A, B, A): one link is enough. A node
+    // disposed during its own run tracks nothing more: dispose freed its
+    // links and nothing would free new ones.
     const tail = dep.subsTail;
-    if (tail && tail.target === sub && tail.seen === sub.run) {
+    if (
+      (tail && tail.target === sub && tail.seen === sub.run) ||
+      sub.flags & DISPOSED
+    ) {
       return;
     }
     const link = new Link(dep, sub, dep.version, sub.run);
@@ -534,6 +569,10 @@ export class Graph {
     if (flags & RUNNING) {
       throw cycle();
     }
+    // A computed owns nothing: cleanups and effects created inside it must
+    // not attach to whichever effect happened to pull it.
+    const prevOwner = this.owner;
+    this.owner = null;
     const prev = this.active;
     const retrack = this.begin(node, flags);
     let value: any;
@@ -544,6 +583,7 @@ export class Graph {
       value = e;
       failed = true;
     }
+    this.owner = prevOwner;
     this.end(node, retrack, prev);
     if (
       failed ||
@@ -702,7 +742,11 @@ function cycle(): Error {
   return new Error("[Directive] Cycle detected in the reactive graph");
 }
 
-/** Create an isolated reactive graph. */
+/**
+ * Create an isolated reactive graph. Nodes belong to the graph that created
+ * them: pass a node only to that graph's methods. Mixing graphs (reading,
+ * writing or disposing another graph's node) is unsupported and unchecked.
+ */
 export function createGraph(options?: GraphOptions): Graph {
   return new Graph(options);
 }

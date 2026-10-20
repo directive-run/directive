@@ -521,3 +521,118 @@ describe("deep graphs", () => {
     expect(chain.every((n) => n.deps === null)).toBe(true);
   });
 });
+
+describe("review fixes (PR #199)", () => {
+  it("refreshes every stale owner top-down, so a child never runs ahead of its DIRTY parent", () => {
+    const g = createGraph();
+    const s2 = g.signal(0);
+    const s3 = g.signal(0);
+    // Re-evaluates when s3 changes, but its value never changes.
+    const k = g.computed(() => {
+      g.read(s3);
+
+      return 1;
+    });
+    const log: string[] = [];
+    g.effect(() => {
+      g.read(k);
+      log.push("G");
+      g.effect(() => {
+        log.push("P");
+        g.effect(() => {
+          log.push(`C${g.read(s2)}`);
+        });
+        g.read(s2);
+      });
+    });
+    log.length = 0;
+    g.batch(() => {
+      g.write(s2, 1);
+      g.write(s3, 1);
+    });
+    expect(log).toEqual(["P", "C1"]);
+  });
+
+  it("an effect that disposes itself mid-run leaves no links behind", () => {
+    const g = createGraph();
+    const a = g.signal(0);
+    const b = g.signal(0);
+    let n = 0;
+    let runs = 0;
+    const e = g.effect(() => {
+      runs++;
+      g.read(a);
+      if (n++) {
+        g.dispose(e);
+      }
+      g.read(b);
+    });
+    g.write(a, 1);
+    expect(subCount(a) + subCount(b)).toBe(0);
+    expect(e.deps).toBe(null);
+    g.write(b, 1);
+    expect(runs).toBe(2);
+  });
+
+  it("onCleanup inside a computed does not attach to the effect that pulled it", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const t = g.signal(0);
+    let cleaned = 0;
+    const c = g.computed(() => {
+      g.onCleanup(() => cleaned++);
+
+      return g.read(s);
+    });
+    g.effect(() => {
+      g.read(t);
+      g.untracked(() => g.read(c));
+    });
+    g.write(t, 1);
+    expect(cleaned).toBe(0);
+  });
+
+  it("an effect created inside a computed is not owned by the pulling effect", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const t = g.signal(0);
+    let inner: ReactiveNode | null = null;
+    const c = g.computed(() => {
+      inner ??= g.effect(() => {});
+
+      return g.read(s);
+    });
+    const outer = g.effect(() => {
+      g.read(t);
+      g.read(c);
+    });
+    expect(inner!.parent).toBe(null);
+    expect(outer.children ?? []).toHaveLength(0);
+  });
+
+  it("touch notifies subscribers of an in-place change without replacing the value", () => {
+    const g = createGraph();
+    const list = g.signal<number[]>([1]);
+    const original = list.value;
+    const len = g.computed(() => g.read(list).length);
+    const seen: number[] = [];
+    g.effect(() => {
+      seen.push(g.read(len));
+    });
+    g.read(list).push(2);
+    const before = list.version;
+    g.touch(list);
+    expect(list.value).toBe(original);
+    expect(list.version).toBe(before + 1);
+    expect(seen).toEqual([1, 2]);
+    g.batch(() => {
+      g.read(list).push(3);
+      g.touch(list);
+      expect(seen).toEqual([1, 2]);
+    });
+    expect(seen).toEqual([1, 2, 3]);
+    // A plain write of the same array is a no-op (Object.is); touch is not.
+    g.write(list, original);
+    expect(seen).toEqual([1, 2, 3]);
+  });
+});
