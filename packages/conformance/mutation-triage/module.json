@@ -1,6 +1,14 @@
 [
   {
     "line": 289,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Twin of 289:30 BlockStatement. With no early return, a module with no facts runs the reserved-name loop over zero keys and throws nothing, so the outcome is identical. Hand-run: survived the suite."
+  },
+  {
+    "line": 289,
     "col": 30,
     "mutator": "BlockStatement",
     "replacement": "{}",

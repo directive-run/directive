@@ -764,6 +764,10 @@
         "more behaviour of the run loop > an effect that fails after being unregistered is not run again": {
           "layer": "L10",
           "by": ["member .effects.register", "member .effects.unregister"]
+        },
+        "a namespaced non-reader costs no snapshot > copies the store for a reader but not for a one-parameter effect": {
+          "layer": "L4",
+          "by": ["option effect deps"]
         }
       }
     },

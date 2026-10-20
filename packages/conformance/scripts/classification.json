@@ -106,7 +106,7 @@
   {
     "file": "src/core/__tests__/blackbox-effects.test.ts",
     "category": "black-box",
-    "cases": 107,
+    "cases": 108,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

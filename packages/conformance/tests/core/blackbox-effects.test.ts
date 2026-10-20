@@ -2482,3 +2482,39 @@ describe("more behaviour of the run loop", () => {
     await system.destroy();
   });
 });
+
+describe("a namespaced non-reader costs no snapshot", () => {
+  it("copies the store for a reader but not for a one-parameter effect", async () => {
+    quiet();
+    const copies = async (run: (facts: any, prev?: any) => void) => {
+      const a = createModule("a", {
+        schema: { facts: { trigger: t.number() } },
+        init: (facts: any) => {
+          facts.trigger = 0;
+        },
+        effects: { watch: { deps: ["trigger"], run } } as never,
+      } as never);
+      const system = createSystem({ modules: { a } } as never) as any;
+      const spy = vi.spyOn(system.facts.a.$store, "toObject");
+      await system.start();
+      for (let i = 1; i <= 3; i++) {
+        system.facts.a.trigger = i;
+        await system.settle();
+      }
+      const n = spy.mock.calls.length;
+      await system.destroy();
+
+      return n;
+    };
+    const reader = await copies((facts, prev) => {
+      void facts.trigger;
+      void prev;
+    });
+    const nonReader = await copies((facts) => {
+      void facts.trigger;
+    });
+
+    expect(reader).toBeGreaterThan(0);
+    expect(nonReader).toBe(0);
+  });
+});
