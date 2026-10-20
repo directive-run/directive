@@ -76,6 +76,10 @@ jobs:
       # the budget intentionally when shipping a deliberate new feature.
       - run: pnpm size
 
+      # The 2.0 graph module's gzip budget (scripts/size.mjs). Runs after the
+      # build so it also reports the built dist/index.js beside the source.
+      - run: pnpm --filter @directive-run/core-next size:check
+
       # Ratchet: no new `as any` casts on system objects in packages/ai/src.
       - run: pnpm check:ai-casts
 
