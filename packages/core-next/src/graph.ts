@@ -209,14 +209,22 @@ export class ReactiveNode<T = any> {
  * instances.
  */
 export class Graph {
+  // Members ending in `_` are build-private: the build (and size.mjs)
+  // mangles every `_`-suffixed property name to a short name that can differ
+  // between builds. Never use one from another package or by string, and
+  // never give a public member a trailing `_` (a test enforces it).
   /** The node whose reads are being tracked, if any. */
   active: ReactiveNode | null = null;
   /** The effect currently running, which owns cleanups and child effects. */
   owner: ReactiveNode | null = null;
   /** Node ids and run ids share one counter: both only need to grow. */
   private seq_ = 0;
+  /**
+   * Holds on flushing: open batches, effect first runs and the running
+   * flush. Effects queue while it is above zero and flush when it returns
+   * to zero.
+   */
   private depth_ = 0;
-  private busy_ = false;
   /** Effects to run, and how many: slots past `qn` are stale. */
   private queue_: Array<ReactiveNode | null> = [];
   private qn_ = 0;
@@ -267,6 +275,12 @@ export class Graph {
    * dispose. Effects created inside `fn` are owned by this effect: disposed
    * before it re-runs, and never run ahead of it in a flush. If the first run
    * throws, the effect is disposed and the error rethrown.
+   *
+   * Outside a flush, the first run's writes flush when it returns. If another
+   * effect throws in that flush, this effect stays alive (its run succeeded)
+   * and the error is rethrown here, as {@link write} rethrows it; no handle is
+   * returned. If both throw, this effect's error is rethrown, with the flush
+   * error set as its `cause` when it is an `Error` with no `cause` yet.
    */
   effect<T>(
     fn: (previous: T | undefined) => T,
@@ -283,12 +297,28 @@ export class Graph {
     if (owner) {
       (owner.children ??= []).push(node);
     }
+    // The first run is a batch: what it writes flushes after it returns.
+    this.depth_++;
     try {
       this.exec_(node);
     } catch (e) {
+      // Only this effect's own failure disposes it. Its error wins over one
+      // from the flush below, which it carries as `cause`.
       this.dispose(node);
+      try {
+        this.depth_--;
+        this.kick_();
+      } catch (f) {
+        if (e instanceof Error) {
+          e.cause ??= f;
+        }
+      }
       throw e;
     }
+    // Another effect failing in this flush is rethrown, as a write rethrows
+    // it; this effect's run succeeded, so it stays alive.
+    this.depth_--;
+    this.kick_();
 
     return node;
   }
@@ -355,7 +385,7 @@ export class Graph {
 
   /** Flush (or schedule a flush) if effects wait and nothing holds them. */
   private kick_(): void {
-    if (!this.depth_ && !this.busy_ && this.qn_) {
+    if (!this.depth_ && this.qn_) {
       this.sched_ ? this.sched_(this) : this.flush();
     }
   }
@@ -394,14 +424,18 @@ export class Graph {
 
   /**
    * Run every queued effect that is stale. Effects queued while flushing run
-   * in the same flush. Errors from effects are collected; the first is
-   * rethrown after the queue drains.
+   * in the same flush. A no-op while effects are held (inside a batch, a
+   * running flush or an effect's first run): they flush when that ends.
+   * Errors from effects are collected; the first is rethrown after the queue
+   * drains.
    */
   flush(): void {
-    if (this.busy_) {
+    // Inside a flush, a batch or an effect's first run, effects are held:
+    // they run when it ends. Flushing here would re-enter a running effect.
+    if (this.depth_) {
       return;
     }
-    this.busy_ = true;
+    this.depth_++;
     const queue = this.queue_;
     // Run ids only grow: an effect whose last run id is not above this has not
     // run in this flush, so its write-loop count starts over (no reset pass).
@@ -437,7 +471,7 @@ export class Graph {
       }
     }
     this.qn_ = 0;
-    this.busy_ = false;
+    this.depth_--;
     if (error !== queue) {
       throw error;
     }
@@ -448,7 +482,7 @@ export class Graph {
    * parent). Returns false once `node` is disposed or no longer stale, so the
    * caller skips it. Owner chains are as deep as effect nesting in user code.
    */
-  private owners_(node: ReactiveNode, p: ReactiveNode | null): boolean {
+  private owners_(node: ReactiveNode, p: ReactiveNode | null): unknown {
     if (!p) {
       return true;
     }
@@ -615,9 +649,7 @@ export class Graph {
     const flags = node.flags;
     const prevOwner = this.owner;
     const prev = this.begin_(node, flags);
-    if (prevOwner) {
-      this.owner = null;
-    }
+    this.owner = null;
     let value: any;
     // `Errored` when `fn` threw, else 0: it goes straight into the flags.
     let failed = 0;
@@ -653,8 +685,9 @@ export class Graph {
   }
 
   /**
-   * Run a computed or effect's function. An effect runs as a batch: what it
-   * writes is flushed after it returns, never inside it.
+   * Run a computed or effect's function. An effect runs only inside a flush
+   * or {@link effect}'s first run, both of which hold its writes back until
+   * it returns.
    */
   private exec_(node: ReactiveNode): void {
     if (!(node.flags & F.Effect)) {
@@ -664,13 +697,8 @@ export class Graph {
     }
     this.clean_(node);
     const prevOwner = this.owner;
-    // A flush already holds writes back; outside one, hold them as a batch.
-    const hold = !this.busy_;
     const prev = this.begin_(node, node.flags);
     this.owner = node;
-    if (hold) {
-      this.depth_++;
-    }
     try {
       node.value = node.fn!(node.value);
     } finally {
@@ -679,10 +707,6 @@ export class Graph {
       // An effect whose first run throws is disposed, so HasValue only
       // matters after a run that completed.
       node.flags = (node.flags & ~F.Running) | F.HasValue;
-      if (hold) {
-        this.depth_--;
-        this.kick_();
-      }
     }
   }
 
@@ -777,8 +801,8 @@ export class Graph {
 }
 
 /** An effect that still has to run: stale and not disposed. */
-function live(node: ReactiveNode): boolean {
-  return !(node.flags & F.Disposed) && !!(node.flags & F.Stale);
+function live(node: ReactiveNode): number {
+  return node.flags & F.Disposed ? 0 : node.flags & F.Stale;
 }
 
 /** `equals` says `next` is unchanged. The default needs no indirect call. */
