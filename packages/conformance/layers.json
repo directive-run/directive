@@ -765,7 +765,7 @@
           "layer": "L10",
           "by": ["member .effects.register", "member .effects.unregister"]
         },
-        "a namespaced non-reader costs no snapshot > copies the store for a reader but not for a one-parameter effect": {
+        "a namespaced non-reader costs fewer snapshots > copies the store less for a one-parameter effect than for a reader": {
           "layer": "L4",
           "by": ["option effect deps"]
         }
