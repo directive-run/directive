@@ -1,171 +1,27 @@
 [
   {
+    "line": 173,
+    "col": 24,
+    "mutator": "LogicalOperator",
+    "replacement": "options.redactErrors && false",
+    "reason": "internals-only",
+    "note": "The engine never passes redactErrors to createFacts (no non-test caller in packages/); only /internals createFacts callers (mutants-facts.test.ts) can set it. Hand-run: survived the suite."
+  },
+  {
+    "line": 220,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "isZodSchema is only called with a truthy schema entry (validateValue returns on a falsy one first), so v !== null is always true."
+  },
+  {
     "line": 239,
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "getExpectedType is only called from validateZod, after isZodSchema already held; the guard is always true there."
-  },
-  {
-    "line": 304,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "when _lastFailedIndex is not a number the second operand (undefined >= 0) is false anyway."
-  },
-  {
-    "line": 552,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted on the line above."
-  },
-  {
-    "line": 612,
-    "col": 17,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
-  },
-  {
-    "line": 612,
-    "col": 33,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
-  },
-  {
-    "line": 613,
-    "col": 15,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "not-observable",
-    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
-  },
-  {
-    "line": 669,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "knownKeys.add in registerKeys only matters to toObject via map.has; set() adds the key when a value is first written."
-  },
-  {
-    "line": 706,
-    "col": 9,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted just before."
-  },
-  {
-    "line": 718,
-    "col": 19,
-    "mutator": "LogicalOperator",
-    "replacement": "originOf?.() && \"authored\"",
-    "reason": "not-observable",
-    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
-  },
-  {
-    "line": 718,
-    "col": 19,
-    "mutator": "OptionalChaining",
-    "replacement": "originOf()",
-    "reason": "not-observable",
-    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
-  },
-  {
-    "line": 721,
-    "col": 9,
-    "mutator": "OptionalChaining",
-    "replacement": "onWrite(key)",
-    "reason": "not-observable",
-    "note": "the engine always supplies onWrite; reachable only by calling the internal unregisterKeys on a bare store."
-  },
-  {
-    "line": 765,
-    "col": 36,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "equivalent",
-    "note": "unwrapDevProxies is only reached after structuredClone failed, which a null fact never does."
-  },
-  {
-    "line": 812,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
-  },
-  {
-    "line": 971,
-    "col": 36,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "a blocked name reads undefined from the map anyway; the early return only skips a tracked read of a key that cannot exist."
-  },
-  {
-    "line": 1053,
-    "col": 37,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
-  },
-  {
-    "line": 1053,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "equivalent",
-    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
-  },
-  {
-    "line": 1057,
-    "col": 36,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
-  },
-  {
-    "line": 1057,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "equivalent",
-    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
-  },
-  {
-    "line": 1083,
-    "col": 22,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
-  },
-  {
-    "line": 1091,
-    "col": 22,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
-  },
-  {
-    "line": 1074,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
   },
   {
     "line": 252,
@@ -192,6 +48,38 @@
     "note": "internals-only: '[redacted]' is only returned when redactErrors is set, which the engine never does."
   },
   {
+    "line": 304,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "when _lastFailedIndex is not a number the second operand (undefined >= 0) is false anyway."
+  },
+  {
+    "line": 326,
+    "col": 54,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "An empty validators array makes the loop below run zero times, the same as returning early."
+  },
+  {
+    "line": 332,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "i <= validators.length",
+    "reason": "equivalent",
+    "note": "validators[validators.length] is undefined and the loop skips non-function entries."
+  },
+  {
+    "line": 359,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: validate is always true in development (the engine never passes validate:false) and validateValue is never called in production."
+  },
+  {
     "line": 359,
     "col": 20,
     "mutator": "BlockStatement",
@@ -208,6 +96,22 @@
     "note": "internals-only: the engine always supplies onChange, so the optional call never sees undefined."
   },
   {
+    "line": 540,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies originOf."
+  },
+  {
+    "line": 540,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
+  },
+  {
     "line": 543,
     "col": 9,
     "mutator": "OptionalChaining",
@@ -216,68 +120,20 @@
     "note": "internals-only: the engine always supplies onWrite."
   },
   {
-    "line": 564,
-    "col": 9,
-    "mutator": "OptionalChaining",
-    "replacement": "onWrite(key as string)",
-    "reason": "internals-only",
-    "note": "internals-only: the engine always supplies onWrite."
-  },
-  {
-    "line": 540,
-    "col": 19,
-    "mutator": "OptionalChaining",
-    "replacement": "originOf()",
-    "reason": "internals-only",
-    "note": "internals-only: the engine always supplies originOf."
-  },
-  {
-    "line": 561,
-    "col": 19,
-    "mutator": "OptionalChaining",
-    "replacement": "originOf()",
-    "reason": "internals-only",
-    "note": "internals-only: the engine always supplies originOf."
-  },
-  {
-    "line": 540,
-    "col": 35,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "internals-only",
-    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
-  },
-  {
-    "line": 561,
-    "col": 35,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "internals-only",
-    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
-  },
-  {
-    "line": 718,
-    "col": 35,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "internals-only",
-    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
-  },
-  {
-    "line": 681,
+    "line": 552,
     "col": 7,
-    "mutator": "OptionalChaining",
-    "replacement": "onKeysRegistered(added.map(k => [k, newSchema[k]] as const))",
-    "reason": "internals-only",
-    "note": "internals-only: the engine always supplies onKeysRegistered."
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted on the line above."
   },
   {
-    "line": 651,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
+    "line": 561,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
     "reason": "internals-only",
-    "note": "internals-only: registerKeys is reached only from registerModule, which already throws on __proto__/constructor/prototype fact keys before calling it (checked: 'Security: ... dangerous key')."
+    "note": "internals-only: the engine always supplies originOf."
   },
   {
     "line": 561,
@@ -288,28 +144,20 @@
     "note": "A batched delete is stamped with the origin at write time; a history restore only writes keys present in the snapshot (a key written later survives goBack), so no delete is ever made with origin 'restore' through the public API."
   },
   {
-    "line": 885,
-    "col": 50,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "perf-only",
-    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+    "line": 561,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
   },
   {
-    "line": 885,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "perf-only",
-    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
-  },
-  {
-    "line": 894,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "perf-only",
-    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+    "line": 564,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onWrite(key as string)",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onWrite."
   },
   {
     "line": 571,
@@ -320,6 +168,94 @@
     "note": "Nested batches would also open and close an engine derivation-hold frame; the frames are balanced by unwindDerivationHolds and the outer hold still covers the nested span, so notification timing is unchanged (a nested-batch derivation-subscriber test does not distinguish it)."
   },
   {
+    "line": 612,
+    "col": 17,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 612,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 613,
+    "col": 15,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 651,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "internals-only: registerKeys is reached only from registerModule, which already throws on __proto__/constructor/prototype fact keys before calling it (checked: 'Security: ... dangerous key')."
+  },
+  {
+    "line": 669,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys.add in registerKeys only matters to toObject via map.has; set() adds the key when a value is first written."
+  },
+  {
+    "line": 681,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onKeysRegistered(added.map(k => [k, newSchema[k]] as const))",
+    "reason": "internals-only",
+    "note": "internals-only: the engine always supplies onKeysRegistered."
+  },
+  {
+    "line": 706,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted just before."
+  },
+  {
+    "line": 718,
+    "col": 19,
+    "mutator": "LogicalOperator",
+    "replacement": "originOf?.() && \"authored\"",
+    "reason": "not-observable",
+    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
+    "line": 718,
+    "col": 19,
+    "mutator": "OptionalChaining",
+    "replacement": "originOf()",
+    "reason": "not-observable",
+    "note": "the engine always supplies originOf and onWrite to the store; the fallback is reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
+    "line": 718,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "internals-only: the 'authored' fallback is only used when originOf is absent, which the engine never allows."
+  },
+  {
+    "line": 721,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onWrite(key)",
+    "reason": "not-observable",
+    "note": "the engine always supplies onWrite; reachable only by calling the internal unregisterKeys on a bare store."
+  },
+  {
     "line": 754,
     "col": 3,
     "mutator": "StringLiteral",
@@ -328,52 +264,12 @@
     "note": "Static initializer mutant: the harness runs only 2 tests against it. The registry-symbol test in blackbox-facts.test.ts fails when the key is changed (verified by hand)."
   },
   {
-    "line": 1053,
-    "col": 27,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "equivalent",
-    "note": "In the `has` trap a symbol that skips the symbol branch reaches store.has(symbol), which is false for any symbol, the same answer as the early return."
-  },
-  {
-    "line": 220,
-    "col": 7,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "isZodSchema is only called with a truthy schema entry (validateValue returns on a falsy one first), so v !== null is always true."
-  },
-  {
-    "line": 332,
-    "col": 21,
-    "mutator": "EqualityOperator",
-    "replacement": "i <= validators.length",
-    "reason": "equivalent",
-    "note": "validators[validators.length] is undefined and the loop skips non-function entries."
-  },
-  {
-    "line": 326,
-    "col": 54,
+    "line": 765,
+    "col": 36,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
-    "note": "An empty validators array makes the loop below run zero times, the same as returning early."
-  },
-  {
-    "line": 359,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "internals-only",
-    "note": "internals-only: validate is always true in development (the engine never passes validate:false) and validateValue is never called in production."
-  },
-  {
-    "line": 971,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "equivalent",
-    "note": "Blocked names (__proto__, constructor, prototype) can never be stored as facts (set and registerKeys refuse them), so store.get returns undefined, the same as the early return."
+    "note": "unwrapDevProxies is only reached after structuredClone failed, which a null fact never does."
   },
   {
     "line": 799,
@@ -390,6 +286,14 @@
     "replacement": "false",
     "reason": "not-observable",
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 812,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
   },
   {
     "line": 826,
@@ -472,6 +376,30 @@
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
   },
   {
+    "line": 885,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
+    "line": 885,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
+    "line": 894,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "nestedProxyCache only preserves the identity of a nested dev-warning wrapper across reads; behaviour is the same without it."
+  },
+  {
     "line": 899,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -550,6 +478,22 @@
     "replacement": "() => undefined",
     "reason": "not-observable",
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 971,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Blocked names (__proto__, constructor, prototype) can never be stored as facts (set and registerKeys refuse them), so store.get returns undefined, the same as the early return."
+  },
+  {
+    "line": 971,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a blocked name reads undefined from the map anyway; the early return only skips a tracked read of a key that cannot exist."
   },
   {
     "line": 991,
@@ -632,6 +576,54 @@
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
   },
   {
+    "line": 1053,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1053,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "In the `has` trap a symbol that skips the symbol branch reaches store.has(symbol), which is false for any symbol, the same answer as the early return."
+  },
+  {
+    "line": 1053,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a symbol is never in the map, so store.has(symbol) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1057,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1057,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "a blocked name can never be set, so store.has(blocked) is false whether or not the branch returns early."
+  },
+  {
+    "line": 1074,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "BLOCKED_PROPS holds only strings, so has(symbol) is false: the typeof guard changes nothing."
+  },
+  {
     "line": 1077,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -712,12 +704,28 @@
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
   },
   {
+    "line": 1083,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
+  },
+  {
     "line": 1087,
     "col": 22,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
     "note": "proxy mechanics / dev-warning detail, not a 2.0 contract"
+  },
+  {
+    "line": 1091,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "an empty trap returns undefined, which the proxy treats as false: same result as return false."
   },
   {
     "line": 1092,

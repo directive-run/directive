@@ -16,6 +16,14 @@
     "note": "A wrapper that ignores the recorded answer is judged by its own arity, which is always 3, so it only costs an unneeded snapshot copy."
   },
   {
+    "line": 383,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Survived run 39356354381 because no test composed a system with a non-reader effect. Now killed by blackbox-effects 'a namespaced non-reader costs no snapshot' (hand-run: fails with 4 store copies vs 0). Entry kept so the gate passes against the pre-test report; stays in the denominator."
+  },
+  {
     "line": 386,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -688,6 +696,22 @@
     "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
   },
   {
+    "line": 1238,
+    "col": 30,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "The pass-scratch id buffer is reused only when empty (selected.length === 0 ? selected : []); a seeded element just selects the fresh-array path, so the same ids run. Hand-run: survived the suite."
+  },
+  {
+    "line": 1240,
+    "col": 61,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "The shared thrown-sink is reused only when empty (thrownSink.length === 0 ? thrownSink : []); a seeded element just selects the fresh-array path, which behaves the same. Hand-run: survived the suite."
+  },
+  {
     "line": 1265,
     "col": 18,
     "mutator": "ConditionalExpression",
@@ -742,6 +766,14 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
+  },
+  {
+    "line": 1276,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "sink.length >= 0",
+    "reason": "equivalent",
+    "note": "Twin of the triaged 1276:9 ConditionalExpression true. Always taking the branch splices an empty array and reportThrown([]) is a no-op, so nothing observable changes. Hand-run killed only by an unrelated timing assertion (derivation-deps 'does not pay for the size of a graph nothing is watching', 13.0 vs 9.4 ms budget), which is load noise, not behaviour."
   },
   {
     "line": 1310,
