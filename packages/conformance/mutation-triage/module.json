@@ -1,0 +1,10 @@
+[
+  {
+    "line": 289,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Removing the early return for a module with no facts survives quickly (not a timeout): the reserved-name loop then runs over zero fact keys and throws nothing, so the outcome is identical."
+  }
+]
