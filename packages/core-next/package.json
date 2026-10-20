@@ -1,0 +1,33 @@
+{
+  "name": "@directive-run/core-next",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Directive 2.0 engine, built layer by layer. Unpublished.",
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Jason Comes",
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && tsup",
+    "test": "cd ../.. && vitest run packages/core-next/",
+    "typecheck": "tsc --noEmit",
+    "bench": "cd ../.. && vitest bench --run packages/core-next/",
+    "size": "node scripts/size.mjs",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "alien-signals": "3.1.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
