@@ -6,14 +6,16 @@
  * proves the run was. A green run that quietly skipped, filtered or dropped
  * tests fails here:
  *
- * - config: the vitest config has exactly the six projects, each with the
+ * - config: the vitest config has exactly the eight projects, each with the
  *   expected root, includes, excludes, setup file, env and core aliases, and
  *   nothing else (no extra setup files, global setup, server deps or mocks);
  * - files: every port ran in every engine project that should run it, and the
  *   self tests and tamper tests ran too;
  * - tests: every test passed, except exactly the aheadOfV1 tests on v1, which
- *   were skipped; nothing is todo; every statically named test ran under its
- *   name, and each file ran the same tests on v1 and local;
+ *   were skipped, and on v2 exactly the tests the layer gate skips (files in
+ *   the `internals` category, tests above layers.rules.json `current`), each
+ *   of which must be skipped; nothing is todo; every statically named test
+ *   ran under its name, and each file ran the same tests on v1, local and v2;
  * - aheadOfV1.json: one entry per test, each with a reason, no wildcards;
  * - the differential project: every diff/ file ran, every scenario under
  *   its literal title, nothing skipped; every scenario file has a layer;
@@ -24,7 +26,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project } from "ts-morph";
-import { coreEntries } from "./core-entries.js";
+import { coreEntries, v2Entries } from "./core-entries.js";
 import { FUZZ_FLOOR as FLOOR } from "./fuzz.js";
 import { staticTests } from "./tests.js";
 
@@ -36,6 +38,8 @@ export const ENGINE_PROJECTS = [
   "conformance:v1:prod",
   "conformance:local",
   "conformance:local:prod",
+  "conformance:v2",
+  "conformance:v2:prod",
 ] as const;
 export const DIFF_PROJECT = "conformance:diff";
 export const CHECKS_PROJECT = "conformance:checks";
@@ -53,7 +57,62 @@ export interface JsonReport {
 }
 
 interface LayersFile {
-  files: Record<string, { tests: Record<string, { dynamic?: true }> }>;
+  files: Record<
+    string,
+    {
+      category?: string;
+      tests: Record<string, { layer?: string; dynamic?: true }>;
+    }
+  >;
+}
+
+/**
+ * Whether helpers/layer-gate.ts skips `name` in `file` on v2: an `internals`
+ * file, no `current` yet, or a layer above it. The same lookup as the gate's
+ * `layerFor`: the exact entry, its numbered duplicates, or else every dynamic
+ * entry, at the highest layer among them.
+ */
+export function v2Skips(
+  layers: LayersFile,
+  current: string | null,
+  file: string,
+  name: string,
+): boolean {
+  const entry = layers.files[file];
+  if (!entry) {
+    return false;
+  }
+  if (entry.category === "internals" || current === null) {
+    return true;
+  }
+  const tests = Object.entries(entry.tests);
+  const matches = tests.filter(
+    ([k]) => k === name || k.startsWith(`${name} #`),
+  );
+  const pool =
+    matches.length > 0 ? matches : tests.filter(([, t]) => t.dynamic);
+  if (pool.length === 0) {
+    return false;
+  }
+  const layer = Math.max(...pool.map(([, t]) => Number(t.layer?.slice(1))));
+
+  return layer > Number(current.slice(1));
+}
+
+/**
+ * The unbuilt core entry points (those core-next maps to src/unbuilt.ts) that
+ * `source` names in a quoted specifier: an import, a dynamic import or a mock.
+ */
+export function unbuiltSpecifiers(
+  source: string,
+  entries: Array<{ specifier: string; file: string }>,
+): string[] {
+  return entries
+    .filter((e) => e.file.endsWith("/unbuilt.ts"))
+    .map((e) => e.specifier)
+    .filter((specifier) =>
+      ['"', "'", "`"].some((q) => source.includes(`${q}${specifier}${q}`)),
+    );
 }
 
 function walk(dir: string): string[] {
@@ -133,7 +192,7 @@ function exactSource(specifier: string): string {
 
 function expectedAlias(
   repoRoot: string,
-  engine: "v1" | "local",
+  engine: "v1" | "local" | "v2",
   build: "development" | "production",
 ): Record<string, string> {
   const conformanceRoot = join(repoRoot, "packages/conformance");
@@ -151,11 +210,14 @@ function expectedAlias(
       out[exactSource(specifier)] = join(dir, target[build]?.import ?? "");
     }
   } else {
+    const v2 = engine === "v2";
     out[exactSource("#is-development")] = join(
       repoRoot,
-      "packages/core/src/dev-true.ts",
+      v2
+        ? "packages/core-next/src/dev-true.ts"
+        : "packages/core/src/dev-true.ts",
     );
-    for (const entry of coreEntries(repoRoot)) {
+    for (const entry of v2 ? v2Entries(repoRoot) : coreEntries(repoRoot)) {
       out[exactSource(entry.specifier)] = entry.file;
     }
   }
@@ -238,7 +300,11 @@ export function checkConfig(
       }
       continue;
     }
-    const engine = name.includes(":v1") ? "v1" : "local";
+    const engine = name.includes(":v1")
+      ? "v1"
+      : name.includes(":v2")
+        ? "v2"
+        : "local";
     const build = name.endsWith(":prod") ? "production" : "development";
     const want = {
       name,
@@ -297,7 +363,19 @@ export function census(
   const ahead = readJson<{ tests: Record<string, Record<string, string>> }>(
     join(conformanceRoot, "aheadOfV1.json"),
   ).tests;
+  const current = readJson<{ current: string | null }>(
+    join(conformanceRoot, "layers.rules.json"),
+  ).current;
   const prod = new Set(prodPorts(conformanceRoot));
+  // Files that import an entry core-next has not built: the stub exports
+  // nothing useful, so any test of theirs that runs on v2 is reading
+  // undefined. Only a fully skipped (gated) file may import one.
+  const v2Unbuilt = v2Entries(repoRoot);
+  const importsUnbuilt = (file: string) =>
+    unbuiltSpecifiers(
+      readFileSync(join(conformanceRoot, file), "utf8"),
+      v2Unbuilt,
+    );
   const runnable = Object.keys(manifest).filter((f) => f.endsWith(".test.ts"));
   const selfFiles = walk(join(conformanceRoot, "self"))
     .filter((f) => f.endsWith(".test.ts"))
@@ -349,6 +427,7 @@ export function census(
 
   for (const [name, files] of ran) {
     const isV1 = name.startsWith("conformance:v1");
+    const isV2 = name.startsWith("conformance:v2");
     const isProd = name.endsWith(":prod");
     const expected =
       name === CHECKS_PROJECT
@@ -373,6 +452,26 @@ export function census(
     for (const [file, tests] of files) {
       const skipAllowed = isV1 ? (ahead[file] ?? {}) : {};
       for (const [test, status] of tests) {
+        if (isV2 && file.startsWith("tests/")) {
+          // The gate decides: what it skips must be skipped, the rest pass.
+          const gated = v2Skips(layers, current, file, test);
+          const unbuilt = status === "skipped" ? [] : importsUnbuilt(file);
+          if (unbuilt.length > 0) {
+            fail(
+              `${name}: ${file} > "${test}" ran (${status}) but the file imports ${unbuilt.join(", ")}, which core-next has not built`,
+            );
+          }
+          if (gated && status !== "skipped") {
+            fail(
+              `${name}: ${file} > "${test}" is above the v2 layer but ${status}`,
+            );
+          } else if (!gated && status !== "passed") {
+            fail(
+              `${name}: ${file} > "${test}" is ${status === "skipped" ? "skipped but at or below the v2 layer" : status}`,
+            );
+          }
+          continue;
+        }
         const allowedSkip = test in skipAllowed;
         if (status === "passed" && allowedSkip) {
           fail(
@@ -443,10 +542,12 @@ export function census(
     }
   }
 
-  // Each file runs the same tests on v1 and local.
+  // Each file runs the same tests on v1, local and v2.
   for (const [a, b] of [
     ["conformance:v1", "conformance:local"],
     ["conformance:v1:prod", "conformance:local:prod"],
+    ["conformance:v1", "conformance:v2"],
+    ["conformance:v1:prod", "conformance:v2:prod"],
   ] as const) {
     const left = ran.get(a);
     const right = ran.get(b);

@@ -38,8 +38,10 @@ import {
   diffTestFiles,
   pluginHooks,
   prodPorts,
+  unbuiltSpecifiers,
+  v2Skips,
 } from "../../lib/census.js";
-import { coreEntries } from "../../lib/core-entries.js";
+import { coreEntries, v2Entries } from "../../lib/core-entries.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
 import { staticTests } from "../../lib/tests.js";
@@ -64,13 +66,19 @@ function walk(dir: string): string[] {
 
 /** The reports a complete, green run produces. */
 function cleanReports(): Record<string, JsonReport> {
-  const layers = readJson(join(conformance, "layers.json")).files as Record<
+  const layersFile = readJson(join(conformance, "layers.json"));
+  const layers = layersFile.files as Record<
     string,
     { tests: Record<string, unknown> }
   >;
+  const current = readJson(join(conformance, "layers.rules.json")).current;
   const prod = new Set(prodPorts(conformance));
   const ports = Object.keys(layers).filter((f) => f.endsWith(".test.ts"));
-  const file = (rel: string, names: string[]) => ({
+  const file = (
+    rel: string,
+    names: string[],
+    status: (name: string) => string = () => "passed",
+  ) => ({
     name: join(conformance, rel),
     assertionResults: names.map((n) => {
       const parts = n.split(" > ");
@@ -78,14 +86,20 @@ function cleanReports(): Record<string, JsonReport> {
       return {
         ancestorTitles: parts.slice(0, -1),
         title: parts[parts.length - 1] as string,
-        status: "passed",
+        status: status(n),
       };
     }),
   });
-  const portFile = (rel: string) =>
+  // On v2 the layer gate skips what core-next has not built yet.
+  const portFile = (rel: string, project: string) =>
     file(
       rel,
       Object.keys(layers[rel]?.tests ?? {}).map((k) => k.replace(/ #\d+$/, "")),
+      (n) =>
+        project.startsWith("conformance:v2") &&
+        v2Skips(layersFile, current, rel, n)
+          ? "skipped"
+          : "passed",
     );
   const self = (engine: string) =>
     file(
@@ -107,7 +121,9 @@ function cleanReports(): Record<string, JsonReport> {
     const isProd = name.endsWith(":prod");
     out[name] = {
       testResults: [
-        ...ports.filter((f) => prod.has(f) === isProd).map(portFile),
+        ...ports
+          .filter((f) => prod.has(f) === isProd)
+          .map((f) => portFile(f, name)),
         self(name),
       ],
     };
@@ -164,6 +180,30 @@ describe("the census", () => {
     );
   });
 
+  it("fails when v2 skips a test at or below its layer", () => {
+    const reports = cleanReports();
+    const ran = reports["conformance:v2"]?.testResults
+      .flatMap((f) => f.assertionResults)
+      .find((a) => a.status === "passed" && !a.title.startsWith("case ")) as {
+      status: string;
+    };
+    ran.status = "skipped";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /skipped but at or below the v2 layer/,
+    );
+  });
+
+  it("fails when v2 runs a test above its layer", () => {
+    const reports = cleanReports();
+    const gated = reports["conformance:v2"]?.testResults
+      .flatMap((f) => f.assertionResults)
+      .find((a) => a.status === "skipped") as { status: string };
+    gated.status = "passed";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /is above the v2 layer but passed/,
+    );
+  });
+
   it("fails when a test was skipped outside aheadOfV1", () => {
     const reports = cleanReports();
     const first = reports["conformance:local"]?.testResults[0]
@@ -186,6 +226,40 @@ describe("the census", () => {
     v1.testResults = v1.testResults.filter((f) => !f.name.includes("/self/"));
     expect(census(repoRoot, reports).join("\n")).toMatch(
       /conformance:v1: self\/engine-identity\.test\.ts did not run/,
+    );
+  });
+
+  it("names the unbuilt entries a source imports, however it quotes them", () => {
+    const entries = [
+      { specifier: "@directive-run/core", file: "/n/index.ts" },
+      { specifier: "@directive-run/core/testing", file: "/n/unbuilt.ts" },
+      { specifier: "@directive-run/core/worker", file: "/n/unbuilt.ts" },
+    ];
+    const src = `import { a } from "@directive-run/core";
+      vi.mock('@directive-run/core/testing', () => ({}));`;
+    expect(unbuiltSpecifiers(src, entries)).toEqual([
+      "@directive-run/core/testing",
+    ]);
+    expect(
+      unbuiltSpecifiers("import x from '@directive-run/core'", entries),
+    ).toEqual([]);
+  });
+
+  it("fails when a v2 test ran in a file that imports an unbuilt entry", () => {
+    const reports = cleanReports();
+    const unbuilt = v2Entries(repoRoot);
+    const file = reports["conformance:v2"]?.testResults.find(
+      (f) =>
+        f.assertionResults.some((a) => a.status === "skipped") &&
+        unbuiltSpecifiers(readFileSync(f.name, "utf8"), unbuilt).length > 0,
+    );
+    expect(file, "a gated port that imports an unbuilt entry").toBeDefined();
+    const skipped = file?.assertionResults.find(
+      (a) => a.status === "skipped",
+    ) as { status: string };
+    skipped.status = "passed";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /ran \(passed\) but the file imports .* which core-next has not built/,
     );
   });
 

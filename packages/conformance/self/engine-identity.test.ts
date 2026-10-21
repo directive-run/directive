@@ -18,7 +18,7 @@ import {
   engineDistTypes,
   enginePackageDir,
 } from "../helpers/engine.js";
-import { coreEntries } from "../lib/core-entries.js";
+import { coreEntries, v2Entries } from "../lib/core-entries.js";
 import { checkV1Pin } from "../lib/v1-pin.js";
 
 const build = process.env.DIRECTIVE_BUILD as "development" | "production";
@@ -26,6 +26,7 @@ const which = engine();
 const root = resolve(import.meta.dirname, "..");
 const v1Dir = join(root, "node_modules/directive-v1");
 const coreDir = resolve(root, "../core");
+const nextDir = resolve(root, "../core-next");
 
 function pinnedVersion(): string {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -58,6 +59,12 @@ function expected(): Map<string, string> {
     for (const entry of coreEntries()) {
       out.set(entry.specifier, entry.file);
     }
+  } else {
+    // core-next's source; entries it has not built yet resolve to
+    // src/unbuilt.ts (lib/core-entries.ts v2Entries).
+    for (const entry of v2Entries()) {
+      out.set(entry.specifier, entry.file);
+    }
   }
 
   return out;
@@ -71,14 +78,16 @@ describe(`engine identity (${which}, ${build})`, () => {
   });
 
   it("finds the engine's package and build where it should", () => {
-    const dir = which === "v1" ? v1Dir : coreDir;
+    const dir = which === "v1" ? v1Dir : which === "v2" ? nextDir : coreDir;
     expect(enginePackageDir()).toBe(dir);
     expect(engineDistEntry()).toBe(join(dir, "dist/index.js"));
     expect(engineDistTypes()).toBe(join(dir, "dist/index.d.ts"));
     expect(existsSync(engineDistEntry())).toBe(true);
     expect(existsSync(engineDistTypes())).toBe(true);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-    expect(pkg.name).toBe("@directive-run/core");
+    expect(pkg.name).toBe(
+      which === "v2" ? "@directive-run/core-next" : "@directive-run/core",
+    );
     if (which === "v1") {
       expect(pkg.version).toBe(pinnedVersion());
     }
@@ -113,6 +122,15 @@ describe(`engine identity (${which}, ${build})`, () => {
       const atFile = await vi.importActual<Module>(file);
       const keys = Object.keys(atFile).sort();
       expect(keys.length).toBeGreaterThan(0);
+      if (which === "v2" && file.endsWith("/unbuilt.ts")) {
+        // Every unbuilt entry maps to the one stub, so the identity checks
+        // below only prove the alias reaches it. Pin that: the stub's sole
+        // export, and the census fails any v2 test that runs in a file
+        // importing it (lib/census.ts unbuiltSpecifiers). When core-next
+        // builds the entry, v2Entries maps it to a real file and this branch
+        // stops applying.
+        expect(keys).toEqual(["UNBUILT"]);
+      }
       expect(Object.keys(viaSuite).sort()).toEqual(keys);
       expect(Object.keys(actual).sort()).toEqual(keys);
       for (const key of keys) {
@@ -127,7 +145,10 @@ describe(`engine identity (${which}, ${build})`, () => {
     const core = await vi.importActual<Module>("@directive-run/core");
     const local = coreEntries().find((e) => e.subpath === ".")?.file as string;
     const v1 = join(v1Dir, "dist", build, "index.js");
-    const other = await vi.importActual<Module>(which === "v1" ? local : v1);
-    expect(core.createSystem).not.toBe(other.createSystem);
+    const others = which === "v2" ? [local, v1] : [which === "v1" ? local : v1];
+    for (const file of others) {
+      const other = await vi.importActual<Module>(file);
+      expect(core.createSystem).not.toBe(other.createSystem);
+    }
   });
 });

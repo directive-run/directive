@@ -112,7 +112,7 @@ const total = Object.values(reports).reduce(
   0,
 );
 console.log(
-  `[census] ${ALL_PROJECTS.length} projects, ${total} tests: every port ran in every engine, nothing skipped but aheadOfV1`,
+  `[census] ${ALL_PROJECTS.length} projects, ${total} tests: every port ran in every engine, nothing skipped but aheadOfV1 on v1 and the layer gate on v2`,
 );
 {
   const apiChanges = JSON.parse(
@@ -134,9 +134,11 @@ console.log(
     }
   }
 }
-const v2 = existsSync(join(repoRoot, "packages/core-next/src/index.ts"));
+const v2Layer = JSON.parse(
+  readFileSync(join(conformanceRoot, "layers.rules.json"), "utf8"),
+).current as string | null;
 console.log(
-  v2
-    ? "[census] v2: core-next compared in the diff project up to layers.rules.json `current`"
-    : "[census] v2: not compared — packages/core-next does not exist yet (Phase 1)",
+  v2Layer === null
+    ? "[census] v2: no layer built yet (layers.rules.json `current` is null); v2 runs nothing"
+    : `[census] v2: core-next runs every port up to ${v2Layer} (conformance:v2, conformance:v2:prod) and the diff scenarios up to ${v2Layer}`,
 );
