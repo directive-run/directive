@@ -39,10 +39,18 @@ import type {
 } from "./types.js";
 
 /** An error from a definition, as plugins and observers see it. */
+/** Which subsystem produced an error (same union as 1.35). */
+export type ErrorSource =
+  | "constraint"
+  | "resolver"
+  | "effect"
+  | "derivation"
+  | "system";
+
 export class DirectiveError extends Error {
   constructor(
     message: string,
-    public readonly source: string,
+    public readonly source: ErrorSource,
     public readonly sourceId: string,
     public readonly context?: unknown,
     public readonly recoverable = true,
@@ -368,7 +376,11 @@ export function createSystem<const M extends ModuleSchema>(
   // The default strategy (skip) for every source an L0 system has. Each
   // error reaches onError, then onErrorRecovery; dev warns once per source.
   const warnedUnhandled = new Set<string>();
-  function reportError(source: string, sourceId: string, error: unknown): void {
+  function reportError(
+    source: ErrorSource,
+    sourceId: string,
+    error: unknown,
+  ): void {
     const wrapped =
       error instanceof DirectiveError
         ? error
