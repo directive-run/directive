@@ -186,3 +186,56 @@ describe("build-private names", () => {
     }
   });
 });
+
+describe("an effect disposed while it runs", () => {
+  it("does not keep cleanups or children registered after its dispose", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const childRuns: number[] = [];
+    let cleaned = 0;
+    const ref: { self?: ReactiveNode } = {};
+    let child: ReactiveNode | undefined;
+    const self = g.effect(() => {
+      g.read(s);
+      if (ref.self) {
+        g.dispose(ref.self);
+        g.onCleanup(() => {
+          cleaned++;
+        });
+        child = g.effect(() => {
+          childRuns.push(g.read(s));
+        });
+      }
+    });
+    ref.self = self;
+    g.write(s, 1);
+    // The child stands alone: it is not in the dead owner's list, so it is
+    // neither leaked there nor torn down with it, and it keeps tracking.
+    expect(self.cleanups ?? []).toEqual([]);
+    expect(child?.parent).toBeNull();
+    expect(cleaned).toBe(0);
+    g.write(s, 2);
+    expect(childRuns).toEqual([1, 2]);
+  });
+});
+
+describe("a cleanup that registers a cleanup while its effect is disposed", () => {
+  it("runs once instead of looping", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    let calls = 0;
+    const again = () => {
+      if (++calls < 1000) {
+        g.onCleanup(again);
+      }
+    };
+    const e: ReactiveNode = g.effect(() => {
+      if (g.read(s) === 1) {
+        g.onCleanup(again);
+        g.dispose(e);
+      }
+    });
+    g.write(s, 1);
+    expect(calls).toBe(1);
+  });
+});

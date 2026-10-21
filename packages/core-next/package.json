@@ -26,9 +26,7 @@
       "import": "./dist/internals.js"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "rm -rf dist && tsup",
     "test": "cd ../.. && vitest run packages/core-next/",

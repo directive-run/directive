@@ -2,13 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "types": [
-      "vitest/globals"
-    ],
+    "types": ["vitest/globals"],
     "rootDir": "."
   },
-  "include": [
-    "src",
-    "bench"
-  ]
+  "include": ["src", "bench"]
 }

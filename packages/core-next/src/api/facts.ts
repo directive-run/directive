@@ -43,9 +43,7 @@ export interface Tracker {
 
 export const DERIVATION_DEP_PREFIX = "\u001F";
 export const describeDep = (dep: string): string =>
-  dep.startsWith(DERIVATION_DEP_PREFIX)
-    ? `derive.${dep.slice(1)}`
-    : dep;
+  dep.startsWith(DERIVATION_DEP_PREFIX) ? `derive.${dep.slice(1)}` : dep;
 
 export function withTracking<T>(
   tracker: Tracker,
@@ -478,7 +476,11 @@ function wrapNested(
         return value;
       }
       const proto = Object.getPrototypeOf(value);
-      if (proto !== Object.prototype && proto !== null && !Array.isArray(value)) {
+      if (
+        proto !== Object.prototype &&
+        proto !== null &&
+        !Array.isArray(value)
+      ) {
         return value;
       }
       const d = Object.getOwnPropertyDescriptor(target, prop);
@@ -540,7 +542,9 @@ export function createFactsProxy<S extends Schema>(
       }
       const value = store.get(prop as keyof InferSchema<S>);
       if (isDevelopment && value !== null && typeof value === "object") {
-        if ((value as Record<symbol, unknown>)[DEV_PROXY_TARGET] !== undefined) {
+        if (
+          (value as Record<symbol, unknown>)[DEV_PROXY_TARGET] !== undefined
+        ) {
           return value;
         }
 

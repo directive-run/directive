@@ -57,7 +57,10 @@ export interface FactsStore<S extends Schema = Schema> {
   set<K extends keyof InferSchema<S>>(key: K, value: InferSchema<S>[K]): void;
   delete(key: keyof InferSchema<S>): void;
   batch(fn: () => void): void;
-  subscribe(keys: Array<keyof InferSchema<S>>, listener: () => void): () => void;
+  subscribe(
+    keys: Array<keyof InferSchema<S>>,
+    listener: () => void,
+  ): () => void;
   subscribeAll(listener: () => void): () => void;
   toObject(): Record<string, unknown>;
 }
@@ -110,7 +113,10 @@ export interface ModuleDef<M extends ModuleSchema> {
   init?: (facts: ModuleFacts<M>) => void;
   derive?: {
     [K in keyof DerivedOf<M>]:
-      | ((facts: Readonly<FactsOf<M>>, derived: Readonly<DerivedOf<M>>) => DerivedOf<M>[K])
+      | ((
+          facts: Readonly<FactsOf<M>>,
+          derived: Readonly<DerivedOf<M>>,
+        ) => DerivedOf<M>[K])
       | {
           compute: (
             facts: Readonly<FactsOf<M>>,
@@ -204,4 +210,6 @@ export interface ObservationEvent {
 /** The facts a system exposes, from a module schema or a raw `{ facts }` schema. */
 export type SystemFacts<M extends { facts: Schema }> = InferSchema<M["facts"]>;
 export type SystemDerived<M extends { facts: Schema; derivations?: Schema }> =
-  M["derivations"] extends Schema ? InferSchema<M["derivations"]> : Record<string, never>;
+  M["derivations"] extends Schema
+    ? InferSchema<M["derivations"]>
+    : Record<string, never>;

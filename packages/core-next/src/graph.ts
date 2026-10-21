@@ -404,7 +404,10 @@ export class Graph {
     }
   }
 
-  /** Register teardown for the running effect. Ignored outside an effect. */
+  /**
+   * Register teardown for the running effect. Ignored outside an effect and
+   * once the running effect is disposed (see {@link dispose}).
+   */
   onCleanup(fn: () => void): void {
     const owner = this.owner;
     if (owner) {
@@ -419,6 +422,13 @@ export class Graph {
    */
   dispose(node: ReactiveNode): void {
     node.flags |= node.flags & F.Effect ? F.Disposed : F.Dirty;
+    // A running effect that is disposed stops owning: `onCleanup` and
+    // `effect()` skip it, so nothing registers on an owner that will never
+    // clean up again (a leak), and a cleanup that registers a cleanup cannot
+    // keep the teardown below looping.
+    if (this.owner === node) {
+      this.owner = null;
+    }
     // A computed owns nothing, so this only cleans effects.
     this.clean_(node);
     this.drop_(node.deps);

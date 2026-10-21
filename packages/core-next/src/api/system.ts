@@ -156,8 +156,10 @@ export function createSystem<const M extends ModuleSchema>(
   }
   const module = options.module as ModuleDefinition<ModuleSchema>;
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  const deriveDefs: Record<string, (facts: unknown, derived: unknown) => unknown> =
-    {};
+  const deriveDefs: Record<
+    string,
+    (facts: unknown, derived: unknown) => unknown
+  > = {};
   for (const [id, raw] of Object.entries(module.derive ?? {})) {
     deriveDefs[id] =
       typeof raw === "function"
@@ -386,10 +388,15 @@ export function createSystem<const M extends ModuleSchema>(
           : source === "resolver"
             ? "onResolverError"
             : null;
-    if (isDevelopment && option && !warnedUnhandled.has(`${source}:${sourceId}`)) {
+    if (
+      isDevelopment &&
+      option &&
+      !warnedUnhandled.has(`${source}:${sourceId}`)
+    ) {
       warnedUnhandled.add(`${source}:${sourceId}`);
-      const message = (error instanceof Error ? error.message : String(error))
-        .replace(/[.!?]+\s*$/, "");
+      const message = (
+        error instanceof Error ? error.message : String(error)
+      ).replace(/[.!?]+\s*$/, "");
       console.warn(
         `[Directive] ${source} "${sourceId}" threw: ${message}. The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
       );
@@ -785,7 +792,13 @@ export function createSystem<const M extends ModuleSchema>(
         onStop: () => emit({ type: "system.stop" }),
         onDestroy: () => emit({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
-          emit({ type: "fact.change", key, prev, next: value, origin: "authored" }),
+          emit({
+            type: "fact.change",
+            key,
+            prev,
+            next: value,
+            origin: "authored",
+          }),
         onFactsBatch: (changes: FactChange[]) => {
           const out: Array<Record<string, unknown>> = [];
           const open = new Map<string, Record<string, unknown>>();

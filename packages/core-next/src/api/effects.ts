@@ -92,8 +92,7 @@ function declaresPrev(run: unknown): boolean {
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager {
-  const { definitions, facts, store, onRun, onError, onWriteBlocked } =
-    options;
+  const { definitions, facts, store, onRun, onError, onWriteBlocked } = options;
   const derived = options.derived ?? {};
   const tracker = options.tracker ?? { deps: null };
   const states = new Map<string, EffectState>();
