@@ -152,6 +152,12 @@ for (const [name, engine] of Object.entries(engines)) {
     `fixture minimal on ${name}: ${await measure(minimal, fixtures, engine)}`,
   );
 }
+// The floor: the same app on the system core with no optional part (see
+// fixtures/floor.ts). core-next only: 1.35 has no such entry point.
+const floor = readFileSync(join(fixtures, "floor.ts"), "utf8");
+console.log(
+  `fixture floor on core-next: ${await measure(floor, fixtures, engines["core-next"])}`,
+);
 console.log(
   `core-next full entry (every export): ${await measure('export * from "@directive-run/core";', fixtures, engines["core-next"])}`,
 );

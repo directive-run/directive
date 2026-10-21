@@ -8,13 +8,13 @@
  */
 
 import isDevelopment from "#is-development";
+import type { SystemPart } from "./core.js";
 import {
   type CreateFactsStoreOptions,
   createFacts as createFactsCore,
   createFactsStore as createFactsStoreCore,
   safeStringify,
 } from "./facts.js";
-import type { SystemPart } from "./core.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
 function isZodSchema(v: unknown): boolean {
@@ -136,9 +136,7 @@ export function createFacts<S extends Schema>(
  * system's store calls on each write in development.
  */
 export const withValidation: SystemPart = ({ kernel, module }) => {
-  const validator = createValidator(
-    (module.schema?.facts ?? {}) as Schema,
-  );
+  const validator = createValidator((module.schema?.facts ?? {}) as Schema);
   if (validator) {
     kernel.define("validate", validator);
   }

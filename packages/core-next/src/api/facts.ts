@@ -111,8 +111,7 @@ export function safeStringify(data: unknown, maxLen = 500): string {
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
-    options;
+  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd } = options;
   const originOf = options.originOf ?? (() => "authored" as FactOrigin);
   const graph = options.graph ?? new Graph();
   const tracker = options.tracker ?? { deps: null };

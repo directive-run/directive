@@ -8,13 +8,13 @@
  */
 
 import isDevelopment from "#is-development";
+import type { SystemPart } from "./core.js";
 import {
   BLOCKED_PROPS,
   type Tracker,
   describeDep,
   withTracking,
 } from "./facts.js";
-import type { SystemPart } from "./core.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
 export interface CreateEffectsOptions<S extends Schema> {
