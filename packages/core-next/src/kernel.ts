@@ -33,6 +33,7 @@ import {
   type Lane,
   type Scheduler,
   type SchedulerTarget,
+  catcher,
   createScheduler,
 } from "./scheduler.js";
 import type { Snapshot } from "./snapshot.js";
@@ -189,6 +190,10 @@ const adder =
     return () => remove(list, item);
   };
 
+const fail = (member: string, what: "already" | "not"): never => {
+  throw Error(`[Directive] Feature member "${member}" ${what} defined`);
+};
+
 /** The last owner handed out per clock. */
 const owners = new WeakMap<Clock, number>();
 
@@ -215,36 +220,17 @@ export function createKernel(options: KernelOptions = {}): Kernel {
 
   const target: SchedulerTarget = {
     flush(l) {
-      // The target marks "no error": user code can never throw it.
-      let error: unknown = target;
+      const guard = catcher();
       settling = true;
-      try {
-        hooks.emit("flush", { lane: l });
-      } catch (e) {
-        error = e;
-      }
+      guard(() => hooks.emit("flush", { lane: l }));
       for (const fn of settlers.slice()) {
-        try {
-          fn(l);
-        } catch (e) {
-          if (error === target) {
-            error = e;
-          }
-        }
+        guard(() => fn(l));
       }
       // L2: the pre-commit interceptor runs here, after the settlers and
       // before the graph's effects see the writes.
       settling = false;
-      try {
-        graph.flush();
-      } catch (e) {
-        if (error === target) {
-          error = e;
-        }
-      }
-      if (error !== target) {
-        throw error;
-      }
+      guard(() => graph.flush());
+      guard();
     },
   };
   const id = scheduler.register(target);
@@ -277,29 +263,19 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     },
     emit(at, data) {
       const seq = ++sink.seq;
-      const listeners = sink.listeners;
-      if (!listeners.length) {
-        return;
-      }
-      const event: KernelEvent = {
-        ...data,
-        t: clock.now(),
-        seq,
-        sys: id,
-        at,
-      };
-      let error: unknown = sink;
-      for (const fn of listeners.slice()) {
-        try {
-          fn(event);
-        } catch (e) {
-          if (error === sink) {
-            error = e;
-          }
+      if (sink.listeners.length) {
+        const event: KernelEvent = {
+          ...data,
+          t: clock.now(),
+          seq,
+          sys: id,
+          at,
+        };
+        const guard = catcher();
+        for (const fn of sink.listeners.slice()) {
+          guard(() => fn(event));
         }
-      }
-      if (error !== sink) {
-        throw error;
+        guard();
       }
     },
     on(fn) {
@@ -335,19 +311,19 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     n_: 0,
     define(member, value) {
       if (member in features || BUILTIN.includes(member)) {
-        throw Error(`[Directive] Feature member "${member}" already defined`);
+        fail(member, "already");
       }
       features[member] = value;
     },
     feature(member) {
       if (!(member in features)) {
-        throw Error(`[Directive] Feature member "${member}" is not defined`);
+        fail(member, "not");
       }
 
       return features[member] as never;
     },
     has: (cap) =>
-      BUILTIN.includes(cap) || cap in features || (cap === "rng" && !!rng),
+      cap in features || BUILTIN.includes(cap) || (cap === "rng" && !!rng),
     onSettle: adder(settlers),
     onDispose: adder(disposers),
     request(l) {
@@ -365,37 +341,26 @@ export function createKernel(options: KernelOptions = {}): Kernel {
         return;
       }
       disposed = true;
-      let error: unknown = target;
-      const run = (fn: () => void): void => {
-        try {
-          fn();
-        } catch (e) {
-          if (error === target) {
-            error = e;
-          }
-        }
-      };
+      const guard = catcher();
       for (const child of children.slice()) {
-        run(() => child.dispose());
+        guard(() => child.dispose());
       }
       for (const fn of disposers.splice(0)) {
-        run(fn);
+        guard(fn);
       }
       clock.clearOwner(owner);
       for (const node of roots.splice(0)) {
-        run(() => graph.dispose(node));
+        guard(() => graph.dispose(node));
       }
       scheduler.unregister(target);
       if (parent) {
         remove(parent.children as Kernel[], kernel);
       }
-      run(() => hooks.emit("dispose"));
+      guard(() => hooks.emit("dispose"));
       for (const fn of mine.splice(0)) {
         remove(sink.listeners, fn);
       }
-      if (error !== target) {
-        throw error;
-      }
+      guard();
     },
   };
   (parent?.children as Kernel[] | undefined)?.push(kernel);

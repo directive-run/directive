@@ -63,15 +63,26 @@ export type ErrorSource =
   | "system";
 
 export class DirectiveError extends Error {
+  declare readonly source: ErrorSource;
+  declare readonly sourceId: string;
+  declare readonly context?: unknown;
+  declare readonly recoverable: boolean;
   constructor(
     message: string,
-    public readonly source: ErrorSource,
-    public readonly sourceId: string,
-    public readonly context?: unknown,
-    public readonly recoverable = true,
+    source: ErrorSource,
+    sourceId: string,
+    context?: unknown,
+    recoverable = true,
   ) {
     super(message);
-    this.name = "DirectiveError";
+    // Own fields in the order 1.35 defines them, `name` last.
+    Object.assign(this, {
+      source,
+      sourceId,
+      context,
+      recoverable,
+      name: "DirectiveError",
+    });
   }
 }
 
@@ -160,7 +171,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const module = options.module as ModuleDefinition<ModuleSchema>;
   if (!module) {
     throw new Error(
-      "[Directive] core-next builds single-module systems so far (createSystem({ module })); `modules` arrives at L1.",
+      "[Directive] createSystem needs a `module` (`modules` arrives at L1)",
     );
   }
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
@@ -237,7 +248,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       const remaining = [...pending];
       pending.clear();
       throw new Error(
-        `[Directive] Infinite derivation notification loop detected after 100 iterations. Remaining: ${remaining.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+        `[Directive] Infinite derivation notification loop detected after 100 iterations. Remaining: ${remaining.join(", ")}.${isDevelopment ? " This usually means a derivation listener is mutating facts that re-trigger the same derivation." : ""}`,
       );
     }
   };

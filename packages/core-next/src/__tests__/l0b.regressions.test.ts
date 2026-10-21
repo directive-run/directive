@@ -217,7 +217,8 @@ describe("L0b review regressions", () => {
   });
 
   it("T9 dispose clears the kernel's timers, listeners and runs onDispose", () => {
-    const p = createKernel({ clock: createVirtualClock() });
+    const clock = createVirtualClock();
+    const p = createKernel({ clock });
     const c = createKernel({ parent: p });
     let fired = 0;
     let heard = 0;
@@ -230,7 +231,7 @@ describe("L0b review regressions", () => {
     off();
     c.dispose();
     c.dispose();
-    p.clock.advanceTo(10);
+    clock.advanceTo(10);
     p.hooks.emit("x");
     expect([fired, heard, hooked]).toEqual([1, 1, 1]);
     expect(c.hooks.on(() => heard++)).toBeTypeOf("function");

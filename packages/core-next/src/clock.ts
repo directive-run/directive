@@ -8,8 +8,9 @@
  *
  * - {@link createClock}: real time (the default a kernel uses). Each timer
  *   gets its own host timer. Host functions are looked up when the clock is
- *   created.
- * - {@link createVirtualClock}: time moves only on {@link Clock.advanceTo}.
+ *   created. It has only the {@link Clock} members.
+ * - {@link createVirtualClock}: time moves only on
+ *   {@link VirtualClock.advanceTo}, and its timers are inspectable data.
  *   It never touches a host timer. Opt-in: import it to use it.
  *
  * {@link createRng}: a seeded PRNG whose whole state is one number. Opt-in.
@@ -38,33 +39,36 @@ export interface TimerOptions {
 export interface Clock {
   /** Current time in ms. */
   now(): number;
-  /** The earliest pending deadline, or `undefined` when none. */
-  nextDeadline(): number | undefined;
-  /**
-   * Fire timers due at or before `t`, earliest first (ties by `seq`). Errors
-   * are collected and the first is rethrown after the due timers ran.
-   *
-   * A virtual clock also fires timers they set that fall due, then sits at
-   * `t` (it never moves backwards). Timers set for the deadline being fired
-   * run in a further pass at that deadline; a deadline that needs more than
-   * 1,000 passes throws, leaving time at that deadline and the timer pending.
-   * A real clock fires only timers that existed when it was called; timers
-   * they set run on their own host timers.
-   */
-  advanceTo(t: number): void;
   /** Schedule `fn` after `ms`. Returns the timer's `seq`, its id. */
   setTimeout(fn: () => void, ms: number, options?: TimerOptions): number;
   clearTimeout(seq: number): void;
   /** Clear every timer set with this `owner`. */
   clearOwner(owner: number): void;
+}
+
+/**
+ * A clock whose timers are data that tests and snapshots drive: the virtual
+ * clock. The real clock leaves these out (its host timers fire on their own),
+ * so they cost a production bundle nothing.
+ */
+export interface VirtualClock extends Clock {
+  /** The earliest pending deadline, or `undefined` when none. */
+  nextDeadline(): number | undefined;
+  /**
+   * Fire timers due at or before `t`, earliest first (ties by `seq`), with
+   * `now()` at each one's deadline; then sit at `t` (time never moves
+   * backwards). Errors are collected and the first is rethrown after the due
+   * timers ran. Timers set for the deadline being fired run in a further
+   * pass at that deadline; a deadline that needs more than 1,000 passes
+   * throws, leaving time at that deadline and the timer pending.
+   */
+  advanceTo(t: number): void;
   /** Pending timers, in firing order. Plain data. */
   timers(): TimerRecord[];
 }
 
 interface Timer extends TimerRecord {
   fn: () => void;
-  /** Host handle (real clock only). */
-  h_?: unknown;
 }
 
 const before = (a: Timer, b: Timer): boolean =>
@@ -101,7 +105,7 @@ const MAX_PASSES = 1000;
  * A clock that moves only when told to. Starts at `start` (default 0). Its
  * timers sit in a min-heap.
  */
-export function createVirtualClock(start = 0): Clock {
+export function createVirtualClock(start = 0): VirtualClock {
   let now = start;
   let seq = 0;
   const heap: Timer[] = [];
@@ -221,8 +225,9 @@ export interface RealClockOptions {
 }
 
 /**
- * Real time: each timer is a record plus its own host timer. Host functions
- * are looked up when the clock is created.
+ * Real time: each timer is its own host timer, remembered with its owner so
+ * {@link Clock.clearOwner} can cancel it. Host functions are looked up when
+ * the clock is created.
  */
 export function createClock(options: RealClockOptions = {}): Clock {
   const g = globalThis as any;
@@ -232,54 +237,24 @@ export function createClock(options: RealClockOptions = {}): Clock {
   const setTimer =
     options.setTimer ?? ((cb: () => void, ms: number) => g.setTimeout(cb, ms));
   const clearTimer = options.clearTimer ?? ((h: unknown) => g.clearTimeout(h));
-  const live = new Map<number, Timer>();
+  /** Pending timers by id: [owner, host handle]. */
+  const live = new Map<number, [number, unknown]>();
   let seq = 0;
   const clear = (id: number): void => {
     const timer = live.get(id);
     if (timer) {
       live.delete(id);
-      clearTimer(timer.h_);
+      clearTimer(timer[1]);
     }
   };
 
   return {
     now,
-    nextDeadline() {
-      let d: number | undefined;
-      for (const { deadline } of live.values()) {
-        if (d === undefined || deadline < d) {
-          d = deadline;
-        }
-      }
-
-      return d;
-    },
-    advanceTo(t) {
-      let error: unknown = live;
-      for (const timer of order(live.values())) {
-        if (timer.deadline > t) {
-          break;
-        }
-        if (live.has(timer.seq)) {
-          clear(timer.seq);
-          try {
-            timer.fn();
-          } catch (e) {
-            if (error === live) {
-              error = e;
-            }
-          }
-        }
-      }
-      if (error !== live) {
-        throw error;
-      }
-    },
     setTimeout(fn, ms, options) {
       const id = ++seq;
-      const timer = make(id, now(), fn, ms, options);
+      const timer: [number, unknown] = [options?.owner ?? 0, undefined];
       live.set(id, timer);
-      timer.h_ = setTimer(
+      timer[1] = setTimer(
         () => {
           if (live.delete(id)) {
             fn();
@@ -292,13 +267,12 @@ export function createClock(options: RealClockOptions = {}): Clock {
     },
     clearTimeout: clear,
     clearOwner(owner) {
-      for (const timer of [...live.values()]) {
-        if (timer.owner === owner) {
-          clear(timer.seq);
+      for (const [id, timer] of live) {
+        if (timer[0] === owner) {
+          clear(id);
         }
       }
     },
-    timers: () => order(live.values()).map(record),
   };
 }
 
