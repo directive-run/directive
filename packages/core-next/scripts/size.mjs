@@ -80,7 +80,7 @@ if (existsSync(dist)) {
   console.log(`dist/index.js: ${builtGz} B min+gzip (built by tsup)`);
 }
 // Fixtures, reported (no budget yet): each bundled for production
-// (`#is-development` resolves to its `false` file, NODE_ENV is "production"),
+// (`#is-development` inlined as in tsup, NODE_ENV is "production"),
 // minified and gzipped the same way. `@directive-run/core` is pointed at
 // core-next and at packages/core (1.35.x), each with its own build's options.
 const fixtures = new URL("./fixtures/", import.meta.url).pathname;
@@ -91,6 +91,32 @@ const engines = {
   },
   "core 1.35": {
     entry: new URL("../../core/src/index.ts", import.meta.url).pathname,
+  },
+};
+// The same inlining tsup.config.ts does (keep in step): esbuild does not fold
+// an imported constant across modules, so resolving `#is-development` to
+// dev-false.ts would leave every dev message in the measured bundle. Writing
+// the expression out at each use lets NODE_ENV="production" fold it.
+const IS_DEV_IMPORT =
+  /^import\s+isDevelopment\s+from\s+["']#is-development["'];?$/m;
+const DEV_CHECK =
+  'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
+const inlineIsDevelopment = {
+  name: "inline-is-development",
+  setup(b) {
+    b.onLoad({ filter: /\/src\/.*\.ts$/ }, (args) => {
+      const source = readFileSync(args.path, "utf8");
+      if (!IS_DEV_IMPORT.test(source)) {
+        return undefined;
+      }
+
+      return {
+        contents: source
+          .replace(IS_DEV_IMPORT, "")
+          .replace(/\bisDevelopment\b/g, `(${DEV_CHECK})`),
+        loader: "ts",
+      };
+    });
   },
 };
 async function measure(contents, resolveDir, engine) {
@@ -105,9 +131,18 @@ async function measure(contents, resolveDir, engine) {
     conditions: ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
     alias: { "@directive-run/core": engine.entry },
-    ...(engine.mangleProps ? { mangleProps: engine.mangleProps } : {}),
+    ...(engine.mangleProps
+      ? { mangleProps: engine.mangleProps, plugins: [inlineIsDevelopment] }
+      : {}),
   });
   const bytes = out.outputFiles[0].contents;
+  // Only dev-gated text: "Validation failed" / "Unknown fact key" stay in
+  // validateValue on purpose, because `validate: true` opts in at runtime.
+  const dev = ["Nested mutation"].filter((m) => Buffer.from(bytes).includes(m));
+  if (dev.length > 0 && engine.mangleProps) {
+    console.error(`dev strings shipped in a production bundle: ${dev}`);
+    process.exitCode = 1;
+  }
 
   return `${bytes.length} B min, ${gzipSync(bytes, { level: 9 }).length} B min+gzip`;
 }

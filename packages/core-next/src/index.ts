@@ -44,6 +44,7 @@ export type { Snapshot, SnapshotPart } from "./snapshot.js";
 
 // The 1.35 public API (alphas keep it unchanged), built on the graph above.
 export { DirectiveError, createModule, createSystem } from "./api/system.js";
+export type { ErrorSource } from "./api/system.js";
 export { t } from "./api/schema-builders.js";
 export type * from "./api/schema-builders.js";
 export type * from "./api/types.js";
