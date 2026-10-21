@@ -233,6 +233,20 @@
         }
       }
     },
+    "tests/core/blackbox-effects-chain.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "an effect that keeps waking itself > is cut after a bounded number of chained passes, with a warning, and the system stays live": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "an effect that keeps waking itself > runs each follow-up pass on its own microtask": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
     "tests/core/blackbox-effects-production.test.ts": {
       "category": "black-box",
       "rule": "L4",

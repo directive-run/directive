@@ -178,6 +178,9 @@
     "tests/core/blackbox-effects-production.test.ts": {
       "rule": "L4"
     },
+    "tests/core/blackbox-effects-chain.test.ts": {
+      "rule": "L4"
+    },
     "tests/core/blackbox-readonly-module-view.test.ts": {
       "rule": "L1"
     },
