@@ -66,6 +66,11 @@ export interface Hooks {
    * the kernel that added it is disposed.
    */
   on(fn: Listener): () => void;
+  /**
+   * True while anything listens on the sink: an emitter can skip building
+   * an expensive record nobody reads.
+   */
+  readonly live: boolean;
 }
 
 /** The wire form of a record: `{...event, v: 1}` (`v` always wins). */
@@ -256,6 +261,9 @@ export function createKernel(options: KernelOptions = {}): Kernel {
 
   const hooks: SinkHooks = {
     sink_: sink,
+    get live() {
+      return sink.listeners.length > 0;
+    },
     emit(at, data) {
       const seq = ++sink.seq;
       const listeners = sink.listeners;

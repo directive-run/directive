@@ -71,9 +71,11 @@ export function withoutTracking<T>(tracker: Tracker, fn: () => T): T {
 
 export interface CreateFactsStoreOptions<S extends Schema> {
   schema: S;
-  validate?: boolean;
-  strictKeys?: boolean;
-  redactErrors?: boolean;
+  /**
+   * Checks a write (development only). Built by `createValidator`
+   * (validate.ts), so a store without one never bundles validation.
+   */
+  validator?: (key: string, value: unknown) => void;
   onChange?: (key: string, value: unknown, prev: unknown) => void;
   onBatch?: (changes: FactChange[]) => void;
   onWrite?: (key: string) => void;
@@ -106,34 +108,15 @@ export function safeStringify(data: unknown, maxLen = 500): string {
   }
 }
 
-function isZodSchema(v: unknown): boolean {
-  const o = v as Record<string, unknown>;
-
-  return (
-    v !== null &&
-    typeof v === "object" &&
-    typeof o.safeParse === "function" &&
-    "_def" in o &&
-    typeof o.parse === "function"
-  );
-}
-
-const typeLabel = (value: unknown) =>
-  value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
-
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { schema, onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
+  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd } =
     options;
   const originOf = options.originOf ?? (() => "authored" as FactOrigin);
   const graph = options.graph ?? new Graph();
   const tracker = options.tracker ?? { deps: null };
-  const isTypeAssertionSchema = Object.keys(schema).length === 0;
-  const validate = options.validate ?? isDevelopment;
-  const strictKeys =
-    options.strictKeys ?? (isDevelopment && !isTypeAssertionSchema);
-  const redactErrors = options.redactErrors ?? false;
+  const validator = options.validator;
 
   /** One graph node per key; `present` says whether the key holds a value. */
   const nodes = options.nodes ?? new Map<string, ReactiveNode>();
@@ -162,64 +145,6 @@ export function createFactsStore<S extends Schema>(
 
     return n;
   };
-  const preview = (value: unknown) =>
-    redactErrors ? "[redacted]" : safeStringify(value);
-
-  function validateValue(key: string, value: unknown): void {
-    if (!validate) {
-      return;
-    }
-    const st = (schema as Record<string, unknown>)[key] as
-      | Record<string, any>
-      | undefined;
-    if (!st) {
-      if (strictKeys) {
-        throw new Error(
-          `[Directive] Unknown fact key: "${key}". Key not defined in schema.`,
-        );
-      }
-      console.warn(`[Directive] Unknown fact key: "${key}"`);
-
-      return;
-    }
-    if (isZodSchema(st)) {
-      const result = st.safeParse(value);
-      if (result.success) {
-        return;
-      }
-      const message =
-        result.error?.message ??
-        result.error?.issues?.[0]?.message ??
-        "Validation failed";
-      const expected = st._typeName
-        ? st._typeName
-        : st._def?.typeName
-          ? String(st._def.typeName).replace(/^Zod/, "").toLowerCase()
-          : "unknown";
-      throw new Error(
-        `[Directive] Validation failed for "${key}": expected ${expected}, got ${typeLabel(value)} ${preview(value)}. ${message}`,
-      );
-    }
-    const validators = st._validators;
-    if (!Array.isArray(validators) || validators.length === 0) {
-      return;
-    }
-    for (let i = 0; i < validators.length; i++) {
-      const validator = validators[i];
-      if (typeof validator !== "function" || validator(value)) {
-        continue;
-      }
-      let indexHint = "";
-      if (typeof st._lastFailedIndex === "number" && st._lastFailedIndex >= 0) {
-        indexHint = ` (element at index ${st._lastFailedIndex} failed)`;
-        st._lastFailedIndex = -1;
-      }
-      throw new Error(
-        `[Directive] Validation failed for "${key}": expected ${st._typeName ?? "unknown"}, got ${typeLabel(value)} ${preview(value)}${i === 0 ? "" : ` (validator ${i + 1} failed)`}${indexHint}`,
-      );
-    }
-  }
-
   const notifyKey = (key: string) =>
     keyListeners.get(key)?.forEach((listener) => listener());
   const notifyAll = () => allListeners.forEach((listener) => listener());
@@ -314,7 +239,7 @@ export function createFactsStore<S extends Schema>(
     set(key: any, value: any) {
       const k = key as string;
       if (isDevelopment) {
-        validateValue(k, value);
+        validator?.(k, value);
       }
       const n = node(k);
       const prev = n.value;
