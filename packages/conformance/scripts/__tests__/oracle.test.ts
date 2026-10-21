@@ -277,6 +277,21 @@ describe("the census", () => {
     );
   });
 
+  it("flags an unbuilt-entry read in the options-object form it(name, { timeout }, fn)", () => {
+    // One line, so the census fixture's `^it(` count ignores this source.
+    const src =
+      'import { loggingPlugin } from "@directive-run/core/plugins"; import { it } from "vitest"; ' +
+      'it("plain", () => {}); it("with options", { timeout: 5000 }, () => { loggingPlugin(); });';
+    const reached = unbuiltReached(
+      new Project({ useInMemoryFileSystem: true }).createSourceFile(
+        "/options-form.test.ts",
+        src,
+      ),
+      v2Entries(repoRoot),
+    );
+    expect([...reached.keys()]).toEqual(["with options"]);
+  });
+
   it("accepts a v2 test in a file importing an unbuilt entry it never reaches", () => {
     const rel = "tests/core/derivation-deps.test.ts";
     const reached = reachingUnbuilt(rel);

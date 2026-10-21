@@ -17,8 +17,14 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { Project } from "ts-morph";
 import type { JsonReport } from "../lib/census.js";
-import { defaultRepoRoot } from "../lib/core-entries.js";
+import { unbuiltReached } from "../lib/census.js";
+import {
+  defaultRepoRoot,
+  v2DistEntries,
+  v2Entries,
+} from "../lib/core-entries.js";
 import {
   type Passed,
   RATCHET_FILE,
@@ -79,7 +85,42 @@ try {
 }
 
 failures.push(...checkRatchet(ratchet, passed));
-const { next, added } = grow(ratchet, passed);
+// A test that reaches an unbuilt entry reads the stub: it may pass for the
+// wrong reason, so --update never adds one.
+const reachProject = new Project({ useInMemoryFileSystem: true });
+const unbuiltCache = new Map<string, Map<string, string[]>>();
+const reachesUnbuilt = (project: string, file: string, test: string) => {
+  const dist = project.includes(":dist");
+  const key = `${dist}:${file}`;
+  let reached = unbuiltCache.get(key);
+  if (!reached) {
+    reached = unbuiltReached(
+      reachProject.createSourceFile(
+        `/${file}`,
+        readFileSync(join(conformanceRoot, file), "utf8"),
+        { overwrite: true },
+      ),
+      dist ? v2DistEntries(repoRoot) : v2Entries(repoRoot),
+    );
+    unbuiltCache.set(key, reached);
+  }
+
+  return [...reached.keys()].some(
+    (k) => k === test || k.startsWith(`${test} #`),
+  );
+};
+const growable: Passed = Object.fromEntries(
+  Object.entries(passed).map(([project, files]) => [
+    project,
+    Object.fromEntries(
+      Object.entries(files).map(([file, names]) => [
+        file,
+        names.filter((t) => !reachesUnbuilt(project, file, t)),
+      ]),
+    ),
+  ]),
+);
+const { next, added } = grow(ratchet, growable);
 const count = (r: Ratchet) =>
   Object.values(r.tests).reduce(
     (n, files) => n + Object.values(files).reduce((m, t) => m + t.length, 0),

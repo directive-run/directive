@@ -434,7 +434,14 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
 /** File- and describe-level code a test can reach. */
 function reachable(test: StaticTest, sf: SourceFile): Node[] {
   const nodes: Node[] = [];
-  const fn = test.call.getArguments()[1];
+  // The body is the last function argument: `it(name, { timeout }, fn)` puts
+  // it at index 2. Fall back to argument 1 for a body passed by reference.
+  const args = test.call.getArguments();
+  const fn =
+    [...args]
+      .reverse()
+      .find((a) => Node.isArrowFunction(a) || Node.isFunctionExpression(a)) ??
+    args[1];
   if (fn) {
     nodes.push(fn);
   }

@@ -184,6 +184,8 @@
         "facts: schema validation (development) > names the failing custom validator by position",
         "facts: schema validation (development) > points at the failing element of a typed array, and forgets it afterwards",
         "facts: schema validation (development) > rejects a value of the wrong type and keeps the old value",
+        "facts: schema validation (development) > shows a preview of the rejected value, trimmed to a bounded length",
+        "facts: schema validation (development) > still reports a value that cannot be stringified",
         "facts: schema validation (development) > validates a first write of a fact that was never set",
         "facts: schema validation (development) > validates a write made inside a batch before applying it",
         "facts: schema validation (development) > validates writes made through the store directly",
@@ -254,6 +256,7 @@
         "a derivation reports its dependencies readably > names a derivation it read without the internal separator",
         "effects track what they read > a tracked effect stays quiet for a fact it never read",
         "effects track what they read > runs again for a fact it read and reads the new value",
+        "effects track what they read > runs again when a derivation it read changes",
         "reads outside any body are plain reads > returns current values and records nothing",
         "the prototype guard on facts > answers nothing for prototype-chain names",
         "tracking nests: each body gets its own dependencies > a three-step chain stays fresh from the bottom",
@@ -287,6 +290,7 @@
         "a fact and a derivation with the same name > does not re-run a fact-gated effect when the derivation goes stale",
         "a fact and a derivation with the same name > keeps an explicit dep that names a fact working",
         "a fact and a derivation with the same name > still invalidates a derivation that reads the like-named fact",
+        "derivation dependencies > re-runs an effect that reads a derivation and no facts",
         "invalidation cost > announces a derivation going stale once, not once per later write",
         "invalidation cost > says nothing about a derivation no dependency set names"
       ],
@@ -297,6 +301,7 @@
         "reaching for a derivation where a module name belongs > does not fire in a single-module system, where the read is correct"
       ],
       "tests/core/derived-in-constraints-effects.test.ts": [
+        "derived in effects > leaves `prevFacts` in the second position",
         "derived is an object > answers `in`, Object.keys, spread, and JSON.stringify",
         "derived is an object > keeps the prototype guards through enumeration",
         "when a derived read is tracked, and when it is not > does not wake a body that declared deps without naming the derivation"
@@ -381,6 +386,7 @@
         "createModule > stores crossModuleDeps when provided"
       ],
       "tests/core/mutants-derivations.test.ts": [
+        "derivations: housekeeping on replace and remove > entries that are not definitions at all are tolerated at registration",
         "derivations: odd definitions > an object-form entry with no compute is tolerated at registration",
         "derivations: subscriptions > a throwing subscriber is reported and does not stop the others",
         "derivations: subscriptions > delivers to every subscriber, and unsubscribing one leaves the rest"
@@ -521,7 +527,8 @@
         "the schema freeze covers our own types only > leaves a self-caching validator writable"
       ],
       "tests/core/settle-strands-invalidations.test.ts": [
-        "an effect's write reaches a derivation-gated constraint > settles without leaving an undelivered invalidation behind"
+        "an effect's write reaches a derivation-gated constraint > settles without leaving an undelivered invalidation behind",
+        "an effect's write reaches a derivation-gated constraint > wakes a derivation-gated effect from an effect-phase write"
       ],
       "tests/core/ssr.test.ts": [
         "SSR > settle() timeout behavior > resolves when system has no async work"
