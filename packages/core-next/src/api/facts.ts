@@ -7,6 +7,11 @@
  * rules are the 1.35 ones, so subscribers see the same notifications in the
  * same order. Each store owns its graph unless one is passed in; nothing here
  * is module-level mutable state.
+ *
+ * Written for size (L0e): one keyed listener helper ({@link listen}) serves
+ * every listener list here and in the system core, every notification goes
+ * through one guarded loop, and development-only code sits behind the dev
+ * flag so a production build drops it.
  */
 
 import isDevelopment from "#is-development";
@@ -17,7 +22,6 @@ import type {
   Facts,
   FactsSnapshot,
   FactsStore,
-  InferSchema,
   Schema,
 } from "./types.js";
 
@@ -45,28 +49,92 @@ export const DERIVATION_DEP_PREFIX = "\u001F";
 export const describeDep = (dep: string): string =>
   dep.startsWith(DERIVATION_DEP_PREFIX) ? `derive.${dep.slice(1)}` : dep;
 
-export function withTracking<T>(
-  tracker: Tracker,
-  fn: () => T,
-): { value: T; deps: Set<string> } {
+/** Run `fn` with `deps` as the tracker's frame; restore the previous one. */
+const framed = <T>(tracker: Tracker, deps: Set<string> | null, fn: () => T) => {
   const prev = tracker.deps;
-  const deps = new Set<string>();
   tracker.deps = deps;
-  try {
-    return { value: fn(), deps };
-  } finally {
-    tracker.deps = prev;
-  }
-}
-
-export function withoutTracking<T>(tracker: Tracker, fn: () => T): T {
-  const prev = tracker.deps;
-  tracker.deps = null;
   try {
     return fn();
   } finally {
     tracker.deps = prev;
   }
+};
+
+export function withTracking<T>(
+  tracker: Tracker,
+  fn: () => T,
+): { value: T; deps: Set<string> } {
+  const deps = new Set<string>();
+
+  return { value: framed(tracker, deps, fn), deps };
+}
+
+export const withoutTracking = <T>(tracker: Tracker, fn: () => T): T =>
+  framed(tracker, null, fn);
+
+/** Keyed listener lists, as every store and system keeps them. */
+export type Listeners<K = string> = Map<K, Set<() => void>>;
+
+/**
+ * Add `fn` under each of `keys`; returns the remover. The one listener
+ * pattern of the store and the system core (fact keys, the store's
+ * catch-all, derivation ids).
+ */
+export function listen<K>(
+  map: Listeners<K>,
+  keys: readonly K[],
+  fn: () => void,
+): () => void {
+  for (const key of keys) {
+    let set = map.get(key);
+    if (!set) {
+      map.set(key, (set = new Set()));
+    }
+    set.add(fn);
+  }
+
+  return () => {
+    for (const key of keys) {
+      map.get(key)?.delete(fn);
+    }
+  };
+}
+
+/** Call every listener under `key`, live (added ones run, removed ones not). */
+export const notify = <K>(map: Listeners<K>, key: K): void =>
+  map.get(key)?.forEach((fn) => fn());
+
+const no = () => false;
+/** The traps a locked view shares: no new properties, no prototype. */
+export const LOCKED = {
+  defineProperty: no,
+  getPrototypeOf: () => null,
+  setPrototypeOf: no,
+};
+
+/**
+ * A read-only keyed view (the system's `derive` and `events`): `has` says
+ * which keys exist, `get` reads one. `traps` adds or overrides traps.
+ */
+export function view(
+  has: (key: string) => boolean,
+  keys: () => string[],
+  get: (key: string) => unknown,
+  traps?: ProxyHandler<Record<string, unknown>>,
+): Record<string, unknown> {
+  const own = (_: object, key: string | symbol) =>
+    typeof key === "string" && has(key);
+
+  return new Proxy({} as Record<string, unknown>, {
+    get: (_, key) => (own(_, key) ? get(key as string) : undefined),
+    has: own,
+    ownKeys: keys,
+    getOwnPropertyDescriptor: (_, key) =>
+      own(_, key)
+        ? { configurable: true, enumerable: true, writable: false }
+        : undefined,
+    ...traps,
+  });
 }
 
 export interface CreateFactsStoreOptions<S extends Schema> {
@@ -108,106 +176,69 @@ export function safeStringify(data: unknown, maxLen = 500): string {
   }
 }
 
+/** The key the store's catch-all (`subscribeAll`) listeners sit under. */
+const ALL = Symbol();
+
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd } = options;
+  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd, validator } =
+    options;
   const originOf = options.originOf ?? (() => "authored" as FactOrigin);
   const graph = options.graph ?? new Graph();
   const tracker = options.tracker ?? { deps: null };
-  const validator = options.validator;
 
   /** One graph node per key; `present` says whether the key holds a value. */
   const nodes = options.nodes ?? new Map<string, ReactiveNode>();
   const present = new Set<string>();
-  const keyListeners = new Map<string, Set<() => void>>();
-  const allListeners = new Set<() => void>();
+  const listeners: Listeners<string | typeof ALL> = new Map();
   let batching = 0;
-  const batchChanges: FactChange[] = [];
-  const dirtyKeys = new Set<string>();
-  let isNotifying = false;
-  const pending: Array<{ key: string; value: unknown; prev: unknown }> = [];
+  const changes: FactChange[] = [];
+  const dirty = new Set<string>();
+  let notifying = false;
+  /** Writes made while notifying: [key, value, prev]. */
+  const pending: [string, unknown, unknown][] = [];
 
   const node = (key: string): ReactiveNode => {
     let n = nodes.get(key);
     if (!n) {
-      n = graph.signal<unknown>(undefined, { equals: false });
-      nodes.set(key, n);
+      nodes.set(key, (n = graph.signal<unknown>(undefined, { equals: false })));
     }
 
     return n;
   };
-  const track = (key: string): ReactiveNode => {
+  const read = (key: string): unknown => {
     tracker.deps?.add(key);
-    const n = node(key);
-    graph.read(n);
 
-    return n;
+    return graph.read(node(key));
   };
-  const notifyKey = (key: string) =>
-    keyListeners.get(key)?.forEach((listener) => listener());
-  const notifyAll = () => allListeners.forEach((listener) => listener());
 
-  function drain(context: string): void {
-    let iterations = 0;
-    while (pending.length > 0) {
-      if (++iterations > 100) {
-        pending.length = 0;
-        const runaway = new Error(
-          `[Directive] Infinite notification loop detected after 100 iterations${context}.`,
-        );
-        (runaway as unknown as Record<symbol, unknown>)[RUNAWAY] = true;
-        throw runaway;
-      }
-      const deferred = pending.splice(0);
-      for (const change of deferred) {
-        onChange?.(change.key, change.value, change.prev);
-        notifyKey(change.key);
-      }
-      notifyAll();
-    }
-  }
-
-  function notifyNow(key: string, value: unknown, prev: unknown): void {
-    if (isNotifying) {
-      pending.push({ key, value, prev });
-
-      return;
-    }
-    isNotifying = true;
+  /**
+   * Notify: `first` runs, then every write the listeners made, a round at a
+   * time, until none is left (100 rounds at most).
+   */
+  function run(first: () => void, context: string): void {
+    notifying = true;
     try {
-      onChange?.(key, value, prev);
-      notifyKey(key);
-      notifyAll();
-      drain(
-        ". A listener is repeatedly mutating facts that re-trigger notifications",
-      );
-    } finally {
-      isNotifying = false;
-    }
-  }
-
-  function flush(): void {
-    if (batching > 0) {
-      return;
-    }
-    const changes = batchChanges.length > 0 ? batchChanges.splice(0) : null;
-    const keys = dirtyKeys.size > 0 ? [...dirtyKeys] : null;
-    dirtyKeys.clear();
-    if (onBatch && changes) {
-      onBatch(changes);
-    }
-    if (keys) {
-      isNotifying = true;
-      try {
-        for (const key of keys) {
-          notifyKey(key);
+      first();
+      for (let rounds = 0; pending.length > 0; ) {
+        if (++rounds > 100) {
+          pending.length = 0;
+          throw Object.assign(
+            Error(
+              `[Directive] Infinite notification loop detected after 100 iterations${context}.`,
+            ),
+            { [RUNAWAY]: true },
+          );
         }
-        notifyAll();
-        drain(" during flush");
-      } finally {
-        isNotifying = false;
+        for (const [key, value, prev] of pending.splice(0)) {
+          onChange?.(key, value, prev);
+          notify(listeners, key);
+        }
+        notify(listeners, ALL);
       }
+    } finally {
+      notifying = false;
     }
   }
 
@@ -218,48 +249,68 @@ export function createFactsStore<S extends Schema>(
     type: "set" | "delete",
   ): void {
     if (batching > 0) {
-      batchChanges.push({ key, value, prev, type, origin: originOf() });
-      dirtyKeys.add(key);
+      changes.push({ key, value, prev, type, origin: originOf() });
+      dirty.add(key);
       onWrite?.(key);
+    } else if (notifying) {
+      pending.push([key, value, prev]);
     } else {
-      notifyNow(key, value, prev);
+      run(() => {
+        onChange?.(key, value, prev);
+        notify(listeners, key);
+        notify(listeners, ALL);
+      }, ". A listener is repeatedly mutating facts that re-trigger notifications");
     }
   }
 
-  const store: FactsStore<S> = {
-    get(key: any) {
-      return track(key as string).value as any;
-    },
-    has(key: any) {
-      track(key as string);
+  function flush(): void {
+    if (batching > 0) {
+      return;
+    }
+    const batch = changes.splice(0);
+    const keys = [...dirty];
+    dirty.clear();
+    if (onBatch && batch.length > 0) {
+      onBatch(batch);
+    }
+    if (keys.length > 0) {
+      run(() => {
+        for (const key of keys) {
+          notify(listeners, key);
+        }
+        notify(listeners, ALL);
+      }, " during flush");
+    }
+  }
 
-      return present.has(key as string);
+  const store = {
+    get: read,
+    has(key: string) {
+      read(key);
+
+      return present.has(key);
     },
-    set(key: any, value: any) {
-      const k = key as string;
+    set(key: string, value: unknown) {
       if (isDevelopment) {
-        validator?.(k, value);
+        validator?.(key, value);
       }
-      const n = node(k);
+      const n = node(key);
       const prev = n.value;
-      if (Object.is(prev, value)) {
-        return;
+      if (!Object.is(prev, value)) {
+        present.add(key);
+        graph.write(n, value);
+        record(key, value, prev, "set");
       }
-      present.add(k);
-      graph.write(n, value);
-      record(k, value, prev, "set");
     },
-    delete(key: any) {
-      const k = key as string;
-      const n = node(k);
+    delete(key: string) {
+      const n = node(key);
       const prev = n.value;
-      present.delete(k);
+      present.delete(key);
       graph.write(n, undefined);
-      record(k, undefined, prev, "delete");
+      record(key, undefined, prev, "delete");
     },
     batch(fn: () => void) {
-      const outermost = batching === 0;
-      batching++;
+      const outermost = !batching++;
       if (outermost) {
         onBatchStart?.();
       }
@@ -276,32 +327,8 @@ export function createFactsStore<S extends Schema>(
         }
       }
     },
-    subscribe(keys: any[], listener: () => void) {
-      for (const key of keys as string[]) {
-        let set = keyListeners.get(key);
-        if (!set) {
-          keyListeners.set(key, (set = new Set()));
-        }
-        set.add(listener);
-      }
-
-      return () => {
-        for (const key of keys as string[]) {
-          const set = keyListeners.get(key);
-          set?.delete(listener);
-          if (set?.size === 0) {
-            keyListeners.delete(key);
-          }
-        }
-      };
-    },
-    subscribeAll(listener: () => void) {
-      allListeners.add(listener);
-
-      return () => {
-        allListeners.delete(listener);
-      };
-    },
+    subscribe: (keys: string[], fn: () => void) => listen(listeners, keys, fn),
+    subscribeAll: (fn: () => void) => listen(listeners, [ALL], fn),
     toObject() {
       const out: Record<string, unknown> = {};
       for (const key of present) {
@@ -310,13 +337,12 @@ export function createFactsStore<S extends Schema>(
 
       return out;
     },
-  } as FactsStore<S>;
-  (store as unknown as Record<string, unknown>).destroy = () => {
-    keyListeners.clear();
-    allListeners.clear();
+    destroy() {
+      listeners.clear();
+    },
   };
 
-  return store;
+  return store as unknown as FactsStore<S>;
 }
 
 const DEV_PROXY_TARGET = Symbol.for("directive.devProxyTarget");
@@ -375,6 +401,7 @@ export function warnNonJson(
   );
 }
 
+/** Development only: a nested value that warns on in-place mutation. */
 function wrapNested(
   cache: WeakMap<object, object>,
   obj: object,
@@ -438,41 +465,39 @@ export function createFactsProxy<S extends Schema>(
   warned: Set<string> = new Set(),
 ): Facts<S> {
   const nested = new WeakMap<object, object>();
+  const s = store as unknown as FactsStore;
+  const untracked =
+    <T>(fn: () => T) =>
+    () =>
+      withoutTracking(tracker, fn);
   const snapshot = (): FactsSnapshot<S> => ({
-    get: (key) => withoutTracking(tracker, () => store.get(key)),
-    has: (key) => withoutTracking(tracker, () => store.has(key)),
+    get: (key) => untracked(() => store.get(key))(),
+    has: (key) => untracked(() => store.has(key))(),
   });
-  const reserved = (prop: string | symbol): boolean =>
-    typeof prop === "symbol" ||
-    prop === "$store" ||
-    prop === "$snapshot" ||
-    BLOCKED_PROPS.has(prop);
+  const special = (prop: string | symbol) =>
+    prop === "$store" || prop === "$snapshot";
+  const reserved = (prop: string | symbol): prop is symbol =>
+    typeof prop === "symbol" || special(prop) || BLOCKED_PROPS.has(prop);
 
   return new Proxy({} as Facts<S>, {
     get(_, prop) {
       if (typeof prop === "symbol") {
-        return prop === INSPECT
-          ? () => withoutTracking(tracker, () => store.toObject())
-          : undefined;
+        return prop === INSPECT ? untracked(s.toObject) : undefined;
       }
       if (BLOCKED_PROPS.has(prop)) {
         return undefined;
       }
-      if (prop === "$store") {
-        return store;
+      if (special(prop)) {
+        return prop === "$store" ? store : snapshot;
       }
-      if (prop === "$snapshot") {
-        return snapshot;
-      }
-      const value = store.get(prop as keyof InferSchema<S>);
-      if (isDevelopment && value !== null && typeof value === "object") {
-        if (
-          (value as Record<symbol, unknown>)[DEV_PROXY_TARGET] !== undefined
-        ) {
-          return value;
-        }
-
-        return wrapNested(nested, value as object, prop);
+      const value = s.get(prop);
+      if (
+        isDevelopment &&
+        value !== null &&
+        typeof value === "object" &&
+        (value as Record<symbol, unknown>)[DEV_PROXY_TARGET] === undefined
+      ) {
+        return wrapNested(nested, value, prop);
       }
 
       return value;
@@ -484,10 +509,10 @@ export function createFactsProxy<S extends Schema>(
       if (isDevelopment) {
         const nonJson = detectNonJsonValueType(value);
         if (nonJson) {
-          warnNonJson(warned, prop as string, nonJson);
+          warnNonJson(warned, prop, nonJson);
         }
       }
-      store.set(prop as keyof InferSchema<S>, value as never);
+      s.set(prop, value);
 
       return true;
     },
@@ -495,36 +520,22 @@ export function createFactsProxy<S extends Schema>(
       if (reserved(prop)) {
         return false;
       }
-      store.delete(prop as keyof InferSchema<S>);
+      s.delete(prop);
 
       return true;
     },
-    has(_, prop) {
-      if (prop === "$store" || prop === "$snapshot") {
-        return true;
-      }
-      if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-
-      return store.has(prop as keyof InferSchema<S>);
-    },
-    ownKeys() {
-      return Object.keys(schema);
-    },
-    getOwnPropertyDescriptor(_, prop) {
-      if (typeof prop === "string" && BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      if (prop === "$store" || prop === "$snapshot") {
-        return { configurable: true, enumerable: false, writable: false };
-      }
-
-      return { configurable: true, enumerable: true, writable: true };
-    },
-    defineProperty: () => false,
-    getPrototypeOf: () => null,
-    setPrototypeOf: () => false,
+    has: (_, prop) =>
+      special(prop) || (!reserved(prop) && s.has(prop as string)),
+    ownKeys: () => Object.keys(schema),
+    getOwnPropertyDescriptor: (_, prop) =>
+      typeof prop === "string" && BLOCKED_PROPS.has(prop)
+        ? undefined
+        : {
+            configurable: true,
+            enumerable: !special(prop),
+            writable: !special(prop),
+          },
+    ...LOCKED,
   });
 }
 
