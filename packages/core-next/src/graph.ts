@@ -174,9 +174,12 @@ export class ReactiveNode<T = any> {
   declare stamp: number;
   /** The effect that created this effect, if any. */
   declare parent: ReactiveNode | null;
-  /** Effects created while this effect ran: disposed before it re-runs. */
-  declare children: ReactiveNode[] | null;
-  declare cleanups: Array<() => void> | null;
+  /**
+   * What this effect owns, in registration order: `onCleanup` functions and
+   * effects created while it ran. Torn down newest first before it re-runs
+   * and on dispose (an owned effect is disposed, a function is called).
+   */
+  declare cleanups: Array<(() => void) | ReactiveNode> | null;
   /** Runs in the current flush, for write-loop detection. */
   declare runs: number;
 
@@ -198,7 +201,6 @@ export class ReactiveNode<T = any> {
       this.subs =
       this.subsTail =
       this.parent =
-      this.children =
       this.cleanups =
         null;
   }
@@ -295,12 +297,13 @@ export class Graph {
     );
     const owner = (node.parent = this.owner);
     if (owner) {
-      (owner.children ??= []).push(node);
+      (owner.cleanups ??= []).push(node);
     }
     // The first run is a batch: what it writes flushes after it returns.
+    // A new effect owns nothing yet, so it runs without the clean step.
     this.depth_++;
     try {
-      this.exec_(node);
+      this.run_(node);
     } catch (e) {
       // Only this effect's own failure disposes it. Its error wins over one
       // from the flush below, which it carries as `cause`.
@@ -696,6 +699,11 @@ export class Graph {
       return;
     }
     this.clean_(node);
+    this.run_(node);
+  }
+
+  /** Run an effect's function, with it as the owner. */
+  private run_(node: ReactiveNode): void {
     const prevOwner = this.owner;
     const prev = this.begin_(node, node.flags);
     this.owner = node;
@@ -782,18 +790,15 @@ export class Graph {
     }
   }
 
-  /** Dispose an effect's children and run its cleanups, untracked. */
+  /** Dispose an effect's owned effects and run its cleanups, untracked. */
   private clean_(node: ReactiveNode): void {
-    const children = node.children;
     const cleanups = node.cleanups;
-    if (children || cleanups) {
+    if (cleanups?.length) {
       this.untracked(() => {
         // Newest first. Popping leaves only what has not run if one throws.
-        while (children?.length) {
-          this.dispose(children.pop()!);
-        }
-        while (cleanups?.length) {
-          cleanups.pop()!();
+        while (cleanups.length) {
+          const item = cleanups.pop()!;
+          item instanceof ReactiveNode ? this.dispose(item) : item();
         }
       });
     }

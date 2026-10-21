@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { type Link, type ReactiveNode, createGraph } from "../graph.js";
+import { Flags, type Link, type ReactiveNode, createGraph } from "../graph.js";
 
 function links(node: ReactiveNode): Link[] {
   const out: Link[] = [];
@@ -288,6 +288,47 @@ describe("effects", () => {
     });
     expect(log).toEqual(["child 1/1", "child cleanup 1", "child 2/2"]);
     expect(subCount(b)).toBe(1);
+  });
+
+  it("tears down owned effects and cleanups together, newest first", () => {
+    const g = createGraph();
+    const a = g.signal(1);
+    const log: string[] = [];
+    const e = g.effect(() => {
+      const v = g.read(a);
+      g.onCleanup(() => log.push(`cleanup A ${v}`));
+      g.effect(() => {
+        g.onCleanup(() => log.push(`child ${v}`));
+      });
+      g.onCleanup(() => log.push(`cleanup B ${v}`));
+    });
+    expect(e.cleanups).toHaveLength(3);
+    g.write(a, 2);
+    expect(log).toEqual(["cleanup B 1", "child 1", "cleanup A 1"]);
+    g.dispose(e);
+    expect(log.slice(3)).toEqual(["cleanup B 2", "child 2", "cleanup A 2"]);
+    expect(e.cleanups).toHaveLength(0);
+    expect(subCount(a)).toBe(0);
+  });
+
+  it("a new effect's first run tracks, owns and flushes like any run", () => {
+    const g = createGraph();
+    const a = g.signal(1);
+    const b = g.signal(0);
+    const seen: number[] = [];
+    g.effect(() => {
+      seen.push(g.read(b));
+    });
+    const e = g.effect(() => {
+      g.write(b, g.read(a) * 10);
+      g.onCleanup(() => {});
+    });
+    // The first run's write flushed after it returned.
+    expect(seen).toEqual([0, 10]);
+    expect(e.cleanups).toHaveLength(1);
+    expect(e.flags & Flags.HasValue).toBeTruthy();
+    g.write(a, 2);
+    expect(seen).toEqual([0, 10, 20]);
   });
 
   it("flushes effects in the order they were notified", () => {
@@ -607,7 +648,7 @@ describe("review fixes (PR #199)", () => {
       g.read(c);
     });
     expect(inner!.parent).toBe(null);
-    expect(outer.children ?? []).toHaveLength(0);
+    expect(outer.cleanups ?? []).toHaveLength(0);
   });
 
   it("touch notifies subscribers of an in-place change without replacing the value", () => {
