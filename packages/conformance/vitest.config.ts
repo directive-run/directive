@@ -8,7 +8,8 @@
  *   `directive-v1`). The reference: whatever it does is the contract.
  * - `conformance:local` — the workspace's core source. Proves the port is
  *   faithful (it must agree with v1) and keeps 1.x honest while it still ships.
- * - `conformance:v2`    — core-next, once it exists (commented slot below).
+ * - `conformance:v2`    — core-next. The layer gate skips what it has not
+ *   built yet: tests above layers.rules.json `current`, and internals files.
  *
  * Tests that mock `#is-development` to exercise production branches run in
  * separate `:prod` projects. Against source the mock does the work; against a
@@ -20,10 +21,16 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import { coreEntries, defaultRepoRoot, v1Entries } from "./lib/core-entries.js";
+import {
+  coreEntries,
+  defaultRepoRoot,
+  v1Entries,
+  v2Entries,
+} from "./lib/core-entries.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const coreRoot = join(defaultRepoRoot, "packages/core");
+const nextRoot = join(defaultRepoRoot, "packages/core-next");
 
 /** Ported tests that flip the dev flag by mocking `#is-development`. */
 function prodFiles(): string[] {
@@ -82,6 +89,25 @@ function localAlias(): Alias {
     {
       find: exact("#is-development"),
       replacement: join(coreRoot, "src/dev-true.ts"),
+    },
+    ...entries
+      .filter((e) => e.subpath !== ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+    ...entries
+      .filter((e) => e.subpath === ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+  ];
+}
+
+/** `@directive-run/core[/sub]` → core-next's source (lib/core-entries.ts v2Entries). */
+function v2Alias(): Alias {
+  const entries = v2Entries();
+
+  return [
+    // As for local: the mock and core-next's own import must agree on the id.
+    {
+      find: exact("#is-development"),
+      replacement: join(nextRoot, "src/dev-true.ts"),
     },
     ...entries
       .filter((e) => e.subpath !== ".")
@@ -152,12 +178,12 @@ export default defineConfig({
         PROD,
         [],
       ),
-      // Phase 1 adds core-next. Same tests and the same setup file, which on
-      // v2 skips every test above layers.rules.json `current` and every file
-      // in the `internals` category (layers.json) until WHITE-BOX.md triage
-      // moves it out. The engine-identity self test needs a v2 branch too.
-      // project("conformance:v2", "v2", "development", v2Alias("development"), TESTS, PROD),
-      // project("conformance:v2:prod", "v2", "production", v2Alias("production"), PROD, []),
+      // core-next. Same tests and the same setup file, which on v2 skips
+      // every test above layers.rules.json `current` and every file in the
+      // `internals` category (layers.json) until WHITE-BOX.md triage moves it
+      // out. As for local, `:prod` relies on each file's own mock.
+      project("conformance:v2", "v2", "development", v2Alias(), TESTS, PROD),
+      project("conformance:v2:prod", "v2", "production", v2Alias(), PROD, []),
       // Differential scenarios: each loads both engines by file (diff/engines.ts)
       // and compares their traces, so it needs no core alias.
       {

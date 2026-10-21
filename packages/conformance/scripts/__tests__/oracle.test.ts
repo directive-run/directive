@@ -38,6 +38,7 @@ import {
   diffTestFiles,
   pluginHooks,
   prodPorts,
+  v2Skips,
 } from "../../lib/census.js";
 import { coreEntries } from "../../lib/core-entries.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
@@ -64,13 +65,19 @@ function walk(dir: string): string[] {
 
 /** The reports a complete, green run produces. */
 function cleanReports(): Record<string, JsonReport> {
-  const layers = readJson(join(conformance, "layers.json")).files as Record<
+  const layersFile = readJson(join(conformance, "layers.json"));
+  const layers = layersFile.files as Record<
     string,
     { tests: Record<string, unknown> }
   >;
+  const current = readJson(join(conformance, "layers.rules.json")).current;
   const prod = new Set(prodPorts(conformance));
   const ports = Object.keys(layers).filter((f) => f.endsWith(".test.ts"));
-  const file = (rel: string, names: string[]) => ({
+  const file = (
+    rel: string,
+    names: string[],
+    status: (name: string) => string = () => "passed",
+  ) => ({
     name: join(conformance, rel),
     assertionResults: names.map((n) => {
       const parts = n.split(" > ");
@@ -78,14 +85,20 @@ function cleanReports(): Record<string, JsonReport> {
       return {
         ancestorTitles: parts.slice(0, -1),
         title: parts[parts.length - 1] as string,
-        status: "passed",
+        status: status(n),
       };
     }),
   });
-  const portFile = (rel: string) =>
+  // On v2 the layer gate skips what core-next has not built yet.
+  const portFile = (rel: string, project: string) =>
     file(
       rel,
       Object.keys(layers[rel]?.tests ?? {}).map((k) => k.replace(/ #\d+$/, "")),
+      (n) =>
+        project.startsWith("conformance:v2") &&
+        v2Skips(layersFile, current, rel, n)
+          ? "skipped"
+          : "passed",
     );
   const self = (engine: string) =>
     file(
@@ -107,7 +120,9 @@ function cleanReports(): Record<string, JsonReport> {
     const isProd = name.endsWith(":prod");
     out[name] = {
       testResults: [
-        ...ports.filter((f) => prod.has(f) === isProd).map(portFile),
+        ...ports
+          .filter((f) => prod.has(f) === isProd)
+          .map((f) => portFile(f, name)),
         self(name),
       ],
     };
@@ -161,6 +176,30 @@ describe("the census", () => {
     );
     expect(census(repoRoot, reports).join("\n")).toMatch(
       /conformance:local: tests\/plugins\/logging\.test\.ts did not run/,
+    );
+  });
+
+  it("fails when v2 skips a test at or below its layer", () => {
+    const reports = cleanReports();
+    const ran = reports["conformance:v2"]?.testResults
+      .flatMap((f) => f.assertionResults)
+      .find((a) => a.status === "passed" && !a.title.startsWith("case ")) as {
+      status: string;
+    };
+    ran.status = "skipped";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /skipped but at or below the v2 layer/,
+    );
+  });
+
+  it("fails when v2 runs a test above its layer", () => {
+    const reports = cleanReports();
+    const gated = reports["conformance:v2"]?.testResults
+      .flatMap((f) => f.assertionResults)
+      .find((a) => a.status === "skipped") as { status: string };
+    gated.status = "passed";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /is above the v2 layer but passed/,
     );
   });
 

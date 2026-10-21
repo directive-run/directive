@@ -6,8 +6,8 @@
  * hand-written: a new core subpath is picked up without anyone remembering.
  */
 
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -138,4 +138,24 @@ export function v1Entries(
   }
 
   return out;
+}
+
+/**
+ * core-next's file for each core entry point: the same path under
+ * `packages/core-next/src` as core's source, or `src/unbuilt.ts` while
+ * core-next has not built that entry. Shared by the vitest config, the
+ * census and the engine-identity test.
+ */
+export function v2Entries(repoRoot = defaultRepoRoot): CoreEntry[] {
+  const coreSrc = join(repoRoot, "packages/core/src");
+  const nextSrc = join(repoRoot, "packages/core-next/src");
+
+  return coreEntries(repoRoot).map((entry) => {
+    const file = join(nextSrc, relative(coreSrc, entry.file));
+
+    return {
+      ...entry,
+      file: existsSync(file) ? file : join(nextSrc, "unbuilt.ts"),
+    };
+  });
 }

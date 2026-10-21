@@ -1,6 +1,6 @@
 {
   "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0\u2013L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
-  "current": null,
+  "current": "L0",
   "$scenarios": "Each differential scenario (diff/scenarios/), by title, and the layer it needs: the highest feature it uses on the plan's ladder. On v2 the diff project runs only scenarios at or below `current`; fuzz cases are placed by the features they use (diff/fuzz/model.ts specLayer); diff/self/ always runs. Checked by the census (lib/census.ts checkScenarioLayers).",
   "scenarios": {
     "derivation chain recomputes once per change": "L0",
