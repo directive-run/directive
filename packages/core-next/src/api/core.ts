@@ -145,7 +145,7 @@ const defsOf = (
 ): Record<string, Fn> => {
   const out: Record<string, Fn> = {};
   for (const [id, raw] of Object.entries(src ?? {})) {
-    out[id] = typeof raw === "function" ? (raw as Fn) : (raw as any)[key];
+    out[id] = typeof raw === "function" ? (raw as Fn) : (raw as any)?.[key];
   }
 
   return out;
@@ -309,6 +309,8 @@ export function createSystemCore<const M extends ModuleSchema>(
             node.flags |= Flags.Dirty;
             report("derivation.invalidate", () => ({ id: d.id_ }));
             pending.add(d.id_);
+            // Wakes an effect that read this derivation (and maybe no fact).
+            changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
             for (let s = node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
