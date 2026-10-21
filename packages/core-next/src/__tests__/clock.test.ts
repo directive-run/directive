@@ -107,7 +107,7 @@ describe("virtual clock", () => {
 });
 
 describe("real clock", () => {
-  it("gives each timer its own host timer; records stay plain data", () => {
+  it("gives each timer its own host timer and cancels it on clear", () => {
     let now = 100;
     const armed: Array<{ cb: () => void; ms: number; live: boolean }> = [];
     const c = createClock({
@@ -123,25 +123,31 @@ describe("real clock", () => {
       },
     });
     const log: string[] = [];
-    c.setTimeout(() => log.push("late"), 50, { owner: 2, kind: "x" });
+    const late = c.setTimeout(() => log.push("late"), 50, { owner: 2 });
     c.setTimeout(() => log.push("early"), 10);
-    expect(armed.map((h) => h.ms)).toEqual([50, 10]);
-    expect(c.nextDeadline()).toBe(110);
-    expect(c.timers()).toEqual([
-      { deadline: 110, owner: 0, kind: "timeout", seq: 2 },
-      { deadline: 150, owner: 2, kind: "x", seq: 1 },
-    ]);
+    c.setTimeout(() => log.push("never"), -5);
+    expect(armed.map((h) => h.ms)).toEqual([50, 10, 0]);
+    expect(c.now()).toBe(100);
     now = 110;
     armed[1]!.cb();
     expect(log).toEqual(["early"]);
-    // advanceTo fires what is due and clears its host timer.
-    now = 150;
-    c.advanceTo(150);
-    expect(log).toEqual(["early", "late"]);
+    // A fired timer is forgotten: firing its host callback again is a no-op.
+    armed[1]!.cb();
+    expect(log).toEqual(["early"]);
+    // Clearing cancels the host timer, and a late host callback does nothing.
+    c.clearTimeout(late);
     expect(armed[0]!.live).toBe(false);
     armed[0]!.cb();
-    expect(log).toEqual(["early", "late"]);
-    expect(c.timers()).toEqual([]);
+    c.clearTimeout(2);
+    expect(armed[1]!.live).toBe(true);
+    expect(log).toEqual(["early"]);
+    // The real clock has only the Clock members.
+    expect(Object.keys(c).sort()).toEqual([
+      "clearOwner",
+      "clearTimeout",
+      "now",
+      "setTimeout",
+    ]);
   });
 
   it("clearOwner clears that owner's timers and their host timers", () => {
@@ -159,9 +165,11 @@ describe("real clock", () => {
     });
     c.setTimeout(() => {}, 5, { owner: 1 });
     c.setTimeout(() => {}, 5, { owner: 2 });
+    c.setTimeout(() => {}, 5, { owner: 1 });
     c.clearOwner(1);
-    expect(c.timers().map((t) => t.owner)).toEqual([2]);
-    expect(handles.map((h) => h.live)).toEqual([false, true]);
+    expect(handles.map((h) => h.live)).toEqual([false, true, false]);
+    c.clearOwner(2);
+    expect(handles.map((h) => h.live)).toEqual([false, false, false]);
   });
 
   it("defaults to performance.now when present", () => {

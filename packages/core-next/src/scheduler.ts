@@ -81,14 +81,29 @@ export interface Scheduler {
   pending(lane?: Lane): boolean;
 }
 
-interface Entry {
-  index: number;
-  target: SchedulerTarget;
-  /** Lanes this entry waits on, one bit per {@link LANES} index. */
-  mask: number;
-}
+/**
+ * An error collector, shared by every "run them all, rethrow the first
+ * error" loop of the kernel's services. `guard(fn)` runs `fn` and keeps its
+ * error when it is the first; `guard()` rethrows that one, if any.
+ */
+export function catcher(): (fn?: () => void) => void {
+  // The function itself marks "no error": user code can never throw it.
+  let first: unknown = catcher;
 
-const laneBit = (lane: Lane): number => 1 << LANES.indexOf(lane);
+  return (fn) => {
+    if (fn) {
+      try {
+        fn();
+      } catch (error) {
+        if (first === catcher) {
+          first = error;
+        }
+      }
+    } else if (first !== catcher) {
+      throw first;
+    }
+  };
+}
 
 const hostTimeout =
   (ms: number): HostCallback =>
@@ -116,161 +131,104 @@ export function browserHosts(): Pick<SchedulerOptions, "frame" | "idle"> {
 /** Create a scheduler. Share it between systems to flush them together. */
 export function createScheduler(options: SchedulerOptions = {}): Scheduler {
   const g = globalThis as any;
-  const host: Record<Lane, HostCallback | undefined> = {
-    sync: undefined,
-    micro:
-      options.micro ??
-      (g.queueMicrotask
-        ? (cb) => g.queueMicrotask(cb)
-        : (cb) => Promise.resolve().then(cb)),
-    frame: options.frame ?? hostTimeout(16),
-    idle: options.idle ?? hostTimeout(0),
-    manual: undefined,
-  };
+  const micro: HostCallback =
+    options.micro ??
+    (g.queueMicrotask
+      ? (cb) => g.queueMicrotask(cb)
+      : (cb) => Promise.resolve().then(cb));
   const maxPasses = options.maxPasses ?? 100;
-  const entries = new Map<SchedulerTarget, Entry>();
-  const waiting: Record<Lane, Entry[]> = {
-    sync: [],
-    micro: [],
-    frame: [],
-    idle: [],
-    manual: [],
-  };
+  /** Registration index per target: the tie-break rank. */
+  const index = new Map<SchedulerTarget, number>();
+  /** Targets waiting per lane, in request order. */
+  const waiting = Object.fromEntries(
+    LANES.map((lane) => [lane, new Set<SchedulerTarget>()]),
+  ) as Record<Lane, Set<SchedulerTarget>>;
   /** Lanes whose host callback is armed. */
-  let armed = 0;
+  const armed = new Set<Lane>();
   /** Lanes flushing now; a request for one joins the running flush. */
-  let running = 0;
+  const running = new Set<Lane>();
   let next = 0;
 
-  const entry = (target: SchedulerTarget): Entry => {
-    let e = entries.get(target);
-    if (!e) {
-      e = { index: next++, target, mask: 0 };
-      entries.set(target, e);
+  const register = (target: SchedulerTarget): number => {
+    if (!index.has(target)) {
+      index.set(target, next++);
     }
 
-    return e;
+    return index.get(target)!;
   };
 
   const flushLane = (lane: Lane, only?: SchedulerTarget): void => {
-    const bit = laneBit(lane);
     const queue = waiting[lane];
-    // The queue itself marks "no error": user code can never throw it.
-    let error: unknown = queue;
-    const prevRunning = running;
-    running |= bit;
+    const guard = catcher();
+    const nested = running.has(lane);
+    running.add(lane);
     try {
       for (let pass = 0; ; pass++) {
-        let batch: Entry[];
-        if (only) {
-          const e = entries.get(only);
-          batch = e && e.mask & bit ? queue.splice(queue.indexOf(e), 1) : [];
-        } else {
-          batch = queue.splice(0);
-        }
+        const batch = only ? (queue.has(only) ? [only] : []) : [...queue];
         if (!batch.length) {
           break;
         }
         if (pass >= maxPasses) {
           // Drop what still waits, so the targets are not wedged: a later
           // request queues them again.
-          for (const e of batch) {
-            e.mask &= ~bit;
+          for (const target of batch) {
+            queue.delete(target);
           }
           throw Error(`[Directive] ${lane} lane did not settle`);
         }
-        batch.sort((a, b) => a.index - b.index);
-        for (const e of batch) {
-          // Cleared just before its flush: a request from here on (its own
-          // flush included) queues it for the next pass.
-          e.mask &= ~bit;
-          if (entries.get(e.target) === e) {
-            try {
-              e.target.flush(lane);
-            } catch (err) {
-              if (error === queue) {
-                error = err;
-              }
-            }
+        batch.sort((a, b) => index.get(a)! - index.get(b)!);
+        for (const target of batch) {
+          // Leaves the queue just before its flush: a request from here on
+          // (its own flush included) queues it for the next pass, while one
+          // made earlier in this pass is met by this flush.
+          if (queue.delete(target)) {
+            guard(() => target.flush(lane));
           }
         }
       }
     } finally {
-      running = prevRunning;
+      if (!nested) {
+        running.delete(lane);
+      }
     }
-    if (error !== queue) {
-      throw error;
-    }
-  };
-
-  const arm = (lane: Lane): void => {
-    const bit = laneBit(lane);
-    const cb = host[lane];
-    if (!cb || armed & bit) {
-      return;
-    }
-    armed |= bit;
-    cb(() => {
-      armed &= ~bit;
-      flushLane(lane);
-    });
+    guard();
   };
 
   return {
-    register: (target) => entry(target).index,
+    register,
     unregister(target) {
-      const e = entries.get(target);
-      if (!e) {
-        return;
-      }
-      entries.delete(target);
-      for (const lane of LANES) {
-        const q = waiting[lane];
-        const i = q.indexOf(e);
-        if (i >= 0) {
-          q.splice(i, 1);
+      if (index.delete(target)) {
+        for (const lane of LANES) {
+          waiting[lane].delete(target);
         }
       }
-      e.mask = 0;
     },
     request(lane, target) {
-      const bit = laneBit(lane);
-      const e = entry(target);
-      if (!(e.mask & bit)) {
-        e.mask |= bit;
-        waiting[lane].push(e);
-      }
-      if (lane !== "sync") {
-        arm(lane);
-      } else if (!(running & bit)) {
+      register(target);
+      waiting[lane].add(target);
+      if (lane === "sync") {
         // A running sync flush picks this up in its next pass.
-        flushLane(lane);
+        if (!running.has(lane)) {
+          flushLane(lane);
+        }
+      } else if (lane !== "manual" && !armed.has(lane)) {
+        // Hosts are looked up on first use of their lane.
+        armed.add(lane);
+        (lane === "micro"
+          ? micro
+          : (options[lane] ?? hostTimeout(lane === "frame" ? 16 : 0)))(() => {
+          armed.delete(lane);
+          flushLane(lane);
+        });
       }
     },
     flush(lane, only) {
-      if (lane) {
-        flushLane(lane, only);
-
-        return;
+      const guard = catcher();
+      for (const l of lane ? [lane] : LANES) {
+        guard(() => flushLane(l, only));
       }
-      let error: unknown = entries;
-      for (const l of LANES) {
-        try {
-          flushLane(l, only);
-        } catch (err) {
-          if (error === entries) {
-            error = err;
-          }
-        }
-      }
-      if (error !== entries) {
-        throw error;
-      }
+      guard();
     },
-    pending(lane) {
-      return lane
-        ? waiting[lane].length > 0
-        : LANES.some((l) => waiting[l].length > 0);
-    },
+    pending: (lane) => (lane ? [lane] : LANES).some((l) => waiting[l].size > 0),
   };
 }
