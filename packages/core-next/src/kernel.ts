@@ -66,6 +66,11 @@ export interface Hooks {
    * the kernel that added it is disposed.
    */
   on(fn: Listener): () => void;
+  /**
+   * True while anything listens on the sink: an emitter can skip building
+   * an expensive record nobody reads.
+   */
+  readonly live: boolean;
 }
 
 /** The wire form of a record: `{...event, v: 1}` (`v` always wins). */
@@ -107,6 +112,12 @@ export interface KernelOptions {
 export interface Kernel {
   /** Unique per scheduler: the registration index (tie-break rank). */
   readonly id: number;
+  /**
+   * Unique per clock (never 0, the unowned owner): pass it as a timer's
+   * `owner`. Kernels sharing a clock but not a scheduler share ids, never
+   * owners, so disposing one never clears another's timers.
+   */
+  readonly owner: number;
   readonly version: number;
   readonly parent: Kernel | null;
   readonly children: readonly Kernel[];
@@ -142,8 +153,8 @@ export interface Kernel {
   /** Flush this kernel now on `lane` (every lane when omitted). */
   flush(lane?: Lane): void;
   /**
-   * Dispose children, run dispose hooks, clear this kernel's timers (its id
-   * as owner), dispose its root effects, remove its listeners, leave the
+   * Dispose children, run dispose hooks, clear this kernel's timers (its
+   * {@link Kernel.owner}), dispose its root effects, remove its listeners, leave the
    * scheduler and emit `dispose`. Idempotent. Afterwards writes never
    * schedule a flush, and request / flush do nothing.
    */
@@ -177,6 +188,9 @@ const adder =
 
     return () => remove(list, item);
   };
+
+/** The last owner handed out per clock. */
+const owners = new WeakMap<Clock, number>();
 
 /** Create a kernel. */
 export function createKernel(options: KernelOptions = {}): Kernel {
@@ -234,6 +248,8 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     },
   };
   const id = scheduler.register(target);
+  const owner = (owners.get(clock) ?? 0) + 1;
+  owners.set(clock, owner);
   const graph = createGraph({
     schedule: () => {
       if (!disposed && !settling) {
@@ -256,6 +272,9 @@ export function createKernel(options: KernelOptions = {}): Kernel {
 
   const hooks: SinkHooks = {
     sink_: sink,
+    get live() {
+      return sink.listeners.length > 0;
+    },
     emit(at, data) {
       const seq = ++sink.seq;
       const listeners = sink.listeners;
@@ -299,6 +318,7 @@ export function createKernel(options: KernelOptions = {}): Kernel {
 
   const kernel: Internal = {
     id,
+    owner,
     version: KERNEL_VERSION,
     parent,
     children,
@@ -361,7 +381,7 @@ export function createKernel(options: KernelOptions = {}): Kernel {
       for (const fn of disposers.splice(0)) {
         run(fn);
       }
-      clock.clearOwner(id);
+      clock.clearOwner(owner);
       for (const node of roots.splice(0)) {
         run(() => graph.dispose(node));
       }

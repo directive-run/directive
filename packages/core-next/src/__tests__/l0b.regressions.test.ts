@@ -222,8 +222,8 @@ describe("L0b review regressions", () => {
     let fired = 0;
     let heard = 0;
     let hooked = 0;
-    c.clock.setTimeout(() => fired++, 5, { owner: c.id });
-    p.clock.setTimeout(() => fired++, 5, { owner: p.id });
+    c.clock.setTimeout(() => fired++, 5, { owner: c.owner });
+    p.clock.setTimeout(() => fired++, 5, { owner: p.owner });
     c.hooks.on(() => heard++);
     c.onDispose(() => hooked++);
     const off = c.onDispose(() => hooked++);
