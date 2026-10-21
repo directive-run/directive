@@ -149,6 +149,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/blackbox-listeners.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/blackbox-readonly-module-create.test.ts",
     "category": "black-box",
     "cases": 42,

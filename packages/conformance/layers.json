@@ -1215,6 +1215,24 @@
         }
       }
     },
+    "tests/core/blackbox-listeners.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "listener timing > a fact listener added during a notify fires only on the next write": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "listener timing > a derivation subscriber added during a notify fires only on the next change": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        },
+        "listener timing > derivation subscribe and watch still fire for writes after destroy": {
+          "layer": "L1",
+          "by": ["import createModule", "import createSystem"]
+        }
+      }
+    },
     "tests/core/blackbox-readonly-module-create.test.ts": {
       "category": "black-box",
       "rule": "L1",

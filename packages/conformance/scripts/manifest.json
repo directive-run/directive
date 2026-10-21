@@ -14,6 +14,7 @@
   "tests/core/blackbox-facts-production.test.ts": "packages/core/src/core/__tests__/blackbox-facts-production.test.ts",
   "tests/core/blackbox-facts-proxy.test.ts": "packages/core/src/core/__tests__/blackbox-facts-proxy.test.ts",
   "tests/core/blackbox-facts.test.ts": "packages/core/src/core/__tests__/blackbox-facts.test.ts",
+  "tests/core/blackbox-listeners.test.ts": "packages/core/src/core/__tests__/blackbox-listeners.test.ts",
   "tests/core/blackbox-readonly-module-create.test.ts": "packages/core/src/core/__tests__/blackbox-readonly-module-create.test.ts",
   "tests/core/blackbox-readonly-module-production.test.ts": "packages/core/src/core/__tests__/blackbox-readonly-module-production.test.ts",
   "tests/core/blackbox-readonly-module-view.test.ts": "packages/core/src/core/__tests__/blackbox-readonly-module-view.test.ts",
