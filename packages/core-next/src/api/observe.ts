@@ -78,8 +78,21 @@ export const withObserve: SystemPart = ({ kernel, system }) => {
       name,
       onInit: () => observer({ type: "system.init" }),
       event_(event) {
+        const batch = event.at === "fact.batch";
         for (const observation of toObservations(event)) {
-          observer(observation);
+          if (!batch) {
+            observer(observation);
+            continue;
+          }
+          // As in 1.35: one throw does not stop the rest of the batch.
+          try {
+            observer(observation);
+          } catch (error) {
+            console.error(
+              `[Directive] Observer threw on fact "${(observation as { key?: string }).key}"; the remaining keys in this batch were still delivered.`,
+              error,
+            );
+          }
         }
       },
     };

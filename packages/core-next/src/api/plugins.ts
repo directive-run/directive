@@ -20,6 +20,8 @@ export interface PluginManager {
   readonly list: readonly Plugin[];
   register(plugin: Plugin): void;
   unregister(name: string): void;
+  /** Deliver a record straight to the plugins (after the kernel is gone). */
+  deliver_(event: KernelEvent): void;
 }
 
 declare module "../kernel.js" {
@@ -123,6 +125,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
         plugins.push(plugin);
         off ??= kernel.hooks.on(dispatch);
       },
+      deliver_: dispatch,
       unregister(name) {
         const index = plugins.findIndex((p) => p.name === name);
         if (index !== -1) {

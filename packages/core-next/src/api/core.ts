@@ -17,7 +17,12 @@
 
 import isDevelopment from "#is-development";
 import { Flags, type ReactiveNode } from "../graph.js";
-import { type Kernel, type KernelOptions, createKernel } from "../kernel.js";
+import {
+  type Kernel,
+  type KernelEvent,
+  type KernelOptions,
+  createKernel,
+} from "../kernel.js";
 import {
   BLOCKED_PROPS,
   DERIVATION_DEP_PREFIX,
@@ -153,11 +158,20 @@ export function createSystemCore<const M extends ModuleSchema>(
   const features = kernel.features as {
     effects?: EffectsFeature;
     validate?: (key: string, value: unknown) => void;
+    plugins?: { deliver_(event: KernelEvent): void };
   };
   const tracker: Tracker = { deps: null };
+  /**
+   * After destroy the kernel's stream is gone, but as in 1.35 plugins and
+   * observers still hear writes: records go straight to the plugins.
+   */
+  let tail: ((event: KernelEvent) => void) | null = null;
+  const live = () => tail !== null || hooks.live;
   /** One record on the kernel's stream, for plugins and observers alike. */
   const emit = (at: string, data?: Record<string, unknown>) =>
-    hooks.emit(at, data);
+    tail
+      ? tail({ ...data, t: kernel.clock.now(), seq: 0, sys: kernel.id, at })
+      : hooks.emit(at, data);
 
   const state = {
     running: false,
@@ -167,6 +181,23 @@ export function createSystemCore<const M extends ModuleSchema>(
     scheduled: false,
     reconciling: false,
   };
+  // 1.35's effect-chain cut: passes started only by writes made while
+  // effects ran are an effect waking itself; after 100 the chain is cut.
+  const MAX_EFFECT_CHAIN = 100;
+  let effectsOpen = false;
+  let effectWrites = 0;
+  let otherWrites = 0;
+  let chain = 0;
+  const noteWrite = () => {
+    if (effectsOpen) {
+      effectWrites++;
+    } else {
+      otherWrites++;
+    }
+  };
+  /** In this system's settle: a follow-up pass waits for the next microtask. */
+  let inSettle = false;
+  let followUpQueued = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
   const notifySettle = () => {
@@ -241,7 +272,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // Dirty, not just checked: like 1.35, the next read runs this
       // derivation first and computes what it reads on demand.
       d.node.flags |= Flags.Dirty;
-      if (hooks.live) {
+      if (live()) {
         emit("derivation.invalidate", { id: d.id });
       }
       pending.add(d.id);
@@ -282,7 +313,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live = true;
       d.stale = false;
-      if (hooks.live) {
+      if (live()) {
         emit("derivation.compute", {
           id: d.id,
           value,
@@ -397,13 +428,14 @@ export function createSystemCore<const M extends ModuleSchema>(
       hold();
       try {
         invalidateKeys([key]);
-        if (hooks.live) {
+        if (live()) {
           emit("fact.set", { key, value, prev });
         }
       } finally {
         release();
       }
       changedKeys.add(key);
+      noteWrite();
       scheduleReconcile();
     },
     onWrite(key) {
@@ -414,7 +446,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       batchHeld = true;
     },
     onBatch(changes: FactChange[]) {
-      if (hooks.live) {
+      if (live()) {
         emit("fact.batch", { changes });
       }
       invalidateKeys(changes.map((c) => c.key));
@@ -425,6 +457,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       for (const change of changes) {
         changedKeys.add(change.key);
       }
+      noteWrite();
       scheduleReconcile();
     },
     onBatchEnd() {
@@ -438,12 +471,37 @@ export function createSystemCore<const M extends ModuleSchema>(
 
   // --- reconcile -------------------------------------------------------------
   function scheduleReconcile(): void {
-    if (!state.running || state.scheduled || state.initializing) {
+    if (!state.running || state.initializing) {
       return;
     }
-    state.scheduled = true;
-    notifySettle();
+    if (!state.scheduled) {
+      state.scheduled = true;
+      notifySettle();
+    } else if (inSettle || followUpQueued) {
+      return;
+    }
+    if (inSettle && kernel.lane === "micro") {
+      // As in 1.35, each follow-up pass runs on its own microtask rather
+      // than in the running lane's next pass.
+      followUpQueued = true;
+      queueMicrotask(followUp);
+    } else {
+      // Asked again even when scheduled: a lane that failed to settle drops
+      // its waiters, and this re-queues the pass, so the system stays live.
+      kernel.request();
+    }
+  }
+  function followUp(): void {
+    followUpQueued = false;
+    if (!state.scheduled || kernel.disposed) {
+      return;
+    }
     kernel.request();
+    try {
+      kernel.flush(kernel.lane);
+    } catch (error) {
+      console.error("[Directive] Unexpected error in reconcile:", error);
+    }
   }
   // The reconcile pass runs in the kernel's settle on its own lane (`micro`
   // unless the kernel options say otherwise): one host callback per tick
@@ -457,11 +515,16 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
     state.scheduled = false;
     if (state.running && !state.initializing) {
-      reconcile().catch((error) => {
-        if (isDevelopment) {
-          console.error("[Directive] Unexpected error in reconcile:", error);
-        }
-      });
+      inSettle = true;
+      try {
+        reconcile().catch((error) => {
+          if (isDevelopment) {
+            console.error("[Directive] Unexpected error in reconcile:", error);
+          }
+        });
+      } finally {
+        inSettle = false;
+      }
     }
   });
 
@@ -469,19 +532,44 @@ export function createSystemCore<const M extends ModuleSchema>(
     if (state.reconciling) {
       return;
     }
+    if (effectWrites > 0 && otherWrites === 0) {
+      chain++;
+    } else {
+      chain = 0;
+    }
+    effectWrites = 0;
+    otherWrites = 0;
+    if (chain > MAX_EFFECT_CHAIN) {
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...changedKeys].slice(0, 5).join(", ")}`,
+        );
+      }
+      changedKeys.clear();
+      chain = 0;
+      notifySettle();
+
+      return;
+    }
     state.reconciling = true;
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
     try {
-      if (hooks.live) {
+      if (live()) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
-      const done = features.effects?.runEffectsFast(passKeys);
+      effectsOpen = true;
+      let done: Promise<void> | undefined;
+      try {
+        done = features.effects?.runEffectsFast(passKeys);
+      } finally {
+        effectsOpen = false;
+      }
       if (done) {
         await done;
       }
-      if (hooks.live) {
+      if (live()) {
         emit("reconcile.end", {
           result: { unmet: [], inflight: [], completed: [], canceled: [] },
         });
@@ -582,7 +670,11 @@ export function createSystemCore<const M extends ModuleSchema>(
       (store as unknown as { destroy(): void }).destroy();
       settleListeners.clear();
       emit("system.destroy", { system });
+      const plugins = features.plugins;
       kernel.dispose();
+      if (plugins) {
+        tail = plugins.deliver_;
+      }
     },
     dispatch(event: SystemEvent) {
       if (BLOCKED_PROPS.has(event.type)) {
@@ -593,7 +685,9 @@ export function createSystemCore<const M extends ModuleSchema>(
         : undefined;
       if (!handler) {
         if (isDevelopment) {
-          console.warn(`[Directive] Unknown event type: "${event.type}"`);
+          console.warn(
+            `[Directive] Unknown event type "${event.type}". No handler is registered for this event. Available events: ${Object.keys(eventDefs).join(", ") || "(none)"}`,
+          );
         }
 
         return;
@@ -691,12 +785,18 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         });
         if (opts?.timeout !== undefined && opts.timeout > 0) {
-          timer = kernel.clock.setTimeout(() => {
-            off();
-            reject(
-              new Error(`[Directive] when: timed out after ${opts.timeout}ms`),
-            );
-          }, opts.timeout);
+          timer = kernel.clock.setTimeout(
+            () => {
+              off();
+              reject(
+                new Error(
+                  `[Directive] when: timed out after ${opts.timeout}ms`,
+                ),
+              );
+            },
+            opts.timeout,
+            { owner: kernel.owner },
+          );
         }
       });
     },
@@ -714,21 +814,25 @@ export function createSystemCore<const M extends ModuleSchema>(
           kernel.clock.clearTimeout(timeout);
           off();
         };
-        const timeout = kernel.clock.setTimeout(() => {
-          finish();
-          const details: string[] = [];
-          if (state.reconciling) {
-            details.push("reconciliation in progress");
-          }
-          if (state.scheduled) {
-            details.push("reconcile scheduled");
-          }
-          reject(
-            new Error(
-              `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
-            ),
-          );
-        }, maxWait);
+        const timeout = kernel.clock.setTimeout(
+          () => {
+            finish();
+            const details: string[] = [];
+            if (state.reconciling) {
+              details.push("reconciliation in progress");
+            }
+            if (state.scheduled) {
+              details.push("reconcile scheduled");
+            }
+            reject(
+              new Error(
+                `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+              ),
+            );
+          },
+          maxWait,
+          { owner: kernel.owner },
+        );
         const off = system.onSettledChange(() => {
           queueMicrotask(() => {
             if (!done && settled()) {

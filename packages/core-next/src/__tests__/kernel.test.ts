@@ -348,7 +348,7 @@ function program(seed: number): string {
         () => k.graph.write(sigs[i]!, v),
         Math.floor(drive() * 40),
         {
-          owner: k.id,
+          owner: k.owner,
           kind: "set",
         },
       );
