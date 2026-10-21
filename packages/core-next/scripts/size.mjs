@@ -68,16 +68,47 @@ for (const [name, contents] of Object.entries(bundles)) {
 }
 const dist = new URL("../dist/index.js", import.meta.url).pathname;
 if (existsSync(dist)) {
-  // The build is not minified; minify it the same way to compare like for
-  // like. Property names are already mangled by the build.
-  const built = await transform(readFileSync(dist, "utf8"), {
+  // tsup runs with `splitting: true`, so dist/index.js imports dist/chunk-*.js.
+  // Measuring index.js alone under-reports what a consumer ships. Bundle the
+  // entry as a consumer's bundler would (chunks followed, dev flag folded by
+  // NODE_ENV=production, @directive-run/* external). Property names are already
+  // mangled by the build.
+  const built = await build({
+    entryPoints: [dist],
+    bundle: true,
     minify: true,
     format: "esm",
     target: "es2022",
-    loader: "js",
+    write: false,
+    logLevel: "silent",
+    metafile: true,
+    conditions: ["production"],
+    define: { "process.env.NODE_ENV": '"production"' },
+    external: ["@directive-run/*"],
   });
-  const builtGz = gzipSync(built.code, { level: 9 }).length;
-  console.log(`dist/index.js: ${builtGz} B min+gzip (built by tsup)`);
+  const builtGz = gzipSync(built.outputFiles[0].contents, { level: 9 }).length;
+  // Guard: every chunk the entry imports must be inside the measured bundle,
+  // so the number can never silently fall back to index.js alone.
+  const distDir = new URL("../dist/", import.meta.url).pathname;
+  const measured = Object.keys(built.metafile.inputs).map((f) =>
+    join(process.cwd(), f),
+  );
+  const measuredNames = new Set(measured.map((f) => f.split("/").pop()));
+  const imported = [
+    ...readFileSync(dist, "utf8").matchAll(
+      /from\s*["']\.\/(chunk-[^"']+\.js)["']/g,
+    ),
+  ].map((m) => m[1]);
+  const missing = imported.filter(
+    (c) => !measuredNames.has(c) || !existsSync(join(distDir, c)),
+  );
+  if (missing.length > 0) {
+    console.error(`dist size excludes imported chunks: ${missing}`);
+    process.exitCode = 1;
+  }
+  console.log(
+    `dist entry incl. chunks (${imported.length} imported): ${builtGz} B min+gzip (dist/index.js bundled, @directive-run/* external)`,
+  );
 }
 // Fixtures, reported (no budget yet): each bundled for production
 // (`#is-development` inlined as in tsup, NODE_ENV is "production"),
