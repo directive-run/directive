@@ -13,7 +13,6 @@ import {
   type CreateFactsStoreOptions,
   createFacts as createFactsCore,
   createFactsStore as createFactsStoreCore,
-  safeStringify,
 } from "./facts.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
@@ -28,6 +27,15 @@ function isZodSchema(v: unknown): boolean {
     typeof o.parse === "function"
   );
 }
+
+/** 1.35's error preview: compact JSON, first 100 chars; never throws. */
+const previewValue = (value: unknown): string => {
+  try {
+    return JSON.stringify(value)?.slice(0, 100) ?? String(value);
+  } catch {
+    return "[circular or non-serializable]";
+  }
+};
 
 const typeLabel = (value: unknown) =>
   value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
@@ -53,7 +61,7 @@ export function createValidator(
     options.strictKeys ?? (isDevelopment && Object.keys(schema).length > 0);
   const redactErrors = options.redactErrors ?? false;
   const preview = (value: unknown) =>
-    redactErrors ? "[redacted]" : safeStringify(value);
+    redactErrors ? "[redacted]" : previewValue(value);
 
   return (key: string, value: unknown): void => {
     const st = (schema as Record<string, unknown>)[key] as
