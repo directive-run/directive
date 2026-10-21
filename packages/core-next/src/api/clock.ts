@@ -15,6 +15,8 @@
  * @see ../../docs/rfcs/0001-t-timer.md
  */
 
+import { type Clock, createClock, createVirtualClock } from "../clock.js";
+
 /**
  * Stable interface for any time source.
  */
@@ -36,81 +38,37 @@ export interface SignalClock {
   advanceBy?(ms: number): void;
 }
 
+/** The 1.35 shape over one of the kernel's clocks (clock.ts). */
+const signalClock = (clock: Clock): SignalClock => ({
+  now: () => clock.now(),
+  setTimeout(cb, ms) {
+    const id = clock.setTimeout(cb, ms);
+
+    return () => clock.clearTimeout(id);
+  },
+});
+
 /**
- * Production clock — wraps `Date.now()` and `globalThis.setTimeout`.
- * No mocking, no virtualization.
+ * Production clock: `Date.now()` and the host `setTimeout`, through the
+ * kernel's real clock ({@link createClock}).
  */
 export function realClock(): SignalClock {
-  return {
-    now: () => Date.now(),
-    setTimeout: (cb, ms) => {
-      const handle = globalThis.setTimeout(cb, ms);
-      return () => globalThis.clearTimeout(handle);
-    },
-  };
+  return signalClock(createClock({ now: () => Date.now() }));
 }
 
 /**
- * Virtual clock — advances only when `advanceBy(ms)` is called. All
- * scheduled callbacks fire synchronously in order of their deadlines.
- *
- * Two scheduled callbacks at the same deadline fire in registration order.
- * Cancellation is O(1).
+ * Virtual clock: advances only when `advanceBy(ms)` is called, firing every
+ * callback whose deadline falls in the window, in deadline order (ties in
+ * registration order), with `now()` at each callback's deadline. Time never
+ * moves backwards: a callback set "in the past" fires at the current time.
+ * Built on the kernel's virtual clock ({@link createVirtualClock}).
  */
 export function virtualClock(initialMs = 0): SignalClock {
-  let nowMs = initialMs;
-  let nextId = 0;
-  interface Scheduled {
-    id: number;
-    deadlineMs: number;
-    cb: () => void;
-    canceled: boolean;
-  }
-  const queue: Scheduled[] = [];
+  const clock = createVirtualClock(initialMs);
 
   return {
-    now: () => nowMs,
-    setTimeout: (cb, ms) => {
-      const entry: Scheduled = {
-        id: nextId++,
-        deadlineMs: nowMs + ms,
-        cb,
-        canceled: false,
-      };
-      queue.push(entry);
-      return () => {
-        entry.canceled = true;
-      };
-    },
-    advanceBy: (ms) => {
-      const targetMs = nowMs + ms;
-      // Fire all callbacks whose deadlines fall in [nowMs, targetMs].
-      // Sort live entries by deadline + registration order so ties
-      // resolve deterministically.
-      while (true) {
-        const ready = queue
-          .filter((e) => !e.canceled && e.deadlineMs <= targetMs)
-          .sort((a, b) =>
-            a.deadlineMs !== b.deadlineMs
-              ? a.deadlineMs - b.deadlineMs
-              : a.id - b.id,
-          );
-        if (ready.length === 0) break;
-        const next = ready[0]!;
-        // Advance "now" monotonically — never let a callback that
-        // schedules another callback in the past pull `nowMs`
-        // backward. Without this clamp, `setTimeout(cb2, -5)` from
-        // inside a callback would make `clock.now()` return a smaller
-        // value mid-advance, breaking elapsedMs (negative results)
-        // and replay determinism.
-        nowMs = Math.max(nowMs, next.deadlineMs);
-        next.canceled = true;
-        next.cb();
-      }
-      // Final advance — even if no callbacks fired in [nowMs, targetMs],
-      // wall clock still moves forward.
-      nowMs = Math.max(nowMs, targetMs);
-    },
+    ...signalClock(clock),
+    advanceBy: (ms) => clock.advanceTo(clock.now() + ms),
   };
 }
 

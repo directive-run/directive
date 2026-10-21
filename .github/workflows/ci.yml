@@ -132,8 +132,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Two tests use the built package: one imports the engine's ESM entry
-      # in a child process, one typechecks against its declarations.
+      # in a child process, one typechecks against its declarations. They run
+      # on every engine, so build both the 1.35 core and core-next (v2).
       - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
 
       # Three independent steps. check-expects proves the ports are faithful;
       # the census runs every project and proves the run was complete (and

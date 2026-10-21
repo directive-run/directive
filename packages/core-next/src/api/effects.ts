@@ -8,6 +8,7 @@
  */
 
 import isDevelopment from "#is-development";
+import type { SystemPart } from "./core.js";
 import {
   BLOCKED_PROPS,
   type Tracker,
@@ -333,3 +334,37 @@ export function createEffectsManager<S extends Schema>(
     isEnabled: (id) => states.get(id)?.enabled ?? false,
   };
 }
+
+/**
+ * The effects part: builds the manager from the module's `effects` and
+ * defines it as the kernel's `effects` feature, which the reconcile pass
+ * runs. A system without this part bundles none of the manager.
+ */
+export const withEffects: SystemPart = (ctx) => {
+  const { kernel, reportError } = ctx;
+  const { hooks } = kernel;
+  const manager = createEffectsManager({
+    definitions: (ctx.module.effects ?? {}) as Record<string, any>,
+    facts: ctx.facts,
+    store: ctx.store,
+    derived: ctx.derived,
+    tracker: ctx.tracker,
+    onRun(id) {
+      if (hooks.live) {
+        hooks.emit("effect.run", { id });
+      }
+    },
+    onError(id, error) {
+      if (hooks.live) {
+        hooks.emit("effect.error", { id, error });
+      }
+      reportError("effect", id, error);
+    },
+    onWriteBlocked(id, key) {
+      if (hooks.live) {
+        hooks.emit("effect.write-blocked", { id, key });
+      }
+    },
+  });
+  kernel.define("effects", manager);
+};
