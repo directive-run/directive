@@ -2,6 +2,12 @@
   "name": "@directive-run/core-next",
   "version": "0.0.0",
   "private": true,
+  "imports": {
+    "#is-development": {
+      "production": "./src/dev-false.ts",
+      "default": "./src/dev-true.ts"
+    }
+  },
   "description": "Directive 2.0 engine, built layer by layer. Unpublished.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -14,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./internals": {
+      "types": "./dist/internals.d.ts",
+      "import": "./dist/internals.js"
     }
   },
   "files": ["dist"],
