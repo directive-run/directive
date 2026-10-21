@@ -26,6 +26,7 @@ export type {
   Rng,
   TimerOptions,
   TimerRecord,
+  VirtualClock,
 } from "./clock.js";
 export { KERNEL_VERSION, createKernel, serializeEvent } from "./kernel.js";
 export type {

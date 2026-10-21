@@ -13,6 +13,11 @@
  *
  * Every piece of state belongs to one system: its graph, tracker, plugin
  * list and warning caches. Two systems in one process never share any.
+ *
+ * Written for size (L0e): system state lives in closure variables (which a
+ * minifier shortens) rather than object fields, build-private fields end in
+ * `_` (mangled by the build), and the listener and view patterns are the
+ * shared helpers in facts.ts. Development-only text sits behind the dev flag.
  */
 
 import isDevelopment from "#is-development";
@@ -26,10 +31,14 @@ import {
 import {
   BLOCKED_PROPS,
   DERIVATION_DEP_PREFIX,
+  LOCKED,
+  type Listeners,
   type Tracker,
   createFactsProxy,
   createFactsStore,
   describeDep,
+  listen,
+  view,
   withTracking,
 } from "./facts.js";
 import type {
@@ -54,15 +63,26 @@ export type ErrorSource =
   | "system";
 
 export class DirectiveError extends Error {
+  declare readonly source: ErrorSource;
+  declare readonly sourceId: string;
+  declare readonly context?: unknown;
+  declare readonly recoverable: boolean;
   constructor(
     message: string,
-    public readonly source: ErrorSource,
-    public readonly sourceId: string,
-    public readonly context?: unknown,
-    public readonly recoverable = true,
+    source: ErrorSource,
+    sourceId: string,
+    context?: unknown,
+    recoverable = true,
   ) {
     super(message);
-    this.name = "DirectiveError";
+    // Own fields in the order 1.35 defines them, `name` last.
+    Object.assign(this, {
+      source,
+      sourceId,
+      context,
+      recoverable,
+      name: "DirectiveError",
+    });
   }
 }
 
@@ -74,12 +94,12 @@ export function createModule<const M extends ModuleSchema>(
 }
 
 interface Derivation {
-  id: string;
-  node: ReactiveNode;
+  id_: string;
+  node_: ReactiveNode;
   /** 1.35's stale flag: set by an invalidation, cleared by a compute. */
-  stale: boolean;
+  stale_: boolean;
   /** Has computed at least once (1.35 creates its state on first read). */
-  live: boolean;
+  live_: boolean;
 }
 
 /**
@@ -116,6 +136,27 @@ declare module "../kernel.js" {
   }
 }
 
+type Fn = (...args: any[]) => any;
+
+/** A module's definitions by id, each as its function (`fn` or `{ [key]: fn }`). */
+const defsOf = (
+  src: Record<string, unknown> | undefined,
+  key: string,
+): Record<string, Fn> => {
+  const out: Record<string, Fn> = {};
+  for (const [id, raw] of Object.entries(src ?? {})) {
+    out[id] = typeof raw === "function" ? (raw as Fn) : (raw as any)[key];
+  }
+
+  return out;
+};
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/** A promise that settles after one microtask. */
+const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
+
 /**
  * A system on its own kernel (a new one per system; `kernel` options can
  * share a scheduler or clock). Without parts it has facts, derivations,
@@ -127,34 +168,18 @@ export function createSystemCore<const M extends ModuleSchema>(
   parts: readonly SystemPart[] = [],
   kernelOptions?: KernelOptions,
 ): System<M> {
-  if (!options.module) {
+  const module = options.module as ModuleDefinition<ModuleSchema>;
+  if (!module) {
     throw new Error(
-      "[Directive] core-next builds single-module systems so far (createSystem({ module })); `modules` arrives at L1.",
+      "[Directive] createSystem needs a `module` (`modules` arrives at L1)",
     );
   }
-  const module = options.module as ModuleDefinition<ModuleSchema>;
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  const deriveDefs: Record<
-    string,
-    (facts: unknown, derived: unknown) => unknown
-  > = {};
-  for (const [id, raw] of Object.entries(module.derive ?? {})) {
-    deriveDefs[id] =
-      typeof raw === "function"
-        ? (raw as (f: unknown, d: unknown) => unknown)
-        : (raw as { compute: (f: unknown, d: unknown) => unknown }).compute;
-  }
-  const eventDefs: Record<string, (facts: unknown, event: unknown) => void> =
-    {};
-  for (const [name, raw] of Object.entries(module.events ?? {})) {
-    eventDefs[name] =
-      typeof raw === "function"
-        ? (raw as (f: unknown, e: unknown) => void)
-        : (raw as { handler: (f: unknown, e: unknown) => void }).handler;
-  }
+  const deriveDefs = defsOf(module.derive, "compute");
+  const eventDefs = defsOf(module.events, "handler");
 
   const kernel = createKernel(kernelOptions);
-  const { graph, hooks } = kernel;
+  const { graph, hooks, clock } = kernel;
   const features = kernel.features as {
     effects?: EffectsFeature;
     validate?: (key: string, value: unknown) => void;
@@ -170,66 +195,63 @@ export function createSystemCore<const M extends ModuleSchema>(
   /** One record on the kernel's stream, for plugins and observers alike. */
   const emit = (at: string, data?: Record<string, unknown>) =>
     tail
-      ? tail({ ...data, t: kernel.clock.now(), seq: 0, sys: kernel.id, at })
+      ? tail({ ...data, t: clock.now(), seq: 0, sys: kernel.id, at })
       : hooks.emit(at, data);
-
-  const state = {
-    running: false,
-    initializing: false,
-    initialized: false,
-    destroyed: false,
-    scheduled: false,
-    reconciling: false,
-  };
-  // 1.35's effect-chain cut: passes started only by writes made while
-  // effects ran are an effect waking itself; after 100 the chain is cut.
-  const MAX_EFFECT_CHAIN = 100;
-  let effectsOpen = false;
-  let effectWrites = 0;
-  let otherWrites = 0;
-  let chain = 0;
-  const noteWrite = () => {
-    if (effectsOpen) {
-      effectWrites++;
-    } else {
-      otherWrites++;
+  /** Emit only when someone listens: the record is not even built otherwise. */
+  const report = (at: string, data: () => Record<string, unknown>) => {
+    if (live()) {
+      emit(at, data());
     }
   };
+
+  let running = false;
+  let initializing = false;
+  let initialized = false;
+  let destroyed = false;
+  let scheduled = false;
+  let reconciling = false;
+  // 1.35's effect-chain cut: passes started only by writes made while
+  // effects ran are an effect waking itself; after 100 the chain is cut.
+  // Writes since the last pass: from an effect, or from elsewhere.
+  let effectsOpen = false;
+  let writtenByEffect = false;
+  let writtenElsewhere = false;
+  let chain = 0;
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
-  const notifySettle = () => {
-    for (const listener of settleListeners) {
-      listener();
-    }
-  };
+  const notifySettle = () => settleListeners.forEach((fn) => fn());
 
   // --- derivations -------------------------------------------------------
   const derivations = new Map<string, Derivation>();
   const byNode = new Map<ReactiveNode, Derivation>();
-  const listeners = new Map<string, Set<() => void>>();
+  const listeners: Listeners = new Map();
   const pending = new Set<string>();
   let holdDepth = 0;
 
-  /** Notify subscribers of the pending derivations (in a sync settle). */
-  function notifyDerivations(): void {
+  /** Tell the subscribers of every derivation that went stale. */
+  const notifyPending = () => {
+    if (pending.size === 0) {
+      return;
+    }
     const ids = [...pending];
     pending.clear();
     for (const id of ids) {
-      for (const listener of listeners.get(id) ?? []) {
+      listeners.get(id)?.forEach((fn) => {
         try {
-          listener();
+          fn();
         } catch (error) {
           console.error("[Directive] Derivation subscriber error:", {
             derivation: id,
             error,
           });
         }
-      }
+      });
     }
-  }
+  };
+
   /**
    * Notifications run on the kernel's `sync` lane: before the write returns,
    * and a listener's own writes get another pass (up to the scheduler's
@@ -237,6 +259,13 @@ export function createSystemCore<const M extends ModuleSchema>(
    */
   const release = () => {
     if (--holdDepth > 0 || pending.size === 0) {
+      return;
+    }
+    if (destroyed) {
+      // The kernel is gone, so no settle will come: as in 1.35, writes still
+      // reach derivation subscribers, right here.
+      notifyPending();
+
       return;
     }
     try {
@@ -248,55 +277,41 @@ export function createSystemCore<const M extends ModuleSchema>(
       const remaining = [...pending];
       pending.clear();
       throw new Error(
-        `[Directive] Infinite derivation notification loop detected after 100 iterations. Remaining: ${remaining.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+        `[Directive] Infinite derivation notification loop detected after 100 iterations. Remaining: ${remaining.join(", ")}.${isDevelopment ? " This usually means a derivation listener is mutating facts that re-trigger the same derivation." : ""}`,
       );
     }
   };
-  const hold = () => {
-    holdDepth++;
-  };
 
-  /** Mark stale every live derivation downstream of `start`, depth first. */
-  function invalidateFrom(start: Derivation, visited: Set<Derivation>): void {
-    const stack = [start];
-    while (stack.length > 0) {
-      const d = stack.pop()!;
-      if (visited.has(d)) {
-        continue;
-      }
-      visited.add(d);
-      if (!d.live || d.stale) {
-        continue;
-      }
-      d.stale = true;
-      // Dirty, not just checked: like 1.35, the next read runs this
-      // derivation first and computes what it reads on demand.
-      d.node.flags |= Flags.Dirty;
-      if (live()) {
-        emit("derivation.invalidate", { id: d.id });
-      }
-      pending.add(d.id);
-      for (let l = d.node.subs; l; l = l.nextSub) {
-        const next = byNode.get(l.target);
-        if (next) {
-          stack.push(next);
-        }
-      }
-    }
-  }
-  function invalidateKeys(keys: Iterable<string>): void {
+  /**
+   * Mark stale every live derivation downstream of the written keys: for each
+   * fact's subscriber in link order, depth first.
+   */
+  function invalidate(keys: Iterable<string>): void {
     holdDepth++;
-    const visited = new Set<Derivation>();
+    const seen = new Set<ReactiveNode>();
     try {
       for (const key of keys) {
-        const factNode = factNodes.get(key);
-        if (!factNode) {
-          continue;
-        }
-        for (let l = factNode.subs; l; l = l.nextSub) {
-          const d = byNode.get(l.target);
-          if (d) {
-            invalidateFrom(d, visited);
+        for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
+          const stack = [l.target];
+          while (stack.length > 0) {
+            const node = stack.pop()!;
+            const d = byNode.get(node);
+            if (!d || seen.has(node)) {
+              continue;
+            }
+            seen.add(node);
+            if (!d.live_ || d.stale_) {
+              continue;
+            }
+            d.stale_ = true;
+            // Dirty, not just checked: like 1.35, the next read runs this
+            // derivation first and computes what it reads on demand.
+            node.flags |= Flags.Dirty;
+            report("derivation.invalidate", () => ({ id: d.id_ }));
+            pending.add(d.id_);
+            for (let s = node.subs; s; s = s.nextSub) {
+              stack.push(s.target);
+            }
           }
         }
       }
@@ -306,73 +321,54 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
 
   function compute(d: Derivation): unknown {
-    const def = deriveDefs[d.id]!;
     try {
       const { value, deps } = withTracking(tracker, () =>
-        def(facts, derivedProxy),
+        deriveDefs[d.id_]!(facts, derive),
       );
-      d.live = true;
-      d.stale = false;
-      if (live()) {
-        emit("derivation.compute", {
-          id: d.id,
-          value,
-          deps: Array.from(deps, describeDep),
-        });
-      }
+      d.live_ = true;
+      d.stale_ = false;
+      report("derivation.compute", () => ({
+        id: d.id_,
+        value,
+        deps: Array.from(deps, describeDep),
+      }));
 
       return value;
     } catch (error) {
-      d.live = true;
-      reportError("derivation", d.id, error);
+      d.live_ = true;
+      reportError("derivation", d.id_, error);
       // 1.35 keeps a throwing derivation stale: the next read runs it again.
-      d.node.flags |= Flags.Dirty;
+      d.node_.flags |= Flags.Dirty;
       throw error;
     }
   }
-  for (const id of Object.keys(deriveDefs)) {
-    const d: Derivation = { id, stale: true, live: false } as Derivation;
-    d.node = graph.computed(() => compute(d), { equals: false });
+  for (const id in deriveDefs) {
+    const d = { id_: id, stale_: true, live_: false } as Derivation;
+    d.node_ = graph.computed(() => compute(d), { equals: false });
     derivations.set(id, d);
-    byNode.set(d.node, d);
+    byNode.set(d.node_, d);
   }
-  function readDerivation(id: string): unknown {
+  function read(id: string): unknown {
     const d = derivations.get(id);
     if (!d) {
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
 
-    return graph.read(d.node);
+    return graph.read(d.node_);
   }
-  const derivedProxy = new Proxy({} as Record<string, unknown>, {
-    get(_, prop) {
-      if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      if (!derivations.has(prop)) {
-        return undefined;
-      }
-
-      return readDerivation(prop);
-    },
-    has: (_, prop) => typeof prop === "string" && derivations.has(prop),
-    ownKeys: () => [...derivations.keys()],
-    getOwnPropertyDescriptor: (_, prop) =>
-      typeof prop === "string" && derivations.has(prop)
-        ? { configurable: true, enumerable: true, writable: false }
-        : undefined,
-    set: () => false,
-    deleteProperty: () => false,
-    defineProperty: () => false,
-    getPrototypeOf: () => null,
-    setPrototypeOf: () => false,
-  });
+  const no = () => false;
+  const derive = view(
+    (id) => derivations.has(id),
+    () => [...derivations.keys()],
+    (id) => (BLOCKED_PROPS.has(id) ? undefined : read(id)),
+    { ...LOCKED, set: no, deleteProperty: no },
+  );
 
   // --- errors ------------------------------------------------------------
   // The default strategy (skip) for every source an L0 system has. Each
   // error reaches onError, then onErrorRecovery; dev warns once per source.
-  const warnedUnhandled = new Set<string>();
+  const warned = new Set<string>();
   function reportError(
     source: ErrorSource,
     sourceId: string,
@@ -382,33 +378,29 @@ export function createSystemCore<const M extends ModuleSchema>(
       error instanceof DirectiveError
         ? error
         : new DirectiveError(
-            error instanceof Error ? error.message : String(error),
+            messageOf(error),
             source,
             sourceId,
             undefined,
             source !== "system",
           );
     emit("error", { error: wrapped });
-    const option =
-      source === "derivation"
-        ? "onDerivationError"
-        : source === "constraint"
-          ? "onConstraintError"
-          : source === "resolver"
-            ? "onResolverError"
-            : null;
-    if (
-      isDevelopment &&
-      option &&
-      !warnedUnhandled.has(`${source}:${sourceId}`)
-    ) {
-      warnedUnhandled.add(`${source}:${sourceId}`);
-      const message = (
-        error instanceof Error ? error.message : String(error)
-      ).replace(/[.!?]+\s*$/, "");
-      console.warn(
-        `[Directive] ${source} "${sourceId}" threw: ${message}. The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
-      );
+    if (isDevelopment) {
+      const option =
+        source === "derivation"
+          ? "onDerivationError"
+          : source === "constraint"
+            ? "onConstraintError"
+            : source === "resolver"
+              ? "onResolverError"
+              : null;
+      const key = `${source}:${sourceId}`;
+      if (option && !warned.has(key)) {
+        warned.add(key);
+        console.warn(
+          `[Directive] ${source} "${sourceId}" threw: ${messageOf(error).replace(/[.!?]+\s*$/, "")}. The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
+        );
+      }
     }
     emit("error.recovery", { error: wrapped, strategy: "skip" });
   }
@@ -416,6 +408,24 @@ export function createSystemCore<const M extends ModuleSchema>(
   // --- facts ---------------------------------------------------------------
   const factNodes = new Map<string, ReactiveNode>();
   let batchHeld = false;
+  const endBatch = () => {
+    if (batchHeld) {
+      batchHeld = false;
+      release();
+    }
+  };
+  /** Changed keys feed the next reconcile pass. */
+  const changed = (keys: string[]) => {
+    for (const key of keys) {
+      changedKeys.add(key);
+    }
+    if (effectsOpen) {
+      writtenByEffect = true;
+    } else {
+      writtenElsewhere = true;
+    }
+    scheduleReconcile();
+  };
   const store = createFactsStore({
     schema,
     graph,
@@ -425,57 +435,38 @@ export function createSystemCore<const M extends ModuleSchema>(
       ? (key, value) => features.validate?.(key, value)
       : undefined,
     onChange(key, value, prev) {
-      hold();
+      holdDepth++;
       try {
-        invalidateKeys([key]);
-        if (live()) {
-          emit("fact.set", { key, value, prev });
-        }
+        invalidate([key]);
+        report("fact.set", () => ({ key, value, prev }));
       } finally {
         release();
       }
-      changedKeys.add(key);
-      noteWrite();
-      scheduleReconcile();
+      changed([key]);
     },
-    onWrite(key) {
-      invalidateKeys([key]);
-    },
+    onWrite: (key) => invalidate([key]),
     onBatchStart() {
-      hold();
+      holdDepth++;
       batchHeld = true;
     },
     onBatch(changes: FactChange[]) {
-      if (live()) {
-        emit("fact.batch", { changes });
-      }
-      invalidateKeys(changes.map((c) => c.key));
-      if (batchHeld) {
-        batchHeld = false;
-        release();
-      }
-      for (const change of changes) {
-        changedKeys.add(change.key);
-      }
-      noteWrite();
-      scheduleReconcile();
+      report("fact.batch", () => ({ changes }));
+      const keys = changes.map((c) => c.key);
+      invalidate(keys);
+      endBatch();
+      changed(keys);
     },
-    onBatchEnd() {
-      if (batchHeld) {
-        batchHeld = false;
-        release();
-      }
-    },
+    onBatchEnd: endBatch,
   });
   const facts = createFactsProxy(store, schema, tracker, new Set());
 
   // --- reconcile -------------------------------------------------------------
   function scheduleReconcile(): void {
-    if (!state.running || state.initializing) {
+    if (!running || initializing) {
       return;
     }
-    if (!state.scheduled) {
-      state.scheduled = true;
+    if (!scheduled) {
+      scheduled = true;
       notifySettle();
     } else if (inSettle || followUpQueued) {
       return;
@@ -491,35 +482,37 @@ export function createSystemCore<const M extends ModuleSchema>(
       kernel.request();
     }
   }
+  const unexpected = (error: unknown) =>
+    console.error("[Directive] Unexpected error in reconcile:", error);
   function followUp(): void {
     followUpQueued = false;
-    if (!state.scheduled || kernel.disposed) {
+    if (!scheduled || kernel.disposed) {
       return;
     }
     kernel.request();
     try {
       kernel.flush(kernel.lane);
     } catch (error) {
-      console.error("[Directive] Unexpected error in reconcile:", error);
+      unexpected(error);
     }
   }
   // The reconcile pass runs in the kernel's settle on its own lane (`micro`
   // unless the kernel options say otherwise): one host callback per tick
   // for every system sharing the scheduler.
   kernel.onSettle((lane) => {
-    if (holdDepth === 0 && pending.size > 0) {
-      notifyDerivations();
+    if (holdDepth === 0) {
+      notifyPending();
     }
-    if (lane !== kernel.lane || !state.scheduled) {
+    if (lane !== kernel.lane || !scheduled) {
       return;
     }
-    state.scheduled = false;
-    if (state.running && !state.initializing) {
+    scheduled = false;
+    if (running && !initializing) {
       inSettle = true;
       try {
         reconcile().catch((error) => {
           if (isDevelopment) {
-            console.error("[Directive] Unexpected error in reconcile:", error);
+            unexpected(error);
           }
         });
       } finally {
@@ -529,20 +522,15 @@ export function createSystemCore<const M extends ModuleSchema>(
   });
 
   async function reconcile(): Promise<void> {
-    if (state.reconciling) {
+    if (reconciling) {
       return;
     }
-    if (effectWrites > 0 && otherWrites === 0) {
-      chain++;
-    } else {
-      chain = 0;
-    }
-    effectWrites = 0;
-    otherWrites = 0;
-    if (chain > MAX_EFFECT_CHAIN) {
+    chain = writtenByEffect && !writtenElsewhere ? chain + 1 : 0;
+    writtenByEffect = writtenElsewhere = false;
+    if (chain > 100) {
       if (isDevelopment) {
         console.warn(
-          `[Directive] Effects kept waking each other for ${MAX_EFFECT_CHAIN} passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...changedKeys].slice(0, 5).join(", ")}`,
+          `[Directive] Effects kept waking each other for 100 passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...changedKeys].slice(0, 5).join(", ")}`,
         );
       }
       changedKeys.clear();
@@ -551,14 +539,12 @@ export function createSystemCore<const M extends ModuleSchema>(
 
       return;
     }
-    state.reconciling = true;
+    reconciling = true;
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
     try {
-      if (live()) {
-        emit("reconcile.start", { snapshot: facts.$snapshot() });
-      }
+      report("reconcile.start", () => ({ snapshot: facts.$snapshot() }));
       effectsOpen = true;
       let done: Promise<void> | undefined;
       try {
@@ -569,13 +555,11 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (done) {
         await done;
       }
-      if (live()) {
-        emit("reconcile.end", {
-          result: { unmet: [], inflight: [], completed: [], canceled: [] },
-        });
-      }
+      report("reconcile.end", () => ({
+        result: { unmet: [], inflight: [], completed: [], canceled: [] },
+      }));
     } finally {
-      state.reconciling = false;
+      reconciling = false;
       if (changedKeys.size > 0) {
         scheduleReconcile();
       }
@@ -584,60 +568,59 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
 
   // --- the system ----------------------------------------------------------
+  const isSettled = () => !scheduled && !reconciling;
+  const warnUnknown = (method: string, id: string) =>
+    console.warn(`[Directive] ${method}: unknown key "${id}"`);
+  /** A clock timer owned by this system; returns its canceller. */
+  const after = (ms: number, fn: () => void) => {
+    const id = clock.setTimeout(fn, ms, { owner: kernel.owner });
+
+    return () => clock.clearTimeout(id);
+  };
   const system = {
     facts,
-    derive: derivedProxy,
-    events: new Proxy({} as Record<string, unknown>, {
-      get(_, prop) {
-        if (typeof prop !== "string" || !(prop in eventDefs)) {
-          return undefined;
-        }
-
-        return (payload?: Record<string, unknown>) =>
-          system.dispatch({ type: prop, ...payload });
-      },
-      has: (_, prop) => typeof prop === "string" && prop in eventDefs,
-      ownKeys: () => Object.keys(eventDefs),
-      getOwnPropertyDescriptor: (_, prop) =>
-        typeof prop === "string" && prop in eventDefs
-          ? { configurable: true, enumerable: true, writable: false }
-          : undefined,
-    }),
+    derive,
+    events: view(
+      (name) => name in eventDefs,
+      () => Object.keys(eventDefs),
+      (name) => (payload?: Record<string, unknown>) =>
+        system.dispatch({ type: name, ...payload }),
+    ),
     get isRunning() {
-      return state.running;
+      return running;
     },
     get isSettled() {
-      return !state.scheduled && !state.reconciling;
+      return isSettled();
     },
     get isInitialized() {
-      return state.initialized;
+      return initialized;
     },
     get isReady() {
-      return state.initialized;
+      return initialized;
     },
     initialize() {
-      if (state.initialized) {
+      if (initialized) {
         return;
       }
-      state.initializing = true;
+      initializing = true;
       if (module.init) {
         store.batch(() => module.init!(facts));
       }
-      state.initializing = false;
-      state.initialized = true;
+      initializing = false;
+      initialized = true;
       for (const id of derivations.keys()) {
         try {
-          readDerivation(id);
+          read(id);
         } catch {
           // Reported through onError; the derivation stays stale.
         }
       }
     },
     start() {
-      if (state.running) {
+      if (running) {
         return;
       }
-      if (state.destroyed) {
+      if (destroyed) {
         if (isDevelopment) {
           console.warn(
             "[Directive] system.start() called after destroy — ignored. Systems are not reusable; create a new one.",
@@ -646,27 +629,24 @@ export function createSystemCore<const M extends ModuleSchema>(
 
         return;
       }
-      if (!state.initialized) {
-        system.initialize();
-      }
-      state.running = true;
+      system.initialize();
+      running = true;
       emit("system.start", { system });
       scheduleReconcile();
     },
     stop() {
-      if (!state.running) {
-        return;
+      if (running) {
+        running = false;
+        features.effects?.cleanupAll();
+        emit("system.stop", { system });
       }
-      state.running = false;
-      features.effects?.cleanupAll();
-      emit("system.stop", { system });
     },
     destroy() {
-      if (state.destroyed) {
+      if (destroyed) {
         return;
       }
       system.stop();
-      state.destroyed = true;
+      destroyed = true;
       (store as unknown as { destroy(): void }).destroy();
       settleListeners.clear();
       emit("system.destroy", { system });
@@ -677,29 +657,25 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     },
     dispatch(event: SystemEvent) {
-      if (BLOCKED_PROPS.has(event.type)) {
+      const type = event.type;
+      if (BLOCKED_PROPS.has(type)) {
         return;
       }
-      const handler = Object.hasOwn(eventDefs, event.type)
-        ? eventDefs[event.type]
+      const handler = Object.hasOwn(eventDefs, type)
+        ? eventDefs[type]
         : undefined;
-      if (!handler) {
-        if (isDevelopment) {
-          console.warn(
-            `[Directive] Unknown event type "${event.type}". No handler is registered for this event. Available events: ${Object.keys(eventDefs).join(", ") || "(none)"}`,
-          );
-        }
-
-        return;
+      if (handler) {
+        store.batch(() => handler(facts, event));
+      } else if (isDevelopment) {
+        console.warn(
+          `[Directive] Unknown event type "${type}". No handler is registered for this event. Available events: ${Object.keys(eventDefs).join(", ") || "(none)"}`,
+        );
       }
-      store.batch(() => handler(facts, event));
     },
     batch(fn: () => void) {
       store.batch(fn);
     },
-    read(id: string) {
-      return readDerivation(id);
-    },
+    read,
     subscribe(ids: string[], listener: () => void) {
       const derived: string[] = [];
       const keys: string[] = [];
@@ -709,36 +685,15 @@ export function createSystemCore<const M extends ModuleSchema>(
         } else if (id in schema) {
           keys.push(id);
         } else if (isDevelopment) {
-          console.warn(`[Directive] subscribe: unknown key "${id}"`);
+          warnUnknown("subscribe", id);
         }
       }
-      const offs: Array<() => void> = [];
-      if (derived.length > 0) {
-        for (const id of derived) {
-          let set = listeners.get(id);
-          if (!set) {
-            listeners.set(id, (set = new Set()));
-          }
-          set.add(listener);
-        }
-        offs.push(() => {
-          for (const id of derived) {
-            const set = listeners.get(id);
-            set?.delete(listener);
-            if (set?.size === 0) {
-              listeners.delete(id);
-            }
-          }
-        });
-      }
-      if (keys.length > 0) {
-        offs.push(store.subscribe(keys as never[], listener));
-      }
+      const offDerived = listen(listeners, derived, listener);
+      const offKeys = store.subscribe(keys, listener);
 
       return () => {
-        for (const off of offs) {
-          off();
-        }
+        offDerived();
+        offKeys();
       };
     },
     watch(
@@ -748,11 +703,10 @@ export function createSystemCore<const M extends ModuleSchema>(
     ) {
       const equal = opts?.equalityFn ?? Object.is;
       const isDerived = derivations.has(id);
-      if (!isDerived && isDevelopment && !(id in schema)) {
-        console.warn(`[Directive] watch: unknown key "${id}"`);
+      if (isDevelopment && !isDerived && !(id in schema)) {
+        warnUnknown("watch", id);
       }
-      const get = () =>
-        isDerived ? readDerivation(id) : store.get(id as never);
+      const get = () => (isDerived ? read(id) : store.get(id));
       let prev = get();
 
       return system.subscribe([id], () => {
@@ -774,36 +728,26 @@ export function createSystemCore<const M extends ModuleSchema>(
 
           return;
         }
-        let timer: number | undefined;
+        let cancel: (() => void) | undefined;
         const off = store.subscribeAll(() => {
           if (predicate(store.toObject())) {
             off();
-            if (timer !== undefined) {
-              kernel.clock.clearTimeout(timer);
-            }
+            cancel?.();
             resolve();
           }
         });
-        if (opts?.timeout !== undefined && opts.timeout > 0) {
-          timer = kernel.clock.setTimeout(
-            () => {
-              off();
-              reject(
-                new Error(
-                  `[Directive] when: timed out after ${opts.timeout}ms`,
-                ),
-              );
-            },
-            opts.timeout,
-            { owner: kernel.owner },
-          );
+        const ms = opts?.timeout;
+        if (ms !== undefined && ms > 0) {
+          cancel = after(ms, () => {
+            off();
+            reject(new Error(`[Directive] when: timed out after ${ms}ms`));
+          });
         }
       });
     },
     async settle(maxWait = 5000) {
-      const settled = () => !state.reconciling && !state.scheduled;
-      await new Promise<void>((resolve) => queueMicrotask(resolve));
-      if (settled()) {
+      await tick();
+      if (isSettled()) {
         return;
       }
 
@@ -811,31 +755,25 @@ export function createSystemCore<const M extends ModuleSchema>(
         let done = false;
         const finish = () => {
           done = true;
-          kernel.clock.clearTimeout(timeout);
+          cancel();
           off();
         };
-        const timeout = kernel.clock.setTimeout(
-          () => {
-            finish();
-            const details: string[] = [];
-            if (state.reconciling) {
-              details.push("reconciliation in progress");
-            }
-            if (state.scheduled) {
-              details.push("reconcile scheduled");
-            }
-            reject(
-              new Error(
-                `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
-              ),
-            );
-          },
-          maxWait,
-          { owner: kernel.owner },
-        );
+        const cancel = after(maxWait, () => {
+          // Read before finish(): its state is what timed out.
+          const details = [
+            reconciling && "reconciliation in progress",
+            scheduled && "reconcile scheduled",
+          ].filter(Boolean);
+          finish();
+          reject(
+            new Error(
+              `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+            ),
+          );
+        });
         const off = system.onSettledChange(() => {
           queueMicrotask(() => {
-            if (!done && settled()) {
+            if (!done && isSettled()) {
               finish();
               resolve();
             }
@@ -860,7 +798,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     system,
     facts: facts as Facts<Schema>,
     store,
-    derived: derivedProxy,
+    derived: derive,
     tracker,
     reportError,
   };
