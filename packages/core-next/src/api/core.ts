@@ -212,9 +212,10 @@ export function createSystemCore<const M extends ModuleSchema>(
   let reconciling = false;
   // 1.35's effect-chain cut: passes started only by writes made while
   // effects ran are an effect waking itself; after 100 the chain is cut.
-  // `writes` since the last pass: 1 = from an effect, 2 = from elsewhere.
+  // Writes since the last pass: from an effect, or from elsewhere.
   let effectsOpen = false;
-  let writes = 0;
+  let writtenByEffect = false;
+  let writtenElsewhere = false;
   let chain = 0;
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
@@ -230,6 +231,27 @@ export function createSystemCore<const M extends ModuleSchema>(
   const pending = new Set<string>();
   let holdDepth = 0;
 
+  /** Tell the subscribers of every derivation that went stale. */
+  const notifyPending = () => {
+    if (pending.size === 0) {
+      return;
+    }
+    const ids = [...pending];
+    pending.clear();
+    for (const id of ids) {
+      listeners.get(id)?.forEach((fn) => {
+        try {
+          fn();
+        } catch (error) {
+          console.error("[Directive] Derivation subscriber error:", {
+            derivation: id,
+            error,
+          });
+        }
+      });
+    }
+  };
+
   /**
    * Notifications run on the kernel's `sync` lane: before the write returns,
    * and a listener's own writes get another pass (up to the scheduler's
@@ -237,6 +259,13 @@ export function createSystemCore<const M extends ModuleSchema>(
    */
   const release = () => {
     if (--holdDepth > 0 || pending.size === 0) {
+      return;
+    }
+    if (destroyed) {
+      // The kernel is gone, so no settle will come: as in 1.35, writes still
+      // reach derivation subscribers, right here.
+      notifyPending();
+
       return;
     }
     try {
@@ -390,7 +419,11 @@ export function createSystemCore<const M extends ModuleSchema>(
     for (const key of keys) {
       changedKeys.add(key);
     }
-    writes |= effectsOpen ? 1 : 2;
+    if (effectsOpen) {
+      writtenByEffect = true;
+    } else {
+      writtenElsewhere = true;
+    }
     scheduleReconcile();
   };
   const store = createFactsStore({
@@ -467,22 +500,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   // unless the kernel options say otherwise): one host callback per tick
   // for every system sharing the scheduler.
   kernel.onSettle((lane) => {
-    if (holdDepth === 0 && pending.size > 0) {
-      // Notify subscribers of the pending derivations.
-      const ids = [...pending];
-      pending.clear();
-      for (const id of ids) {
-        listeners.get(id)?.forEach((fn) => {
-          try {
-            fn();
-          } catch (error) {
-            console.error("[Directive] Derivation subscriber error:", {
-              derivation: id,
-              error,
-            });
-          }
-        });
-      }
+    if (holdDepth === 0) {
+      notifyPending();
     }
     if (lane !== kernel.lane || !scheduled) {
       return;
@@ -506,8 +525,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     if (reconciling) {
       return;
     }
-    chain = writes === 1 ? chain + 1 : 0;
-    writes = 0;
+    chain = writtenByEffect && !writtenElsewhere ? chain + 1 : 0;
+    writtenByEffect = writtenElsewhere = false;
     if (chain > 100) {
       if (isDevelopment) {
         console.warn(
@@ -670,7 +689,7 @@ export function createSystemCore<const M extends ModuleSchema>(
         }
       }
       const offDerived = listen(listeners, derived, listener);
-      const offKeys = store.subscribe(keys as never[], listener);
+      const offKeys = store.subscribe(keys, listener);
 
       return () => {
         offDerived();
@@ -687,7 +706,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (isDevelopment && !isDerived && !(id in schema)) {
         warnUnknown("watch", id);
       }
-      const get = () => (isDerived ? read(id) : store.get(id as never));
+      const get = () => (isDerived ? read(id) : store.get(id));
       let prev = get();
 
       return system.subscribe([id], () => {

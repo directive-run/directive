@@ -95,7 +95,12 @@ export function listen<K>(
 
   return () => {
     for (const key of keys) {
-      map.get(key)?.delete(fn);
+      const set = map.get(key);
+      // An emptied set goes, so a listener added during a notify starts a
+      // fresh set and waits for the next write, as in 1.35.
+      if (set?.delete(fn) && !set.size) {
+        map.delete(key);
+      }
     }
   };
 }

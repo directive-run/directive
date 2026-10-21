@@ -241,3 +241,78 @@ describe("system core", () => {
     });
   });
 });
+
+describe("listeners (review round)", () => {
+  it("a listener added during a notify waits for the next write", () => {
+    const { store, facts } = createFacts({ schema: { a: t.number() } });
+    const log: string[] = [];
+    const off = store.subscribe(["a"], () => {
+      log.push("first");
+      off();
+      store.subscribe(["a"], () => log.push("late"));
+    });
+    facts.a = 1;
+    expect(log).toEqual(["first"]);
+    facts.a = 2;
+    expect(log).toEqual(["first", "late"]);
+  });
+
+  it("an emptied listener list is dropped from the map", () => {
+    const map: Map<string, Set<() => void>> = new Map();
+    const off = listen(map, ["k"], () => {});
+    off();
+    expect(map.size).toBe(0);
+  });
+
+  it("derivation subscribers added during a notify wait for the next change", () => {
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.number() },
+        derivations: { d: t.number() },
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.a = 0;
+      },
+      derive: { d: (f) => f.a * 2 },
+    });
+    const system = createSystemCore({ module: mod }, []);
+    system.start();
+    const log: string[] = [];
+    system.read("d");
+    const off = system.subscribe(["d"], () => {
+      log.push("first");
+      off();
+      system.subscribe(["d"], () => log.push("late"));
+    });
+    system.facts.a = 1;
+    expect(log).toEqual(["first"]);
+    system.read("d");
+    system.facts.a = 2;
+    expect(log).toEqual(["first", "late"]);
+  });
+
+  it("derivation subscribers and watchers still hear writes after destroy", () => {
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.number() },
+        derivations: { d: t.number() },
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.a = 0;
+      },
+      derive: { d: (f) => f.a * 2 },
+    });
+    const system = createSystemCore({ module: mod }, []);
+    system.start();
+    const seen: number[] = [];
+    system.subscribe(["d"], () => seen.push(system.read("d") as number));
+    system.read("d");
+    system.destroy();
+    system.facts.a = 3;
+    expect(seen).toEqual([6]);
+  });
+});

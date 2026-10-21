@@ -194,8 +194,8 @@ const fail = (member: string, what: "already" | "not"): never => {
   throw Error(`[Directive] Feature member "${member}" ${what} defined`);
 };
 
-/** The last owner handed out per clock. */
-const owners = new WeakMap<Clock, number>();
+/** A clock with the count of owners handed out (the clock holds its own). */
+type Owned = Clock & { owners_?: number };
 
 /** Create a kernel. */
 export function createKernel(options: KernelOptions = {}): Kernel {
@@ -234,8 +234,8 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     },
   };
   const id = scheduler.register(target);
-  const owner = (owners.get(clock) ?? 0) + 1;
-  owners.set(clock, owner);
+  const owner = ((clock as Owned).owners_ ?? 0) + 1;
+  (clock as Owned).owners_ = owner;
   const graph = createGraph({
     schedule: () => {
       if (!disposed && !settling) {
