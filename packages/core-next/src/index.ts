@@ -41,3 +41,25 @@ export { PHASES, withPhases } from "./phases.js";
 export type { Ctx, Phase, Phases } from "./phases.js";
 export { withSnapshot } from "./snapshot.js";
 export type { Snapshot, SnapshotPart } from "./snapshot.js";
+
+// The 1.35 public API (alphas keep it unchanged), built on the graph above.
+export { DirectiveError, createModule, createSystem } from "./api/system.js";
+export { t } from "./api/schema-builders.js";
+export type * from "./api/schema-builders.js";
+export type * from "./api/types.js";
+export {
+  completeTimer,
+  elapsedMs,
+  initialTimerState,
+  pauseTimer,
+  registerRepeat,
+  remainingMs,
+  resetTimer,
+  resumeTimer,
+  startTimer,
+  tickTimer,
+  timerOps,
+} from "./api/timer.js";
+export type { TimerFactOpts, TimerFactState } from "./api/timer.js";
+export { defaultClock, realClock, virtualClock } from "./api/clock.js";
+export type { SignalClock } from "./api/clock.js";
