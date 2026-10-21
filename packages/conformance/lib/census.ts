@@ -99,6 +99,22 @@ export function v2Skips(
   return layer > Number(current.slice(1));
 }
 
+/**
+ * The unbuilt core entry points (those core-next maps to src/unbuilt.ts) that
+ * `source` names in a quoted specifier: an import, a dynamic import or a mock.
+ */
+export function unbuiltSpecifiers(
+  source: string,
+  entries: Array<{ specifier: string; file: string }>,
+): string[] {
+  return entries
+    .filter((e) => e.file.endsWith("/unbuilt.ts"))
+    .map((e) => e.specifier)
+    .filter((specifier) =>
+      ['"', "'", "`"].some((q) => source.includes(`${q}${specifier}${q}`)),
+    );
+}
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
@@ -351,6 +367,15 @@ export function census(
     join(conformanceRoot, "layers.rules.json"),
   ).current;
   const prod = new Set(prodPorts(conformanceRoot));
+  // Files that import an entry core-next has not built: the stub exports
+  // nothing useful, so any test of theirs that runs on v2 is reading
+  // undefined. Only a fully skipped (gated) file may import one.
+  const v2Unbuilt = v2Entries(repoRoot);
+  const importsUnbuilt = (file: string) =>
+    unbuiltSpecifiers(
+      readFileSync(join(conformanceRoot, file), "utf8"),
+      v2Unbuilt,
+    );
   const runnable = Object.keys(manifest).filter((f) => f.endsWith(".test.ts"));
   const selfFiles = walk(join(conformanceRoot, "self"))
     .filter((f) => f.endsWith(".test.ts"))
@@ -430,6 +455,12 @@ export function census(
         if (isV2 && file.startsWith("tests/")) {
           // The gate decides: what it skips must be skipped, the rest pass.
           const gated = v2Skips(layers, current, file, test);
+          const unbuilt = status === "skipped" ? [] : importsUnbuilt(file);
+          if (unbuilt.length > 0) {
+            fail(
+              `${name}: ${file} > "${test}" ran (${status}) but the file imports ${unbuilt.join(", ")}, which core-next has not built`,
+            );
+          }
           if (gated && status !== "skipped") {
             fail(
               `${name}: ${file} > "${test}" is above the v2 layer but ${status}`,

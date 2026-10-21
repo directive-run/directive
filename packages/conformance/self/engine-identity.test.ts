@@ -122,6 +122,15 @@ describe(`engine identity (${which}, ${build})`, () => {
       const atFile = await vi.importActual<Module>(file);
       const keys = Object.keys(atFile).sort();
       expect(keys.length).toBeGreaterThan(0);
+      if (which === "v2" && file.endsWith("/unbuilt.ts")) {
+        // Every unbuilt entry maps to the one stub, so the identity checks
+        // below only prove the alias reaches it. Pin that: the stub's sole
+        // export, and the census fails any v2 test that runs in a file
+        // importing it (lib/census.ts unbuiltSpecifiers). When core-next
+        // builds the entry, v2Entries maps it to a real file and this branch
+        // stops applying.
+        expect(keys).toEqual(["UNBUILT"]);
+      }
       expect(Object.keys(viaSuite).sort()).toEqual(keys);
       expect(Object.keys(actual).sort()).toEqual(keys);
       for (const key of keys) {

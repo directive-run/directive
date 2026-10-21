@@ -38,9 +38,10 @@ import {
   diffTestFiles,
   pluginHooks,
   prodPorts,
+  unbuiltSpecifiers,
   v2Skips,
 } from "../../lib/census.js";
-import { coreEntries } from "../../lib/core-entries.js";
+import { coreEntries, v2Entries } from "../../lib/core-entries.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
 import { staticTests } from "../../lib/tests.js";
@@ -225,6 +226,40 @@ describe("the census", () => {
     v1.testResults = v1.testResults.filter((f) => !f.name.includes("/self/"));
     expect(census(repoRoot, reports).join("\n")).toMatch(
       /conformance:v1: self\/engine-identity\.test\.ts did not run/,
+    );
+  });
+
+  it("names the unbuilt entries a source imports, however it quotes them", () => {
+    const entries = [
+      { specifier: "@directive-run/core", file: "/n/index.ts" },
+      { specifier: "@directive-run/core/testing", file: "/n/unbuilt.ts" },
+      { specifier: "@directive-run/core/worker", file: "/n/unbuilt.ts" },
+    ];
+    const src = `import { a } from "@directive-run/core";
+      vi.mock('@directive-run/core/testing', () => ({}));`;
+    expect(unbuiltSpecifiers(src, entries)).toEqual([
+      "@directive-run/core/testing",
+    ]);
+    expect(
+      unbuiltSpecifiers("import x from '@directive-run/core'", entries),
+    ).toEqual([]);
+  });
+
+  it("fails when a v2 test ran in a file that imports an unbuilt entry", () => {
+    const reports = cleanReports();
+    const unbuilt = v2Entries(repoRoot);
+    const file = reports["conformance:v2"]?.testResults.find(
+      (f) =>
+        f.assertionResults.some((a) => a.status === "skipped") &&
+        unbuiltSpecifiers(readFileSync(f.name, "utf8"), unbuilt).length > 0,
+    );
+    expect(file, "a gated port that imports an unbuilt entry").toBeDefined();
+    const skipped = file?.assertionResults.find(
+      (a) => a.status === "skipped",
+    ) as { status: string };
+    skipped.status = "passed";
+    expect(census(repoRoot, reports).join("\n")).toMatch(
+      /ran \(passed\) but the file imports .* which core-next has not built/,
     );
   });
 
