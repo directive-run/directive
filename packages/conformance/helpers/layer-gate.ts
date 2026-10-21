@@ -8,6 +8,11 @@
  *   release has shipped yet.
  * - v2 skips tests above layers.rules.json `current`, and every file in the
  *   `internals` category until it is triaged (WHITE-BOX.md).
+ * - `DIRECTIVE_V2_ALL=1` (set only by scripts/v2-ratchet.ts, never in the
+ *   config) runs v2's tests above `current` too, to measure what already
+ *   passes. The census run never sets it, and the census fails any test above
+ *   `current` that was not skipped, so setting it there cannot turn a run
+ *   green.
  */
 
 import { readFileSync } from "node:fs";
@@ -96,10 +101,10 @@ beforeEach((ctx) => {
       ctx.skip();
     }
   } else if (which === "v2") {
+    const all = process.env.DIRECTIVE_V2_ALL === "1";
     if (
       entry?.category === "internals" ||
-      current === null ||
-      layer > index(current)
+      (!all && (current === null || layer > index(current)))
     ) {
       ctx.skip();
     }

@@ -21,6 +21,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isHarnessPath } from "./harness.js";
 import { oracleLockHash } from "./lockfile.js";
+import { RATCHET_FILE, type Ratchet, checkShrink } from "./ratchet.js";
 
 export const BASELINE_FILE = "oracle-baseline.json";
 export const LABEL = "oracle-change";
@@ -153,8 +154,30 @@ export function checkPullRequest(
   changedFiles: string[],
   labels: string[],
   lockfile?: { base: string; head: string },
+  ratchet?: { base: string | null; head: string },
 ): string[] {
   const failures: string[] = [];
+  // The v2 ratchet only grows: a removal needs a reason and the label.
+  if (changedFiles.includes(`${PREFIX}${RATCHET_FILE}`)) {
+    if (!ratchet) {
+      failures.push(
+        `${RATCHET_FILE} changed but its base and head were not provided`,
+      );
+    } else if (ratchet.base !== null) {
+      try {
+        failures.push(
+          ...checkShrink(
+            JSON.parse(ratchet.base) as Ratchet,
+            JSON.parse(ratchet.head) as Ratchet,
+            labels.includes(LABEL),
+            LABEL,
+          ),
+        );
+      } catch {
+        failures.push(`${RATCHET_FILE} is not valid JSON at the base or head`);
+      }
+    }
+  }
   const conformance = changedFiles.filter(isConformanceHarness);
   const engine = changedFiles.filter((f) =>
     f.startsWith("packages/core-next/"),

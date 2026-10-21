@@ -114,11 +114,9 @@ jobs:
   conformance:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # TODO(2.0 Phase 0 gate): remove continue-on-error and make this job a
-    # required check once Jason signs off the Phase 0 gate (frozen-contract
-    # list + WHITE-BOX.md fates), before any core-next code lands.
-    continue-on-error: true
+    timeout-minutes: 30
+    # Blocking: a red oracle fails the run, and the job is a required check
+    # on main (branch protection).
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -145,6 +143,10 @@ jobs:
       # run from the base branch in oracle-guard.yml.
       - run: pnpm --filter @directive-run/conformance check:expects
       - run: pnpm --filter @directive-run/conformance census
+      # The v2 ratchet: every test in v2-passing.json (what core-next has
+      # passed, above `current` included) still passes on core-next's source
+      # and on its built dist (lib/ratchet.ts).
+      - run: pnpm --filter @directive-run/conformance ratchet
       - run: pnpm --filter @directive-run/conformance oracle:guard
 
   # Packaging breakage (wrong exports/types fields, a CJS consumer resolving

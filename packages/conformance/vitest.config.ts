@@ -10,6 +10,10 @@
  *   faithful (it must agree with v1) and keeps 1.x honest while it still ships.
  * - `conformance:v2`    — core-next. The layer gate skips what it has not
  *   built yet: tests above layers.rules.json `current`, and internals files.
+ * - `conformance:v2:dist` — the same, against core-next's built `dist/` (what
+ *   ships: mangled internal members, the dev check folded at each use). Its
+ *   `:prod` project sets NODE_ENV=production, which is how the built dev check
+ *   reads production; a `#is-development` mock has nothing to reach there.
  *
  * Tests that mock `#is-development` to exercise production branches run in
  * separate `:prod` projects. Against source the mock does the work; against a
@@ -25,6 +29,7 @@ import {
   coreEntries,
   defaultRepoRoot,
   v1Entries,
+  v2DistEntries,
   v2Entries,
 } from "./lib/core-entries.js";
 
@@ -118,6 +123,26 @@ function v2Alias(): Alias {
   ];
 }
 
+/** `@directive-run/core[/sub]` → core-next's built dist (lib/core-entries.ts v2DistEntries). */
+function v2DistAlias(): Alias {
+  const entries = v2DistEntries();
+
+  return [
+    // Nothing in dist imports it (the build writes the check out), but a
+    // test's `vi.mock("#is-development")` still has to resolve.
+    {
+      find: exact("#is-development"),
+      replacement: join(nextRoot, "src/dev-true.ts"),
+    },
+    ...entries
+      .filter((e) => e.subpath !== ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+    ...entries
+      .filter((e) => e.subpath === ".")
+      .map((e) => ({ find: exact(e.specifier), replacement: e.file })),
+  ];
+}
+
 function project(
   name: string,
   engine: "v1" | "local" | "v2",
@@ -125,6 +150,7 @@ function project(
   alias: Alias,
   include: string[],
   exclude: string[],
+  extraEnv: Record<string, string> = {},
 ) {
   return {
     resolve: { alias },
@@ -138,7 +164,7 @@ function project(
       // Fails a test layers.json cannot place; skips aheadOfV1 on v1 and,
       // on v2, internals files and tests above `current`.
       setupFiles: ["helpers/layer-gate.ts"],
-      env: { DIRECTIVE_ENGINE: engine, DIRECTIVE_BUILD: build },
+      env: { DIRECTIVE_ENGINE: engine, DIRECTIVE_BUILD: build, ...extraEnv },
     },
   };
 }
@@ -184,6 +210,25 @@ export default defineConfig({
       // out. As for local, `:prod` relies on each file's own mock.
       project("conformance:v2", "v2", "development", v2Alias(), TESTS, PROD),
       project("conformance:v2:prod", "v2", "production", v2Alias(), PROD, []),
+      // core-next's built dist, under the same gate.
+      project(
+        "conformance:v2:dist",
+        "v2",
+        "development",
+        v2DistAlias(),
+        TESTS,
+        PROD,
+        { DIRECTIVE_V2_TARGET: "dist" },
+      ),
+      project(
+        "conformance:v2:dist:prod",
+        "v2",
+        "production",
+        v2DistAlias(),
+        PROD,
+        [],
+        { DIRECTIVE_V2_TARGET: "dist", NODE_ENV: "production" },
+      ),
       // Differential scenarios: each loads both engines by file (diff/engines.ts)
       // and compares their traces, so it needs no core alias.
       {
