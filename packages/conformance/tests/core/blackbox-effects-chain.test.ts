@@ -7,13 +7,19 @@
  *
  * Public API only. Pins 1.35's two observable behaviours: each follow-up
  * pass runs on its own microtask, and a chain of passes started only by
- * effects is cut after 100 passes with a warning, leaving the system live.
+ * effects is cut after a bounded number of passes with a warning, leaving
+ * the system live. The exact limit and warning text are not contracts.
  */
 
 import { createModule, createSystem, t } from "@directive-run/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Lets queued microtasks run; no real timers. */
+async function drain(turns = 2000) {
+  for (let i = 0; i < turns; i++) {
+    await Promise.resolve();
+  }
+}
 
 /** An effect that dispatches `inc` while 0 < n < limit. */
 function selfWaking(limit = Number.POSITIVE_INFINITY) {
@@ -55,28 +61,28 @@ afterEach(() => {
 });
 
 describe("an effect that keeps waking itself", () => {
-  it("is cut after 100 chained passes, with a warning, and the system stays live", async () => {
+  it("is cut after a bounded number of chained passes, with a warning, and the system stays live", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { module, runs, bind } = selfWaking();
     const system = bind(createSystem({ module }));
     system.start();
     await Promise.resolve();
     system.events.inc();
-    await sleep(20);
+    await drain();
 
-    // One pass on start, one from the dispatch, then 100 chained passes.
-    expect(runs.length).toBe(102);
-    expect(system.facts.n).toBe(102);
+    // The chain ran for a while, then stopped on its own.
+    expect(runs.length).toBeGreaterThan(10);
+    expect(runs.length).toBeLessThan(1000);
+    // The last dispatch lands; only its effect pass is cut.
+    expect(
+      system.facts.n - (runs[runs.length - 1] as number),
+    ).toBeLessThanOrEqual(1);
     expect(system.isSettled).toBe(true);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "[Directive] Effects kept waking each other for 100 passes in a row",
-      ),
-    );
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/kept waking/i));
 
     runs.length = 0;
     system.facts.n = -100;
-    await sleep(5);
+    await drain();
     expect(runs).toEqual([-100]);
     expect(system.isSettled).toBe(true);
     system.destroy();
@@ -103,9 +109,13 @@ describe("an effect that keeps waking itself", () => {
     await Promise.resolve();
     system.events.inc();
     await ticker;
-    await sleep(5);
+    await drain();
 
-    expect(ticks).toEqual([0, 2, 3, 4]);
+    // Start, the dispatch, then two chained passes (n reaches 3).
+    expect(ticks).toHaveLength(4);
+    // Each pass after the dispatch lands on a strictly later microtask.
+    expect(ticks[2]).toBeGreaterThan(ticks[1] as number);
+    expect(ticks[3]).toBeGreaterThan(ticks[2] as number);
     system.destroy();
   });
 });

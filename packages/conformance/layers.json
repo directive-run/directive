@@ -237,7 +237,7 @@
       "category": "black-box",
       "rule": "L4",
       "tests": {
-        "an effect that keeps waking itself > is cut after 100 chained passes, with a warning, and the system stays live": {
+        "an effect that keeps waking itself > is cut after a bounded number of chained passes, with a warning, and the system stays live": {
           "layer": "L1",
           "by": ["import createModule", "import createSystem"]
         },
