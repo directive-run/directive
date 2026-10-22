@@ -182,6 +182,33 @@ export function createSystemCore<const M extends ModuleSchema>(
     );
   }
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
+  // A security boundary (1.35): runs in every environment.
+  for (const [section, obj] of [
+    ["schema", schema],
+    ["events", module.events],
+    ["derive", module.derive],
+    ["effects", module.effects],
+    ["sources", module.sources],
+    ["constraints", module.constraints],
+    ["resolvers", module.resolvers],
+  ] as const) {
+    for (const key of Object.keys(obj ?? {})) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
+        );
+      }
+    }
+  }
+  if (isDevelopment) {
+    for (const key in schema) {
+      if (module.derive && Object.hasOwn(module.derive, key)) {
+        console.warn(
+          `[Directive] "${key}" exists as both a fact and a derivation. They are tracked separately and will not invalidate each other, but two things one name apart are hard to read — consider renaming one.`,
+        );
+      }
+    }
+  }
   const deriveDefs = defsOf(module.derive, "compute");
   const eventDefs = defsOf(module.events, "handler");
 
@@ -596,6 +623,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     return () => clock.clearTimeout(id);
   };
   const system = {
+    _mode: "single",
     facts,
     derive,
     events: view(
