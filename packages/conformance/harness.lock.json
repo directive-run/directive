@@ -71,7 +71,7 @@
     "lib/guard.ts": "cdd82fd2c7013ee86005912ba7af63bc77b296511f3b5033a3573d70b9b31e33",
     "lib/harness.ts": "abb9e3d0b20db0f9a440d3a3b1083eeb2accc581478c5b1c02f06b9c2e9529a7",
     "lib/imports.ts": "2f8d9b61feffa72e85bb8a90b6ea73dadac33ea5edc240f76b627f5d0d73ca19",
-    "lib/layers.ts": "078152f33a0cbdd1c53e5a7c536619c83fb0f7f79282d258c14ae17de730c9aa",
+    "lib/layers.ts": "7bec7836b1e579f80cb4a696b974dce44577a7b48f57e369158facc79e9c041f",
     "lib/lockfile.ts": "dd38a83cbc0fe5f8f868ad9e3c20b224864c5ed01752427d5b8294a46e4cd654",
     "lib/ratchet.ts": "4d7bd10e8e3f2fb1fad2a79061e7c1342fd9bf1d1669df9d29a0bc50d86c1e00",
     "lib/rewrites.ts": "dfc048b56b9a61de160b3f79e7fec572adf4dab3174d37dc629241c3751ac95d",

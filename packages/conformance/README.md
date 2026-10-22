@@ -225,16 +225,23 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
 - **The vehicle is not a feature.** `createSystem` and `createModule` are how
   every runtime test builds a system, so they do not place it
   (`lib/layers.ts` `VEHICLES`); namespacing, several modules and
-  crossModuleDeps still place a test at L1 through their option keys. For a
-  test that builds a system, the file's `rule` is a floor instead: a test in
-  an L3 lifecycle file sits at L3 even if it uses nothing but the vehicle. So
-  a test runs on v2 as soon as the features it exercises and the behaviour
-  its file tests exist. Basic effects (run, cleanup, auto-tracking) are L0;
-  `deps`, `on` and `prev` lift a test to L4. Reflection on an engine object
-  (`Object.getOwnPropertyDescriptor`, `Reflect.*`) and data-form derivations
-  (a predicate or `$template` as `compute`) are L1; dynamic definitions are
-  L10 however the registry is reached (`const d = system.derive as Any;
-  d.register(…)`).
+  crossModuleDeps still place a test at L1 through their option keys.
+- **Per-test placement; the file's rule is a default.** A test is placed by
+  the features found in its own body, its describes' hooks and declarations,
+  and the file-level code it reaches. The L0 reads, writes and definitions
+  (`facts`, `derive`, `events`, `dispatch`, `read`, `subscribe`, `watch`,
+  `batch`, and the `init`/`derive`/`events`/`effects` options) count as
+  found without raising anything. Only a test that builds a system and shows
+  nothing beyond the vehicle and the schema builders (`t`) takes its file's
+  `rule`: a lifecycle test in an L3 file that only calls `system.start()`
+  sits at L3, while the same file's "facts proxy reads and writes values"
+  sits at L0. Basic effects (run, cleanup, auto-tracking) are L0; `deps`,
+  `on` and `prev` lift a test to L4; module `hooks`, `initialFacts` and
+  `tickMs` are L3. Reflection on an engine object
+  (`Object.getOwnPropertyDescriptor`, `Reflect.*`) is L1. Data-form
+  derivations (a predicate or `$template` as `compute`) are L11: the
+  predicate DSL evaluates them. Dynamic definitions are L10 however the
+  registry is reached (`const d = system.derive as Any; d.register(…)`).
 
 ## The v2 ratchet (`v2-passing.json`)
 
