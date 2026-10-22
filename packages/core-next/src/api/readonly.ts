@@ -34,8 +34,8 @@ interface Snapshot {
   readonly ref: object;
   readonly prototype: object | null;
   readonly extensible: boolean;
-    readonly time?: number;
-    readonly slots: Array<{
+  readonly time?: number;
+  readonly slots: Array<{
     readonly key: unknown;
     readonly value: unknown;
     readonly child: Snapshot | null;
@@ -252,8 +252,8 @@ export function createCheckedReadView<T extends object>(
   source: T,
   refuse: RefuseWrite,
   options: {
-        override?: (key: string | symbol) => unknown;
-        prefix?: string;
+    override?: (key: string | symbol) => unknown;
+    prefix?: string;
   } = {},
 ): CheckedReadView<T> {
   const target = source as unknown as Record<string | symbol, unknown>;
@@ -269,14 +269,15 @@ export function createCheckedReadView<T extends object>(
         }
       }
       const value = unwrap(target[prop]);
-      if (
-        isDevelopment &&
-        recorded !== null &&
-        typeof prop === "string" &&
-        isRecordable(value) &&
-        !recorded.has(prop)
-      ) {
-        recorded.set(prop, record(value, budget, new WeakSet()));
+      if (isDevelopment) {
+        if (
+          recorded !== null &&
+          typeof prop === "string" &&
+          isRecordable(value) &&
+          !recorded.has(prop)
+        ) {
+          recorded.set(prop, record(value, budget, new WeakSet()));
+        }
       }
 
       return value;
@@ -324,24 +325,26 @@ export function createCheckedReadView<T extends object>(
   return {
     view,
     takeMutation(): string | null {
-      if (!isDevelopment || recorded === null || recorded.size === 0) {
-        return null;
-      }
       let found: string | null = null;
-      for (const [name, snapshot] of recorded) {
-        if (snapshot === null) {
-          continue;
-        }
-        found = firstChange(
-          snapshot,
-          options.prefix ? `${options.prefix}.${name}` : name,
-        );
-        if (found !== null) {
-          break;
+      // A positive dev block, so a production build drops the whole check.
+      if (isDevelopment) {
+        if (recorded !== null && recorded.size > 0) {
+          for (const [name, snapshot] of recorded) {
+            if (snapshot === null) {
+              continue;
+            }
+            found = firstChange(
+              snapshot,
+              options.prefix ? `${options.prefix}.${name}` : name,
+            );
+            if (found !== null) {
+              break;
+            }
+          }
+          recorded.clear();
+          budget = { left: NODE_BUDGET };
         }
       }
-      recorded.clear();
-      budget = { left: NODE_BUDGET };
 
       return found;
     },

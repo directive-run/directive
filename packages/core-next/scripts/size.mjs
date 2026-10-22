@@ -183,6 +183,13 @@ for (const [name, engine] of Object.entries(engines)) {
     `fixture minimal on ${name}: ${await measure(minimal, fixtures, engine)}`,
   );
 }
+// Two namespaced modules with a cross-module read (fixtures/two-module.ts).
+const twoModule = readFileSync(join(fixtures, "two-module.ts"), "utf8");
+for (const [name, engine] of Object.entries(engines)) {
+  console.log(
+    `fixture two-module on ${name}: ${await measure(twoModule, fixtures, engine)}`,
+  );
+}
 // The floor: the same app on the system core with no optional part (see
 // fixtures/floor.ts). core-next only: 1.35 has no such entry point.
 const floor = readFileSync(join(fixtures, "floor.ts"), "utf8");

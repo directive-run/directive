@@ -48,7 +48,12 @@ export function createSystem<const M extends ModuleSchema>(
       "[Directive] createSystem expects modules as an object, not an array.\n\nInstead of:\n  createSystem({ modules: [authModule, dataModule] })\n\nUse:\n  createSystem({ modules: { auth: authModule, data: dataModule } })\n\nOr for a single module:\n  createSystem({ module: counterModule })",
     );
   }
-  if (modules && typeof modules === "object" && "id" in modules && "schema" in modules) {
+  if (
+    modules &&
+    typeof modules === "object" &&
+    "id" in modules &&
+    "schema" in modules
+  ) {
     throw new Error(
       "[Directive] A single module was passed to `modules:`. For a single module, use `module:` instead:\n\n  createSystem({ module: myModule })\n\nFor multiple modules, wrap in an object:\n  createSystem({ modules: { myName: myModule } })",
     );

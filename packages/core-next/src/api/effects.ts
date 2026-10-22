@@ -9,11 +9,7 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import {
-  type Tracker,
-  describeDep,
-  withTracking,
-} from "./facts.js";
+import { type Tracker, describeDep, withTracking } from "./facts.js";
 import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 

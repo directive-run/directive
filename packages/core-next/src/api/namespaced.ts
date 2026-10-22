@@ -17,11 +17,7 @@ import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { createSystemCore } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
-import {
-  BLOCKED_PROPS,
-  detectNonJsonValueType,
-  warnNonJson,
-} from "./facts.js";
+import { BLOCKED_PROPS, detectNonJsonValueType, warnNonJson } from "./facts.js";
 import type { ModuleDefinition, System, SystemOptions } from "./types.js";
 
 export const SEPARATOR = "::";
@@ -193,7 +189,9 @@ export function createNamespacedSystem(
 
       return hardened({
         get: (key) =>
-          key === "$store" || key === "$snapshot" ? src[key] : src[prefix + key],
+          key === "$store" || key === "$snapshot"
+            ? src[key]
+            : src[prefix + key],
         set(key, value) {
           if (isDevelopment) {
             const type = detectNonJsonValueType(value);
@@ -363,7 +361,10 @@ export function createNamespacedSystem(
     facts: system.facts as Rec,
     derive: system.derive as Rec,
     read: system.read as (id: string) => unknown,
-    subscribe: system.subscribe as (ids: string[], fn: () => void) => () => void,
+    subscribe: system.subscribe as (
+      ids: string[],
+      fn: () => void,
+    ) => () => void,
     watch: system.watch as (...args: any[]) => () => void,
     when: system.when as (...args: any[]) => Promise<void>,
   };
@@ -420,10 +421,8 @@ export function createNamespacedSystem(
         let view = eventViews.get(ns);
         if (!view) {
           view = hardened({
-            get:
-              (name) =>
-              (payload?: Rec) =>
-                system.dispatch({ type: ns + SEPARATOR + name, ...payload }),
+            get: (name) => (payload?: Rec) =>
+              system.dispatch({ type: ns + SEPARATOR + name, ...payload }),
           });
           eventViews.set(ns, view);
         }
