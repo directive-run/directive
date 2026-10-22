@@ -34,7 +34,7 @@ function build(deps: Record<string, typeof vSchema>, extra: object = {}) {
       events: { poke: {} },
     },
     crossModuleDeps: deps,
-    init: (f) => {
+    init: (f: any) => {
       f.v = 10;
       f.tick = 0;
     },
@@ -141,7 +141,7 @@ describe("a module sees exactly its declared dependencies", () => {
         requirements: { LOOK: {} },
       },
       crossModuleDeps: { b: vSchema },
-      init: (f) => {
+      init: (f: any) => {
         f.go = true;
       },
       constraints: {
@@ -263,7 +263,7 @@ describe("writes through a dependency view", () => {
     const a = createModule("a", {
       schema: { facts: { go: t.boolean() }, requirements: { WRITE: {} } },
       crossModuleDeps: { b: vSchema },
-      init: (f) => {
+      init: (f: any) => {
         f.go = true;
       },
       constraints: {
