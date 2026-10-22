@@ -621,8 +621,10 @@ export function createSystemCore<const M extends ModuleSchema>(
         return;
       }
       initializing = true;
-      if (module.init) {
-        store.batch(() => module.init!(facts));
+      // A namespaced system runs each module's init in its own batch (1.35).
+      for (const init of (module as { inits_?: Fn[] }).inits_ ??
+        (module.init ? [module.init] : [])) {
+        store.batch(() => init(facts));
       }
       initializing = false;
       initialized = true;

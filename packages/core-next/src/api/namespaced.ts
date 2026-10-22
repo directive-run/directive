@@ -348,13 +348,8 @@ export function createNamespacedSystem(
   const flat = {
     id: ordered.join(","),
     schema: { facts, derivations, events: {} },
-    init: inits.length
-      ? (src: Rec) => {
-          for (const init of inits) {
-            init(src);
-          }
-        }
-      : undefined,
+    inits_: inits,
+    modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
     derive,
     events,
     effects,
