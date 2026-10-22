@@ -10,8 +10,22 @@
  * - an option key in a definition (`resolvers.<id>.batch` → L7);
  * - a system method or property (`system.history` → L8).
  *
- * Over-approximating is the safe direction: a test placed too high only runs
- * later than it could; a test placed too low fails an engine that is right.
+ * Two things are not features:
+ *
+ * - the vehicle (`VEHICLES`): `createSystem` and `createModule` are how every
+ *   runtime test builds a system at all, so they say nothing about what the
+ *   test exercises. Namespacing, multiple modules and crossModuleDeps are
+ *   still placed, by their option keys (`modules`, `crossModuleDeps` → L1);
+ * - so, for a test that builds a system, the file's rule is a floor: it sits
+ *   at least at the layer whose behaviour its file tests (`layers.rules.json`),
+ *   even when it uses nothing above the vehicle. (A lifecycle test in an L3
+ *   file needs only `createSystem` and `system.start()`.) A test that builds
+ *   no system is placed by its features alone, as before.
+ *
+ * So a test runs on v2 as soon as the features it exercises and the
+ * behaviour its file tests exist. Over-approximating is the safe direction:
+ * a test placed too high only runs later than it could; a test placed too
+ * low fails an engine that is right.
  */
 
 import { relative } from "node:path";
@@ -58,6 +72,14 @@ const MODULE_LAYERS: [RegExp, Layer][] = [
     "L0",
   ],
 ];
+
+/**
+ * The vehicle: exports that build a system, which every runtime test needs
+ * whatever it tests. Placed at L0 (the ladder's L0 is a system of one
+ * module's facts, derivations, basic effects and events); what the test does
+ * with the system places it.
+ */
+export const VEHICLES = new Set(["createSystem", "createModule"]);
 
 /** Exports placed by name where their module holds more than one layer. */
 const NAME_LAYERS: Record<string, Layer> = {
@@ -128,6 +150,67 @@ const REGISTRIES = new Set([
   "events",
 ]);
 
+/**
+ * Reflection on an engine object (`Object.getOwnPropertyDescriptor(facts,
+ * …)`, `Reflect.ownKeys(derive)`): what the facts, derive and events views
+ * look like under reflection is the plan's L1 (compiled accessors, read-only
+ * and prev views; the "proxies under reflection" scenarios sit at L1).
+ */
+const REFLECTION_OBJECT = new Set([
+  "getOwnPropertyDescriptor",
+  "getOwnPropertyDescriptors",
+  "getPrototypeOf",
+  "setPrototypeOf",
+  "defineProperty",
+  "isExtensible",
+  "preventExtensions",
+]);
+
+/** `(x as T)`, `x!`, `(x)` → `x`. */
+function unwrap(node: Node): Node {
+  let current = node;
+  while (
+    Node.isParenthesizedExpression(current) ||
+    Node.isAsExpression(current) ||
+    Node.isNonNullExpression(current) ||
+    Node.isTypeAssertion(current) ||
+    Node.isSatisfiesExpression(current)
+  ) {
+    current = current.getExpression();
+  }
+
+  return current;
+}
+
+/**
+ * The registry a member call is made on: `system.derive.register(…)`,
+ * `(system.derive as Any).register(…)`, or `d.register(…)` after
+ * `const d = system.derive as Any`.
+ */
+function registryOf(receiver: Node): string | undefined {
+  const target = unwrap(receiver);
+  if (Node.isPropertyAccessExpression(target)) {
+    return REGISTRIES.has(target.getName()) ? target.getName() : undefined;
+  }
+  if (Node.isIdentifier(target)) {
+    for (const decl of target.getSymbol()?.getDeclarations() ?? []) {
+      const init = Node.isVariableDeclaration(decl)
+        ? decl.getInitializer()
+        : undefined;
+      const value = init ? unwrap(init) : undefined;
+      if (
+        value &&
+        Node.isPropertyAccessExpression(value) &&
+        REGISTRIES.has(value.getName())
+      ) {
+        return value.getName();
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export interface Feature {
   name: string;
   layer: Layer;
@@ -144,6 +227,10 @@ function coreBindings(
   const bindings = new Map<string, Feature>();
   const place = (local: string, exported: string, target: SourceFile) => {
     if (!isCoreFile(target.getFilePath())) {
+      return;
+    }
+    if (VEHICLES.has(exported)) {
+      bindings.set(local, { name: exported, layer: "L0" });
       return;
     }
     const byName = NAME_LAYERS[exported];
@@ -286,6 +373,24 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
           out.push({ name: `option ${label}`, layer });
         }
       }
+      // A data-form derivation: `compute` given a predicate or a template
+      // instead of a function (the plan's data forms, L1).
+      if (
+        matchesSuffix(chain, ["derive", "*", "compute"]) &&
+        Node.isPropertyAssignment(node)
+      ) {
+        const value = node.getInitializer();
+        if (
+          value &&
+          !Node.isArrowFunction(unwrap(value)) &&
+          !Node.isFunctionExpression(unwrap(value))
+        ) {
+          out.push({ name: "option derive data form", layer: "L1" });
+        }
+      }
+      if (chain[chain.length - 1] === "$template") {
+        out.push({ name: "option derive data form", layer: "L1" });
+      }
       if (matchesSuffix(chain, ["effects", "*", "run"])) {
         const fn = Node.isPropertyAssignment(node)
           ? node.getInitializer()
@@ -307,15 +412,18 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
         out.push({ name: `member .${name}`, layer });
       }
       const receiver = node.getExpression();
+      const registry = REGISTRY_MEMBERS.has(name)
+        ? registryOf(receiver)
+        : undefined;
+      if (registry) {
+        out.push({ name: `member .${registry}.${name}`, layer: "L10" });
+      }
+      const on = unwrap(receiver).getText();
       if (
-        REGISTRY_MEMBERS.has(name) &&
-        Node.isPropertyAccessExpression(receiver) &&
-        REGISTRIES.has(receiver.getName())
+        on === "Reflect" ||
+        (on === "Object" && REFLECTION_OBJECT.has(name))
       ) {
-        out.push({
-          name: `member .${receiver.getName()}.${name}`,
-          layer: "L10",
-        });
+        out.push({ name: "reflection", layer: "L1" });
       }
     }
   });
@@ -326,7 +434,14 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
 /** File- and describe-level code a test can reach. */
 function reachable(test: StaticTest, sf: SourceFile): Node[] {
   const nodes: Node[] = [];
-  const fn = test.call.getArguments()[1];
+  // The body is the last function argument: `it(name, { timeout }, fn)` puts
+  // it at index 2. Fall back to argument 1 for a body passed by reference.
+  const args = test.call.getArguments();
+  const fn =
+    [...args]
+      .reverse()
+      .find((a) => Node.isArrowFunction(a) || Node.isFunctionExpression(a)) ??
+    args[1];
   if (fn) {
     nodes.push(fn);
   }
@@ -404,6 +519,21 @@ function reachable(test: StaticTest, sf: SourceFile): Node[] {
   return [...included];
 }
 
+/** Whether `test` can reach any of the file-level `names` (lib/census.ts). */
+export function reachesAny(
+  test: StaticTest,
+  sf: SourceFile,
+  names: Set<string>,
+): boolean {
+  return reachable(test, sf).some(
+    (node) =>
+      (Node.isIdentifier(node) && names.has(node.getText())) ||
+      node
+        .getDescendantsOfKind(SyntaxKind.Identifier)
+        .some((id) => names.has(id.getText())),
+  );
+}
+
 export interface TestLayer {
   layer: Layer;
   /** The features that set the layer. */
@@ -451,17 +581,25 @@ export function layerTests(
       .filter((f) => instruments.has(f.name) && layerIndex(f.layer) > ruleIndex)
       .map((f) => `${f.name} (${f.layer})`)
       .sort();
-    const top = raising.reduce(
+    const featureTop = raising.reduce(
       (max, f) => Math.max(max, layerIndex(f.layer)),
       0,
     );
+    // For a test that builds a system, the file's rule is a floor (header).
+    const floor = all.some((f) => VEHICLES.has(f.name.replace(/^import /, "")))
+      ? ruleIndex
+      : 0;
+    const top = Math.max(featureTop, floor);
     const layer = LAYERS[top] as Layer;
     const entry: TestLayer = {
       layer,
-      by: raising
-        .filter((f) => f.layer === layer)
-        .map((f) => f.name)
-        .sort(),
+      by:
+        floor > featureTop
+          ? [`rule ${rule.rule}`]
+          : raising
+              .filter((f) => f.layer === layer)
+              .map((f) => f.name)
+              .sort(),
     };
     if (pulled.length > 0) {
       entry.pulledDown = pulled;

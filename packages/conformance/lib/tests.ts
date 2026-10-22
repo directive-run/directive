@@ -54,7 +54,13 @@ function isBlock(call: CallExpression, roots: string[]): boolean {
   if (!root || !roots.includes(root)) {
     return false;
   }
-  const [title, fn] = call.getArguments();
+  const args = call.getArguments();
+  const title = args[0];
+  // The body is the last function argument: `it(name, { timeout }, fn)`.
+  const fn = [...args]
+    .slice(1)
+    .reverse()
+    .find((a) => Node.isArrowFunction(a) || Node.isFunctionExpression(a));
   if (!title) {
     return false;
   }

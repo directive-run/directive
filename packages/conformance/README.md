@@ -7,13 +7,15 @@ than one engine:
 | --- | --- |
 | `conformance:v1`, `conformance:v1:prod` | the published release pinned by the `directive-v1` npm alias (now `@directive-run/core@1.35.0`), development and production builds. The reference. |
 | `conformance:local`, `conformance:local:prod` | the workspace's `packages/core` source |
-| `conformance:v2` (commented slot) | core-next, from Phase 1 |
+| `conformance:v2`, `conformance:v2:prod` | core-next's source, up to `current` in `layers.rules.json` |
+| `conformance:v2:dist`, `conformance:v2:dist:prod` | core-next's built `dist/` (what ships: mangled `_` members, the dev check folded at each use; `:prod` sets `NODE_ENV=production`), same gate |
 | `conformance:diff` | differential scenarios: both engines in one process, traces compared (`diff/`) |
 | `conformance:checks` | the tamper tests for `check-expects` |
 
 ```bash
 pnpm --filter @directive-run/core build          # two tests use the built package
 pnpm conformance                                 # check-expects, census, oracle guard
+pnpm --filter @directive-run/conformance ratchet [--update]  # v2 never-regress list
 pnpm --filter @directive-run/conformance typecheck
 pnpm --filter @directive-run/conformance port    # re-copy after core's tests change
 pnpm --filter @directive-run/conformance oracle:update  # after changing the harness
@@ -220,6 +222,38 @@ reports, at the highest feature it actually uses — see `lib/layers.ts`.
   flush.
 - Files in the `internals` category are skipped on v2 until WHITE-BOX.md
   triage moves them out. On v2, tests above `current` are skipped too.
+- **The vehicle is not a feature.** `createSystem` and `createModule` are how
+  every runtime test builds a system, so they do not place it
+  (`lib/layers.ts` `VEHICLES`); namespacing, several modules and
+  crossModuleDeps still place a test at L1 through their option keys. For a
+  test that builds a system, the file's `rule` is a floor instead: a test in
+  an L3 lifecycle file sits at L3 even if it uses nothing but the vehicle. So
+  a test runs on v2 as soon as the features it exercises and the behaviour
+  its file tests exist. Basic effects (run, cleanup, auto-tracking) are L0;
+  `deps`, `on` and `prev` lift a test to L4. Reflection on an engine object
+  (`Object.getOwnPropertyDescriptor`, `Reflect.*`) and data-form derivations
+  (a predicate or `$template` as `compute`) are L1; dynamic definitions are
+  L10 however the registry is reached (`const d = system.derive as Any;
+  d.register(…)`).
+
+## The v2 ratchet (`v2-passing.json`)
+
+The census only proves that v2 runs what the gate allows and that those
+tests pass. The ratchet proves nothing core-next once passed stops passing,
+above `current` included:
+
+- `pnpm --filter @directive-run/conformance ratchet` runs the four v2
+  projects with the layer gate opened (`DIRECTIVE_V2_ALL=1`; only this script
+  sets it, and a census run with it set fails) and fails if any test listed
+  in `v2-passing.json` does not pass on core-next's source **and** its dist
+  twin. CI runs it after the census.
+- `ratchet --update` adds every test that now passes on both. It never
+  removes one. Run it in the engine PR that made them pass: the file is not a
+  harness file, so it may change alongside `packages/core-next`.
+- Removing a test means adding a `removed` entry (`project`, `file`, `test`,
+  `reason`) in a PR labelled `oracle-change`; the Oracle guard (from the base
+  branch) fails a PR that drops a listed test without both
+  (`lib/ratchet.ts` `checkShrink`).
 
 ## Threat model
 
@@ -272,15 +306,9 @@ the oracle now accepts that it did not before.
 
 ## What main enforces today, and after the Phase 0 gate
 
-- **Today:** the `conformance` job runs on every push with
-  `continue-on-error: true`, so a red oracle is visible but does not block a
-  merge. The Oracle guard workflow runs on every PR but is not a required
-  check. Nothing here changes repository settings.
-- **At the Phase 0 gate (Jason's decision):** make `conformance` and
-  `Oracle guard` required status checks on main, decide whether
-  `enforce_admins` applies to them, and remove `continue-on-error` from the
-  `conformance` job (the TODO in ci.yml). Until then the guarantees above
-  hold only as far as people respect a red check.
+- The `conformance` job blocks: it has no `continue-on-error`, and it is a
+  required status check on main. A red check-expects, census, ratchet or
+  tree-mode guard fails the run.
 
 ## When it fails
 
@@ -299,6 +327,7 @@ the oracle now accepts that it did not before.
 | diff: a source fault went unnoticed | A faulted copy of core passes every scenario | Add the scenario that would catch it |
 | diff: "not deterministic" | The reference run twice gave different traces: the scenario or recorder depends on something outside the run | Fix the scenario or the recorder; never a divergence |
 | diff: a stale divergence | An approved difference no longer occurs | Remove the entry |
+| ratchet: a listed test no longer passes | core-next regressed something it once passed (on source, or only in the built dist: a mangled member, the folded dev check) | Fix core-next; removing the entry needs a reason and the `oracle-change` label |
 | oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |
 | Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together | Label it if the change is deliberate; split engine and oracle PRs |
 

@@ -38,6 +38,7 @@ import {
   diffTestFiles,
   pluginHooks,
   prodPorts,
+  unbuiltReached,
   unbuiltSpecifiers,
   v2Skips,
 } from "../../lib/census.js";
@@ -245,22 +246,72 @@ describe("the census", () => {
     ).toEqual([]);
   });
 
-  it("fails when a v2 test ran in a file that imports an unbuilt entry", () => {
-    const reports = cleanReports();
-    const unbuilt = v2Entries(repoRoot);
-    const file = reports["conformance:v2"]?.testResults.find(
-      (f) =>
-        f.assertionResults.some((a) => a.status === "skipped") &&
-        unbuiltSpecifiers(readFileSync(f.name, "utf8"), unbuilt).length > 0,
+  // A port's tests that reach a binding of an entry core-next has not built.
+  const reachingUnbuilt = (rel: string) =>
+    unbuiltReached(
+      new Project({ useInMemoryFileSystem: true }).createSourceFile(
+        `/${rel}`,
+        readFileSync(join(conformance, rel), "utf8"),
+      ),
+      v2Entries(repoRoot),
     );
-    expect(file, "a gated port that imports an unbuilt entry").toBeDefined();
-    const skipped = file?.assertionResults.find(
-      (a) => a.status === "skipped",
-    ) as { status: string };
-    skipped.status = "passed";
+
+  it("fails when a v2 test ran that reaches an unbuilt entry", () => {
+    const reports = cleanReports();
+    let flipped: { status: string } | undefined;
+    for (const f of reports["conformance:v2"]?.testResults ?? []) {
+      const reached = reachingUnbuilt(relative(conformance, f.name));
+      flipped = f.assertionResults.find(
+        (a) =>
+          a.status === "skipped" &&
+          reached.has([...a.ancestorTitles, a.title].join(" > ")),
+      );
+      if (flipped) {
+        break;
+      }
+    }
+    expect(flipped, "a gated test that reaches an unbuilt entry").toBeDefined();
+    (flipped as { status: string }).status = "passed";
     expect(census(repoRoot, reports).join("\n")).toMatch(
       /ran \(passed\) but the file imports .* which core-next has not built/,
     );
+  });
+
+  it("flags an unbuilt-entry read in the options-object form it(name, { timeout }, fn)", () => {
+    // One line, so the census fixture's `^it(` count ignores this source.
+    const src =
+      'import { loggingPlugin } from "@directive-run/core/plugins"; import { it } from "vitest"; ' +
+      'it("plain", () => {}); it("with options", { timeout: 5000 }, () => { loggingPlugin(); });';
+    const reached = unbuiltReached(
+      new Project({ useInMemoryFileSystem: true }).createSourceFile(
+        "/options-form.test.ts",
+        src,
+      ),
+      v2Entries(repoRoot),
+    );
+    expect([...reached.keys()]).toEqual(["with options"]);
+  });
+
+  it("accepts a v2 test in a file importing an unbuilt entry it never reaches", () => {
+    const rel = "tests/core/derivation-deps.test.ts";
+    const reached = reachingUnbuilt(rel);
+    const name =
+      "derivation dependencies > re-runs an effect that reads a derivation and no facts";
+    expect(
+      unbuiltSpecifiers(
+        readFileSync(join(conformance, rel), "utf8"),
+        v2Entries(repoRoot),
+      ),
+    ).toEqual(["@directive-run/core/testing"]);
+    expect(reached.has(name)).toBe(false);
+    // Every test that calls flushMicrotasks reaches it.
+    const reaching = [...reached.keys()];
+    expect(reaching.length).toBeGreaterThan(0);
+    expect(
+      reaching.every((k) =>
+        reached.get(k)?.includes("@directive-run/core/testing"),
+      ),
+    ).toBe(true);
   });
 
   it("fails when a project produced no report", () => {

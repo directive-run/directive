@@ -18,11 +18,13 @@ import {
   engineDistTypes,
   enginePackageDir,
 } from "../helpers/engine.js";
-import { coreEntries, v2Entries } from "../lib/core-entries.js";
+import { coreEntries, v2DistEntries, v2Entries } from "../lib/core-entries.js";
 import { checkV1Pin } from "../lib/v1-pin.js";
 
 const build = process.env.DIRECTIVE_BUILD as "development" | "production";
 const which = engine();
+/** The `:dist` projects run core-next's built output instead of its source. */
+const dist = process.env.DIRECTIVE_V2_TARGET === "dist";
 const root = resolve(import.meta.dirname, "..");
 const v1Dir = join(root, "node_modules/directive-v1");
 const coreDir = resolve(root, "../core");
@@ -60,9 +62,9 @@ function expected(): Map<string, string> {
       out.set(entry.specifier, entry.file);
     }
   } else {
-    // core-next's source; entries it has not built yet resolve to
-    // src/unbuilt.ts (lib/core-entries.ts v2Entries).
-    for (const entry of v2Entries()) {
+    // core-next's source, or its dist on the `:dist` projects; entries it has
+    // not built yet resolve to src/unbuilt.ts (lib/core-entries.ts).
+    for (const entry of dist ? v2DistEntries() : v2Entries()) {
       out.set(entry.specifier, entry.file);
     }
   }
@@ -72,9 +74,16 @@ function expected(): Map<string, string> {
 
 type Module = Record<string, unknown>;
 
-describe(`engine identity (${which}, ${build})`, () => {
+describe(`engine identity (${which}${dist ? " dist" : ""}, ${build})`, () => {
   it("knows which build it runs", () => {
     expect(["development", "production"]).toContain(build);
+    expect(dist ? which : "v2").toBe("v2");
+    if (dist) {
+      // The built dev check reads NODE_ENV at each use (core-next tsup.config.ts).
+      expect(process.env.NODE_ENV === "production").toBe(
+        build === "production",
+      );
+    }
   });
 
   it("finds the engine's package and build where it should", () => {
@@ -145,7 +154,10 @@ describe(`engine identity (${which}, ${build})`, () => {
     const core = await vi.importActual<Module>("@directive-run/core");
     const local = coreEntries().find((e) => e.subpath === ".")?.file as string;
     const v1 = join(v1Dir, "dist", build, "index.js");
-    const others = which === "v2" ? [local, v1] : [which === "v1" ? local : v1];
+    // On v2 the source and the dist are other engines to each other.
+    const nextOther = join(nextDir, dist ? "src/index.ts" : "dist/index.js");
+    const others =
+      which === "v2" ? [local, v1, nextOther] : [which === "v1" ? local : v1];
     for (const file of others) {
       const other = await vi.importActual<Module>(file);
       expect(core.createSystem).not.toBe(other.createSystem);

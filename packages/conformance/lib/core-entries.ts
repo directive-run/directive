@@ -159,3 +159,40 @@ export function v2Entries(repoRoot = defaultRepoRoot): CoreEntry[] {
     };
   });
 }
+
+/** core-next's package directory. */
+export function nextPackageDir(repoRoot = defaultRepoRoot): string {
+  return join(repoRoot, "packages/core-next");
+}
+
+/**
+ * core-next's built output for each core entry point, for the `:dist`
+ * projects: the file core-next's own `exports` serve for the same subpath
+ * (`dist/index.js`), or `src/unbuilt.ts` where core-next has not built the
+ * entry (as v2Entries). This is what ships: internal members mangled
+ * (`mangleProps`), the dev check written out at each use and read from
+ * `NODE_ENV` at run time.
+ */
+export function v2DistEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
+  const nextRoot = nextPackageDir(repoRoot);
+  const pkg = JSON.parse(readFileSync(join(nextRoot, "package.json"), "utf8"));
+  const exportsMap = pkg.exports as Record<string, unknown>;
+
+  return v2Entries(repoRoot).map((entry) => {
+    if (entry.file.endsWith("/unbuilt.ts")) {
+      return entry;
+    }
+    const dist = runtimeTarget(exportsMap[entry.subpath]);
+    if (!dist) {
+      return { ...entry, file: join(nextRoot, "src/unbuilt.ts") };
+    }
+    const file = resolve(nextRoot, dist);
+    if (!existsSync(file)) {
+      throw new Error(
+        `core-next has no ${dist} for ${entry.specifier}; run \`pnpm --filter @directive-run/core-next build\``,
+      );
+    }
+
+    return { ...entry, file };
+  });
+}

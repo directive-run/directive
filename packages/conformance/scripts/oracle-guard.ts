@@ -79,8 +79,36 @@ if (process.argv.includes("--pr")) {
     ? { base: await lockAt(pr.base.sha), head: await lockAt(pr.head.sha) }
     : undefined;
 
+  // v2-passing.json at both ends, as data (null: the base has none yet).
+  const ratchetPath = "packages/conformance/v2-passing.json";
+  const ratchetAt = async (sha: string) => {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${ratchetPath}?ref=${sha}`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+          accept: "application/vnd.github.raw+json",
+        },
+      },
+    );
+    if (res.status === 404) {
+      return null;
+    }
+    if (!res.ok) {
+      throw new Error(`GitHub API contents/${ratchetPath}: ${res.status}`);
+    }
+
+    return res.text();
+  };
+  const ratchet = changed.includes(ratchetPath)
+    ? {
+        base: await ratchetAt(pr.base.sha),
+        head: (await ratchetAt(pr.head.sha)) ?? '{"tests":{}}',
+      }
+    : undefined;
+
   const labels = pr.labels.map((l) => l.name);
-  failures.push(...checkPullRequest(changed, labels, lockfile));
+  failures.push(...checkPullRequest(changed, labels, lockfile, ratchet));
   console.log(
     `[oracle-guard] PR #${pr.number}: ${changed.length} changed files, labels: ${labels.join(", ") || "none"}`,
   );

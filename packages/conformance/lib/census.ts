@@ -6,7 +6,7 @@
  * proves the run was. A green run that quietly skipped, filtered or dropped
  * tests fails here:
  *
- * - config: the vitest config has exactly the eight projects, each with the
+ * - config: the vitest config has exactly the ten projects, each with the
  *   expected root, includes, excludes, setup file, env and core aliases, and
  *   nothing else (no extra setup files, global setup, server deps or mocks);
  * - files: every port ran in every engine project that should run it, and the
@@ -25,9 +25,10 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { Node, Project } from "ts-morph";
-import { coreEntries, v2Entries } from "./core-entries.js";
+import { Node, Project, type SourceFile } from "ts-morph";
+import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import { FUZZ_FLOOR as FLOOR } from "./fuzz.js";
+import { reachesAny } from "./layers.js";
 import { staticTests } from "./tests.js";
 
 /** The fewest fuzz cases a differential run may execute (lib/fuzz.ts). */
@@ -40,6 +41,8 @@ export const ENGINE_PROJECTS = [
   "conformance:local:prod",
   "conformance:v2",
   "conformance:v2:prod",
+  "conformance:v2:dist",
+  "conformance:v2:dist:prod",
 ] as const;
 export const DIFF_PROJECT = "conformance:diff";
 export const CHECKS_PROJECT = "conformance:checks";
@@ -113,6 +116,70 @@ export function unbuiltSpecifiers(
     .filter((specifier) =>
       ['"', "'", "`"].some((q) => source.includes(`${q}${specifier}${q}`)),
     );
+}
+
+/**
+ * The tests of a port that reach an unbuilt entry, by test key → the entries.
+ * A binding statically imported from an unbuilt entry counts only for the
+ * tests that reach it (their own code, their describes' hooks and
+ * declarations, file-level code they call); an unbuilt entry named any other
+ * way (a dynamic import, a mock, a string) counts for every test.
+ */
+export function unbuiltReached(
+  sf: SourceFile,
+  entries: Array<{ specifier: string; file: string }>,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const specs = unbuiltSpecifiers(sf.getFullText(), entries);
+  if (specs.length === 0) {
+    return out;
+  }
+  const names = new Map<string, string>();
+  let elsewhere: string[] = [];
+  const imported = new Set<string>();
+  for (const imp of sf.getImportDeclarations()) {
+    const spec = imp.getModuleSpecifierValue();
+    if (!specs.includes(spec)) {
+      continue;
+    }
+    imported.add(spec);
+    if (imp.isTypeOnly()) {
+      continue;
+    }
+    for (const n of imp.getNamedImports()) {
+      if (!n.isTypeOnly()) {
+        names.set(n.getAliasNode()?.getText() ?? n.getName(), spec);
+      }
+    }
+    const def = imp.getDefaultImport()?.getText();
+    if (def) {
+      names.set(def, spec);
+    }
+    const ns = imp.getNamespaceImport()?.getText();
+    if (ns) {
+      names.set(ns, spec);
+    }
+  }
+  // Named outside a static import too (or only there): every test reaches it.
+  const withoutImports = sf
+    .getStatements()
+    .filter((st) => !Node.isImportDeclaration(st))
+    .map((st) => st.getFullText())
+    .join("\n");
+  elsewhere = unbuiltSpecifiers(withoutImports, entries);
+  for (const test of staticTests(sf)) {
+    const reached = new Set(elsewhere);
+    for (const [name, spec] of names) {
+      if (!reached.has(spec) && reachesAny(test, sf, new Set([name]))) {
+        reached.add(spec);
+      }
+    }
+    if (reached.size > 0) {
+      out.set(test.key, [...reached].sort());
+    }
+  }
+
+  return out;
 }
 
 function walk(dir: string): string[] {
@@ -194,6 +261,7 @@ function expectedAlias(
   repoRoot: string,
   engine: "v1" | "local" | "v2",
   build: "development" | "production",
+  dist = false,
 ): Record<string, string> {
   const conformanceRoot = join(repoRoot, "packages/conformance");
   const out: Record<string, string> = {};
@@ -217,7 +285,12 @@ function expectedAlias(
         ? "packages/core-next/src/dev-true.ts"
         : "packages/core/src/dev-true.ts",
     );
-    for (const entry of v2 ? v2Entries(repoRoot) : coreEntries(repoRoot)) {
+    const entries = !v2
+      ? coreEntries(repoRoot)
+      : dist
+        ? v2DistEntries(repoRoot)
+        : v2Entries(repoRoot);
+    for (const entry of entries) {
       out[exactSource(entry.specifier)] = entry.file;
     }
   }
@@ -306,6 +379,7 @@ export function checkConfig(
         ? "v2"
         : "local";
     const build = name.endsWith(":prod") ? "production" : "development";
+    const dist = name.startsWith("conformance:v2:dist");
     const want = {
       name,
       root: conformanceRoot,
@@ -317,7 +391,12 @@ export function checkConfig(
           : ["tests/**/*.test.ts", ...self],
       exclude: build === "production" ? [] : prod,
       setupFiles: ["helpers/layer-gate.ts"],
-      env: { DIRECTIVE_ENGINE: engine, DIRECTIVE_BUILD: build },
+      env: {
+        DIRECTIVE_ENGINE: engine,
+        DIRECTIVE_BUILD: build,
+        ...(dist ? { DIRECTIVE_V2_TARGET: "dist" } : {}),
+        ...(dist && build === "production" ? { NODE_ENV: "production" } : {}),
+      },
     };
     if (!sameJson(Object.keys(project), ["resolve", "test"])) {
       fail(`${name} may only hold resolve and test`);
@@ -335,7 +414,7 @@ export function checkConfig(
     if (!sameJson(resolveKeys, ["alias"])) {
       fail(`${name} resolve may only hold alias`);
     }
-    const expected = expectedAlias(repoRoot, engine, build);
+    const expected = expectedAlias(repoRoot, engine, build, dist);
     const sort = (o: Record<string, string>) =>
       Object.fromEntries(
         Object.entries(o).sort(([a], [b]) => a.localeCompare(b)),
@@ -368,14 +447,45 @@ export function census(
   ).current;
   const prod = new Set(prodPorts(conformanceRoot));
   // Files that import an entry core-next has not built: the stub exports
-  // nothing useful, so any test of theirs that runs on v2 is reading
-  // undefined. Only a fully skipped (gated) file may import one.
+  // nothing useful, so a test that reaches one of its bindings and runs on v2
+  // is reading undefined. Only a gated test may reach one.
   const v2Unbuilt = v2Entries(repoRoot);
-  const importsUnbuilt = (file: string) =>
-    unbuiltSpecifiers(
-      readFileSync(join(conformanceRoot, file), "utf8"),
-      v2Unbuilt,
+  const v2DistUnbuilt = v2DistEntries(repoRoot);
+  const reachedCache = new Map<string, Map<string, string[]>>();
+  const unbuiltProject = new Project({ useInMemoryFileSystem: true });
+  const importsUnbuilt = (file: string, test: string, dist: boolean) => {
+    const cacheKey = `${dist}:${file}`;
+    let reached = reachedCache.get(cacheKey);
+    if (!reached) {
+      reached = unbuiltReached(
+        unbuiltProject.createSourceFile(
+          `/${file}`,
+          readFileSync(join(conformanceRoot, file), "utf8"),
+          { overwrite: true },
+        ),
+        dist ? v2DistUnbuilt : v2Unbuilt,
+      );
+      reachedCache.set(cacheKey, reached);
+    }
+    // The exact key, its numbered duplicates, or (computed titles) any test.
+    const matches = [...reached].filter(
+      ([k]) => k === test || k.startsWith(`${test} #`),
     );
+    const pool = matches.length > 0 ? matches : [...reached];
+    const exact = [...reached.keys()].some(
+      (k) => k === test || k.startsWith(`${test} #`),
+    );
+    const known = layers.files[file]?.tests ?? {};
+    const isStatic = Object.keys(known).some(
+      (k) => (k === test || k.startsWith(`${test} #`)) && !known[k]?.dynamic,
+    );
+
+    return [
+      ...new Set(
+        (exact || !isStatic ? pool : []).flatMap(([, specs]) => specs),
+      ),
+    ].sort();
+  };
   const runnable = Object.keys(manifest).filter((f) => f.endsWith(".test.ts"));
   const selfFiles = walk(join(conformanceRoot, "self"))
     .filter((f) => f.endsWith(".test.ts"))
@@ -455,7 +565,14 @@ export function census(
         if (isV2 && file.startsWith("tests/")) {
           // The gate decides: what it skips must be skipped, the rest pass.
           const gated = v2Skips(layers, current, file, test);
-          const unbuilt = status === "skipped" ? [] : importsUnbuilt(file);
+          const unbuilt =
+            status === "skipped"
+              ? []
+              : importsUnbuilt(
+                  file,
+                  test,
+                  name.startsWith("conformance:v2:dist"),
+                );
           if (unbuilt.length > 0) {
             fail(
               `${name}: ${file} > "${test}" ran (${status}) but the file imports ${unbuilt.join(", ")}, which core-next has not built`,
@@ -548,6 +665,8 @@ export function census(
     ["conformance:v1:prod", "conformance:local:prod"],
     ["conformance:v1", "conformance:v2"],
     ["conformance:v1:prod", "conformance:v2:prod"],
+    ["conformance:v1", "conformance:v2:dist"],
+    ["conformance:v1:prod", "conformance:v2:dist:prod"],
   ] as const) {
     const left = ran.get(a);
     const right = ran.get(b);

@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0\u2013L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
+  "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0–L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
   "current": "L0",
   "$scenarios": "Each differential scenario (diff/scenarios/), by title, and the layer it needs: the highest feature it uses on the plan's ladder. On v2 the diff project runs only scenarios at or below `current`; fuzz cases are placed by the features they use (diff/fuzz/model.ts specLayer); diff/self/ always runs. Checked by the census (lib/census.ts checkScenarioLayers).",
   "scenarios": {
@@ -167,22 +167,22 @@
       "rule": "L0"
     },
     "tests/core/mutants-effects.test.ts": {
-      "rule": "L4"
+      "rule": "L0"
     },
     "tests/core/mutants-effects-production.test.ts": {
-      "rule": "L4"
+      "rule": "L0"
     },
     "tests/core/blackbox-effects.test.ts": {
-      "rule": "L4"
+      "rule": "L0"
     },
     "tests/core/blackbox-effects-readonly.test.ts": {
-      "rule": "L4"
+      "rule": "L1"
     },
     "tests/core/blackbox-effects-production.test.ts": {
-      "rule": "L4"
+      "rule": "L0"
     },
     "tests/core/blackbox-effects-chain.test.ts": {
-      "rule": "L4"
+      "rule": "L0"
     },
     "tests/core/blackbox-readonly-module-view.test.ts": {
       "rule": "L1"
@@ -574,7 +574,7 @@
   ],
   "notes": {
     "multi-module-correctness": "The plan puts multi-module-correctness in L1 and its source parts in L5. Only the .prod file is black-box; the main file imports createCrossModuleFactsProxy and is white-box (see WHITE-BOX.md), so its split waits for that triage.",
-    "effects": "The plan's L4 names effects and effects-lazy-prev-facts; both are white-box (derivationDep, declaresPrevFacts). L4 has only two black-box files until they are rewritten.",
+    "effects": "The plan's ladder puts basic effects (run, cleanup, auto-tracking) at L0 and full effects (deps/on, prev, per-frame skip-tracking) at L4. So the black-box effects files' rule is L0 (read-only views, L1, for blackbox-effects-readonly) and each test that uses deps, on or prev is lifted to L4 by those options (lib/layers.ts OPTION_LAYERS). The plan's L4 files effects and effects-lazy-prev-facts are white-box (derivationDep, declaresPrevFacts).",
     "predicate": "predicate and predicate-describe (L11) and sweep-under are white-box."
   },
   "instrumentNotes": {
