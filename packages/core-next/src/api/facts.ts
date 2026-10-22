@@ -350,7 +350,7 @@ export function createFactsStore<S extends Schema>(
   return store as unknown as FactsStore<S>;
 }
 
-const DEV_PROXY_TARGET = Symbol.for("directive.devProxyTarget");
+export const DEV_PROXY_TARGET = Symbol.for("directive.devProxyTarget");
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 
 /** Values whose mutations a fact cannot see; facts should be JSON. */

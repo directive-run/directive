@@ -31,7 +31,9 @@ export const withInspect: SystemPart = ({ module, system }) => {
     sources: [],
     attachedSourceCount: 0,
     derivations: metas(module.derive),
-    modules: [{ id: module.id, meta: module.meta }],
+    modules: (module as { modules_?: unknown[] }).modules_ ?? [
+      { id: module.id, meta: module.meta },
+    ],
     traceEnabled: false,
   });
 };

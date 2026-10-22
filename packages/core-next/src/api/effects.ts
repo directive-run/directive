@@ -9,12 +9,8 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import {
-  BLOCKED_PROPS,
-  type Tracker,
-  describeDep,
-  withTracking,
-} from "./facts.js";
+import { type Tracker, describeDep, withTracking } from "./facts.js";
+import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
 export interface CreateEffectsOptions<S extends Schema> {
@@ -48,12 +44,15 @@ interface EffectState {
   cleanup: (() => void) | null;
 }
 
-function writeMessage(id: string, key: string): string {
-  return `[Directive] effect "${id}" tried to write "${key}". Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key.split(".")[0]} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
+function writeMessage(id: string, key: string, inPlace?: boolean): string {
+  return `[Directive] effect "${id}" ${inPlace ? `changed "${key}" in place` : `tried to write "${key}"`}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key.split(".")[0]} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
 }
 
+/** Set on a wrapped run (namespaced.ts): whether the author's run reads prev. */
+export const PREV_READ: unique symbol = Symbol();
+
 /** 0 or 2+ parameters, or anything opaque, may read prevFacts. */
-function declaresPrev(run: unknown): boolean {
+export function declaresPrev(run: unknown): boolean {
   if (typeof run !== "function") {
     return true;
   }
@@ -99,8 +98,8 @@ export function createEffectsManager<S extends Schema>(
   const states = new Map<string, EffectState>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
-  const prevObserved = Object.values(definitions).some((d) =>
-    declaresPrev(d?.run),
+  const prevObserved = Object.values(definitions).some(
+    (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
   );
 
   for (const id of Object.keys(definitions)) {
@@ -114,7 +113,7 @@ export function createEffectsManager<S extends Schema>(
     });
   }
 
-  const refuse = (id: string, key: string): boolean => {
+  const refuse = (id: string, key: string): true => {
     onWriteBlocked?.(id, key);
     if (isDevelopment) {
       throw new Error(writeMessage(id, key));
@@ -123,53 +122,54 @@ export function createEffectsManager<S extends Schema>(
     return true;
   };
 
-  /** A read-only view of the facts for effect `id`: writes are refused. */
-  const views = new Map<string, unknown>();
-  function viewFor(id: string): unknown {
+  /** The read-only view of the facts for effect `id`: writes are refused. */
+  const views = new Map<string, CheckedReadView<object>>();
+  function viewFor(id: string): CheckedReadView<object> {
     let view = views.get(id);
-    if (view) {
-      return view;
+    if (!view) {
+      let readonlyStore: FactsStore<S> | undefined;
+      view = createCheckedReadView(facts as object, (key) => refuse(id, key), {
+        override: (prop) =>
+          prop === "$store"
+            ? (readonlyStore ??= {
+                get: (key) => store.get(key),
+                has: (key) => store.has(key),
+                set: (key) => {
+                  refuse(id, String(key));
+                },
+                delete: (key) => {
+                  refuse(id, String(key));
+                },
+                batch: (fn) => store.batch(fn),
+                subscribe: (keys, listener) => store.subscribe(keys, listener),
+                subscribeAll: (listener) => store.subscribeAll(listener),
+                toObject: () => store.toObject(),
+              })
+            : undefined,
+      });
+      views.set(id, view);
     }
-    const readonlyStore: FactsStore<S> = {
-      get: (key) => store.get(key),
-      has: (key) => store.has(key),
-      set: (key) => {
-        refuse(id, String(key));
-      },
-      delete: (key) => {
-        refuse(id, String(key));
-      },
-      batch: (fn) => store.batch(fn),
-      subscribe: (keys, listener) => store.subscribe(keys, listener),
-      subscribeAll: (listener) => store.subscribeAll(listener),
-      toObject: () => store.toObject(),
-    };
-    view = new Proxy(facts as object, {
-      get(target, prop) {
-        if (prop === "$store") {
-          return readonlyStore;
-        }
-
-        return Reflect.get(target, prop);
-      },
-      set(_, prop) {
-        if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
-          return false;
-        }
-
-        return refuse(id, prop);
-      },
-      deleteProperty(_, prop) {
-        if (typeof prop === "symbol" || BLOCKED_PROPS.has(prop)) {
-          return false;
-        }
-
-        return refuse(id, prop);
-      },
-    });
-    views.set(id, view);
 
     return view;
+  }
+
+  /** Development: this run's prev and derived checks. */
+  const runChecks = new Map<string, CheckedReadView<object>[]>();
+  /** Development: throw if the effect changed a value in place. */
+  function checkInPlace(id: string): void {
+    if (isDevelopment) {
+      const found =
+        viewFor(id).takeMutation() ??
+        (runChecks.get(id) ?? []).reduce<string | null>(
+          (first, check) => first ?? check.takeMutation(),
+          null,
+        );
+      runChecks.delete(id);
+      if (found !== null) {
+        onWriteBlocked?.(id, found);
+        throw new Error(writeMessage(id, found, true));
+      }
+    }
   }
 
   function runCleanup(state: EffectState): void {
@@ -225,9 +225,30 @@ export function createEffectsManager<S extends Schema>(
     onRun?.(state.id, state.deps ? Array.from(state.deps, describeDep) : []);
     try {
       let out: unknown;
+      const id = state.id;
       const call = () =>
         store.batch(() => {
-          out = def.run(viewFor(state.id), previous, derived);
+          let prev: object | null = previous;
+          let d: object = derived;
+          if (isDevelopment) {
+            const checks: CheckedReadView<object>[] = [];
+            const checked = (src: object, prefix: string) => {
+              const check = createCheckedReadView(
+                src,
+                (key) => refuse(id, `${prefix}.${key}`),
+                { prefix },
+              );
+              checks.push(check);
+
+              return check.view;
+            };
+            if (prev !== null) {
+              prev = checked(prev, "prevFacts");
+            }
+            d = checked(derived, "derived");
+            runChecks.set(id, checks);
+          }
+          out = def.run(viewFor(id).view, prev, d);
         });
       if (state.explicit) {
         call();
@@ -236,12 +257,15 @@ export function createEffectsManager<S extends Schema>(
         state.deps = tracked.deps.size > 0 ? tracked.deps : null;
       }
       if (out instanceof Promise) {
-        return out.then(
-          (settled) => keep(state, settled),
-          (error) => report(state, error),
-        );
+        return out
+          .then((settled) => {
+            keep(state, settled);
+            checkInPlace(id);
+          })
+          .catch((error) => report(state, error));
       }
       keep(state, out);
+      checkInPlace(id);
     } catch (error) {
       thrown.push([state, error]);
     }
@@ -355,10 +379,11 @@ export const withEffects: SystemPart = (ctx) => {
       }
     },
     onError(id, error) {
+      // As in 1.35: the error boundary hears it before the effect hook.
+      reportError("effect", id, error);
       if (hooks.live) {
         hooks.emit("effect.error", { id, error });
       }
-      reportError("effect", id, error);
     },
     onWriteBlocked(id, key) {
       if (hooks.live) {
