@@ -52,8 +52,11 @@ function writeMessage(id: string, key: string): string {
   return `[Directive] effect "${id}" tried to write "${key}". Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key.split(".")[0]} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
 }
 
+/** Set on a wrapped run (namespaced.ts): whether the author's run reads prev. */
+export const PREV_READ: unique symbol = Symbol();
+
 /** 0 or 2+ parameters, or anything opaque, may read prevFacts. */
-function declaresPrev(run: unknown): boolean {
+export function declaresPrev(run: unknown): boolean {
   if (typeof run !== "function") {
     return true;
   }
@@ -99,8 +102,8 @@ export function createEffectsManager<S extends Schema>(
   const states = new Map<string, EffectState>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
-  const prevObserved = Object.values(definitions).some((d) =>
-    declaresPrev(d?.run),
+  const prevObserved = Object.values(definitions).some(
+    (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
   );
 
   for (const id of Object.keys(definitions)) {

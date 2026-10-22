@@ -45,7 +45,6 @@ import type {
   FactChange,
   Facts,
   FactsStore,
-  ModuleDef,
   ModuleDefinition,
   ModuleSchema,
   Schema,
@@ -86,12 +85,7 @@ export class DirectiveError extends Error {
   }
 }
 
-export function createModule<const M extends ModuleSchema>(
-  id: string,
-  definition: ModuleDef<M>,
-): ModuleDefinition<M> {
-  return { ...definition, id } as unknown as ModuleDefinition<M>;
-}
+export { createModule } from "./module.js";
 
 interface Derivation {
   id_: string;
@@ -145,7 +139,20 @@ const defsOf = (
 ): Record<string, Fn> => {
   const out: Record<string, Fn> = {};
   for (const [id, raw] of Object.entries(src ?? {})) {
-    out[id] = typeof raw === "function" ? (raw as Fn) : (raw as any)?.[key];
+    const fn = typeof raw === "function" ? raw : (raw as any)?.[key];
+    if (
+      key === "compute" &&
+      typeof raw === "object" &&
+      fn !== undefined &&
+      typeof fn !== "function" &&
+      (typeof fn !== "object" || fn === null)
+    ) {
+      // 1.35's message: a data form must be a predicate or template object.
+      throw new Error(
+        `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof fn}`,
+      );
+    }
+    out[id] = fn as Fn;
   }
 
   return out;
@@ -171,7 +178,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const module = options.module as ModuleDefinition<ModuleSchema>;
   if (!module) {
     throw new Error(
-      "[Directive] createSystem needs a `module` (`modules` arrives at L1)",
+      `[Directive] createSystem requires a module. Got: ${typeof module}`,
     );
   }
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
@@ -364,7 +371,16 @@ export function createSystemCore<const M extends ModuleSchema>(
     (id) => derivations.has(id),
     () => [...derivations.keys()],
     (id) => (BLOCKED_PROPS.has(id) ? undefined : read(id)),
-    { ...LOCKED, set: no, deleteProperty: no },
+    {
+      ...LOCKED,
+      set: no,
+      deleteProperty: no,
+      // As in 1.35, a derivation reads like a getter under reflection.
+      getOwnPropertyDescriptor: (_, id) =>
+        typeof id === "string" && derivations.has(id)
+          ? { configurable: true, enumerable: true, get: () => read(id) }
+          : undefined,
+    },
   );
 
   // --- errors ------------------------------------------------------------

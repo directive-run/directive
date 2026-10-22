@@ -148,6 +148,7 @@ export interface ModuleDefinition<M extends ModuleSchema = ModuleSchema> {
   readonly derive?: Record<string, unknown>;
   readonly events?: Record<string, unknown>;
   readonly effects?: Record<string, unknown>;
+  readonly crossModuleDeps?: Record<string, unknown>;
   readonly meta?: DefinitionMeta;
   readonly [key: string]: unknown;
 }
@@ -164,7 +165,12 @@ export interface Plugin {
 }
 
 export interface SystemOptions<M extends ModuleSchema> {
-  module: ModuleDefinition<M>;
+  /** One module, accessed flat (`system.facts.count`). */
+  module?: ModuleDefinition<M>;
+  /** Several modules, accessed by namespace (`system.facts.auth.token`). */
+  modules?: Record<string, ModuleDefinition<any>>;
+  /** Module init order: by crossModuleDeps (default), declaration, or explicit. */
+  initOrder?: "auto" | "declaration" | string[];
   plugins?: Plugin[];
   [key: string]: unknown;
 }
