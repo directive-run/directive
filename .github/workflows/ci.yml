@@ -5,13 +5,15 @@ name: CI
 # run happened when a pull request opened — by which point several
 # independent failures were stacked on each other, each hiding the next.
 # Two of them would have broken the release rather than the branch.
+# Pull requests run on `pull_request`; `push` only runs for main. Every job
+# runs on both events, never skipped: a skipped job reports a check with the
+# same name as a required one, and GitHub counts a skipped check as passing,
+# so a red run could merge beside a skipped twin (#205 did).
 on:
   push:
+    branches: [main]
   pull_request:
 
-# A branch push and its pull request would otherwise both fire for the same
-# commit. Same-repo work is covered by `push`; `pull_request` is left to do
-# the job for forks, where `push` does not reach us.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -24,7 +26,6 @@ jobs:
     # Skip the pull_request event for branches in this repository, which
     # `push` has already covered. Fork pull requests still run, since no
     # push event reaches us for those.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,7 +113,6 @@ jobs:
   # are faithful and its tamper tests. The suite's typecheck runs in
   # build-and-test with every other package.
   conformance:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Blocking: a red oracle fails the run, and the job is a required check
@@ -155,7 +155,6 @@ jobs:
   # are-the-types-wrong, then installs the packed core + react tarballs into a
   # clean project with plain npm and loads/type-checks them.
   package-checks:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -186,7 +185,6 @@ jobs:
   # Every example must keep compiling against the workspace packages, so an
   # API change cannot silently strand the examples. Blocking.
   examples:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -214,7 +212,6 @@ jobs:
         run: pnpm -r --no-bail --filter './examples/*' typecheck
 
   e2e:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
