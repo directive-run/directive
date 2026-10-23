@@ -39,6 +39,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The conformance vitest config resolves core's and core-next's builds
+      # when it loads.
+      - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
+
       - name: Pick the seed
         id: seed
         env:
