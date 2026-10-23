@@ -62,4 +62,6 @@ jobs:
           DIFF_FUZZ_SEED: ${{ steps.seed.outputs.seed }}
           DIFF_FUZZ_RUNS: ${{ inputs.runs || '5000' }}
         working-directory: packages/conformance
-        run: ./node_modules/.bin/vitest run --config vitest.config.ts --project conformance:diff diff/fuzz
+        # 5,000 cases on three engines (v1, local, v2) need more than the
+        # project's 120 s default; PR runs use fewer cases and keep it.
+        run: ./node_modules/.bin/vitest run --config vitest.config.ts --project conformance:diff --testTimeout=1200000 diff/fuzz
