@@ -193,6 +193,9 @@
     "tests/core/blackbox-readonly-module-production.test.ts": {
       "rule": "L1"
     },
+    "tests/core/blackbox-cross-module-deps.test.ts": {
+      "rule": "L1"
+    },
     "tests/core/frozen-facts.test.ts": {
       "rule": "L0"
     },

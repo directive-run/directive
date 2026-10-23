@@ -147,6 +147,52 @@
         }
       }
     },
+    "tests/core/blackbox-cross-module-deps.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "tests": {
+        "a module sees exactly its declared dependencies > a derivation reads declared deps and not an undeclared module": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "a module sees exactly its declared dependencies > an effect reads declared deps and not an undeclared module": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "a module sees exactly its declared dependencies > the flat own-fact name is not a view in a module with deps": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "a module sees exactly its declared dependencies > an event handler sees its own facts flat and no dependency views": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "a module sees exactly its declared dependencies > a resolver reads declared deps through ctx.deps and not others": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "each dependency name maps to the right module > two declared deps are not swapped, in either declaration order": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "each dependency name maps to the right module > a view follows later writes to the module it names": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "self is not confused with a dependency > self reads this module and deps read the others, same fact name": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "writes through a dependency view > an effect cannot write a dependency, itself or an undeclared name": {
+          "layer": "L4",
+          "by": ["option effect deps"]
+        },
+        "writes through a dependency view > a resolver cannot write a dependency through ctx.deps": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
     "tests/core/blackbox-derivations.test.ts": {
       "category": "black-box",
       "rule": "L0",
