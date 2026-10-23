@@ -16,14 +16,20 @@
  *   runtime test builds a system at all, so they say nothing about what the
  *   test exercises. Namespacing, multiple modules and crossModuleDeps are
  *   still placed, by their option keys (`modules`, `crossModuleDeps` → L1);
- * - so, for a test that builds a system, the file's rule is a floor: it sits
- *   at least at the layer whose behaviour its file tests (`layers.rules.json`),
- *   even when it uses nothing above the vehicle. (A lifecycle test in an L3
- *   file needs only `createSystem` and `system.start()`.) A test that builds
- *   no system is placed by its features alone, as before.
+ * - nor are the schema builders (`SCAFFOLD`: `t`), which every module
+ *   declares its facts with.
  *
- * So a test runs on v2 as soon as the features it exercises and the
- * behaviour its file tests exist. Over-approximating is the safe direction:
+ * The file's rule is a default, not a floor. A test that builds a system and
+ * shows nothing beyond the vehicle and the scaffold takes its file's rule:
+ * a lifecycle test in an L3 file needs only `createSystem` and
+ * `system.start()`, and nothing in it says it is not testing L3. Any other
+ * feature found places the test by itself; the L0 reads, writes and
+ * definitions (`facts`, `derive`, `dispatch`, `init`, …) count as found
+ * without raising anything, so an L3 file's "facts proxy reads and writes
+ * values" sits at L0. A test that builds no system is placed by its features
+ * alone.
+ *
+ * So a test runs on v2 as soon as the features it exercises exist. Over-approximating is the safe direction:
  * a test placed too high only runs later than it could; a test placed too
  * low fails an engine that is right.
  */
@@ -81,6 +87,13 @@ const MODULE_LAYERS: [RegExp, Layer][] = [
  */
 export const VEHICLES = new Set(["createSystem", "createModule"]);
 
+/**
+ * Not the vehicle, but nothing a test exercises either: the schema builders
+ * every module declares its facts with. A test that uses only the vehicle and
+ * these has told per-test placement nothing, so its file's rule places it.
+ */
+const SCAFFOLD = new Set(["t"]);
+
 /** Exports placed by name where their module holds more than one layer. */
 const NAME_LAYERS: Record<string, Layer> = {
   // utils/utils.ts holds unrelated helpers; place what tests use by name.
@@ -101,11 +114,31 @@ const OPTION_LAYERS: [string[], Layer, string][] = [
   [["history"], "L8", "history"],
   [["meta"], "L9", "meta"],
   [["modules"], "L1", "modules"],
+  // Module lifecycle hooks, SSR initial facts and the tick interval: the
+  // plan's L3 (lifecycle, ssr, clock/timer).
+  [["hooks"], "L3", "module hooks"],
+  [["initialFacts"], "L3", "initial facts"],
+  [["tickMs"], "L3", "tick interval"],
+  // The L0 definitions. They never raise a test; they are what per-test
+  // placement finds in a test that uses only L0 (see layerTests).
+  [["init"], "L0", "init"],
+  [["derive"], "L0", "derivations"],
+  [["events"], "L0", "events"],
+  [["effects"], "L0", "effects"],
   [["crossModuleDeps"], "L1", "crossModuleDeps"],
 ];
 
 /** Member names, on any receiver. */
 const MEMBER_LAYERS: Record<string, Layer> = {
+  // L0 reads and writes: found, never raising (see layerTests).
+  facts: "L0",
+  derive: "L0",
+  events: "L0",
+  dispatch: "L0",
+  read: "L0",
+  subscribe: "L0",
+  watch: "L0",
+  batch: "L0",
   inspect: "L9",
   observe: "L9",
   explain: "L9",
@@ -233,7 +266,9 @@ function coreBindings(
       bindings.set(local, { name: exported, layer: "L0" });
       return;
     }
-    const byName = NAME_LAYERS[exported];
+    const byName = Object.hasOwn(NAME_LAYERS, exported)
+      ? NAME_LAYERS[exported]
+      : undefined;
     if (byName) {
       bindings.set(local, { name: exported, layer: byName });
       return;
@@ -385,11 +420,11 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
           !Node.isArrowFunction(unwrap(value)) &&
           !Node.isFunctionExpression(unwrap(value))
         ) {
-          out.push({ name: "option derive data form", layer: "L1" });
+          out.push({ name: "option derive data form", layer: "L11" });
         }
       }
       if (chain[chain.length - 1] === "$template") {
-        out.push({ name: "option derive data form", layer: "L1" });
+        out.push({ name: "option derive data form", layer: "L11" });
       }
       if (matchesSuffix(chain, ["effects", "*", "run"])) {
         const fn = Node.isPropertyAssignment(node)
@@ -407,7 +442,10 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
       }
     } else if (Node.isPropertyAccessExpression(node)) {
       const name = node.getName();
-      const layer = MEMBER_LAYERS[name];
+      // Own keys only: `.constructor` must not find Object.prototype's.
+      const layer = Object.hasOwn(MEMBER_LAYERS, name)
+        ? MEMBER_LAYERS[name]
+        : undefined;
       if (layer) {
         out.push({ name: `member .${name}`, layer });
       }
@@ -585,10 +623,16 @@ export function layerTests(
       (max, f) => Math.max(max, layerIndex(f.layer)),
       0,
     );
-    // For a test that builds a system, the file's rule is a floor (header).
-    const floor = all.some((f) => VEHICLES.has(f.name.replace(/^import /, "")))
-      ? ruleIndex
-      : 0;
+    // The file's rule is a default, not a floor: it places a test that
+    // builds a system and uses nothing else we can see (header).
+    const isVehicle = (f: Feature) =>
+      VEHICLES.has(f.name.replace(/^import /, ""));
+    const isScaffold = (f: Feature) =>
+      isVehicle(f) || SCAFFOLD.has(f.name.replace(/^import /, ""));
+    const floor =
+      all.some(isVehicle) && !raising.some((f) => !isScaffold(f))
+        ? ruleIndex
+        : 0;
     const top = Math.max(featureTop, floor);
     const layer = LAYERS[top] as Layer;
     const entry: TestLayer = {

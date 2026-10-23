@@ -124,16 +124,16 @@
       "rule": "L7",
       "tests": {
         "reading your own write inside a batched body > an effect sees its own write through derived": {
-          "layer": "L7",
-          "by": ["rule L7"]
+          "layer": "L4",
+          "by": ["option effect deps", "option effect prev"]
         },
         "reading your own write inside a batched body > matches what the same code does in a constraint, which was never batched": {
-          "layer": "L7",
-          "by": ["rule L7"]
+          "layer": "L2",
+          "by": ["option constraints"]
         },
         "reading your own write inside a batched body > still announces once, at the end, with the batch whole": {
-          "layer": "L7",
-          "by": ["rule L7"]
+          "layer": "L4",
+          "by": ["option effect deps"]
         }
       }
     },
@@ -285,7 +285,16 @@
       "tests": {
         "an effect that keeps waking itself > is cut after a bounded number of chained passes, with a warning, and the system stays live": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option effects",
+            "option events",
+            "option init"
+          ]
         },
         "an effect that keeps waking itself > runs each follow-up pass on its own microtask": {
           "layer": "L3",
@@ -837,23 +846,55 @@
       "tests": {
         "facts in production > does not validate values": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts in production > neither throws nor warns about unknown keys": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts in production > does not warn about non-JSON values or nested mutation": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts in production > hands nested objects back as stored, and a Date stays a Date": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts in production > still notifies, batches and deletes": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts in production > still ignores a write to a fact whose module was unregistered": {
           "layer": "L10",
@@ -867,7 +908,13 @@
       "tests": {
         "facts proxy: property access > exposes the store and the untracked snapshot, and nothing else special": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: property access > hides prototype-pollution keys": {
           "layer": "L1",
@@ -875,23 +922,53 @@
         },
         "facts proxy: property access > reads unknown symbols as undefined": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: assignment refused > throws when assigning a symbol key": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: assignment refused > throws when assigning the reserved accessors": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: assignment refused > throws when assigning a prototype-pollution key": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: assignment refused > throws when deleting a symbol, a reserved accessor or a pollution key": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: assignment refused > deletes an ordinary fact and reports success": {
           "layer": "L1",
@@ -903,11 +980,23 @@
         },
         "facts proxy: reflection > answers `in` for the reserved accessors and for facts that have a value": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: reflection > lists the schema's keys": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts proxy: reflection > refuses to define properties": {
           "layer": "L1",
@@ -925,51 +1014,131 @@
       "tests": {
         "facts: reads, writes and delete > reads back what was written and reports presence": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: reads, writes and delete > removes a fact completely on delete": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: reads, writes and delete > serialises only the facts that currently hold a value": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: reads, writes and delete > does not notify when a write leaves the value unchanged": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: reads, writes and delete > treats NaN written over NaN as no change": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > notifies every subscriber of a key, not just the last one": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > keeps the remaining subscribers when one of two unsubscribes": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > tolerates unsubscribing twice": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > stops a catch-all subscriber when it unsubscribes": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: notifications > lets a subscriber to several keys leave all of them at once": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > notifies only the key that changed": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > notifies on delete, once": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > emits exactly one fact.change per write, and nothing for an unrelated key": {
           "layer": "L9",
@@ -981,23 +1150,58 @@
         },
         "facts: notifications > completes a re-entrant chain of at least a hundred follow-up writes": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > defers a write made inside a listener until the current notification cycle is over": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > still tells catch-all subscribers about a write made from a listener": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > stops a runaway write loop rather than spinning forever": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > does not leave the system stuck after a runaway loop was stopped": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: notifications > keeps delivering later keys when an observer throws a non-error value": {
           "layer": "L9",
@@ -1009,19 +1213,52 @@
         },
         "facts: batching > notifies once after a batch, not once per write": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > holds notifications until the outermost of nested batches ends": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > tells a derivation's subscriber once, after the outermost of nested batches": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
         },
         "facts: batching > reads its own writes immediately inside a batch": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: batching > does not call anyone for an empty batch or one that changed nothing": {
           "layer": "L3",
@@ -1033,7 +1270,15 @@
         },
         "facts: batching > notifies a key deleted inside a batch once, after the batch": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > reports a delete inside a batch with the value it removed": {
           "layer": "L9",
@@ -1041,23 +1286,64 @@
         },
         "facts: batching > lets a derivation read see a fact deleted earlier in the same batch": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
         },
         "facts: batching > still flushes a batch whose body throws, and rethrows": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > defers a write made from a batch listener until the flush cycle is over": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > completes a follow-up chain started from a batch flush": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > stops a runaway chain started inside a batch flush": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: batching > labels what a restore wrote as restore, and the rest as authored": {
           "layer": "L9",
@@ -1065,127 +1351,304 @@
         },
         "facts: schema validation (development) > rejects a value of the wrong type and keeps the old value": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > does not notify for a rejected write": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > describes the offending value by its kind": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > shows a preview of the rejected value, trimmed to a bounded length": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > still reports a value that cannot be stringified": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > does not hide the value in an error message": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > names the failing custom validator by position": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > points at the failing element of a typed array, and forgets it afterwards": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > accepts every valid write through each builder": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > validates a write made inside a batch before applying it": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > validates writes made through the store directly": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: schema validation (development) > validates a first write of a fact that was never set": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: unknown keys (development) > refuses to write a key the schema does not declare": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: unknown keys (development) > still stores the value, without throwing, when the schema declares no facts": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > accepts a value the schema parses and rejects one it does not": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > derives the expected type name by dropping a leading Zod and lower-casing": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > copes with a Zod-shaped schema whose definition is empty": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > prefers a declared type name over the Zod definition": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > falls back from the error message to the first issue to a generic line": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > does not treat something missing a Zod ingredient as a Zod schema": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: Zod-style schemas > recognises a schema whose hooks are present": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: hand-rolled schema entries > accepts anything for an entry that carries no validators": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: hand-rolled schema entries > runs validators in order, skipping entries that are not functions": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: hand-rolled schema entries > falls back to the declared type name when there is one": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: non-JSON assignment (development) > still stores the value it warned about": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > still assigns a nested property": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > still assigns deeper nested properties": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > reads normally and allows replacing the whole fact": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > still assigns when a read-back value was stored as the fact": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > still assigns nested values copied out of a read": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > keeps working on frozen and sealed containers": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > reads a nested object behind a read-only or non-configurable property": {
           "layer": "L1",
@@ -1193,23 +1656,53 @@
         },
         "facts: nested mutation (development) > returns null properties and primitives untouched": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > hides prototype-pollution keys on nested values": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > leaves Map, Set and Date usable inside a fact": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > leaves objects with no prototype mutable": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: nested mutation (development) > allows symbol-keyed assignment, and hands symbol-keyed objects back as they are": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "facts: history snapshots > snapshots a fact that holds null, inside and outside an object": {
           "layer": "L8",
@@ -1229,7 +1722,14 @@
         },
         "facts: teardown and dynamic registration > drops its listeners when the system is destroyed": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
         },
         "facts: teardown and dynamic registration > serialises a dynamically registered module only once its facts hold values": {
           "layer": "L10",
@@ -1267,15 +1767,42 @@
       "tests": {
         "listener timing > a fact listener added during a notify fires only on the next write": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
         },
         "listener timing > a derivation subscriber added during a notify fires only on the next change": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .read",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
         },
         "listener timing > derivation subscribe and watch still fire for writes after destroy": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .read",
+            "member .subscribe",
+            "member .watch",
+            "option derivations",
+            "option init"
+          ]
         }
       }
     },
@@ -1288,24 +1815,39 @@
           "by": ["member .meta", "option meta"]
         },
         "what createModule hands back > fills in empty derive and events when none are given": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "member .derive",
+            "member .events"
+          ]
         },
         "what createModule hands back > leaves the optional parts undefined when they are not given": {
           "layer": "L9",
           "by": ["member .meta"]
         },
         "what createModule hands back > passes derive, events, effects, constraints, resolvers and hooks through": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"]
+          "layer": "L3",
+          "by": ["option module hooks"]
         },
         "what createModule hands back > keeps crossModuleDeps when given": {
           "layer": "L1",
           "by": ["option crossModuleDeps"]
         },
         "what createModule hands back > builds a working module": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "what createModule hands back > a module factory makes one module per name": {
           "layer": "L1",
@@ -1363,8 +1905,8 @@
           "by": ["rule L1"]
         },
         "definitions createModule refuses, in every build > a derivation name carrying the unit separator": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option derivations"]
         },
         "what createModule warns about in development > a module id that is not a non-empty string": {
           "layer": "L1",
@@ -1399,16 +1941,16 @@
           "by": ["rule L1"]
         },
         "what createModule warns about in development > a derivation with no declaration, and a declaration with no derivation": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option derivations"]
         },
         "what createModule warns about in development > derivations that line up": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option derivations"]
         },
         "what createModule warns about in development > an event with no declaration, and a declaration with no handler": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option events"]
         },
         "what createModule warns about in development > history.snapshotEvents naming an event the schema does not declare": {
           "layer": "L8",
@@ -1465,8 +2007,14 @@
           "by": ["option constraints"]
         },
         "createModule in production > still hands back the module": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events"
+          ]
         },
         "the facts an effect reads through, in production > a delete and a definition are dropped quietly, and reported": {
           "layer": "L4",
@@ -1678,32 +2226,74 @@
       "tests": {
         "assigning an untrackable value warns once per path and kind > `names a ${label}`": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"],
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ],
           "dynamic": true
         },
         "assigning an untrackable value warns once per path and kind > names a File when the runtime has one": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "assigning an untrackable value warns once per path and kind > does not warn for values that round-trip as JSON": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "assigning an untrackable value warns once per path and kind > does not repeat a warning for the same path and kind": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "assigning an untrackable value warns once per path and kind > warns again for the same path with a different kind": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "assigning an untrackable value warns once per path and kind > warns for each distinct path": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "the warning memory is bounded > stops growing: far more unique paths than any sane bound do not all stay remembered": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         }
       }
     },
@@ -2150,12 +2740,12 @@
       "rule": "L1",
       "tests": {
         "the derivation dependency namespace > rejects a fact key carrying the separator": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option derivations"]
         },
         "the derivation dependency namespace > rejects a derivation carrying the separator": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "import t", "option derivations"]
         },
         "the derivation dependency namespace > rejects it mid-name, not only in front": {
           "layer": "L1",
@@ -2191,7 +2781,16 @@
         },
         "derivation dependencies > re-runs an effect that reads a derivation and no facts": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
         },
         "derivation dependencies > leaves a system whose constraints read only facts unchanged": {
           "layer": "L2",
@@ -2199,7 +2798,16 @@
         },
         "a fact and a derivation with the same name > does not re-run a fact-gated effect when the derivation goes stale": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
         },
         "a fact and a derivation with the same name > does not re-evaluate a fact-gated constraint when the derivation goes stale": {
           "layer": "L2",
@@ -2231,7 +2839,15 @@
         },
         "a fact and a derivation with the same name > still invalidates a derivation that reads the like-named fact": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
         },
         "invalidation cost > announces a derivation going stale once, not once per later write": {
           "layer": "L3",
@@ -2243,7 +2859,16 @@
         },
         "invalidation cost > says nothing about a derivation no dependency set names": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
         },
         "invalidation cost > does not pay for the size of a graph nothing is watching": {
           "layer": "L13",
@@ -2273,7 +2898,17 @@
         },
         "derivation hold re-entrancy > still announces once per batch when nothing nests": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "a nested batch cannot release its parent's hold > announces once per batch even when a plugin batches inside the broadcast": {
           "layer": "L3",
@@ -2369,7 +3004,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > deferred notification > invalidateMany batches notifications across multiple keys": {
@@ -2377,7 +3013,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > deferred notification > subscriber receives notification exactly once per batch": {
@@ -2385,7 +3022,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > composition > derivation depending on another derivation via proxy": {
@@ -2425,7 +3063,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > proxy security > BLOCKED_PROPS (__proto__, constructor, prototype) return undefined": {
@@ -2505,7 +3144,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > subscribe > subscribe with multiple IDs fires on any change": {
@@ -2513,7 +3153,8 @@
           "by": [
             "import createDerivationsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .subscribe"
           ]
         },
         "derivations > onCompute / onError callbacks > onCompute fires with id, value, deps": {
@@ -2556,7 +3197,14 @@
         },
         "reaching for a derivation where a module name belongs > does not fire in a single-module system, where the read is correct": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
         }
       }
     },
@@ -2992,8 +3640,15 @@
           "by": ["option effect deps"]
         },
         "an effect writing a fact > still lets the effect read facts and track them": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
         },
         "an effect writing a fact > does not stop an effect from dispatching an event": {
           "layer": "L4",
@@ -3063,8 +3718,14 @@
           "by": ["member .observe"]
         },
         "a refused effect write > hands out stored values, so cloning works as it does in production": {
-          "layer": "L4",
-          "by": ["rule L4"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option init"
+          ]
         },
         "a refused effect write > reports a nested mutation in development, naming the path": {
           "layer": "L4",
@@ -3089,52 +3750,117 @@
       "rule": "L3",
       "tests": {
         "Engine — Lifecycle > system starts stopped (isRunning false)": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > system.start() sets isRunning true": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > system.stop() sets isRunning false": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > system.destroy() cleans up the system": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > double start is a no-op": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > double stop is a no-op": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > init function runs and sets initial facts": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > isInitialized is true after start": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > initialize() can be called before start() for SSR": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Lifecycle > fires onInit hook during initialization": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option module hooks"]
         },
         "Engine — Lifecycle > fires onStart hook on start()": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option module hooks"]
         },
         "Engine — Lifecycle > fires onStop hook on stop()": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option module hooks"]
         },
         "Engine — Lifecycle > fires onResolverError hook when a resolver throws after retries": {
           "layer": "L13",
@@ -3149,12 +3875,28 @@
           "by": ["import flushMicrotasks"]
         },
         "Engine — Facts > facts proxy reads and writes values": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Facts > facts.$snapshot returns an untracked snapshot accessor": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Facts > facts.$store.batch() batches multiple changes to the same key": {
           "layer": "L13",
@@ -3165,36 +3907,107 @@
           "by": ["import flushMicrotasks"]
         },
         "Engine — Derivations > derive functions auto-track dependencies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Derivations > derivations recompute when deps change": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Derivations > derivation composition (facts, derived) works": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Events > dispatch fires event handler which mutates facts": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Events > dispatch with payload passes data to handler": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Events > events proxy provides dispatch functions": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Events > multiple dispatches accumulate state": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Events > unknown events warn in dev mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Constraints & Resolvers > constraint when returning true creates requirement": {
           "layer": "L13",
@@ -3237,24 +4050,49 @@
           "by": ["import flushMicrotasks"]
         },
         "Engine — Read > system.read(key) returns current derivation value": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Read > system.read(key) updates after fact change": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Settle > system.settle() resolves when no pending resolvers": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Settle > system.settle() waits for resolvers to complete": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
         },
         "Engine — Settle > system.settle() throws on timeout": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
         },
         "Engine — Settle > isSettled is true when no resolvers are running": {
           "layer": "L13",
@@ -3293,16 +4131,30 @@
           "by": ["rule L3"]
         },
         "Engine — Security > BLOCKED_PROPS in events definition throws": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option events"
+          ]
         },
         "Engine — Security > BLOCKED_PROPS in dispatch event type is silently ignored": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — Security > schema collision between modules throws in dev mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Engine — Error Boundary > system catches resolver errors and does not crash": {
           "layer": "L13",
@@ -3325,40 +4177,69 @@
           "by": ["member .getSnapshot", "member .restore"]
         },
         "Engine — Namespaced System > namespaced system provides access via namespace.key": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Engine — Namespaced System > namespaced events dispatch through namespace": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Engine — Namespaced System > namespaced derivations work": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Engine — When > when() resolves immediately if predicate is already true": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — When > when() waits for predicate to become true": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — When > when() rejects on timeout": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Engine — onSettledChange > onSettledChange fires when settlement status changes": {
           "layer": "L13",
           "by": ["import flushMicrotasks"]
         },
         "Engine — Dev Warnings > warns when fact and derivation share the same name": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option init"
+          ]
         },
         "Engine — initialFacts > initialFacts overrides module init values": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option initial facts"]
         },
         "Engine — Effects > effects run when their tracked facts change": {
           "layer": "L13",
@@ -3526,19 +4407,43 @@
       "tests": {
         "exotic objects in facts > keeps a Set usable": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "exotic objects in facts > keeps a Map usable": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "exotic objects in facts > keeps a Date usable": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "exotic objects in facts > still warns about a nested mutation of a plain object": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         }
       }
     },
@@ -3582,7 +4487,15 @@
         },
         "a throwing subscriber is contained > keeps notifying the subscribers that did not throw": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option init"
+          ]
         }
       }
     },
@@ -3644,7 +4557,7 @@
         },
         "createFactsStore > get and set > skips notification when value has not changed (Object.is)": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > has > returns true for a key that has been set": {
           "layer": "L0",
@@ -3660,7 +4573,7 @@
         },
         "createFactsStore > delete > notifies subscribers when a key is deleted": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > toObject > returns a plain object snapshot of all set keys": {
           "layer": "L0",
@@ -3676,39 +4589,44 @@
         },
         "createFactsStore > batch > coalesces notifications — subscriber fires once, not per-set": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "createFactsStore > batch > fires key-specific listeners once per dirty key after batch": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "createFactsStore > batch > does not notify if batch makes no changes": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "createFactsStore > batch > nested batch — notifications fire after outermost batch ends": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "createFactsStore > batch > calls onBatch callback with change records": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "createFactsStore > subscribe > fires listener when a subscribed key changes": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > subscribe > does not fire listener for unrelated key changes": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > subscribe > fires for multiple subscribed keys": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > subscribe > returns an unsubscribe function that prevents further notifications": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFactsStore > subscribeAll > fires listener on any key change": {
           "layer": "L0",
@@ -4000,15 +4918,20 @@
         },
         "re-entrance guards > notifyNonBatched coalesces — store.set during notification is deferred": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "re-entrance guards > deferred changes during batch flush are also processed": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "re-entrance guards > throws on infinite notification loops": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "createFacts > returns both store and facts proxy": {
           "layer": "L0",
@@ -4120,11 +5043,21 @@
         },
         "flush clears its buffer before notifying > a listener that opens a nested batch does not re-report the outer batch": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "flush clears its buffer before notifying > a listener that writes to a key in the outer batch does not recurse forever": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         }
       }
     },
@@ -4134,11 +5067,23 @@
       "tests": {
         "frozen values in facts > can be read back": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "frozen values in facts > can be read back when the whole tree is frozen": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         }
       }
     },
@@ -4205,16 +5150,21 @@
       "rule": "L1",
       "tests": {
         "createModule > creates a module def with id and schema": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "option events"]
         },
         "createModule > passes through all config properties": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"]
+          "layer": "L3",
+          "by": ["option module hooks"]
         },
         "createModule > defaults derive and events to empty objects": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "member .derive",
+            "member .events",
+            "option events"
+          ]
         },
         "createModule > passes through history.snapshotEvents": {
           "layer": "L8",
@@ -4225,12 +5175,12 @@
           "by": ["option crossModuleDeps"]
         },
         "createModule > warns on empty module ID": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "option events"]
         },
         "createModule > warns on non-kebab-case ID": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "option events"]
         },
         "createModule > warns when schema is missing": {
           "layer": "L1",
@@ -4241,16 +5191,16 @@
           "by": ["rule L1"]
         },
         "createModule > warns on derive key not in schema.derivations": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "option derivations", "option events"]
         },
         "createModule > warns on schema.derivations key without derive impl": {
           "layer": "L1",
           "by": ["rule L1"]
         },
         "createModule > warns on event key not in schema.events": {
-          "layer": "L1",
-          "by": ["rule L1"]
+          "layer": "L0",
+          "by": ["import createModule", "option events"]
         },
         "createModule > warns on schema.events key without event handler": {
           "layer": "L1",
@@ -4377,16 +5327,16 @@
       "rule": "L0",
       "tests": {
         "derivations: object-form definitions > freezes a predicate spec and a template spec at registration": {
-          "layer": "L1",
+          "layer": "L11",
           "by": ["option derive data form"]
         },
         "derivations: object-form definitions > rejects a compute that is neither function, template nor predicate": {
-          "layer": "L1",
+          "layer": "L11",
           "by": ["option derive data form"]
         },
         "derivations: object-form definitions > registers object-form derivations at runtime with their meta": {
-          "layer": "L10",
-          "by": ["member .derive.register"]
+          "layer": "L11",
+          "by": ["option derive data form"]
         },
         "derivations: object-form definitions > assign swaps the function and drops the old meta": {
           "layer": "L10",
@@ -4398,11 +5348,29 @@
         },
         "derivations: subscriptions > delivers to every subscriber, and unsubscribing one leaves the rest": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
         },
         "derivations: subscriptions > a throwing subscriber is reported and does not stop the others": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
         },
         "derivations: subscriptions > a subscriber that keeps re-invalidating trips the loop guard": {
           "layer": "L10",
@@ -4501,8 +5469,8 @@
           "by": ["member .derive.register", "member .derive.unregister"]
         },
         "derivations: odd definitions > an object-form entry with no compute is tolerated at registration": {
-          "layer": "L9",
-          "by": ["option meta"]
+          "layer": "L11",
+          "by": ["option derive data form"]
         },
         "derivations: replacing a live name through registerModule > the new definition wins, the old meta goes, and everyone is told": {
           "layer": "L10",
@@ -4527,7 +5495,13 @@
         },
         "derivations: housekeeping on replace and remove > entries that are not definitions at all are tolerated at registration": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option init"
+          ]
         }
       }
     },
@@ -4664,7 +5638,8 @@
           "by": [
             "import createEffectsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .facts"
           ]
         },
         "the facts an effect reads through > a refused write still says why when nobody is listening": {
@@ -4672,7 +5647,8 @@
           "by": [
             "import createEffectsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .facts"
           ]
         },
         "the facts an effect reads through > the store behind it refuses set and delete and reports them": {
@@ -4680,7 +5656,8 @@
           "by": [
             "import createEffectsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .facts"
           ]
         },
         "the facts an effect reads through > the store behind it still reads, batches and subscribes": {
@@ -4688,7 +5665,10 @@
           "by": [
             "import createEffectsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe"
           ]
         },
         "the facts an effect reads through > reads see live values": {
@@ -4696,7 +5676,8 @@
           "by": [
             "import createEffectsManager",
             "import createFacts",
-            "import t"
+            "import t",
+            "member .facts"
           ]
         },
         "prevFacts and derived are read-only in development > writing prevFacts names it": {
@@ -5309,7 +6290,15 @@
       "tests": {
         "fact store behaviour seen through a system > re-derives when a derivation asks whether a fact exists": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
         },
         "fact store behaviour seen through a system > stops delivering a batch to an observer once its own write runs away": {
           "layer": "L9",
@@ -5412,47 +6401,62 @@
         },
         "notification coalescing > allows exactly 100 deferred rounds and then throws": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "notification coalescing > names the flush when the loop starts inside a batch": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "notification coalescing > recovers after a runaway loop": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "notification coalescing > defers a write made by a listener during a batch flush until the listeners finish": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "notification coalescing > notifies subscribeAll for a deferred write as well as the first": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "notification coalescing > does not call onBatch for a batch that wrote nothing": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "batch hooks > fires onBatchStart and onBatchEnd once for nested batches, end after onBatch": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "batch hooks > still fires onBatchEnd when the batch body throws": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "batch hooks > reports onWrite at the moment of an in-batch write, set or delete": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "delete > is deferred inside a batch and reported with its previous value and origin": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": [
+            "import createFactsStore",
+            "import t",
+            "member .batch",
+            "member .subscribe"
+          ]
         },
         "delete > stamps the origin asked for at the moment of the write": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "delete > notifies synchronously, with the previous value, outside a batch": {
           "layer": "L0",
@@ -5460,11 +6464,11 @@
         },
         "subscriptions > keeps every listener of a key, and only unsubscribes the one asked": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "subscriptions > tolerates unsubscribing twice and resubscribing afterwards": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "subscriptions > subscribeAll's unsubscribe stops further calls": {
           "layer": "L0",
@@ -5598,12 +6602,12 @@
       "rule": "L6",
       "tests": {
         "nested mutation checks, in production > a resolver reading a dependency gets the stored value and no check": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
         },
         "nested mutation checks, in production > a gate mutating a value in place still attaches": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L5",
+          "by": ["option sources"]
         }
       }
     },
@@ -5612,24 +6616,24 @@
       "rule": "L6",
       "tests": {
         "an effect mutating a collection or date in place > is reported for a Map, a Set and a Date": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L4",
+          "by": ["option effect deps"]
         },
         "reading without mutating > is quiet for a null-prototype object, which a structured copy turns plain": {
           "layer": "L9",
           "by": ["member .inspect"]
         },
         "a resolver mutating a dependency module's value in place > is reported after the resolver settles, naming the path": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L3",
+          "by": ["option plugins"]
         },
         "a resolver mutating a dependency module's value in place > is reported for a Map changed in place": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L3",
+          "by": ["option plugins"]
         },
         "a resolver mutating a dependency module's value in place > is quiet for a resolver that only reads": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L3",
+          "by": ["option plugins"]
         },
         "a source gate mutating a value in place > is a gate error and the source stays detached, single-module": {
           "layer": "L9",
@@ -5644,8 +6648,8 @@
           "by": ["member .inspect"]
         },
         "a source gate mutating a value in place > a gate that only reads attaches": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L5",
+          "by": ["option sources"]
         }
       }
     },
@@ -5662,16 +6666,16 @@
           "by": ["member .inspect"]
         },
         "reading class instances > never runs a getter while recording": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L5",
+          "by": ["option sources"]
         },
         "cost > a gate reading a large value stays cheap per write": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L5",
+          "by": ["option sources"]
         },
         "a gate that fails closed > warns once in development when nothing else is listening": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L5",
+          "by": ["option sources"]
         }
       }
     },
@@ -5688,8 +6692,8 @@
           "by": ["member .observe"]
         },
         "system.notify.guardrailBlocked —  > caps reentry depth to prevent infinite recursion through the broadcast fabric": {
-          "layer": "L9",
-          "by": ["rule L9"]
+          "layer": "L3",
+          "by": ["option plugins"]
         },
         "system.notify.guardrailBlocked —  > is a no-op after destroy": {
           "layer": "L9",
@@ -5703,31 +6707,92 @@
       "tests": {
         "nullable() equality — item 10 reproduction > explicit null assignment makes facts.x === null": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option events",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > derivation that reads nullable fact narrows correctly after null assignment": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > nullable object fact: null assignment after set makes equality work": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > rapid set/clear/set cycle keeps equality consistent": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > nullable array fact: empty vs null vs populated distinguishes correctly": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > nullable on init (no explicit null assignment) reads as null": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
         },
         "nullable() equality — item 10 reproduction > derivation reading two nullable facts via &&/|| compose correctly": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         }
       }
     },
@@ -5859,7 +6924,7 @@
         },
         "FactsStore destroy > subscribe callbacks don't fire after destroy": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .subscribe"]
         },
         "FactsStore destroy > subscribeAll callbacks don't fire after destroy": {
           "layer": "L0",
@@ -5867,11 +6932,19 @@
         },
         "FactsStore destroy > system.destroy() clears store listeners via engine": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .subscribe",
+            "option events",
+            "option init"
+          ]
         },
         "FactsStore destroy > batch operations still work after destroy (no crash)": {
           "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "by": ["import createFactsStore", "import t", "member .batch"]
         },
         "conditional topo sort rebuild > registers constraints without after deps without full graph rebuild": {
           "layer": "L2",
@@ -7384,8 +8457,15 @@
           "by": ["member .inspect"]
         },
         "a derivation may be named after an Object.prototype member > returns its value rather than the builtin": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
         },
         "the prune does not run when there is nothing to prune > stays correct in a system that reads no derivation at all": {
           "layer": "L9",
@@ -7881,7 +8961,12 @@
       "tests": {
         "the schema freeze covers our own types only > leaves a self-caching validator writable": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "member .facts",
+            "option init"
+          ]
         },
         "the schema freeze covers our own types only > still freezes the types we build, so a tag cannot be removed": {
           "layer": "L9",
@@ -8470,11 +9555,11 @@
         },
         "SSR > settle() timeout behavior > resolves when system has no async work": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option initial facts"]
         },
         "SSR > settle() timeout behavior > settle() with timeout rejects on slow resolvers": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
         },
         "SSR > isPrototypeSafe validation in single-module hydrate() > skips hydrated facts with __proto__ key": {
           "layer": "L6",
@@ -8486,7 +9571,7 @@
         },
         "SSR > isPrototypeSafe validation in single-module hydrate() > top-level isPrototypeSafe throws for initialFacts with dangerous keys": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option initial facts"]
         },
         "SSR > isPrototypeSafe validation in single-module hydrate() > allows clean hydrated facts": {
           "layer": "L6",
@@ -8586,11 +9671,22 @@
       "tests": {
         "SystemFacts / SystemDerived > extracts the typed facts shape from a single-module system": {
           "layer": "L0",
-          "by": ["import createModule", "import createSystem", "import t"]
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option init"
+          ]
         },
         "SystemFacts / SystemDerived > accepts a SingleModuleSystem<S> reference and infers S": {
           "layer": "L0",
-          "by": ["import createModule", "import t"]
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option init"
+          ]
         },
         "SystemFacts / SystemDerived > accepts a raw module schema": {
           "layer": "L0",
@@ -8607,192 +9703,276 @@
       "rule": "L3",
       "tests": {
         "Single Module Mode > provides direct fact access": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > allows writing facts directly": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > derivations accessible directly": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > events dispatch directly": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > events accept payloads": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > lifecycle: start, stop, destroy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > _mode is 'single'": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > subscribe fires on fact changes": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > watch fires with new and previous value": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > read returns derivation value": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "Single Module Mode > throws when module is not provided": {
           "layer": "L3",
           "by": ["rule L3"]
         },
         "Namespaced Module Mode > namespaces facts by module key": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > writes to namespaced facts": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > reads namespaced derivations": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > dispatches namespaced events": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > events.auth.logout works": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > _mode is 'namespaced'": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > subscribe with namespaced keys fires on changes": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > subscribe with wildcard fires on any key in namespace": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > subscribeModule fires on any key in namespace": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > read accepts namespace.key format": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > watch accepts namespace.key format": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > lifecycle works in namespaced mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > unknown namespace returns undefined from facts proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > unknown namespace returns undefined from derive proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespaced Module Mode > unknown namespace returns undefined from events proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespace Validation > throws when module name contains '::'": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespace Validation > throws when schema key contains '::'": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespace Validation > throws when modules is an array": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespace Validation > throws when a single module is passed to modules: instead of module:": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Namespace Validation > throws when tickMs is zero or negative": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option tick interval"]
         },
         "Topological Sort > initializes modules in dependency order": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
         },
         "Topological Sort > throws on circular dependencies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
         },
         "Topological Sort > respects explicit initOrder when provided": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Topological Sort > throws when explicit initOrder is missing modules": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on namespaced facts proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on module facts proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on namespaced derive proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on module derive proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on namespaced events proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > BLOCKED_PROPS return undefined on module events proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > symbols return undefined on namespace proxies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Proxy Security > set returns false on read-only derive proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
         },
         "Proxy Security > defineProperty returns false on namespace proxies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
         },
         "Proxy Security > setPrototypeOf returns false on namespace proxies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
         },
         "Proxy Security > getPrototypeOf returns null on namespace proxies": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
         },
         "Proxy Security > set returns false on single-module events proxy": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["reflection"]
         },
         "Distributable Snapshot > getDistributableSnapshot returns facts grouped by namespace": {
           "layer": "L12",
@@ -8835,16 +10015,16 @@
           "by": ["option plugins"]
         },
         "Config Forwarding > zeroConfig applies defaults": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "InitialFacts & Hydration > initialFacts applied on start in namespaced mode": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option initial facts"]
         },
         "InitialFacts & Hydration > initialFacts applied on start in single module mode": {
           "layer": "L3",
-          "by": ["rule L3"]
+          "by": ["option initial facts"]
         },
         "InitialFacts & Hydration > hydrate applies facts before start in namespaced mode": {
           "layer": "L6",
@@ -8859,8 +10039,8 @@
           "by": ["member .inspect"]
         },
         "Engine Passthrough Methods > batch coalesces mutations": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "Engine Passthrough Methods > isSettled reflects engine state": {
           "layer": "L13",
@@ -8871,8 +10051,8 @@
           "by": ["import flushMicrotasks"]
         },
         "Cross-Module Dependencies > derivation can read facts from another module via crossModuleDeps": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
         },
         "Dynamic Module Registration > registerModule adds a new namespace in namespaced mode": {
           "layer": "L10",
@@ -8891,20 +10071,37 @@
           "by": ["member .registerModule"]
         },
         "when() > resolves when predicate becomes true in single module mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "when() > resolves when predicate becomes true in namespaced mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         },
         "dispatch() > dispatch forwards to engine in single module mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
         },
         "dispatch() > dispatch forwards to engine in namespaced mode": {
-          "layer": "L3",
-          "by": ["rule L3"]
+          "layer": "L1",
+          "by": ["option modules"]
         }
       }
     },
@@ -9153,8 +10350,8 @@
           "by": ["member .trace"]
         },
         "Trace > calls onTraceComplete plugin hook with finalized trace entry": {
-          "layer": "L9",
-          "by": ["rule L9"]
+          "layer": "L4",
+          "by": ["option effect deps"]
         },
         "Trace > includes trace in inspect() when enabled": {
           "layer": "L9",
@@ -10570,8 +11767,8 @@
       "rule": "L6",
       "tests": {
         "the hydration capability > is not reachable from a consumer plugin": {
-          "layer": "L6",
-          "by": ["rule L6"]
+          "layer": "L3",
+          "by": ["option plugins"]
         },
         "the hydration capability > marks restored values as hydration with persistence listed first": {
           "layer": "L6",
