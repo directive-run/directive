@@ -13,6 +13,12 @@
  *   passes. The census run never sets it, and the census fails any test above
  *   `current` that was not skipped, so setting it there cannot turn a run
  *   green.
+ * - `DIRECTIVE_MUTATION_CEILING=Ln` (set only by vitest.stryker.config.ts,
+ *   from `MUTATION_LAYER`) skips, on the local engine, every test placed
+ *   above Ln, the same way v2 skips tests above `current`. A skipped test
+ *   never runs its body, so it neither covers nor kills a mutant: the
+ *   mutation score of a layer's files counts only kills by tests that run on
+ *   v2 at that layer (MUTATION.md).
  */
 
 import { readFileSync } from "node:fs";
@@ -40,6 +46,14 @@ const ahead = read("aheadOfV1.json").tests as Record<
 >;
 
 const index = (layer: string) => Number(layer.slice(1));
+
+const ceilingEnv = process.env.DIRECTIVE_MUTATION_CEILING;
+if (ceilingEnv !== undefined && !/^L(?:[0-9]|1[0-3])$/.test(ceilingEnv)) {
+  throw new Error(
+    `DIRECTIVE_MUTATION_CEILING must be L0..L13, got "${ceilingEnv}"`,
+  );
+}
+const ceiling = ceilingEnv === undefined ? undefined : index(ceilingEnv);
 
 interface TaskLike {
   name: string;
@@ -95,7 +109,9 @@ beforeEach((ctx) => {
   }
 
   const which = engine();
-  if (which === "v1") {
+  if (which === "local" && ceiling !== undefined && layer > ceiling) {
+    ctx.skip();
+  } else if (which === "v1") {
     // One entry per test, with a reason; the census rejects anything else.
     if (Object.hasOwn(ahead[file] ?? {}, name)) {
       ctx.skip();

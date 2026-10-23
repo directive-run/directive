@@ -5,7 +5,8 @@ name: Mutation testing (nightly)
 # which run against core SOURCE) must kill each mutant. Report-only for now:
 # the 80% gate comes later (see packages/conformance/MUTATION.md).
 #
-# Sharded by engine file group so each job stays far under the 6 h limit. The
+# Sharded by layer (MUTATION.md table), each shard run with that layer as its
+# ceiling (MUTATION_LAYER), so each job stays far under the 6 h limit. The
 # incremental file is cached per shard, so only mutants in changed code or
 # changed tests are re-run after the first night.
 
@@ -25,19 +26,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # One shard per MUTATION.md layer row (L3 and L11 split for time).
+        # `layer` is the shard's ceiling: tests placed above it are left out,
+        # so each score counts only kills by tests that run on v2 there.
         include:
-          - shard: engine
+          - shard: l1-state
+            layer: L1
+            mutate: packages/core/src/core/facts.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/tracking.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/module.ts,packages/core/src/core/internal-scopes.ts
+          - shard: l2-resolvers
+            layer: L2
+            mutate: packages/core/src/core/constraints.ts,packages/core/src/core/resolvers.ts,packages/core/src/core/requirements.ts,packages/core/src/core/timer.ts,packages/core/src/core/clock.ts
+          - shard: l3-engine
+            layer: L3
             mutate: packages/core/src/core/engine.ts
-          - shard: resolvers
-            mutate: packages/core/src/core/resolvers.ts,packages/core/src/core/requirements.ts,packages/core/src/core/timer.ts,packages/core/src/core/clock.ts,packages/core/src/core/constraints.ts
-          - shard: system
+          - shard: l3-system
+            layer: L3
             mutate: packages/core/src/core/system.ts,packages/core/src/core/system-proxies.ts,packages/core/src/core/system-module-transform.ts
-          - shard: predicate
+          - shard: l3-rest
+            layer: L3
+            mutate: packages/core/src/core/engine-accessors.ts,packages/core/src/core/engine-definitions.ts,packages/core/src/core/engine-trace.ts,packages/core/src/core/errors.ts,packages/core/src/core/plugins.ts,packages/core/src/core/schema-builders.ts,packages/core/src/core/schema-introspection.ts,packages/core/src/core/sources.ts
+          - shard: l11-predicate
+            layer: L11
             mutate: packages/core/src/core/predicate*.ts
-          - shard: state
-            mutate: packages/core/src/core/facts.ts,packages/core/src/core/tracking.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/module.ts,packages/core/src/core/plugins.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/internal-scopes.ts
-          - shard: rest
-            mutate: packages/core/src/core/errors.ts,packages/core/src/core/schema-builders.ts,packages/core/src/core/schema-introspection.ts,packages/core/src/core/sources.ts,packages/core/src/core/replay-under.ts,packages/core/src/core/sweep-under.ts,packages/core/src/core/rules-diff.ts,packages/core/src/core/predict.ts,packages/core/src/core/doctor.ts,packages/core/src/core/engine-trace.ts,packages/core/src/core/engine-accessors.ts,packages/core/src/core/engine-definitions.ts
+          - shard: l11-rest
+            layer: L11
+            mutate: packages/core/src/core/predict.ts,packages/core/src/core/sweep-under.ts,packages/core/src/core/replay-under.ts,packages/core/src/core/rules-diff.ts,packages/core/src/core/doctor.ts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -58,10 +71,15 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/conformance/.stryker-cache
-          key: mutation-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: mutation-${{ matrix.shard }}-
+          # layers.json in the key: a test that moves layer changes which
+          # tests may kill, so results cached under the old placement are
+          # not reused.
+          key: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
+          restore-keys: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-
 
       - name: Mutate
+        env:
+          MUTATION_LAYER: ${{ matrix.layer }}
         run: pnpm --filter @directive-run/conformance mutate:file "${{ matrix.mutate }}"
 
       - name: Save incremental cache
@@ -69,7 +87,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/conformance/.stryker-cache
-          key: mutation-${{ matrix.shard }}-${{ github.run_id }}
+          key: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
 
       - name: Name the reports
         if: ${{ !cancelled() }}

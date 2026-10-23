@@ -13,9 +13,27 @@ behaviour the oracle does not pin down.
 (see `lib/core-entries.ts`), so a mutant written into `src/` is what runs.
 It also leaves out every file in the `internals` category (layers.json).
 `conformance:v2` skips those, so a mutant only they kill is a behaviour the
-2.0 oracle does not pin. Every kill the score counts comes from a test that
-also runs on v2. To kill a mutant, write a black-box test; an `/internals`
-test still documents 1.35 but does not move the gate.
+2.0 oracle does not pin. To kill a mutant, write a black-box test; an
+`/internals` test still documents 1.35 but does not move the gate.
+
+### The layer ceiling
+
+v2 also skips every test placed above the layer it has built (layers.json,
+`current`). A test placed at L8 that happens to kill a mutant in `facts.ts`
+does not protect the L1 build: it does not run on v2 until L8. So a layer's
+score must count only kills by tests placed at or below that layer.
+
+`MUTATION_LAYER=Ln` sets that ceiling. `vitest.stryker.config.ts` drops every
+test file whose tests all sit above Ln, and passes the ceiling to
+`helpers/layer-gate.ts`, which skips the remaining tests above Ln per test,
+exactly as it skips tests above `current` on v2. The skip happens before the
+test body runs, so a skipped test neither covers nor kills a mutant. Without
+`MUTATION_LAYER` the run is the old one: every non-internals test counts.
+
+Run each layer's files (the table below) with that layer as the ceiling. A
+score from such a run counts only kills from tests that run on v2 at that
+layer; a score from a run without the ceiling, or with a higher one,
+overstates what the gate protects and must not be used for `--check`.
 Stryker runs `inPlace` from the repo root (the engine is outside this package)
 and restores the files afterwards. Run it on a clean checkout.
 
@@ -24,7 +42,7 @@ and restores the files afterwards. Run it on a clean checkout.
 Build core once (one test spawns a process against `dist/`):
 
     pnpm --filter @directive-run/core build
-    pnpm --filter @directive-run/conformance mutate:file packages/core/src/core/tracking.ts
+    MUTATION_LAYER=L1 pnpm --filter @directive-run/conformance mutate:file packages/core/src/core/tracking.ts
 
 `mutate` with no argument runs the whole engine (hours; CI shards it). Reports
 land in `packages/conformance/reports/mutation/` (`mutation.html` is the one
@@ -33,16 +51,21 @@ Both are gitignored.
 
 ## CI
 
-`.github/workflows/mutation-nightly.yml` runs the engine in six shards, caches
-the incremental file per shard, uploads each shard's JSON and HTML, and prints
-a per-shard score. It is report-only: `thresholds.break` is `null`. The 80%
+`.github/workflows/mutation-nightly.yml` runs the engine in seven shards, one
+per row of the table below (L3 and L11 are split in two and three for time),
+each with its row's layer as `MUTATION_LAYER`. It caches the incremental file
+per shard, keyed by the shard and a hash of `layers.json` (a test that moves
+layer changes which tests may kill, so old results are not reused), uploads
+each shard's JSON and HTML, and prints a per-shard score. It is report-only: `thresholds.break` is `null`. The 80%
 gate (`high`) is added later.
 
 ## The rule
 
 The gate is per layer. Before a layer is built, the 1.35 files it reproduces
-must PASS:
+must PASS, on a report from a run with that layer's ceiling, so the gate
+counts only kills from tests that run on v2 at that layer:
 
+    MUTATION_LAYER=L1 pnpm --filter @directive-run/conformance mutate:file packages/core/src/core/facts.ts,packages/core/src/core/tracking.ts
     pnpm --filter @directive-run/conformance exec tsx scripts/mutation-score.ts --check --files facts.ts,tracking.ts packages/conformance/reports
 
 `scripts/mutation-score.ts` takes Stryker JSON reports (files or directories)

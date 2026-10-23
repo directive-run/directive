@@ -7,6 +7,13 @@
  * when its gate score is >= 80% AND every remaining non-ignored Survived or
  * NoCoverage mutant is listed in mutation-triage/<basename>.json (matched by
  * line + col + mutator + replacement). `--check` exits 1 if a selected file FAILs.
+ *
+ * `--check` is the per-layer gate only on reports from a run with that
+ * layer's ceiling (`MUTATION_LAYER=Ln`, MUTATION.md): there every kill comes
+ * from a test that runs on v2 at Ln. A report from a run without the ceiling
+ * also counts kills by tests placed higher, which v2 does not run yet, and
+ * overstates the gate. The report does not record the ceiling, so the caller
+ * (the nightly workflow, or the commands in MUTATION.md) must set it.
  */
 
 import {
