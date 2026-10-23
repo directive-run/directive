@@ -65,6 +65,10 @@ jobs:
 
       # One conformance test spawns a process against core's built output.
       - run: pnpm --filter @directive-run/core build
+      # The conformance vitest config resolves core-next's dist for the v2
+      # projects when it loads, so it must exist even though Stryker only
+      # runs the local projects.
+      - run: pnpm --filter @directive-run/core-next build
 
       - name: Restore incremental cache
         id: cache
