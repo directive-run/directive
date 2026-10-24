@@ -154,6 +154,12 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   onWrite?: (key: string) => void;
   onBatchStart?: () => void;
   onBatchEnd?: () => void;
+  /**
+   * Called for every change, just before the graph is written: where the
+   * write's provenance stamp is taken (L2 writer stamps) and where the L2
+   * pre-commit interceptor will sit. SPIKE: see docs/rfc-l2-reconcile.md.
+   */
+  stamp?: (key: string) => void;
   originOf?: () => FactOrigin;
   /** The graph to hold values in (a system passes its own). */
   graph?: Graph;
@@ -187,8 +193,15 @@ const ALL = Symbol();
 export function createFactsStore<S extends Schema>(
   options: CreateFactsStoreOptions<S>,
 ): FactsStore<S> {
-  const { onChange, onBatch, onWrite, onBatchStart, onBatchEnd, validator } =
-    options;
+  const {
+    onChange,
+    onBatch,
+    onWrite,
+    onBatchStart,
+    onBatchEnd,
+    validator,
+    stamp,
+  } = options;
   const originOf = options.originOf ?? (() => "authored" as FactOrigin);
   const graph = options.graph ?? new Graph();
   const tracker = options.tracker ?? { deps: null };
@@ -303,6 +316,7 @@ export function createFactsStore<S extends Schema>(
       const prev = n.value;
       if (!Object.is(prev, value)) {
         present.add(key);
+        stamp?.(key);
         graph.write(n, value);
         record(key, value, prev, "set");
       }
@@ -311,6 +325,7 @@ export function createFactsStore<S extends Schema>(
       const n = node(key);
       const prev = n.value;
       present.delete(key);
+      stamp?.(key);
       graph.write(n, undefined);
       record(key, undefined, prev, "delete");
     },

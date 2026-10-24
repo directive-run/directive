@@ -116,6 +116,16 @@ export interface SystemContext {
   readonly tracker: Tracker;
   /** Report an error from `source` (the default strategy: skip). */
   reportError(source: ErrorSource, sourceId: string, error: unknown): void;
+  /** Ask for a reconcile pass (through the kernel's scheduler). */
+  schedule(): void;
+  /**
+   * Watch a derivation named in declared deps: every invalidation of what it
+   * reads wakes the reader, even while it stays stale (it is never computed
+   * for the reader). 1.35's observed set, for declared deps.
+   */
+  watch(id: string): void;
+  /** Tell settle listeners that `isSettled` may have changed. */
+  settled(): void;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -125,6 +135,30 @@ export type SystemPart = (ctx: SystemContext) => void;
 export interface EffectsFeature {
   runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
   cleanupAll(): void;
+}
+
+/**
+ * The L2 reconcile feature (reconcile.ts) as the pass drives it. SPIKE: see
+ * docs/rfc-l2-reconcile.md.
+ */
+export interface ReconcileFeature {
+  /** Stamp a write to `key` with its writer (facts.ts, before graph.write). */
+  stamp_(key: string): void;
+  /** Pass start: the writes this pass is about are closed. */
+  begin_(): void;
+  /** After effects: the requirements now (a promise only when it must wait). */
+  evaluate_(passKeys: Set<string>): any[] | Promise<any[]>;
+  /** Diff, cancel or satisfy, dispatch, requeue. */
+  commit_(current: any[], passKeys: Set<string>): void;
+  /** A run is in flight: not settled. */
+  busy_(): boolean;
+  start_(): void;
+  stop_(): void;
+  /** The 1.35 `onReconcileEnd` result. */
+  result_(): Record<string, unknown>;
+  /** Settle-timeout details, before and after the core's own. */
+  details_(): string[];
+  unmet_(): string[];
 }
 
 declare module "../kernel.js" {
@@ -222,6 +256,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const { graph, hooks, clock } = kernel;
   const features = kernel.features as {
     effects?: EffectsFeature;
+    reconcile?: ReconcileFeature;
     validate?: (key: string, value: unknown) => void;
     plugins?: { deliver_(event: KernelEvent): void };
   };
@@ -269,6 +304,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const byNode = new Map<ReactiveNode, Derivation>();
   const listeners: Listeners = new Map();
   const pending = new Set<string>();
+  const watched = new Set<string>();
   let holdDepth = 0;
 
   /** Tell the subscribers of every derivation that went stale. */
@@ -341,6 +377,11 @@ export function createSystemCore<const M extends ModuleSchema>(
             }
             seen.add(node);
             if (!d.live_ || d.stale_) {
+              if (d.stale_ && watched.has(d.id_)) {
+                // Still stale, so nothing below it moves, but a body that
+                // named it in its deps hears every change upstream (1.35).
+                changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
+              }
               continue;
             }
             d.stale_ = true;
@@ -505,6 +546,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     graph,
     tracker,
     nodes: factNodes,
+    stamp: (key) => features.reconcile?.stamp_(key),
     validator: isDevelopment
       ? (key, value) => features.validate?.(key, value)
       : undefined,
@@ -617,6 +659,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
+    const l2 = features.reconcile;
+    l2?.begin_();
     try {
       report("reconcile.start", () => ({ snapshot: facts.$snapshot() }));
       effectsOpen = true;
@@ -629,8 +673,16 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (done) {
         await done;
       }
+      if (l2) {
+        // 1.35 awaits constraint evaluation only when it must; the diff,
+        // dispatch and pass end then share one continuation, as in 1.35.
+        const asked = l2.evaluate_(passKeys);
+        l2.commit_(asked instanceof Promise ? await asked : asked, passKeys);
+      }
       report("reconcile.end", () => ({
-        result: { unmet: [], inflight: [], completed: [], canceled: [] },
+        result: l2
+          ? l2.result_()
+          : { unmet: [], inflight: [], completed: [], canceled: [] },
       }));
     } finally {
       reconciling = false;
@@ -642,7 +694,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
 
   // --- the system ----------------------------------------------------------
-  const isSettled = () => !scheduled && !reconciling;
+  const isSettled = () =>
+    !scheduled && !reconciling && !features.reconcile?.busy_();
   const warnUnknown = (method: string, id: string) =>
     console.warn(`[Directive] ${method}: unknown key "${id}"`);
   /** A clock timer owned by this system; returns its canceller. */
@@ -708,12 +761,14 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       system.initialize();
       running = true;
+      features.reconcile?.start_();
       emit("system.start", { system });
       scheduleReconcile();
     },
     stop() {
       if (running) {
         running = false;
+        features.reconcile?.stop_();
         features.effects?.cleanupAll();
         emit("system.stop", { system });
       }
@@ -838,8 +893,10 @@ export function createSystemCore<const M extends ModuleSchema>(
         const cancel = after(maxWait, () => {
           // Read before finish(): its state is what timed out.
           const details = [
+            ...(features.reconcile?.details_() ?? []),
             reconciling && "reconciliation in progress",
             scheduled && "reconcile scheduled",
+            ...(features.reconcile?.unmet_() ?? []),
           ].filter(Boolean);
           finish();
           reject(
@@ -878,6 +935,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     derived: derive,
     tracker,
     reportError,
+    schedule: scheduleReconcile,
+    settled: notifySettle,
+    watch: (id) => watched.add(id),
   };
   for (const part of parts) {
     part(ctx);
