@@ -487,6 +487,12 @@
         "frozen values in facts > can be read back",
         "frozen values in facts > can be read back when the whole tree is frozen"
       ],
+      "tests/core/l1-derivations-gate.test.ts": [
+        "telling a subscriber a derivation moved > is done once per fresh-to-stale change, however many writes follow before it is read",
+        "telling a subscriber a derivation moved > never re-enters a listener: a batch it commits is announced after it returns",
+        "telling a subscriber a derivation moved > reaches a subscriber to the end of a chain only when the chain was fresh",
+        "telling a subscriber a derivation moved > stops a listener that keeps making its own derivation stale, and drops what was queued"
+      ],
       "tests/core/l1-derivations.test.ts": [
         "a derivation declared as { compute } > computes like the bare function",
         "caching and what a derivation depends on > a derivation read from a closure over the system is a dependency",
