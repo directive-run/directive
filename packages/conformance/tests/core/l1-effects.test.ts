@@ -944,7 +944,7 @@ describe("enabling and disabling effects", () => {
   it("a disabled effect that read a derivation sees its new value when enabled", async () => {
     const ran: number[] = [];
     const system = build({
-      e: (facts: any, _prev: any, derived: any) =>
+      e: (_facts: any, _prev: any, derived: any) =>
         void ran.push(derived.doubled),
     });
     await system.start();
