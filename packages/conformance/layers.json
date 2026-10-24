@@ -5352,6 +5352,544 @@
         }
       }
     },
+    "tests/core/l1-effects.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "which effects run > every enabled effect runs once at start, in declaration order": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect runs only for what it read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect that read nothing runs on every change": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect that read a derivation runs when it changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > a changed value the effect read wakes it, an equal write does not": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > a conditional read is followed, also after many identical runs": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect keeps reacting after the system sat idle and many runs": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect woken by an event sees the fact the event wrote": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .dispatch",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an async effect makes settle() wait for it": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > settle() after a write waits for an async effect woken by it": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > a throw next to an async effect is reported by the time settle() returns": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > an effect that read nothing coexists with one that read a derivation": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "which effects run > a synchronous effect has finished by the time the write settles": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > runs before the next run, once, and not again": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > an effect with no cleanup re-runs without one": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > an async effect's cleanup is kept when it settles, and run before the next run": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > a returned value that is not a function is not kept as a cleanup": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > stop() runs every pending cleanup, once": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > destroy() runs pending cleanups": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > a cleanup that throws is reported and the effect still re-runs": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > an async effect settling after stop() has its cleanup called at once": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > a late cleanup that throws after stop() is reported": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "cleanup > before stop(), a settling effect's cleanup is kept, not called": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > is reported to the console": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > does not stop the others, and runs again on the next change": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > every body runs before a thrown error is announced": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > an async rejection is reported and the effect keeps running": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > an effect that threw runs again when what it read changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a throwing effect > a throw after reading nothing new does not wedge the effect": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a write is refused: the fact is unchanged and the error reported": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a refused write names the effect and the fact": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a nested mutation names the effect and the fact, as a change in place": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a write in a later run is refused too": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a nested value mutated in place is reported": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > reading a nested value without mutating it is fine": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > the store behind facts can be read but not written": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a write through the store behind facts is refused": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what an effect may do with facts > a read of every kind leaves the facts alone": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "enabling and disabling effects > a disabled effect does not run at start, and runs again once enabled": {
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
+        },
+        "enabling and disabling effects > a disabled effect stays quiet through changes, and sees the latest value once enabled": {
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
+        },
+        "enabling and disabling effects > an effect disabled by an earlier one in the same pass does not run": {
+          "layer": "L4",
+          "by": ["member .effects.disable"]
+        },
+        "enabling and disabling effects > a disabled effect that read a derivation sees its new value when enabled": {
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
+        },
+        "async effects that read nothing before their first await > warns once per effect, and not for pre-await reads or sync effects": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-views.test.ts": {
       "category": "black-box",
       "rule": "L1",

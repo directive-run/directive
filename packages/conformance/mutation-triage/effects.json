@@ -8,6 +8,42 @@
     "note": "Static module-level constant evaluated at load; the symbol key is only a shared name between wrapper and reader, and Stryker cannot attribute a per-test failure to a static mutant."
   },
   {
+    "line": 377,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when run is not a function the system still starts",
+    "layer": "L3"
+  },
+  {
+    "line": 377,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 377,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof run === \"function\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when run is not a function the system still starts",
+    "layer": "L3"
+  },
+  {
+    "line": 377,
+    "col": 22,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
     "line": 383,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -20,8 +56,9 @@
     "col": 27,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "Survived run 39356354381 because no test composed a system with a non-reader effect. Now killed by blackbox-effects 'a namespaced non-reader costs no snapshot' (hand-run: fails with 4 store copies vs 0). Entry kept so the gate passes against the pre-test report; stays in the denominator."
+    "reason": "later-layer",
+    "note": "Namespaced non-reader snapshot copy count (prev parameter) — killed in the full run by a namespaced non-reader costs fewer snapshots copies the store less for a one-parameter effect than for a reader",
+    "layer": "L4"
   },
   {
     "line": 386,
@@ -40,6 +77,42 @@
     "note": "The prevFacts answer is memoized per function; recomputing it gives the same answer."
   },
   {
+    "line": 404,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 404,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "run.length !== 0",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has only a rest parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 404,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has only a rest parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 404,
+    "col": 32,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has only a rest parameter",
+    "layer": "L3"
+  },
+  {
     "line": 405,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -54,6 +127,24 @@
     "replacement": "run.length > 2",
     "reason": "equivalent",
     "note": "A two-parameter function is also answered true by the source scan that follows; the early return is a shortcut."
+  },
+  {
+    "line": 405,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 405,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "run.length < 2",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
   },
   {
     "line": 410,
@@ -72,6 +163,96 @@
     "note": "Function.prototype.toString does not throw for any callable a definition can hold; the catch is a defensive fallback with no reachable trigger."
   },
   {
+    "line": 417,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 417,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has the arguments object",
+    "layer": "L3"
+  },
+  {
+    "line": 417,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "source.includes(\"arguments\") && source.includes(\"[native code]\")",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has the arguments object",
+    "layer": "L3"
+  },
+  {
+    "line": 417,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 417,
+    "col": 55,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 421,
+    "col": 31,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a bare arrow parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a bare arrow parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "open !== -1",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 423,
+    "col": 16,
+    "mutator": "UnaryOperator",
+    "replacement": "+1",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a bare arrow parameter",
+    "layer": "L3"
+  },
+  {
     "line": 426,
     "col": 22,
     "mutator": "EqualityOperator",
@@ -80,12 +261,425 @@
     "note": "Reading source[source.length] yields undefined, which matches no branch."
   },
   {
+    "line": 426,
+    "col": 22,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 426,
+    "col": 22,
+    "mutator": "EqualityOperator",
+    "replacement": "i >= source.length",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 426,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a rest second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "(ch === \"(\" || ch === \"[\") && ch === \"{\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a rest second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a rest second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \"(\" && ch === \"[\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a destructured first parameter and a defaulted second",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"(\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 16,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a rest second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 23,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured array",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 23,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"[\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 30,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured array",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 37,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"{\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 37,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a destructured first parameter and a defaulted second",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 44,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a destructured first parameter and a defaulted second",
+    "layer": "L3"
+  },
+  {
+    "line": 428,
+    "col": 49,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 429,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "depth--",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "(ch === \")\" || ch === \"]\") && ch === \"}\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \")\" && ch === \"]\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \")\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 30,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"]\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 30,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured array",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 37,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured array",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 44,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured object",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 44,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"}\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 51,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has a destructured object",
+    "layer": "L3"
+  },
+  {
+    "line": 430,
+    "col": 56,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 431,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "depth++",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a destructured first parameter and a defaulted second",
+    "layer": "L3"
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "depth !== 0",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a destructured first parameter and a defaulted second",
+    "layer": "L3"
+  },
+  {
+    "line": 434,
+    "col": 31,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \",\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \",\" || depth === 1",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 435,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter, where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it — killed in the full run by an effect that can read prevFacts is handed them when it has a defaulted second parameter",
+    "layer": "L3"
+  },
+  {
     "line": 441,
     "col": 10,
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
     "note": "Reached only for unbalanced source; a function's own source is always balanced, so the answer cannot be forced."
+  },
+  {
+    "line": 461,
+    "col": 7,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Wording of the refusal message; the tests assert the effect id, the fact and in-place versus write, not the sentence."
   },
   {
     "line": 462,
@@ -144,6 +738,15 @@
     "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
   },
   {
+    "line": 593,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Builds the dependency list handed to the onRun plugin hook only — killed in the full run by what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
     "line": 594,
     "col": 9,
     "mutator": "ConditionalExpression",
@@ -153,11 +756,47 @@
   },
   {
     "line": 594,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "wantsRunDeps()",
+    "reason": "later-layer",
+    "note": "Builds the dependency list handed to the onRun plugin hook only — killed in the full run by what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 594,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Builds the dependency list handed to the onRun plugin hook only — killed in the full run by what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 594,
     "col": 26,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "perf-only",
     "note": "Without the early return the dependency list is built even when no trace reads it; nothing public sees it."
+  },
+  {
+    "line": 629,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 630,
+    "col": 12,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by prevFacts and derived are read-only in development writing prevFacts names it",
+    "layer": "L3"
   },
   {
     "line": 641,
@@ -169,11 +808,29 @@
   },
   {
     "line": 644,
+    "col": 10,
+    "mutator": "LogicalOperator",
+    "replacement": "runChecks.get(id) && []",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself a nested change in previous facts is found",
+    "layer": "L4"
+  },
+  {
+    "line": 644,
     "col": 31,
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
     "reason": "not-observable",
     "note": "runChecks always holds an entry for a run that reaches the check, except a second overlapping run, whose empty-array fallback has no observable difference."
+  },
+  {
+    "line": 645,
+    "col": 29,
+    "mutator": "LogicalOperator",
+    "replacement": "first && check.takeMutation()",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
   },
   {
     "line": 648,
@@ -182,6 +839,201 @@
     "replacement": ";",
     "reason": "not-observable",
     "note": "Drops a per-run bookkeeping entry that is overwritten by the next run of the same effect."
+  },
+  {
+    "line": 674,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 674,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "prev === null",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 676,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 679,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 680,
+    "col": 13,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 680,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 682,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 687,
+    "col": 25,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 688,
+    "col": 11,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 688,
+    "col": 21,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 690,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
+  },
+  {
+    "line": 692,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by the facts view itself a nested change in previous facts is found",
+    "layer": "L4"
+  },
+  {
+    "line": 700,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them — killed in the full run by cutting a self-waking chain keeps a write that is not the chain's own",
+    "layer": "L4"
+  },
+  {
+    "line": 724,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "onGates.size <= 0",
+    "reason": "later-layer",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4) — killed in the full run by an effect that cannot read prevFacts costs no snapshot when it has one named parameter",
+    "layer": "L3"
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "onGates.size >= 0",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4) — killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
+    "layer": "L4"
+  },
+  {
+    "line": 731,
+    "col": 7,
+    "mutator": "MethodExpression",
+    "replacement": "Object.values(definitions as Record<string, unknown>).every(def => declaresPrevFacts((def as {\n  run?: unknown;\n})?.run))",
+    "reason": "later-layer",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4) — killed in the full run by a refused effect write reports a nested mutation in development, naming the path",
+    "layer": "L4"
   },
   {
     "line": 732,
@@ -193,11 +1045,29 @@
   },
   {
     "line": 740,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4) — killed in the full run by prevFacts values an effect registered later sees the facts as they were at registration",
+    "layer": "L10"
+  },
+  {
+    "line": 740,
     "col": 46,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
     "note": "Whether a stale (non-null) snapshot is refreshed on re-registration is not a contract; both engines hand the effect a prior-facts object."
+  },
+  {
+    "line": 766,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
   },
   {
     "line": 767,
@@ -208,6 +1078,24 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
+    "line": 767,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
+    "line": 767,
+    "col": 12,
+    "mutator": "LogicalOperator",
+    "replacement": "isDerivation(name) && isFactKey(name)",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
     "line": 792,
     "col": 34,
     "mutator": "ArrayDeclaration",
@@ -216,12 +1104,66 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
+    "line": 795,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by which effects run a disabled effect drops the derivations it pinned",
+    "layer": "L4"
+  },
+  {
     "line": 799,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 799,
+    "col": 13,
+    "mutator": "BooleanLiteral",
+    "replacement": "isFactKey(name)",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
+    "line": 799,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
+    "line": 799,
+    "col": 31,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 800,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
+    "line": 813,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
   },
   {
     "line": 815,
@@ -241,6 +1183,24 @@
   },
   {
     "line": 815,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 815,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "state.rawDeps !== null",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 815,
     "col": 35,
     "mutator": "ConditionalExpression",
     "replacement": "false",
@@ -249,11 +1209,29 @@
   },
   {
     "line": 815,
+    "col": 35,
+    "mutator": "EqualityOperator",
+    "replacement": "pending !== null",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 815,
     "col": 55,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 815,
+    "col": 55,
+    "mutator": "EqualityOperator",
+    "replacement": "pending.length !== 0",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
   },
   {
     "line": 818,
@@ -265,11 +1243,47 @@
   },
   {
     "line": 818,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "pending.some(isKnownName)",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 818,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 818,
+    "col": 10,
+    "mutator": "MethodExpression",
+    "replacement": "pending.every(isKnownName)",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by declared dependencies one of several unresolved names becoming a derivation is enough",
+    "layer": "L10"
+  },
+  {
+    "line": 818,
     "col": 37,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 830,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by more behaviour of the run loop enable, disable and isEnabled on an unknown effect throw",
+    "layer": "L4"
   },
   {
     "line": 835,
@@ -278,6 +1292,51 @@
     "replacement": ";",
     "reason": "equivalent",
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
+  },
+  {
+    "line": 840,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by data-form on swapping to a function-form effect drops the old gate",
+    "layer": "L10"
+  },
+  {
+    "line": 847,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by what reading leaves behind a fact is judged against what the run first saw, on every run",
+    "layer": "L4"
+  },
+  {
+    "line": 847,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by what reading leaves behind a fact is judged against what the run first saw, on every run",
+    "layer": "L4"
+  },
+  {
+    "line": 856,
+    "col": 25,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by which effects run a run reports itself to plugins and names the effect on the stack",
+    "layer": "L10"
+  },
+  {
+    "line": 857,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither — killed in the full run by prevFacts values a data gate registered later fires only for a real change",
+    "layer": "L10"
   },
   {
     "line": 871,
@@ -360,6 +1419,15 @@
     "note": "The enabled check in shouldRun is repeated by runEffect, and initial stability state is overwritten before it is read."
   },
   {
+    "line": 946,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Dep-stability reset, declared-deps refresh or data-form gate in shouldRun (L4 deps/on). Stability only skips re-tracking and is reset by shouldRun on any overlapping change, so it is reachable only through a pending rerun (navigation, L8) — killed in the full run by declared dependencies a derivation registered after the effect is picked up",
+    "layer": "L10"
+  },
+  {
     "line": 956,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -368,12 +1436,30 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 966,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Dep-stability reset, declared-deps refresh or data-form gate in shouldRun (L4 deps/on). Stability only skips re-tracking and is reset by shouldRun on any overlapping change, so it is reachable only through a pending rerun (navigation, L8) — killed in the full run by data-form on fires only when the gate holds, and only for changes to its facts",
+    "layer": "L3"
+  },
+  {
     "line": 986,
     "col": 9,
     "mutator": "OptionalChaining",
     "replacement": "onError(state.id, error)",
     "reason": "internals-only",
     "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
+  },
+  {
+    "line": 988,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "later-layer",
+    "note": "Wording of the cleanup error message or the plugin error hook — killed in the full run by cleanup a cleanup that throws is reported and the effect still re-runs",
+    "layer": "L3"
   },
   {
     "line": 1004,
@@ -390,6 +1476,69 @@
     "replacement": "``",
     "reason": "not-observable",
     "note": "A string used only in a message or an error-attribution label; the observable behaviour (throw / report) is unchanged."
+  },
+  {
+    "line": 1032,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by which effects run an async effect makes settle() wait for it",
+    "layer": "L3"
+  },
+  {
+    "line": 1032,
+    "col": 43,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by the facts an effect reads through is also refused after an await",
+    "layer": "L3"
+  },
+  {
+    "line": 1033,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by cleanup an async effect's cleanup is stored when it settles",
+    "layer": "L3"
+  },
+  {
+    "line": 1034,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by cleanup an async effect's cleanup is stored when it settles",
+    "layer": "L3"
+  },
+  {
+    "line": 1035,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by an in-place change to a nested fact is reported when it happens after an await",
+    "layer": "L3"
+  },
+  {
+    "line": 1038,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by the facts an effect reads through is refused from a cleanup too",
+    "layer": "L3"
+  },
+  {
+    "line": 1039,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "runBatchedEffect is reached only by effects with declared deps or by a stable auto-tracked effect (rerun path, L8) — killed in the full run by an in-place change to a nested fact names where it happened a deep property",
+    "layer": "L4"
   },
   {
     "line": 1045,
@@ -616,6 +1765,70 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 1112,
+    "col": 70,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "deps.size >= 0",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "deps.size > 0 && warnedAsync.has(id)",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "deps.size <= 0",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
     "line": 1131,
     "col": 5,
     "mutator": "CallExpression",
@@ -638,6 +1851,30 @@
     "replacement": "{}",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+  },
+  {
+    "line": 1165,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1165,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1166,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
   },
   {
     "line": 1184,
@@ -688,6 +1925,24 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 1207,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!state.enabled && !def",
+    "reason": "later-layer",
+    "note": "Error plugin hook, stability reset after a throw (see dep stability) or a disabled/unregistered effect (L4/L10) — killed in the full run by enabling and disabling effects an effect disabled by an earlier one in the same pass does not run",
+    "layer": "L4"
+  },
+  {
+    "line": 1207,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "Error plugin hook, stability reset after a throw (see dep stability) or a disabled/unregistered effect (L4/L10) — killed in the full run by which effects run an effect disabled by an earlier one in the same pass does not run",
+    "layer": "L4"
+  },
+  {
     "line": 1214,
     "col": 5,
     "mutator": "OptionalChaining",
@@ -710,6 +1965,32 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "equivalent",
     "note": "The shared thrown-sink is reused only when empty (thrownSink.length === 0 ? thrownSink : []); a seeded element just selects the fresh-array path, which behaves the same. Hand-run: survived the suite."
+  },
+  {
+    "line": 1243,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "States are created lazily by getState, so the eager loop differs only when an invalid on or deps definition throws at creation — killed in the full run by data-form on rejects a value that is not a predicate, by what it is",
+    "layer": "L3"
+  },
+  {
+    "line": 1244,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "States are created lazily by getState, so the eager loop differs only when an invalid on or deps definition throws at creation — killed in the full run by data-form on rejects a value that is not a predicate, by what it is",
+    "layer": "L3"
+  },
+  {
+    "line": 1246,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Without it prevFactsObserved keeps its default of true, so the snapshot is built every pass: the same results at the cost of a copy."
   },
   {
     "line": 1265,
@@ -744,6 +2025,14 @@
     "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
   },
   {
+    "line": 1268,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Whether a pass with only synchronous effects returns a promise or undefined; the caller awaits only a defined result and settles the same either way. updatePreviousSnapshot feeds prevFacts (L4)."
+  },
+  {
     "line": 1269,
     "col": 13,
     "mutator": "ConditionalExpression",
@@ -774,6 +2063,23 @@
     "replacement": "sink.length >= 0",
     "reason": "equivalent",
     "note": "Twin of the triaged 1276:9 ConditionalExpression true. Always taking the branch splices an empty array and reportThrown([]) is a no-op, so nothing observable changes. Hand-run killed only by an unrelated timing assertion (derivation-deps 'does not pay for the size of a graph nothing is watching', 13.0 vs 9.4 ms budget), which is load noise, not behaviour."
+  },
+  {
+    "line": 1283,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Whether a pass with only synchronous effects returns a promise or undefined; the caller awaits only a defined result and settles the same either way. updatePreviousSnapshot feeds prevFacts (L4)."
+  },
+  {
+    "line": 1310,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "History navigation reruns — killed in the full run by an effect re-run by a navigation warns when it dispatches, naming the effect",
+    "layer": "L8"
   },
   {
     "line": 1310,
@@ -814,6 +2120,50 @@
     "replacement": "pendingReruns.size >= 0",
     "reason": "equivalent",
     "note": "Navigation and rerun set handling: an empty or absent set selects the same effects as the guarded path."
+  },
+  {
+    "line": 1317,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "History navigation reruns — killed in the full run by the retry strategy for an effect re-runs the failed effect until it succeeds",
+    "layer": "L4"
+  },
+  {
+    "line": 1317,
+    "col": 20,
+    "mutator": "EqualityOperator",
+    "replacement": "pendingReruns.size <= 0",
+    "reason": "later-layer",
+    "note": "History navigation reruns — killed in the full run by a throwing effect the retry strategy runs it again, a bounded number of times",
+    "layer": "L3"
+  },
+  {
+    "line": 1318,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
+  },
+  {
+    "line": 1323,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "History navigation reruns — killed in the full run by a throwing effect the retry strategy runs it again, a bounded number of times",
+    "layer": "L3"
+  },
+  {
+    "line": 1328,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "History navigation reruns — killed in the full run by effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
   },
   {
     "line": 1329,
@@ -1208,6 +2558,15 @@
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
   },
   {
+    "line": 1535,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by cutting a self-waking chain keeps a write that is not the chain's own",
+    "layer": "L4"
+  },
+  {
     "line": 1540,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -1232,6 +2591,60 @@
     "note": "A retry also calls scheduleReconcile, so the extra check at the end of a pass never decides whether a rerun happens."
   },
   {
+    "line": 1549,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run system.effects.call runs the effect now, even without a change",
+    "layer": "L10"
+  },
+  {
+    "line": 1551,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by more behaviour of the run loop call on an unknown effect says it does not exist",
+    "layer": "L10"
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "state.enabled",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run system.effects.call runs the effect now, even without a change",
+    "layer": "L10"
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run system.effects.call runs the effect now, even without a change",
+    "layer": "L10"
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run call on a disabled effect does nothing",
+    "layer": "L10"
+  },
+  {
+    "line": 1563,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by cleanup call stores a cleanup from a sync and from an async effect",
+    "layer": "L10"
+  },
+  {
     "line": 1567,
     "col": 76,
     "mutator": "ArrayDeclaration",
@@ -1240,12 +2653,84 @@
     "note": "callOne's dependency list reaches only the trace, and a trace exists only while a pass is running, which a call() from outside never is."
   },
   {
+    "line": 1570,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run system.effects.call runs the effect now, even without a change",
+    "layer": "L10"
+  },
+  {
+    "line": 1572,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run system.effects.call runs the effect now, even without a change",
+    "layer": "L10"
+  },
+  {
     "line": 1575,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+  },
+  {
+    "line": 1575,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run call reports a throw and an async rejection, and does not reject",
+    "layer": "L10"
+  },
+  {
+    "line": 1575,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by which effects run call reports a throw and an async rejection, and does not reject",
+    "layer": "L10"
+  },
+  {
+    "line": 1577,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by cleanup call stores a cleanup from a sync and from an async effect",
+    "layer": "L10"
+  },
+  {
+    "line": 1578,
+    "col": 16,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by cleanup call stores a cleanup from a sync and from an async effect",
+    "layer": "L10"
+  },
+  {
+    "line": 1579,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by cleanup call stores a cleanup from a sync and from an async effect",
+    "layer": "L10"
+  },
+  {
+    "line": 1581,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "system.effects.call / runningEffect / pending reruns — killed in the full run by an in-place change to a nested fact is reported for a call()",
+    "layer": "L10"
   },
   {
     "line": 1583,
