@@ -309,6 +309,11 @@
       "rule": "L2",
       "pin": true
     },
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["member .inspect"]
+    },
     "tests/core/reconcile-timing-rules.test.ts": {
       "rule": "L2",
       "pin": true,

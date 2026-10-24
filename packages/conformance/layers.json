@@ -6264,6 +6264,117 @@
         }
       }
     },
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "requirement identity in a running system > requirements of one type that differ in content are separate requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the same requirement from two constraints is one requirement, owned by the one evaluated first": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the id is built from the content: the same in two systems and in any key order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a resolver key is the requirement's identity: a shared key is one requirement and the first wins": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that is still required keeps its run, and one no longer required is canceled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that comes back after going away starts a new run": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "requirement identity in a running system > a requirement stops being unmet when its constraint stops requiring it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > req() builds what a constraint requires and forType() routes it to its resolver": {
+          "layer": "L2",
+          "by": [
+            "import forType",
+            "import req",
+            "option constraints",
+            "option resolvers"
+          ],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "generateRequirementId > derives the id from the type and the content, whatever the key order": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > differs when the type or any property differs": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > uses the key function instead when one is given": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "req > builds a requirement from its type and properties": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "req > makes a new object on each call and leaves its input alone": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "isRequirementType > is true only for a requirement of that type": {
+          "layer": "L2",
+          "by": ["import isRequirementType"]
+        },
+        "forType > makes a predicate for one requirement type": {
+          "layer": "L2",
+          "by": ["import forType"]
+        },
+        "RequirementSet > keeps the first requirement added under an id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > looks entries up by id and removes them by id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > lists its ids and entries in insertion order": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > counts its entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clear empties it": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clone is an independent copy holding the same entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff reports what only this set holds as added and what only the other holds as removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff of two sets with the same ids reports nothing, and an empty side is all added or all removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",
