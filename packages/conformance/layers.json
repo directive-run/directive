@@ -5125,6 +5125,67 @@
         }
       }
     },
+    "tests/core/l1-derivations-gate.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "telling a subscriber a derivation moved > is done once per fresh-to-stale change, however many writes follow before it is read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "telling a subscriber a derivation moved > reaches a subscriber to the end of a chain only when the chain was fresh": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .read",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "telling a subscriber a derivation moved > never re-enters a listener: a batch it commits is announced after it returns": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "telling a subscriber a derivation moved > stops a listener that keeps making its own derivation stale, and drops what was queued": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-derivations.test.ts": {
       "category": "black-box",
       "rule": "L0",
