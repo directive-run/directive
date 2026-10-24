@@ -27,12 +27,19 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
-import { FUZZ_FLOOR as FLOOR, maxRunaways } from "./fuzz.js";
+import {
+  FUZZ_FLOOR as FLOOR,
+  FUZZ_V2_FLOOR as V2_FLOOR,
+  maxRunaways,
+} from "./fuzz.js";
 import { reachesAny } from "./layers.js";
 import { staticTests } from "./tests.js";
 
 /** The fewest fuzz cases a differential run may execute (lib/fuzz.ts). */
 export const FUZZ_FLOOR = FLOOR;
+
+/** The fewest fuzz cases compared on v2 when v2 runs anything (lib/fuzz.ts). */
+export const FUZZ_V2_FLOOR = V2_FLOOR;
 
 export const ENGINE_PROJECTS = [
   "conformance:v1",
@@ -953,9 +960,15 @@ export function checkHooksFired(
   return failures;
 }
 
-/** The fuzzer ran, at least FUZZ_FLOOR cases. */
+/**
+ * The fuzzer ran, at least FUZZ_FLOOR cases, and (when `v2Expected`: v2 has
+ * built a layer, `current` in layers.rules.json is not null) at least
+ * FUZZ_V2_FLOOR of them were compared on v2 as well. A fuzz run that v2 sits
+ * out of proves nothing about 2.0, and a missing count counts as zero.
+ */
 export function checkFuzzRuns(
-  runs: Array<{ seed: number; runs: number; runaway?: number }>,
+  runs: Array<{ seed: number; runs: number; runaway?: number; v2?: number }>,
+  v2Expected: boolean,
 ): string[] {
   if (runs.length === 0) {
     return ["conformance:diff: the fuzzer reported no runs"];
@@ -973,6 +986,11 @@ export function checkFuzzRuns(
     if (runaway > cap) {
       out.push(
         `conformance:diff: ${runaway} runaway fuzz cases (seed ${r.seed}); at most ${cap} allowed (max(1% of cases, 2))`,
+      );
+    }
+    if (v2Expected && !(r.v2 !== undefined && r.v2 >= FUZZ_V2_FLOOR)) {
+      out.push(
+        `conformance:diff: the fuzzer compared ${r.v2 ?? 0} cases on v2 (seed ${r.seed}); the floor is ${FUZZ_V2_FLOOR} while v2 runs anything`,
       );
     }
   }
