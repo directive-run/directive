@@ -152,6 +152,15 @@ untriaged. `layer` must be L0..L13 and above the file's row in the table;
 anything else is a mislabel and the scorer exits with an error. A reviewer
 verifies that the feature really belongs to that layer on the plan's layer
 ladder.
+Every `later-layer` entry needs a non-empty `note` naming the later feature
+AND the test that kills the mutant in the full run; the scorer rejects an
+empty one. A full report with no `source` (or a different one) is treated as
+stale: nothing is deferred against it.
+
+The score output lists every deferred mutant (`file:line:col mutator`, in a
+collapsible block). Reviewer step: spot-check that each listed line really
+belongs to a later layer's feature (open the line, read the entry's note),
+because a deferral removes that mutant from the gate score.
 
 | Layer | Files in `packages/core/src/core/` |
 |---|---|

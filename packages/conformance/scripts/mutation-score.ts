@@ -84,6 +84,13 @@ export interface TriageEntry {
   note?: string;
 }
 
+export interface DeferredMutant {
+  mutant: Mutant;
+  /** "full-run": NoCoverage here, reached in the full run. "later-layer": triaged to a later layer. */
+  why: "full-run" | "later-layer";
+  layer?: string;
+}
+
 export interface FileScore {
   file: string;
   killed: number;
@@ -94,6 +101,8 @@ export interface FileScore {
   excluded: number;
   /** NoCoverage here but reached in the full run: scored at a higher layer. */
   deferred: number;
+  /** The deferred mutants, for the reviewer's spot-check. */
+  deferredMutants: DeferredMutant[];
   /** A full report was given but its source for this file differs. */
   fullStale: boolean;
   rawScore: number;
@@ -185,6 +194,11 @@ export function validateTriage(
         `triage ${at}: later-layer needs layer L0..L13, got ${JSON.stringify(t.layer)}`,
       );
     }
+    if (typeof t.note !== "string" || t.note.trim() === "") {
+      throw new Error(
+        `triage ${at}: later-layer needs a note naming the later feature and the test that kills it in the full run`,
+      );
+    }
     if (rowLayer === undefined) {
       throw new Error(
         `triage ${at}: later-layer, but ${basename(file)} has no row in MUTATION.md`,
@@ -232,11 +246,12 @@ export function scoreFile(
   );
   // A full report of different source has different mutants at the same
   // positions: it cannot vouch for anything, so nothing is deferred.
+  // A report that lacks `source` cannot be checked, so it is stale too.
   const fullStale =
     full !== undefined &&
-    full.source !== undefined &&
-    data.source !== undefined &&
-    full.source !== data.source;
+    (full.source === undefined ||
+      data.source === undefined ||
+      full.source !== data.source);
   const reachedInFull = new Set(
     full && !fullStale
       ? full.mutants
@@ -245,6 +260,7 @@ export function scoreFile(
       : [],
   );
   let deferred = 0;
+  const deferredMutants: DeferredMutant[] = [];
   let killed = 0;
   let survived = 0;
   let noCoverage = 0;
@@ -285,6 +301,11 @@ export function scoreFile(
       if (ceiling !== undefined && ceiling < layerNum(entry!.layer ?? "L0")) {
         triagedCount++;
         deferred++;
+        deferredMutants.push({
+          mutant: m,
+          why: "later-layer",
+          layer: entry!.layer,
+        });
         continue;
       }
       // At or above it (or ceiling unknown): it counts, as if untriaged.
@@ -292,6 +313,7 @@ export function scoreFile(
     }
     if (m.status === "NoCoverage" && reachedInFull.has(k)) {
       deferred++;
+      deferredMutants.push({ mutant: m, why: "full-run" });
       continue;
     }
     if (m.status === "Survived") {
@@ -317,6 +339,7 @@ export function scoreFile(
     triaged: triagedCount,
     excluded,
     deferred,
+    deferredMutants,
     fullStale,
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
@@ -425,8 +448,42 @@ export function formatTable(rows: FileScore[]): string {
   return lines.join("\n");
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
+/** Each deferred mutant as `file:line:col mutator`, grouped under a collapsible block. */
+export function formatDeferred(rows: FileScore[]): string {
+  const lines: string[] = [];
+  for (const r of rows) {
+    for (const d of r.deferredMutants) {
+      const { line, column } = d.mutant.location.start;
+      lines.push(
+        `${basename(r.file)}:${line}:${column} ${d.mutant.mutatorName} (${d.why === "later-layer" ? `later-layer ${d.layer}` : "reached in full run"})`,
+      );
+    }
+  }
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `<details><summary>Deferred mutants (${lines.length}): spot-check that each line belongs to a later layer</summary>`,
+    "",
+    "```",
+    ...lines,
+    "```",
+    "",
+    "</details>",
+  ].join("\n");
+}
+
+export interface RunResult {
+  code: number;
+  out: string;
+  err: string[];
+}
+
+/** The CLI, without process side effects: `root` holds MUTATION.md, mutation-triage/ and reports/. */
+export function run(args: string[], root: string): RunResult {
+  const err: string[] = [];
+  const fail = (m: string): RunResult => ({ code: 1, out: "", err: [m] });
   let check = false;
   let only: string[] | undefined;
   const fullPaths: string[] = [];
@@ -441,31 +498,43 @@ function main(): void {
     } else if (a === "--layer") {
       const v = args[++i] ?? "";
       if (v !== "row" && !LAYER.test(v)) {
-        console.error(
+        return fail(
           `mutation-score: --layer must be L0..L13 or row, got "${v}"`,
         );
-        process.exit(1);
       }
       layer = v === "row" ? "row" : layerNum(v);
     } else if (a === "--full") {
       const p = args[++i];
       if (p === undefined) {
-        console.error("mutation-score: --full needs a report or directory");
-        process.exit(1);
+        return fail("mutation-score: --full needs a report or directory");
       }
       fullPaths.push(p);
     } else {
       paths.push(a);
     }
   }
-  const root = resolve(import.meta.dirname, "..");
   const reports = collect(paths.length ? paths : [join(root, "reports")]);
   const full = fullPaths.length ? loadFiles(collect(fullPaths)) : undefined;
   if (full && full.size === 0) {
-    console.error("mutation-score: --full: no mutated files in those reports");
-    process.exit(1);
+    return fail("mutation-score: --full: no mutated files in those reports");
   }
-  const rows = scoreReports(reports, join(root, "mutation-triage"), only, full);
+  const mdPath = join(root, "MUTATION.md");
+  const rowMap = existsSync(mdPath)
+    ? rowLayers(readFileSync(mdPath, "utf8"))
+    : new Map<string, number>();
+  let rows: FileScore[];
+  try {
+    rows = scoreReports(
+      reports,
+      join(root, "mutation-triage"),
+      only,
+      full,
+      rowMap,
+      layer,
+    );
+  } catch (e) {
+    return fail(`mutation-score: ${(e as Error).message}`);
+  }
   const stale = rows.filter((r) => r.fullStale).map((r) => basename(r.file));
   const notInFull = full
     ? rows.filter((r) => !full.has(r.file)).map((r) => basename(r.file))
@@ -481,7 +550,7 @@ function main(): void {
       : `Ceiling: ${layer === "row" ? "each file's MUTATION.md row" : `L${layer}`}.`,
     ...(stale.length
       ? [
-          `Full report has different source for: ${stale.join(", ")} (nothing deferred there).`,
+          `Full report has different or missing source for: ${stale.join(", ")} (nothing deferred there).`,
         ]
       : []),
     ...(notInFull.length
@@ -489,28 +558,40 @@ function main(): void {
           `Not in the full report: ${notInFull.join(", ")} (nothing deferred there).`,
         ]
       : []),
+    ...(formatDeferred(rows) ? ["", formatDeferred(rows)] : []),
   ].join("\n");
-  console.log(out);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `## Mutation score by file (report-only)\n\n${out}\n`,
-    );
-  }
   const missing = (only ?? []).filter(
     (name) => !rows.some((r) => basename(r.file) === name),
   );
   if (rows.length === 0 || missing.length > 0) {
-    console.error(
+    err.push(
       rows.length === 0
         ? "mutation-score: no mutated files found in the reports"
         : `mutation-score: not in any report: ${missing.join(", ")}`,
     );
-    process.exit(1);
+
+    return { code: 1, out, err };
   }
-  if (check && rows.some((r) => !r.pass)) {
-    process.exit(1);
+
+  return { code: check && rows.some((r) => !r.pass) ? 1 : 0, out, err };
+}
+
+function main(): void {
+  const root = resolve(import.meta.dirname, "..");
+  const r = run(process.argv.slice(2), root);
+  if (r.out) {
+    console.log(r.out);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `## Mutation score by file (report-only)\n\n${r.out}\n`,
+      );
+    }
   }
+  for (const e of r.err) {
+    console.error(e);
+  }
+  process.exit(r.code);
 }
 
 if (

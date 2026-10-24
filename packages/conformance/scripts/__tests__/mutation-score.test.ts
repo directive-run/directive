@@ -3,13 +3,18 @@
  * for every remaining survivor. Pure logic, runs on a tiny fake report.
  */
 
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   type ReportFile,
   type TriageEntry,
+  formatDeferred,
   formatTable,
   isMessageText,
   rowLayers,
+  run,
   scoreFile,
   validateTriage,
 } from "../mutation-score.js";
@@ -258,6 +263,34 @@ describe("mutation-score", () => {
       expect(() => validateTriage("a.ts", bad("L4"), 1)).not.toThrow();
     });
 
+    it("requires a note naming the feature and the killing test", () => {
+      for (const note of [undefined, "", "   "]) {
+        expect(() =>
+          validateTriage("a.ts", [{ ...later(4, "x >= 1"), note }], 1),
+        ).toThrow(/needs a note naming the later feature and the test/);
+      }
+    });
+
+    it("lists each deferred mutant as file:line:col mutator", () => {
+      const s = scoreFile("a.ts", report, triage, undefined, 1);
+      const text = formatDeferred([s]);
+      expect(text).toContain("<details>");
+      expect(text).toContain("a.ts:4:5 EqualityOperator (later-layer L4)");
+      expect(text).toContain("a.ts:5:5 EqualityOperator (later-layer L4)");
+      expect(
+        formatDeferred([scoreFile("a.ts", report, [], undefined, 1)]),
+      ).toBe("");
+    });
+
+    it("treats a report without source as stale: nothing deferred", () => {
+      const noSource = { mutants: report.mutants } as ReportFile;
+      const s = scoreFile("a.ts", report, [], noSource);
+      expect(s.fullStale).toBe(true);
+      expect(s.deferred).toBe(0);
+      const s2 = scoreFile("a.ts", noSource, [], report);
+      expect(s2.fullStale).toBe(true);
+    });
+
     it("reads each file's row layer from the MUTATION.md table", () => {
       const rows = rowLayers(
         [
@@ -273,5 +306,79 @@ describe("mutation-score", () => {
         ["predicate.ts", 11],
       ]);
     });
+  });
+});
+
+describe("CLI (run)", () => {
+  // facts.ts is row L1 in this MUTATION.md; its triage defers L4 code.
+  const setup = (note = "prev capture; killed by prev-capture.test.ts") => {
+    const root = mkdtempSync(join(tmpdir(), "mutscore-"));
+    mkdirSync(join(root, "mutation-triage"));
+    mkdirSync(join(root, "reports"));
+    writeFileSync(
+      join(root, "MUTATION.md"),
+      "| Layer | Files |\n|---|---|\n| L0-L1 | facts.ts |\n",
+    );
+    writeFileSync(
+      join(root, "mutation-triage", "facts.json"),
+      JSON.stringify([
+        {
+          line: 4,
+          col: 5,
+          mutator: "EqualityOperator",
+          replacement: "x >= 1",
+          reason: "later-layer",
+          layer: "L4",
+          note,
+        },
+      ]),
+    );
+    writeFileSync(
+      join(root, "reports", "r.json"),
+      JSON.stringify({
+        files: {
+          "src/facts.ts": {
+            source,
+            mutants: [
+              ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+              mut(4, 5, 10, "Survived", "EqualityOperator", "x >= 1"),
+            ],
+          },
+        },
+      }),
+    );
+
+    return root;
+  };
+
+  it("--layer Ln below the entry's layer defers it; at or above it counts", () => {
+    const root = setup();
+    const below = run(["--check", "--layer", "L1"], root);
+    expect(below.err).toEqual([]);
+    expect(below.code).toBe(0);
+    expect(below.out).toContain("facts.ts:4:5 EqualityOperator");
+    expect(below.out).toContain("Ceiling: L1.");
+    for (const l of ["L4", "L9"]) {
+      const at = run(["--check", "--layer", l], root);
+      expect(at.code).toBe(1);
+      expect(at.out).not.toContain("<details>");
+    }
+    expect(run(["--check"], root).code).toBe(1);
+  });
+
+  it("--layer row uses the file's MUTATION.md row (L1) as the ceiling", () => {
+    const root = setup();
+    const r = run(["--check", "--layer", "row"], root);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("each file's MUTATION.md row");
+    expect(r.out).toContain("| facts.ts | 4 | 0 | 0 | 1 |");
+  });
+
+  it("rejects a later-layer entry without a note, and a bad --layer", () => {
+    const root = setup("");
+    const r = run(["--layer", "row"], root);
+    expect(r.code).toBe(1);
+    expect(r.err.join("\n")).toMatch(/needs a note/);
+    expect(run(["--layer", "L99"], root).code).toBe(1);
   });
 });

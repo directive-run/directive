@@ -43,6 +43,7 @@ import {
   v2Skips,
 } from "../../lib/census.js";
 import { coreEntries, v2Entries } from "../../lib/core-entries.js";
+import { maxRunaways } from "../../lib/fuzz.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
 import { staticTests } from "../../lib/tests.js";
@@ -548,9 +549,23 @@ describe("the differential project", () => {
       "conformance:diff: the fuzzer reported no runs",
     ]);
     expect(checkFuzzRuns([{ seed: 1, runs: 0 }]).join("\n")).toMatch(
-      /ran 0 cases .* floor is 200/,
+      /compared 0 cases .* floor is 200/,
     );
     expect(checkFuzzRuns([{ seed: 1, runs: Number.NaN }])).toHaveLength(1);
+  });
+
+  it("caps runaway fuzz cases at max(1% of cases, 2)", () => {
+    // 205 generated: 2 runaways are fine, 3 are not.
+    expect(checkFuzzRuns([{ seed: 1, runs: 203, runaway: 2 }])).toEqual([]);
+    expect(
+      checkFuzzRuns([{ seed: 1, runs: 202, runaway: 3 }]).join("\n"),
+    ).toMatch(/3 runaway fuzz cases .* at most 2 allowed/);
+    // 1% scales: 1000 generated allows 10.
+    expect(checkFuzzRuns([{ seed: 1, runs: 990, runaway: 10 }])).toEqual([]);
+    expect(checkFuzzRuns([{ seed: 1, runs: 989, runaway: 11 }])).toHaveLength(
+      1,
+    );
+    expect(maxRunaways(205)).toBe(2);
   });
 
   it("fails the typecheck when PLUGIN_HOOKS misses a hook", () => {
