@@ -6264,6 +6264,387 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "lifecycle: each transition happens once and is announced once > start() twice starts once: one onStart for plugins and for modules": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > stop() before start() does nothing; on a running system it announces once": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > destroy() stops a running system first, then announces the destroy once": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > start() after destroy() is refused: no start hooks and no work": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > stopAsync() announces to plugins and modules once and runs effect cleanups": {
+          "layer": "L3",
+          "by": [
+            "member .stopAsync",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > stopAsync() on a module with no hooks resolves": {
+          "layer": "L3",
+          "by": [
+            "member .stopAsync",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > destroyAsync() stops, then announces the destroy once": {
+          "layer": "L3",
+          "by": [
+            "member .destroyAsync",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "lifecycle: each transition happens once and is announced once > a pass scheduled just before stop() does not run after it": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "readiness > isReady is false before start, and whenReady() before start rejects": {
+          "layer": "L3",
+          "by": [
+            "member .whenReady",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "readiness > whenReady() right after start resolves for every caller once the first pass is done": {
+          "layer": "L3",
+          "by": [
+            "member .whenReady",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "settling > isSettled is false while a pass is scheduled and while a resolver is in flight": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "settling > onSettledChange hears the system become busy, and nothing after unsubscribing": {
+          "layer": "L3",
+          "by": [
+            "member .onSettledChange",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "settling > a resolver whose own write retracts its requirement completes and is never canceled": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "the plugin hook stream > a constraint's pass reports evaluate, created, start, complete and met, in order": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the plugin hook stream > onReconcileEnd lists unmet and in-flight requirements, and a canceled one with its resolver": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the plugin hook stream > an effect's run is reported to plugins by its id": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the plugin hook stream > a resolver retry is reported with the attempt number": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the plugin hook stream > an async plugin onInit that rejects is reported, and the system still runs": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > a throwing constraint is reported, and disable stops asking it": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > skip leaves a throwing constraint in place, so it is asked again": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > an effect that throws under disable stops running": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > an effect that keeps throwing under retry is retried three times, then waits for its next change": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > an effect that fails once under retry runs again and then stops": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > a resolver that fails under disable turns its constraint off": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > a resolver that fails under skip is run again for its next requirement": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > retry-later gives a failed resolver's requirement another pass after its delay, not before": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > retry-later chosen by a function, with no retryLater config, still polls (default delay)": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > skip starts no retry-later polling": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > stop() drops a pending retry-later": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > retry-later asks a throwing constraint again after the delay": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > a module's onResolverError hook hears the error and requirement; a throwing hook is isolated": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "error boundary strategies > a resolver error in a module with no hooks does not break the system": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > watch on a derivation calls back only when its value changes": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > watch with an equalityFn calls back only when it says the value changed": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > watch on an unknown key warns in development": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > when() resolves once its predicate holds and leaves no timer behind": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > when() with a timeout rejects once it passes; a zero timeout never rejects": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "watch, when and subscribe > subscribe hears facts and derivations it names, and warns about unknown ones": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "initialize, reserved names, effect chains and settle(maxWait) > initialize() a second time does not run module init again": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
+        },
+        "initialize, reserved names, effect chains and settle(maxWait) > dispatching a reserved name such as __proto__ is ignored without a warning": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "initialize, reserved names, effect chains and settle(maxWait) > an effect whose run keeps waking itself is cut after a bounded run, with a warning, and wakes again on a later write": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "initialize, reserved names, effect chains and settle(maxWait) > settle(maxWait) rejects when a resolver never finishes; a settle that resolves leaves no timer": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "resolver keys and system.notify > a resolver's key decides which requirements are the same run": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "resolver keys and system.notify > notify.guardrailBlocked reaches plugins only for a registered plugin name": {
+          "layer": "L3",
+          "by": ["option module hooks", "option plugins"]
+        },
+        "resolver keys and system.notify > notify.guardrailCoverage reaches plugins until destroy; with no plugins notify is silent": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "readiness and polling after the first pass > whenReady() first called after the system is ready resolves at once": {
+          "layer": "L3",
+          "by": [
+            "member .whenReady",
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "readiness and polling after the first pass > stop() and stopAsync() end retry-later polling at once": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",

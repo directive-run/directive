@@ -1,0 +1,1696 @@
+[
+  {
+    "line": 253,
+    "col": 51,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 255,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 255,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof value !== \"object\"",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 255,
+    "col": 22,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 256,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "value === null",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 257,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 359,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Object.assign(target, undefined) copies nothing, so the guard only skips a no-op"
+  },
+  {
+    "line": 360,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Object.assign(target, undefined) copies nothing, so the guard only skips a no-op"
+  },
+  {
+    "line": 361,
+    "col": 5,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "module sources detached by unregisterModule — killed in the full run by tests/core/unregister-module.test.ts > unregisterModule detaches the module's sources",
+    "layer": "L10"
+  },
+  {
+    "line": 363,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "module sources detached by unregisterModule — killed in the full run by tests/core/unregister-module.test.ts > unregisterModule detaches the module's sources",
+    "layer": "L10"
+  },
+  {
+    "line": 371,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Object.assign(target, undefined) copies nothing, so the guard only skips a no-op"
+  },
+  {
+    "line": 405,
+    "col": 57,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/schema-freeze-scope.test.ts > the schema freeze covers our own types only still freezes the types we build, so a tag cannot be removed",
+    "layer": "L9"
+  },
+  {
+    "line": 410,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/schema-freeze-scope.test.ts > the schema freeze covers our own types only still freezes the types we build, so a tag cannot be removed",
+    "layer": "L9"
+  },
+  {
+    "line": 412,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back rejects a tags value that is not an array of strings",
+    "layer": "L9"
+  },
+  {
+    "line": 417,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/schema-freeze-scope.test.ts > the schema freeze covers our own types only still freezes the types we build, so a tag cannot be removed",
+    "layer": "L9"
+  },
+  {
+    "line": 417,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 418,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "schema-type freeze behind fact tags — killed in the full run by tests/core/fact-tags-immutable.test.ts > a fact's tags cannot be taken back refuses a _meta reassignment on the live schema type",
+    "layer": "L9"
+  },
+  {
+    "line": 426,
+    "col": 32,
+    "mutator": "MethodExpression",
+    "replacement": "config.modules.every((m: any) => m.history?.snapshotEvents)",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents history.snapshotModules only listed modules create snapshots",
+    "layer": "L8"
+  },
+  {
+    "line": 427,
+    "col": 5,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 429,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 603,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "stopRetryLaterTimer: with the guard forced true it calls clearInterval(null), a no-op, and assigns null to a timer that is already null"
+  },
+  {
+    "line": 717,
+    "col": 5,
+    "mutator": "UpdateOperator",
+    "replacement": "hydrationDepth--",
+    "reason": "later-layer",
+    "note": "hydration origin depth (hydrate) — killed in the full run by tests/core/fact-origin-at-write.test.ts > fact origin is stamped at the write labels hydrated state as hydration, not as something the program did",
+    "layer": "L9"
+  },
+  {
+    "line": 720,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "hydration origin depth (hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 721,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "hydrationDepth++",
+    "reason": "later-layer",
+    "note": "hydration origin depth (hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 775,
+    "col": 42,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history navigation write record — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 803,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation effects-phase flag — killed in the full run by tests/core/history-clone-integrity.test.ts > history snapshots never alias live state does not let a later mutation rewrite a snapshot already taken",
+    "layer": "L8"
+  },
+  {
+    "line": 853,
+    "col": 31,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/history-clone-integrity.test.ts > history snapshots never alias live state does not let a later mutation rewrite a snapshot already taken",
+    "layer": "L8"
+  },
+  {
+    "line": 874,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not suppress an ordinary write that shares the pass",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationDepth !== 0",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "navigationDepth === 0 || !navigationEffectsOpen",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 34,
+    "mutator": "BooleanLiteral",
+    "replacement": "navigationEffectsOpen",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 877,
+    "col": 58,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 880,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 896,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 896,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 896,
+    "col": 12,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationWrites <= 0",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 896,
+    "col": 12,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationWrites >= 0",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 896,
+    "col": 12,
+    "mutator": "LogicalOperator",
+    "replacement": "navigationWrites > 0 || ordinaryWrites === 0",
+    "reason": "later-layer",
+    "note": "history navigation write accounting — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 908,
+    "col": 71,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 912,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 915,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/fact-origin-at-write.test.ts > fact origin is stamped at the write labels hydrated state as hydration, not as something the program did",
+    "layer": "L9"
+  },
+  {
+    "line": 915,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 915,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "hydrationDepth <= 0",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 915,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "hydrationDepth >= 0",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 915,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/plugins/hydration-scope.test.ts > the hydration capability marks restored values as hydration with persistence listed first",
+    "layer": "L6"
+  },
+  {
+    "line": 916,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/plugins/hydration-scope.test.ts > the hydration capability marks restored values as hydration with persistence listed first",
+    "layer": "L6"
+  },
+  {
+    "line": 919,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "fact origin stamping (restore / hydrate) — killed in the full run by tests/core/blackbox-facts.test.ts > facts: batching reports a delete inside a batch with the value it removed",
+    "layer": "L9"
+  },
+  {
+    "line": 923,
+    "col": 43,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 953,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace creates a trace entry on fact change",
+    "layer": "L9"
+  },
+  {
+    "line": 985,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshot scheduling — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 985,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "dispatchDepth !== 0",
+    "reason": "later-layer",
+    "note": "history snapshot scheduling — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 985,
+    "col": 34,
+    "mutator": "BooleanLiteral",
+    "replacement": "duringNavigation",
+    "reason": "later-layer",
+    "note": "history snapshot scheduling — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 985,
+    "col": 53,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history snapshot scheduling — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 986,
+    "col": 30,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshot scheduling — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents direct fact mutation creates snapshot even with filtering",
+    "layer": "L8"
+  },
+  {
+    "line": 1026,
+    "col": 24,
+    "mutator": "MethodExpression",
+    "replacement": "changes",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1026,
+    "col": 51,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1026,
+    "col": 69,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1027,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1027,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "authored.length === changes.length",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1042,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1042,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1042,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "dispatchDepth !== 0",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1042,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "dispatchDepth === 0 || !duringNavigation",
+    "reason": "later-layer",
+    "note": "history navigation: restored vs authored writes — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1089,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1090,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace fields records which derivations recomputed, with their dependencies",
+    "layer": "L9"
+  },
+  {
+    "line": 1101,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1128,
+    "col": 19,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "trace run deps — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 1128,
+    "col": 25,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace run deps — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 1128,
+    "col": 25,
+    "mutator": "EqualityOperator",
+    "replacement": "traceManager.currentTrace == null",
+    "reason": "later-layer",
+    "note": "trace run deps — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 1130,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1131,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 1141,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1145,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1147,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace fields records an effect that threw",
+    "layer": "L9"
+  },
+  {
+    "line": 1260,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1460,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1464,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1471,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace attributes async resolver completion to the correct trace",
+    "layer": "L9"
+  },
+  {
+    "line": 1483,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "hasPlugins() fast path: it is kept exact on register/unregister, and with no plugin every broadcast iterates an empty snapshot (plugins.ts broadcast), so forcing the guard true runs an empty loop with arguments that have no side effects"
+  },
+  {
+    "line": 1509,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace attributes resolver errors to the correct trace",
+    "layer": "L9"
+  },
+  {
+    "line": 1666,
+    "col": 49,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "dynamic definitions registry — killed in the full run by tests/core/derivation-deps.test.ts > a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 1676,
+    "col": 15,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions registry — killed in the full run by tests/core/derivation-deps.test.ts > a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it",
+    "layer": "L10"
+  },
+  {
+    "line": 1709,
+    "col": 5,
+    "mutator": "UpdateOperator",
+    "replacement": "reconcileDepth--",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1710,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1710,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "reconcileDepth >= MAX_RECONCILE_DEPTH",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1710,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1711,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1711,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1711,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1717,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1717,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1717,
+    "col": 25,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1718,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "MAX_RECONCILE_DEPTH guard is unreachable: reconcile() returns before incrementing while a pass runs, and reconcileDepth is reset to 0 at the end of every pass (the engine's own comment: 'Reset every pass, which leaves the ceiling above unreachable. That is deliberate'), so the depth is 1 at the check and the block never runs"
+  },
+  {
+    "line": 1799,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1799,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken",
+    "layer": "L12"
+  },
+  {
+    "line": 1799,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "passIsEntirelyNavigation() && ordinaryWrites === 0 && restoredKeys.size > 0",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/effect-navigation-rerun.test.ts > effects after a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 8,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/effect-navigation-rerun.test.ts > effects after a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 8,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not suppress an ordinary write that shares the pass",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 8,
+    "mutator": "EqualityOperator",
+    "replacement": "ordinaryWrites !== 0",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not suppress an ordinary write that shares the pass",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 8,
+    "mutator": "LogicalOperator",
+    "replacement": "ordinaryWrites === 0 || restoredKeys.size > 0",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not suppress an ordinary write that shares the pass",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 32,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 1800,
+    "col": 32,
+    "mutator": "EqualityOperator",
+    "replacement": "restoredKeys.size <= 0",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/core/effect-navigation-rerun.test.ts > effects after a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1800,
+    "col": 32,
+    "mutator": "EqualityOperator",
+    "replacement": "restoredKeys.size >= 0",
+    "reason": "later-layer",
+    "note": "history navigation pass — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
+    "layer": "L12"
+  },
+  {
+    "line": 1826,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "batched resolvers: spare write counts — killed in the full run by tests/core/resolver-outcomes.test.ts > resolver outcomes a batch that satisfied its requirement is superseded when it returns",
+    "layer": "L7"
+  },
+  {
+    "line": 1836,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1842,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1842,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation dispatches when a later write satisfies the constraint again",
+    "layer": "L8"
+  },
+  {
+    "line": 1842,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "passKeys.size <= 0",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1842,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "passKeys.size >= 0",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation dispatches when a later write satisfies the constraint again",
+    "layer": "L8"
+  },
+  {
+    "line": 1842,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation does not re-dispatch resolvers for the rewound state",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "followsNavigation",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation does not re-dispatch resolvers for the rewound state",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation does not re-dispatch resolvers for the rewound state",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "!followsNavigation && passFromEffects || snapshotEventNames === null || shouldTakeSnapshot",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1849,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "!followsNavigation || passFromEffects",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1852,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1857,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1857,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1858,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1862,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "followsNavigation",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1862,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1862,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1862,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "!followsNavigation || snapshotEventNames === null || shouldTakeSnapshot",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not destroy the redo stack",
+    "layer": "L8"
+  },
+  {
+    "line": 1863,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1863,
+    "col": 12,
+    "mutator": "EqualityOperator",
+    "replacement": "snapshotEventNames !== null",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1863,
+    "col": 12,
+    "mutator": "LogicalOperator",
+    "replacement": "snapshotEventNames === null && shouldTakeSnapshot",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1864,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents snapshots all events when history.snapshotEvents is omitted (backward compat)",
+    "layer": "L8"
+  },
+  {
+    "line": 1865,
+    "col": 25,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1867,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents snapshots all events when history.snapshotEvents is omitted (backward compat)",
+    "layer": "L8"
+  },
+  {
+    "line": 1876,
+    "col": 30,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history snapshots per pass — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 1908,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/mutants-derivations.test.ts > derivations: assign wakes a constraint that gates on the replaced derivation",
+    "layer": "L10"
+  },
+  {
+    "line": 1908,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationKeys === null",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/mutants-derivations.test.ts > derivations: assign wakes a constraint that gates on the replaced derivation",
+    "layer": "L10"
+  },
+  {
+    "line": 1908,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "navigationKeys !== null || ordinaryKeyCount === 0",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/mutants-derivations.test.ts > derivations: assign wakes a constraint that gates on the replaced derivation",
+    "layer": "L10"
+  },
+  {
+    "line": 1913,
+    "col": 31,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > an effect re-run by a navigation warns when it dispatches, naming the effect",
+    "layer": "L8"
+  },
+  {
+    "line": 1913,
+    "col": 31,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1913,
+    "col": 31,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationKeys === null",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > history with an effect that dispatches records settled states only, so undo lands on one",
+    "layer": "L8"
+  },
+  {
+    "line": 1927,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1928,
+    "col": 28,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1929,
+    "col": 33,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation effects re-run window — killed in the full run by tests/core/blackbox-effects.test.ts > effects after a history navigation re-runs a mirroring effect and sits out an onNavigate skip one",
+    "layer": "L8"
+  },
+  {
+    "line": 1947,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "followsNavigation",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1947,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1947,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1947,
+    "col": 31,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1948,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/navigation-side-effects.test.ts > a reactive write during a history navigation does not re-attach a gated source",
+    "layer": "L8"
+  },
+  {
+    "line": 1966,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history navigation: gated sources and requirements — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation dispatches when a later write satisfies the constraint again",
+    "layer": "L8"
+  },
+  {
+    "line": 2013,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace tracks constraints and requirements when triggered",
+    "layer": "L9"
+  },
+  {
+    "line": 2037,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace tracks constraints and requirements when triggered",
+    "layer": "L9"
+  },
+  {
+    "line": 2126,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/trace.test.ts > Trace attributes async resolver completion to the correct trace",
+    "layer": "L9"
+  },
+  {
+    "line": 2211,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "trace — killed in the full run by tests/core/blackbox-effects.test.ts > what a run tells the trace lists declared deps, with derivations as derive.<id>",
+    "layer": "L9"
+  },
+  {
+    "line": 2220,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "dynamic definitions deferred flush — killed in the full run by tests/core/blackbox-effects.test.ts > more behaviour of the run loop an effect that fails after being unregistered is not run again",
+    "layer": "L10"
+  },
+  {
+    "line": 2332,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > an effect re-run by a navigation warns when it dispatches, naming the effect",
+    "layer": "L8"
+  },
+  {
+    "line": 2332,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/engine.test.ts > constraint-binding (RFC-0003) — engine integration emits `constraint.binding.disabled` (reason: async-declared) when `abortOn` lands on a declared-async constraint",
+    "layer": "L13"
+  },
+  {
+    "line": 2332,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "isDevelopment || navigationEffectsOpen",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > an effect re-run by a navigation warns when it dispatches, naming the effect",
+    "layer": "L8"
+  },
+  {
+    "line": 2342,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "dispatchDepth--",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents history.snapshotEvents: [] disables all event snapshots",
+    "layer": "L8"
+  },
+  {
+    "line": 2347,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2347,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "navigationDepth !== 0",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2347,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "navigationDepth === 0 && !navigationEffectsOpen || snapshotEventNames === null || snapshotEventNames.has(eventName)",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2348,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "navigationEffectsOpen",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2349,
+    "col": 10,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2350,
+    "col": 9,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2351,
+    "col": 30,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents only creates snapshots for listed events",
+    "layer": "L8"
+  },
+  {
+    "line": 2357,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents history.snapshotEvents: [] disables all event snapshots",
+    "layer": "L8"
+  },
+  {
+    "line": 2358,
+    "col": 9,
+    "mutator": "UpdateOperator",
+    "replacement": "dispatchDepth++",
+    "reason": "later-layer",
+    "note": "history.snapshotEvents per dispatch / navigation dispatch warning — killed in the full run by tests/core/snapshot-events.test.ts > history.snapshotEvents history.snapshotEvents: [] disables all event snapshots",
+    "layer": "L8"
+  },
+  {
+    "line": 2361,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "unknown-event drop reporting — killed in the full run by tests/core/multi-module-correctness.prod.test.ts > production build still records a publish with no handler as an unknown-event drop",
+    "layer": "L9"
+  },
+  {
+    "line": 2369,
+    "col": 12,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "unknown-event drop reporting — killed in the full run by tests/core/multi-module-correctness.prod.test.ts > production build still records a publish with no handler as an unknown-event drop",
+    "layer": "L9"
+  },
+  {
+    "line": 2477,
+    "col": 66,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "fact tag recording — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — captures observation events captures fact.change with prior + next",
+    "layer": "L12"
+  },
+  {
+    "line": 2478,
+    "col": 44,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "fact tag recording — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — captures observation events captures fact.change with prior + next",
+    "layer": "L12"
+  },
+  {
+    "line": 2489,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "note": "fact tag recording — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — PII redaction redacts pii-tagged fact values by default",
+    "layer": "L12"
+  },
+  {
+    "line": 2494,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "fact tag recording — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — captures observation events captures fact.change with prior + next",
+    "layer": "L12"
+  },
+  {
+    "line": 2626,
+    "col": 13,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Constraints dynamic definitions assign overrides an existing constraint",
+    "layer": "L13"
+  },
+  {
+    "line": 2630,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Constraints dynamic definitions register adds a new constraint, isDynamic returns true, listDynamic includes it",
+    "layer": "L13"
+  },
+  {
+    "line": 2631,
+    "col": 20,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Constraints dynamic definitions register adds a new constraint, isDynamic returns true, listDynamic includes it",
+    "layer": "L13"
+  },
+  {
+    "line": 2633,
+    "col": 14,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Effects dynamic definitions register adds a new effect",
+    "layer": "L13"
+  },
+  {
+    "line": 2634,
+    "col": 16,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Disabled interactions with call effects.call respects disabled state (does not run)",
+    "layer": "L13"
+  },
+  {
+    "line": 2635,
+    "col": 15,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Disabled interactions with call effects.call respects disabled state (does not run)",
+    "layer": "L13"
+  },
+  {
+    "line": 2636,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "effects.isEnabled (enable / disable) — killed in the full run by tests/core/blackbox-effects.test.ts > which effects run every enabled effect runs once at start, and a disabled one waits",
+    "layer": "L4"
+  },
+  {
+    "line": 2646,
+    "col": 13,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Effects dynamic definitions assign overrides an existing effect (new run function executes)",
+    "layer": "L13"
+  },
+  {
+    "line": 2647,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Effects dynamic definitions register adds a new effect",
+    "layer": "L13"
+  },
+  {
+    "line": 2648,
+    "col": 20,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Effects dynamic definitions register adds a new effect",
+    "layer": "L13"
+  },
+  {
+    "line": 2650,
+    "col": 16,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Resolvers dynamic definitions register adds a new resolver",
+    "layer": "L13"
+  },
+  {
+    "line": 2667,
+    "col": 13,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Resolvers dynamic definitions assign overrides an existing resolver",
+    "layer": "L13"
+  },
+  {
+    "line": 2671,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Resolvers dynamic definitions register adds a new resolver",
+    "layer": "L13"
+  },
+  {
+    "line": 2672,
+    "col": 20,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/core/dynamic-definitions.test.ts > Resolvers dynamic definitions register adds a new resolver",
+    "layer": "L13"
+  },
+  {
+    "line": 2679,
+    "col": 11,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "dynamic definitions API — killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — PII redaction redacts pii-tagged fact values by default",
+    "layer": "L12"
+  },
+  {
+    "line": 3330,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "initialize() returns at once when isInitialized (its first statement), so calling it unconditionally from start() changes nothing"
+  },
+  {
+    "line": 3361,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "sources attach — killed in the full run by tests/core/unregister-module.test.ts > unregisterModule detaches the module's sources",
+    "layer": "L10"
+  },
+  {
+    "line": 4891,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "hydration scope (hydrate) — killed in the full run by tests/plugins/hydration-scope.test.ts > the hydration capability marks restored values as hydration with persistence listed first",
+    "layer": "L6"
+  }
+]
