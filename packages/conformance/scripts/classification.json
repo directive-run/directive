@@ -536,6 +536,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l1-derivations.test.ts",
+    "category": "black-box",
+    "cases": 20,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l1-views.test.ts",
+    "category": "black-box",
+    "cases": 43,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/meta-query-does-not-watch.test.ts",
     "category": "black-box",
     "cases": 2,
