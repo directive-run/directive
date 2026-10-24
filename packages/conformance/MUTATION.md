@@ -87,7 +87,7 @@ Both are gitignored.
 
 ## CI
 
-`.github/workflows/mutation-nightly.yml` runs the engine in seven shards, one
+`.github/workflows/mutation-nightly.yml` runs the engine in eight shards, one
 per row of the table below (L3 and L11 are split in two and three for time),
 each with its row's layer as `MUTATION_LAYER`. It caches the incremental file
 per shard, keyed by the shard and a hash of `layers.json` (a test that moves
@@ -164,9 +164,10 @@ because a deferral removes that mutant from the gate score.
 
 | Layer | Files in `packages/core/src/core/` |
 |---|---|
-| L0-L1 (Phase 1) | facts.ts, derivations.ts, effects.ts, tracking.ts, read-only-view.ts, module.ts, internal-scopes.ts |
+| L0-L1 (Phase 1) | facts.ts, derivations.ts, effects.ts, tracking.ts, read-only-view.ts, module.ts |
 | L2 | constraints.ts, resolvers.ts, requirements.ts, timer.ts, clock.ts |
 | L3 | engine.ts, engine-accessors.ts, engine-definitions.ts, engine-trace.ts, system.ts, system-proxies.ts, system-module-transform.ts, errors.ts, plugins.ts, schema-builders.ts, schema-introspection.ts, sources.ts |
+| L6 | internal-scopes.ts |
 | L11 | predicate.ts, predicate-describe.ts, predicate-hash.ts, predicate-to-mongo.ts, predicate-to-pgrest.ts, predicate-to-sql.ts, predict.ts, sweep-under.ts, replay-under.ts, rules-diff.ts, doctor.ts |
 
 Every file lands in exactly one row. The `__tests__/` and `types/` folders are
