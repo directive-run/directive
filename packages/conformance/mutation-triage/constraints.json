@@ -1,0 +1,1632 @@
+[
+  {
+    "line": 382,
+    "col": 20,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "internals-only",
+    "note": "Default for `isDerivation`: the engine always passes one (createConstraintsManager call in engine.ts), so the default is reached only by a manager built through /internals."
+  },
+  {
+    "line": 382,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "Default for `isDerivation`: the engine always passes one (createConstraintsManager call in engine.ts), so the default is reached only by a manager built through /internals."
+  },
+  {
+    "line": 417,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 417,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 417,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 418,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 418,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 418,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 423,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 423,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 423,
+    "col": 21,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 432,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "A data-form `when` (L11) with explicit deps: clearing them hands tracking back to the predicate. No test at any layer declares both."
+  },
+  {
+    "line": 432,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Sets an absent `deps` to undefined; every reader tests `def.deps` for truthiness, so nothing changes."
+  },
+  {
+    "line": 432,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "A data-form `when` (L11) with explicit deps: clearing them hands tracking back to the predicate. No test at any layer declares both."
+  },
+  {
+    "line": 440,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"devtools whenExplain panel renders the clause tree for a data-form `when` constraint\" (tests/plugins/devtools-when-explain.test.ts)"
+  },
+  {
+    "line": 446,
+    "col": 52,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "A non-object, non-function `when`: memoizePredicate repeats this check; no test at any layer passes such a `when`."
+  },
+  {
+    "line": 451,
+    "col": 58,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a data-form `when` (L11) declared async, with deps, or with no operators; no test at any layer checks it."
+  },
+  {
+    "line": 468,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "A data-form `when` (L11) declared async is evaluated on the sync path; no test at any layer declares one."
+  },
+  {
+    "line": 469,
+    "col": 44,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "A data-form `when` (L11) declared async is evaluated on the sync path; no test at any layer declares one."
+  },
+  {
+    "line": 483,
+    "col": 17,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"constraint when — data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
+  },
+  {
+    "line": 486,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"constraint when — data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
+  },
+  {
+    "line": 490,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 491,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 491,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 491,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "key !== \"$changed\"",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 491,
+    "col": 21,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 491,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 492,
+    "col": 19,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "`$changed` as a stray key in a data-form `when` (L11); no test at any layer reaches it."
+  },
+  {
+    "line": 519,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Cache of untracked async ids: it is reset on every change to definitions, async detection or disabled state, so recomputing it every time gives the same list."
+  },
+  {
+    "line": 524,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "`def !== undefined`: the ids come from Object.keys(definitions), so def is always defined."
+  },
+  {
+    "line": 526,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "`def.async === true` replaced by false: a declared-async constraint is also in asyncConstraintIds (initState adds it), so the list is the same."
+  },
+  {
+    "line": 553,
+    "col": 36,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "Initial topological order, overwritten by detectCyclesAndComputeTopoOrder() at construction before anything reads it."
+  },
+  {
+    "line": 559,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "An `after` entry naming no constraint gets a reverse-map entry nothing reads: markResolved is only called for constraint ids that exist."
+  },
+  {
+    "line": 559,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "An `after` entry naming no constraint gets a reverse-map entry nothing reads: markResolved is only called for constraint ids that exist."
+  },
+  {
+    "line": 562,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "A second dependent of the same constraint replaces the first in the reverse map; the pass after a resolver finishes still re-asks every constraint (empty key set), so the lost dependent is asked anyway. No test at any layer separates them."
+  },
+  {
+    "line": 573,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Clearing the reverse map only matters on a rebuild (register/assign/unregister, L10); a stale dependent only gets one extra re-evaluation."
+  },
+  {
+    "line": 611,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "def.after",
+    "reason": "equivalent",
+    "note": "topoVisit is called only with ids that have a definition (Object.keys and the definitions[depId] check), so `def` is always defined."
+  },
+  {
+    "line": 613,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Visiting an id with no definition appends it to the topological order with no edges; unknown ids are never sorted or evaluated, the relative order of real ids is unchanged, and cycle detection is the same."
+  },
+  {
+    "line": 620,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The visited check runs before the visiting check, so a finished node left in `visiting` is never seen again."
+  },
+  {
+    "line": 632,
+    "col": 33,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "A placeholder entry shifts every topological index by one or sits before the cycle's start in the path; relative order and the reported cycle (sliced from the repeated id) are unchanged."
+  },
+  {
+    "line": 635,
+    "col": 21,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "A placeholder entry shifts every topological index by one or sits before the cycle's start in the path; relative order and the reported cycle (sliced from the repeated id) are unchanged."
+  },
+  {
+    "line": 685,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "With no `async` flag, isAsync becomes undefined instead of false and is read only as falsy; the branch that re-reads a runtime-detected async id runs only when assign (L10) re-initialises the constraint."
+  },
+  {
+    "line": 690,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Re-initialising a constraint already detected async: initState runs again only for system.constraints.assign (L10); no test at any layer reaches it."
+  },
+  {
+    "line": 690,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Re-initialising a constraint already detected async: initState runs again only for system.constraints.assign (L10); no test at any layer reaches it."
+  },
+  {
+    "line": 691,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Re-initialising a constraint already detected async: initState runs again only for system.constraints.assign (L10); no test at any layer reaches it."
+  },
+  {
+    "line": 702,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 702,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 707,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "For a declared-async constraint the id set duplicates `def.async`; every reader (untrackedAsyncIds, isAsyncConstraint) checks `def.async` first and state.isAsync is set from the same value."
+  },
+  {
+    "line": 707,
+    "col": 18,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "For a declared-async constraint the id set duplicates `def.async`; every reader (untrackedAsyncIds, isAsyncConstraint) checks `def.async` first and state.isAsync is set from the same value."
+  },
+  {
+    "line": 708,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "For a declared-async constraint the id set duplicates `def.async`; every reader (untrackedAsyncIds, isAsyncConstraint) checks `def.async` first and state.isAsync is set from the same value."
+  },
+  {
+    "line": 717,
+    "col": 21,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 720,
+    "col": 27,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "An `after` entry naming no constraint is always satisfied (isAfterDepSatisfied), so a placeholder entry blocks nothing; the unknown-ref warning reads def.after, not state.after."
+  },
+  {
+    "line": 731,
+    "col": 12,
+    "mutator": "LogicalOperator",
+    "replacement": "states.get(id) && initState(id)",
+    "reason": "not-observable",
+    "note": "Re-initialising state on every read resets hitCount/lastResult/lastActiveAt; async detection survives through asyncConstraintIds. a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 735,
+    "col": 63,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 736,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 736,
+    "col": 30,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 736,
+    "col": 30,
+    "mutator": "EqualityOperator",
+    "replacement": "a.size !== 0",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 740,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "a.has(dep)",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 740,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 745,
+    "col": 12,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "depsEqual only lets updateDependencies skip rebuilding an identical dependency set; treating sets as unequal rebuilds the same maps."
+  },
+  {
+    "line": 752,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Every dependency in a constraint's old set is registered in the reverse map (they are added and removed together), so the missing-set branch never runs."
+  },
+  {
+    "line": 752,
+    "col": 25,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Every dependency in a constraint's old set is registered in the reverse map (they are added and removed together), so the missing-set branch never runs."
+  },
+  {
+    "line": 756,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Dropping an emptied reverse-map set only frees memory; lookups treat an empty set and a missing one alike."
+  },
+  {
+    "line": 756,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dropping an emptied reverse-map set only frees memory; lookups treat an empty set and a missing one alike."
+  },
+  {
+    "line": 757,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dropping an emptied reverse-map set only frees memory; lookups treat an empty set and a missing one alike."
+  },
+  {
+    "line": 773,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Clearing a disabled constraint's dependencies: every reader skips disabled ids; the only trace left is the watched-derivation set (L9), which no test checks for a disabled constraint."
+  },
+  {
+    "line": 775,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Clearing a disabled constraint's dependencies: every reader skips disabled ids; the only trace left is the watched-derivation set (L9), which no test checks for a disabled constraint."
+  },
+  {
+    "line": 784,
+    "col": 48,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Reverse-map cleanup on unregister (L10); no test at any layer reaches it."
+  },
+  {
+    "line": 785,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Reverse-map cleanup on unregister (L10); no test at any layer reaches it."
+  },
+  {
+    "line": 793,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Skipping or performing the update of an identical dependency set leaves the same maps."
+  },
+  {
+    "line": 793,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Skipping or performing the update of an identical dependency set leaves the same maps."
+  },
+  {
+    "line": 838,
+    "col": 16,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "The value returned from the catch is discarded: `threw` is set, so the error is rethrown."
+  },
+  {
+    "line": 854,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "constraint result and error recording (observation and error boundary) — killed in the full run by \"createAuditLedger — captures observation events captures constraint.evaluate with whenSpec + whenExplain\" (tests/plugins/audit-ledger.test.ts)"
+  },
+  {
+    "line": 856,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 856,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 856,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 857,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "state.hitCount--",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 860,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 861,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onEvaluate(id, result)",
+    "reason": "internals-only",
+    "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
+  },
+  {
+    "line": 871,
+    "col": 24,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 872,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 873,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, error)",
+    "reason": "internals-only",
+    "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
+  },
+  {
+    "line": 908,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 908,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 909,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 913,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 924,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "a `when` that returns a Promise, promoted to async — killed in the full run by \"createAuditLedger — captures observation events captures constraint.evaluate with whenSpec + whenExplain\" (tests/plugins/audit-ledger.test.ts)"
+  },
+  {
+    "line": 937,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 937,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 938,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 944,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 950,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Explicit deps of an async constraint are registered again when its result is recorded (updateConstraintDeps / handleInactiveConstraint), before any later pass reads them; only require-read churn differs. No test at any layer separates them."
+  },
+  {
+    "line": 951,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Explicit deps of an async constraint are registered again when its result is recorded (updateConstraintDeps / handleInactiveConstraint), before any later pass reads them; only require-read churn differs. No test at any layer separates them."
+  },
+  {
+    "line": 968,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 968,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 968,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 969,
+    "col": 9,
+    "mutator": "UpdateOperator",
+    "replacement": "state.hitCount--",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 972,
+    "col": 28,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 973,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onEvaluate(id, result)",
+    "reason": "internals-only",
+    "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
+  },
+  {
+    "line": 977,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 978,
+    "col": 28,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 979,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, error)",
+    "reason": "internals-only",
+    "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
+  },
+  {
+    "line": 1028,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 1028,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 1029,
+    "col": 14,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 1029,
+    "col": 30,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Unknown-constraint guard: every caller passes an id that exists, except a constraint unregistered (L10) mid-pass; no test at any layer reaches it."
+  },
+  {
+    "line": 1045,
+    "col": 18,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "The value returned from the catch is discarded: `threw` is set, so the error is rethrown."
+  },
+  {
+    "line": 1066,
+    "col": 77,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1067,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1067,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1067,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "additionalDeps.size !== 0",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1067,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1071,
+    "col": 26,
+    "mutator": "LogicalOperator",
+    "replacement": "constraintDeps.get(id) && new Set()",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1072,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1073,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1075,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1076,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1091,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Re-sorting on every pass gives the same order: priorities and the topological index change only when the cache is reset."
+  },
+  {
+    "line": 1157,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The early return for a constraint with no `after` gives the same answer as the loop over its empty list; every evaluated id has state."
+  },
+  {
+    "line": 1157,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!state && state.after.length === 0",
+    "reason": "equivalent",
+    "note": "The early return for a constraint with no `after` gives the same answer as the loop over its empty list; every evaluated id has state."
+  },
+  {
+    "line": 1157,
+    "col": 19,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The early return for a constraint with no `after` gives the same answer as the loop over its empty list; every evaluated id has state."
+  },
+  {
+    "line": 1157,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "The early return for a constraint with no `after` gives the same answer as the loop over its empty list; every evaluated id has state."
+  },
+  {
+    "line": 1186,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1194,
+    "col": 12,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1196,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Require-read dependencies of an async constraint without deps: it is re-asked on every pass anyway, so the merged set only feeds own-write detection and the trace; no test at any layer pins it."
+  },
+  {
+    "line": 1206,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Mapping an empty list stores the same empty list."
+  },
+  {
+    "line": 1206,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Mapping an empty list stores the same empty list."
+  },
+  {
+    "line": 1250,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "noFireConstraints is cleared at the start of each evaluate and a constraint is evaluated at most once per evaluate, so it is never in the set when it fires."
+  },
+  {
+    "line": 1261,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(id, original)",
+    "reason": "internals-only",
+    "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
+  },
+  {
+    "line": 1262,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "The non-RequireError path: reachable only if a require returns an array whose own `filter` throws; no test at any layer does that."
+  },
+  {
+    "line": 1271,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "The non-RequireError path: reachable only if a require returns an array whose own `filter` throws; no test at any layer does that."
+  },
+  {
+    "line": 1354,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Only adds an await (or evaluates a placeholder id that the unknown-id guard answers false); requirements and their order are unchanged."
+  },
+  {
+    "line": 1354,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Only adds an await (or evaluates a placeholder id that the unknown-id guard answers false); requirements and their order are unchanged."
+  },
+  {
+    "line": 1359,
+    "col": 39,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Only adds an await (or evaluates a placeholder id that the unknown-id guard answers false); requirements and their order are unchanged."
+  },
+  {
+    "line": 1401,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A disabled constraint has no entries in the reverse map: disable() clears them and a disabled result is never recorded."
+  },
+  {
+    "line": 1462,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Filtering out disabled ids when none is disabled leaves the same list."
+  },
+  {
+    "line": 1483,
+    "col": 14,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1483,
+    "col": 14,
+    "mutator": "EqualityOperator",
+    "replacement": "remainingToEvaluate.length >= 0",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1483,
+    "col": 14,
+    "mutator": "LogicalOperator",
+    "replacement": "remainingToEvaluate.length > 0 || maxPasses > 0",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1483,
+    "col": 48,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1483,
+    "col": 48,
+    "mutator": "EqualityOperator",
+    "replacement": "maxPasses >= 0",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1491,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1491,
+    "col": 63,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1494,
+    "col": 9,
+    "mutator": "UpdateOperator",
+    "replacement": "maxPasses++",
+    "reason": "perf-only",
+    "note": "Extra passes only re-partition constraints that are still blocked: nothing is evaluated and their cached requirements are already in the set, which keeps the first entry per id. A pass that makes progress removes at least one id, so the loop ends without the bound; the only difference is extra awaits."
+  },
+  {
+    "line": 1504,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+  },
+  {
+    "line": 1504,
+    "col": 34,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "With no definitions there are no dirty ids (dirty ids are always defined ids) and no-fire state is irrelevant."
+  },
+  {
+    "line": 1504,
+    "col": 34,
+    "mutator": "EqualityOperator",
+    "replacement": "dirtyConstraints.size !== 0",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+  },
+  {
+    "line": 1504,
+    "col": 63,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+  },
+  {
+    "line": 1505,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "With no definitions there are no dirty ids (dirty ids are always defined ids) and no-fire state is irrelevant."
+  },
+  {
+    "line": 1512,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "The fast path returning null falls back to evaluate(), which gives the same requirements one await later."
+  },
+  {
+    "line": 1512,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "The fast path returning null falls back to evaluate(), which gives the same requirements one await later."
+  },
+  {
+    "line": 1516,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "The fast path returning null falls back to evaluate(), which gives the same requirements one await later."
+  },
+  {
+    "line": 1521,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "The fast path returning null falls back to evaluate(), which gives the same requirements one await later."
+  },
+  {
+    "line": 1531,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "The fast path returning null falls back to evaluate(), which gives the same requirements one await later."
+  },
+  {
+    "line": 1538,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "Stale no-fire ids are cleared at the next evaluate's start; dirty ids left here are all disabled, and enable() marks its id dirty again."
+  },
+  {
+    "line": 1539,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "Stale no-fire ids are cleared at the next evaluate's start; dirty ids left here are all disabled, and enable() marks its id dirty again."
+  },
+  {
+    "line": 1541,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1541,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1541,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "disabled.size !== 0",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1541,
+    "col": 40,
+    "mutator": "MethodExpression",
+    "replacement": "sorted",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1541,
+    "col": 54,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1541,
+    "col": 62,
+    "mutator": "BooleanLiteral",
+    "replacement": "disabled.has(id)",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1542,
+    "col": 17,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1545,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1545,
+    "col": 35,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1545,
+    "col": 35,
+    "mutator": "EqualityOperator",
+    "replacement": "reqs.length >= 0",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1550,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1550,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Disabled constraints hold no cached requirements (disable() deletes them, disabled results are never recorded), and building the list or returning the shared empty one yields the same requirements."
+  },
+  {
+    "line": 1559,
+    "col": 55,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "getState for trace (L9) — killed in the full run by \"Trace tracks constraints and requirements when triggered\" (tests/core/trace.test.ts)"
+  },
+  {
+    "line": 1570,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Watched-derivation bookkeeping: an extra id only keeps a derivation of that name watched (L9 watched set); no test at any layer checks it."
+  },
+  {
+    "line": 1594,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
+  },
+  {
+    "line": 1596,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
+  },
+  {
+    "line": 1597,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
+  },
+  {
+    "line": 1620,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1623,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1623,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1623,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1624,
+    "col": 48,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1625,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1633,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 1633,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 1633,
+    "col": 18,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
+  },
+  {
+    "line": 1662,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "hasDirty() counting a disabled dirty id only schedules one extra pass, which asks nothing (disabled ids are skipped)."
+  },
+  {
+    "line": 1667,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "hasDirty() saying yes only schedules one extra pass after a resolver that satisfied its requirement."
+  },
+  {
+    "line": 1670,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "invalidate()/isResolved() have no engine caller; only /internals reaches them."
+  },
+  {
+    "line": 1681,
+    "col": 32,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1682,
+    "col": 26,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1689,
+    "col": 25,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1690,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1698,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1722,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1769,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1782,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1783,
+    "col": 16,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1788,
+    "col": 32,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1797,
+    "col": 79,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1801,
+    "col": 57,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Dynamic definitions (system.constraints.register/assign/unregister/call, resolver keys registered later; L10); no test at any layer reaches this branch."
+  },
+  {
+    "line": 1809,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "explainWhen for a data-form `when` — killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts)"
+  },
+  {
+    "line": 1811,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "spec",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtoolsPlugin event tracing records whenExplain on data-form constraint.evaluate events\" (tests/plugins/devtools.test.ts)"
+  },
+  {
+    "line": 1811,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+  },
+  {
+    "line": 1811,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "explainWhen for a data-form `when` — killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts)"
+  },
+  {
+    "line": 1811,
+    "col": 18,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+  }
+]

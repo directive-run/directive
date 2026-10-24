@@ -139,16 +139,19 @@ describe("when and require", () => {
   });
 
   it("emits nothing for a require that returns null, undefined or an empty list", async () => {
+    const out = consoleSpy();
     const { system, starts } = build({
       constraints: {
         nul: { when: () => true, require: () => null },
         undef: { when: () => true, require: () => undefined },
         empty: { when: () => true, require: () => [] },
+        fine: { when: () => true, require: req("fine") },
       },
     });
     system.start();
     await system.settle();
-    expect(starts()).toEqual([]);
+    expect(starts()).toEqual(["fine"]);
+    expect(out.errors()).toEqual([]);
     system.destroy();
   });
 
@@ -203,6 +206,7 @@ describe("when and require", () => {
     const { system, starts } = build({
       constraints: {
         quiet: { when: (facts: any) => facts.n >= 0, require: () => null },
+        off: { when: (facts: any) => facts.n < 0, require: req("off") },
         other: { when: (facts: any) => facts.m > 0, require: req("other") },
       },
     });
@@ -210,8 +214,11 @@ describe("when and require", () => {
     await system.settle();
     system.facts.m = 1;
     await system.settle();
+    system.facts.m = 2;
+    await system.settle();
     expect(starts()).toEqual(["other"]);
     expect(out.errors()).toEqual([]);
+    expect(out.warnings()).toEqual([]);
     system.destroy();
   });
 
@@ -513,6 +520,72 @@ describe("after", () => {
     system.destroy();
   });
 
+  it("waits again for a named constraint that did not fire on an earlier pass and fires now", async () => {
+    const { system, log, open } = build({
+      hold: ["first"],
+      constraints: {
+        first: { when: (facts: any) => facts.n === 1, require: req("first") },
+        second: {
+          after: ["first"],
+          when: (facts: any) => facts.m >= 0,
+          require: (facts: any) => req(`second${facts.m}`),
+        },
+      },
+    });
+    system.start();
+    await system.settle();
+    expect(log).toEqual(["start:second0", "end:second0"]);
+    // A pass in which first is asked and does not fire.
+    system.facts.n = 2;
+    await system.settle();
+    system.facts.n = 1;
+    system.facts.m = 1;
+    await flush();
+    expect(log).toEqual(["start:second0", "end:second0", "start:first"]);
+    open("first");
+    await system.settle();
+    expect(log).toEqual([
+      "start:second0",
+      "end:second0",
+      "start:first",
+      "end:first",
+      "start:second1",
+      "end:second1",
+    ]);
+    system.destroy();
+  });
+
+  it("lets an unrelated write through while a higher-priority constraint is still held back", async () => {
+    const out = consoleSpy();
+    const { system, log, open } = build({
+      hold: ["first"],
+      constraints: {
+        second: {
+          priority: 10,
+          after: ["first"],
+          when: () => true,
+          require: req("second"),
+        },
+        first: { when: () => true, require: req("first") },
+      },
+    });
+    system.start();
+    await flush();
+    system.facts.flag = true;
+    await flush();
+    expect(log).toEqual(["start:first"]);
+    open("first");
+    await system.settle();
+    expect(log).toEqual([
+      "start:first",
+      "end:first",
+      "start:second",
+      "end:second",
+    ]);
+    expect(out.errors()).toEqual([]);
+    system.destroy();
+  });
+
   it("keeps the requirements of every other constraint while one is held back", async () => {
     const out = consoleSpy();
     const { system, log, open } = build({
@@ -625,6 +698,7 @@ describe("after", () => {
 describe("re-evaluation after writes", () => {
   it("asks a constraint again only when a fact its when read changes", async () => {
     let calls = 0;
+    let peer = 0;
     const { system } = build({
       constraints: {
         c: {
@@ -635,17 +709,25 @@ describe("re-evaluation after writes", () => {
           },
           require: req("c"),
         },
+        peer: {
+          when: (facts: any) => {
+            peer++;
+
+            return facts.n > 5;
+          },
+          require: req("peer"),
+        },
       },
     });
     system.start();
     await system.settle();
-    expect(calls).toBe(1);
+    expect([calls, peer]).toEqual([1, 1]);
     system.facts.m = 1;
     await system.settle();
-    expect(calls).toBe(1);
+    expect([calls, peer]).toEqual([1, 1]);
     system.facts.n = 1;
     await system.settle();
-    expect(calls).toBe(2);
+    expect([calls, peer]).toEqual([2, 2]);
     system.destroy();
   });
 
@@ -687,6 +769,39 @@ describe("re-evaluation after writes", () => {
     await system.settle();
     expect(calls).toBe(4);
     expect(starts()).toEqual(["c"]);
+    system.destroy();
+  });
+
+  it("stops being woken by a fact it no longer reads when it reads fewer facts", async () => {
+    let calls = 0;
+    const { system } = build({
+      constraints: {
+        c: {
+          when: (facts: any) => {
+            calls++;
+            if (facts.flag) {
+              return facts.n > 5;
+            }
+            const n = facts.n;
+            const m = facts.m;
+
+            return n > 5 && m > 5;
+          },
+          require: req("c"),
+        },
+      },
+    });
+    system.start();
+    await system.settle();
+    system.facts.flag = true;
+    await system.settle();
+    expect(calls).toBe(2);
+    system.facts.m = 1;
+    await system.settle();
+    expect(calls).toBe(2);
+    system.facts.n = 1;
+    await system.settle();
+    expect(calls).toBe(3);
     system.destroy();
   });
 
@@ -923,6 +1038,32 @@ describe("async constraints", () => {
     system.destroy();
   });
 
+  it("treats `async: false` like no flag: asks it again only when what its when read changes", async () => {
+    let calls = 0;
+    const { system } = build({
+      constraints: {
+        c: {
+          async: false,
+          when: (facts: any) => {
+            calls++;
+
+            return facts.n > 5;
+          },
+          require: req("c"),
+        },
+      },
+    });
+    system.start();
+    await system.settle();
+    system.facts.m = 1;
+    await system.settle();
+    expect(calls).toBe(1);
+    system.facts.n = 1;
+    await system.settle();
+    expect(calls).toBe(2);
+    system.destroy();
+  });
+
   it("asks an async constraint without deps on every pass, with a development warning naming it", async () => {
     const out = consoleSpy();
     let calls = 0;
@@ -948,6 +1089,7 @@ describe("async constraints", () => {
     system.facts.m = 1;
     await system.settle();
     expect(calls).toBe(2);
+    expect(out.errors()).toEqual([]);
     system.destroy();
   });
 
@@ -1119,7 +1261,7 @@ describe("async constraints", () => {
   });
 
   it("emits the requirements of sync constraints before those of async ones in the same pass", async () => {
-    consoleSpy();
+    const out = consoleSpy();
     const { system, starts } = build({
       constraints: {
         later: {
@@ -1135,6 +1277,7 @@ describe("async constraints", () => {
     system.start();
     await system.settle();
     expect(starts()).toEqual(["sync", "async"]);
+    expect(out.naming("later")).toHaveLength(0);
     system.destroy();
   });
 
@@ -1213,10 +1356,18 @@ describe("disable and enable", () => {
     system.destroy();
   });
 
-  it("asks a re-enabled constraint on the next pass, even if nothing it read changed", async () => {
+  it("asks a re-enabled constraint on the next pass, even if nothing it read changed, and only then", async () => {
+    let calls = 0;
     const { system, starts } = build({
       constraints: {
-        c: { when: (facts: any) => facts.n === 0, require: req("c") },
+        c: {
+          when: (facts: any) => {
+            calls++;
+
+            return facts.n === 0;
+          },
+          require: req("c"),
+        },
       },
     });
     system.constraints.disable("c");
@@ -1227,6 +1378,10 @@ describe("disable and enable", () => {
     system.facts.m = 1;
     await system.settle();
     expect(starts()).toEqual(["c"]);
+    expect(calls).toBe(1);
+    system.facts.m = 2;
+    await system.settle();
+    expect(calls).toBe(1);
     system.destroy();
   });
 
@@ -1242,6 +1397,7 @@ describe("disable and enable", () => {
     system.constraints.enable("ghost");
     system.start();
     await system.settle();
+    system.constraints.enable("phantom");
     system.facts.n = 1;
     await system.settle();
     expect(starts()).toEqual(["c"]);

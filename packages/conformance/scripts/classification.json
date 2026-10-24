@@ -574,7 +574,7 @@
   {
     "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
     "category": "black-box",
-    "cases": 49,
+    "cases": 53,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

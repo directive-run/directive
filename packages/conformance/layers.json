@@ -6374,6 +6374,14 @@
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
         },
+        "after > waits again for a named constraint that did not fire on an earlier pass and fires now": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > lets an unrelated write through while a higher-priority constraint is still held back": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
         "after > keeps the requirements of every other constraint while one is held back": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
@@ -6399,6 +6407,10 @@
           "by": ["option constraints", "option resolvers"]
         },
         "re-evaluation after writes > follows the branch its when took: the fact it stopped reading no longer wakes it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > stops being woken by a fact it no longer reads when it reads fewer facts": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
         },
@@ -6435,6 +6447,10 @@
           "by": ["option constraints", "option resolvers"]
         },
         "async constraints > asks an async constraint with deps again on a write to one of them, not on other writes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > treats `async: false` like no flag: asks it again only when what its when read changes": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
         },
@@ -6482,7 +6498,7 @@
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
         },
-        "disable and enable > asks a re-enabled constraint on the next pass, even if nothing it read changed": {
+        "disable and enable > asks a re-enabled constraint on the next pass, even if nothing it read changed, and only then": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
         },
