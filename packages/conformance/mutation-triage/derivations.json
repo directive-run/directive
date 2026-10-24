@@ -1399,64 +1399,10 @@
     "layer": "L9"
   },
   {
-    "line": 783,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "later-layer",
-    "note": "Marks a derivation read through a constraint's derived parameter as watched, which is what wakes the constraint when it moves (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
-  },
-  {
-    "line": 783,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "currentTrackingKind() !== \"observer\"",
-    "reason": "later-layer",
-    "note": "Marks a derivation read through a constraint's derived parameter as watched, which is what wakes the constraint when it moves (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
-  },
-  {
-    "line": 783,
-    "col": 37,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "note": "Marks a derivation read through a constraint's derived parameter as watched, which is what wakes the constraint when it moves (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
-  },
-  {
-    "line": 817,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "later-layer",
-    "note": "A membership test from a constraint marks the name watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test from a constraint makes the name watched",
-    "layer": "L9"
-  },
-  {
-    "line": 817,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "currentTrackingKind() !== \"observer\"",
-    "reason": "later-layer",
-    "note": "A membership test from a constraint marks the name watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test from a constraint makes the name watched",
-    "layer": "L9"
-  },
-  {
     "line": 817,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "later-layer",
-    "note": "A membership test inside a derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test inside a derivation does not",
-    "layer": "L9"
-  },
-  {
-    "line": 817,
-    "col": 37,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
     "reason": "later-layer",
     "note": "A membership test inside a derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test inside a derivation does not",
     "layer": "L9"
@@ -1469,15 +1415,6 @@
     "reason": "later-layer",
     "note": "A system.derive read inside a derivation body is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a derivation read through system.derive from a body is not watched",
     "layer": "L9"
-  },
-  {
-    "line": 1030,
-    "col": 37,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "note": "getProxy is the derived parameter handed to a constraint's when() (L2) and to effects that declare derivation dependencies (L4) — killed in the full run by derived in constraints gates a constraint on a derivation in a single-module system",
-    "layer": "L2"
   },
   {
     "line": 1075,
@@ -1619,50 +1556,5 @@
     "reason": "later-layer",
     "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) — killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
     "layer": "L13"
-  },
-  {
-    "line": 1140,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "note": "collectInvalidated's all-invalidated branch reports every watched derivation, so forcing it wakes watchers whose derivation did not move (constraints, L2) — killed in the full run by derivations: waking constraints that read derivations wakes only the watcher whose derivation moved",
-    "layer": "L2"
-  },
-  {
-    "line": 1175,
-    "col": 14,
-    "mutator": "EqualityOperator",
-    "replacement": "queue.length >= 0",
-    "reason": "later-layer",
-    "note": "The walk over the invalidation roots in collectInvalidated, which feeds constraint wake-up (L2); under the mutant it never ends, so the run times out — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond (timed out in the full run)",
-    "layer": "L2"
-  },
-  {
-    "line": 1177,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "note": "The walk in collectInvalidated that finds every watcher downstream of a change, for constraint wake-up (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
-  },
-  {
-    "line": 1179,
-    "col": 15,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "note": "The walk in collectInvalidated that finds every watcher downstream of a change, for constraint wake-up (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
-  },
-  {
-    "line": 1179,
-    "col": 15,
-    "mutator": "EqualityOperator",
-    "replacement": "++reached < watched",
-    "reason": "later-layer",
-    "note": "The walk in collectInvalidated that finds every watcher downstream of a change, for constraint wake-up (L2) — killed in the full run by derivations: waking constraints that read derivations reaches every watcher downstream of one change, through a diamond",
-    "layer": "L2"
   }
 ]

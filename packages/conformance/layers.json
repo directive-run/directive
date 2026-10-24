@@ -5125,6 +5125,121 @@
         }
       }
     },
+    "tests/core/l1-derivations-effects.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "pin": true,
+      "tests": {
+        "an effect reading a derivation > re-runs when the derivation changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "an effect reading a derivation > re-runs when the end of a derivation chain changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "an effect reading a derivation > is not re-run by a write the derivation does not depend on": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "an effect reading a derivation > re-runs when it only tested the derivation's membership": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "an effect reading a derivation > then a fact depends on that fact too": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "two effects reading derivations > of one fact are both re-run when it changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "two effects reading derivations > of different facts: a write to one re-runs only its effect": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["option effect prev (L4)"]
+        },
+        "a derivation reading a derivation > then a fact depends on that fact too": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "a derivation whose compute is not a function > is refused when the system is built": {
+          "layer": "L11",
+          "by": ["option derive data form"],
+          "above": ["option derive data form"]
+        }
+      }
+    },
     "tests/core/l1-derivations-gate.test.ts": {
       "category": "black-box",
       "rule": "L0",
