@@ -350,6 +350,12 @@
     "tests/core/error-boundary.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-errors-oracle.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-errors-oracle-production.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/plugins.test.ts": {
       "rule": "L3"
     },
