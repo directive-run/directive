@@ -59,6 +59,7 @@
   "tests/core/l1-gate-rest-production.test.ts": "packages/core/src/core/__tests__/l1-gate-rest-production.test.ts",
   "tests/core/l1-gate-rest.test.ts": "packages/core/src/core/__tests__/l1-gate-rest.test.ts",
   "tests/core/l1-views.test.ts": "packages/core/src/core/__tests__/l1-views.test.ts",
+  "tests/core/l2-requirements-oracle.test.ts": "packages/core/src/core/__tests__/l2-requirements-oracle.test.ts",
   "tests/core/meta-query-does-not-watch.test.ts": "packages/core/src/core/__tests__/meta-query-does-not-watch.test.ts",
   "tests/core/meta-query-timing.test.ts": "packages/core/src/core/__tests__/meta-query-timing.test.ts",
   "tests/core/module.test.ts": "packages/core/src/core/__tests__/module.test.ts",
