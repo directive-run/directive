@@ -83,9 +83,8 @@ function printTables(r, stat) {
   console.log(
     `heap, scalar writes (steady state, bytes per write; writes/trial v1 ${h.v1WritesPerTrial} v2 ${h.v2WritesPerTrial}): write loop only v1 ${bytes(h.v1WriteOnlyBytesPerOp)} / v2 ${bytes(h.v2WriteOnlyBytesPerOp)}; with settle v1 ${bytes(h.v1FullStepBytesPerOp)} / v2 ${bytes(h.v2FullStepBytesPerOp)}`,
   );
-  const known = (xs) => xs.filter((x) => x !== null);
   console.log(
-    `heap calibration (a known ${h.calibration.expected} B per pass reads back as): v1 ${f(median(known(h.calibration.v1)), 1)} / v2 ${f(median(known(h.calibration.v2)), 1)}`,
+    `heap calibration (a known ${h.calibration.expected} B per pass reads back as): v1 ${bytes(h.calibration.v1)} / v2 ${bytes(h.calibration.v2)}`,
   );
   console.log(
     `development checks on: v1 ${r.devChecks.v1}, v2 ${r.devChecks.v2} (NODE_ENV ${r.env})`,
@@ -263,6 +262,13 @@ const heapOf = (engine, key) =>
   heapSamples[engine].length
     ? median(heapSamples[engine].map((h) => h[key]))
     : null;
+const calibrated = (engine) => {
+  const xs = heapSamples[engine]
+    .map((h) => h.calibration.measured)
+    .filter((x) => x !== null);
+
+  return xs.length ? median(xs) : null;
+};
 const result = {
   node: process.version,
   platform: `${process.platform}-${process.arch}`,
@@ -284,8 +290,8 @@ const result = {
     v2FullStepBytesPerOp: heapOf("v2", "fullStepBytesPerOp"),
     calibration: {
       expected: 176,
-      v1: heapSamples.v1.map((h) => h.calibration.measured),
-      v2: heapSamples.v2.map((h) => h.calibration.measured),
+      v1: calibrated("v1"),
+      v2: calibrated("v2"),
     },
   },
   notes,
