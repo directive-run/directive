@@ -8,6 +8,38 @@
     "note": "Static module-level constant evaluated at load; the symbol key is only a shared name between wrapper and reader, and Stryker cannot attribute a per-test failure to a static mutant."
   },
   {
+    "line": 377,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 377,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 377,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof run === \"function\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 377,
+    "col": 22,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
     "line": 383,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -40,6 +72,38 @@
     "note": "The prevFacts answer is memoized per function; recomputing it gives the same answer."
   },
   {
+    "line": 404,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 404,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "run.length !== 0",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 404,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 404,
+    "col": 32,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
     "line": 405,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -54,6 +118,22 @@
     "replacement": "run.length > 2",
     "reason": "equivalent",
     "note": "A two-parameter function is also answered true by the source scan that follows; the early return is a shortcut."
+  },
+  {
+    "line": 405,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 405,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "run.length < 2",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
   },
   {
     "line": 410,
@@ -72,6 +152,86 @@
     "note": "Function.prototype.toString does not throw for any callable a definition can hold; the catch is a defensive fallback with no reachable trigger."
   },
   {
+    "line": 417,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 417,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 417,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "source.includes(\"arguments\") && source.includes(\"[native code]\")",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 417,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 417,
+    "col": 55,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 421,
+    "col": 31,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 423,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "open !== -1",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 423,
+    "col": 16,
+    "mutator": "UnaryOperator",
+    "replacement": "+1",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
     "line": 426,
     "col": 22,
     "mutator": "EqualityOperator",
@@ -80,12 +240,380 @@
     "note": "Reading source[source.length] yields undefined, which matches no branch."
   },
   {
+    "line": 426,
+    "col": 22,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 426,
+    "col": 22,
+    "mutator": "EqualityOperator",
+    "replacement": "i >= source.length",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 426,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "(ch === \"(\" || ch === \"[\") && ch === \"{\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \"(\" && ch === \"[\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"(\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 16,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 23,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 23,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"[\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 30,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 37,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"{\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 37,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 44,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 428,
+    "col": 49,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 429,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "depth--",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "(ch === \")\" || ch === \"]\") && ch === \"}\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \")\" && ch === \"]\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 16,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \")\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 30,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"]\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 30,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 37,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 44,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 44,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \"}\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 51,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 430,
+    "col": 56,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 431,
+    "col": 7,
+    "mutator": "UpdateOperator",
+    "replacement": "depth++",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 434,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "depth !== 0",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 434,
+    "col": 31,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "EqualityOperator",
+    "replacement": "ch !== \",\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 16,
+    "mutator": "LogicalOperator",
+    "replacement": "ch === \",\" || depth === 1",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
+    "line": 435,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source scan that decides whether a run function can read prevFacts. It only gates building the snapshot, so a wrong answer is visible only through the prev parameter (L4), where blackbox-effects \"an effect that can read prevFacts is handed them\" kills it."
+  },
+  {
     "line": 441,
     "col": 10,
     "mutator": "BooleanLiteral",
     "replacement": "false",
     "reason": "not-observable",
     "note": "Reached only for unbalanced source; a function's own source is always balanced, so the answer cannot be forced."
+  },
+  {
+    "line": 461,
+    "col": 7,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Wording of the refusal message; the tests assert the effect id, the fact and in-place versus write, not the sentence."
   },
   {
     "line": 462,
@@ -144,6 +672,14 @@
     "note": "internals-only: createEffectsManager option defaults; the engine always passes isDerivation, isFactKey and wantsRunDeps."
   },
   {
+    "line": 593,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Builds the dependency list handed to the onRun plugin hook only (L3)."
+  },
+  {
     "line": 594,
     "col": 9,
     "mutator": "ConditionalExpression",
@@ -153,11 +689,43 @@
   },
   {
     "line": 594,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "wantsRunDeps()",
+    "reason": "not-observable",
+    "note": "Builds the dependency list handed to the onRun plugin hook only (L3)."
+  },
+  {
+    "line": 594,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Builds the dependency list handed to the onRun plugin hook only (L3)."
+  },
+  {
+    "line": 594,
     "col": 26,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "perf-only",
     "note": "Without the early return the dependency list is built even when no trace reads it; nothing public sees it."
+  },
+  {
+    "line": 629,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 630,
+    "col": 12,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
   },
   {
     "line": 641,
@@ -169,11 +737,27 @@
   },
   {
     "line": 644,
+    "col": 10,
+    "mutator": "LogicalOperator",
+    "replacement": "runChecks.get(id) && []",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 644,
     "col": 31,
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
     "reason": "not-observable",
     "note": "runChecks always holds an entry for a run that reaches the check, except a second overlapping run, whose empty-array fallback has no observable difference."
+  },
+  {
+    "line": 645,
+    "col": 29,
+    "mutator": "LogicalOperator",
+    "replacement": "first && check.takeMutation()",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
   },
   {
     "line": 648,
@@ -182,6 +766,182 @@
     "replacement": ";",
     "reason": "not-observable",
     "note": "Drops a per-run bookkeeping entry that is overwritten by the next run of the same effect."
+  },
+  {
+    "line": 674,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 674,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 676,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "prev === null",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 676,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 679,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 680,
+    "col": 13,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 680,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 682,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 687,
+    "col": 25,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 688,
+    "col": 11,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 688,
+    "col": 21,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 690,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 692,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 700,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Development wrapper for the prev and derived parameters of run, observable only by writing to them (L4)."
+  },
+  {
+    "line": 724,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "onGates.size <= 0",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "onGates.size >= 0",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 730,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 731,
+    "col": 7,
+    "mutator": "MethodExpression",
+    "replacement": "Object.values(definitions as Record<string, unknown>).every(def => declaresPrevFacts((def as {\n  run?: unknown;\n})?.run))",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
   },
   {
     "line": 732,
@@ -193,11 +953,27 @@
   },
   {
     "line": 740,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4)."
+  },
+  {
+    "line": 740,
     "col": 46,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
     "note": "Whether a stale (non-null) snapshot is refreshed on re-registration is not a contract; both engines hand the effect a prior-facts object."
+  },
+  {
+    "line": 766,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
   },
   {
     "line": 767,
@@ -208,6 +984,22 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
+    "line": 767,
+    "col": 12,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 767,
+    "col": 12,
+    "mutator": "LogicalOperator",
+    "replacement": "isDerivation(name) && isFactKey(name)",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
     "line": 792,
     "col": 34,
     "mutator": "ArrayDeclaration",
@@ -216,12 +1008,60 @@
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
   },
   {
+    "line": 795,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
     "line": 799,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 799,
+    "col": 13,
+    "mutator": "BooleanLiteral",
+    "replacement": "isFactKey(name)",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 799,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 799,
+    "col": 31,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 800,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 813,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
   },
   {
     "line": 815,
@@ -241,6 +1081,22 @@
   },
   {
     "line": 815,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 815,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "state.rawDeps !== null",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 815,
     "col": 35,
     "mutator": "ConditionalExpression",
     "replacement": "false",
@@ -249,11 +1105,27 @@
   },
   {
     "line": 815,
+    "col": 35,
+    "mutator": "EqualityOperator",
+    "replacement": "pending !== null",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 815,
     "col": 55,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 815,
+    "col": 55,
+    "mutator": "EqualityOperator",
+    "replacement": "pending.length !== 0",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
   },
   {
     "line": 818,
@@ -265,11 +1137,43 @@
   },
   {
     "line": 818,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "pending.some(isKnownName)",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 818,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 818,
+    "col": 10,
+    "mutator": "MethodExpression",
+    "replacement": "pending.every(isKnownName)",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 818,
     "col": 37,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
     "note": "Late-resolved deps: the optimisations around when names are re-asked do not change the dependency set that results."
+  },
+  {
+    "line": 830,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
   },
   {
     "line": 835,
@@ -278,6 +1182,46 @@
     "replacement": ";",
     "reason": "equivalent",
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
+  },
+  {
+    "line": 840,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 847,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 847,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 856,
+    "col": 25,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
+  },
+  {
+    "line": 857,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Declared deps and data-form on resolution (L4); an auto-tracked effect has neither."
   },
   {
     "line": 871,
@@ -360,6 +1304,14 @@
     "note": "The enabled check in shouldRun is repeated by runEffect, and initial stability state is overwritten before it is read."
   },
   {
+    "line": 946,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dep-stability reset, declared-deps refresh or data-form gate in shouldRun (L4 deps/on). Stability only skips re-tracking and is reset by shouldRun on any overlapping change, so it is reachable only through a pending rerun (navigation, L8)."
+  },
+  {
     "line": 956,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -368,12 +1320,28 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 966,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Dep-stability reset, declared-deps refresh or data-form gate in shouldRun (L4 deps/on). Stability only skips re-tracking and is reset by shouldRun on any overlapping change, so it is reachable only through a pending rerun (navigation, L8)."
+  },
+  {
     "line": 986,
     "col": 9,
     "mutator": "OptionalChaining",
     "replacement": "onError(state.id, error)",
     "reason": "internals-only",
     "note": "internals-only: The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the effects manager directly from /internals."
+  },
+  {
+    "line": 988,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Wording of the cleanup error message or the plugin error hook (L3)."
   },
   {
     "line": 1004,
@@ -390,6 +1358,62 @@
     "replacement": "``",
     "reason": "not-observable",
     "note": "A string used only in a message or an error-attribution label; the observable behaviour (throw / report) is unchanged."
+  },
+  {
+    "line": 1032,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1032,
+    "col": 43,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1033,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1034,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1035,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1038,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
+  },
+  {
+    "line": 1039,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "runBatchedEffect is reached only by effects with declared deps (L4) or by a stable auto-tracked effect (rerun path, L8)."
   },
   {
     "line": 1045,
@@ -616,6 +1640,70 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 1112,
+    "col": 70,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "deps.size >= 0",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "deps.size > 0 && warnedAsync.has(id)",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "deps.size <= 0",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1113,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
     "line": 1131,
     "col": 5,
     "mutator": "CallExpression",
@@ -638,6 +1726,30 @@
     "replacement": "{}",
     "reason": "perf-only",
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
+  },
+  {
+    "line": 1165,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1165,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
+  },
+  {
+    "line": 1166,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "dev-only",
+    "note": "Development warning for an async auto-tracked effect that read nothing before its first await. Observable on 1.x (console.warn once per effect) but core-next has no such diagnostic at L1, so it cannot be a gate test yet."
   },
   {
     "line": 1184,
@@ -688,6 +1800,22 @@
     "note": "Dependency-stability fast path: after several identical runs tracking is skipped. Reached only through requestRerun; the observable result is the same dependency set, found with less work."
   },
   {
+    "line": 1207,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!state.enabled && !def",
+    "reason": "not-observable",
+    "note": "Error plugin hook (L3), stability reset after a throw (see dep stability) or a disabled/unregistered effect (L4/L10)."
+  },
+  {
+    "line": 1207,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Error plugin hook (L3), stability reset after a throw (see dep stability) or a disabled/unregistered effect (L4/L10)."
+  },
+  {
     "line": 1214,
     "col": 5,
     "mutator": "OptionalChaining",
@@ -710,6 +1838,30 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "equivalent",
     "note": "The shared thrown-sink is reused only when empty (thrownSink.length === 0 ? thrownSink : []); a seeded element just selects the fresh-array path, which behaves the same. Hand-run: survived the suite."
+  },
+  {
+    "line": 1243,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "States are created lazily by getState, so the eager loop differs only when an invalid on or deps definition throws at creation (L4)."
+  },
+  {
+    "line": 1244,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "States are created lazily by getState, so the eager loop differs only when an invalid on or deps definition throws at creation (L4)."
+  },
+  {
+    "line": 1246,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Without it prevFactsObserved keeps its default of true, so the snapshot is built every pass: the same results at the cost of a copy."
   },
   {
     "line": 1265,
@@ -744,6 +1896,14 @@
     "note": "Scratch-buffer reuse and allocation avoidance for the run loop; a fresh array behaves identically."
   },
   {
+    "line": 1268,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Whether a pass with only synchronous effects returns a promise or undefined; the caller awaits only a defined result and settles the same either way. updatePreviousSnapshot feeds prevFacts (L4)."
+  },
+  {
     "line": 1269,
     "col": 13,
     "mutator": "ConditionalExpression",
@@ -774,6 +1934,22 @@
     "replacement": "sink.length >= 0",
     "reason": "equivalent",
     "note": "Twin of the triaged 1276:9 ConditionalExpression true. Always taking the branch splices an empty array and reportThrown([]) is a no-op, so nothing observable changes. Hand-run killed only by an unrelated timing assertion (derivation-deps 'does not pay for the size of a graph nothing is watching', 13.0 vs 9.4 ms budget), which is load noise, not behaviour."
+  },
+  {
+    "line": 1283,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Whether a pass with only synchronous effects returns a promise or undefined; the caller awaits only a defined result and settles the same either way. updatePreviousSnapshot feeds prevFacts (L4)."
+  },
+  {
+    "line": 1310,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
   },
   {
     "line": 1310,
@@ -814,6 +1990,46 @@
     "replacement": "pendingReruns.size >= 0",
     "reason": "equivalent",
     "note": "Navigation and rerun set handling: an empty or absent set selects the same effects as the guarded path."
+  },
+  {
+    "line": 1317,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
+  },
+  {
+    "line": 1317,
+    "col": 20,
+    "mutator": "EqualityOperator",
+    "replacement": "pendingReruns.size <= 0",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
+  },
+  {
+    "line": 1318,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
+  },
+  {
+    "line": 1323,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
+  },
+  {
+    "line": 1328,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "History navigation reruns (L8)."
   },
   {
     "line": 1329,
@@ -1208,6 +2424,14 @@
     "note": "Bookkeeping that getState/initState re-creates lazily or that is overwritten on the next registration; no behaviour differs."
   },
   {
+    "line": 1535,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
     "line": 1540,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -1232,6 +2456,54 @@
     "note": "A retry also calls scheduleReconcile, so the extra check at the end of a pass never decides whether a rerun happens."
   },
   {
+    "line": 1549,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1551,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "state.enabled",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1558,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1563,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
     "line": 1567,
     "col": 76,
     "mutator": "ArrayDeclaration",
@@ -1240,12 +2512,76 @@
     "note": "callOne's dependency list reaches only the trace, and a trace exists only while a pass is running, which a call() from outside never is."
   },
   {
+    "line": 1570,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1572,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
     "line": 1575,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
     "note": "Awaiting an undefined value, or re-checking a condition an earlier guard has already settled, takes the same path."
+  },
+  {
+    "line": 1575,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1575,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1577,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1578,
+    "col": 16,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1579,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
+  },
+  {
+    "line": 1581,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "system.effects.call / runningEffect / pending reruns (L10, L8)."
   },
   {
     "line": 1583,

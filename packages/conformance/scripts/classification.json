@@ -536,6 +536,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l1-effects.test.ts",
+    "category": "black-box",
+    "cases": 38,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/meta-query-does-not-watch.test.ts",
     "category": "black-box",
     "cases": 2,

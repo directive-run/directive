@@ -54,6 +54,7 @@
   "tests/core/facts.test.ts": "packages/core/src/core/__tests__/facts.test.ts",
   "tests/core/frozen-facts.test.ts": "packages/core/src/core/__tests__/frozen-facts.test.ts",
   "tests/core/history-clone-integrity.test.ts": "packages/core/src/core/__tests__/history-clone-integrity.test.ts",
+  "tests/core/l1-effects.test.ts": "packages/core/src/core/__tests__/l1-effects.test.ts",
   "tests/core/meta-query-does-not-watch.test.ts": "packages/core/src/core/__tests__/meta-query-does-not-watch.test.ts",
   "tests/core/meta-query-timing.test.ts": "packages/core/src/core/__tests__/meta-query-timing.test.ts",
   "tests/core/module.test.ts": "packages/core/src/core/__tests__/module.test.ts",
