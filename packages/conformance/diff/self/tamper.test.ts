@@ -22,6 +22,7 @@ import {
   type BuildContext,
   type Divergence,
   type ScenarioDef,
+  runBudgeted,
   runOn,
   runScenario,
 } from "../scenario.js";
@@ -564,5 +565,80 @@ describe("recorder", () => {
 
     expect(rec.trace).toEqual([]);
     expect(() => rec.checkpoint("x")).toThrow(/record\(system\)/);
+  });
+});
+
+describe("run budget", () => {
+  // The tamper target with time passing after it settles, so an endless
+  // timer chain actually runs. A small budget keeps the runaway runs short
+  // (each timer callback costs a real event-loop turn under advance).
+  const timed: ScenarioDef = {
+    ...def,
+    budget: 2000,
+    steps: [
+      { op: "start" },
+      { op: "set", key: "go", value: true },
+      { op: "settle" },
+      { op: "advance", ms: 100 },
+      { op: "destroy" },
+    ],
+  };
+  // An engine whose systems keep a timer chain going forever: two timers
+  // per firing, like resolvers re-triggering each other.
+  const endless = faulty({
+    system: () => {
+      const spawn = () => {
+        setTimeout(spawn, 1);
+        setTimeout(spawn, 1);
+      };
+      spawn();
+
+      return {};
+    },
+  });
+
+  it("a candidate that never settles where the reference does is a hang, and fails", async () => {
+    const result = await runScenario(timed, {
+      wrapCandidate: endless,
+      divergences: [],
+    });
+    expect(result.runaway).toBe(false);
+    expect(result.hung).toEqual(["local"]);
+    expect(result.ok).toBe(false);
+    expect(result.report).toMatch(
+      /hang in scenario "tamper target": local made more than \d+ timer callbacks/,
+    );
+    // The control: the same scenario without the fault settles and passes.
+    const control = await runScenario(timed, { divergences: [] });
+    expect([control.ok, control.hung, control.runaway]).toEqual([
+      true,
+      [],
+      false,
+    ]);
+    expect(control.fired).toBeLessThan(timed.budget!);
+  });
+
+  it("a reference that never settles is a runaway: discarded, nothing compared", async () => {
+    const result = await runScenario(timed, {
+      wrapReference: endless,
+      divergences: [],
+    });
+    expect(result.runaway).toBe(true);
+    expect(result.compared).toEqual([]);
+    expect(result.ok).toBe(false);
+    expect(result.fired).toBe(timed.budget! + 1);
+    expect(result.report).toMatch(/runaway in scenario "tamper target"/);
+  });
+
+  it("counts deterministically: the same run fires the same callbacks", async () => {
+    const [v1] = engines();
+    const a = await runBudgeted(v1!, timed);
+    const b = await runBudgeted(v1!, timed);
+    expect(a.fired).toBeGreaterThan(0);
+    expect(a.fired).toBe(b.fired);
+    expect(a.runaway).toBe(false);
+    // Under a budget below what it needs, the same run is a runaway.
+    const short = await runBudgeted(v1!, timed, a.fired - 1);
+    expect(short.runaway).toBe(true);
   });
 });

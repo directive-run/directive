@@ -9,18 +9,36 @@ name: Mutation testing (nightly)
 # ceiling (MUTATION_LAYER), so each job stays far under the 6 h limit. The
 # incremental file is cached per shard, so only mutants in changed code or
 # changed tests are re-run after the first night.
+#
+# Once a week (and on dispatch with `ceiling: none`) the same shards run
+# with no ceiling: the full run. Its reports are what `mutation-score.ts
+# --full` needs to defer a NoCoverage mutant that only tests above the
+# ceiling reach (MUTATION.md, "Deferral"). The nightly summary downloads
+# the latest full-run reports; without any it defers nothing. The full run
+# is scored on its own too, and must keep passing.
 
 on:
   schedule:
     - cron: "41 8 * * *"
+    # The weekly full (no-ceiling) run. Keep in step with `full` below.
+    - cron: "11 3 * * 0"
   workflow_dispatch:
+    inputs:
+      ceiling:
+        description: "layer: each shard at its layer's ceiling; none: the full run"
+        type: choice
+        options: [layer, none]
+        default: layer
 
 permissions:
   contents: read
 
+env:
+  FULL: ${{ github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none' }}
+
 jobs:
   mutate:
-    name: mutate (${{ matrix.shard }})
+    name: mutate (${{ matrix.shard }}${{ (github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none') && ', full' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 330
     strategy:
@@ -78,20 +96,24 @@ jobs:
           # layers.json in the key: a test that moves layer changes which
           # tests may kill, so results cached under the old placement are
           # not reused.
-          key: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
-          restore-keys: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-
+          # A full run's results differ from a ceiling run's: its own cache.
+          key: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
+          restore-keys: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-
 
       - name: Mutate
         env:
-          MUTATION_LAYER: ${{ matrix.layer }}
-        run: pnpm --filter @directive-run/conformance mutate:file "${{ matrix.mutate }}"
+          LAYER: ${{ matrix.layer }}
+        run: |
+          # The full run sets no ceiling: every non-internals test counts.
+          if [ "$FULL" != "true" ]; then export MUTATION_LAYER="$LAYER"; fi
+          pnpm --filter @directive-run/conformance mutate:file "${{ matrix.mutate }}"
 
       - name: Save incremental cache
         if: ${{ !cancelled() }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/conformance/.stryker-cache
-          key: mutation-${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
+          key: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
 
       - name: Name the reports
         if: ${{ !cancelled() }}
@@ -103,11 +125,13 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: mutation-${{ matrix.shard }}
+          name: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}
           path: |
             packages/conformance/reports/mutation/${{ matrix.shard }}.json
             packages/conformance/reports/mutation/${{ matrix.shard }}.html
-          retention-days: 30
+          # Full-run reports serve every nightly until the next weekly run:
+          # kept for five weeks so one failed weekly run does not lose them.
+          retention-days: ${{ env.FULL == 'true' && 35 || 30 }}
 
   summary:
     name: Per-shard scores
@@ -115,11 +139,16 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      # To list and download the latest full-run artifacts.
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             packages/conformance/package.json
+            packages/conformance/MUTATION.md
             packages/conformance/scripts/mutation-score.ts
             packages/conformance/mutation-triage
           sparse-checkout-cone-mode: false
@@ -130,10 +159,37 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: mutation-*
+          pattern: ${{ env.FULL == 'true' && 'mutation-full-*' || 'mutation-l*' }}
           path: reports
           merge-multiple: true
 
-      # Report-only: no --check. The script appends the table to the job summary.
+      # A ceiling run defers NoCoverage mutants the full run reaches, so it
+      # needs the latest full-run report of each shard (any run: the newest
+      # unexpired artifact of that name). None yet: nothing is deferred.
+      - name: Fetch the latest full-run reports
+        if: ${{ env.FULL != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p full
+          for shard in l1-state l2-resolvers l3-engine l3-system l3-rest l11-predicate l11-rest; do
+            id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=mutation-full-$shard&per_page=1" --jq '.artifacts[0].id // empty')
+            if [ -z "$id" ]; then echo "no full-run report for $shard"; continue; fi
+            gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > "full/$shard.zip"
+            unzip -o -q "full/$shard.zip" "$shard.json" -d full && rm "full/$shard.zip"
+          done
+          ls full
+
+      # Report-only: no --check. The script appends the table to the job
+      # summary. The full run is scored as it is (it must keep passing).
       - name: Print scores
-        run: npx --yes tsx@4.21.0 packages/conformance/scripts/mutation-score.ts reports
+        run: |
+          score="npx --yes tsx@4.21.0 packages/conformance/scripts/mutation-score.ts"
+          if [ "$FULL" = "true" ]; then
+            $score reports
+          elif ls full/*.json > /dev/null 2>&1; then
+            # Each shard ran at its MUTATION.md row's layer.
+            $score --layer row --full full reports
+          else
+            $score --layer row reports
+          fi
