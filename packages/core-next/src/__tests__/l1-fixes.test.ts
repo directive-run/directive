@@ -51,3 +51,40 @@ describe("L1 fixes", () => {
     expect((createSystem({ module: mod }) as any)._mode).toBe("single");
   });
 });
+
+describe("membership test on derived tracks", () => {
+  function make() {
+    const seen: boolean[] = [];
+    const mod = createModule("m", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { base: t.number(), gate: t.boolean() },
+        events: {},
+        requirements: {},
+      },
+      derive: {
+        base: (f: any) => f.n,
+        gate: (_f: any, d: any) => {
+          const has = "base" in d;
+          seen.push(has);
+
+          return has;
+        },
+      },
+    } as any);
+    const system = createSystem({ module: mod }) as any;
+
+    return { system, seen };
+  }
+
+  it("`in derived` follows its target like a read", () => {
+    const { system, seen } = make();
+    system.start?.();
+    expect(system.read("gate")).toBe(true);
+    const n = seen.length;
+    system.facts.n = 5;
+    system.read("gate");
+
+    expect(seen.length).toBe(n + 1);
+  });
+});
