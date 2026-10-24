@@ -32,6 +32,11 @@ const repoRoot = defaultRepoRoot;
 const conformanceRoot = join(repoRoot, "packages/conformance");
 const failures: string[] = [];
 
+// The highest layer core-next has built; null until Phase 1.
+const v2Layer = JSON.parse(
+  readFileSync(join(conformanceRoot, "layers.rules.json"), "utf8"),
+).current as string | null;
+
 failures.push(...checkLock(conformanceRoot));
 failures.push(...checkAheadOfV1(conformanceRoot));
 failures.push(...checkScenarioLayers(conformanceRoot));
@@ -41,6 +46,12 @@ const config = (
 failures.push(...checkConfig(config, repoRoot));
 
 const out = mkdtempSync(join(tmpdir(), "conformance-census-"));
+let fuzzRuns: Array<{
+  seed: number;
+  runs: number;
+  runaway?: number;
+  v2?: number;
+}> = [];
 const reports: Record<string, JsonReport> = {};
 // The differential project logs here what a test cannot assert on its own:
 // divergences used, hooks fired, fuzz cases run (diff/scenario.ts).
@@ -92,9 +103,8 @@ try {
   failures.push(
     ...checkHooksFired(conformanceRoot, new Set(readLines("hooks-fired.txt"))),
   );
-  failures.push(
-    ...checkFuzzRuns(readLines("fuzz.jsonl").map((l) => JSON.parse(l))),
-  );
+  fuzzRuns = readLines("fuzz.jsonl").map((l) => JSON.parse(l));
+  failures.push(...checkFuzzRuns(fuzzRuns, v2Layer !== null));
 } finally {
   rmSync(out, { recursive: true, force: true });
 }
@@ -134,9 +144,9 @@ console.log(
     }
   }
 }
-const v2Layer = JSON.parse(
-  readFileSync(join(conformanceRoot, "layers.rules.json"), "utf8"),
-).current as string | null;
+console.log(
+  `[census] fuzz: ${fuzzRuns.map((r) => `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too`).join("; ")}`,
+);
 console.log(
   v2Layer === null
     ? "[census] v2: no layer built yet (layers.rules.json `current` is null); v2 runs nothing"

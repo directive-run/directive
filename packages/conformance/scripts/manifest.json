@@ -56,6 +56,8 @@
   "tests/core/history-clone-integrity.test.ts": "packages/core/src/core/__tests__/history-clone-integrity.test.ts",
   "tests/core/l1-derivations.test.ts": "packages/core/src/core/__tests__/l1-derivations.test.ts",
   "tests/core/l1-effects.test.ts": "packages/core/src/core/__tests__/l1-effects.test.ts",
+  "tests/core/l1-gate-rest-production.test.ts": "packages/core/src/core/__tests__/l1-gate-rest-production.test.ts",
+  "tests/core/l1-gate-rest.test.ts": "packages/core/src/core/__tests__/l1-gate-rest.test.ts",
   "tests/core/l1-views.test.ts": "packages/core/src/core/__tests__/l1-views.test.ts",
   "tests/core/l2-requirements-oracle.test.ts": "packages/core/src/core/__tests__/l2-requirements-oracle.test.ts",
   "tests/core/meta-query-does-not-watch.test.ts": "packages/core/src/core/__tests__/meta-query-does-not-watch.test.ts",
