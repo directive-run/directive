@@ -157,6 +157,19 @@ AND the test that kills the mutant in the full run; the scorer rejects an
 empty one. A full report with no `source` (or a different one) is treated as
 stale: nothing is deferred against it.
 
+With `--full`, every `later-layer` entry is validated against the full report,
+because the entry claims that a later test kills the mutant. If the mutant is
+not Killed or Timeout in the full run (Survived, NoCoverage, absent from it, or
+the full report is stale or lacks the file), the entry is INVALID: it counts as
+if untriaged, even when the full-run rule would otherwise defer it, so it is an
+unexplained survivor that fails the gate, and the output lists it under
+"later-layer without a full-run kill" with `file:line:col`. Nothing is deferred
+on an agent's word that some test exists. When the full report also records
+`killedBy` and `testFiles` (Stryker JSON), the note should name one of the
+killing tests, by its test name or file basename; if it names none, the output
+prints a warning listing the killers (it does not fail). Without `--full`
+nothing is validated, and the output says so.
+
 The score output lists every deferred mutant (`file:line:col mutator`, in a
 collapsible block). Reviewer step: spot-check that each listed line really
 belongs to a later layer's feature (open the line, read the entry's note),
