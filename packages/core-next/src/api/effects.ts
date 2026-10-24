@@ -9,7 +9,7 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import { type Tracker, describeDep, withTracking } from "./facts.js";
+import { type Tracker, describeDep } from "./facts.js";
 import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
@@ -20,6 +20,11 @@ export interface CreateEffectsOptions<S extends Schema> {
   derived?: Record<string, unknown>;
   tracker?: Tracker;
   onRun?: (id: string, deps: string[]) => void;
+  /**
+   * Whether `onRun` will read its `deps` right now (1.35). When this returns
+   * false, `onRun` gets an empty list instead of one built per run.
+   */
+  wantsRunDeps?: () => boolean;
   onError?: (id: string, error: unknown) => void;
   onWriteBlocked?: (id: string, key: string) => void;
 }
@@ -42,11 +47,16 @@ interface EffectState {
   explicit: boolean;
   deps: Set<string> | null;
   cleanup: (() => void) | null;
+  /** What the current run's `run` returned. */
+  out_?: unknown;
 }
 
 function writeMessage(id: string, key: string, inPlace?: boolean): string {
   return `[Directive] effect "${id}" ${inPlace ? `changed "${key}" in place` : `tried to write "${key}"`}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key.split(".")[0]} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
 }
+
+/** What `onRun` gets when `wantsRunDeps` says it will not read the list. */
+const NO_DEPS = Object.freeze([]) as unknown as string[];
 
 /** Set on a wrapped run (namespaced.ts): whether the author's run reads prev. */
 export const PREV_READ: unique symbol = Symbol();
@@ -92,7 +102,15 @@ export function declaresPrev(run: unknown): boolean {
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager {
-  const { definitions, facts, store, onRun, onError, onWriteBlocked } = options;
+  const {
+    definitions,
+    facts,
+    store,
+    onRun,
+    wantsRunDeps,
+    onError,
+    onWriteBlocked,
+  } = options;
   const derived = options.derived ?? {};
   const tracker = options.tracker ?? { deps: null };
   const states = new Map<string, EffectState>();
@@ -125,11 +143,16 @@ export function createEffectsManager<S extends Schema>(
 
   /** The read-only view of the facts for effect `id`: writes are refused. */
   const views = new Map<string, CheckedReadView<object>>();
-  function viewFor(id: string): CheckedReadView<object> {
-    let view = views.get(id);
-    if (!view) {
-      let readonlyStore: FactsStore<S> | undefined;
-      view = createCheckedReadView(facts as object, (key) => refuse(id, key), {
+  // A miss builds the view in its own function: the closures below capture
+  // `id`, and a capture in viewFor would allocate on every (hit) call.
+  const viewFor = (id: string): CheckedReadView<object> =>
+    views.get(id) ?? newView(id);
+  function newView(id: string): CheckedReadView<object> {
+    let readonlyStore: FactsStore<S> | undefined;
+    const view = createCheckedReadView(
+      facts as object,
+      (key) => refuse(id, key),
+      {
         override: (prop) =>
           prop === "$store"
             ? (readonlyStore ??= {
@@ -147,9 +170,9 @@ export function createEffectsManager<S extends Schema>(
                 toObject: () => store.toObject(),
               })
             : undefined,
-      });
-      views.set(id, view);
-    }
+      },
+    );
+    views.set(id, view);
 
     return view;
   }
@@ -224,6 +247,41 @@ export function createEffectsManager<S extends Schema>(
     );
   }
 
+  /**
+   * The effect about to run and its definition. One body serves every run,
+   * so a run allocates no closures: `body` reads these before calling the
+   * author's code, and keeps the result on the effect's own state, so a run
+   * started from inside another leaves the outer run's result in place.
+   */
+  let running: EffectState;
+  let runningDef: any;
+  const body = () => {
+    const state = running;
+    const def = runningDef;
+    const id = state.id;
+    let prev: object | null = previous;
+    let d: object = derived;
+    if (isDevelopment) {
+      const checks: CheckedReadView<object>[] = [];
+      const checked = (src: object, prefix: string) => {
+        const check = createCheckedReadView(
+          src,
+          (key) => refuse(id, `${prefix}.${key}`),
+          { prefix },
+        );
+        checks.push(check);
+
+        return check.view;
+      };
+      if (prev !== null) {
+        prev = checked(prev, "prevFacts");
+      }
+      d = checked(derived, "derived");
+      runChecks.set(id, checks);
+    }
+    state.out_ = def.run(viewFor(id).view, prev, d);
+  };
+
   /** Run one effect. A sync throw is returned in `thrown`; async errors are reported. */
   function run(
     state: EffectState,
@@ -234,52 +292,41 @@ export function createEffectsManager<S extends Schema>(
       return undefined;
     }
     runCleanup(state);
-    onRun?.(state.id, state.deps ? Array.from(state.deps, describeDep) : []);
+    onRun?.(
+      state.id,
+      wantsRunDeps?.() === false
+        ? NO_DEPS
+        : state.deps
+          ? Array.from(state.deps, describeDep)
+          : [],
+    );
+    const id = state.id;
     try {
-      let out: unknown;
-      const id = state.id;
-      const call = () =>
-        store.batch(() => {
-          let prev: object | null = previous;
-          let d: object = derived;
-          if (isDevelopment) {
-            const checks: CheckedReadView<object>[] = [];
-            const checked = (src: object, prefix: string) => {
-              const check = createCheckedReadView(
-                src,
-                (key) => refuse(id, `${prefix}.${key}`),
-                { prefix },
-              );
-              checks.push(check);
-
-              return check.view;
-            };
-            if (prev !== null) {
-              prev = checked(prev, "prevFacts");
-            }
-            d = checked(derived, "derived");
-            runChecks.set(id, checks);
-          }
-          out = def.run(viewFor(id).view, prev, d);
-        });
+      running = state;
+      runningDef = def;
       if (state.explicit) {
-        call();
+        store.batch(body);
       } else {
-        const tracked = withTracking(tracker, call);
-        state.deps = tracked.deps.size > 0 ? tracked.deps : null;
-        if (isDevelopment && out instanceof Promise) {
-          warnAsyncAutoTracked(id, tracked.deps);
+        // withTracking's frame, without its result object.
+        const deps = new Set<string>();
+        const outer = tracker.deps;
+        tracker.deps = deps;
+        try {
+          store.batch(body);
+        } finally {
+          tracker.deps = outer;
+        }
+        state.deps = deps.size > 0 ? deps : null;
+        if (isDevelopment && state.out_ instanceof Promise) {
+          warnAsyncAutoTracked(id, deps);
         }
       }
-      if (out instanceof Promise) {
-        return out
-          .then((settled) => {
-            keep(state, settled);
-            checkInPlace(id);
-          })
-          .catch((error) => report(state, error));
+      const result = state.out_;
+      state.out_ = undefined;
+      if (result instanceof Promise) {
+        return later(state, result);
       }
-      keep(state, out);
+      keep(state, result);
       checkInPlace(id);
     } catch (error) {
       thrown.push([state, error]);
@@ -287,6 +334,18 @@ export function createEffectsManager<S extends Schema>(
 
     return undefined;
   }
+
+  /**
+   * An async run's result. Its own function: the closures capture `state`,
+   * and a capture in `run` would allocate on every (sync) run.
+   */
+  const later = (state: EffectState, result: Promise<unknown>) =>
+    result
+      .then((settled) => {
+        keep(state, settled);
+        checkInPlace(state.id);
+      })
+      .catch((error) => report(state, error));
 
   function select(changed: Set<string>): EffectState[] {
     const out: EffectState[] = [];
@@ -393,6 +452,8 @@ export const withEffects: SystemPart = (ctx) => {
         hooks.emit("effect.run", { id });
       }
     },
+    // The hook reports the id only: no dependency list is built per run.
+    wantsRunDeps: () => false,
     onError(id, error) {
       // As in 1.35: the error boundary hears it before the effect hook.
       reportError("effect", id, error);
