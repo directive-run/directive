@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/conformance",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Black-box conformance suite for @directive-run/core: the same tests run against the published 1.35 engine (the reference) and the in-repo engine, and later core-next.",
   "type": "module",
