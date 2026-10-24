@@ -96,6 +96,7 @@ export function createEffectsManager<S extends Schema>(
   const derived = options.derived ?? {};
   const tracker = options.tracker ?? { deps: null };
   const states = new Map<string, EffectState>();
+  const warnedAsync = new Set<string>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
   const prevObserved = Object.values(definitions).some(
@@ -212,6 +213,17 @@ export function createEffectsManager<S extends Schema>(
     console.error(`[Directive] Effect "${state.id}" threw an error:`, error);
   }
 
+  /** Dev: an async auto-tracked effect that read nothing before its first await. */
+  function warnAsyncAutoTracked(id: string, deps: Set<unknown>): void {
+    if (deps.size > 0 || warnedAsync.has(id)) {
+      return;
+    }
+    warnedAsync.add(id);
+    console.warn(
+      `[Directive] Async effect "${id}" recorded no dependencies, so it runs on every reconcile. Auto-tracking cannot see across an \`await\` — the tracking context closes when the body returns its promise — and this effect read nothing before its first one. Add \`deps: ["key1", "key2"]\`, or move the reads above the first \`await\`.`,
+    );
+  }
+
   /** Run one effect. A sync throw is returned in `thrown`; async errors are reported. */
   function run(
     state: EffectState,
@@ -255,6 +267,9 @@ export function createEffectsManager<S extends Schema>(
       } else {
         const tracked = withTracking(tracker, call);
         state.deps = tracked.deps.size > 0 ? tracked.deps : null;
+        if (isDevelopment && out instanceof Promise) {
+          warnAsyncAutoTracked(id, tracked.deps);
+        }
       }
       if (out instanceof Promise) {
         return out
