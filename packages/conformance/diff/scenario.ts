@@ -105,6 +105,8 @@ export interface ScenarioDef {
    * scenarios about what a reader sees of a derivation nobody observes.
    */
   observeDerivations?: boolean;
+  /** Timer callbacks one run may make (default RUN_BUDGET). */
+  budget?: number;
 }
 
 /**
@@ -144,6 +146,20 @@ export interface ScenarioResult {
   /** Engines compared against the reference. */
   compared: string[];
   traces: { reference: TraceEntry[]; candidate: TraceEntry[] };
+  /**
+   * The reference's first run passed the timer-callback budget: the case
+   * itself never settles, so nothing is compared (`ok` is false; the fuzzer
+   * discards such a case as a runaway and counts it).
+   */
+  runaway: boolean;
+  /**
+   * Runs that passed the budget where the reference's first run settled:
+   * an engine under test that hangs, or a second reference run that did
+   * (nondeterminism). Always a failure.
+   */
+  hung: string[];
+  /** Timer callbacks the reference's first run made. */
+  fired: number;
   report: string;
 }
 
@@ -155,6 +171,8 @@ export interface RunOptions {
   wrapCandidate?: EngineWrap;
   /** Use exactly these engines under test instead of the default set. */
   candidates?: EngineHandle[];
+  /** Replace the reference engine (budget self-tests only). */
+  wrapReference?: EngineWrap;
   divergences?: Divergence[];
 }
 
@@ -234,6 +252,65 @@ const realNow = Date.now.bind(Date);
 const REAL_ASYNC_BUDGET_MS = 2000;
 
 const CONSOLE_LEVELS = ["log", "info", "warn", "error", "debug"] as const;
+
+/**
+ * The most timer callbacks (setTimeout, setInterval, setImmediate firings)
+ * one engine run may make. Nothing else bounds a run: `advance` and the
+ * fake clock run every timer that falls due, so a system whose timers keep
+ * scheduling more (1.35 resolvers re-triggering each other through late
+ * writes of cancelled bodies, legal 1.35 behaviour) never returns. Counted
+ * on the fake clock, so the same case always lands on the same side.
+ * `DIFF_RUN_BUDGET` overrides it (for measuring).
+ */
+export const RUN_BUDGET = Number(process.env.DIFF_RUN_BUDGET ?? 20_000);
+
+type TimerFn = (cb: unknown, ...rest: unknown[]) => unknown;
+const COUNTED = ["setTimeout", "setInterval", "setImmediate"] as const;
+
+/**
+ * Count timer callbacks on the (already installed) fake timers. Past
+ * `limit` the run is a runaway: every pending timer is cleared and further
+ * callbacks are dropped, so the run winds down; its trace is not compared.
+ */
+function installBudget(limit: number) {
+  const g = globalThis as unknown as Record<string, TimerFn>;
+  const fakes = COUNTED.map((name) => [name, g[name] as TimerFn] as const);
+  const state = { fired: 0, exceeded: false };
+  for (const [name, fake] of fakes) {
+    g[name] = function (this: unknown, cb: unknown, ...rest: unknown[]) {
+      if (typeof cb !== "function") {
+        return fake.call(this, cb, ...rest);
+      }
+
+      return fake.call(
+        this,
+        function (this: unknown, ...args: unknown[]) {
+          if (state.exceeded) {
+            return;
+          }
+          if (++state.fired > limit) {
+            state.exceeded = true;
+            vi.clearAllTimers();
+
+            return;
+          }
+
+          return (cb as (...a: unknown[]) => unknown).apply(this, args);
+        },
+        ...rest,
+      );
+    };
+  }
+
+  return {
+    state,
+    uninstall() {
+      for (const [name, fake] of fakes) {
+        g[name] = fake;
+      }
+    },
+  };
+}
 
 /**
  * Let queued microtasks run (the engine schedules with queueMicrotask). How
@@ -378,10 +455,28 @@ export async function runOn(
   engine: EngineHandle,
   def: ScenarioDef,
 ): Promise<TraceEntry[]> {
+  return (await runBudgeted(engine, def)).trace;
+}
+
+export interface BudgetedRun {
+  trace: TraceEntry[];
+  /** Timer callbacks the run made (at most the budget + 1). */
+  fired: number;
+  /** The run passed the budget: its trace is cut short and not compared. */
+  runaway: boolean;
+}
+
+/** Run one scenario on one engine under a timer-callback budget. */
+export async function runBudgeted(
+  engine: EngineHandle,
+  def: ScenarioDef,
+  limit = def.budget ?? RUN_BUDGET,
+): Promise<BudgetedRun> {
   const rec = createRecorder();
   // Everything that makes a run deterministic, and everything that captures
   // what the engine prints, goes in before the engine loads.
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
+  const budget = installBudget(limit);
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -423,7 +518,11 @@ export async function runOn(
     } catch (error) {
       rec.push({ k: "threw", where: "createSystem", error: normalize(error) });
 
-      return rec.trace;
+      return {
+        trace: rec.trace,
+        fired: budget.state.fired,
+        runaway: budget.state.exceeded,
+      };
     }
     const snapshots = new Map<string, unknown>();
     for (const [i, step] of def.steps.entries()) {
@@ -467,11 +566,16 @@ export async function runOn(
       spy.mockRestore();
     }
     random.mockRestore();
+    budget.uninstall();
     vi.clearAllTimers();
     vi.useRealTimers();
   }
 
-  return rec.trace;
+  return {
+    trace: rec.trace,
+    fired: budget.state.fired,
+    runaway: budget.state.exceeded,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -570,22 +674,59 @@ export async function runScenario(
   def: ScenarioDef,
   opts: RunOptions = {},
 ): Promise<ScenarioResult> {
-  const [reference, local, v2] = engines() as [
+  const [v1, local, v2] = engines() as [
     EngineHandle,
     EngineHandle,
     EngineHandle | undefined,
   ];
+  const reference = opts.wrapReference ? opts.wrapReference(v1) : v1;
   const candidates = opts.candidates ?? [
     opts.wrapCandidate ? opts.wrapCandidate(local) : local,
     ...(v2 && v2Runs(def.layer) ? [v2] : []),
   ];
   const divergences = opts.divergences ?? readDivergences();
 
-  const first = await runOn(reference, def);
-  const again = await runOn(reference, def);
+  const limit = def.budget ?? RUN_BUDGET;
+  const firstRun = await runBudgeted(reference, def, limit);
+  const first = firstRun.trace;
+  if (firstRun.runaway) {
+    // Nothing to compare: the reference itself does not settle.
+    return {
+      name: def.name,
+      ok: false,
+      nondeterministic: [],
+      differences: [],
+      unexplained: [],
+      advisories: [],
+      used: [],
+      compared: [],
+      traces: { reference: first, candidate: [] },
+      runaway: true,
+      hung: [],
+      fired: firstRun.fired,
+      report: `runaway in scenario "${def.name}": the reference (${reference.name}) made more than ${limit} timer callbacks, so the case never settles and is not compared`,
+    };
+  }
+  const againRun = await runBudgeted(reference, def, limit);
+  const again = againRun.trace;
   const theirs: Record<string, TraceEntry[]> = {};
+  const hung: string[] = [];
+  const problems: string[] = [];
+  if (againRun.runaway) {
+    hung.push(`${reference.name} (second run)`);
+    problems.push(
+      `reference engine is not deterministic in scenario "${def.name}": its second run made more than ${limit} timer callbacks, the first ${firstRun.fired}`,
+    );
+  }
   for (const engine of candidates) {
-    theirs[engine.name] = await runOn(engine, def);
+    const run = await runBudgeted(engine, def, limit);
+    theirs[engine.name] = run.trace;
+    if (run.runaway) {
+      hung.push(engine.name);
+      problems.push(
+        `hang in scenario "${def.name}": ${engine.name} made more than ${limit} timer callbacks where the reference settled after ${firstRun.fired}`,
+      );
+    }
   }
 
   const nondeterministic = compareFull(first, again, "v1 (second run)");
@@ -622,6 +763,7 @@ export async function runScenario(
   });
 
   const report = [
+    ...problems,
     formatReport(
       def.name,
       "reference engine is not deterministic",
@@ -637,7 +779,10 @@ export async function runScenario(
 
   return {
     name: def.name,
-    ok: nondeterministic.length === 0 && unexplained.length === 0,
+    ok:
+      hung.length === 0 &&
+      nondeterministic.length === 0 &&
+      unexplained.length === 0,
     nondeterministic,
     differences,
     unexplained,
@@ -648,6 +793,9 @@ export async function runScenario(
       reference: first,
       candidate: theirs[candidates[0]?.name ?? ""] ?? [],
     },
+    runaway: false,
+    hung,
+    fired: firstRun.fired,
     report,
   };
 }
@@ -678,9 +826,12 @@ export function logResult(result: ScenarioResult): void {
   ]);
 }
 
-/** Record that the fuzzer ran `runs` cases from `seed`. */
-export function logFuzz(seed: number, runs: number): void {
-  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs })]);
+/**
+ * Record that the fuzzer compared `runs` cases from `seed` and discarded
+ * `runaway` more (cases whose reference run passed the budget).
+ */
+export function logFuzz(seed: number, runs: number, runaway = 0): void {
+  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs, runaway })]);
 }
 
 /** `DIFF_DUMP=<dir>` writes each scenario's traces there, for reading. */

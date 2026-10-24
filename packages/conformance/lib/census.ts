@@ -27,7 +27,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
-import { FUZZ_FLOOR as FLOOR } from "./fuzz.js";
+import { FUZZ_FLOOR as FLOOR, maxRunaways } from "./fuzz.js";
 import { reachesAny } from "./layers.js";
 import { staticTests } from "./tests.js";
 
@@ -955,16 +955,27 @@ export function checkHooksFired(
 
 /** The fuzzer ran, at least FUZZ_FLOOR cases. */
 export function checkFuzzRuns(
-  runs: Array<{ seed: number; runs: number }>,
+  runs: Array<{ seed: number; runs: number; runaway?: number }>,
 ): string[] {
   if (runs.length === 0) {
     return ["conformance:diff: the fuzzer reported no runs"];
   }
+  const out: string[] = [];
+  for (const r of runs) {
+    // `runs` is the compared count; runaways were generated but discarded.
+    if (!(r.runs >= FUZZ_FLOOR)) {
+      out.push(
+        `conformance:diff: the fuzzer compared ${r.runs} cases (seed ${r.seed}); the floor is ${FUZZ_FLOOR}`,
+      );
+    }
+    const runaway = r.runaway ?? 0;
+    const cap = maxRunaways(r.runs + runaway);
+    if (runaway > cap) {
+      out.push(
+        `conformance:diff: ${runaway} runaway fuzz cases (seed ${r.seed}); at most ${cap} allowed (max(1% of cases, 2))`,
+      );
+    }
+  }
 
-  return runs
-    .filter((r) => !(r.runs >= FUZZ_FLOOR))
-    .map(
-      (r) =>
-        `conformance:diff: the fuzzer ran ${r.runs} cases (seed ${r.seed}); the floor is ${FUZZ_FLOOR}`,
-    );
+  return out;
 }

@@ -473,8 +473,12 @@
           "by": ["option plugins"]
         },
         "which effects run > every enabled effect runs once at start, and a disabled one waits": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
         },
         "which effects run > explicit deps run for their own changes and not for others": {
           "layer": "L3",
@@ -489,16 +493,16 @@
           "by": ["option plugins"]
         },
         "which effects run > a disabled effect is skipped, enabling brings it back": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > an effect disabled by an earlier one in the same pass does not run": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > a disabled effect drops the derivations it pinned": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > an async effect makes settle() wait for it": {
           "layer": "L3",
@@ -694,8 +698,8 @@
           "by": ["option effect deps"]
         },
         "a throwing effect > the disable strategy stops the effect until it is enabled again": {
-          "layer": "L3",
-          "by": ["option error boundary", "option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.enable", "member .effects.isEnabled"]
         },
         "a throwing effect > the retry strategy runs it again, a bounded number of times": {
           "layer": "L3",
@@ -815,8 +819,12 @@
           "by": ["option plugins"]
         },
         "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
         },
         "more behaviour of the run loop > call on an unknown effect says it does not exist": {
           "layer": "L10",
@@ -4336,8 +4344,8 @@
           "by": ["option error boundary"]
         },
         "error boundary: disable strategy > disables an effect after error": {
-          "layer": "L3",
-          "by": ["option error boundary"]
+          "layer": "L4",
+          "by": ["member .effects.isEnabled"]
         },
         "error boundary: disable strategy > disables the originating constraint when a resolver fails": {
           "layer": "L3",

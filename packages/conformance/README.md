@@ -101,8 +101,9 @@ the traces to agree.
   derivations and effects, cleanups, every boundary strategy, sources,
   history, trace) and step sequences (writes, batches, Dates, publishes,
   stop/start/destroy mid-run, snapshot/restore, back/forward, a second
-  system in the same engine instance). PR CI runs the fixed seed for 200
-  cases — the census fails fewer (`lib/fuzz.ts` `FUZZ_FLOOR`) — and
+  system in the same engine instance). PR CI runs the fixed seed for 205
+  cases (`FUZZ_DEFAULT_RUNS`); the census fails fewer than 200 compared (`lib/fuzz.ts`
+  `FUZZ_FLOOR`) or more than max(1% of cases, 2) runaways — and
   `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a random seed
   it prints; failures shrink and print the seed and spec.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
