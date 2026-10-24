@@ -1,8 +1,8 @@
 /**
  * Runs the whole-system workloads for ONE engine inside the current process
  * and prints a single JSON line:
- *   time mode (default):     { engine, devChecks, results: { workload: nsPerOp }, notes }
- *   heap mode (BENCH_MODE=heap): { engine, devChecks, heap: { ... } }
+ *   time mode (default):     { engine, devChecks, envSwap, cpuSource, results: { workload: nsPerOp }, notes }
+ *   heap mode (BENCH_MODE=heap): { engine, devChecks, envSwap, cpuSource, heap: { ... } }
  *
  * Fairness rules (as in ../runner.mjs): the process holds exactly one engine;
  * the per-engine adapter lives in the entry file; each workload is first
@@ -35,10 +35,28 @@ function median(xs) {
 
 // CPU time of this thread, in microseconds. It leaves out the time the process
 // spent descheduled, which on a busy machine is most of the noise in wall time.
+// process.cpuUsage() is NOT a substitute: it counts every thread of the process
+// (GC helpers, compiler threads), so it is noisier and charges background work to
+// whichever engine triggers it. The fallback is therefore refused unless the
+// driver passes --allow-cpu-fallback (BENCH_ALLOW_CPU_FALLBACK=1), and the source
+// in use is reported in every result so the driver can print and record it.
+const cpuSource =
+  typeof process.threadCpuUsage === "function"
+    ? "threadCpuUsage"
+    : "cpuUsage-fallback";
+if (
+  cpuSource !== "threadCpuUsage" &&
+  process.env.BENCH_ALLOW_CPU_FALLBACK !== "1"
+) {
+  throw new Error(
+    `process.threadCpuUsage is missing on Node ${process.version}; refusing to fall back to process.cpuUsage() silently. Use a Node that has it, or pass --allow-cpu-fallback to accept whole-process CPU time (labelled "cpuUsage-fallback" in the output).`,
+  );
+}
 const cpuMicros = () => {
-  const u = process.threadCpuUsage
-    ? process.threadCpuUsage()
-    : process.cpuUsage();
+  const u =
+    cpuSource === "threadCpuUsage"
+      ? process.threadCpuUsage()
+      : process.cpuUsage();
 
   return u.user + u.system;
 };
@@ -250,16 +268,21 @@ function devChecksOn({ createModule, createSystem, t }) {
  * Entry point shared by the per-engine entries. `load` imports the engine
  * (it must be a dynamic import: NODE_ENV has to be in place first).
  *
- * `process.env` becomes a plain object so the engines' runtime
- * `process.env.NODE_ENV` checks cost a property read, the way a bundler's
- * folded constant costs nothing; Node's real env accessor is slow and would
- * otherwise charge whichever engine reads it more often.
+ * By default `process.env` becomes a plain object, so the engines' runtime
+ * `process.env.NODE_ENV` checks cost a property read, the way a bundler's folded
+ * constant costs nothing. That models a BUNDLED consumer. Node's real env
+ * accessor is slow and would otherwise charge whichever engine reads it more
+ * often. BENCH_ENV_SWAP=0 (driver: --no-env-swap) leaves the real `process.env`
+ * in place instead, which is the UNBUNDLED-Node case (report-only).
  */
 export async function main(engine, load) {
-  process.env = {
-    ...process.env,
-    NODE_ENV: process.env.BENCH_NODE_ENV || "production",
-  };
+  const nodeEnv = process.env.BENCH_NODE_ENV || "production";
+  const envSwap = process.env.BENCH_ENV_SWAP !== "0";
+  if (envSwap) {
+    process.env = { ...process.env, NODE_ENV: nodeEnv };
+  } else {
+    process.env.NODE_ENV = nodeEnv;
+  }
   const mod = await load();
   const api = {
     createModule: mod.createModule,
@@ -271,5 +294,7 @@ export async function main(engine, load) {
     process.env.BENCH_MODE === "heap"
       ? await heapProbe(engine, api)
       : await runAll(engine, api, process.env.BENCH_ONLY?.split(","));
-  process.stdout.write(`${JSON.stringify({ ...report, devChecks })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ ...report, devChecks, envSwap, cpuSource })}\n`,
+  );
 }

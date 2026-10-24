@@ -33,7 +33,7 @@
     "typecheck": "tsc --noEmit",
     "bench": "cd ../.. && vitest bench --run packages/core-next/",
     "bench:fair": "pnpm build && node bench/run.mjs",
-    "bench:system": "pnpm build && node bench/system/run.mjs",
+    "bench:system": "pnpm --filter @directive-run/core build && pnpm --filter @directive-run/core-next build && node bench/system/run.mjs",
     "size": "node scripts/size.mjs",
     "size:check": "node scripts/size.mjs --check",
     "clean": "rm -rf dist"
