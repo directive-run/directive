@@ -13,10 +13,14 @@
  * batch writes, write Dates twice, publish from the source, and start a
  * second system in the same engine instance.
  *
- * Every feature carries the layer that builds it (the plan's ladder);
- * `specLayer()` is the highest one a case uses, so a v2 run compares only
- * the cases its `current` layer covers. `toScenario()` turns a spec into a
- * ScenarioDef that builds the same system on whichever engine runs it.
+ * Every feature carries the layer that builds it (the plan's ladder,
+ * `FEATURE_LAYERS`); `specLayer()` is the highest one a case uses, so a v2
+ * run compares only the cases its `current` layer covers. Left alone, almost
+ * every case uses something above `current`, so `specArbitrary({ ceiling })`
+ * leaves out every feature above the ceiling: the fuzzer adds a share of
+ * cases generated at `current` (fuzz.test.ts) and v2 takes part in them.
+ * `toScenario()` turns a spec into a ScenarioDef that builds the same system
+ * on whichever engine runs it.
  */
 
 import fc from "fast-check";
@@ -90,12 +94,78 @@ export interface FuzzSpec {
   steps: FuzzStep[];
 }
 
+/**
+ * The layer (the plan's ladder) that builds each feature the generator can
+ * use. `specLayer()` places a case by the highest one it uses and
+ * `specArbitrary({ ceiling })` leaves out every feature above the ceiling;
+ * both read this table, so a feature's layer is written down once. A feature
+ * sits at the layer of the highest thing its generated code calls, as
+ * lib/layers.ts places it (the self test pins the cases that were once wrong).
+ */
+export const FEATURE_LAYERS = {
+  /** A second module: namespacing, wildcard events, crossModuleDeps. */
+  modules: 1,
+  /** Constraint and resolver pairs: delays, failures, retries, timeouts. */
+  constraints: 2,
+  /** An error boundary, with every strategy. */
+  boundary: 3,
+  /** The stop, start and destroy steps. */
+  lifecycle: 3,
+  /**
+   * Effect cleanups. Basic effects (run, cleanup, auto-tracking) are L0 in
+   * layers.rules.json (`notes.effects`); only deps, on and prev are L4.
+   */
+  effectCleanups: 0,
+  /** Effects with explicit deps. */
+  effectDeps: 4,
+  /** An event source, and publishing from it. */
+  sources: 5,
+  /** The snapshot and restore steps (getSnapshot and restore are L6). */
+  snapshots: 6,
+  /** The twin step: it reads the second system's getSnapshot (L6). */
+  twin: 6,
+  /** The history option and the back and forward steps. */
+  history: 8,
+  /** The trace option. */
+  trace: 9,
+} as const;
+
+type Feature = keyof typeof FEATURE_LAYERS;
+
+/** The steps that need a feature beyond the L0 reads and writes. */
+const STEP_FEATURES = {
+  stop: "lifecycle",
+  start: "lifecycle",
+  destroy: "lifecycle",
+  snapshot: "snapshots",
+  restore: "snapshots",
+  back: "history",
+  forward: "history",
+  twin: "twin",
+} as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
+
+const layerNumber = (layer: string) => Number(layer.slice(1));
+
+export interface SpecOptions {
+  /**
+   * The highest layer a case may use ("L1"): every feature built above it is
+   * left out. Omitted, all of them are in play. With a ceiling at or above
+   * the highest feature, the arbitrary is the one with no ceiling.
+   */
+  ceiling?: string;
+}
+
 const value = fc.integer({ min: -2, max: 6 });
 
-function moduleArbitrary(cross: boolean): fc.Arbitrary<FuzzModule> {
+function moduleArbitrary(
+  cross: boolean,
+  allows: (feature: Feature) => boolean,
+): fc.Arbitrary<FuzzModule> {
   return fc.integer({ min: 1, max: 3 }).chain((facts) => {
     const fact = fc.integer({ min: 0, max: facts - 1 });
     const factSet = fc.uniqueArray(fact, { minLength: 1, maxLength: facts });
+    const flag = (feature: Feature) =>
+      allows(feature) ? fc.boolean() : fc.constant(false);
 
     return fc.record({
       facts: fc.constant(facts),
@@ -126,28 +196,30 @@ function moduleArbitrary(cross: boolean): fc.Arbitrary<FuzzModule> {
         minLength: 1,
         maxLength: 3,
       }),
-      constraints: fc.array(
-        fc.record({
-          fact,
-          atLeast: fc.integer({ min: 0, max: 4 }),
-          crossAtLeast: cross
-            ? fc.option(fc.integer({ min: 0, max: 3 }), { nil: null })
-            : fc.constant(null),
-          priority: fc.integer({ min: 0, max: 3 }),
-          writes: fact,
-          value,
-          delay: fc.constantFrom(0, 1, 5, 20),
-          fails: fc.integer({ min: 0, max: 2 }),
-          retry: fc.integer({ min: 0, max: 2 }),
-          timeout: fc.option(fc.constantFrom(3, 10, 50), { nil: null }),
-        }),
-        { maxLength: 3 },
-      ),
+      constraints: allows("constraints")
+        ? fc.array(
+            fc.record({
+              fact,
+              atLeast: fc.integer({ min: 0, max: 4 }),
+              crossAtLeast: cross
+                ? fc.option(fc.integer({ min: 0, max: 3 }), { nil: null })
+                : fc.constant(null),
+              priority: fc.integer({ min: 0, max: 3 }),
+              writes: fact,
+              value,
+              delay: fc.constantFrom(0, 1, 5, 20),
+              fails: fc.integer({ min: 0, max: 2 }),
+              retry: fc.integer({ min: 0, max: 2 }),
+              timeout: fc.option(fc.constantFrom(3, 10, 50), { nil: null }),
+            }),
+            { maxLength: 3 },
+          )
+        : fc.constant<FuzzConstraint[]>([]),
       effects: fc.array(
         fc.record({
           reads: factSet,
-          explicitDeps: fc.boolean(),
-          cleanup: fc.boolean(),
+          explicitDeps: flag("effectDeps"),
+          cleanup: flag("effectCleanups"),
           throwsAt: fc.option(fc.integer({ min: 3, max: 8 }), {
             nil: null,
             freq: 4,
@@ -155,16 +227,34 @@ function moduleArbitrary(cross: boolean): fc.Arbitrary<FuzzModule> {
         }),
         { maxLength: 2 },
       ),
-      source: fc.option(fc.record({ gated: fc.boolean() }), {
-        nil: null,
-        freq: 2,
-      }),
+      source: allows("sources")
+        ? fc.option(fc.record({ gated: fc.boolean() }), {
+            nil: null,
+            freq: 2,
+          })
+        : fc.constant<FuzzModule["source"]>(null),
     });
   });
 }
 
-const stepArbitrary = (modules: number) => {
+const stepArbitrary = (
+  modules: number,
+  allows: (feature: Feature) => boolean,
+) => {
   const mod = fc.integer({ min: 0, max: modules - 1 });
+  // Publishing needs a source, and the other ops each need a feature.
+  const ops = (
+    [
+      "stop",
+      "start",
+      "destroy",
+      "snapshot",
+      "restore",
+      "back",
+      "forward",
+      "twin",
+    ] as const
+  ).filter((op) => allows(STEP_FEATURES[op]));
 
   return fc.oneof(
     {
@@ -204,18 +294,22 @@ const stepArbitrary = (modules: number) => {
         }),
       }),
     },
-    {
-      weight: 2,
-      arbitrary: fc.record({
-        op: fc.constant("publish" as const),
-        event: fc.constantFrom(
-          "own" as const,
-          "unknown" as const,
-          "cross" as const,
-        ),
-        value,
-      }),
-    },
+    ...(allows("sources")
+      ? [
+          {
+            weight: 2,
+            arbitrary: fc.record({
+              op: fc.constant("publish" as const),
+              event: fc.constantFrom(
+                "own" as const,
+                "unknown" as const,
+                "cross" as const,
+              ),
+              value,
+            }),
+          },
+        ]
+      : []),
     {
       weight: 3,
       arbitrary: fc.record({
@@ -225,41 +319,51 @@ const stepArbitrary = (modules: number) => {
     },
     { weight: 2, arbitrary: fc.record({ op: fc.constant("tick" as const) }) },
     { weight: 3, arbitrary: fc.record({ op: fc.constant("settle" as const) }) },
-    {
-      weight: 1,
-      arbitrary: fc.record({
-        op: fc.constantFrom(
-          "stop" as const,
-          "start" as const,
-          "destroy" as const,
-          "snapshot" as const,
-          "restore" as const,
-          "back" as const,
-          "forward" as const,
-          "twin" as const,
-        ),
-      }),
-    },
+    ...(ops.length > 0
+      ? [
+          {
+            weight: 1,
+            arbitrary: fc.record({ op: fc.constantFrom(...ops) }),
+          },
+        ]
+      : []),
   ) as fc.Arbitrary<FuzzStep>;
 };
 
-export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
-  return fc.integer({ min: 1, max: 2 }).chain((count) =>
+export function specArbitrary(
+  options: SpecOptions = {},
+): fc.Arbitrary<FuzzSpec> {
+  const { ceiling } = options;
+  if (ceiling !== undefined && !/^L\d+$/.test(ceiling)) {
+    throw new Error(`specArbitrary: ceiling "${ceiling}" is not a layer (L0…)`);
+  }
+  const top =
+    ceiling === undefined ? Number.POSITIVE_INFINITY : layerNumber(ceiling);
+  const allows = (feature: Feature) => FEATURE_LAYERS[feature] <= top;
+
+  return fc.integer({ min: 1, max: allows("modules") ? 2 : 1 }).chain((count) =>
     fc.record({
       modules: fc.tuple(
-        ...Array.from({ length: count }, (_, i) => moduleArbitrary(i === 1)),
+        ...Array.from({ length: count }, (_, i) =>
+          moduleArbitrary(i === 1, allows),
+        ),
       ),
-      boundary: fc.constantFrom(
-        null,
-        "skip" as const,
-        "retry" as const,
-        "retry-later" as const,
-        "disable" as const,
-        "throw" as const,
-      ),
-      history: fc.boolean(),
-      trace: fc.boolean(),
-      steps: fc.array(stepArbitrary(count), { minLength: 1, maxLength: 14 }),
+      boundary: allows("boundary")
+        ? fc.constantFrom(
+            null,
+            "skip" as const,
+            "retry" as const,
+            "retry-later" as const,
+            "disable" as const,
+            "throw" as const,
+          )
+        : fc.constant<Boundary | null>(null),
+      history: allows("history") ? fc.boolean() : fc.constant(false),
+      trace: allows("trace") ? fc.boolean() : fc.constant(false),
+      steps: fc.array(stepArbitrary(count, allows), {
+        minLength: 1,
+        maxLength: 14,
+      }),
     }),
   );
 }
@@ -267,39 +371,38 @@ export function specArbitrary(): fc.Arbitrary<FuzzSpec> {
 /** The highest layer (the plan's ladder) a case uses. */
 export function specLayer(spec: FuzzSpec): string {
   let n = 0;
-  const use = (layer: number) => {
-    n = Math.max(n, layer);
+  const use = (feature: Feature) => {
+    n = Math.max(n, FEATURE_LAYERS[feature]);
   };
   if (spec.modules.length > 1) {
-    use(1);
+    use("modules");
   }
   for (const m of spec.modules) {
     if (m.constraints.length > 0) {
-      use(2);
+      use("constraints");
     }
-    if (m.effects.some((e) => e.cleanup || e.explicitDeps)) {
-      use(4);
+    if (m.effects.some((e) => e.cleanup)) {
+      use("effectCleanups");
+    }
+    if (m.effects.some((e) => e.explicitDeps)) {
+      use("effectDeps");
     }
     if (m.source) {
-      use(5);
+      use("sources");
     }
   }
   if (spec.boundary) {
-    use(3);
+    use("boundary");
   }
   if (spec.trace) {
-    use(9);
+    use("trace");
   }
   if (spec.history) {
-    use(8);
+    use("history");
   }
   for (const s of spec.steps) {
-    if (["stop", "start", "destroy", "twin"].includes(s.op)) {
-      use(3);
-    } else if (s.op === "snapshot" || s.op === "restore") {
-      use(6);
-    } else if (s.op === "back" || s.op === "forward") {
-      use(8);
+    if (s.op in STEP_FEATURES) {
+      use(STEP_FEATURES[s.op as keyof typeof STEP_FEATURES]);
     }
   }
 
