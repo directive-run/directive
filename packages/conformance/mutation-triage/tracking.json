@@ -214,5 +214,50 @@
     "replacement": "nonJsonWarningCache.size > NON_JSON_WARNING_CACHE_MAX",
     "reason": "not-observable",
     "note": "off-by-one on the warning-memory bound; the exact size is a 1.x detail, the contract is only that the memory is bounded"
+  },
+  {
+    "line": 100,
+    "col": 13,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Pops the tracking frame when a tracked body ends. A frame left behind changes no value, dependency or recompute a base-layer test can read; it shows only in the tags a derivation inherits (meta, L9) and in the count of watched derivations (inspect(), L9) — killed in the full run by tags along the derivation graph stops where the author says the claim stops holding"
+  },
+  {
+    "line": 101,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Pops the tracking frame when a tracked body ends. A frame left behind changes no value, dependency or recompute a base-layer test can read; it shows only in the tags a derivation inherits (meta, L9) and in the count of watched derivations (inspect(), L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is"
+  },
+  {
+    "line": 225,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The readable name of a dependency (derive.<id>). It reaches a reader only through a plugin's dependency report (L3) or the trace (L9) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator"
+  },
+  {
+    "line": 226,
+    "col": 33,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The readable name of a dependency (derive.<id>). It reaches a reader only through a plugin's dependency report (L3) or the trace (L9) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator"
+  },
+  {
+    "line": 226,
+    "col": 43,
+    "mutator": "MethodExpression",
+    "replacement": "dep",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "The readable name of a dependency (derive.<id>). It reaches a reader only through a plugin's dependency report (L3) or the trace (L9) — killed in the full run by what a run tells the trace lists declared deps, with derivations as derive.<id>"
   }
 ]
