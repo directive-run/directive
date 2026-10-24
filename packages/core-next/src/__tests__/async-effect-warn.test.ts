@@ -28,9 +28,23 @@ describe("async auto-tracked effect with no reads before first await", () => {
   it("warns once per effect, not for deps / pre-await reads / sync", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const sys = build({
-      bare: { run: async () => { await sleep(0); } },
-      explicit: { deps: ["n"], run: async () => { await sleep(0); } },
-      reads: { run: async (f: { n: number }) => { void f.n; await sleep(0); } },
+      bare: {
+        run: async () => {
+          await sleep(0);
+        },
+      },
+      explicit: {
+        deps: ["n"],
+        run: async () => {
+          await sleep(0);
+        },
+      },
+      reads: {
+        run: async (f: { n: number }) => {
+          void f.n;
+          await sleep(0);
+        },
+      },
       sync: { run: () => {} },
     });
     sys.start?.();
@@ -39,7 +53,9 @@ describe("async auto-tracked effect with no reads before first await", () => {
     await sleep(10);
     const msgs = warn.mock.calls.map((c) => String(c[0]));
     expect(msgs.filter((m) => m.includes('"bare"'))).toHaveLength(1);
-    expect(msgs.filter((m) => /"(explicit|reads|sync)"/.test(m))).toHaveLength(0);
+    expect(msgs.filter((m) => /"(explicit|reads|sync)"/.test(m))).toHaveLength(
+      0,
+    );
     expect(msgs[0]).toContain("recorded no dependencies");
   });
 });
