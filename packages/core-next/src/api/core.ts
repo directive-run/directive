@@ -402,6 +402,20 @@ export function createSystemCore<const M extends ModuleSchema>(
       ...LOCKED,
       set: no,
       deleteProperty: no,
+      // As in 1.35, a membership test is a read: it follows its target, so a
+      // gate on `"x" in derived` re-runs when it changes. (The graph edge
+      // needs a real read, so the target computes; a throw is not the
+      // membership test's to raise.)
+      has: (_, id) => {
+        if (typeof id !== "string" || !derivations.has(id)) {
+          return false;
+        }
+        try {
+          read(id);
+        } catch {}
+
+        return true;
+      },
       // As in 1.35, a derivation reads like a getter under reflection.
       getOwnPropertyDescriptor: (_, id) =>
         typeof id === "string" && derivations.has(id)
