@@ -87,9 +87,9 @@ Both are gitignored.
 
 ## CI
 
-`.github/workflows/mutation-nightly.yml` runs the engine in seven shards, one
-per row of the table below (L3 and L11 are split in two and three for time),
-each with its row's layer as `MUTATION_LAYER`. It caches the incremental file
+`.github/workflows/mutation-nightly.yml` runs the engine in ten shards, one
+per row of the table below except L3 (three shards) and L11 (two), which are
+split for time, each with its row's layer as `MUTATION_LAYER`. It caches the incremental file
 per shard, keyed by the shard and a hash of `layers.json` (a test that moves
 layer changes which tests may kill, so old results are not reused), uploads
 each shard's JSON and HTML, and prints a per-shard score. It is report-only: `thresholds.break` is `null`. The 80%
@@ -164,13 +164,29 @@ because a deferral removes that mutant from the gate score.
 
 | Layer | Files in `packages/core/src/core/` |
 |---|---|
-| L0-L1 (Phase 1) | facts.ts, derivations.ts, effects.ts, tracking.ts, read-only-view.ts, module.ts, internal-scopes.ts |
-| L2 | constraints.ts, resolvers.ts, requirements.ts, timer.ts, clock.ts |
-| L3 | engine.ts, engine-accessors.ts, engine-definitions.ts, engine-trace.ts, system.ts, system-proxies.ts, system-module-transform.ts, errors.ts, plugins.ts, schema-builders.ts, schema-introspection.ts, sources.ts |
+| L1 (Phase 1: the L0 and L1 files) | facts.ts, derivations.ts, effects.ts, tracking.ts, read-only-view.ts, module.ts, internal-scopes.ts |
+| L2 | constraints.ts, resolvers.ts, requirements.ts |
+| L3 | engine.ts, engine-accessors.ts, engine-definitions.ts, system.ts, system-proxies.ts, system-module-transform.ts, errors.ts, plugins.ts, schema-builders.ts, clock.ts, timer.ts |
+| L5 | sources.ts |
+| L6 | schema-introspection.ts |
+| L9 | engine-trace.ts |
 | L11 | predicate.ts, predicate-describe.ts, predicate-hash.ts, predicate-to-mongo.ts, predicate-to-pgrest.ts, predicate-to-sql.ts, predict.ts, sweep-under.ts, replay-under.ts, rules-diff.ts, doctor.ts |
 
-Every file lands in exactly one row. The `__tests__/` and `types/` folders are
-not mutated.
+A file sits in the row of the plan's layer that owns its feature (the layer
+ladder), not the layer of the code that happens to call it. clock.ts and
+timer.ts are the L3 clock/timer; sources.ts is the L5 `source()`;
+schema-introspection.ts is the L6 snapshot and schema introspection;
+engine-trace.ts is the L9 `trace()`. A file whose counted mutants were all
+deferred at its old row had proved nothing there, which is how the first
+three were found. The L1 row covers the L0 and L1 files and its ceiling is
+L1: the row's layer is always the highest layer in its first cell, which is
+what `--layer row` and the nightly shard use.
+
+Every file of `packages/core/src/core/` lands in exactly one row, except
+`types.ts` (types only, nothing to mutate). The `__tests__/` and `types/`
+folders are not mutated. `scripts/__tests__/mutation-shards.test.ts` keeps
+this table and the nightly workflow's shards in step: it fails when a file
+is in no row, in two shards, or in a shard whose layer is not its row's.
 
 If a run is killed or times out, re-run the shard with the same cache; the
 incremental file keeps finished results.

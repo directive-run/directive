@@ -175,6 +175,15 @@
     "tests/core/l1-effects.test.ts": {
       "rule": "L0"
     },
+    "tests/core/l3-small-oracle-accessors.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-small-oracle-plugins.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-small-oracle-schema-builders.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/blackbox-effects.test.ts": {
       "rule": "L0"
     },
