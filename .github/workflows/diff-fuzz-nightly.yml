@@ -2,6 +2,9 @@ name: Differential fuzz (nightly)
 
 # The 2.0 oracle's fuzzer at depth: a fresh random seed every night and
 # 25x the cases PR CI runs (which pins seed 0x5eed at the 200-case floor).
+# 40% of the cases (2,000 of 5,000) are generated at or below the layer
+# core-next has built (layers.rules.json `current`), so v2 takes part in them;
+# the rest span every layer (diff/fuzz/fuzz.test.ts).
 # On a failure fast-check prints the seed and the shrink path, and the
 # error carries the shrunk spec and the first divergence: rerun locally with
 #   DIFF_FUZZ_SEED=<seed> DIFF_FUZZ_RUNS=5000 pnpm --filter @directive-run/conformance \
