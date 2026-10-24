@@ -6264,6 +6264,234 @@
         }
       }
     },
+    "tests/core/l2-constraints-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "tests": {
+        "constraints in production > ignores an `after` naming no constraint without a warning": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints in production > does not warn about an async constraint without deps": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints in production > does not warn when one constraint emits more than ten requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints in production > does not warn about a when that returns a promise, and honours its answer": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints in production > still rejects an `after` cycle when the system is created": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
+    "tests/core/l2-constraints-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "tests": {
+        "when and require > emits the requirement of a constraint whose when holds, and none for one whose when does not": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > emits nothing for a require that returns null, undefined or an empty list": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > skips null and undefined entries in a list and emits the rest in order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > emits one requirement for a static require and for a require function returning one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > emits a requirement once a require that answered nothing answers one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > keeps an untouched constraint answering nothing when another constraint fires": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > wakes a constraint on a fact only its require read": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > warns in development when one constraint emits more than ten requirements, and not at ten": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "when and require > passes the system's derived values to when and require": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "priority > asks higher priority first; equal priority keeps declaration order; no priority is 0": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "priority > orders by priority again when the system restarts": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > waits for the named constraint's resolver to finish": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > runs the waiting constraint when the named one's resolver satisfied it by its own write": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > waits for every constraint it names": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > does not wait for a named constraint whose when does not hold": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > does not wait for a named constraint that is disabled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > does not wait for a named constraint whose when threw": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > does not wait for a named constraint whose require threw": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > ignores an `after` naming no constraint, with a development warning naming both": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > keeps the requirement of a constraint it holds back": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > keeps the requirements of every other constraint while one is held back": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > after a restart asks constraints of equal priority dependencies first": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > runs a diamond in dependency order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > rejects a cycle when the system is created, naming the constraints on it and no other": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "after > rejects a constraint that names itself in `after`": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > asks a constraint again only when a fact its when read changes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > follows the branch its when took: the fact it stopped reading no longer wakes it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > keeps waking the other constraints on a fact one of them stopped reading": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > with explicit deps, is woken by those and not by other facts its when read": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "re-evaluation after writes > keeps the requirement of a constraint a write did not touch, without aborting its resolver": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "errors inside when and require > reports a when that throws in development, naming the constraint, and emits nothing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "errors inside when and require > reports a require that throws in development, with the original error, and emits nothing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "errors inside when and require > wakes a require that threw on the write that fixes what it read": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "errors inside when and require > keeps an untouched constraint whose require threw out of later passes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > emits the requirement of an async when that resolves true, and none for one that resolves false": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > asks an async constraint with deps again on a write to one of them, not on other writes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > asks an async constraint without deps on every pass, with a development warning naming it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > treats a when that returns a promise as async: warns, honours the answer, asks it every pass": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > emits nothing for a when that returns a promise that rejects, and reports it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > emits nothing for an async when that rejects, reports it, and fires once it resolves true": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > times an async when out after its own timeout and emits nothing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > times an async when out after 5000 ms by default": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > fires an async when that answers true before its timeout": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > emits the requirements of sync constraints before those of async ones in the same pass": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > emits nothing for an async constraint disabled while its when was pending": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "async constraints > does not ask a disabled async constraint without deps on later passes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "disable and enable > does not ask a disabled constraint when the system starts, and asks the rest": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "disable and enable > asks a re-enabled constraint on the next pass, even if nothing it read changed": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "disable and enable > reports a name that is no constraint as not disabled, and keeps working after enable() of one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",
