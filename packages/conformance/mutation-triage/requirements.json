@@ -1,0 +1,26 @@
+[
+  {
+    "line": 58,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "reqIdCache memoizes the default id per requirement object; without the lookup the id is recomputed from the same content and comes out identical. Only a requirement object mutated after its id was made, or a count of stableStringify calls, could tell them apart, and 2.0's ids are built from content, not from a per-object memo. Hand-run with the new l2-requirements-oracle tests: survives."
+  },
+  {
+    "line": 58,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "The cached-id early return only skips recomputing the same id; with the block emptied the code falls through and rebuilds an identical string. Same memo as line 58 col 7. Hand-run with the new l2-requirements-oracle tests: survives."
+  },
+  {
+    "line": 67,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "reqIdCache.set stores the id for the next lookup of the same object; never storing it means every call recomputes the identical id. Same memo as line 58 col 7. Hand-run with the new l2-requirements-oracle tests: survives."
+  }
+]

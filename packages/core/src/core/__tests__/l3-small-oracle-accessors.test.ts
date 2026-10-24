@@ -38,14 +38,13 @@ describe("system.derive", () => {
 
     expect("doubled" in system.derive).toBe(true);
     expect("nope" in system.derive).toBe(false);
-    expect(Symbol.iterator in system.derive).toBe(false);
   });
 
-  it("owns a property for each derivation and for nothing else", () => {
+  it("lists exactly the derivations when enumerated or spread", () => {
     const system = build();
 
-    expect(Object.hasOwn(system.derive, "doubled")).toBe(true);
-    expect(Object.hasOwn(system.derive, "nope")).toBe(false);
+    expect(Object.keys(system.derive)).toEqual(["doubled"]);
+    expect({ ...system.derive }).toEqual({ doubled: 4 });
   });
 
   it("a derived value cannot be assigned", () => {

@@ -8,85 +8,13 @@
     "note": "Every caller of createSchemaType passes its validators, so the default is never used."
   },
   {
-    "line": 205,
-    "col": 63,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 206,
-    "col": 30,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[]",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 206,
-    "col": 35,
-    "mutator": "LogicalOperator",
-    "replacement": "refinements && []",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 206,
-    "col": 50,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[\"Stryker was here\"]",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 206,
-    "col": 55,
-    "mutator": "ObjectLiteral",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 208,
-    "col": 9,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[]",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "t.*().refine() — the plan puts refine/transform/brand at L6; no test in the full run calls it"
-  },
-  {
-    "line": 245,
-    "col": 55,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta() on a schema type — the plan puts meta at L9; no test in the full run calls it on this builder"
-  },
-  {
     "line": 574,
     "col": 7,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Type name of t.boolean(), read by schema introspection (getKind) — killed in the full run by getKind — primitive builders t.boolean() → { kind: 'boolean' }"
-  },
-  {
-    "line": 597,
-    "col": 9,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
+    "note": "Type name of t.boolean(), read by schema introspection (getKind) \u2014 killed in the full run by getKind \u2014 primitive builders t.boolean() \u2192 { kind: 'boolean' }"
   },
   {
     "line": 605,
@@ -121,24 +49,6 @@
     "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
   },
   {
-    "line": 686,
-    "col": 59,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta() on a schema type — the plan puts meta at L9; no test in the full run calls it on this builder"
-  },
-  {
-    "line": 721,
-    "col": 9,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
     "line": 755,
     "col": 36,
     "mutator": "ConditionalExpression",
@@ -171,15 +81,6 @@
     "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
   },
   {
-    "line": 778,
-    "col": 59,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta() on a schema type — the plan puts meta at L9; no test in the full run calls it on this builder"
-  },
-  {
     "line": 812,
     "col": 23,
     "mutator": "ConditionalExpression",
@@ -188,182 +89,11 @@
     "note": "The enum values are strings, so set membership already fails for a non-string and the typeof check adds nothing."
   },
   {
-    "line": 813,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "``",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 813,
-    "col": 27,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 835,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "``",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 853,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "(innerType as ExtendedSchemaType<T>)._typeName && \"unknown\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 853,
-    "col": 57,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 881,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "(innerType as ExtendedSchemaType<T>)._typeName && \"unknown\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 881,
-    "col": 57,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 945,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "(valueType as ExtendedSchemaType<V>)._typeName && \"unknown\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 945,
-    "col": 57,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 982,
-    "col": 7,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 983,
-    "col": 9,
-    "mutator": "LogicalOperator",
-    "replacement": "(schemaType as ExtendedSchemaType<unknown>)._typeName && \"unknown\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 983,
-    "col": 66,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1011,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1028,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1045,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
     "line": 1067,
     "col": 19,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
     "note": "Returns undefined instead of false from a validator; every caller reads validators as truthy or falsy."
-  },
-  {
-    "line": 1072,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1087,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1100,
-    "col": 41,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
-  },
-  {
-    "line": 1113,
-    "col": 45,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name string, read by schema introspection (L6) and dev messages only; the full run does not kill it, so the L6 gate needs a case for it."
   }
 ]

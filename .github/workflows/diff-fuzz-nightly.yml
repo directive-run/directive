@@ -1,7 +1,10 @@
 name: Differential fuzz (nightly)
 
 # The 2.0 oracle's fuzzer at depth: a fresh random seed every night and
-# 25x the cases PR CI runs (which pins seed 0x5eed at the 200-case floor).
+# 25x the cases PR CI runs across every layer (which pins seed 0x5eed at 205).
+# On top of the 5,000, it adds 2,000 more (40%) generated at or below the layer
+# core-next has built (layers.rules.json `current`), so v2 takes part in them
+# (diff/fuzz/fuzz.test.ts): 7,000 cases in all.
 # On a failure fast-check prints the seed and the shrink path, and the
 # error carries the shrunk spec and the first divergence: rerun locally with
 #   DIFF_FUZZ_SEED=<seed> DIFF_FUZZ_RUNS=5000 pnpm --filter @directive-run/conformance \
@@ -62,6 +65,7 @@ jobs:
           DIFF_FUZZ_SEED: ${{ steps.seed.outputs.seed }}
           DIFF_FUZZ_RUNS: ${{ inputs.runs || '5000' }}
         working-directory: packages/conformance
-        # 5,000 cases on three engines (v1, local, v2) need more than the
-        # project's 120 s default; PR runs use fewer cases and keep it.
+        # 7,000 cases (5,000 across every layer and 2,000 for v2) on three
+        # engines (v1, local, v2) need more than the project's 120 s default;
+        # PR runs use fewer cases and keep it.
         run: ./node_modules/.bin/vitest run --config vitest.config.ts --project conformance:diff --testTimeout=1200000 diff/fuzz

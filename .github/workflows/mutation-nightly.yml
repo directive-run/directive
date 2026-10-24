@@ -47,14 +47,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # One shard per MUTATION.md layer row (L3 and L11 split for time).
+        # One shard per MUTATION.md layer row (L3 and L11 split for time, L6 by feature).
         # A shard's files are the table's files for its row, no more, no less.
         # `layer` is the shard's ceiling: tests placed above it are left out,
         # so each score counts only kills by tests that run on v2 there.
         include:
           - shard: l1-state
             layer: L1
-            mutate: packages/core/src/core/facts.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/tracking.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/module.ts,packages/core/src/core/internal-scopes.ts
+            mutate: packages/core/src/core/facts.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/tracking.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/module.ts
           - shard: l2-resolvers
             layer: L2
             mutate: packages/core/src/core/constraints.ts,packages/core/src/core/resolvers.ts,packages/core/src/core/requirements.ts
@@ -66,16 +66,22 @@ jobs:
             mutate: packages/core/src/core/system.ts,packages/core/src/core/system-proxies.ts,packages/core/src/core/system-module-transform.ts
           - shard: l3-rest
             layer: L3
-            mutate: packages/core/src/core/engine-accessors.ts,packages/core/src/core/engine-definitions.ts,packages/core/src/core/errors.ts,packages/core/src/core/plugins.ts,packages/core/src/core/schema-builders.ts,packages/core/src/core/clock.ts,packages/core/src/core/timer.ts
+            mutate: packages/core/src/core/engine-accessors.ts,packages/core/src/core/errors.ts,packages/core/src/core/plugins.ts,packages/core/src/core/schema-builders.ts,packages/core/src/core/clock.ts,packages/core/src/core/timer.ts
           - shard: l5-sources
             layer: L5
             mutate: packages/core/src/core/sources.ts
           - shard: l6-introspection
             layer: L6
             mutate: packages/core/src/core/schema-introspection.ts
+          - shard: l6-hydration
+            layer: L6
+            mutate: packages/core/src/core/internal-scopes.ts
           - shard: l9-trace
             layer: L9
             mutate: packages/core/src/core/engine-trace.ts
+          - shard: l10-dynamic
+            layer: L10
+            mutate: packages/core/src/core/engine-definitions.ts
           - shard: l11-predicate
             layer: L11
             mutate: packages/core/src/core/predicate*.ts
@@ -185,7 +191,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p full
-          for shard in l1-state l2-resolvers l3-engine l3-system l3-rest l5-sources l6-introspection l9-trace l11-predicate l11-rest; do
+          for shard in l1-state l2-resolvers l3-engine l3-system l3-rest l5-sources l6-introspection l6-hydration l9-trace l10-dynamic l11-predicate l11-rest; do
             id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=mutation-full-$shard&per_page=1" --jq '.artifacts[0].id // empty')
             if [ -z "$id" ]; then echo "no full-run report for $shard"; continue; fi
             gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > "full/$shard.zip"

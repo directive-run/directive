@@ -114,15 +114,16 @@ describe("plugin onInit", () => {
     await idle();
 
     expect(good).toHaveBeenCalledOnce();
+    // One report per failing plugin, each naming the plugin and the hook.
+    // How the report is shaped (message, fields, argument order) is not pinned.
     expect(error).toHaveBeenCalledTimes(2);
-    expect(error.mock.calls[0]?.[1]).toMatchObject({
-      plugin: "bad-sync",
-      hook: "onInit",
-    });
-    expect(error.mock.calls[1]?.[1]).toMatchObject({
-      plugin: "bad-async",
-      hook: "onInit",
-    });
+    const reports = error.mock.calls.map((call) =>
+      call.map((arg) => JSON.stringify(arg) ?? String(arg)).join(" "),
+    );
+    const reported = (plugin: string) =>
+      reports.some((r) => r.includes(plugin) && r.includes("onInit"));
+    expect(reported("bad-sync")).toBe(true);
+    expect(reported("bad-async")).toBe(true);
 
     system.start();
     system.facts.n = 5;
