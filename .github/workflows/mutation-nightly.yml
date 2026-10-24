@@ -50,7 +50,7 @@ jobs:
         include:
           - shard: l1-state
             layer: L1
-            mutate: packages/core/src/core/facts.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/tracking.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/module.ts,packages/core/src/core/internal-scopes.ts
+            mutate: packages/core/src/core/facts.ts,packages/core/src/core/derivations.ts,packages/core/src/core/effects.ts,packages/core/src/core/tracking.ts,packages/core/src/core/read-only-view.ts,packages/core/src/core/module.ts
           - shard: l2-resolvers
             layer: L2
             mutate: packages/core/src/core/constraints.ts,packages/core/src/core/resolvers.ts,packages/core/src/core/requirements.ts,packages/core/src/core/timer.ts,packages/core/src/core/clock.ts
@@ -63,6 +63,9 @@ jobs:
           - shard: l3-rest
             layer: L3
             mutate: packages/core/src/core/engine-accessors.ts,packages/core/src/core/engine-definitions.ts,packages/core/src/core/engine-trace.ts,packages/core/src/core/errors.ts,packages/core/src/core/plugins.ts,packages/core/src/core/schema-builders.ts,packages/core/src/core/schema-introspection.ts,packages/core/src/core/sources.ts
+          - shard: l6-hydration
+            layer: L6
+            mutate: packages/core/src/core/internal-scopes.ts
           - shard: l11-predicate
             layer: L11
             mutate: packages/core/src/core/predicate*.ts
@@ -172,7 +175,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p full
-          for shard in l1-state l2-resolvers l3-engine l3-system l3-rest l11-predicate l11-rest; do
+          for shard in l1-state l2-resolvers l3-engine l3-system l3-rest l6-hydration l11-predicate l11-rest; do
             id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=mutation-full-$shard&per_page=1" --jq '.artifacts[0].id // empty')
             if [ -z "$id" ]; then echo "no full-run report for $shard"; continue; fi
             gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > "full/$shard.zip"
