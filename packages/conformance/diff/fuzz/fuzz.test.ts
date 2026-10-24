@@ -3,23 +3,26 @@
  * trace identically on every engine (and twice on the reference).
  *
  * PR CI runs the fixed seed below for FUZZ_DEFAULT_RUNS (FUZZ_FLOOR + 5)
- * cases, so a run is reproducible and a couple of runaways cannot drop the
- * compared count under the floor. The nightly workflow (.github/workflows/diff-fuzz-nightly.yml)
- * picks a random `DIFF_FUZZ_SEED` and raises `DIFF_FUZZ_RUNS`. Fewer cases
- * than the floor fail here and in the census. On a failure fast-check
- * shrinks the case and prints the seed and path to replay it; the error
- * also carries the shrunk spec and the first divergence.
+ * cases across every layer, so a run is reproducible and a couple of
+ * runaways cannot drop the compared count under the floor, and adds the v2
+ * share described below. The nightly workflow
+ * (.github/workflows/diff-fuzz-nightly.yml) picks a random `DIFF_FUZZ_SEED`
+ * and raises `DIFF_FUZZ_RUNS`. Fewer cases than the floor fail here and in
+ * the census. On a failure fast-check shrinks the case and prints the seed
+ * and path to replay it; the error also carries the shrunk spec and the
+ * first divergence.
  *
- * A run has two phases of exact size (so the split is a guarantee, not a
+ * A run has two phases of exact size (so the count is a guarantee, not a
  * probability) and the same replay: the seed and run count reproduce both.
  *
- * - FUZZ_V2_PERCENT of the cases (lib/fuzz.ts) are generated with a ceiling
- *   at `current` in layers.rules.json, the highest layer core-next has built
- *   (model.ts `FEATURE_LAYERS`), so v2 takes part in them. Left to chance,
- *   nearly every case uses a feature above `current` and v2 sits out of it.
- * - The rest are generated across every layer, as before: v1 and the
- *   workspace engine are compared on all of them, v2 on those that happen to
- *   fit.
+ * - RUNS cases are generated across every layer, the cases a run always
+ *   had: v1 and the workspace engine are compared on all of them, v2 on those
+ *   that happen to fit. Adding the v2 share never takes one of them away.
+ * - On top of those, v2Cases(RUNS) more cases (FUZZ_V2_PERCENT of RUNS,
+ *   lib/fuzz.ts) are generated with a ceiling at `current` in
+ *   layers.rules.json, the highest layer core-next has built (model.ts
+ *   `FEATURE_LAYERS`), so v2 takes part in them. Left to chance, nearly every
+ *   case uses a feature above `current` and v2 sits out of it.
  *
  * Every engine run has a timer-callback budget (diff/scenario.ts
  * RUN_BUDGET). A case whose reference run passes it never settles on 1.35
@@ -72,7 +75,7 @@ describe("differential fuzz", () => {
     const phases = [
       {
         label: "across every layer",
-        runs: RUNS - upToCurrent,
+        runs: RUNS,
         seed: SEED,
         arbitrary: specArbitrary(),
       },
@@ -88,7 +91,7 @@ describe("differential fuzz", () => {
           ]),
     ];
     console.info(
-      `[diff fuzz] seed ${SEED}, ${RUNS} runs: ${phases.map((p) => `${p.runs} ${p.label}`).join(", ")}`,
+      `[diff fuzz] seed ${SEED}, ${RUNS + upToCurrent} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
     );
     let ran = 0;
     let runaway = 0;

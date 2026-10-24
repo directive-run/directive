@@ -17,8 +17,8 @@
  * `FEATURE_LAYERS`); `specLayer()` is the highest one a case uses, so a v2
  * run compares only the cases its `current` layer covers. Left alone, almost
  * every case uses something above `current`, so `specArbitrary({ ceiling })`
- * leaves out every feature above the ceiling: the fuzzer generates a share of
- * its cases at `current` (fuzz.test.ts) and v2 takes part in them.
+ * leaves out every feature above the ceiling: the fuzzer adds a share of
+ * cases generated at `current` (fuzz.test.ts) and v2 takes part in them.
  * `toScenario()` turns a spec into a ScenarioDef that builds the same system
  * on whichever engine runs it.
  */
@@ -98,7 +98,9 @@ export interface FuzzSpec {
  * The layer (the plan's ladder) that builds each feature the generator can
  * use. `specLayer()` places a case by the highest one it uses and
  * `specArbitrary({ ceiling })` leaves out every feature above the ceiling;
- * both read this table, so a feature's layer is written down once.
+ * both read this table, so a feature's layer is written down once. A feature
+ * sits at the layer of the highest thing its generated code calls, as
+ * lib/layers.ts places it (the self test pins the cases that were once wrong).
  */
 export const FEATURE_LAYERS = {
   /** A second module: namespacing, wildcard events, crossModuleDeps. */
@@ -107,14 +109,21 @@ export const FEATURE_LAYERS = {
   constraints: 2,
   /** An error boundary, with every strategy. */
   boundary: 3,
-  /** The stop, start, destroy and twin steps. */
+  /** The stop, start and destroy steps. */
   lifecycle: 3,
-  /** Effect cleanups and explicit deps. */
-  effectControls: 4,
+  /**
+   * Effect cleanups. Basic effects (run, cleanup, auto-tracking) are L0 in
+   * layers.rules.json (`notes.effects`); only deps, on and prev are L4.
+   */
+  effectCleanups: 0,
+  /** Effects with explicit deps. */
+  effectDeps: 4,
   /** An event source, and publishing from it. */
   sources: 5,
-  /** The snapshot and restore steps. */
+  /** The snapshot and restore steps (getSnapshot and restore are L6). */
   snapshots: 6,
+  /** The twin step: it reads the second system's getSnapshot (L6). */
+  twin: 6,
   /** The history option and the back and forward steps. */
   history: 8,
   /** The trace option. */
@@ -132,7 +141,7 @@ const STEP_FEATURES = {
   restore: "snapshots",
   back: "history",
   forward: "history",
-  twin: "lifecycle",
+  twin: "twin",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
@@ -209,8 +218,8 @@ function moduleArbitrary(
       effects: fc.array(
         fc.record({
           reads: factSet,
-          explicitDeps: flag("effectControls"),
-          cleanup: flag("effectControls"),
+          explicitDeps: flag("effectDeps"),
+          cleanup: flag("effectCleanups"),
           throwsAt: fc.option(fc.integer({ min: 3, max: 8 }), {
             nil: null,
             freq: 4,
@@ -372,8 +381,11 @@ export function specLayer(spec: FuzzSpec): string {
     if (m.constraints.length > 0) {
       use("constraints");
     }
-    if (m.effects.some((e) => e.cleanup || e.explicitDeps)) {
-      use("effectControls");
+    if (m.effects.some((e) => e.cleanup)) {
+      use("effectCleanups");
+    }
+    if (m.effects.some((e) => e.explicitDeps)) {
+      use("effectDeps");
     }
     if (m.source) {
       use("sources");

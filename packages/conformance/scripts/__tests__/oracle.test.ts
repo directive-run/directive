@@ -601,8 +601,9 @@ describe("the differential project", () => {
     expect(checkFuzzRuns([run(0)], false)).toEqual([]);
   });
 
-  it("splits the fuzz cases so v2 always has its floor", () => {
-    // The split is exact: nothing is lost or counted twice.
+  it("adds fuzz cases so v2 always has its floor", () => {
+    // The share is added to a run's cases across every layer, never taken
+    // from them, and it is a part of a run, not all of it.
     for (const runs of [FUZZ_FLOOR, FUZZ_DEFAULT_RUNS, 1000, 5000]) {
       expect(v2Cases(runs)).toBeGreaterThan(0);
       expect(v2Cases(runs)).toBeLessThan(runs);

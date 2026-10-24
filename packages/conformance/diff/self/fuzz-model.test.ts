@@ -9,6 +9,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   FEATURE_LAYERS,
+  type FuzzEffect,
+  type FuzzModule,
   type FuzzSpec,
   specArbitrary,
   specLayer,
@@ -70,14 +72,16 @@ describe("fuzz generator ceiling", () => {
         s.modules.some((m) => m.constraints.length > 0),
       ),
       boundary: specs.some((s) => s.boundary !== null),
-      lifecycle: steps("stop", "start", "destroy", "twin"),
-      effectControls: specs.some((s) =>
-        s.modules.some((m) =>
-          m.effects.some((e) => e.cleanup || e.explicitDeps),
-        ),
+      lifecycle: steps("stop", "start", "destroy"),
+      effectCleanups: specs.some((s) =>
+        s.modules.some((m) => m.effects.some((e) => e.cleanup)),
+      ),
+      effectDeps: specs.some((s) =>
+        s.modules.some((m) => m.effects.some((e) => e.explicitDeps)),
       ),
       sources: specs.some((s) => s.modules.some((m) => m.source !== null)),
       snapshots: steps("snapshot", "restore"),
+      twin: steps("twin"),
       history: specs.some((s) => s.history) && steps("back", "forward"),
       trace: specs.some((s) => s.trace),
     };
@@ -86,6 +90,64 @@ describe("fuzz generator ceiling", () => {
       Object.keys(FEATURE_LAYERS).sort(),
     );
     expect(Object.entries(used).filter(([, seen]) => !seen)).toEqual([]);
+  });
+
+  it("keeps the L0 effect cleanups in play at the lowest ceiling", () => {
+    // Basic effects (run, cleanup, auto-tracking) are L0 in layers.rules.json;
+    // only explicit deps are L4. Cleanups once sat with the deps, so a ceiling
+    // below L4 never generated one and v2 never saw a cleanup.
+    const effects = sample("L0").flatMap((s) =>
+      s.modules.flatMap((m) => m.effects),
+    );
+
+    expect(effects.some((e) => e.cleanup)).toBe(true);
+    expect(effects.some((e) => e.explicitDeps)).toBe(false);
+  });
+
+  it("places a case by what its steps and effects call", () => {
+    const base: FuzzSpec = {
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: false,
+      steps: [{ op: "settle" }],
+    };
+    const withEffect = (effect: Partial<FuzzEffect>): FuzzSpec => ({
+      ...base,
+      modules: [
+        {
+          ...(base.modules[0] as FuzzModule),
+          effects: [
+            {
+              reads: [0],
+              explicitDeps: false,
+              cleanup: false,
+              throwsAt: null,
+              ...effect,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(specLayer(base)).toBe("L0");
+    expect(specLayer(withEffect({ cleanup: true }))).toBe("L0");
+    expect(specLayer(withEffect({ explicitDeps: true }))).toBe("L4");
+    // The twin step reads a second system's getSnapshot, which lib/layers.ts
+    // places at L6 (MEMBER_LAYERS), above the lifecycle steps it also uses.
+    expect(specLayer({ ...base, steps: [{ op: "twin" }] })).toBe("L6");
+    expect(specLayer({ ...base, steps: [{ op: "snapshot" }] })).toBe("L6");
+    expect(specLayer({ ...base, steps: [{ op: "stop" }] })).toBe("L3");
   });
 
   it("yields only cases v2 runs at the current layer", () => {
