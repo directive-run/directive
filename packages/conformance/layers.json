@@ -6264,6 +6264,229 @@
         }
       }
     },
+    "tests/core/l2-resolvers-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "retry backoff fires each attempt exactly when its delay ends > does not retry without a retry policy": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > \"none\" waits initialDelay before every retry": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > initialDelay defaults to 100ms": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > \"linear\" waits initialDelay × attempt": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > \"exponential\" doubles the delay each attempt": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > maxDelay caps the delay": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > maxDelay defaults to 30s": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > an unknown backoff waits initialDelay": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry backoff fires each attempt exactly when its delay ends > a zero delay still waits 1ms": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > \"full\" samples within [0, delay)": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > \"full\" never goes below 1ms": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > \"equal\" samples within [delay/2, delay)": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > { maxMs } adds up to maxMs on top of the delay": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > jitter applies after maxDelay clamps the delay": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "jitter draws from Math.random > \"%s adds no jitter\"": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"],
+          "dynamic": true
+        },
+        "retry outcomes > announces each retry with the next attempt number, then completes": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > reports the last error once the attempts run out, with no retry after the last": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > stops at once when shouldRetry says no": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > shouldRetry sees the error, the attempt and why it failed (\"error\" or \"timeout\")": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > a thrown non-Error reaches the hooks as an Error": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > a run canceled during its backoff is not retried and announces no retry": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > a canceled run that throws on abort reports no error": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > a run that satisfies its requirement and then throws is not run again": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "retry outcomes > onResolverComplete gets the time from the first attempt's start": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "timeout > fails the attempt exactly at its deadline": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "timeout > \"a timeout of %i means no timeout\"": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"],
+          "dynamic": true
+        },
+        "which resolver handles a requirement > a predicate takes only what it accepts; later resolvers take the rest": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "writes a run counts as its own > deleting a fact retracts the requirement as an own write, not a cancel": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "writes a run counts as its own > two own writes in one pass both count": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "writes a run counts as its own > writing a fact's current value is not an own write": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "writes a run counts as its own > deleting an absent fact is not an own write": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "writes a run counts as its own > \"an own write %i passes earlier does not shield an outside retraction\"": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"],
+          "dynamic": true
+        },
+        "a superseded run > drops its late write silently and keeps running": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "a superseded run > drops its late delete silently and keeps running": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "a superseded run > reports no error when it throws late": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "a superseded run > finishing does not untrack the run that replaced it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "abortOn rejects a run's write to a fact changed meanwhile > rejects every later write to that fact too": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "abortOn rejects a run's write to a fact changed meanwhile > lets a run write an abortOn fact nothing else changed, again and again": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "abortOn rejects a run's write to a fact changed meanwhile > reports ten rejections, then one summary of the rest": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "abortOn rejects a run's write to a fact changed meanwhile > a bound run retracted from outside keeps retrying to the end": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "the resolver context > snapshot() returns the current facts": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["option plugins (L3)"]
+        },
+        "definition checks > a resolver with no resolve function is rejected when the system is created": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        },
+        "inspect() shows an in-flight run's status > pending as it starts, then running with the attempt number; listed as in flight": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",

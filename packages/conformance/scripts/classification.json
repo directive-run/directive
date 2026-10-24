@@ -563,6 +563,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l2-resolvers-oracle.test.ts",
+    "category": "black-box",
+    "cases": 43,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/meta-query-does-not-watch.test.ts",
     "category": "black-box",
     "cases": 2,

@@ -1,0 +1,2663 @@
+[
+  {
+    "line": 42,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 43,
+    "col": 7,
+    "mutator": "BooleanLiteral",
+    "replacement": "signal.aborted",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 43,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 43,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "reason === null",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "LogicalOperator",
+    "replacement": "reason !== null && typeof reason === \"object\" && \"kind\" in reason || (reason as {\n  kind: unknown;\n}).kind === \"clobbered\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "LogicalOperator",
+    "replacement": "reason !== null && typeof reason === \"object\" || \"kind\" in reason",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "mutator": "LogicalOperator",
+    "replacement": "reason !== null || typeof reason === \"object\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 47,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 47,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof reason !== \"object\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 47,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 48,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 49,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 49,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "(reason as {\n  kind: unknown;\n}).kind !== \"clobbered\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 49,
+    "col": 44,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 50,
+    "col": 5,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 57,
+    "col": 12,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 58,
+    "col": 15,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 59,
+    "col": 16,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 64,
+    "col": 10,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 64,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 403,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "An empty backoff name falls to the default branch, which waits initialDelay, exactly what \"none\" does."
+  },
+  {
+    "line": 417,
+    "col": 36,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 418,
+    "col": 12,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "DEFAULT_BATCH is spread under def.batch only on the batch path, which runs only when def.batch.enabled is already true, so the default never shows."
+  },
+  {
+    "line": 436,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 436,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "!jitter && jitter === \"none\"",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 436,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 436,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 436,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 450,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 450,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A missing jitter and \"none\" reach the final `return computedDelay` anyway; the early return only shortcuts it."
+  },
+  {
+    "line": 452,
+    "col": 40,
+    "mutator": "EqualityOperator",
+    "replacement": "jitter.maxMs >= 0",
+    "reason": "equivalent",
+    "note": "Differs only at maxMs 0, which yields no jitter either way."
+  },
+  {
+    "line": 473,
+    "col": 10,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "An empty backoff name falls to the default branch, which waits initialDelay, exactly what \"none\" does."
+  },
+  {
+    "line": 553,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development-only validation or warning path."
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "BooleanLiteral",
+    "replacement": "def.batch?.enabled",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch"
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch"
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "!def.batch?.enabled && def.resolveBatch",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+  },
+  {
+    "line": 569,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "(!def.batch?.enabled || def.resolveBatch) && def.resolveBatchWithResults",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+  },
+  {
+    "line": 572,
+    "col": 7,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+  },
+  {
+    "line": 580,
+    "col": 12,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 671,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 672,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 672,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 672,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "statuses.size <= MAX_STATUSES",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 672,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "statuses.size >= MAX_STATUSES",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 672,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 674,
+    "col": 31,
+    "mutator": "ArithmeticOperator",
+    "replacement": "statuses.size + MAX_STATUSES",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 676,
+    "col": 23,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 676,
+    "col": 23,
+    "mutator": "EqualityOperator",
+    "replacement": "i <= entriesToRemove",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 676,
+    "col": 23,
+    "mutator": "EqualityOperator",
+    "replacement": "i >= entriesToRemove",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 676,
+    "col": 44,
+    "mutator": "UpdateOperator",
+    "replacement": "i--",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 676,
+    "col": 49,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 678,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 678,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 678,
+    "col": 18,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 687,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 699,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 732,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 734,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 739,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 742,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 744,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 744,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 753,
+    "col": 76,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 755,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 755,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 755,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "resolversByType.size < MAX_RESOLVER_CACHE",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 755,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "resolversByType.size > MAX_RESOLVER_CACHE",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 755,
+    "col": 55,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 757,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 757,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 757,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "oldest === undefined",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 757,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 758,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "LRU refresh / eviction of the resolver cache past 1000 requirement types; memory only."
+  },
+  {
+    "line": 763,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 772,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 772,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 779,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "v1-bug",
+    "note": "The per-type resolver cache. Disabling or mis-filling it changes the answer only when two resolvers can take one requirement: 1.35 then prefers the one cached for the type over declaration order (verified: a predicate resolver declared first loses a requirement it accepts to a string resolver cached earlier). That preference is an accident of the cache, not a contract to keep."
+  },
+  {
+    "line": 801,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 801,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 801,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!getConstraintBinding && !req",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 801,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "(!getConstraintBinding || !req) && !req.fromConstraint",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 803,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 803,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+  },
+  {
+    "line": 889,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 896,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1032,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1034,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1034,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1034,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1035,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1055,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Records a failure after a satisfying write for a development warning only."
+  },
+  {
+    "line": 1076,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Fact keys are strings, so `true && !Object.is(...)` is the same check."
+  },
+  {
+    "line": 1076,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Fact keys are strings, so `true && !Object.is(...)` is the same check."
+  },
+  {
+    "line": 1086,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only changes whether deleting a key the facts view does not have counts as the run's own write. A test that deletes an absent fact and then writes it from outside in the same pass sees the run canceled either way (tried; l2-resolvers-oracle keeps that test)."
+  },
+  {
+    "line": 1086,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only changes whether deleting a key the facts view does not have counts as the run's own write. A test that deletes an absent fact and then writes it from outside in the same pass sees the run canceled either way (tried; l2-resolvers-oracle keeps that test)."
+  },
+  {
+    "line": 1086,
+    "col": 13,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof key === \"string\" || Reflect.has(t, key)",
+    "reason": "not-observable",
+    "note": "Only changes whether deleting a key the facts view does not have counts as the run's own write. A test that deletes an absent fact and then writes it from outside in the same pass sees the run canceled either way (tried; l2-resolvers-oracle keeps that test)."
+  },
+  {
+    "line": 1107,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "The engine always passes onClobber / onClobberSuppressed and invokeResolve always passes the attribution, so the guard is always true."
+  },
+  {
+    "line": 1107,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "onClobber || clobberAttribution",
+    "reason": "equivalent",
+    "note": "The engine always passes onClobber / onClobberSuppressed and invokeResolve always passes the attribution, so the guard is always true."
+  },
+  {
+    "line": 1116,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "The engine always passes onClobber / onClobberSuppressed and invokeResolve always passes the attribution, so the guard is always true."
+  },
+  {
+    "line": 1116,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "onClobberSuppressed || clobberAttribution",
+    "reason": "equivalent",
+    "note": "The engine always passes onClobber / onClobberSuppressed and invokeResolve always passes the attribution, so the guard is always true."
+  },
+  {
+    "line": 1135,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Write recording for a context without a controller or requirement ids (dynamic call / batch) — killed in the full run by Resolvers dynamic definitions assign overrides an existing resolver"
+  },
+  {
+    "line": 1135,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "controller || requirementIds.length > 0",
+    "reason": "equivalent",
+    "note": "Every L2 context has a controller and exactly one requirement id, so the guard is always true there."
+  },
+  {
+    "line": 1135,
+    "col": 21,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Every L2 context has a controller and exactly one requirement id, so the guard is always true there."
+  },
+  {
+    "line": 1135,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "requirementIds.length >= 0",
+    "reason": "equivalent",
+    "note": "Every L2 context has a controller and exactly one requirement id, so the guard is always true there."
+  },
+  {
+    "line": 1143,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1171,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1171,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "abortContext?.reason !== \"clobbered\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "abortContext.reason",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 36,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1178,
+    "col": 49,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1180,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1180,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1180,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "retryPolicy.shouldRetry || !retryPolicy.shouldRetry(normalizedError, attempt, abortContext)",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1181,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "retryPolicy.shouldRetry(normalizedError, attempt, abortContext)",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1182,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1183,
+    "col": 18,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1183,
+    "col": 28,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1186,
+    "col": 14,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1186,
+    "col": 24,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+  },
+  {
+    "line": 1196,
+    "col": 24,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "An empty action is not \"continue\", so the retry loop stops exactly as it does for this one."
+  },
+  {
+    "line": 1200,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The signal can be aborted here only if shouldRetry itself aborts the run synchronously (system.stop() inside it). Without the check the run waits out its backoff and the check after the wait returns abort: same outcome, a pending timer meanwhile."
+  },
+  {
+    "line": 1200,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The signal can be aborted here only if shouldRetry itself aborts the run synchronously (system.stop() inside it). Without the check the run waits out its backoff and the check after the wait returns abort: same outcome, a pending timer meanwhile."
+  },
+  {
+    "line": 1201,
+    "col": 16,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The signal can be aborted here only if shouldRetry itself aborts the run synchronously (system.stop() inside it). Without the check the run waits out its backoff and the check after the wait returns abort: same outcome, a pending timer meanwhile."
+  },
+  {
+    "line": 1201,
+    "col": 26,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "The signal can be aborted here only if shouldRetry itself aborts the run synchronously (system.stop() inside it). Without the check the run waits out its backoff and the check after the wait returns abort: same outcome, a pending timer meanwhile."
+  },
+  {
+    "line": 1208,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1209,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1210,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1212,
+    "col": 44,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1212,
+    "col": 67,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1213,
+    "col": 17,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The abort listener only ends the backoff wait early. Without it the wait runs out and the aborted check after it returns abort: same outcome; the timer just stays pending, and nothing at L2 waits on it."
+  },
+  {
+    "line": 1218,
+    "col": 16,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "Only changes the error a run canceled during its backoff reports. 1.35 reports the last error after that cancel (observed in l2-resolvers-oracle), which is itself questionable, so no test pins it."
+  },
+  {
+    "line": 1218,
+    "col": 26,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "An empty action is not \"continue\", so the retry loop stops exactly as it does for this one."
+  },
+  {
+    "line": 1247,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Single runs always have def.resolve (validation requires it unless batching) and the definition read synchronously before the run starts; only batch fallback and dynamic unregister (L7/L10) reach this, and the full run does not kill it."
+  },
+  {
+    "line": 1247,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Single runs always have def.resolve (validation requires it unless batching) and the definition read synchronously before the run starts; only batch fallback and dynamic unregister (L7/L10) reach this, and the full run does not kill it."
+  },
+  {
+    "line": 1266,
+    "col": 20,
+    "mutator": "EqualityOperator",
+    "replacement": "timeout >= 0",
+    "reason": "equivalent",
+    "note": "A zero timeout already fails the `timeout &&` operand, so `>= 0` and `> 0` agree."
+  },
+  {
+    "line": 1286,
+    "col": 26,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1287,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1292,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 1293,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onComplete(resolverId, req, duration)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1303,
+    "col": 26,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1304,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1310,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 1311,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(resolverId, req, error)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1368,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Single runs always have def.resolve (validation requires it unless batching) and the definition read synchronously before the run starts; only batch fallback and dynamic unregister (L7/L10) reach this, and the full run does not kill it."
+  },
+  {
+    "line": 1368,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Single runs always have def.resolve (validation requires it unless batching) and the definition read synchronously before the run starts; only batch fallback and dynamic unregister (L7/L10) reach this, and the full run does not kill it."
+  },
+  {
+    "line": 1374,
+    "col": 23,
+    "mutator": "LogicalOperator",
+    "replacement": "inflight.get(req.id)?.startedAt && Date.now()",
+    "reason": "equivalent",
+    "note": "startedAt is set in the same synchronous step that starts the run, so Date.now() returns the same value."
+  },
+  {
+    "line": 1377,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "At attempt 1 the controller is new, and after a backoff the wait already returned abort if the signal was aborted; only an abort landing in the microtask gap between the wait and the next attempt reaches this."
+  },
+  {
+    "line": 1377,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "At attempt 1 the controller is new, and after a backoff the wait already returned abort if the signal was aborted; only an abort landing in the microtask gap between the wait and the next attempt reaches this."
+  },
+  {
+    "line": 1382,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "On attempt 1 the run record is fresh (not satisfied), so dropping `attempt > 1` or the optional chain changes nothing."
+  },
+  {
+    "line": 1382,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "attempt >= 1",
+    "reason": "equivalent",
+    "note": "On attempt 1 the run record is fresh (not satisfied), so dropping `attempt > 1` or the optional chain changes nothing."
+  },
+  {
+    "line": 1382,
+    "col": 26,
+    "mutator": "OptionalChaining",
+    "replacement": "runRecords.get(controller).satisfied",
+    "reason": "equivalent",
+    "note": "On attempt 1 the run record is fresh (not satisfied), so dropping `attempt > 1` or the optional chain changes nothing."
+  },
+  {
+    "line": 1406,
+    "col": 13,
+    "mutator": "OptionalChaining",
+    "replacement": "record.discard",
+    "reason": "equivalent",
+    "note": "Every single run has a run record by the time it can throw (createContext makes it)."
+  },
+  {
+    "line": 1409,
+    "col": 13,
+    "mutator": "OptionalChaining",
+    "replacement": "record.satisfied",
+    "reason": "equivalent",
+    "note": "Every single run has a run record by the time it can throw (createContext makes it)."
+  },
+  {
+    "line": 1424,
+    "col": 21,
+    "mutator": "OptionalChaining",
+    "replacement": "onRetry(resolverId, req, next)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1463,
+    "col": 32,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1465,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1465,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1475,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1475,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1475,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1476,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1479,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1479,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1479,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "results.length === requirements.length",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1479,
+    "col": 49,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1486,
+    "col": 23,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1488,
+    "col": 21,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1488,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "i <= requirements.length",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1488,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "i >= requirements.length",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1488,
+    "col": 46,
+    "mutator": "UpdateOperator",
+    "replacement": "i--",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1488,
+    "col": 51,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1492,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1492,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1492,
+    "col": 27,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1493,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1497,
+    "col": 21,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1498,
+    "col": 21,
+    "mutator": "LogicalOperator",
+    "replacement": "result.error && new Error(\"Batch item failed\")",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1499,
+    "col": 28,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1500,
+    "col": 16,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1506,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onError(resolverId, req, error)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "hasFailures",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "!hasFailures && requirements.some((_, i) => results[i]?.success)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 25,
+    "mutator": "MethodExpression",
+    "replacement": "requirements.every((_, i) => results[i]?.success)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 43,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 53,
+    "mutator": "OptionalChaining",
+    "replacement": "results[i].success",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1510,
+    "col": 75,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1511,
+    "col": 14,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1515,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1613,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1644,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1645,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1646,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onRetry(resolverId, req, nextAttempt)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1668,
+    "col": 60,
+    "mutator": "UpdateOperator",
+    "replacement": "attempt--",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1669,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1672,
+    "col": 26,
+    "mutator": "OptionalChaining",
+    "replacement": "runRecords.get(controller).satisfied",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1672,
+    "col": 65,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1693,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1699,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1699,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1699,
+    "col": 40,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1707,
+    "col": 11,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1711,
+    "col": 13,
+    "mutator": "BooleanLiteral",
+    "replacement": "outcome.shouldContinue",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1711,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1711,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1711,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1727,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1840,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1870,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1880,
+    "col": 52,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1881,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1882,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1920,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 1956,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "resolve() meets an in-flight run only after markSatisfied: requeue waits until the run is no longer resolving, and a retraction aborts or detaches it first."
+  },
+  {
+    "line": 1956,
+    "col": 14,
+    "mutator": "OptionalChaining",
+    "replacement": "record.satisfied",
+    "reason": "equivalent",
+    "note": "An in-flight run always has a run record (createContext makes it synchronously)."
+  },
+  {
+    "line": 1956,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "resolve() meets an in-flight run only after markSatisfied: requeue waits until the run is no longer resolving, and a retraction aborts or detaches it first."
+  },
+  {
+    "line": 1961,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 1962,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The slot is overwritten by inflight.set for the new run a few lines below."
+  },
+  {
+    "line": 1963,
+    "col": 30,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1964,
+    "col": 18,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 1968,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 1969,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onCancel(current.resolverId, current.originalRequirement)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1974,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Only the development warning for an unmatched requirement differs; the next guard returns."
+  },
+  {
+    "line": 1984,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "findResolver only returns ids present in definitions."
+  },
+  {
+    "line": 1987,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers — killed in the full run by attribution is per run one batch's write does not shield another batch of the same definition"
+  },
+  {
+    "line": 2011,
+    "col": 7,
+    "mutator": "OptionalChaining",
+    "replacement": "onStart(resolverId, req)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 2021,
+    "col": 22,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "The running map is read only by drainResolvers, which only unregisterModule (L10) calls; nothing at L2 waits on it, and the full run does not kill it."
+  },
+  {
+    "line": 2021,
+    "col": 29,
+    "mutator": "UpdateOperator",
+    "replacement": "nextRunId--",
+    "reason": "equivalent",
+    "note": "Run keys stay unique counting down."
+  },
+  {
+    "line": 2026,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "options.factsBaseline",
+    "reason": "internals-only",
+    "note": "The engine always supplies the options object, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 2031,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2037,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "onResolutionComplete(runRecords.get(controller)?.satisfied === true)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 2038,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The flag only decides whether a finished run schedules one more reconcile pass. No test at L2, nor any in the full run, sees a difference: every case that needs the pass also has a write, dirty constraint or requeue that schedules one. Candidate for an L3 settle test."
+  },
+  {
+    "line": 2038,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "The flag only decides whether a finished run schedules one more reconcile pass. No test at L2, nor any in the full run, sees a difference: every case that needs the pass also has a write, dirty constraint or requeue that schedules one. Candidate for an L3 settle test."
+  },
+  {
+    "line": 2038,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "runRecords.get(controller)?.satisfied !== true",
+    "reason": "not-observable",
+    "note": "The flag only decides whether a finished run schedules one more reconcile pass. No test at L2, nor any in the full run, sees a difference: every case that needs the pass also has a write, dirty constraint or requeue that schedules one. Candidate for an L3 settle test."
+  },
+  {
+    "line": 2038,
+    "col": 13,
+    "mutator": "OptionalChaining",
+    "replacement": "runRecords.get(controller).satisfied",
+    "reason": "equivalent",
+    "note": "The finished run's controller always has a run record."
+  },
+  {
+    "line": 2038,
+    "col": 55,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The flag only decides whether a finished run schedules one more reconcile pass. No test at L2, nor any in the full run, sees a difference: every case that needs the pass also has a write, dirty constraint or requeue that schedules one. Candidate for an L3 settle test."
+  },
+  {
+    "line": 2041,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "The running map is read only by drainResolvers, which only unregisterModule (L10) calls; nothing at L2 waits on it, and the full run does not kill it."
+  },
+  {
+    "line": 2048,
+    "col": 27,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Draining in-flight resolvers on unregisterModule — killed in the full run by unregisterModule resolves only once in-flight resolvers have drained"
+  },
+  {
+    "line": 2071,
+    "col": 42,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "drainResolvers (unregisterModule waiting for in-flight resolvers). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2078,
+    "col": 53,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "drainResolvers (unregisterModule waiting for in-flight resolvers). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2080,
+    "col": 92,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "drainResolvers (unregisterModule waiting for in-flight resolvers). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2093,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2096,
+    "col": 37,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2097,
+    "col": 18,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2101,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 2103,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "onCancel(state.resolverId, state.originalRequirement)",
+    "reason": "internals-only",
+    "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 2110,
+    "col": 57,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2110,
+    "col": 57,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2110,
+    "col": 57,
+    "mutator": "EqualityOperator",
+    "replacement": "r.id !== requirementId",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2111,
+    "col": 25,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2113,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2115,
+    "col": 39,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2116,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2120,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2122,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2122,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2122,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2123,
+    "col": 13,
+    "mutator": "OptionalChaining",
+    "replacement": "onCancel(batch.resolverId, removed)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2143,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers — killed in the full run by attribution is per run one batch's write does not shield another batch of the same definition"
+  },
+  {
+    "line": 2213,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2218,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2219,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2220,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2221,
+    "col": 48,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2222,
+    "col": 28,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2223,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2227,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "onCancel(state.resolverId, {\n  id\n} as RequirementWithId)",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2230,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2231,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2233,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "perf-only",
+    "note": "Caps the status map at 1000 entries (memory only); statuses are read only by inspect()/explain() (L9)."
+  },
+  {
+    "line": 2239,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "inspect() asks only for in-flight ids, which always have a state; only explain() (L9) asks for others."
+  },
+  {
+    "line": 2245,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2245,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2245,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2249,
+    "col": 14,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2249,
+    "col": 23,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Resolver status records (pending/running/success/error/canceled/idle) are read only by system.inspect() and explain() (L9); no L2 API reads them, and the full run does not kill it either."
+  },
+  {
+    "line": 2273,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2273,
+    "col": 32,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2291,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Returns an empty write map instead of null. Both mean the run wrote nothing this pass: jointPassWrites and satisfiedByOwnWrite find no key in it; no test (L2 or full run) tells them apart."
+  },
+  {
+    "line": 2291,
+    "col": 16,
+    "mutator": "OptionalChaining",
+    "replacement": "record.pass",
+    "reason": "equivalent",
+    "note": "passWritesFor reads the record of an in-flight run, which always exists."
+  },
+  {
+    "line": 2291,
+    "col": 32,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Returns an empty write map instead of null. Both mean the run wrote nothing this pass: jointPassWrites and satisfiedByOwnWrite find no key in it; no test (L2 or full run) tells them apart."
+  },
+  {
+    "line": 2291,
+    "col": 32,
+    "mutator": "EqualityOperator",
+    "replacement": "record.pass.size >= 0",
+    "reason": "not-observable",
+    "note": "Returns an empty write map instead of null. Both mean the run wrote nothing this pass: jointPassWrites and satisfiedByOwnWrite find no key in it; no test (L2 or full run) tells them apart."
+  },
+  {
+    "line": 2294,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers — killed in the full run by a batched resolver whose own write retracts its requirement is not canceled"
+  },
+  {
+    "line": 2309,
+    "col": 14,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2309,
+    "col": 14,
+    "mutator": "EqualityOperator",
+    "replacement": "liveRuns.size >= 0",
+    "reason": "perf-only",
+    "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
+  },
+  {
+    "line": 2314,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers — killed in the full run by resolver outcomes a batch that satisfied its requirement is superseded when it returns"
+  },
+  {
+    "line": 2336,
+    "col": 34,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "Batched resolvers (resolveBatch / resolveBatchWithResults, batch windows). No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2355,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2368,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2399,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2400,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2402,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2403,
+    "col": 32,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2404,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2408,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "onCancel(id, req)",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic resolver assign / unregister. No test reaches it in the full run either; that layer's gate must add one."
+  },
+  {
+    "line": 2446,
+    "col": 21,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "The engine calls abortAll() before destroy() on both stop paths, and the cleared maps are never read after destroy."
+  },
+  {
+    "line": 2447,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The engine calls abortAll() before destroy() on both stop paths, and the cleared maps are never read after destroy."
+  },
+  {
+    "line": 2448,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The engine calls abortAll() before destroy() on both stop paths, and the cleared maps are never read after destroy."
+  },
+  {
+    "line": 2449,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "The engine calls abortAll() before destroy() on both stop paths, and the cleared maps are never read after destroy."
+  }
+]
