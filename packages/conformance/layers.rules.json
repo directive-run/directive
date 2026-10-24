@@ -347,6 +347,15 @@
     "tests/core/system-async-lifecycle.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-proxies-oracle.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-proxies-oracle-transform.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-proxies-oracle-production.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/error-boundary.test.ts": {
       "rule": "L3"
     },

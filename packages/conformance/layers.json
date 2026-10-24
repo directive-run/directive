@@ -6264,6 +6264,173 @@
         }
       }
     },
+    "tests/core/l3-proxies-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a composed system in a production build > ignores a resolver's writes to a dependency without throwing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > still refuses to replace a namespace through the cross-module view, silently": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > prints nothing when a derivation name is read as a module, or a non-JSON value is written": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > still refuses a module with a prototype-walking key": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle-transform.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a module joining a composed system > builds when no section holds a prototype-walking key": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a module joining a composed system > `is refused for \"${key}\" in ${section}`": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "dynamic": true
+        },
+        "a module joining a composed system > is refused when only the second module is dangerous": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "function-form constraints in a composed system > hands `when` and `require` the module's own facts and its dependencies by name": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "data-form constraint `when` in a composed system > evaluates every form against the module's own facts": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "data-form constraint `when` in a composed system > re-evaluates when the facts it reads change": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "data-form constraint `when` in a composed system > does not read another module's fact of the same name": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "object-form events in a composed system > keeps the handler when an event gives both a handler and a patch": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "object-form events in a composed system > runs an event given as an object with a handler, and a bare function": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > computes a derivation given as an object with a compute function": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > runs a module's effect against its own facts and reruns it on change": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > reads a module's own facts by bare name when crossModuleDeps is empty": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "constraints and resolvers in a composed system > re-evaluates a constraint with explicit deps only when those facts change": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints and resolvers in a composed system > holds a constraint back until the constraints it follows have resolved": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints and resolvers in a composed system > hands a resolver its own facts, and ctx.deps only when the module declares dependencies": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "more than one module with crossModuleDeps in a composed system > gives each module its own view of itself and of what it declared": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "a bare module in a composed system > joins with no init, derivations, events, effects, constraints or resolvers": {
+          "layer": "L1",
+          "by": ["option modules"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a composed system's views answer reflection > lists a module's facts, and the module names at the top": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > lists a module's derivations, and the module names at the top": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > lists the module names under events and dispatches into the named module": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > dispatches an event addressed by its namespaced type": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > writes land in the owning module and nowhere else": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > deletes a fact from its own module only": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > refuses to replace or remove a namespace": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > never exposes or accepts the prototype-walking keys": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > never treats a symbol as a fact": {
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
+        },
+        "the derivations a module's own code receives > are this module's derivations by their bare names, not its siblings'": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "the facts a module with crossModuleDeps receives > sees itself and its declared dependencies, and nothing else": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "the facts a module with crossModuleDeps receives > cannot replace a namespace through the view": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "the facts a module's event handler receives > are its own facts, with the store behind them reachable as in a single-module system": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "the facts a resolver receives > reads and writes its own module's facts, reads dependencies, and cannot write them": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "the facts a resolver receives > scopes the store a resolver reaches through its facts to its own module": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "the facts a resolver receives > keeps a dependency's subscription quiet when only its own facts change": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",

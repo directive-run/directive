@@ -1,0 +1,905 @@
+[
+  {
+    "line": 112,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 112,
+    "col": 16,
+    "mutator": "OptionalChaining",
+    "replacement": "mod.schema.facts",
+    "reason": "equivalent",
+    "note": "prefixSchema dereferences mod.schema.facts unguarded straight after, so a module without a schema throws the same TypeError either way."
+  },
+  {
+    "line": 113,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 114,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 115,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 116,
+    "col": 5,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) — killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
+  },
+  {
+    "line": 116,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) — killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
+  },
+  {
+    "line": 117,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 118,
+    "col": 6,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Section label that appears only in the refusal message; message text is not pinned."
+  },
+  {
+    "line": 172,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 172,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 172,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "clause && typeof clause === \"object\" || typeof (clause as {\n  fact?: unknown;\n}).fact === \"string\"",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 172,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "clause || typeof clause === \"object\"",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 173,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 174,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+  },
+  {
+    "line": 186,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Freezes a private copy of the rewritten spec; the only reader of the spec is inspect (the plan's L9)."
+  },
+  {
+    "line": 191,
+    "col": 42,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "A `when` that is neither a function nor an object spec is rejected downstream; no valid public input reaches this return."
+  },
+  {
+    "line": 213,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Freezes a private copy of the rewritten spec; the only reader of the spec is inspect (the plan's L9)."
+  },
+  {
+    "line": 306,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 306,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 306,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "derive === undefined && derive === null",
+    "reason": "internals-only",
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 306,
+    "col": 31,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 306,
+    "col": 48,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 344,
+    "col": 19,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Marking an unchanged section as changed rebuilds an identical copy; only the identity of the section object differs."
+  },
+  {
+    "line": 348,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+  },
+  {
+    "line": 348,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+  },
+  {
+    "line": 348,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "def.when !== undefined || typeof def.when !== \"function\"",
+    "reason": "equivalent",
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+  },
+  {
+    "line": 348,
+    "col": 37,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+  },
+  {
+    "line": 348,
+    "col": 57,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+  },
+  {
+    "line": 358,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Taking the rebuilt copy of an unchanged section gives an identical section; only object identity differs."
+  },
+  {
+    "line": 364,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 364,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createModule always supplies derive; the missing-derive branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 364,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 365,
+    "col": 19,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Marking an unchanged section as changed rebuilds an identical copy; only the identity of the section object differs."
+  },
+  {
+    "line": 367,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "raw && typeof raw === \"object\" || Object.hasOwn(raw, \"compute\")",
+    "reason": "equivalent",
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "raw || typeof raw === \"object\"",
+    "reason": "equivalent",
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+  },
+  {
+    "line": 369,
+    "col": 16,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+  },
+  {
+    "line": 369,
+    "col": 16,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof raw !== \"object\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 369,
+    "col": 31,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 372,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 378,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A function compute that skips this early exit falls through the template and predicate tests (both false for a function) to the same `next[key] = raw`."
+  },
+  {
+    "line": 387,
+    "col": 32,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Data-form derivation compute (predicate/template, L11) with a meta block (L9): no test in either run reaches it."
+  },
+  {
+    "line": 397,
+    "col": 32,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Data-form derivation compute (predicate/template, L11) with a meta block (L9): no test in either run reaches it."
+  },
+  {
+    "line": 404,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 404,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Taking the rebuilt copy of an unchanged section gives an identical section; only object identity differs."
+  },
+  {
+    "line": 410,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 410,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createModule always supplies events; the missing-events branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 410,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 411,
+    "col": 19,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Marking an unchanged section as changed rebuilds an identical copy; only the identity of the section object differs."
+  },
+  {
+    "line": 413,
+    "col": 54,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 414,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 414,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "An event that is not an object with a handler or a patch falls through to the same `next[key] = raw`."
+  },
+  {
+    "line": 414,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "raw || typeof raw === \"object\"",
+    "reason": "equivalent",
+    "note": "An event that is not an object with a handler or a patch falls through to the same `next[key] = raw`."
+  },
+  {
+    "line": 414,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "An event that is not an object with a handler or a patch falls through to the same `next[key] = raw`."
+  },
+  {
+    "line": 414,
+    "col": 18,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof raw !== \"object\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 414,
+    "col": 33,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 443,
+    "col": 34,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Event patch with a meta block (meta is L9): no test in either run reaches it."
+  },
+  {
+    "line": 450,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 450,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Taking the rebuilt copy of an unchanged section gives an identical section; only object identity differs."
+  },
+  {
+    "line": 456,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+  },
+  {
+    "line": 477,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Returning a spread copy of an unchanged module instead of the module itself; only object identity differs."
+  },
+  {
+    "line": 478,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 478,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "derive !== mod.derive",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+  },
+  {
+    "line": 479,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 479,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "events !== mod.events",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 480,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+  },
+  {
+    "line": 480,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "effects !== mod.effects",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+  },
+  {
+    "line": 481,
+    "col": 5,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Returning a spread copy of an unchanged module instead of the module itself; only object identity differs."
+  },
+  {
+    "line": 490,
+    "col": 10,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "An empty section record instead of undefined registers nothing; the engine treats both alike."
+  },
+  {
+    "line": 490,
+    "col": 10,
+    "mutator": "EqualityOperator",
+    "replacement": "Object.keys(rec).length >= 0",
+    "reason": "equivalent",
+    "note": "An empty section record instead of undefined registers nothing; the engine treats both alike."
+  },
+  {
+    "line": 528,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createModule always supplies derive; the missing-derive branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 528,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createModule always supplies derive; the missing-derive branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 552,
+    "col": 9,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Derivation given as { compute, meta } (meta is L9): no test in either run reaches it."
+  },
+  {
+    "line": 564,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createModule always supplies events; the missing-events branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 564,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createModule always supplies events; the missing-events branch is only reachable by passing prefixModuleDefinition a hand-built module."
+  },
+  {
+    "line": 572,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
+  },
+  {
+    "line": 572,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
+  },
+  {
+    "line": 572,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof raw === \"object\" && raw !== null || Object.hasOwn(raw, \"handler\")",
+    "reason": "equivalent",
+    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
+  },
+  {
+    "line": 572,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof raw === \"object\" || raw !== null",
+    "reason": "equivalent",
+    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
+  },
+  {
+    "line": 586,
+    "col": 9,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Event given as { handler, meta } (meta is L9): no test in either run reaches it."
+  },
+  {
+    "line": 764,
+    "col": 25,
+    "mutator": "MethodExpression",
+    "replacement": "mutated",
+    "reason": "not-observable",
+    "note": "Names the owning module in the in-place-change message only; message text is not pinned."
+  },
+  {
+    "line": 764,
+    "col": 58,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Names the owning module in the in-place-change message only; message text is not pinned."
+  },
+  {
+    "line": 786,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 786,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 786,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "resolverDef.resolveBatch || {\n  resolveBatch: async (reqs: unknown[], ctx: {\n    facts: unknown;\n    signal: AbortSignal;\n  }) => {\n    await run(ctx, wrapped => resolverDef.resolveBatch!(reqs, wrapped));\n  }\n}",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 794,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 794,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 794,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "resolverDef.resolveBatchWithResults || {\n  resolveBatchWithResults: async (reqs: unknown[], ctx: {\n    facts: unknown;\n    signal: AbortSignal;\n  }) => {\n    return run(ctx, wrapped => resolverDef.resolveBatchWithResults!(reqs, wrapped));\n  }\n}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Batch resolver with results (L7) during unregisterModule (L10) — killed in the full run by unregisterModule waits for an in-flight batched resolver and aborts it"
+  },
+  {
+    "line": 794,
+    "col": 50,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 798,
+    "col": 14,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 799,
+    "col": 27,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Batch resolver wrappers (resolveBatch, resolveBatchWithResults) are the plan's L7; the tests that run them do not distinguish these mutants. Needs an L7 batch-resolver test."
+  },
+  {
+    "line": 828,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development check that a resolver changed a dependency's value in place; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 832,
+    "col": 18,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development check that a resolver changed a dependency's value in place; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 836,
+    "col": 18,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development check that a resolver changed a dependency's value in place; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 859,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development check that a resolver changed a dependency's value in place; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 945,
+    "col": 40,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Source gate in-place mutation check (sources are L5) — killed in the full run by a source gate mutating a value in place is a gate error and the source stays detached, namespaced"
+  },
+  {
+    "line": 947,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Source gate in-place mutation check (sources are L5) — killed in the full run by a source gate mutating a value in place is a gate error and the source stays detached, namespaced"
+  },
+  {
+    "line": 954,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source gate wrapper (sources are the plan's L5) given a non-function gate: no test in either run reaches it. Needs an L5 source-gate test."
+  },
+  {
+    "line": 1009,
+    "col": 34,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 1010,
+    "col": 10,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 1012,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 1012,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents multi-module: each module controls its own events"
+  },
+  {
+    "line": 1014,
+    "col": 11,
+    "mutator": "OptionalChaining",
+    "replacement": "mod.history?.snapshotEvents.map",
+    "reason": "not-observable",
+    "note": "History (L8) given without snapshotEvents: no test in either run distinguishes it. Needs an L8 test."
+  },
+  {
+    "line": 1050,
+    "col": 7,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "depNamespaces is read only when hasCrossModuleDeps is true, so its value without dependencies is never used."
+  },
+  {
+    "line": 1063,
+    "col": 19,
+    "mutator": "LogicalOperator",
+    "replacement": "mod.schema.requirements && {}",
+    "reason": "not-observable",
+    "note": "The requirements schema is read by types and devtools only; no runtime path in either run depends on it."
+  }
+]
