@@ -5890,6 +5890,137 @@
         }
       }
     },
+    "tests/core/l1-gate-rest-production.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "createModule in production, for a module built from facts, derivations and events > does not warn about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in production, for a module built from facts, derivations and events > still refuses what is structurally wrong, and still hands back the module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "member .derive",
+            "member .events"
+          ]
+        }
+      }
+    },
+    "tests/core/l1-gate-rest.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a batch announces only what it wrote > a batch that wrote nothing, or only what was already stored, notifies nobody": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > a later batch does not announce the keys an earlier one wrote": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > an empty batch inside a listener does not end the deferral of the listener's own writes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > warns about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > stays quiet about a module that is well formed": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot membership test": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > an effect still reads derivations after it awaits": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > a derivation handle kept from an effect's run still reads after the run has finished": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-views.test.ts": {
       "category": "black-box",
       "rule": "L1",
@@ -6264,384 +6395,114 @@
         }
       }
     },
-    "tests/core/l3-engine-oracle.test.ts": {
+    "tests/core/l2-requirements-oracle.test.ts": {
       "category": "black-box",
-      "rule": "L3",
+      "rule": "L2",
+      "pin": true,
       "tests": {
-        "lifecycle: each transition happens once and is announced once > start() twice starts once: one onStart for plugins and for modules": {
-          "layer": "L3",
+        "requirement identity in a running system > requirements of one type that differ in content are separate requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the same requirement from two constraints is one requirement, owned by the one evaluated first": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the id is built from the content: the same in two systems and in any key order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a resolver key is the requirement's identity: a shared key is one requirement and the first wins": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that is still required keeps its run, and one no longer required is canceled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that comes back after going away starts a new run": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "requirement identity in a running system > a requirement stops being unmet when its constraint stops requiring it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > req() builds what a constraint requires and forType() routes it to its resolver": {
+          "layer": "L2",
           "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+            "import forType",
+            "import req",
+            "option constraints",
+            "option resolvers"
+          ],
+          "pulledDown": ["member .inspect (L9)"]
         },
-        "lifecycle: each transition happens once and is announced once > stop() before start() does nothing; on a running system it announces once": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "generateRequirementId > derives the id from the type and the content, whatever the key order": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
         },
-        "lifecycle: each transition happens once and is announced once > destroy() stops a running system first, then announces the destroy once": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "generateRequirementId > differs when the type or any property differs": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
         },
-        "lifecycle: each transition happens once and is announced once > start() after destroy() is refused: no start hooks and no work": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "generateRequirementId > uses the key function instead when one is given": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
         },
-        "lifecycle: each transition happens once and is announced once > stopAsync() announces to plugins and modules once and runs effect cleanups": {
-          "layer": "L3",
-          "by": [
-            "member .stopAsync",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "req > builds a requirement from its type and properties": {
+          "layer": "L2",
+          "by": ["import req"]
         },
-        "lifecycle: each transition happens once and is announced once > stopAsync() on a module with no hooks resolves": {
-          "layer": "L3",
-          "by": [
-            "member .stopAsync",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "req > makes a new object on each call and leaves its input alone": {
+          "layer": "L2",
+          "by": ["import req"]
         },
-        "lifecycle: each transition happens once and is announced once > destroyAsync() stops, then announces the destroy once": {
-          "layer": "L3",
-          "by": [
-            "member .destroyAsync",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "isRequirementType > is true only for a requirement of that type": {
+          "layer": "L2",
+          "by": ["import isRequirementType"]
         },
-        "lifecycle: each transition happens once and is announced once > a pass scheduled just before stop() does not run after it": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "forType > makes a predicate for one requirement type": {
+          "layer": "L2",
+          "by": ["import forType"]
         },
-        "readiness > isReady is false before start, and whenReady() before start rejects": {
-          "layer": "L3",
-          "by": [
-            "member .whenReady",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > keeps the first requirement added under an id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "readiness > whenReady() right after start resolves for every caller once the first pass is done": {
-          "layer": "L3",
-          "by": [
-            "member .whenReady",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > looks entries up by id and removes them by id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "settling > isSettled is false while a pass is scheduled and while a resolver is in flight": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > lists its ids and entries in insertion order": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "settling > onSettledChange hears the system become busy, and nothing after unsubscribing": {
-          "layer": "L3",
-          "by": [
-            "member .onSettledChange",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > counts its entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "settling > a resolver whose own write retracts its requirement completes and is never canceled": {
-          "layer": "L3",
-          "by": ["option plugins"]
+        "RequirementSet > clear empties it": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "the plugin hook stream > a constraint's pass reports evaluate, created, start, complete and met, in order": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > clone is an independent copy holding the same entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "the plugin hook stream > onReconcileEnd lists unmet and in-flight requirements, and a canceled one with its resolver": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > diff reports what only this set holds as added and what only the other holds as removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         },
-        "the plugin hook stream > an effect's run is reported to plugins by its id": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "the plugin hook stream > a resolver retry is reported with the attempt number": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "the plugin hook stream > an async plugin onInit that rejects is reported, and the system still runs": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > a throwing constraint is reported, and disable stops asking it": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > skip leaves a throwing constraint in place, so it is asked again": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > an effect that throws under disable stops running": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > an effect that keeps throwing under retry is retried three times, then waits for its next change": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > an effect that fails once under retry runs again and then stops": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > a resolver that fails under disable turns its constraint off": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > a resolver that fails under skip is run again for its next requirement": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > retry-later gives a failed resolver's requirement another pass after its delay, not before": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > retry-later chosen by a function, with no retryLater config, still polls (default delay)": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > skip starts no retry-later polling": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > stop() drops a pending retry-later": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > retry-later asks a throwing constraint again after the delay": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > a module's onResolverError hook hears the error and requirement; a throwing hook is isolated": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "error boundary strategies > a resolver error in a module with no hooks does not break the system": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > watch on a derivation calls back only when its value changes": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > watch with an equalityFn calls back only when it says the value changed": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > watch on an unknown key warns in development": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > when() resolves once its predicate holds and leaves no timer behind": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > when() with a timeout rejects once it passes; a zero timeout never rejects": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "watch, when and subscribe > subscribe hears facts and derivations it names, and warns about unknown ones": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "initialize, reserved names, effect chains and settle(maxWait) > initialize() a second time does not run module init again": {
-          "layer": "L0",
-          "by": [
-            "import createModule",
-            "import createSystem",
-            "import t",
-            "member .facts",
-            "option derivations",
-            "option events",
-            "option init"
-          ]
-        },
-        "initialize, reserved names, effect chains and settle(maxWait) > dispatching a reserved name such as __proto__ is ignored without a warning": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "initialize, reserved names, effect chains and settle(maxWait) > an effect whose run keeps waking itself is cut after a bounded run, with a warning, and wakes again on a later write": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "initialize, reserved names, effect chains and settle(maxWait) > settle(maxWait) rejects when a resolver never finishes; a settle that resolves leaves no timer": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "resolver keys and system.notify > a resolver's key decides which requirements are the same run": {
-          "layer": "L3",
-          "by": ["option plugins"]
-        },
-        "resolver keys and system.notify > notify.guardrailBlocked reaches plugins only for a registered plugin name": {
-          "layer": "L3",
-          "by": ["option module hooks", "option plugins"]
-        },
-        "resolver keys and system.notify > notify.guardrailCoverage reaches plugins until destroy; with no plugins notify is silent": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "readiness and polling after the first pass > whenReady() first called after the system is ready resolves at once": {
-          "layer": "L3",
-          "by": [
-            "member .whenReady",
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
-        },
-        "readiness and polling after the first pass > stop() and stopAsync() end retry-later polling at once": {
-          "layer": "L3",
-          "by": [
-            "option error boundary",
-            "option module hooks",
-            "option plugins"
-          ]
+        "RequirementSet > diff of two sets with the same ids reports nothing, and an empty side is all added or all removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
         }
       }
     },
