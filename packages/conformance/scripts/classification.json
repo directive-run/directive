@@ -590,6 +590,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-engine-oracle.test.ts",
+    "category": "black-box",
+    "cases": 49,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/meta-query-does-not-watch.test.ts",
     "category": "black-box",
     "cases": 2,

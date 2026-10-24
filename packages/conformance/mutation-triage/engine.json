@@ -230,15 +230,6 @@
     "layer": "L8"
   },
   {
-    "line": 853,
-    "col": 31,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "later-layer",
-    "note": "history navigation write accounting — killed in the full run by tests/core/history-clone-integrity.test.ts > history snapshots never alias live state does not let a later mutation rewrite a snapshot already taken",
-    "layer": "L8"
-  },
-  {
     "line": 874,
     "col": 33,
     "mutator": "BlockStatement",
@@ -928,15 +919,6 @@
     "reason": "later-layer",
     "note": "history navigation pass — killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
     "layer": "L12"
-  },
-  {
-    "line": 1826,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "later-layer",
-    "note": "batched resolvers: spare write counts — killed in the full run by tests/core/resolver-outcomes.test.ts > resolver outcomes a batch that satisfied its requirement is superseded when it returns",
-    "layer": "L7"
   },
   {
     "line": 1836,
