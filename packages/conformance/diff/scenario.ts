@@ -197,6 +197,11 @@ function readLayerRules(): LayerRules {
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
 
+/** The highest layer core-next has built (layers.rules.json `current`); null until Phase 1. */
+export function currentLayer(): string | null {
+  return readLayerRules().current;
+}
+
 /** Whether v2 runs a scenario at `layer` under the current ladder. */
 export function v2Runs(layer: string | undefined): boolean {
   const { current } = readLayerRules();
@@ -827,11 +832,17 @@ export function logResult(result: ScenarioResult): void {
 }
 
 /**
- * Record that the fuzzer compared `runs` cases from `seed` and discarded
- * `runaway` more (cases whose reference run passed the budget).
+ * Record that the fuzzer compared `runs` cases from `seed` (`v2` of them on
+ * v2 as well) and discarded `runaway` more (cases whose reference run passed
+ * the budget).
  */
-export function logFuzz(seed: number, runs: number, runaway = 0): void {
-  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs, runaway })]);
+export function logFuzz(
+  seed: number,
+  runs: number,
+  runaway: number,
+  v2: number,
+): void {
+  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs, runaway, v2 })]);
 }
 
 /** `DIFF_DUMP=<dir>` writes each scenario's traces there, for reading. */
