@@ -1,5 +1,13 @@
 # @directive-run/knowledge
 
+## 1.35.1
+
+### Patch Changes
+
+- [#179](https://github.com/directive-run/directive/pull/179) [`dcecbe5`](https://github.com/directive-run/directive/commit/dcecbe5e9050d957b945ace6c1ab176588c168ce) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix the DevTools server example in the AI debug and observability guide: the factory is `createDevToolsServer({ transport, timeline })`, not `createDevtoolsServer({ timeline, port })`.
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
 ## 1.35.0
 
 ### Patch Changes

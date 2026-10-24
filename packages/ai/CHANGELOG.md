@@ -1,5 +1,13 @@
 # @directive-run/ai
 
+## 1.35.1
+
+### Patch Changes
+
+- [#182](https://github.com/directive-run/directive/pull/182) [`a31a6ba`](https://github.com/directive-run/directive/commit/a31a6ba51af1863d3b54dbf37891521cfffe18e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createJSONFileStore` now loads `node:path` lazily, so browser bundles of `@directive-run/ai` no longer pull it in. Path validation (including the `baseDir` escape check) now runs on the first load instead of at construction, and a rejected path throws from `getChunks()` / `size()` / `reload()`.
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
 ## 1.35.0
 
 ### Minor Changes

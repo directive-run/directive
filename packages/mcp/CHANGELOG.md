@@ -1,5 +1,18 @@
 # @directive-run/mcp
 
+## 0.6.30
+
+### Patch Changes
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
+- Updated dependencies [[`dcecbe5`](https://github.com/directive-run/directive/commit/dcecbe5e9050d957b945ace6c1ab176588c168ce), [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda)]:
+  - @directive-run/knowledge@1.35.1
+  - @directive-run/claude-plugin@1.35.1
+  - @directive-run/lint@0.1.5
+  - @directive-run/sandbox@0.4.29
+  - @directive-run/scaffold@0.2.4
+
 ## 0.6.29
 
 ### Patch Changes

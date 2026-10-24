@@ -1,5 +1,13 @@
 # @directive-run/el
 
+## 1.1.4
+
+### Patch Changes
+
+- [#181](https://github.com/directive-run/directive/pull/181) [`071cf03`](https://github.com/directive-run/directive/commit/071cf03a4577c7d40ab5658ef1b2ba107662bcbe) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `el()` props now accept `style` as a string or a partial style object (typed `ElProps`, exported). A string sets `style.cssText`; an object is assigned property by property. Previously an object style was assigned to `element.style` directly and produced `[object Object]`.
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
 ## 1.1.3
 
 ### Patch Changes
