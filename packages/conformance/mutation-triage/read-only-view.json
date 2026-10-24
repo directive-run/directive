@@ -238,5 +238,37 @@
     "replacement": "{}",
     "reason": "internals-only",
     "note": "Skipping the early return changes nothing for an empty record; for a null record (production) it would throw, and no public path calls takeMutation there."
+  },
+  {
+    "line": 33,
+    "col": 25,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A primitive has no wrapper symbol, so `(5)[DEV_PROXY_TARGET] ?? 5` is 5, the same as returning it. (null and undefined are the inputs that differ, and are killed.)"
+  },
+  {
+    "line": 154,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "perf-only",
+    "note": "Large-array shortcut: it stops the walk early, which the per-slot budget would do anyway for the same value. The sign of the reset only changes how much of the budget later facts in the same run get, which is not a contract."
+  },
+  {
+    "line": 154,
+    "col": 60,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "perf-only",
+    "note": "Large-array shortcut: it stops the walk early, which the per-slot budget would do anyway for the same value. The sign of the reset only changes how much of the budget later facts in the same run get, which is not a contract."
+  },
+  {
+    "line": 323,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only the effect facts view passes an override, and it always does; a view without one is a resolver or source gate view (L2, L5)."
   }
 ]
