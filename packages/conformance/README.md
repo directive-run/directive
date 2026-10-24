@@ -102,10 +102,18 @@ the traces to agree.
   history, trace) and step sequences (writes, batches, Dates, publishes,
   stop/start/destroy mid-run, snapshot/restore, back/forward, a second
   system in the same engine instance). PR CI runs the fixed seed for 205
-  cases (`FUZZ_DEFAULT_RUNS`); the census fails fewer than 200 compared (`lib/fuzz.ts`
-  `FUZZ_FLOOR`) or more than max(1% of cases, 2) runaways — and
-  `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a random seed
-  it prints; failures shrink and print the seed and spec.
+  cases across every layer (`FUZZ_DEFAULT_RUNS`); the census fails fewer than
+  200 compared (`lib/fuzz.ts` `FUZZ_FLOOR`) or more than max(1% of cases, 2)
+  runaways — and `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a
+  random seed it prints; failures shrink and print the seed and spec. A system
+  that uses every layer sits above `current`, so v2 would sit out of nearly all
+  of them. Each run therefore adds 40% more cases (`FUZZ_V2_PERCENT`: 82 on top
+  of 205, 2,000 on top of 5,000; an exact count, not a probability), generated
+  with a ceiling at `current` (`specArbitrary({ ceiling })`, from
+  `FEATURE_LAYERS`), so v2 takes part in them, and the census fails fewer than
+  60 cases compared on v2 (`FUZZ_V2_FLOOR`, counted from what each run
+  compared) while `current` is not null. The cases across every layer all still
+  run, as before.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the
