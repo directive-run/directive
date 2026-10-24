@@ -94,6 +94,12 @@ interface Derivation {
   stale_: boolean;
   /** Has computed at least once (1.35 creates its state on first read). */
   live_: boolean;
+  /**
+   * What a membership test (`"id" in derived`) reads: made on the first test,
+   * never written. It is the edge a read would leave, without the read that
+   * runs the derivation. See `invalidate`.
+   */
+  asked_: ReactiveNode | null;
 }
 
 /**
@@ -348,6 +354,10 @@ export function createSystemCore<const M extends ModuleSchema>(
             for (let s = node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
+            // As in 1.35, whoever asked whether it exists goes stale with it.
+            for (let s = d.asked_?.subs; s; s = s.nextSub) {
+              stack.push(s.target);
+            }
           }
         }
       }
@@ -379,7 +389,12 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
   }
   for (const id in deriveDefs) {
-    const d = { id_: id, stale_: true, live_: false } as Derivation;
+    const d = {
+      id_: id,
+      stale_: true,
+      live_: false,
+      asked_: null,
+    } as Derivation;
     d.node_ = graph.computed(() => compute(d), { equals: false });
     derivations.set(id, d);
     byNode.set(d.node_, d);
@@ -402,17 +417,17 @@ export function createSystemCore<const M extends ModuleSchema>(
       ...LOCKED,
       set: no,
       deleteProperty: no,
-      // As in 1.35, a membership test is a read: it follows its target, so a
-      // gate on `"x" in derived` re-runs when it changes. (The graph edge
-      // needs a real read, so the target computes; a throw is not the
-      // membership test's to raise.)
+      // As in 1.35, a membership test is a read that only follows its target:
+      // the asker is tracked and goes stale with it, and the target is left
+      // for whoever reads its value (a read would run it, and report its
+      // throw, for a question about whether it exists).
       has: (_, id) => {
-        if (typeof id !== "string" || !derivations.has(id)) {
+        const d = typeof id === "string" ? derivations.get(id) : undefined;
+        if (!d) {
           return false;
         }
-        try {
-          read(id);
-        } catch {}
+        tracker.deps?.add(DERIVATION_DEP_PREFIX + d.id_);
+        graph.read((d.asked_ ??= graph.signal(0)));
 
         return true;
       },
