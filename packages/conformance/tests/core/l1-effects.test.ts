@@ -877,3 +877,116 @@ describe("what an effect may do with facts", () => {
     await system.destroy();
   });
 });
+
+describe("enabling and disabling effects", () => {
+  it("a disabled effect does not run at start, and runs again once enabled", async () => {
+    const ran: string[] = [];
+    const system = build({
+      a: (facts: any) => void ran.push(`a${facts.count}`),
+      b: (facts: any) => void ran.push(`b${facts.count}`),
+    });
+    system.effects.disable("a");
+    await system.start();
+
+    expect(ran).toContain("b0");
+    expect(ran).not.toContain("a0");
+    expect(system.effects.isEnabled("a")).toBe(false);
+    expect(system.effects.isEnabled("b")).toBe(true);
+
+    system.effects.enable("a");
+    expect(system.effects.isEnabled("a")).toBe(true);
+    await bump(system, "count", 1);
+    expect(ran).toContain("a1");
+    await system.destroy();
+  });
+
+  it("a disabled effect stays quiet through changes, and sees the latest value once enabled", async () => {
+    const ran: number[] = [];
+    const system = build({
+      e: (facts: any) => void ran.push(facts.count),
+    });
+    await system.start();
+    system.effects.disable("e");
+    await bump(system, "count", 1);
+    expect(ran).toEqual([0]);
+
+    system.effects.enable("e");
+    await bump(system, "count", 2);
+    expect(ran[ran.length - 1]).toBe(2);
+    await system.destroy();
+  });
+
+  it("an effect disabled by an earlier one in the same pass does not run", async () => {
+    const ran: string[] = [];
+    const holder: { sys?: any } = {};
+    const system = build({
+      first: (facts: any) => {
+        void facts.count;
+        ran.push("first");
+        if (facts.count > 0) {
+          holder.sys.effects.disable("second");
+        }
+      },
+      second: (facts: any) => {
+        void facts.count;
+        ran.push("second");
+      },
+    });
+    holder.sys = system;
+    await system.start();
+    ran.length = 0;
+    await bump(system, "count", 1);
+
+    expect(ran).toEqual(["first"]);
+    await system.destroy();
+  });
+
+  it("a disabled effect that read a derivation sees its new value when enabled", async () => {
+    const ran: number[] = [];
+    const system = build({
+      e: (facts: any, _prev: any, derived: any) =>
+        void ran.push(derived.doubled),
+    });
+    await system.start();
+    await bump(system, "count", 1);
+    expect(ran[ran.length - 1]).toBe(2);
+    system.effects.disable("e");
+    await bump(system, "count", 2);
+    system.effects.enable("e");
+    await bump(system, "count", 3);
+
+    expect(ran[ran.length - 1]).toBe(6);
+    await system.destroy();
+  });
+});
+
+describe("async effects that read nothing before their first await", () => {
+  it("warns once per effect, and not for pre-await reads or sync effects", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const system = build({
+      bare: {
+        run: async () => {
+          await Promise.resolve();
+        },
+      },
+      reads: {
+        run: async (facts: any) => {
+          void facts.count;
+          await Promise.resolve();
+        },
+      },
+      sync: { run: () => {} },
+    });
+    await system.start();
+    await bump(system, "count", 1);
+    await flush();
+    const msgs = warn.mock.calls.map((c) => String(c[0]));
+
+    expect(msgs.filter((m) => m.includes('"bare"'))).toHaveLength(1);
+    expect(msgs.filter((m) => /"(reads|sync)"/.test(m))).toHaveLength(0);
+    expect(msgs.find((m) => m.includes('"bare"'))).toContain(
+      "recorded no dependencies",
+    );
+    await system.destroy();
+  });
+});

@@ -184,6 +184,13 @@ const REGISTRIES = new Set([
 ]);
 
 /**
+ * Effect controls on the system's effects view (`system.effects.disable(…)`,
+ * `.enable`, `.isEnabled`): the plan's L4 (effects: controls). Only on an
+ * `effects` receiver, so a test's own `enable` helper raises nothing.
+ */
+const EFFECT_CONTROLS = new Set(["disable", "enable", "isEnabled"]);
+
+/**
  * Reflection on an engine object (`Object.getOwnPropertyDescriptor(facts,
  * …)`, `Reflect.ownKeys(derive)`): what the facts, derive and events views
  * look like under reflection is the plan's L1 (compiled accessors, read-only
@@ -455,6 +462,9 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
         : undefined;
       if (registry) {
         out.push({ name: `member .${registry}.${name}`, layer: "L10" });
+      }
+      if (EFFECT_CONTROLS.has(name) && registryOf(receiver) === "effects") {
+        out.push({ name: `member .effects.${name}`, layer: "L4" });
       }
       const on = unwrap(receiver).getText();
       if (

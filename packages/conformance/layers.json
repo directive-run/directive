@@ -473,8 +473,12 @@
           "by": ["option plugins"]
         },
         "which effects run > every enabled effect runs once at start, and a disabled one waits": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
         },
         "which effects run > explicit deps run for their own changes and not for others": {
           "layer": "L3",
@@ -489,16 +493,16 @@
           "by": ["option plugins"]
         },
         "which effects run > a disabled effect is skipped, enabling brings it back": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > an effect disabled by an earlier one in the same pass does not run": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > a disabled effect drops the derivations it pinned": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
         },
         "which effects run > an async effect makes settle() wait for it": {
           "layer": "L3",
@@ -694,8 +698,8 @@
           "by": ["option effect deps"]
         },
         "a throwing effect > the disable strategy stops the effect until it is enabled again": {
-          "layer": "L3",
-          "by": ["option error boundary", "option plugins"]
+          "layer": "L4",
+          "by": ["member .effects.enable", "member .effects.isEnabled"]
         },
         "a throwing effect > the retry strategy runs it again, a bounded number of times": {
           "layer": "L3",
@@ -815,8 +819,12 @@
           "by": ["option plugins"]
         },
         "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
         },
         "more behaviour of the run loop > call on an unknown effect says it does not exist": {
           "layer": "L10",
@@ -4336,8 +4344,8 @@
           "by": ["option error boundary"]
         },
         "error boundary: disable strategy > disables an effect after error": {
-          "layer": "L3",
-          "by": ["option error boundary"]
+          "layer": "L4",
+          "by": ["member .effects.isEnabled"]
         },
         "error boundary: disable strategy > disables the originating constraint when a resolver fails": {
           "layer": "L3",
@@ -5117,6 +5125,233 @@
         }
       }
     },
+    "tests/core/l1-derivations.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a derivation declared as { compute } > computes like the bare function": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > computes once until a fact it read changes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation read through another is computed once, not per reader": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation that switches what it reads stops following the old fact": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation that starts reading more follows the new fact": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation that stops reading a fact stops following it, same count of reads": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > switching one dependency for another of the same count relinks": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation that now reads a different fact, same count, follows the new one": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derived value reached through the derived chain follows facts two levels down": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a membership test on derived is a read that follows its target": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "caching and what a derivation depends on > a derivation read from a closure over the system is a dependency": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "the derived object a derivation reads through > answers undefined for names that are not derivations, even inherited ones": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "the derived object a derivation reads through > lists derivations, and an enumerated getter yields the value": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "the derived object a derivation reads through > cannot be written, deleted from or redefined": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "circular derivations > are reported, not run forever": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "subscribing to derivations > one batch of writes notifies each derivation once, after every derivation is current": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "subscribing to derivations > a write that changes nothing a derivation read does not notify it": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "subscribing to derivations > unsubscribing twice is harmless and stops notifications": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "subscribing to derivations > two subscribers to one derivation both hear it; leaving one keeps the other": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "subscribing to derivations > a subscriber that keeps rewriting what it listens to is stopped": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-effects.test.ts": {
       "category": "black-box",
       "rule": "L0",
@@ -5619,6 +5854,413 @@
             "option events",
             "option init"
           ]
+        },
+        "enabling and disabling effects > a disabled effect does not run at start, and runs again once enabled": {
+          "layer": "L4",
+          "by": [
+            "member .effects.disable",
+            "member .effects.enable",
+            "member .effects.isEnabled"
+          ]
+        },
+        "enabling and disabling effects > a disabled effect stays quiet through changes, and sees the latest value once enabled": {
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
+        },
+        "enabling and disabling effects > an effect disabled by an earlier one in the same pass does not run": {
+          "layer": "L4",
+          "by": ["member .effects.disable"]
+        },
+        "enabling and disabling effects > a disabled effect that read a derivation sees its new value when enabled": {
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"]
+        },
+        "async effects that read nothing before their first await > warns once per effect, and not for pre-await reads or sync effects": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        }
+      }
+    },
+    "tests/core/l1-views.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "tests": {
+        "an in-place change to a nested fact names where it happened > a deep property": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a property swapped for another object of the same shape": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a property added": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a property removed": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > one property removed and another added": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > the second of two sibling objects": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > an array element, deep inside": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > an element pushed onto an array": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Date moved": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Map value replaced under a string key": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Map value replaced under an object key": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Map value replaced under a number key": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a property that held undefined removed and another added": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Map entry added": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Map entry swapped for another key": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > an object held in a Map's second entry": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > an object held under the second object key of a Map": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Set grown": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a Set member swapped": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a prototype changed": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "an in-place change to a nested fact names where it happened > an object frozen": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > an accessor replaced": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "an in-place change to a nested fact names where it happened > a change inside a structure that refers to itself": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a change in an object shared by two properties, named once": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > the second fact read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > the first change, when two facts were both changed": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > the changed fact, when a later one read is untouched": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "an in-place change to a nested fact names where it happened > a change made after the fact was read twice": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what is not reported > reading without changing anything": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > facts that are null, undefined or primitive": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > a typed array written through, which is a leaf": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > an already-frozen object": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > a value too large to check, even when changed": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > `${name} is left unchecked, quietly`": {
+          "layer": "L1",
+          "by": ["reflection"],
+          "dynamic": true
+        },
+        "what is not reported > a later run is still bounded the same way": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > an unchecked large fact does not hide a change in the next one": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > a getter is recorded without being run": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "what is not reported > an effect handed the stored object itself": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "a change is reported once, then the check starts over > a second run that changes nothing reports nothing": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a change is reported once, then the check starts over > a later run that changes something else reports that": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "a top-level change through the facts an effect is handed > `${name} is refused, names what was attempted, and changes nothing`": {
+          "layer": "L1",
+          "by": ["reflection"],
+          "dynamic": true
+        },
+        "the facts object an effect is handed > lists and describes only the real facts, with no prototype": {
+          "layer": "L1",
+          "by": ["reflection"]
         }
       }
     },

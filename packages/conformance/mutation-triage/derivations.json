@@ -1326,5 +1326,357 @@
     "replacement": "\"\"",
     "reason": "equivalent",
     "note": "the engine stores the function in the shared definitions map before calling registerDefinitions, so the function branch installs what is already there"
+  },
+  {
+    "line": 259,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only a data-form compute (predicate or template, L11) is not a function; at L1 compute is always a function, so forcing this branch changes nothing a layer-1 test can reach."
+  },
+  {
+    "line": 283,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Wrapper fallthrough and meta storage: an object form without a function compute, or with meta (L9), is not reachable with L0-L1 features."
+  },
+  {
+    "line": 326,
+    "col": 24,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Initial value of the all-invalidated flag, read only by collectInvalidated, which feeds constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 368,
+    "col": 5,
+    "mutator": "OptionalChaining",
+    "replacement": "depSet.delete",
+    "reason": "equivalent",
+    "note": "The engine only unlinks a dependency it linked, so the set exists and the optional chain never short-circuits."
+  },
+  {
+    "line": 583,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "onCompute feeds plugin hooks (L3)."
+  },
+  {
+    "line": 583,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "onCompute feeds plugin hooks (L3)."
+  },
+  {
+    "line": 584,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "onCompute feeds plugin hooks (L3)."
+  },
+  {
+    "line": 665,
+    "col": 18,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Re-entrancy guard of the notification flush: the engine's own fact-notification loop guard (100 passes) fires first for any listener loop a public API can build."
+  },
+  {
+    "line": 671,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The flush backstop (100 passes): the engine's own fact-notification loop guard fires first for any listener loop a public API can build."
+  },
+  {
+    "line": 671,
+    "col": 13,
+    "mutator": "UpdateOperator",
+    "replacement": "--iterations",
+    "reason": "not-observable",
+    "note": "The flush backstop (100 passes): the engine's own fact-notification loop guard fires first for any listener loop a public API can build."
+  },
+  {
+    "line": 735,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "!state && state.isStale",
+    "reason": "not-observable",
+    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
+  },
+  {
+    "line": 735,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
+  },
+  {
+    "line": 735,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
+  },
+  {
+    "line": 783,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 783,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 783,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "currentTrackingKind() !== \"observer\"",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 783,
+    "col": 37,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 817,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 817,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "currentTrackingKind() !== \"observer\"",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 817,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 817,
+    "col": 37,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 913,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Outside a tracking frame trackAccess is a no-op, and marking observed is for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1030,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "getProxy is used for the derived parameter of constraints and effects (L2, L4)."
+  },
+  {
+    "line": 1075,
+    "col": 55,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1076,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1076,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "observedIds.size !== 0",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1087,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1088,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1093,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "stale",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1093,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1093,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1093,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1104,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1112,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1112,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1112,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "observedIds.size !== 0",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1112,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1126,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1126,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1140,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1175,
+    "col": 14,
+    "mutator": "EqualityOperator",
+    "replacement": "queue.length >= 0",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1177,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1179,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+  },
+  {
+    "line": 1179,
+    "col": 15,
+    "mutator": "EqualityOperator",
+    "replacement": "++reached < watched",
+    "reason": "not-observable",
+    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
   }
 ]

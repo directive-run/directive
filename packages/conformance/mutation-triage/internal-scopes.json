@@ -1,0 +1,18 @@
+[
+  {
+    "line": 26,
+    "col": 9,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Installed by the engine for a persistence plugin (L3) that restores stored state; no layer-1 behaviour reads it."
+  },
+  {
+    "line": 27,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Installed by the engine for a persistence plugin (L3) that restores stored state; no layer-1 behaviour reads it."
+  }
+]

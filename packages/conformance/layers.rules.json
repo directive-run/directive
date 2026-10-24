@@ -187,6 +187,12 @@
     "tests/core/blackbox-effects-chain.test.ts": {
       "rule": "L0"
     },
+    "tests/core/l1-views.test.ts": {
+      "rule": "L1"
+    },
+    "tests/core/l1-derivations.test.ts": {
+      "rule": "L0"
+    },
     "tests/core/blackbox-readonly-module-view.test.ts": {
       "rule": "L1"
     },
