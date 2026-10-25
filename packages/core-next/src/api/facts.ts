@@ -219,13 +219,29 @@ export function createFactsStore<S extends Schema>(
   };
 
   /**
-   * Notify: `first` runs, then every write the listeners made, a round at a
-   * time, until none is left (100 rounds at most).
+   * Notify: the first write (`key`, with `onChange`) or the flushed `keys`
+   * run, then every write the listeners made, a round at a time, until none
+   * is left (100 rounds at most). Arguments, not a closure: a write outside a
+   * batch allocates nothing here.
    */
-  function run(first: () => void, context: string): void {
+  function run(
+    context: string,
+    keys: string[] | null,
+    key?: string,
+    value?: unknown,
+    prev?: unknown,
+  ): void {
     notifying = true;
     try {
-      first();
+      if (keys) {
+        for (const k of keys) {
+          notify(listeners, k);
+        }
+      } else {
+        onChange?.(key!, value, prev);
+        notify(listeners, key!);
+      }
+      notify(listeners, ALL);
       for (let rounds = 0; pending.length > 0; ) {
         if (++rounds > 100) {
           pending.length = 0;
@@ -260,32 +276,29 @@ export function createFactsStore<S extends Schema>(
     } else if (notifying) {
       pending.push([key, value, prev]);
     } else {
-      run(() => {
-        onChange?.(key, value, prev);
-        notify(listeners, key);
-        notify(listeners, ALL);
-      }, ". A listener is repeatedly mutating facts that re-trigger notifications");
+      run(
+        ". A listener is repeatedly mutating facts that re-trigger notifications",
+        null,
+        key,
+        value,
+        prev,
+      );
     }
   }
 
   function flush(): void {
-    if (batching > 0) {
+    // A batch that wrote nothing (an effect run, say) has nothing to flush:
+    // return before building the lists.
+    if (batching > 0 || !dirty.size) {
       return;
     }
     const batch = changes.splice(0);
     const keys = [...dirty];
     dirty.clear();
-    if (onBatch && batch.length > 0) {
+    if (onBatch) {
       onBatch(batch);
     }
-    if (keys.length > 0) {
-      run(() => {
-        for (const key of keys) {
-          notify(listeners, key);
-        }
-        notify(listeners, ALL);
-      }, " during flush");
-    }
+    run(" during flush", keys);
   }
 
   const store = {
