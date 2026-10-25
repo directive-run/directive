@@ -487,6 +487,12 @@
         "frozen values in facts > can be read back",
         "frozen values in facts > can be read back when the whole tree is frozen"
       ],
+      "tests/core/l1-derivations-gate.test.ts": [
+        "telling a subscriber a derivation moved > is done once per fresh-to-stale change, however many writes follow before it is read",
+        "telling a subscriber a derivation moved > never re-enters a listener: a batch it commits is announced after it returns",
+        "telling a subscriber a derivation moved > reaches a subscriber to the end of a chain only when the chain was fresh",
+        "telling a subscriber a derivation moved > stops a listener that keeps making its own derivation stale, and drops what was queued"
+      ],
       "tests/core/l1-derivations.test.ts": [
         "a derivation declared as { compute } > computes like the bare function",
         "caching and what a derivation depends on > a derivation read from a closure over the system is a dependency",
@@ -549,6 +555,17 @@
         "which effects run > an effect woken by an event sees the fact the event wrote",
         "which effects run > every enabled effect runs once at start, in declaration order",
         "which effects run > settle() after a write waits for an async effect woken by it"
+      ],
+      "tests/core/l1-gate-rest.test.ts": [
+        "a batch announces only what it wrote > a batch that wrote nothing, or only what was already stored, notifies nobody",
+        "a batch announces only what it wrote > a later batch does not announce the keys an earlier one wrote",
+        "a batch announces only what it wrote > an empty batch inside a listener does not end the deferral of the listener's own writes",
+        "createModule in development, for a module built from facts, derivations and events > stays quiet about a module that is well formed",
+        "createModule in development, for a module built from facts, derivations and events > warns about a badly formed module",
+        "tracking: a body that has already awaited > a derivation handle kept from an effect's run still reads after the run has finished",
+        "tracking: a body that has already awaited > an effect still reads derivations after it awaits",
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot membership test",
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot read"
       ],
       "tests/core/l1-views.test.ts": [
         "a change is reported once, then the check starts over > a later run that changes something else reports that",
@@ -944,6 +961,10 @@
         "an effect writing a fact, in production > does not wrap nested values, so reads cost nothing extra",
         "an effect writing a fact, in production > is ignored without throwing",
         "an effect writing a fact, in production > still reports the dropped write to plugins"
+      ],
+      "tests/core/l1-gate-rest-production.test.ts": [
+        "createModule in production, for a module built from facts, derivations and events > does not warn about a badly formed module",
+        "createModule in production, for a module built from facts, derivations and events > still refuses what is structurally wrong, and still hands back the module"
       ],
       "tests/core/mutants-effects-production.test.ts": [
         "effects in production > does not check for an in-place mutation, sync, async or via callOne",
