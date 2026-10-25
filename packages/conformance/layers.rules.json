@@ -193,6 +193,17 @@
     "tests/core/l1-derivations.test.ts": {
       "rule": "L0"
     },
+    "tests/core/l1-derivations-gate.test.ts": {
+      "rule": "L0"
+    },
+    "tests/core/l1-derivations-effects.test.ts": {
+      "rule": "L0",
+      "pin": true,
+      "instruments": ["option effect prev"],
+      "allowAbove": {
+        "option derive data form": "the detector reads any non-function compute as a data form; this test hands a bare number, which is no form at all and is refused, so it waits for L11 only because of that reading"
+      }
+    },
     "tests/core/blackbox-readonly-module-view.test.ts": {
       "rule": "L1"
     },

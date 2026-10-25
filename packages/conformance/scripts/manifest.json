@@ -54,6 +54,8 @@
   "tests/core/facts.test.ts": "packages/core/src/core/__tests__/facts.test.ts",
   "tests/core/frozen-facts.test.ts": "packages/core/src/core/__tests__/frozen-facts.test.ts",
   "tests/core/history-clone-integrity.test.ts": "packages/core/src/core/__tests__/history-clone-integrity.test.ts",
+  "tests/core/l1-derivations-effects.test.ts": "packages/core/src/core/__tests__/l1-derivations-effects.test.ts",
+  "tests/core/l1-derivations-gate.test.ts": "packages/core/src/core/__tests__/l1-derivations-gate.test.ts",
   "tests/core/l1-derivations.test.ts": "packages/core/src/core/__tests__/l1-derivations.test.ts",
   "tests/core/l1-effects.test.ts": "packages/core/src/core/__tests__/l1-effects.test.ts",
   "tests/core/l1-gate-rest-production.test.ts": "packages/core/src/core/__tests__/l1-gate-rest-production.test.ts",
