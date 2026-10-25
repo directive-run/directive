@@ -966,6 +966,20 @@ describe("definition checks", () => {
     } as never);
     expect(() => createSystem({ module: mod } as never)).toThrow();
   });
+
+  it("a resolver with only resolveBatch and batching off is reported complete without running anything", async () => {
+    // Validation accepts resolveBatch without batch.enabled. The run takes the
+    // single path, which has no resolve() to call: 1.35 reports it complete
+    // (no error, nothing in flight) rather than calling what is not there.
+    const { system, log } = build({ resolveBatch: async () => {} });
+    system.facts.go = true;
+    await advance(10);
+    expect(log.starts).toBe(1);
+    expect(log.completes).toBe(1);
+    expect(log.errors).toEqual([]);
+    expect(system.inspect().inflight).toEqual([]);
+    system.destroy();
+  });
 });
 
 describe("inspect() shows an in-flight run's status", () => {

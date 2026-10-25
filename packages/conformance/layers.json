@@ -6722,6 +6722,11 @@
           "layer": "L2",
           "by": ["option resolvers"]
         },
+        "definition checks > a resolver with only resolveBatch and batching off is reported complete without running anything": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
         "inspect() shows an in-flight run's status > pending as it starts, then running with the attempt number; listed as in flight": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"],
