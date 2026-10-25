@@ -258,7 +258,10 @@
     },
     "tests/core/constraints.test.ts": {
       "rule": "L2",
-      "pin": true
+      "pin": true,
+      "allowAbove": {
+        "option predicate data form": "the `$matches: string` throw is raised by a data-form predicate (L11); the attribution rule itself is L2"
+      }
     },
     "tests/core/constraint-disable.test.ts": {
       "rule": "L2"

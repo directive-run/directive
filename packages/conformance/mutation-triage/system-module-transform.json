@@ -49,15 +49,6 @@
     "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) — killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
   },
   {
-    "line": 116,
-    "col": 6,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) — killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
-  },
-  {
     "line": 117,
     "col": 6,
     "mutator": "StringLiteral",
@@ -79,15 +70,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
-  },
-  {
-    "line": 172,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream."
+    "note": "isPredicate already guarantees every clause is a plain object with an op; only an invalid clause (a non-string fact) tells these apart, and that fails downstream. This key matches two mutants: the whole `&&` condition and its first operand `clause` both start here."
   },
   {
     "line": 172,
@@ -151,15 +134,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "internals-only",
-    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
-  },
-  {
-    "line": 306,
-    "col": 7,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "internals-only",
-    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals. This key matches two mutants: the whole `||` condition and its first operand `derive === undefined` both start here."
   },
   {
     "line": 306,
@@ -199,15 +174,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
-  },
-  {
-    "line": 348,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical."
+    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical. This key matches two mutants: the whole `&&` condition and its first operand `def.when !== undefined` both start here."
   },
   {
     "line": 348,
@@ -247,7 +214,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -264,7 +231,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -281,7 +248,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -290,7 +257,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -299,15 +266,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
-  },
-  {
-    "line": 369,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`."
+    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`. This key matches two mutants: the whole `&&` condition and its first operand `raw` both start here."
   },
   {
     "line": 369,
@@ -339,7 +298,7 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -348,7 +307,7 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -357,7 +316,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -390,7 +349,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -407,7 +366,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -424,7 +383,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -441,7 +400,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -450,7 +409,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -483,7 +442,7 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -492,7 +451,7 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -509,7 +468,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -526,7 +485,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
@@ -543,7 +502,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -552,7 +511,7 @@
     "mutator": "EqualityOperator",
     "replacement": "derive !== mod.derive",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
@@ -561,7 +520,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -570,7 +529,7 @@
     "mutator": "EqualityOperator",
     "replacement": "events !== mod.events",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
@@ -579,7 +538,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
@@ -588,7 +547,7 @@
     "mutator": "EqualityOperator",
     "replacement": "effects !== mod.effects",
     "reason": "later-layer",
-    "layer": "L13",
+    "layer": "L11",
     "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
@@ -661,15 +620,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
-  },
-  {
-    "line": 572,
-    "col": 7,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
+    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be. This key matches two mutants: the whole `&&` condition and its first operand `typeof raw === \"object\"` both start here. Only the whole-condition mutant survives; the first-conjunct one is killed by twelve tests at or below L3."
   },
   {
     "line": 572,

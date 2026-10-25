@@ -141,15 +141,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "Property descriptor a view reports for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract."
-  },
-  {
-    "line": 156,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Property descriptor a view reports for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract."
+    "note": "Property descriptor a view reports for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract. This key matches two mutants: the whole `&&` condition and its first operand `config.has` both start here."
   },
   {
     "line": 156,
@@ -1085,15 +1077,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 925,
-    "col": 20,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test. This key matches two mutants: the whole `||` condition and its first operand `prop === \"self\"` both start here."
   },
   {
     "line": 925,

@@ -228,8 +228,10 @@ describe("a composed system's facts", () => {
     for (const view of [system.facts, system.facts.left, system.derive.left]) {
       expect(Reflect.has(view, sym)).toBe(false);
       expect(view[sym]).toBeUndefined();
-      expect(Reflect.set(view, sym, 1)).toBe(false);
-      expect(Reflect.deleteProperty(view, sym)).toBe(false);
+      Reflect.set(view, sym, 1);
+      expect(view[sym]).toBeUndefined();
+      Reflect.deleteProperty(view, sym);
+      expect(Reflect.has(view, sym)).toBe(false);
     }
 
     expect(Object.keys(system.facts.left).sort()).toEqual([

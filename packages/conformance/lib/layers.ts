@@ -206,6 +206,34 @@ const REFLECTION_OBJECT = new Set([
   "preventExtensions",
 ]);
 
+/**
+ * The predicate language of the data forms (core/predicate.ts): a constraint
+ * `when`, an effect `on` or an event `patch` given as data instead of a
+ * function is the plan's L11. The operators place a test wherever the object
+ * is built, so a helper that passes `when` through by name still counts.
+ */
+const PREDICATE_OPERATORS = new Set([
+  "$all",
+  "$any",
+  "$not",
+  "$eq",
+  "$ne",
+  "$gt",
+  "$gte",
+  "$lt",
+  "$lte",
+  "$in",
+  "$nin",
+  "$exists",
+  "$between",
+  "$contains",
+  "$startsWith",
+  "$endsWith",
+  "$matches",
+  "$changed",
+  "$ref",
+]);
+
 /** `(x as T)`, `x!`, `(x)` → `x`. */
 function unwrap(node: Node): Node {
   let current = node;
@@ -432,6 +460,43 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
       }
       if (chain[chain.length - 1] === "$template") {
         out.push({ name: "option derive data form", layer: "L11" });
+      }
+      // A data-form predicate: a constraint's `when` or an effect's `on`
+      // given as an object or array spec instead of a function
+      // (`{ phase: "red" }`), and the predicate operators themselves
+      // wherever the object is built (`{ $gte: 30 }`, `{ op: "$eq" }`),
+      // since a helper may pass `when` through by name (the plan's data
+      // forms, L11). Only a literal counts: `when: options.when ?? fn` or
+      // `when: cond ? f : g` is a function the test chose at run time.
+      if (
+        (matchesSuffix(chain, ["constraints", "*", "when"]) ||
+          matchesSuffix(chain, ["effects", "*", "on"])) &&
+        Node.isPropertyAssignment(node)
+      ) {
+        const value = node.getInitializer();
+        const spec = value ? unwrap(value) : undefined;
+        if (
+          spec &&
+          (Node.isObjectLiteralExpression(spec) ||
+            Node.isArrayLiteralExpression(spec))
+        ) {
+          out.push({ name: "option predicate data form", layer: "L11" });
+        }
+      }
+      const last = chain[chain.length - 1];
+      if (last !== undefined && PREDICATE_OPERATORS.has(last)) {
+        out.push({ name: "option predicate data form", layer: "L11" });
+      }
+      if (last === "op" && Node.isPropertyAssignment(node)) {
+        const value = node.getInitializer();
+        const op = value ? unwrap(value) : undefined;
+        if (
+          op &&
+          Node.isStringLiteral(op) &&
+          PREDICATE_OPERATORS.has(op.getLiteralText())
+        ) {
+          out.push({ name: "option predicate data form", layer: "L11" });
+        }
       }
       if (matchesSuffix(chain, ["effects", "*", "run"])) {
         const fn = Node.isPropertyAssignment(node)

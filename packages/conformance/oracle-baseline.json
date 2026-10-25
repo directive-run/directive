@@ -31,7 +31,7 @@
   },
   "allowAbove": {
     "tests/core/constraint-reevaluation.test.ts": ["option error boundary"],
-    "tests/core/constraints.test.ts": [],
+    "tests/core/constraints.test.ts": ["option predicate data form"],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/reconcile-timing-rules.test.ts": [
       "member .history",
@@ -89,7 +89,7 @@
       "normalize requirements > single requirement object is wrapped in array": "L2",
       "normalize requirements > null/undefined require produces empty requirements": "L2",
       "normalize requirements > array require passes through": "L2",
-      "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": "L2"
+      "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": "L11"
     },
     "tests/core/l2-requirements-oracle.test.ts": {
       "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",
