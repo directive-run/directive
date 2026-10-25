@@ -175,6 +175,12 @@
     "tests/core/l1-effects.test.ts": {
       "rule": "L0"
     },
+    "tests/core/l2-constraints-oracle.test.ts": {
+      "rule": "L2"
+    },
+    "tests/core/l2-constraints-oracle-production.test.ts": {
+      "rule": "L2"
+    },
     "tests/core/blackbox-effects.test.ts": {
       "rule": "L0"
     },
