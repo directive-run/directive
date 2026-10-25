@@ -5890,6 +5890,137 @@
         }
       }
     },
+    "tests/core/l1-gate-rest-production.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "createModule in production, for a module built from facts, derivations and events > does not warn about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in production, for a module built from facts, derivations and events > still refuses what is structurally wrong, and still hands back the module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "member .derive",
+            "member .events"
+          ]
+        }
+      }
+    },
+    "tests/core/l1-gate-rest.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a batch announces only what it wrote > a batch that wrote nothing, or only what was already stored, notifies nobody": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > a later batch does not announce the keys an earlier one wrote": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > an empty batch inside a listener does not end the deferral of the listener's own writes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > warns about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > stays quiet about a module that is well formed": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot membership test": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > an effect still reads derivations after it awaits": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > a derivation handle kept from an effect's run still reads after the run has finished": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-views.test.ts": {
       "category": "black-box",
       "rule": "L1",
@@ -6261,6 +6392,344 @@
         "the facts object an effect is handed > lists and describes only the real facts, with no prototype": {
           "layer": "L1",
           "by": ["reflection"]
+        }
+      }
+    },
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "requirement identity in a running system > requirements of one type that differ in content are separate requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the same requirement from two constraints is one requirement, owned by the one evaluated first": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the id is built from the content: the same in two systems and in any key order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a resolver key is the requirement's identity: a shared key is one requirement and the first wins": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that is still required keeps its run, and one no longer required is canceled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that comes back after going away starts a new run": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "requirement identity in a running system > a requirement stops being unmet when its constraint stops requiring it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > req() builds what a constraint requires and forType() routes it to its resolver": {
+          "layer": "L2",
+          "by": [
+            "import forType",
+            "import req",
+            "option constraints",
+            "option resolvers"
+          ],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "generateRequirementId > derives the id from the type and the content, whatever the key order": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > differs when the type or any property differs": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > uses the key function instead when one is given": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "req > builds a requirement from its type and properties": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "req > makes a new object on each call and leaves its input alone": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "isRequirementType > is true only for a requirement of that type": {
+          "layer": "L2",
+          "by": ["import isRequirementType"]
+        },
+        "forType > makes a predicate for one requirement type": {
+          "layer": "L2",
+          "by": ["import forType"]
+        },
+        "RequirementSet > keeps the first requirement added under an id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > looks entries up by id and removes them by id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > lists its ids and entries in insertion order": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > counts its entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clear empties it": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clone is an independent copy holding the same entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff reports what only this set holds as added and what only the other holds as removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff of two sets with the same ids reports nothing, and an empty side is all added or all removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        }
+      }
+    },
+    "tests/core/l3-errors-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "the error boundary in production > skips an unhandled error from a constraint, a resolver and a derivation without a word": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "the error boundary in production > retry-later gives up silently once its attempts are used": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        }
+      }
+    },
+    "tests/core/l3-errors-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "which strategy a source gets > skips by default, for every source, and the system keeps running": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "which strategy a source gets > \"an option set for the %s source changes that source and no other\"": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ],
+          "dynamic": true
+        },
+        "which strategy a source gets > a handler function receives the thrown error and the id; a string it returns is the strategy": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "which strategy a source gets > a handler that throws is logged and the error is skipped": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "which strategy a source gets > a value that is not an Error is reported by its string form": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what an observer is told > a DirectiveError names the source, the id, the cause and whether it is recoverable": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what an observer is told > a DirectiveError the code threw itself reaches observers as that object, and the strategy follows the place it was thrown": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what an observer is told > an observer that throws is contained: the failure is logged and recovery still happens": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what an observer is told > plugins hear each source's own error hook, and a module hook hears resolver failures": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > disable stops a constraint from being evaluated again; skip does not": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > disable stops an effect from running again; skip does not": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > disable on a resolver disables the constraint that required it": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > retry runs a failed effect again without waiting for a change": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > retry is reported for a failed resolver, which runs again the next time its requirement is raised": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > retry makes the next read of a failed derivation compute it again": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > throw raises the DirectiveError to whoever read the derivation": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "what each strategy does > \"throw stops the pass and reports the DirectiveError from a failing %s\"": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ],
+          "dynamic": true
+        },
+        "retry-later > retries a failing constraint after a growing delay, then gives up with a skip": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "retry-later > starts the budget over once it has given up": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "retry-later > honours delayMs, backoffMultiplier, maxRetries and maxDelayMs": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "retry-later > stop() discards retries that were waiting": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "retry-later > a resolver that succeeds clears its retry budget and its waiting retry": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "retry-later remembers attempts for a bounded number of sources > keeps the attempt counts of the first 1000 sources and forgets the oldest after that": {
+          "layer": "L3",
+          "by": ["option error boundary", "option plugins"]
+        },
+        "the development warning for an error nothing handles > speaks once for each constraint, resolver and derivation that throws, never for an effect": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the development warning for an error nothing handles > \"is silent when the %s source has an option, and speaks when only the other sources do\"": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ],
+          "dynamic": true
+        },
+        "the development warning for an error nothing handles > a handler function counts as handling it, even one that returns nothing": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the development warning for an error nothing handles > errorBoundary.onError counts as handling it": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "the development warning for an error nothing handles > stays quiet about a failure that came after the run had satisfied its requirement": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "the development warning for an error nothing handles > remembers the first 1000 sources it spoke about and forgets the oldest after that": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
         }
       }
     },

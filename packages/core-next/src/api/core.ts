@@ -21,7 +21,7 @@
  */
 
 import isDevelopment from "#is-development";
-import { Flags, type ReactiveNode } from "../graph.js";
+import { Flags, Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
   type KernelEvent,
@@ -392,6 +392,19 @@ export function createSystemCore<const M extends ModuleSchema>(
       throw error;
     }
   }
+  /**
+   * 1.35 keeps a derivation's state for the life of the system: its value and
+   * the facts it reads stay put until it computes again. The graph releases a
+   * computed that loses its last reader (it goes dirty and drops its own
+   * edges), which for a derivation is wrong twice over: the next read runs it
+   * again for nothing, and a write to a fact it reads no longer reaches it, so
+   * its subscribers are never told. A reader loses a derivation by reading
+   * something else (a branch) or by throwing before it gets there.
+   *
+   * So every derivation keeps one reader that never runs: the edge a read
+   * would leave, without the read.
+   */
+  const keep = graph.computed(() => 0);
   for (const id in deriveDefs) {
     const d = {
       id_: id,
@@ -399,9 +412,15 @@ export function createSystemCore<const M extends ModuleSchema>(
       live_: false,
       asked_: null,
     } as Derivation;
-    d.node_ = graph.computed(() => compute(d), { equals: false });
+    const node = (d.node_ = graph.computed(() => compute(d), {
+      equals: false,
+    }));
+    const link = new Link(node, keep, keep.deps, node.subsTail);
+    keep.deps = link;
+    node.subsTail ? (node.subsTail.nextSub = link) : (node.subs = link);
+    node.subsTail = link;
     derivations.set(id, d);
-    byNode.set(d.node_, d);
+    byNode.set(node, d);
   }
   function read(id: string): unknown {
     const d = derivations.get(id);
