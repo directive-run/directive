@@ -5890,6 +5890,137 @@
         }
       }
     },
+    "tests/core/l1-gate-rest-production.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "createModule in production, for a module built from facts, derivations and events > does not warn about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in production, for a module built from facts, derivations and events > still refuses what is structurally wrong, and still hands back the module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "member .derive",
+            "member .events"
+          ]
+        }
+      }
+    },
+    "tests/core/l1-gate-rest.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "tests": {
+        "a batch announces only what it wrote > a batch that wrote nothing, or only what was already stored, notifies nobody": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > a later batch does not announce the keys an earlier one wrote": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "a batch announces only what it wrote > an empty batch inside a listener does not end the deferral of the listener's own writes": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option init"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > warns about a badly formed module": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "createModule in development, for a module built from facts, derivations and events > stays quiet about a module that is well formed": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import t",
+            "option derivations",
+            "option events"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot read": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot membership test": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > an effect still reads derivations after it awaits": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        },
+        "tracking: a body that has already awaited > a derivation handle kept from an effect's run still reads after the run has finished": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-views.test.ts": {
       "category": "black-box",
       "rule": "L1",
@@ -6264,6 +6395,117 @@
         }
       }
     },
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "requirement identity in a running system > requirements of one type that differ in content are separate requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the same requirement from two constraints is one requirement, owned by the one evaluated first": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > the id is built from the content: the same in two systems and in any key order": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a resolver key is the requirement's identity: a shared key is one requirement and the first wins": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that is still required keeps its run, and one no longer required is canceled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > a requirement that comes back after going away starts a new run": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "requirement identity in a running system > a requirement stops being unmet when its constraint stops requiring it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "requirement identity in a running system > req() builds what a constraint requires and forType() routes it to its resolver": {
+          "layer": "L2",
+          "by": [
+            "import forType",
+            "import req",
+            "option constraints",
+            "option resolvers"
+          ],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "generateRequirementId > derives the id from the type and the content, whatever the key order": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > differs when the type or any property differs": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "generateRequirementId > uses the key function instead when one is given": {
+          "layer": "L2",
+          "by": ["import generateRequirementId"]
+        },
+        "req > builds a requirement from its type and properties": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "req > makes a new object on each call and leaves its input alone": {
+          "layer": "L2",
+          "by": ["import req"]
+        },
+        "isRequirementType > is true only for a requirement of that type": {
+          "layer": "L2",
+          "by": ["import isRequirementType"]
+        },
+        "forType > makes a predicate for one requirement type": {
+          "layer": "L2",
+          "by": ["import forType"]
+        },
+        "RequirementSet > keeps the first requirement added under an id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > looks entries up by id and removes them by id": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > lists its ids and entries in insertion order": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > counts its entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clear empties it": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > clone is an independent copy holding the same entries": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff reports what only this set holds as added and what only the other holds as removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        },
+        "RequirementSet > diff of two sets with the same ids reports nothing, and an empty side is all added or all removed": {
+          "layer": "L2",
+          "by": ["import RequirementSet"]
+        }
+      }
+    },
     "tests/core/l3-system-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L3",
@@ -6320,6 +6562,14 @@
           "by": ["option crossModuleDeps", "option modules"]
         },
         "module initialization order > \"declaration\" follows the order the modules were written in": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "module initialization order > circular crossModuleDeps are refused, naming the cycle in dependency order": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "module initialization order > a cycle that does not start at the first module names only the cycle": {
           "layer": "L1",
           "by": ["option crossModuleDeps", "option modules"]
         },
@@ -6396,6 +6646,10 @@
           "layer": "L3",
           "by": ["option initial facts"]
         },
+        "initialFacts in a namespaced system > a module may be named constructor, but initialFacts under that name are still dropped, with a warning in development": {
+          "layer": "L3",
+          "by": ["option initial facts"]
+        },
         "initialFacts in a namespaced system > refuses facts carrying a prototype-pollution key when the system starts": {
           "layer": "L3",
           "by": ["option initial facts"]
@@ -6425,10 +6679,27 @@
           "by": ["option crossModuleDeps", "option modules", "reflection"],
           "dynamic": true
         },
+        "the status properties > \"%s: meta is an enumerable, configurable value\"": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules", "reflection"],
+          "dynamic": true
+        },
         "the status properties > \"%s: follow the lifecycle\"": {
           "layer": "L3",
           "by": ["member .whenReady"],
           "dynamic": true
+        },
+        "the events view of a single-module system > names the module's events and nothing else": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "reflection"]
+        },
+        "the events view of a single-module system > knows no symbol and no prototype-chain name": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "reflection"]
+        },
+        "the events view of a single-module system > cannot be written, deleted, redefined or re-parented": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "reflection"]
         },
         "a system that is never started > \"%s: is reported once, in development\"": {
           "layer": "L1",

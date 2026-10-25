@@ -27,6 +27,7 @@ import {
   DIFF_PROJECT,
   DIFF_TEST_ROOTS,
   FUZZ_FLOOR,
+  FUZZ_V2_FLOOR,
   type JsonReport,
   census,
   checkAheadOfV1,
@@ -43,7 +44,7 @@ import {
   v2Skips,
 } from "../../lib/census.js";
 import { coreEntries, v2Entries } from "../../lib/core-entries.js";
-import { maxRunaways } from "../../lib/fuzz.js";
+import { FUZZ_DEFAULT_RUNS, maxRunaways, v2Cases } from "../../lib/fuzz.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
 import { staticTests } from "../../lib/tests.js";
@@ -544,28 +545,74 @@ describe("the differential project", () => {
   });
 
   it("requires the fuzzer to run at least its floor", () => {
-    expect(checkFuzzRuns([{ seed: 1, runs: FUZZ_FLOOR }])).toEqual([]);
-    expect(checkFuzzRuns([])).toEqual([
+    expect(checkFuzzRuns([{ seed: 1, runs: FUZZ_FLOOR }], false)).toEqual([]);
+    expect(checkFuzzRuns([], false)).toEqual([
       "conformance:diff: the fuzzer reported no runs",
     ]);
-    expect(checkFuzzRuns([{ seed: 1, runs: 0 }]).join("\n")).toMatch(
+    expect(checkFuzzRuns([{ seed: 1, runs: 0 }], false).join("\n")).toMatch(
       /compared 0 cases .* floor is 200/,
     );
-    expect(checkFuzzRuns([{ seed: 1, runs: Number.NaN }])).toHaveLength(1);
+    expect(checkFuzzRuns([{ seed: 1, runs: Number.NaN }], false)).toHaveLength(
+      1,
+    );
   });
 
   it("caps runaway fuzz cases at max(1% of cases, 2)", () => {
     // 205 generated: 2 runaways are fine, 3 are not.
-    expect(checkFuzzRuns([{ seed: 1, runs: 203, runaway: 2 }])).toEqual([]);
+    expect(checkFuzzRuns([{ seed: 1, runs: 203, runaway: 2 }], false)).toEqual(
+      [],
+    );
     expect(
-      checkFuzzRuns([{ seed: 1, runs: 202, runaway: 3 }]).join("\n"),
+      checkFuzzRuns([{ seed: 1, runs: 202, runaway: 3 }], false).join("\n"),
     ).toMatch(/3 runaway fuzz cases .* at most 2 allowed/);
     // 1% scales: 1000 generated allows 10.
-    expect(checkFuzzRuns([{ seed: 1, runs: 990, runaway: 10 }])).toEqual([]);
-    expect(checkFuzzRuns([{ seed: 1, runs: 989, runaway: 11 }])).toHaveLength(
-      1,
+    expect(checkFuzzRuns([{ seed: 1, runs: 990, runaway: 10 }], false)).toEqual(
+      [],
     );
+    expect(
+      checkFuzzRuns([{ seed: 1, runs: 989, runaway: 11 }], false),
+    ).toHaveLength(1);
     expect(maxRunaways(205)).toBe(2);
+  });
+
+  it("requires the fuzzer to compare a floor of cases on v2 while v2 runs anything", () => {
+    const run = (v2?: number) => ({
+      seed: 1,
+      runs: FUZZ_DEFAULT_RUNS,
+      runaway: 0,
+      ...(v2 === undefined ? {} : { v2 }),
+    });
+
+    expect(checkFuzzRuns([run(FUZZ_V2_FLOOR)], true)).toEqual([]);
+    expect(checkFuzzRuns([run(v2Cases(FUZZ_DEFAULT_RUNS))], true)).toEqual([]);
+    // The fuzz run the gap left: v2 in none of the cases.
+    expect(checkFuzzRuns([run(0)], true).join("\n")).toMatch(
+      /compared 0 cases on v2 .* floor is 60/,
+    );
+    expect(checkFuzzRuns([run(FUZZ_V2_FLOOR - 1)], true)).toHaveLength(1);
+    // A log with no v2 count (an old or doctored one) counts as none.
+    expect(checkFuzzRuns([run()], true).join("\n")).toMatch(
+      /compared 0 cases on v2/,
+    );
+    expect(checkFuzzRuns([run(Number.NaN)], true)).toHaveLength(1);
+    // Every run in the log is held to it.
+    expect(checkFuzzRuns([run(FUZZ_V2_FLOOR), run(0)], true)).toHaveLength(1);
+    // Before v2 builds a layer (`current` is null) it takes part in nothing.
+    expect(checkFuzzRuns([run(0)], false)).toEqual([]);
+  });
+
+  it("adds fuzz cases so v2 always has its floor", () => {
+    // The share is added to a run's cases across every layer, never taken
+    // from them, and it is a part of a run, not all of it.
+    for (const runs of [FUZZ_FLOOR, FUZZ_DEFAULT_RUNS, 1000, 5000]) {
+      expect(v2Cases(runs)).toBeGreaterThan(0);
+      expect(v2Cases(runs)).toBeLessThan(runs);
+    }
+    expect(v2Cases(FUZZ_DEFAULT_RUNS)).toBe(82);
+    expect(v2Cases(5000)).toBe(2000);
+    // Even the smallest run the fuzzer accepts, with a few cases discarded,
+    // leaves the floor met.
+    expect(v2Cases(FUZZ_FLOOR)).toBeGreaterThanOrEqual(FUZZ_V2_FLOOR + 10);
   });
 
   it("fails the typecheck when PLUGIN_HOOKS misses a hook", () => {

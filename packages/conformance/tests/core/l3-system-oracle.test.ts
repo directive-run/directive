@@ -6,9 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Black-box tests for what createSystem does around the engine: argument
 // checks, module ordering, the tick interval, SSR initial facts, the status
-// properties, zeroConfig and the development-only diagnostics. Public API
-// only; no message text and no Proxy trap results. A warning is asserted by
-// whether it fires, never by what it says.
+// properties, the events view, zeroConfig and the development-only
+// diagnostics. Public API only. A warning is asserted by whether it fires,
+// never by what it says. Message text is read in one place: the cycle a
+// circular-dependency error names, because the module order it prints is
+// the behaviour. The events view is asserted under reflection (`in`,
+// Object.keys, descriptors) because layers.rules.json keeps "events proxies
+// under reflection" as a contract.
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -152,6 +156,29 @@ describe("module initialization order", () => {
     expect(order).toEqual(["dependent", "base"]);
 
     system.destroy();
+  });
+
+  it("circular crossModuleDeps are refused, naming the cycle in dependency order", () => {
+    expect(() =>
+      createSystem({
+        modules: {
+          a: counter("a", { deps: { b: dep } }),
+          b: counter("b", { deps: { a: dep } }),
+        },
+      } as never),
+    ).toThrow(/: a → b → a\./);
+  });
+
+  it("a cycle that does not start at the first module names only the cycle", () => {
+    expect(() =>
+      createSystem({
+        modules: {
+          x: counter("x", { deps: { y: dep } }),
+          y: counter("y", { deps: { z: dep } }),
+          z: counter("z", { deps: { y: dep } }),
+        },
+      } as never),
+    ).toThrow(/: y → z → y\./);
   });
 
   it("a dependency on a module that does not exist is ignored when ordering, whatever its name", () => {
@@ -432,6 +459,40 @@ describe("initialFacts in a namespaced system", () => {
     system.destroy();
   });
 
+  it("a module may be named constructor, but initialFacts under that name are still dropped, with a warning in development", async () => {
+    const warn = quietWarn();
+    const seen: unknown[] = [];
+    const ctor = createModule("ctor", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: { peek: {} },
+        requirements: {},
+      },
+      init: (facts: any) => {
+        facts.count = 0;
+      },
+      events: {
+        peek: (facts: any) => {
+          seen.push(facts.count);
+        },
+      },
+    } as never);
+    const system = createSystem({
+      modules: { constructor: ctor, a: counter("a") },
+      initialFacts: { constructor: { count: 9 }, a: { count: 5 } },
+    } as never) as any;
+    system.start();
+    system.dispatch({ type: "constructor::peek" });
+    await system.settle();
+
+    expect(seen).toEqual([0]);
+    expect(system.facts.a.count).toBe(5);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+
   it("refuses facts carrying a prototype-pollution key when the system starts", () => {
     const system = createSystem({
       modules: { a: counter("a") },
@@ -575,7 +636,13 @@ describe("the status properties", () => {
   it.each(forms)("%s: enumerable, configurable accessors", (_, build) => {
     const system = build();
 
-    for (const key of ["isRunning", "isSettled", "isInitialized", "isReady"]) {
+    for (const key of [
+      "isRunning",
+      "isSettled",
+      "isInitialized",
+      "isReady",
+      "trace",
+    ]) {
       const descriptor = Object.getOwnPropertyDescriptor(system, key);
 
       expect(typeof descriptor?.get).toBe("function");
@@ -586,6 +653,23 @@ describe("the status properties", () => {
 
     system.destroy();
   });
+
+  it.each(forms)(
+    "%s: meta is an enumerable, configurable value",
+    (_, build) => {
+      const system = build();
+      const descriptor = Object.getOwnPropertyDescriptor(system, "meta");
+
+      expect(descriptor).toBeDefined();
+      expect(descriptor && "value" in descriptor).toBe(true);
+      expect(descriptor?.value).toBeDefined();
+      expect(descriptor?.enumerable).toBe(true);
+      expect(descriptor?.configurable).toBe(true);
+      expect(Object.keys(system)).toContain("meta");
+
+      system.destroy();
+    },
+  );
 
   it.each(forms)("%s: follow the lifecycle", async (_, build) => {
     const system = build();
@@ -605,6 +689,75 @@ describe("the status properties", () => {
 
     system.stop();
     expect(system.isRunning).toBe(false);
+
+    system.destroy();
+  });
+});
+
+describe("the events view of a single-module system", () => {
+  function view() {
+    const system = createSystem({ module: counter("c") } as never) as any;
+    system.start();
+
+    return system;
+  }
+
+  it("names the module's events and nothing else", () => {
+    const system = view();
+
+    expect("inc" in system.events).toBe(true);
+    expect("nope" in system.events).toBe(false);
+    expect(Object.keys(system.events)).toEqual(["inc"]);
+    expect(Object.getOwnPropertyDescriptor(system.events, "inc")).toMatchObject(
+      { enumerable: true, configurable: true },
+    );
+    expect(
+      Object.getOwnPropertyDescriptor(system.events, "nope"),
+    ).toBeUndefined();
+
+    system.destroy();
+  });
+
+  it("knows no symbol and no prototype-chain name", () => {
+    const system = view();
+    const symbol = Symbol("tag");
+
+    expect(system.events[symbol]).toBeUndefined();
+    expect(symbol in system.events).toBe(false);
+    expect(
+      Object.getOwnPropertyDescriptor(system.events, symbol),
+    ).toBeUndefined();
+    for (const name of ["constructor", "__proto__", "prototype"]) {
+      expect(system.events[name]).toBeUndefined();
+      expect(name in system.events).toBe(false);
+      expect(
+        Object.getOwnPropertyDescriptor(system.events, name),
+      ).toBeUndefined();
+    }
+
+    system.destroy();
+  });
+
+  it("cannot be written, deleted, redefined or re-parented", () => {
+    const system = view();
+
+    expect(() => {
+      system.events.extra = () => {};
+    }).toThrow(TypeError);
+    expect(() => {
+      // biome-ignore lint/performance/noDelete: the deleteProperty trap is what is under test
+      delete system.events.inc;
+    }).toThrow(TypeError);
+    expect(() =>
+      Object.defineProperty(system.events, "extra", {
+        value: 1,
+        configurable: true,
+      }),
+    ).toThrow(TypeError);
+    expect(Object.getPrototypeOf(system.events)).toBeNull();
+    expect(() => Object.setPrototypeOf(system.events, {})).toThrow(TypeError);
+    expect("inc" in system.events).toBe(true);
+    expect(Object.keys(system.events)).toEqual(["inc"]);
 
     system.destroy();
   });

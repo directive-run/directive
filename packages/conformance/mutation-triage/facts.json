@@ -8,6 +8,15 @@
     "note": "The engine never passes redactErrors to createFacts (no non-test caller in packages/); only /internals createFacts callers (mutants-facts.test.ts) can set it. Hand-run: survived the suite."
   },
   {
+    "line": 197,
+    "col": 8,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The batch buffer starts empty. A stray first entry is invisible to the engine's own bookkeeping, which reads only the key of an entry and ignores a keyless one; only a plugin's batch report (onFactsBatch, L3) shows it — killed in the full run by facts: batching reports an empty batch to a plugin never, and a real one once with every change"
+  },
+  {
     "line": 220,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -88,6 +97,15 @@
     "note": "internals-only: validate:false is never passed by the engine; in production validateValue is not called at all (set() guards on isDevelopment)."
   },
   {
+    "line": 439,
+    "col": 62,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "The mark that tells system.observe() to rethrow the notification-loop guard instead of logging it. Nothing else reads the mark; observe() is L9 — killed in the full run by fact store behaviour seen through a system stops delivering a batch to an observer once its own write runs away"
+  },
+  {
     "line": 447,
     "col": 9,
     "mutator": "OptionalChaining",
@@ -96,12 +114,57 @@
     "note": "internals-only: the engine always supplies onChange, so the optional call never sees undefined."
   },
   {
+    "line": 472,
+    "col": 21,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "An empty batch is taken as no batch, so onBatch is not called. The engine's own response to an empty call changes nothing a base-layer test can read (onBatchEnd releases the hold either way); a plugin's batch report (onFactsBatch, L3) hears it — killed in the full run by facts: batching does not call anyone for an empty batch or one that changed nothing"
+  },
+  {
+    "line": 472,
+    "col": 21,
+    "mutator": "EqualityOperator",
+    "replacement": "batchChanges.length >= 0",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "An empty batch is taken as no batch, so onBatch is not called. The engine's own response to an empty call changes nothing a base-layer test can read (onBatchEnd releases the hold either way); a plugin's batch report (onFactsBatch, L3) hears it — killed in the full run by facts: batching does not call anyone for an empty batch or one that changed nothing"
+  },
+  {
+    "line": 521,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "A late write to a fact whose module was unregistered lands nowhere. Unregistering a module is unregisterModule (L10) — killed in the full run by facts: teardown and dynamic registration ignores a late write to a fact whose module was unregistered"
+  },
+  {
+    "line": 539,
+    "col": 17,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The set label on a batch record. The engine reads only key, prev, value and origin from a record, so only a plugin's batch report (onFactsBatch, L3) shows the label — killed in the full run by facts: batching reports an empty batch to a plugin never, and a real one once with every change"
+  },
+  {
     "line": 540,
     "col": 19,
     "mutator": "OptionalChaining",
     "replacement": "originOf()",
     "reason": "internals-only",
     "note": "internals-only: the engine always supplies originOf."
+  },
+  {
+    "line": 540,
+    "col": 19,
+    "mutator": "LogicalOperator",
+    "replacement": "originOf?.() && \"authored\"",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "The origin label of a batched write. Only a restore labels a write other than authored (restore and hydrate, L6; history, L8), and only observe() or a plugin shows the label (L9) — killed in the full run by facts: batching labels what a restore wrote as restore, and the rest as authored"
   },
   {
     "line": 540,
@@ -126,6 +189,33 @@
     "replacement": ";",
     "reason": "equivalent",
     "note": "knownKeys is only read by toObject, which also requires map.has(key); the map entry is deleted on the line above."
+  },
+  {
+    "line": 556,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The batch record of a batched set. The engine invalidates derivations at write time (onWrite) and listeners hear the dirty keys, so with the record missing or empty nothing a base-layer test reads changes; only a plugin's batch report (onFactsBatch, L3) shows it — killed in the full run by facts: batching reports an empty batch to a plugin never, and a real one once with every change"
+  },
+  {
+    "line": 556,
+    "col": 27,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The batch record of a batched set. The engine invalidates derivations at write time (onWrite) and listeners hear the dirty keys, so with the record missing or empty nothing a base-layer test reads changes; only a plugin's batch report (onFactsBatch, L3) shows it — killed in the full run by facts: batching reports an empty batch to a plugin never, and a real one once with every change"
+  },
+  {
+    "line": 560,
+    "col": 17,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L3",
+    "note": "The delete label on a batch record. The engine reads only key, prev, value and origin from a record, so only a plugin's batch report (onFactsBatch, L3) shows the label — killed in the full run by facts: batching reports an empty batch to a plugin never, and a real one once with every change"
   },
   {
     "line": 561,
@@ -190,6 +280,15 @@
     "replacement": ";",
     "reason": "not-observable",
     "note": "empty listener-set cleanup is a memory release; a later subscribe recreates the set either way."
+  },
+  {
+    "line": 628,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "toObject skips a known key that holds no value. A key is known without a value only after dynamic registration (registerModule, L10) — killed in the full run by facts: teardown and dynamic registration serialises a dynamically registered module only once its facts hold values"
   },
   {
     "line": 651,

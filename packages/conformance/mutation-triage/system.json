@@ -13,31 +13,7 @@
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
     "reason": "equivalent",
-    "note": "`path` only feeds the cycle printed in the circular-dependency error (indexOf/slice for display): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
-  },
-  {
-    "line": 71,
-    "col": 21,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[]",
-    "reason": "equivalent",
-    "note": "Builds the cycle text of the circular-dependency error: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
-  },
-  {
-    "line": 71,
-    "col": 25,
-    "mutator": "MethodExpression",
-    "replacement": "path",
-    "reason": "equivalent",
-    "note": "Builds the cycle text of the circular-dependency error: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
-  },
-  {
-    "line": 78,
-    "col": 5,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "`path` only feeds the cycle printed in the circular-dependency error: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+    "note": "Message wording only: `path` only feeds the cycle printed in the circular-dependency error (indexOf/slice for display): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
   },
   {
     "line": 82,
@@ -53,7 +29,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "equivalent",
-    "note": "`path` only feeds the cycle printed in the circular-dependency error (stale entries only lengthen the printed list): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+    "note": "Message wording only: `path` only feeds the cycle printed in the circular-dependency error (stale entries only lengthen the printed list): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
   },
   {
     "line": 91,
@@ -93,7 +69,7 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "equivalent",
-    "note": "A line of the multi-line array-modules error text: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+    "note": "Message wording only: A line of the multi-line array-modules error text: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
   },
   {
     "line": 215,
@@ -160,7 +136,7 @@
     "mutator": "ArrayDeclaration",
     "replacement": "[]",
     "reason": "equivalent",
-    "note": "The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+    "note": "Message wording only: The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
   },
   {
     "line": 272,
@@ -245,28 +221,12 @@
     "note": "Both are reached only with a truthy tickMs, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so `tickMs > 0` always holds for a number; only a non-numeric tickMs (outside the types) differs."
   },
   {
-    "line": 404,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "equivalent",
-    "note": "A blocked namespace name is skipped either way: without this branch it is not a known namespace and is skipped (with a development warning) by the next one. Only the warning text differs, unless a module is itself named __proto__, constructor or prototype."
-  },
-  {
-    "line": 404,
-    "col": 41,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "equivalent",
-    "note": "A blocked namespace name is skipped either way: without this branch it is not a known namespace and is skipped (with a development warning) by the next one. Only the warning text differs, unless a module is itself named __proto__, constructor or prototype."
-  },
-  {
     "line": 417,
     "col": 37,
     "mutator": "ArrayDeclaration",
     "replacement": "[]",
     "reason": "equivalent",
-    "note": "The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+    "note": "Message wording only: The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
   },
   {
     "line": 424,
@@ -308,69 +268,6 @@
     "replacement": "false",
     "reason": "not-observable",
     "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
-  },
-  {
-    "line": 933,
-    "col": 15,
-    "mutator": "LogicalOperator",
-    "replacement": "history && isDev",
-    "reason": "later-layer",
-    "layer": "L8",
-    "note": "zeroConfig turns history on in development (history ?? isDev); observable only through system.history — no test in the full run kills it (it survived both runs); the L8 gate will count it until a test at that layer does"
-  },
-  {
-    "line": 957,
-    "col": 12,
-    "mutator": "ObjectLiteral",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "the system.trace accessor — killed in the full run by trace.test.ts: Trace returns null when trace is not enabled"
-  },
-  {
-    "line": 961,
-    "col": 19,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "enumerable flag of the system.trace accessor — no test in the full run kills it (it survived both runs); the L9 gate will count it until a test at that layer does"
-  },
-  {
-    "line": 962,
-    "col": 21,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "configurable flag of the system.trace accessor — no test in the full run kills it (it survived both runs); the L9 gate will count it until a test at that layer does"
-  },
-  {
-    "line": 964,
-    "col": 11,
-    "mutator": "ObjectLiteral",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "the system.meta property (read after dynamic registration) — killed in the full run by blackbox-facts.test.ts: facts: teardown and dynamic registration does not wake tag watchers more than once for a module that declares no facts"
-  },
-  {
-    "line": 966,
-    "col": 19,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "enumerable flag of the system.meta property — no test in the full run kills it (it survived both runs); the L9 gate will count it until a test at that layer does"
-  },
-  {
-    "line": 967,
-    "col": 21,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "configurable flag of the system.meta property — no test in the full run kills it (it survived both runs); the L9 gate will count it until a test at that layer does"
   },
   {
     "line": 1015,
@@ -490,76 +387,12 @@
     "note": "hydrate() facts applied at init in a single-module system — killed in the full run by ssr.test.ts: SSR hydrate() before start() round-trip applies hydrated facts on start"
   },
   {
-    "line": 1191,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the get trap's symbol check; a symbol read off system.events returns undefined."
-  },
-  {
-    "line": 1191,
-    "col": 34,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the get trap's symbol check; a symbol read off system.events returns undefined."
-  },
-  {
-    "line": 1191,
-    "col": 44,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the get trap's symbol check; a symbol read off system.events returns undefined."
-  },
-  {
-    "line": 1194,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the get trap's blocked-name check; __proto__, constructor and prototype read off system.events return undefined."
-  },
-  {
-    "line": 1194,
-    "col": 43,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the get trap's blocked-name check; __proto__, constructor and prototype read off system.events return undefined."
-  },
-  {
-    "line": 1202,
-    "col": 37,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
     "line": 1203,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
     "note": "The symbol early return of the has trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
-  },
-  {
-    "line": 1203,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1203,
-    "col": 13,
-    "mutator": "EqualityOperator",
-    "replacement": "typeof prop !== \"symbol\"",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
   },
   {
     "line": 1203,
@@ -576,46 +409,6 @@
     "replacement": "{}",
     "reason": "equivalent",
     "note": "The symbol early return of the has trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
-  },
-  {
-    "line": 1204,
-    "col": 18,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1206,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1206,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1206,
-    "col": 38,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1207,
-    "col": 18,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
   },
   {
     "line": 1210,
@@ -623,15 +416,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1212,
-    "col": 17,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the ownKeys trap (`Object.keys(system.events)`); the key list of the events view is reflection, not an event contract."
+    "note": "Differs only when mod.events is falsy, and createModule always fills events ({} by default), so no module built through the public API reaches the other branch. proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
   },
   {
     "line": 1213,
@@ -639,15 +424,7 @@
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
     "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the ownKeys trap (`Object.keys(system.events)`); the key list of the events view is reflection, not an event contract."
-  },
-  {
-    "line": 1215,
-    "col": 58,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
+    "note": "Differs only when mod.events is falsy, and createModule always fills events ({} by default), so no module built through the public API reaches the other branch. proxy mechanics, not a 2.0 contract: the ownKeys trap (`Object.keys(system.events)`); the key list of the events view is reflection, not an event contract."
   },
   {
     "line": 1216,
@@ -656,22 +433,6 @@
     "replacement": "false",
     "reason": "equivalent",
     "note": "The symbol early return of the getOwnPropertyDescriptor trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
-  },
-  {
-    "line": 1216,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1216,
-    "col": 13,
-    "mutator": "EqualityOperator",
-    "replacement": "typeof prop !== \"symbol\"",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
   },
   {
     "line": 1216,
@@ -688,86 +449,6 @@
     "replacement": "{}",
     "reason": "equivalent",
     "note": "The symbol early return of the getOwnPropertyDescriptor trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
-  },
-  {
-    "line": 1219,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1219,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1219,
-    "col": 38,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1222,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1222,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1222,
-    "col": 13,
-    "mutator": "LogicalOperator",
-    "replacement": "mod.events || prop in mod.events",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1222,
-    "col": 47,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1223,
-    "col": 18,
-    "mutator": "ObjectLiteral",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1223,
-    "col": 34,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
-  },
-  {
-    "line": 1223,
-    "col": 52,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the getOwnPropertyDescriptor trap; the descriptor of an events-view entry is reflection, not an event contract."
   },
   {
     "line": 1228,
@@ -786,14 +467,6 @@
     "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
   },
   {
-    "line": 1232,
-    "col": 16,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the deleteProperty / defineProperty / getPrototypeOf / setPrototypeOf trap results of the events view; reflective mutation of the view is not an event contract."
-  },
-  {
     "line": 1234,
     "col": 24,
     "mutator": "BlockStatement",
@@ -802,35 +475,11 @@
     "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
   },
   {
-    "line": 1235,
-    "col": 16,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the deleteProperty / defineProperty / getPrototypeOf / setPrototypeOf trap results of the events view; reflective mutation of the view is not an event contract."
-  },
-  {
-    "line": 1237,
-    "col": 24,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the deleteProperty / defineProperty / getPrototypeOf / setPrototypeOf trap results of the events view; reflective mutation of the view is not an event contract."
-  },
-  {
     "line": 1240,
     "col": 24,
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
     "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
-  },
-  {
-    "line": 1241,
-    "col": 16,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "proxy mechanics, not a 2.0 contract: the deleteProperty / defineProperty / getPrototypeOf / setPrototypeOf trap results of the events view; reflective mutation of the view is not an event contract."
   }
 ]
