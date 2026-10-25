@@ -2,7 +2,7 @@
   "pins": [
     "tests/core/constraint-reevaluation.test.ts",
     "tests/core/constraints.test.ts",
-    "tests/core/l1-derivations-effects.test.ts",
+    "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/reconcile-timing-rules.test.ts",
     "tests/core/requeue-after-resolver-finishes.test.ts",
     "tests/core/requeue.test.ts",
@@ -16,7 +16,7 @@
   "instruments": {
     "tests/core/constraint-reevaluation.test.ts": ["option plugins"],
     "tests/core/constraints.test.ts": [],
-    "tests/core/l1-derivations-effects.test.ts": ["option effect prev"],
+    "tests/core/l2-requirements-oracle.test.ts": ["member .inspect"],
     "tests/core/reconcile-timing-rules.test.ts": ["option plugins"],
     "tests/core/requeue-after-resolver-finishes.test.ts": [],
     "tests/core/requeue.test.ts": ["import flushMicrotasks"],
@@ -32,7 +32,7 @@
   "allowAbove": {
     "tests/core/constraint-reevaluation.test.ts": ["option error boundary"],
     "tests/core/constraints.test.ts": [],
-    "tests/core/l1-derivations-effects.test.ts": ["option derive data form"],
+    "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/reconcile-timing-rules.test.ts": [
       "member .history",
       "option batch resolver",
@@ -91,16 +91,30 @@
       "normalize requirements > array require passes through": "L2",
       "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": "L2"
     },
-    "tests/core/l1-derivations-effects.test.ts": {
-      "an effect reading a derivation > re-runs when the derivation changes": "L0",
-      "an effect reading a derivation > re-runs when the end of a derivation chain changes": "L0",
-      "an effect reading a derivation > is not re-run by a write the derivation does not depend on": "L0",
-      "an effect reading a derivation > re-runs when it only tested the derivation's membership": "L0",
-      "an effect reading a derivation > then a fact depends on that fact too": "L0",
-      "two effects reading derivations > of one fact are both re-run when it changes": "L0",
-      "two effects reading derivations > of different facts: a write to one re-runs only its effect": "L0",
-      "a derivation reading a derivation > then a fact depends on that fact too": "L0",
-      "a derivation whose compute is not a function > is refused when the system is built": "L11"
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",
+      "requirement identity in a running system > the same requirement from two constraints is one requirement, owned by the one evaluated first": "L2",
+      "requirement identity in a running system > the id is built from the content: the same in two systems and in any key order": "L2",
+      "requirement identity in a running system > a resolver key is the requirement's identity: a shared key is one requirement and the first wins": "L2",
+      "requirement identity in a running system > a requirement that is still required keeps its run, and one no longer required is canceled": "L2",
+      "requirement identity in a running system > a requirement that comes back after going away starts a new run": "L2",
+      "requirement identity in a running system > a requirement stops being unmet when its constraint stops requiring it": "L2",
+      "requirement identity in a running system > req() builds what a constraint requires and forType() routes it to its resolver": "L2",
+      "generateRequirementId > derives the id from the type and the content, whatever the key order": "L2",
+      "generateRequirementId > differs when the type or any property differs": "L2",
+      "generateRequirementId > uses the key function instead when one is given": "L2",
+      "req > builds a requirement from its type and properties": "L2",
+      "req > makes a new object on each call and leaves its input alone": "L2",
+      "isRequirementType > is true only for a requirement of that type": "L2",
+      "forType > makes a predicate for one requirement type": "L2",
+      "RequirementSet > keeps the first requirement added under an id": "L2",
+      "RequirementSet > looks entries up by id and removes them by id": "L2",
+      "RequirementSet > lists its ids and entries in insertion order": "L2",
+      "RequirementSet > counts its entries": "L2",
+      "RequirementSet > clear empties it": "L2",
+      "RequirementSet > clone is an independent copy holding the same entries": "L2",
+      "RequirementSet > diff reports what only this set holds as added and what only the other holds as removed": "L2",
+      "RequirementSet > diff of two sets with the same ids reports nothing, and an empty side is all added or all removed": "L2"
     },
     "tests/core/reconcile-timing-rules.test.ts": {
       "a resolver whose own write retracts its requirement > `completes, never canceled (wait ${waitAfterWrite} microtasks${batched ? \", batched\" : \"\"}${viaDerivation ? \", via a derivation\" : \"\"})`": "L7",

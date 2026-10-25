@@ -14,5 +14,77 @@
     "replacement": "{}",
     "reason": "equivalent",
     "note": "Removing the early return for a module with no facts survives quickly (not a timeout): the reserved-name loop then runs over zero fact keys and throws nothing, so the outcome is identical."
+  },
+  {
+    "line": 319,
+    "col": 9,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved abortOn key. abortOn is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build an abortOn entry __proto__"
+  },
+  {
+    "line": 323,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved abortOn key. abortOn is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build an abortOn entry __proto__"
+  },
+  {
+    "line": 358,
+    "col": 9,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved bind key. bind is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build a bind entry __proto__"
+  },
+  {
+    "line": 362,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved bind key. bind is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build a bind entry __proto__"
+  },
+  {
+    "line": 471,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "Development warning about history.snapshotEvents. history is an option of its own (L8) — killed in the full run by createModule warns on empty history.snapshotEvents array"
+  },
+  {
+    "line": 478,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Development warning about a resolver that names an undeclared requirement. resolvers are L2 — killed in the full run by createModule warns on resolver referencing unknown requirement type"
+  },
+  {
+    "line": 617,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved abortOn key. abortOn is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build an abortOn entry __proto__"
+  },
+  {
+    "line": 623,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Refusal of a reserved bind key. bind is an option of a constraint (constraints, L2), which no base-layer module declares — killed in the full run by definitions createModule refuses, in every build a bind entry __proto__"
   }
 ]
