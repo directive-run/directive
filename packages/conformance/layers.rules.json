@@ -363,6 +363,9 @@
     "tests/core/engine.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-engine-oracle.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/system.test.ts": {
       "rule": "L3"
     },
