@@ -599,6 +599,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l2-constraints-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
+    "category": "black-box",
+    "cases": 53,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-requirements-oracle.test.ts",
     "category": "black-box",
     "cases": 23,
