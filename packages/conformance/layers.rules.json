@@ -315,6 +315,11 @@
       "rule": "L2",
       "pin": true
     },
+    "tests/core/l2-requirements-oracle.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["member .inspect"]
+    },
     "tests/core/reconcile-timing-rules.test.ts": {
       "rule": "L2",
       "pin": true,
@@ -354,6 +359,12 @@
       "rule": "L3"
     },
     "tests/core/error-boundary.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-errors-oracle.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-errors-oracle-production.test.ts": {
       "rule": "L3"
     },
     "tests/core/plugins.test.ts": {
