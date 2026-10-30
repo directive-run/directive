@@ -359,6 +359,11 @@
     "tests/core/reconcile-depth-guard.test.ts": {
       "rule": "L2"
     },
+    "tests/core/l2-resolvers-oracle.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins", "member .inspect"]
+    },
     "tests/core/superseded-bodies-and-retry-timer.test.ts": {
       "rule": "L2",
       "pin": true,
