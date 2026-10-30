@@ -59,3 +59,32 @@ describe("system.derive", () => {
     expect(system.derive.doubled).toBe(4);
   });
 });
+
+describe("system.derive reflection on names that are not derivations", () => {
+  it("a symbol is never a derivation", () => {
+    const system = build();
+
+    expect(Symbol.iterator in system.derive).toBe(false);
+    expect(Symbol.for("directive.test") in system.derive).toBe(false);
+  });
+
+  it("an unknown name is not an own key, and a derivation is", () => {
+    const system = build();
+
+    expect(Object.hasOwn(system.derive, "nope")).toBe(false);
+    expect(Object.getOwnPropertyDescriptor(system.derive, "nope")).toBe(
+      undefined,
+    );
+    expect(Object.hasOwn(system.derive, "doubled")).toBe(true);
+  });
+
+  it("the names that guard against prototype pollution are not derivations", () => {
+    const system = build();
+
+    for (const name of ["__proto__", "constructor", "prototype"]) {
+      expect(name in system.derive).toBe(false);
+      expect(Object.hasOwn(system.derive, name)).toBe(false);
+      expect(system.derive[name]).toBeUndefined();
+    }
+  });
+});

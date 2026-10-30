@@ -118,7 +118,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L12",
-    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"devtools whenExplain panel renders the clause tree for a data-form `when` constraint\" (tests/plugins/devtools-when-explain.test.ts)"
+    "note": "data-form `when` and its $changed guard (L11) \u2014 killed in the full run by \"devtools whenExplain panel renders the clause tree for a data-form `when` constraint\" (tests/plugins/devtools-when-explain.test.ts)"
   },
   {
     "line": 446,
@@ -159,7 +159,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"constraint when — data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
+    "note": "data-form `when` and its $changed guard (L11) \u2014 killed in the full run by \"constraint when \u2014 data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
   },
   {
     "line": 486,
@@ -168,7 +168,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "data-form `when` and its $changed guard (L11) — killed in the full run by \"constraint when — data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
+    "note": "data-form `when` and its $changed guard (L11) \u2014 killed in the full run by \"constraint when \u2014 data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)"
   },
   {
     "line": 490,
@@ -419,14 +419,6 @@
     "note": "An `after` entry naming no constraint is always satisfied (isAfterDepSatisfied), so a placeholder entry blocks nothing; the unknown-ref warning reads def.after, not state.after."
   },
   {
-    "line": 731,
-    "col": 12,
-    "mutator": "LogicalOperator",
-    "replacement": "states.get(id) && initState(id)",
-    "reason": "not-observable",
-    "note": "Re-initialising state on every read resets hitCount/lastResult/lastActiveAt; async detection survives through asyncConstraintIds. a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
     "line": 735,
     "col": 63,
     "mutator": "BlockStatement",
@@ -523,22 +515,6 @@
     "note": "Dropping an emptied reverse-map set only frees memory; lookups treat an empty set and a missing one alike."
   },
   {
-    "line": 773,
-    "col": 50,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Clearing a disabled constraint's dependencies: every reader skips disabled ids; the only trace left is the watched-derivation set (L9), which no test checks for a disabled constraint."
-  },
-  {
-    "line": 775,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Clearing a disabled constraint's dependencies: every reader skips disabled ids; the only trace left is the watched-derivation set (L9), which no test checks for a disabled constraint."
-  },
-  {
     "line": 784,
     "col": 48,
     "mutator": "BlockStatement",
@@ -559,16 +535,16 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "Skipping or performing the update of an identical dependency set leaves the same maps."
+    "reason": "not-observable",
+    "note": "Not equivalent: without the early return, updateDependencies removes and re-adds the id in factToConstraints, and the incremental pass evaluates in that Set's order (constraints.ts:1475). Two same-priority constraints A (reads x, y) and B (reads x): write y, then x; resolvers start A,B on 1.35 and B,A with the mutant. Same-priority start order is incidental (README), so the oracle does not pin it. Counted."
   },
   {
     "line": 793,
     "col": 38,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "equivalent",
-    "note": "Skipping or performing the update of an identical dependency set leaves the same maps."
+    "reason": "not-observable",
+    "note": "Not equivalent: without the early return, updateDependencies removes and re-adds the id in factToConstraints, and the incremental pass evaluates in that Set's order (constraints.ts:1475). Two same-priority constraints A (reads x, y) and B (reads x): write y, then x; resolvers start A,B on 1.35 and B,A with the mutant. Same-priority start order is incidental (README), so the oracle does not pin it. Counted."
   },
   {
     "line": 838,
@@ -577,47 +553,6 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "The value returned from the catch is discarded: `threw` is set, so the error is rethrown."
-  },
-  {
-    "line": 854,
-    "col": 11,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L12",
-    "note": "constraint result and error recording (observation and error boundary) — killed in the full run by \"createAuditLedger — captures observation events captures constraint.evaluate with whenSpec + whenExplain\" (tests/plugins/audit-ledger.test.ts)"
-  },
-  {
-    "line": 856,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 856,
-    "col": 9,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 856,
-    "col": 17,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 857,
-    "col": 7,
-    "mutator": "UpdateOperator",
-    "replacement": "state.hitCount--",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
   },
   {
     "line": 860,
@@ -634,14 +569,6 @@
     "replacement": "onEvaluate(id, result)",
     "reason": "internals-only",
     "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
-  },
-  {
-    "line": 871,
-    "col": 24,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
   },
   {
     "line": 872,
@@ -692,15 +619,6 @@
     "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
   },
   {
-    "line": 924,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "later-layer",
-    "layer": "L12",
-    "note": "a `when` that returns a Promise, promoted to async — killed in the full run by \"createAuditLedger — captures observation events captures constraint.evaluate with whenSpec + whenExplain\" (tests/plugins/audit-ledger.test.ts)"
-  },
-  {
     "line": 937,
     "col": 9,
     "mutator": "ConditionalExpression",
@@ -749,38 +667,6 @@
     "note": "Explicit deps of an async constraint are registered again when its result is recorded (updateConstraintDeps / handleInactiveConstraint), before any later pass reads them; only require-read churn differs. No test at any layer separates them."
   },
   {
-    "line": 968,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 968,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 968,
-    "col": 19,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
-    "line": 969,
-    "col": 9,
-    "mutator": "UpdateOperator",
-    "replacement": "state.hitCount--",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
-  },
-  {
     "line": 972,
     "col": 28,
     "mutator": "BooleanLiteral",
@@ -795,14 +681,6 @@
     "replacement": "onEvaluate(id, result)",
     "reason": "internals-only",
     "note": "Optional call of onEvaluate/onError: the engine always supplies both (createConstraintsManager call in engine.ts), so the missing-callback case exists only for a manager built through /internals."
-  },
-  {
-    "line": 977,
-    "col": 26,
-    "mutator": "BooleanLiteral",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Constraint state bookkeeping: a ConstraintState field read only by inspect()/trace (L9); no test at any layer pins it."
   },
   {
     "line": 978,
@@ -1163,7 +1041,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L10",
-    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+    "note": "the no-work fast path after a dynamic unregister (L10) \u2014 killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts) Killer: blackbox-effects.test.ts."
   },
   {
     "line": 1504,
@@ -1180,7 +1058,7 @@
     "replacement": "dirtyConstraints.size !== 0",
     "reason": "later-layer",
     "layer": "L10",
-    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+    "note": "the no-work fast path after a dynamic unregister (L10) \u2014 killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
   },
   {
     "line": 1504,
@@ -1189,7 +1067,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L10",
-    "note": "the no-work fast path after a dynamic unregister (L10) — killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
+    "note": "the no-work fast path after a dynamic unregister (L10) \u2014 killed in the full run by \"fact store behaviour seen through a system reports an unregistered module's facts as deletions, with their previous values\" (tests/core/mutants-facts-system.test.ts)"
   },
   {
     "line": 1505,
@@ -1358,7 +1236,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L9",
-    "note": "getState for trace (L9) — killed in the full run by \"Trace tracks constraints and requirements when triggered\" (tests/core/trace.test.ts)"
+    "note": "getState for trace (L9) \u2014 killed in the full run by \"Trace tracks constraints and requirements when triggered\" (tests/core/trace.test.ts) Killer: engine.test.ts."
   },
   {
     "line": 1570,
@@ -1369,28 +1247,12 @@
     "note": "Watched-derivation bookkeeping: an extra id only keeps a derivation of that name watched (L9 watched set); no test at any layer checks it."
   },
   {
-    "line": 1594,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
-  },
-  {
-    "line": 1596,
-    "col": 7,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "equivalent",
-    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
-  },
-  {
     "line": 1597,
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "equivalent",
-    "note": "A disabled constraint's cached requirements, dependencies and when-deps are never read while disabled (every reader filters disabled ids) and are rebuilt on its first evaluation after enable()."
+    "reason": "not-observable",
+    "note": "A stale latestWhenDeps entry after disable()+enable() only changes how a runtime-promoted async constraint without `deps` records its dependencies (replace instead of merge); it is asked every pass either way, so only dependency bookkeeping (inspect().observedDerivations) could differ. No test pins it."
   },
   {
     "line": 1620,
@@ -1591,7 +1453,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "explainWhen for a data-form `when` — killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts)"
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts) Killer: devtools.test.ts."
   },
   {
     "line": 1811,
@@ -1600,7 +1462,7 @@
     "replacement": "spec",
     "reason": "later-layer",
     "layer": "L12",
-    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtoolsPlugin event tracing records whenExplain on data-form constraint.evaluate events\" (tests/plugins/devtools.test.ts)"
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtoolsPlugin event tracing records whenExplain on data-form constraint.evaluate events\" (tests/plugins/devtools.test.ts) Killer: data-forms.test.ts."
   },
   {
     "line": 1811,
@@ -1609,7 +1471,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L12",
-    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts) Killer: devtools.test.ts."
   },
   {
     "line": 1811,
@@ -1618,7 +1480,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "explainWhen for a data-form `when` — killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts)"
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"data-form introspection observe() emits whenExplain for a data-form constraint evaluation\" (tests/core/data-forms.test.ts) Killer: devtools.test.ts."
   },
   {
     "line": 1811,
@@ -1627,6 +1489,122 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L12",
-    "note": "explainWhen for a data-form `when` — killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+  },
+  {
+    "line": 411,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "Data-form `when` normalisation (predicate DSL, L11): with the body emptied a function `when` still works and only a data-form one breaks. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+  },
+  {
+    "line": 412,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "Data-form `when` guard (predicate DSL, L11): always returning early only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+  },
+  {
+    "line": 412,
+    "col": 9,
+    "mutator": "BooleanLiteral",
+    "replacement": "def",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "Data-form `when` guard (predicate DSL, L11): `!def` flipped to `def` returns early for every defined constraint, which only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+  },
+  {
+    "line": 501,
+    "col": 46,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "Construction-time normalisation loop for data-form `when` specs (predicate DSL, L11). Killed in the full run by \"constraint when \u2014 data form fires when the predicate holds and produces requirements\" (tests/core/data-forms.test.ts)."
+  },
+  {
+    "line": 502,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "Construction-time normalisation call for data-form `when` specs (predicate DSL, L11). Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+  },
+  {
+    "line": 884,
+    "col": 21,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "ConstraintState.isAsync of a runtime-promoted async constraint is read only by the abortOn binding (constraint-binding, RFC-0003). Killed in the full run by \"constraint-binding (RFC-0003) \u2014 engine integration emits `constraint.binding.disabled` (reason: async-promoted) when `when()` returns a Promise but async wasn't declared\" (tests/core/engine.test.ts)."
+  },
+  {
+    "line": 1805,
+    "col": 29,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "getWhenSpec feeds the data-form `when` introspection (predicate DSL, L11) and dynamic assign. Killed in the full run by \"regression: constraints.assign chain swaps whenSpec correctly function-form \u2192 data-form \u2192 function-form correctly adds/removes whenSpec\" (tests/core/dynamic-definitions.test.ts)."
+  },
+  {
+    "line": 776,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Dropping a disabled constraint's entries from the fact-to-constraint map leaves stale entries; every reader skips disabled ids. The one visible effect is an extra wake-up after enable() when the constraint's branch changed so it no longer reads that fact; no test at any layer pins it."
+  },
+  {
+    "line": 773,
+    "col": 50,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Disable-cleanup of watched derivations. Observable only through inspect().observedDerivations (L9 introspection, an advisory cost counter). Full-run killer: l9-constraints-observed-derivations.test.ts \"no longer keeps watched the derivation it read, and does again once enabled\" (moved from the pinned L2 file in #253 review; valid once a full run includes it)."
+  },
+  {
+    "line": 775,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Disable-cleanup of watched derivations. Observable only through inspect().observedDerivations (L9 introspection, an advisory cost counter). Full-run killer: l9-constraints-observed-derivations.test.ts \"no longer keeps watched the derivation it read, and does again once enabled\" (moved from the pinned L2 file in #253 review; valid once a full run includes it)."
+  },
+  {
+    "line": 775,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Disable-cleanup of watched derivations. Observable only through inspect().observedDerivations (L9 introspection, an advisory cost counter). Full-run killer: l9-constraints-observed-derivations.test.ts \"no longer keeps watched the derivation it read, and does again once enabled\" (moved from the pinned L2 file in #253 review; valid once a full run includes it)."
+  },
+  {
+    "line": 777,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Disable-cleanup of watched derivations. Observable only through inspect().observedDerivations (L9 introspection, an advisory cost counter). Full-run killer: l9-constraints-observed-derivations.test.ts \"no longer keeps watched the derivation it read, and does again once enabled\" (moved from the pinned L2 file in #253 review; valid once a full run includes it)."
+  },
+  {
+    "line": 1596,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "Disable-cleanup of watched derivations. Observable only through inspect().observedDerivations (L9 introspection, an advisory cost counter). Full-run killer: l9-constraints-observed-derivations.test.ts \"no longer keeps watched the derivation it read, and does again once enabled\" (moved from the pinned L2 file in #253 review; valid once a full run includes it)."
   }
 ]

@@ -6625,6 +6625,68 @@
         }
       }
     },
+    "tests/core/l2-constraints-oracle-state.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a disabled constraint is not asked while it is waiting on another > asks it, once, after it is enabled again": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a disabled constraint is not asked while it is waiting on another > is not asked when the system restarts after a write while it was stopped": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "every dependent of a constraint is asked once it finishes > asks each of two constraints waiting on the same one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > lists every constraint in declaration order with its priority and whether it is disabled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > shows whether a constraint is active, how many times it was, and when it last was": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > keeps counting across passes: each pass that finds it active adds one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > shows a constraint whose when threw as not active": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > reports an async constraint the same way, and not active once its when rejects": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a when that returns a promise without async: true > is reported to plugins and to inspect() with the answer it resolved to, every time it is asked": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        }
+      }
+    },
     "tests/core/l2-constraints-oracle.test.ts": {
       "category": "black-box",
       "rule": "L2",
@@ -8016,6 +8078,114 @@
             "option derivations",
             "option init"
           ]
+        },
+        "system.derive reflection on names that are not derivations > a symbol is never a derivation": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "system.derive reflection on names that are not derivations > an unknown name is not an own key, and a derivation is": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "system.derive reflection on names that are not derivations > the names that guard against prototype pollution are not derivations": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        }
+      }
+    },
+    "tests/core/l3-small-oracle-clock-timer.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "virtualClock deadlines > fires a callback whose deadline is exactly the instant advanced to": {
+          "layer": "L3",
+          "by": ["import virtualClock"]
+        },
+        "virtualClock deadlines > fires a callback due exactly at the end of a larger advance, after earlier ones": {
+          "layer": "L3",
+          "by": ["import virtualClock"]
+        },
+        "timer state transitions leave the wrong status alone > startTimer on a running timer changes nothing, so it keeps its start": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > startTimer on a paused timer changes nothing, so it stays paused": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > registerRepeat on a paused timer changes nothing": {
+          "layer": "L3",
+          "by": [
+            "import initialTimerState",
+            "import pauseTimer",
+            "import registerRepeat",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > resumeTimer on a completed timer leaves it completed": {
+          "layer": "L3",
+          "by": [
+            "import completeTimer",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import resumeTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > excludes every earlier pause when the timer is paused again": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import resumeTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > a timer completed while paused reports the elapsed time it had": {
+          "layer": "L3",
+          "by": [
+            "import completeTimer",
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > a paused timer that never recorded when it paused counts against the clock": {
+          "layer": "L3",
+          "by": ["import elapsedMs"]
+        },
+        "elapsed time > resumeTimer on a paused timer that never recorded when it paused changes nothing": {
+          "layer": "L3",
+          "by": ["import resumeTimer"]
+        },
+        "timerOps > remainingMs counts the configured total down from the start": {
+          "layer": "L3",
+          "by": ["import remainingMs", "import timerOps"]
         }
       }
     },
@@ -8483,6 +8653,16 @@
           "layer": "L3",
           "by": ["option plugins"],
           "dynamic": true
+        }
+      }
+    },
+    "tests/core/l9-constraints-observed-derivations.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "tests": {
+        "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
+          "layer": "L9",
+          "by": ["member .inspect"]
         }
       }
     },

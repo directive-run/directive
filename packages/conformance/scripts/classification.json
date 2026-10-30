@@ -617,6 +617,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l2-constraints-oracle-state.test.ts",
+    "category": "black-box",
+    "cases": 11,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
     "category": "black-box",
     "cases": 53,
@@ -700,7 +709,16 @@
   {
     "file": "src/core/__tests__/l3-small-oracle-accessors.test.ts",
     "category": "black-box",
-    "cases": 4,
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-clock-timer.test.ts",
+    "category": "black-box",
+    "cases": 11,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -746,6 +764,15 @@
     "file": "src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
     "category": "black-box",
     "cases": 30,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l9-constraints-observed-derivations.test.ts",
+    "category": "black-box",
+    "cases": 1,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

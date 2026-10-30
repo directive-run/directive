@@ -4,6 +4,7 @@
     "tests/core/constraints.test.ts",
     "tests/core/l1-derivations-effects.test.ts",
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts",
+    "tests/core/l2-constraints-oracle-state.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l2-resolvers-oracle.test.ts",
     "tests/core/l3-system-oracle-production.test.ts",
@@ -24,6 +25,10 @@
     "tests/core/constraints.test.ts": [],
     "tests/core/l1-derivations-effects.test.ts": ["option effect prev"],
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": [],
+    "tests/core/l2-constraints-oracle-state.test.ts": [
+      "member .inspect",
+      "option plugins"
+    ],
     "tests/core/l2-requirements-oracle.test.ts": ["member .inspect"],
     "tests/core/l2-resolvers-oracle.test.ts": [
       "member .inspect",
@@ -49,6 +54,7 @@
     "tests/core/constraints.test.ts": ["option predicate data form"],
     "tests/core/l1-derivations-effects.test.ts": ["option derive data form"],
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": [],
+    "tests/core/l2-constraints-oracle-state.test.ts": [],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l2-resolvers-oracle.test.ts": [],
     "tests/core/l3-system-oracle-production.test.ts": [],
@@ -130,6 +136,19 @@
       "unregistering a batched resolver > leaves another batched resolver's queue and running batch alone": "L10",
       "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves": "L10",
       "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": "L10"
+    },
+    "tests/core/l2-constraints-oracle-state.test.ts": {
+      "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
+      "a disabled constraint is not asked while it is waiting on another > asks it, once, after it is enabled again": "L2",
+      "a disabled constraint is not asked while it is waiting on another > is not asked when the system restarts after a write while it was stopped": "L2",
+      "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished": "L2",
+      "every dependent of a constraint is asked once it finishes > asks each of two constraints waiting on the same one": "L2",
+      "inspect() reports each constraint > lists every constraint in declaration order with its priority and whether it is disabled": "L2",
+      "inspect() reports each constraint > shows whether a constraint is active, how many times it was, and when it last was": "L2",
+      "inspect() reports each constraint > keeps counting across passes: each pass that finds it active adds one": "L2",
+      "inspect() reports each constraint > shows a constraint whose when threw as not active": "L2",
+      "inspect() reports each constraint > reports an async constraint the same way, and not active once its when rejects": "L2",
+      "a when that returns a promise without async: true > is reported to plugins and to inspect() with the answer it resolved to, every time it is asked": "L2"
     },
     "tests/core/l2-requirements-oracle.test.ts": {
       "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",

@@ -178,6 +178,9 @@
     "tests/core/l3-small-oracle-accessors.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-small-oracle-clock-timer.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/l3-small-oracle-plugins.test.ts": {
       "rule": "L3"
     },
@@ -189,6 +192,11 @@
     },
     "tests/core/l2-constraints-oracle-production.test.ts": {
       "rule": "L2"
+    },
+    "tests/core/l2-constraints-oracle-state.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins", "member .inspect"]
     },
     "tests/core/blackbox-effects.test.ts": {
       "rule": "L0"
@@ -500,6 +508,9 @@
     },
     "tests/core/navigation-side-effects.test.ts": {
       "rule": "L8"
+    },
+    "tests/core/l9-constraints-observed-derivations.test.ts": {
+      "rule": "L9"
     },
     "tests/core/trace.test.ts": {
       "rule": "L9"

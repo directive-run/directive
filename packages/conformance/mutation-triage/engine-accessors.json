@@ -15,7 +15,7 @@
     "replacement": "() => undefined",
     "reason": "later-layer",
     "layer": "L10",
-    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it"
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by declared dependencies a derivation registered after the effect is picked up (blackbox-effects.test.ts, placed at L10)"
   },
   {
     "line": 49,
@@ -136,22 +136,6 @@
     "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
   },
   {
-    "line": 85,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
-  },
-  {
-    "line": 85,
-    "col": 36,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
-  },
-  {
     "line": 94,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -174,22 +158,6 @@
     "replacement": "{}",
     "reason": "equivalent",
     "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
-  },
-  {
-    "line": 98,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
-  },
-  {
-    "line": 98,
-    "col": 36,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
   },
   {
     "line": 106,
