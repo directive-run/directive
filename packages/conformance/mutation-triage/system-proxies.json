@@ -1,0 +1,1434 @@
+[
+  {
+    "line": 56,
+    "col": 40,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Name of the util.inspect hook symbol; only Node's printer reads it (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 65,
+    "col": 70,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 66,
+    "col": 7,
+    "mutator": "BooleanLiteral",
+    "replacement": "config.ownKeys",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 66,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 66,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 66,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 70,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 108,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 108,
+    "col": 43,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 109,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "util.inspect hook that prints a view as a plain snapshot; a debugging nicety (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 133,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Trap-level handling of symbol and prototype-walking keys on a view: only Reflect-level probes tell the mutant apart (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 133,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Trap-level handling of symbol and prototype-walking keys on a view: only Reflect-level probes tell the mutant apart (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 137,
+    "col": 46,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Trap-level handling of symbol and prototype-walking keys on a view: only Reflect-level probes tell the mutant apart (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 150,
+    "col": 50,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Reflect.ownKeys on a view built without an ownKeys rule; proxy mechanics, not a 2.0 contract."
+  },
+  {
+    "line": 153,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A symbol that skips this guard reaches the `typeof prop === \"string\"` test two lines down and gets undefined there too."
+  },
+  {
+    "line": 153,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A symbol that skips this guard reaches the `typeof prop === \"string\"` test two lines down and gets undefined there too."
+  },
+  {
+    "line": 153,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A symbol that skips this guard reaches the `typeof prop === \"string\"` test two lines down and gets undefined there too."
+  },
+  {
+    "line": 156,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Property descriptor a view reports for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract. This key matches two mutants: the whole `&&` condition and its first operand `config.has` both start here."
+  },
+  {
+    "line": 156,
+    "col": 25,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Property descriptor a view reports for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract."
+  },
+  {
+    "line": 162,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "defineProperty and setPrototypeOf trap results; proxy mechanics, not a 2.0 contract."
+  },
+  {
+    "line": 168,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "defineProperty and setPrototypeOf trap results; proxy mechanics, not a 2.0 contract."
+  },
+  {
+    "line": 250,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: it saves allocation and keeps wrapper identity, neither of which is a 2.0 contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 250,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: it saves allocation and keeps wrapper identity, neither of which is a 2.0 contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 252,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: it saves allocation and keeps wrapper identity, neither of which is a 2.0 contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 252,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: it saves allocation and keeps wrapper identity, neither of which is a 2.0 contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 257,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: it saves allocation and keeps wrapper identity, neither of which is a 2.0 contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 272,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 272,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 274,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 274,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 274,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 275,
+    "col": 37,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 295,
+    "col": 30,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "The module facts view lists its own keys, but Object.keys, spread, JSON and entries are also filtered by the descriptor trap, so only Reflect.ownKeys sees an unfiltered list (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 297,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "The module facts view lists its own keys, but Object.keys, spread, JSON and entries are also filtered by the descriptor trap, so only Reflect.ownKeys sees an unfiltered list (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 306,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 335,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 335,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 351,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 369,
+    "col": 11,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 369,
+    "col": 28,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 370,
+    "col": 15,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 370,
+    "col": 32,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 371,
+    "col": 11,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 371,
+    "col": 25,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 392,
+    "col": 32,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "createCrossModuleFactsProxy is exported for the white-box proxy tests; every engine path (createScopedFactsProxy) passes the role explicitly, so the default is never used through a public path."
+  },
+  {
+    "line": 396,
+    "col": 59,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Cache key of the cross-module facts view; a collision only matters if two modules share one facts store handle, and the engine hands each call its own (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 400,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 400,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 402,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 402,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 407,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 454,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 479,
+    "col": 7,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "store || typeof store === \"object\"",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 18,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof store !== \"object\"",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 35,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 481,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 503,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 506,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 508,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 510,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 510,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 513,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 514,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 514,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 514,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "warned.size <= MAX_WARNED_KEYS_PER_SYSTEM",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 514,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "warned.size >= MAX_WARNED_KEYS_PER_SYSTEM",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 514,
+    "col": 51,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 516,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 516,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 516,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "oldest === undefined",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 516,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 517,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "dev-only",
+    "note": "Once-per-system bookkeeping behind the development warnings; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 544,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Cache helper behind the resolver and read-only views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 546,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Cache helper behind the resolver and read-only views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 549,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Cache helper behind the resolver and read-only views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 551,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Cache helper behind the resolver and read-only views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 574,
+    "col": 12,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 574,
+    "col": 22,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 575,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 576,
+    "col": 32,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 577,
+    "col": 47,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 578,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 578,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 578,
+    "col": 15,
+    "mutator": "MethodExpression",
+    "replacement": "key.endsWith(prefix)",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 578,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 579,
+    "col": 23,
+    "mutator": "MethodExpression",
+    "replacement": "key",
+    "reason": "not-observable",
+    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 609,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Cache key of a resolver dependency view; a collision only matters if two calls share one facts handle, and the engine hands each call its own (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 637,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Cache key of the ctx.deps view; the engine hands each resolver call its own facts handle (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 637,
+    "col": 49,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Cache key of the ctx.deps view; the engine hands each resolver call its own facts handle (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 646,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for a resolver reading an undeclared ctx.deps name; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 646,
+    "col": 15,
+    "mutator": "LogicalOperator",
+    "replacement": "isDevelopment || !RUNTIME_PROBE_PROPS.has(prop)",
+    "reason": "dev-only",
+    "note": "Development warning for a resolver reading an undeclared ctx.deps name; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 649,
+    "col": 15,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "dev-only",
+    "note": "Development warning for a resolver reading an undeclared ctx.deps name; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 666,
+    "col": 14,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
+  },
+  {
+    "line": 667,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
+  },
+  {
+    "line": 667,
+    "col": 24,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
+  },
+  {
+    "line": 688,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Cache key of the scoped $store view; the engine hands each resolver call its own facts handle (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 721,
+    "col": 15,
+    "mutator": "MethodExpression",
+    "replacement": "target",
+    "reason": "not-observable",
+    "note": "Names the owning module in the refusal message only; message text is not pinned."
+  },
+  {
+    "line": 733,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Looking up the null key the guard would have short-circuited answers undefined, the same as the short-circuit."
+  },
+  {
+    "line": 738,
+    "col": 18,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Looking up the null key the guard would have short-circuited answers false, the same as the short-circuit."
+  },
+  {
+    "line": 763,
+    "col": 13,
+    "mutator": "MethodExpression",
+    "replacement": "keys.map(key => ownKey(key))",
+    "reason": "equivalent",
+    "note": "A null entry in the subscription list matches no fact, so keeping it instead of filtering it out never changes which changes are heard."
+  },
+  {
+    "line": 765,
+    "col": 43,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "A null entry in the subscription list matches no fact, so keeping it instead of filtering it out never changes which changes are heard."
+  },
+  {
+    "line": 805,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Cache key of the resolver facts view; the engine hands each resolver call its own facts handle (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 809,
+    "col": 30,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "The $snapshot accessor the engine reads on a resolver view; its return shape is an implementation detail."
+  },
+  {
+    "line": 816,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "The $snapshot accessor the engine reads on a resolver view; its return shape is an implementation detail."
+  },
+  {
+    "line": 816,
+    "col": 24,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "The $snapshot accessor the engine reads on a resolver view; its return shape is an implementation detail."
+  },
+  {
+    "line": 816,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The $snapshot accessor the engine reads on a resolver view; its return shape is an implementation detail."
+  },
+  {
+    "line": 843,
+    "col": 69,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 870,
+    "col": 60,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 900,
+    "col": 19,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 900,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 902,
+    "col": 55,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 903,
+    "col": 20,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 904,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 904,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 904,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "prop !== \"self\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 904,
+    "col": 20,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 904,
+    "col": 28,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 907,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 907,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 907,
+    "col": 34,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 912,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 912,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 912,
+    "col": 11,
+    "mutator": "LogicalOperator",
+    "replacement": "isDevelopment || !RUNTIME_PROBE_PROPS.has(prop)",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 912,
+    "col": 28,
+    "mutator": "BooleanLiteral",
+    "replacement": "RUNTIME_PROBE_PROPS.has(prop)",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 912,
+    "col": 60,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 915,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 916,
+    "col": 11,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 923,
+    "col": 10,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 924,
+    "col": 13,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 925,
+    "col": 10,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 925,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test. This key matches two mutants: the whole `||` condition and its first operand `prop === \"self\"` both start here."
+  },
+  {
+    "line": 925,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 925,
+    "col": 20,
+    "mutator": "EqualityOperator",
+    "replacement": "prop !== \"self\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 925,
+    "col": 20,
+    "mutator": "LogicalOperator",
+    "replacement": "prop === \"self\" && depNamesSet.has(prop)",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 925,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 926,
+    "col": 14,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+  },
+  {
+    "line": 952,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 952,
+    "col": 23,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 954,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 954,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 959,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 981,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the module derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1011,
+    "col": 11,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1012,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1013,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1014,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1015,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1016,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1017,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1018,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1019,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1020,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1021,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "dev-only",
+    "note": "Names the development warning never fires for (runtime probes); no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1057,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1057,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "RUNTIME_PROBE_PROPS.has(requested) && requested.startsWith(\"@@\")",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1057,
+    "col": 45,
+    "mutator": "MethodExpression",
+    "replacement": "requested.endsWith(\"@@\")",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1057,
+    "col": 73,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1085,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1085,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1085,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "owners.length !== 1",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1087,
+    "col": 31,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1087,
+    "col": 38,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "dev-only",
+    "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1101,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1101,
+    "col": 15,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1121,
+    "col": 3,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the namespaced derive view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1150,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Proxy cache for the events views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1152,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the events views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1165,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Proxy cache for the events views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1165,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Proxy cache for the events views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1183,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "Proxy cache for the events views: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 1251,
+    "col": 12,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+  },
+  {
+    "line": 1252,
+    "col": 11,
+    "mutator": "BooleanLiteral",
+    "replacement": "result._root",
+    "reason": "not-observable",
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+  },
+  {
+    "line": 1252,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+  },
+  {
+    "line": 1252,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+  },
+  {
+    "line": 1252,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+  }
+]

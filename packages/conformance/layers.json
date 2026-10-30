@@ -457,12 +457,12 @@
           "by": ["member .effects.assign"]
         },
         "prevFacts values > a data gate on $changed works although the body reads no prev": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "prevFacts values > a data gate registered later fires only for a real change": {
-          "layer": "L10",
-          "by": ["member .effects.register"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "prevFacts values > is refreshed after a pass whose effects are async": {
           "layer": "L3",
@@ -473,12 +473,8 @@
           "by": ["option plugins"]
         },
         "which effects run > every enabled effect runs once at start, and a disabled one waits": {
-          "layer": "L4",
-          "by": [
-            "member .effects.disable",
-            "member .effects.enable",
-            "member .effects.isEnabled"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "which effects run > explicit deps run for their own changes and not for others": {
           "layer": "L3",
@@ -565,28 +561,28 @@
           "by": ["option plugins"]
         },
         "data-form on > freezes the spec it was given": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > fires only when the gate holds, and only for changes to its facts": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > keeps the predicate's facts as its deps whatever the body reads": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > swapping to a function-form effect drops the old gate": {
-          "layer": "L10",
-          "by": ["member .effects.assign"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > swapping a function-form effect for a gated one installs the gate": {
-          "layer": "L10",
-          "by": ["member .effects.assign"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > unregistering a gated effect drops its gate": {
-          "layer": "L10",
-          "by": ["member .effects.register", "member .effects.unregister"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "cleanup > runs before the next run, once, and not again": {
           "layer": "L3",
@@ -795,8 +791,8 @@
           "by": ["option plugins"]
         },
         "an effect that cannot read prevFacts costs no snapshot > a data gate makes the snapshot even though the body ignores it": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "an effect that cannot read prevFacts costs no snapshot > unregistering the last reader stops the copying": {
           "layer": "L10",
@@ -815,8 +811,8 @@
           "by": ["member .registerModule"]
         },
         "more behaviour of the run loop > a data gate with $changed ignores a write that left that fact alone": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw": {
           "layer": "L4",
@@ -2618,8 +2614,9 @@
           "by": ["import createConstraintsManager"]
         },
         "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": {
-          "layer": "L2",
-          "by": ["import createConstraintsManager"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "above": ["option predicate data form"]
         }
       }
     },
@@ -2726,16 +2723,16 @@
           "by": ["import flushMicrotasks"]
         },
         "constraint `when` — $changed rejected unconditionally > throws at createSystem time when $changed appears in a constraint `when`": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "constraint `when` — $changed rejected unconditionally > throw message mentions the fix (move to effect or boolean derivation)": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "constraint `when` — $changed rejected unconditionally > throws for $changed nested inside a combinator": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "event handler + patch conflict > dev-warns and uses handler (patch is ignored) when both are provided": {
           "layer": "L13",
@@ -3286,99 +3283,99 @@
       "tests": {
         "doctor.checkAgainst — direct contradictions > $gte vs $lt with no overlap → direct": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — direct contradictions > $gt 50 vs $lt 50 (boundary) → direct": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — direct contradictions > $eq vs different $eq → direct": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — direct contradictions > $eq vs matching $ne → direct": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — direct contradictions > $in vs $in with no shared values → direct": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — subset (M17: now a warning, not a contradiction) > candidate $gte 100 vs existing $gte 50 → subset in warnings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — subset (M17: now a warning, not a contradiction) > two identical $eq clauses → subset in warnings (candidate redundant)": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — subset (M17: now a warning, not a contradiction) > candidate $in [US] vs existing $in [US,EU] → subset in warnings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — overlap (warning, not error) > shared fact with non-comparable ops → overlap warning": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — overlap (warning, not error) > $gte vs $lt with non-empty intersection → overlap (not direct)": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — clean cases > disjoint fact paths → no findings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — clean cases > empty existing set → no findings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — clean cases > constraint without whenSpec (function-form) → skipped, no findings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — clean cases > accepts the inspect()-style { constraints: [...] } wrapper": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAgainst — reason quality > reason cites both sides of the conflict": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > flags a candidate path that matches a constraint's abortOn: (M5: in warnings)": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > flags a candidate path that matches a constraint's bind: (M5: in warnings)": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > no findings when constraints expose no abortOn:/bind: metadata": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > no findings when candidate paths are disjoint from abort-bindings": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > CheckAbortOnResult shape is { warnings } only — no contradictions field": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > accepts the inspect()-style { constraints: [...] } wrapper": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor.checkAbortOn — abortOn/bind awareness > F1: real system.inspect().constraints[].abortOn is populated and doctor flags it": {
           "layer": "L11",
-          "by": ["import doctor"]
+          "by": ["import doctor", "option predicate data form"]
         },
         "doctor — flattenPredicate leaf shape contract > flattenPredicate emits { path, op, value } LeafClause shape": {
           "layer": "L11",
-          "by": ["import flattenPredicate"]
+          "by": ["import flattenPredicate", "option predicate data form"]
         },
         "doctor — flattenPredicate leaf shape contract > LeafClause shape is preserved across combinator nesting": {
           "layer": "L11",
-          "by": ["import flattenPredicate"]
+          "by": ["import flattenPredicate", "option predicate data form"]
         }
       }
     },
@@ -7774,6 +7771,173 @@
         }
       }
     },
+    "tests/core/l3-proxies-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a composed system in a production build > ignores a resolver's writes to a dependency without throwing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > still refuses to replace a namespace through the cross-module view, silently": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > prints nothing when a derivation name is read as a module, or a non-JSON value is written": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a composed system in a production build > still refuses a module with a prototype-walking key": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle-transform.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a module joining a composed system > builds when no section holds a prototype-walking key": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a module joining a composed system > `is refused for \"${key}\" in ${section}`": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "dynamic": true
+        },
+        "a module joining a composed system > is refused when only the second module is dangerous": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "function-form constraints in a composed system > hands `when` and `require` the module's own facts and its dependencies by name": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "data-form constraint `when` in a composed system > evaluates every form against the module's own facts": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "data-form constraint `when` in a composed system > re-evaluates when the facts it reads change": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "data-form constraint `when` in a composed system > does not read another module's fact of the same name": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "object-form events in a composed system > keeps the handler when an event gives both a handler and a patch": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "object-form events in a composed system > runs an event given as an object with a handler, and a bare function": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > computes a derivation given as an object with a compute function": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > runs a module's effect against its own facts and reruns it on change": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "derivations, effects and flat access in a composed system > reads a module's own facts by bare name when crossModuleDeps is empty": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "constraints and resolvers in a composed system > re-evaluates a constraint with explicit deps only when those facts change": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints and resolvers in a composed system > holds a constraint back until the constraints it follows have resolved": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "constraints and resolvers in a composed system > hands a resolver its own facts, and ctx.deps only when the module declares dependencies": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "more than one module with crossModuleDeps in a composed system > gives each module its own view of itself and of what it declared": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "a bare module in a composed system > joins with no init, derivations, events, effects, constraints or resolvers": {
+          "layer": "L1",
+          "by": ["option modules"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a composed system's views answer reflection > lists a module's facts, and the module names at the top": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > lists a module's derivations, and the module names at the top": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > lists the module names under events and dispatches into the named module": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's views answer reflection > dispatches an event addressed by its namespaced type": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > writes land in the owning module and nowhere else": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > deletes a fact from its own module only": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > refuses to replace or remove a namespace": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > never exposes or accepts the prototype-walking keys": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a composed system's facts > never treats a symbol as a fact": {
+          "layer": "L1",
+          "by": ["option modules", "reflection"]
+        },
+        "the derivations a module's own code receives > are this module's derivations by their bare names, not its siblings'": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "the facts a module with crossModuleDeps receives > sees itself and its declared dependencies, and nothing else": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "the facts a module with crossModuleDeps receives > cannot replace a namespace through the view": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
+        },
+        "the facts a module's event handler receives > are its own facts, with the store behind them reachable as in a single-module system": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "the facts a resolver receives > reads and writes its own module's facts, reads dependencies, and cannot write them": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "the facts a resolver receives > scopes the store a resolver reaches through its facts to its own module": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "the facts a resolver receives > keeps a dependency's subscription quiet when only its own facts change": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
     "tests/core/l3-small-oracle-accessors.test.ts": {
       "category": "black-box",
       "rule": "L3",
@@ -8370,7 +8534,7 @@
       "tests": {
         "derivations: object-form definitions > freezes a predicate spec and a template spec at registration": {
           "layer": "L11",
-          "by": ["option derive data form"]
+          "by": ["option derive data form", "option predicate data form"]
         },
         "derivations: object-form definitions > rejects a compute that is neither function, template nor predicate": {
           "layer": "L11",
@@ -8378,7 +8542,7 @@
         },
         "derivations: object-form definitions > registers object-form derivations at runtime with their meta": {
           "layer": "L11",
-          "by": ["option derive data form"]
+          "by": ["option derive data form", "option predicate data form"]
         },
         "derivations: object-form definitions > assign swaps the function and drops the old meta": {
           "layer": "L10",
@@ -8660,12 +8824,8 @@
           ]
         },
         "prevFacts values > a data gate reads prevFacts even when the effect body does not": {
-          "layer": "L0",
-          "by": [
-            "import createEffectsManager",
-            "import createFacts",
-            "import t"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "prevFacts values > unregistering the last reader stops copying": {
           "layer": "L0",
@@ -8875,36 +9035,20 @@
           ]
         },
         "data-form on > freezes the spec it was given": {
-          "layer": "L0",
-          "by": [
-            "import createEffectsManager",
-            "import createFacts",
-            "import t"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > fires only when the gate holds, and only for changes to its facts": {
-          "layer": "L0",
-          "by": [
-            "import createEffectsManager",
-            "import createFacts",
-            "import t"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > keeps the predicate's facts as its deps whatever the body reads": {
-          "layer": "L0",
-          "by": [
-            "import createEffectsManager",
-            "import createFacts",
-            "import t"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "data-form on > swapping to a function-form effect drops the old gate": {
-          "layer": "L0",
-          "by": [
-            "import createEffectsManager",
-            "import createFacts",
-            "import t"
-          ]
+          "layer": "L11",
+          "by": ["option predicate data form"]
         },
         "cleanup > runs before the next run, once, and not again": {
           "layer": "L0",
@@ -10226,75 +10370,75 @@
         },
         "predicateToSQL — basic operators > translates $eq and $ne": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — basic operators > translates all orderable operators": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — basic operators > translates $in and $nin with ANY()": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — basic operators > translates $exists": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — basic operators > translates $between": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — string LIKE operators > translates $startsWith with ESCAPE clause and escaped wildcards": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — string LIKE operators > translates $endsWith": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — string LIKE operators > translates $contains for strings": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — string LIKE operators > rejects $contains on non-strings": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — string LIKE operators > translates $matches with case-insensitive RegExp": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > $all flattens to AND": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > $any becomes OR": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > $not wraps in NOT()": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > nests combinators": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > empty $all → TRUE, empty $any → FALSE": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — combinators > rejects combinator with sibling keys": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — array form > array of clauses ANDs together": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — array form > single-clause array stays flat": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — security > rejects table identifier with semicolon": {
           "layer": "L11",
@@ -10314,7 +10458,7 @@
         },
         "predicateToSQL — security > rejects $changed (effects-only)": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — security > rejects nested predicate": {
           "layer": "L11",
@@ -10326,7 +10470,7 @@
         },
         "predicateToSQL — security > validates select projection — array of columns": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — security > rejects free-form select with SQL injection": {
           "layer": "L11",
@@ -10334,7 +10478,7 @@
         },
         "predicateToSQL — security > rejects deep recursion (DoS guard)": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — security > rejects cyclic spec (DoS guard via depth limit)": {
           "layer": "L11",
@@ -10342,15 +10486,15 @@
         },
         "predicateToSQL — placeholder customization > supports MySQL/SQLite `?` placeholders": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToSQL — placeholder customization > supports single-column select": {
           "layer": "L11",
-          "by": ["import predicateToSQL"]
+          "by": ["import predicateToSQL", "option predicate data form"]
         },
         "predicateToWhere — embeddable WHERE > returns just the WHERE body + params": {
           "layer": "L11",
-          "by": ["import predicateToWhere"]
+          "by": ["import predicateToWhere", "option predicate data form"]
         },
         "predicateToMongo — basic > translates bare equality": {
           "layer": "L11",
@@ -10358,47 +10502,47 @@
         },
         "predicateToMongo — basic > passes through Mongo-native operators": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — basic > translates $between to $gte + $lte": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — basic > translates $startsWith / $endsWith / $contains to $regex": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — basic > escapes regex metacharacters": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — basic > translates $matches RegExp to plain JSON $regex + $options": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > $all → $and": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > $any → $or": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > $not → $nor": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > empty $any → stable tautological-false via $expr": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > collapses single-element $all/$any": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — combinators > rejects combinator with sibling keys": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — security > rejects top-level $where (no-prefix injection)": {
           "layer": "L11",
@@ -10406,7 +10550,7 @@
         },
         "predicateToMongo — security > rejects array-form $where via fact key": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — security > rejects dotted field by default": {
           "layer": "L11",
@@ -10422,11 +10566,11 @@
         },
         "predicateToMongo — security > rejects $changed": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToMongo — security > rejects deep recursion": {
           "layer": "L11",
-          "by": ["import predicateToMongo"]
+          "by": ["import predicateToMongo", "option predicate data form"]
         },
         "predicateToPostgrest — basic > translates bare equality": {
           "layer": "L11",
@@ -10434,31 +10578,31 @@
         },
         "predicateToPostgrest — basic > translates comparison operators": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > translates $in/$nin with parentheses list": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > translates $exists": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > decomposes $between to $gte + $lte (portable across all 3 targets)": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > translates $startsWith/$endsWith/$contains with * wildcard": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > translates $matches with imatch for case-insensitive": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > quotes strings with reserved characters": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — basic > encodes the querystring by default": {
           "layer": "L11",
@@ -10466,27 +10610,27 @@
         },
         "predicateToPostgrest — combinators > $all at top is flat (multiple top-level filters)": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — combinators > $any at top wraps in or=(...)": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — combinators > $not wraps in not.and=(...)": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — combinators > nests $any inside $all": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — combinators > empty $any → stable contradiction": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — combinators > rejects combinator with sibling keys": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — security > rejects invalid column": {
           "layer": "L11",
@@ -10498,18 +10642,19 @@
         },
         "predicateToPostgrest — security > rejects $changed": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "predicateToPostgrest — security > rejects deep recursion": {
           "layer": "L11",
-          "by": ["import predicateToPostgrest"]
+          "by": ["import predicateToPostgrest", "option predicate data form"]
         },
         "one predicate, three targets — parity > produces equivalent filters across targets": {
           "layer": "L11",
           "by": [
             "import predicateToMongo",
             "import predicateToPostgrest",
-            "import predicateToSQL"
+            "import predicateToSQL",
+            "option predicate data form"
           ]
         },
         "one predicate, three targets — parity > $between works portably across all three targets": {
@@ -10517,7 +10662,8 @@
           "by": [
             "import predicateToMongo",
             "import predicateToPostgrest",
-            "import predicateToSQL"
+            "import predicateToSQL",
+            "option predicate data form"
           ]
         }
       }
@@ -10528,27 +10674,27 @@
       "tests": {
         "predicateHash — determinism > returns a non-empty 8-character hex string": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — determinism > is stable across runs for the same input": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — determinism > is identical for semantically-identical predicates with different key order": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — determinism > is identical for nested predicates with different key order": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — determinism > differs for different predicates": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — determinism > treats array ordering as significant (combinator children are arrays)": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — edge cases > hashes an empty predicate without throwing": {
           "layer": "L11",
@@ -10556,11 +10702,11 @@
         },
         "predicateHash — edge cases > hashes a deeply-nested predicate": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — edge cases > hashes null operand values": {
           "layer": "L11",
-          "by": ["import predicateHash"]
+          "by": ["import predicateHash", "option predicate data form"]
         },
         "predicateHash — edge cases > hashes boolean / number / string operands distinctly": {
           "layer": "L11",
@@ -10574,75 +10720,75 @@
       "tests": {
         "predict — happy path > wouldFire: true when all clauses pass, missingChanges empty": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — happy path > does not leak the input predicate reference on the result": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $gte → 'set X to at least N (currently A)'": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $eq → 'set X to V (currently A)'": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $in → 'set X to one of [...] (currently A)'": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $exists: true → 'set X to a non-null value' when the fact is undefined": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $exists: false → 'unset X'": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $between → ranges show both bounds": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — missingChanges suggestions > $startsWith / $endsWith / $contains → string-shape hints": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — multi-clause + combinators > collects every failing leaf when $all has multiple": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — multi-clause + combinators > flat object form collects all failures": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — multi-clause + combinators > returns empty missingChanges when predicate has no failed clauses": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > $changed with prev → fires when value differs from prev": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > $changed with prev → fails when value matches prev, suggestion mentions it": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > M10: $changed without prev → synthetic warning entry per $changed clause (when wouldFire is false)": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > M10: $changed without prev and nested in $all → still synthetically reported when wouldFire is false": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > M2: $changed without prev → NO synthetic warning when other clauses make wouldFire true": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         },
         "predict — prev/$changed > M2: $changed without prev → synthetic warning still fires when wouldFire === false": {
           "layer": "L11",
-          "by": ["import predict"]
+          "by": ["import predict", "option predicate data form"]
         }
       }
     },
@@ -10702,19 +10848,19 @@
       "tests": {
         "replayUnder > counts matches under a tightening change and holds the invariant": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > reports new matches when the rule is loosened": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > reports lost matches when the rule is tightened": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > holds the invariant across mixed new + lost changes": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > caps samples at maxSamples while keeping full counts": {
           "layer": "L11",
@@ -10734,27 +10880,27 @@
         },
         "replayUnder > reports delta 0 and full unchanged when proposed equals original": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > replays combinator specs ($all / $any / $not) correctly": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > carries correct clause pass bits in diff samples": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder > threads the previous frame's facts for $changed predicates": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder — spec validation > throws a clear error when the proposed spec has a string $matches operand": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder — spec validation > identifies the original spec when it is the invalid one": {
           "layer": "L11",
-          "by": ["import replayUnder"]
+          "by": ["import replayUnder", "option predicate data form"]
         },
         "replayUnder — spec validation > throws on a non-predicate spec (string)": {
           "layer": "L11",
@@ -11531,7 +11677,7 @@
       "tests": {
         "diffRules – constraint level > classifies added / removed / changed / unchanged": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – constraint level > sorts constraints alphabetically for deterministic output": {
           "layer": "L11",
@@ -11539,23 +11685,23 @@
         },
         "diffRules – direction analysis > relaxes $gte when threshold drops": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – direction analysis > tightens $gte when threshold rises": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – direction analysis > relaxes $lte when threshold rises": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – direction analysis > tightens $between when range narrows": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – direction analysis > relaxes $in when the set grows, tightens $nin when set grows": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – direction analysis > falls back to 'changed' for non-numeric value changes": {
           "layer": "L11",
@@ -11563,15 +11709,15 @@
         },
         "diffRules – combinators > walks into $all and reports per-branch changes": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – combinators > walks into $any and reports added branches": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – combinators > walks into $not": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "toRulesMap – input shapes > accepts a flat { id: whenSpec } map": {
           "layer": "L11",
@@ -11591,15 +11737,15 @@
         },
         "flattenPredicate > flattens object form to one clause per fact": {
           "layer": "L11",
-          "by": ["import flattenPredicate"]
+          "by": ["import flattenPredicate", "option predicate data form"]
         },
         "flattenPredicate > flattens array form (PredicateClause[])": {
           "layer": "L11",
-          "by": ["import flattenPredicate"]
+          "by": ["import flattenPredicate", "option predicate data form"]
         },
         "flattenPredicate > recurses into nested predicates (cross-module)": {
           "layer": "L11",
-          "by": ["import flattenPredicate"]
+          "by": ["import flattenPredicate", "option predicate data form"]
         },
         "diffClauses – function-form predicates > emits a single 'changed' placeholder when only one side is walkable": {
           "layer": "L11",
@@ -11611,11 +11757,11 @@
         },
         "diffRules – AE-round regressions > $contains on arrays gets direction analysis (relaxed when set grows)": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – AE-round regressions > $contains on strings stays 'changed' (substring direction is ambiguous)": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – AE-round regressions > emits a (function-form) placeholder for opaque removed/added constraints": {
           "layer": "L11",
@@ -11623,7 +11769,7 @@
         },
         "diffRules – AE-round regressions > ties on path are broken by operator name (deterministic across input order)": {
           "layer": "L11",
-          "by": ["import diffRules"]
+          "by": ["import diffRules", "option predicate data form"]
         },
         "diffRules – output stability > sorts changes by path for deterministic output": {
           "layer": "L11",
