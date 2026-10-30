@@ -10,7 +10,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   engine,
@@ -154,32 +154,12 @@ describe(`engine identity (${which}${dist ? " dist" : ""}, ${build})`, () => {
     const core = await vi.importActual<Module>("@directive-run/core");
     const local = coreEntries().find((e) => e.subpath === ".")?.file as string;
     const v1 = join(v1Dir, "dist", build, "index.js");
-    // Transforming a source tree is the slow part of this test (4.3 s of its
-    // 5 s timeout under CI load), so on v2 it loads only what is cheap and
-    // proves the rest from paths, which load nothing:
-    // - The workspace's 1.35 source is not loaded. The release (`v1`) is that
-    //   engine, pinned byte for byte, so a core-next that forwarded to 1.35 is
-    //   caught there; core pointed at the 1.35 directory fails the path check.
-    // - The dist project does not load core-next's source to compare. An alias
-    //   to the source fails the path check, and the per-entry tests above fail
-    //   it too (the suite would hold the source's objects, not the dist's).
-    //   The source project does compare against the built dist (one small file).
+    // On v2 the source and the dist are other engines to each other.
+    const nextOther = join(nextDir, dist ? "src/index.ts" : "dist/index.js");
     const others =
-      which === "v2"
-        ? [v1, ...(dist ? [] : [join(nextDir, "dist/index.js")])]
-        : [which === "v1" ? local : v1];
-    if (which === "v2") {
-      const home = join(nextDir, dist ? "dist" : "src") + sep;
-      const unbuilt = join(nextDir, "src/unbuilt.ts");
-      for (const file of files.values()) {
-        expect(file.startsWith(home) || file === unbuilt, file).toBe(true);
-      }
-    }
-    // Together, not one after another: the transforms overlap their file reads.
-    const loaded = await Promise.all(
-      others.map((file) => vi.importActual<Module>(file)),
-    );
-    for (const other of loaded) {
+      which === "v2" ? [local, v1, nextOther] : [which === "v1" ? local : v1];
+    for (const file of others) {
+      const other = await vi.importActual<Module>(file);
       expect(core.createSystem).not.toBe(other.createSystem);
     }
   });
