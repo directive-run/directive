@@ -1,5 +1,17 @@
 # @directive-run/ai
 
+## 1.36.0
+
+### Minor Changes
+
+- [#245](https://github.com/directive-run/directive/pull/245) [`9320627`](https://github.com/directive-run/directive/commit/93206278735fb80261edcfa2368a334d7252baca) Thanks [@jasoncomes](https://github.com/jasoncomes)! - New `@directive-run/ai/workers-ai` entry point: `createWorkersAIRunner({ binding: env.AI })` runs an agent through a Cloudflare Workers AI binding, with no API key and no fetch. It reports the token counts Workers AI returns, and says plainly when a response reports none, so a spend cap charges its estimate instead of a made-up zero. It also exports `WORKERS_AI_PRICING`, a dated rate table (checked 2026-10-30) with the real paid Cloudflare prices. This first version buffers the full answer and does not stream.
+
+### Patch Changes
+
+- [#182](https://github.com/directive-run/directive/pull/182) [`a31a6ba`](https://github.com/directive-run/directive/commit/a31a6ba51af1863d3b54dbf37891521cfffe18e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createJSONFileStore` now loads `node:path` lazily, so browser bundles of `@directive-run/ai` no longer pull it in. Path validation (including the `baseDir` escape check) now runs on the first load instead of at construction, and a rejected path throws from `getChunks()` / `size()` / `reload()`.
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
 ## 1.35.0
 
 ### Minor Changes
