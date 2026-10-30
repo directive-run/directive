@@ -698,11 +698,14 @@ export function createSystemCore<const M extends ModuleSchema>(
     _mode: "single",
     facts,
     derive,
+    // Locked like facts and derive (1.35 parity): no prototype-chain names,
+    // no symbols, and no write, delete, redefine or re-parent.
     events: view(
-      (name) => name in eventDefs,
+      (name) => !BLOCKED_PROPS.has(name) && name in eventDefs,
       () => Object.keys(eventDefs),
       (name) => (payload?: Record<string, unknown>) =>
         system.dispatch({ type: name, ...payload }),
+      { ...LOCKED, set: no, deleteProperty: no },
     ),
     get isRunning() {
       return running;

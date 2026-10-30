@@ -50,6 +50,50 @@ describe("L1 fixes", () => {
 
     expect((createSystem({ module: mod }) as any)._mode).toBe("single");
   });
+
+  describe("the events view is locked like facts and derive (1.35 parity)", () => {
+    const events = () =>
+      createSystem({
+        module: createModule("ev", {
+          schema: {
+            facts: { x: t.number() },
+            derivations: {},
+            events: { ping: t.object() },
+            requirements: {},
+          },
+          events: { ping: () => {} },
+        } as any),
+      }).events as Record<string | symbol, unknown>;
+
+    it("knows no symbol and no prototype-chain name", () => {
+      const ev = events();
+      const sym = Symbol("s");
+      for (const name of ["constructor", "__proto__", "prototype", sym]) {
+        expect(ev[name]).toBeUndefined();
+        expect(name in ev).toBe(false);
+        expect(Object.getOwnPropertyDescriptor(ev, name)).toBeUndefined();
+      }
+      expect(Object.getPrototypeOf(ev)).toBeNull();
+      expect(Object.keys(ev)).toEqual(["ping"]);
+      expect(typeof ev.ping).toBe("function");
+    });
+
+    it("cannot be written, deleted, redefined or re-parented", () => {
+      const ev = events();
+      expect(() => {
+        ev.z = 1;
+      }).toThrow(TypeError);
+      expect(() => {
+        delete ev.ping;
+      }).toThrow(TypeError);
+      expect(() => Object.defineProperty(ev, "z", { value: 1 })).toThrow(
+        TypeError,
+      );
+      expect(() => Object.setPrototypeOf(ev, {})).toThrow(TypeError);
+      expect(Object.keys(ev)).toEqual(["ping"]);
+      expect(typeof ev.ping).toBe("function");
+    });
+  });
 });
 
 describe("membership test on derived tracks", () => {
