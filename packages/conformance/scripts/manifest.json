@@ -64,6 +64,7 @@
   "tests/core/l2-constraints-oracle-production.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle-production.test.ts",
   "tests/core/l2-constraints-oracle.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle.test.ts",
   "tests/core/l2-requirements-oracle.test.ts": "packages/core/src/core/__tests__/l2-requirements-oracle.test.ts",
+  "tests/core/l2-resolvers-oracle.test.ts": "packages/core/src/core/__tests__/l2-resolvers-oracle.test.ts",
   "tests/core/l3-engine-oracle.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle.test.ts",
   "tests/core/l3-errors-oracle-production.test.ts": "packages/core/src/core/__tests__/l3-errors-oracle-production.test.ts",
   "tests/core/l3-errors-oracle.test.ts": "packages/core/src/core/__tests__/l3-errors-oracle.test.ts",
