@@ -7244,6 +7244,77 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-boundaries.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a module with a dangerous key is refused, naming where it is > \"a dangerous key in %s\"": {
+          "layer": "L5",
+          "by": ["option sources"],
+          "dynamic": true
+        },
+        "a module with a dangerous key is refused, naming where it is > a name starting with $ is only reserved for facts: events, derivations and effects may use it": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "settle() that gives up says what it was waiting for > names the resolver still running and the requirement that is unmet": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "settle() that gives up says what it was waiting for > a settle that is not stuck does not mention resolvers or requirements": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "module hooks that are only partly filled in > a module with onStart but no onStop stops and destroys, sync and async": {
+          "layer": "L3",
+          "by": ["option module hooks"]
+        },
+        "module hooks that are only partly filled in > destroy() and destroyAsync() of a running system call the module's onStop once": {
+          "layer": "L3",
+          "by": ["option module hooks"]
+        },
+        "stopping a system ends what is in flight > stop() and stopAsync() abort a resolver that is still running": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a resolver's error strategy and its module hook > the module's onResolverError hook is given an Error, the requirement and the facts": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "a resolver's error strategy and its module hook > a module with other hooks but no onResolverError reports no hook failure": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "a resolver's error strategy and its module hook > a throwing onResolverError hook is reported with the module's id, and the system carries on": {
+          "layer": "L3",
+          "by": [
+            "option error boundary",
+            "option module hooks",
+            "option plugins"
+          ]
+        },
+        "a resolver that wrote the fact its constraint reads > alone in changing what the constraint reads: finishes, is not canceled": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a resolver that wrote the fact its constraint reads > a write from outside in the same pass to something the constraint reads, even only through a derivation of a derivation, makes it an ordinary cancel": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a resolver that wrote the fact its constraint reads > two resolvers that between them end their constraint's requirements: neither is canceled": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle.test.ts": {
       "category": "black-box",
       "rule": "L3",
