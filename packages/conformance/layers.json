@@ -8072,7 +8072,7 @@
             "import startTimer"
           ]
         },
-        "elapsed time > only a paused timer is frozen: a completed one keeps counting against the clock": {
+        "elapsed time > a timer completed while paused reports the elapsed time it had": {
           "layer": "L3",
           "by": [
             "import completeTimer",

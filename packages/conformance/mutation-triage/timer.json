@@ -1,0 +1,10 @@
+[
+  {
+    "line": 97,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "v1-bug",
+    "note": "1.35 bug: a timer completed while paused keeps counting elapsed time against the clock (elapsedMs at 500 after pausing at 100 reads 500), against 'pauses freeze' (RFC 0001) and the pausedDurationMs bookkeeping. The mutant freezes it, which is arguably correct, so the oracle does not pin either; 2.0 (core-next api/timer.ts copies this code) must decide. Counted. This entry is the left-operand `state.status === \"paused\"` \u2192 true mutant; the whole-condition `true` mutant is killed."
+  }
+]

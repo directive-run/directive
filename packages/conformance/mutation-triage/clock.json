@@ -21,6 +21,6 @@
     "mutator": "ArithmeticOperator",
     "replacement": "a.id + b.id",
     "reason": "equivalent",
-    "note": "Reached only for equal deadlines, where the tie-break is already redundant (see 94:13). `a.id + b.id` is never negative, and V8's sort only asks whether the comparator result is below zero, so 0 and a positive number order tied entries the same way. Applied by hand, the whole conformance:local suite at MUTATION_LAYER=L3 passes; 12,000 random tie-heavy arrays sort identically on Node 22."
+    "note": "Reached only for equal deadlines, where the tie-break is already redundant (see 94:13). `a.id + b.id` is never negative, and V8's sort only asks whether the comparator result is below zero, so 0 and a positive number order tied entries the same way. Applied by hand, the whole conformance:local suite at MUTATION_LAYER=L3 passes; 12,000 random tie-heavy arrays sort identically on Node 22. Verified on V8 only: `a.id + b.id` is not a consistent comparator, so another engine's sort may call it on tied pairs and differ."
   }
 ]

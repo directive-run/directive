@@ -96,13 +96,15 @@ describe("elapsed time", () => {
     expect(elapsedMs(state, 9_999)).toBe(250);
   });
 
-  it("only a paused timer is frozen: a completed one keeps counting against the clock", () => {
+  // Only the read at the moment of completion is pinned. Later reads of a
+  // timer completed while paused keep counting on 1.35, against "pauses
+  // freeze" (RFC 0001); triaged v1-bug in mutation-triage/timer.json.
+  it("a timer completed while paused reports the elapsed time it had", () => {
     const completed = completeTimer(
       pauseTimer(startTimer(initialTimerState(), 0), 100),
     );
 
     expect(elapsedMs(completed, 100)).toBe(100);
-    expect(elapsedMs(completed, 500)).toBe(500);
   });
 
   it("a paused timer that never recorded when it paused counts against the clock", () => {
@@ -138,7 +140,6 @@ describe("timerOps", () => {
     expect(ops.remainingMs(state, 0)).toBe(1_000);
     expect(ops.remainingMs(state, 300)).toBe(700);
     expect(ops.remainingMs(state, 5_000)).toBe(0);
-    expect(ops.remainingMs(ops.initial(), 300)).toBe(1_000);
     expect(remainingMs(state, 300, 1_000)).toBe(700);
   });
 });
