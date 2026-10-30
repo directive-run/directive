@@ -6594,6 +6594,73 @@
         }
       }
     },
+    "tests/core/l2-constraints-oracle-state.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a disabled constraint is not asked while it is waiting on another > asks it, once, after it is enabled again": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a disabled constraint is not asked while it is waiting on another > is not asked when the system restarts after a write while it was stopped": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "every dependent of a constraint is asked once it finishes > asks each of two constraints waiting on the same one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > lists every constraint in declaration order with its priority and whether it is disabled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > shows whether a constraint is active, how many times it was, and when it last was": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > keeps counting across passes: each pass that finds it active adds one": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > shows a constraint whose when threw as not active": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "inspect() reports each constraint > reports an async constraint the same way, and not active once its when rejects": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a when that returns a promise without async: true > is reported to plugins and to inspect() with the answer it resolved to, every time it is asked": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
+        },
+        "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        }
+      }
+    },
     "tests/core/l2-constraints-oracle.test.ts": {
       "category": "black-box",
       "rule": "L2",

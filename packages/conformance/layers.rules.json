@@ -190,6 +190,11 @@
     "tests/core/l2-constraints-oracle-production.test.ts": {
       "rule": "L2"
     },
+    "tests/core/l2-constraints-oracle-state.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["option plugins", "member .inspect"]
+    },
     "tests/core/blackbox-effects.test.ts": {
       "rule": "L0"
     },

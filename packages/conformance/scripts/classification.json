@@ -608,6 +608,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l2-constraints-oracle-state.test.ts",
+    "category": "black-box",
+    "cases": 12,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
     "category": "black-box",
     "cases": 53,
