@@ -153,14 +153,6 @@
   },
   {
     "line": 156,
-    "col": 11,
-    "mutator": "LogicalOperator",
-    "replacement": "config.has || typeof prop === \"string\"",
-    "reason": "not-observable",
-    "note": "Descriptor answer for a key (hasOwn, getOwnPropertyDescriptor); descriptors are proxy mechanics, not a 2.0 contract."
-  },
-  {
-    "line": 156,
     "col": 25,
     "mutator": "ConditionalExpression",
     "replacement": "true",
@@ -1448,7 +1440,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1456,7 +1448,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "result._root",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1464,7 +1456,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1472,7 +1464,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1480,6 +1472,6 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   }
 ]

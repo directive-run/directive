@@ -46,7 +46,7 @@
     "replacement": "[]",
     "reason": "later-layer",
     "layer": "L10",
-    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) — killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
+    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) \u2014 killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
   },
   {
     "line": 116,
@@ -302,7 +302,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 364,
@@ -319,7 +319,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 365,
@@ -336,7 +336,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 369,
@@ -345,7 +345,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 369,
@@ -386,7 +386,7 @@
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 369,
@@ -395,7 +395,7 @@
     "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 369,
@@ -404,7 +404,7 @@
     "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute — data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 372,
@@ -413,7 +413,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 378,
@@ -430,7 +430,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute — data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 378,
@@ -439,7 +439,7 @@
     "replacement": "typeof c !== \"function\"",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute — data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 378,
@@ -480,7 +480,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 404,
@@ -497,7 +497,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 410,
@@ -514,7 +514,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 411,
@@ -531,7 +531,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 414,
@@ -540,7 +540,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 414,
@@ -573,7 +573,7 @@
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 414,
@@ -582,7 +582,7 @@
     "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 414,
@@ -591,7 +591,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch — data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 416,
@@ -600,7 +600,7 @@
     "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch — data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 422,
@@ -609,15 +609,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch — dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
-  },
-  {
-    "line": 422,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Data-form (object-form `when`/`on`/`patch`) bookkeeping that survives in the full run too: it copies an unchanged definition, or warns in development only; no view differs."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 422,
@@ -650,7 +642,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch — dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 424,
@@ -659,7 +651,7 @@
     "replacement": "``",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch — dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 428,
@@ -668,7 +660,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch — data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 443,
@@ -685,7 +677,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 450,
@@ -702,7 +694,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
     "line": 456,
@@ -711,7 +703,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on — data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 457,
@@ -728,7 +720,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on — data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 461,
@@ -737,7 +729,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on — data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 461,
@@ -754,7 +746,7 @@
     "replacement": "def.on === undefined",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on — data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 461,
@@ -771,7 +763,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on — data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 471,
@@ -796,34 +788,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
-  },
-  {
-    "line": 477,
-    "col": 5,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
-  },
-  {
-    "line": 477,
-    "col": 5,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
-  },
-  {
-    "line": 477,
-    "col": 5,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 477,
@@ -841,7 +806,7 @@
     "replacement": "constraints === mod.constraints && derive === mod.derive && events === mod.events || effects === mod.effects",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 477,
@@ -868,7 +833,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 478,
@@ -877,7 +842,7 @@
     "replacement": "derive !== mod.derive",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced derivation compute — data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
   },
   {
     "line": 479,
@@ -886,7 +851,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 479,
@@ -895,7 +860,7 @@
     "replacement": "events !== mod.events",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
   },
   {
     "line": 480,
@@ -904,7 +869,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
     "line": 480,
@@ -913,7 +878,7 @@
     "replacement": "effects !== mod.effects",
     "reason": "later-layer",
     "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks — killed in the full run by namespaced effect on — data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
   },
   {
     "line": 481,
@@ -1026,7 +991,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when — data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
   },
   {
     "line": 764,
@@ -1172,7 +1137,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
   },
   {
     "line": 1010,
@@ -1181,7 +1146,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
   },
   {
     "line": 1012,
@@ -1190,7 +1155,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
   },
   {
     "line": 1012,
@@ -1199,7 +1164,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) — killed in the full run by history.snapshotEvents multi-module: each module controls its own events"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents multi-module: each module controls its own events"
   },
   {
     "line": 1014,
