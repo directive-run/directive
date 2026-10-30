@@ -1,0 +1,18 @@
+[
+  {
+    "line": 452,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "With an empty queue the early return and the loop below do the same nothing."
+  },
+  {
+    "line": 452,
+    "col": 45,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "With an empty queue the early return and the loop below do the same nothing."
+  }
+]

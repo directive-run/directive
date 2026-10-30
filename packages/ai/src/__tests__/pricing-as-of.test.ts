@@ -23,6 +23,10 @@ import {
 import { GEMINI_PRICING, GEMINI_PRICING_AS_OF } from "../adapters/gemini.js";
 import { OLLAMA_PRICING, OLLAMA_PRICING_AS_OF } from "../adapters/ollama.js";
 import { OPENAI_PRICING, OPENAI_PRICING_AS_OF } from "../adapters/openai.js";
+import {
+  WORKERS_AI_PRICING,
+  WORKERS_AI_PRICING_AS_OF,
+} from "../adapters/workers-ai.js";
 import type { ModelPricing } from "../pricing.js";
 
 /**
@@ -73,6 +77,12 @@ const TABLES = [
     name: "OLLAMA_PRICING",
     table: OLLAMA_PRICING,
     asOf: OLLAMA_PRICING_AS_OF,
+    fingerprint: "",
+  },
+  {
+    name: "WORKERS_AI_PRICING",
+    table: WORKERS_AI_PRICING,
+    asOf: WORKERS_AI_PRICING_AS_OF,
     fingerprint: "",
   },
 ];
@@ -139,6 +149,7 @@ describe("a rate cannot move without its date moving", () => {
     OPENAI_PRICING: "5dacdbb0a433f50a",
     GEMINI_PRICING: "38cc87759ab22df0",
     OLLAMA_PRICING: "f81daede7c795e7c",
+    WORKERS_AI_PRICING: "9e92f7813f73e779",
   };
 
   it.each(TABLES)("$name matches its pinned rates", ({ name, table }) => {
