@@ -1,0 +1,34 @@
+[
+  {
+    "line": 259,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "safeCall is only handed a closure (broadcast wraps every hook call in one), so the missing-function guard never fires."
+  },
+  {
+    "line": 259,
+    "col": 14,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "safeCall is only handed a closure (broadcast wraps every hook call in one), so the missing-function guard never fires."
+  },
+  {
+    "line": 280,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "safeCallAsync is only handed a closure (emitInit wraps the onInit call in one), so the missing-function guard never fires."
+  },
+  {
+    "line": 280,
+    "col": 14,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "safeCallAsync is only handed a closure (emitInit wraps the onInit call in one), so the missing-function guard never fires."
+  }
+]

@@ -231,18 +231,16 @@ export function createSystemCore<const M extends ModuleSchema>(
    * observers still hear writes: records go straight to the plugins.
    */
   let tail: ((event: KernelEvent) => void) | null = null;
+  /**
+   * True while a record has a reader. Every emitter on a hot path asks first,
+   * so with nothing listening a record (and its closure) is never built.
+   */
   const live = () => tail !== null || hooks.live;
   /** One record on the kernel's stream, for plugins and observers alike. */
   const emit = (at: string, data?: Record<string, unknown>) =>
     tail
       ? tail({ ...data, t: clock.now(), seq: 0, sys: kernel.id, at })
       : hooks.emit(at, data);
-  /** Emit only when someone listens: the record is not even built otherwise. */
-  const report = (at: string, data: () => Record<string, unknown>) => {
-    if (live()) {
-      emit(at, data());
-    }
-  };
 
   let running = false;
   let initializing = false;
@@ -324,15 +322,17 @@ export function createSystemCore<const M extends ModuleSchema>(
 
   /**
    * Mark stale every live derivation downstream of the written keys: for each
-   * fact's subscriber in link order, depth first.
+   * fact's subscriber in link order, depth first. A fact nothing in the graph
+   * reads allocates nothing here.
    */
-  function invalidate(keys: Iterable<string>): void {
+  function invalidate(keys: readonly string[]): void {
     holdDepth++;
-    const seen = new Set<ReactiveNode>();
+    let seen: Set<ReactiveNode> | undefined;
     try {
       for (const key of keys) {
         for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
           const stack = [l.target];
+          seen ??= new Set();
           while (stack.length > 0) {
             const node = stack.pop()!;
             const d = byNode.get(node);
@@ -347,7 +347,9 @@ export function createSystemCore<const M extends ModuleSchema>(
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
             node.flags |= Flags.Dirty;
-            report("derivation.invalidate", () => ({ id: d.id_ }));
+            if (live()) {
+              emit("derivation.invalidate", { id: d.id_ });
+            }
             pending.add(d.id_);
             // Wakes an effect that read this derivation (and maybe no fact).
             changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
@@ -373,11 +375,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
-      report("derivation.compute", () => ({
-        id: d.id_,
-        value,
-        deps: Array.from(deps, describeDep),
-      }));
+      if (live()) {
+        emit("derivation.compute", {
+          id: d.id_,
+          value,
+          deps: Array.from(deps, describeDep),
+        });
+      }
 
       return value;
     } catch (error) {
@@ -507,8 +511,15 @@ export function createSystemCore<const M extends ModuleSchema>(
       release();
     }
   };
+  /**
+   * One write's key list, reused so a write allocates none. Safe to reuse:
+   * each loop over it reads its one key first, and a nested write that
+   * refills it (a listener's batch) is done before the loop looks for a next
+   * key, of which there is none. Refilled before each use.
+   */
+  const one = [""];
   /** Changed keys feed the next reconcile pass. */
-  const changed = (keys: string[]) => {
+  const changed = (keys: readonly string[]) => {
     for (const key of keys) {
       changedKeys.add(key);
     }
@@ -530,20 +541,29 @@ export function createSystemCore<const M extends ModuleSchema>(
     onChange(key, value, prev) {
       holdDepth++;
       try {
-        invalidate([key]);
-        report("fact.set", () => ({ key, value, prev }));
+        one[0] = key;
+        invalidate(one);
+        if (live()) {
+          emit("fact.set", { key, value, prev });
+        }
       } finally {
         release();
       }
-      changed([key]);
+      one[0] = key;
+      changed(one);
     },
-    onWrite: (key) => invalidate([key]),
+    onWrite(key) {
+      one[0] = key;
+      invalidate(one);
+    },
     onBatchStart() {
       holdDepth++;
       batchHeld = true;
     },
     onBatch(changes: FactChange[]) {
-      report("fact.batch", () => ({ changes }));
+      if (live()) {
+        emit("fact.batch", { changes });
+      }
       const keys = changes.map((c) => c.key);
       invalidate(keys);
       endBatch();
@@ -637,7 +657,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     const passKeys = changedKeys;
     changedKeys = new Set();
     try {
-      report("reconcile.start", () => ({ snapshot: facts.$snapshot() }));
+      if (live()) {
+        emit("reconcile.start", { snapshot: facts.$snapshot() });
+      }
       effectsOpen = true;
       let done: Promise<void> | undefined;
       try {
@@ -648,9 +670,11 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (done) {
         await done;
       }
-      report("reconcile.end", () => ({
-        result: { unmet: [], inflight: [], completed: [], canceled: [] },
-      }));
+      if (live()) {
+        emit("reconcile.end", {
+          result: { unmet: [], inflight: [], completed: [], canceled: [] },
+        });
+      }
     } finally {
       reconciling = false;
       if (changedKeys.size > 0) {
