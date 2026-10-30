@@ -852,3 +852,105 @@ describe("abortOn on a batched resolver", () => {
     system.destroy();
   });
 });
+
+describe("a batch that fails after it was taken away from its requirements", () => {
+  it("is not retried and reports no error when it throws because it was aborted", async () => {
+    const g = gate();
+    const h = handler(async () => {
+      await g.promise;
+      throw new Error("aborted by the caller");
+    });
+    const { system, log } = build({
+      batch: { enabled: true, windowMs: 10 },
+      retry: { attempts: 3, backoff: "none" },
+      resolveBatch: h.fn,
+    });
+    system.facts.want = ["a", "b"];
+    await advance(20);
+    system.facts.want = [];
+    await advance(10);
+    g.open();
+    await advance(1000);
+
+    expect(h.calls).toHaveLength(1);
+    expect(log.errors).toEqual([]);
+    expect(sorted(log.cancels)).toEqual(["a", "b"]);
+    system.destroy();
+  });
+
+  it("is canceled and its later failure dropped when its requirement comes back and a new batch takes it over", async () => {
+    const g = gate();
+    const log: Log = { completes: [], errors: [], cancels: [], retries: [] };
+    let calls = 0;
+    const mod = createModule("own", {
+      schema: {
+        facts: { go: t.boolean(), done: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { LOAD: {} },
+      },
+      init: (f: any) => {
+        f.go = false;
+        f.done = false;
+      },
+      constraints: {
+        load: {
+          when: (f: any) => f.go && !f.done,
+          require: { type: "LOAD" },
+        },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          batch: { enabled: true, windowMs: 10 },
+          retry: { attempts: 3, backoff: "none" },
+          resolveBatch: async (_reqs: unknown, ctx: any) => {
+            calls++;
+            if (calls === 1) {
+              // Satisfies its own requirement, then fails much later.
+              ctx.facts.done = true;
+              await g.promise;
+              throw new Error("late failure");
+            }
+          },
+        },
+      },
+    } as never);
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "rec",
+          onResolverComplete: (_r: string, req: { id: string }) => {
+            log.completes.push(req.id);
+          },
+          onResolverError: (_r: string, req: { id: string }, e: unknown) => {
+            log.errors.push([req.id, e]);
+          },
+          onResolverCancel: (_r: string, req: { id: string }) => {
+            log.cancels.push(req.id);
+          },
+        },
+      ],
+    } as never) as any;
+    system.start();
+    system.facts.go = true;
+    await advance(50);
+    expect(calls).toBe(1);
+    expect(log.completes).toEqual([]);
+
+    // The requirement comes back while the first batch is still going.
+    system.facts.done = false;
+    await advance(50);
+    expect(calls).toBe(2);
+    expect(log.cancels).toHaveLength(1);
+    expect(log.completes).toHaveLength(1);
+
+    g.open();
+    await advance(1000);
+    expect(calls).toBe(2);
+    expect(log.errors).toEqual([]);
+    expect(log.completes).toHaveLength(1);
+    system.destroy();
+  });
+});

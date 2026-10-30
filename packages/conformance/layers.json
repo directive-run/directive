@@ -8470,6 +8470,14 @@
         "abortOn on a batched resolver > does not bind a batch that mixes requirements from different constraints": {
           "layer": "L7",
           "by": ["option batch resolver"]
+        },
+        "a batch that fails after it was taken away from its requirements > is not retried and reports no error when it throws because it was aborted": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a batch that fails after it was taken away from its requirements > is canceled and its later failure dropped when its requirement comes back and a new batch takes it over": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
         }
       }
     },
