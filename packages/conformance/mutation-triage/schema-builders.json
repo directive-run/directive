@@ -1,0 +1,99 @@
+[
+  {
+    "line": 41,
+    "col": 42,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "Every caller of createSchemaType passes its validators, so the default is never used."
+  },
+  {
+    "line": 574,
+    "col": 7,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L6",
+    "note": "Type name of t.boolean(), read by schema introspection (getKind) \u2014 killed in the full run by getKind \u2014 primitive builders t.boolean() \u2192 { kind: 'boolean' }"
+  },
+  {
+    "line": 605,
+    "col": 31,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
+  },
+  {
+    "line": 605,
+    "col": 40,
+    "mutator": "UnaryOperator",
+    "replacement": "+1",
+    "reason": "not-observable",
+    "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
+  },
+  {
+    "line": 615,
+    "col": 26,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
+  },
+  {
+    "line": 615,
+    "col": 35,
+    "mutator": "UnaryOperator",
+    "replacement": "+1",
+    "reason": "not-observable",
+    "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
+  },
+  {
+    "line": 755,
+    "col": 36,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+  },
+  {
+    "line": 755,
+    "col": 36,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+  },
+  {
+    "line": 755,
+    "col": 36,
+    "mutator": "LogicalOperator",
+    "replacement": "v !== null || v !== undefined",
+    "reason": "equivalent",
+    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+  },
+  {
+    "line": 755,
+    "col": 50,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+  },
+  {
+    "line": 812,
+    "col": 23,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "The enum values are strings, so set membership already fails for a non-string and the typeof check adds nothing."
+  },
+  {
+    "line": 1067,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Returns undefined instead of false from a validator; every caller reads validators as truthy or falsy."
+  }
+]

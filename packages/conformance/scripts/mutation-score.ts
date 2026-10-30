@@ -32,6 +32,17 @@
  * Lk, such a mutant is deferred even if Survived; at or above Lk, or with no
  * `--layer`, it counts as if untriaged. `layer` must be L0..L13 and above
  * the file's MUTATION.md row, or the triage file is rejected.
+ *
+ * Validation (`--full`): a `later-layer` entry claims a later test kills the
+ * mutant. With a full report, that claim is checked: the mutant must be
+ * Killed or Timeout in the full run. If not (Survived, NoCoverage, absent, or
+ * the full report is stale or lacks the file), the entry is INVALID: it counts
+ * as untriaged (it is not deferred, not even by the full-run rule), so it is
+ * an unexplained survivor and fails the gate, and it is listed under
+ * "later-layer without a full-run kill". If the full report records `killedBy`
+ * and `testFiles` (Stryker JSON), the entry's note must also name one of the
+ * killing tests (its name or file basename); if not, it is listed as a
+ * warning only. Without `--full` later-layer entries are unvalidated.
  */
 
 import {
@@ -48,6 +59,8 @@ export const GATE = 80;
 
 export interface Mutant {
   id?: string;
+  /** Stryker: ids of the tests that killed it (keys of the report's test index). */
+  killedBy?: string[];
   mutatorName: string;
   replacement?: string;
   status: string;
@@ -57,13 +70,22 @@ export interface Mutant {
   };
 }
 
+export interface TestRef {
+  name: string;
+  /** The test file's path in the report's `testFiles`. */
+  file: string;
+}
+
 export interface ReportFile {
   source?: string;
   mutants: Mutant[];
+  /** Test id -> test, from the report's `testFiles`; set by `loadFiles`. */
+  tests?: Record<string, TestRef>;
 }
 
 export interface Report {
   files: Record<string, ReportFile>;
+  testFiles?: Record<string, { tests?: { id: string; name: string }[] }>;
 }
 
 export interface TriageEntry {
@@ -91,6 +113,22 @@ export interface DeferredMutant {
   layer?: string;
 }
 
+/** A `later-layer` entry whose mutant the full run does not kill. */
+export interface InvalidLaterLayer {
+  mutant: Mutant;
+  layer: string;
+  /** The mutant's status in the full run, or why it cannot be looked up. */
+  fullStatus: string;
+}
+
+/** A valid `later-layer` entry whose note names none of the killing tests. */
+export interface UnnamedKiller {
+  mutant: Mutant;
+  layer: string;
+  /** The full run's killing tests, as `name [file basename]`. */
+  killers: string[];
+}
+
 export interface FileScore {
   file: string;
   killed: number;
@@ -105,6 +143,10 @@ export interface FileScore {
   deferredMutants: DeferredMutant[];
   /** A full report was given but its source for this file differs. */
   fullStale: boolean;
+  /** `later-layer` entries not killed in the full run: counted as untriaged. */
+  invalidLaterLayer: InvalidLaterLayer[];
+  /** Warnings: the note names none of the full run's killing tests. */
+  unnamedKillers: UnnamedKiller[];
   rawScore: number;
   gateScore: number;
   unexplained: Mutant[];
@@ -233,6 +275,29 @@ export function rowLayers(markdown: string): Map<string, number> {
   return out;
 }
 
+const isDetected = (m: Mutant): boolean =>
+  m.status === "Killed" || m.status === "Timeout";
+
+const normalize = (s: string): string => s.toLowerCase().replace(/\s+/g, " ");
+
+/** The full run's killing tests of these mutants, as `{ name, base }`. */
+function killersOf(
+  mutants: Mutant[],
+  tests: Record<string, TestRef> | undefined,
+): { name: string; base: string }[] {
+  const out = new Map<string, { name: string; base: string }>();
+  for (const m of mutants) {
+    for (const id of m.killedBy ?? []) {
+      const t = tests?.[id];
+      if (t) {
+        out.set(id, { name: t.name, base: basename(t.file) });
+      }
+    }
+  }
+
+  return [...out.values()];
+}
+
 export function scoreFile(
   file: string,
   data: ReportFile,
@@ -240,6 +305,11 @@ export function scoreFile(
   full?: ReportFile,
   /** The run's layer ceiling (number), for `later-layer` triage. */
   ceiling?: number,
+  /**
+   * Validate `later-layer` entries against the full run. True whenever a full
+   * report was asked for, even if this file is missing from it.
+   */
+  validateLater: boolean = full !== undefined,
 ): FileScore {
   const triaged = new Map(
     triage.map((t) => [key(t.line, t.col, t.mutator, t.replacement), t]),
@@ -259,6 +329,16 @@ export function scoreFile(
           .map((m) => mutantKey(m))
       : [],
   );
+  const fullByKey = new Map<string, Mutant[]>();
+  if (full && !fullStale) {
+    for (const m of full.mutants) {
+      const list = fullByKey.get(mutantKey(m)) ?? [];
+      list.push(m);
+      fullByKey.set(mutantKey(m), list);
+    }
+  }
+  const invalidLaterLayer: InvalidLaterLayer[] = [];
+  const unnamedKillers: UnnamedKiller[] = [];
   let deferred = 0;
   const deferredMutants: DeferredMutant[] = [];
   let killed = 0;
@@ -296,6 +376,41 @@ export function scoreFile(
       excluded++;
       continue;
     }
+    let invalidLater = false;
+    if (reason === "later-layer" && validateLater) {
+      const layerOfEntry = entry!.layer ?? "L0";
+      const inFull = fullByKey.get(k) ?? [];
+      const killers = inFull.filter(isDetected);
+      if (killers.length === 0) {
+        // The claim "a later test kills it" is false: untriaged, undeferred.
+        invalidLater = true;
+        reason = undefined;
+        invalidLaterLayer.push({
+          mutant: m,
+          layer: layerOfEntry,
+          fullStatus: fullStale
+            ? "stale full report"
+            : (inFull[0]?.status ?? "not in the full report"),
+        });
+      } else {
+        const named = killersOf(killers, full?.tests);
+        const note = normalize(entry!.note ?? "");
+        if (
+          named.length > 0 &&
+          !named.some(
+            (t) =>
+              note.includes(normalize(t.name)) ||
+              note.includes(normalize(t.base)),
+          )
+        ) {
+          unnamedKillers.push({
+            mutant: m,
+            layer: layerOfEntry,
+            killers: named.map((t) => `${t.name} [${t.base}]`),
+          });
+        }
+      }
+    }
     if (reason === "later-layer") {
       // Below its layer: a later feature's code, deferred to that layer.
       if (ceiling !== undefined && ceiling < layerNum(entry!.layer ?? "L0")) {
@@ -311,7 +426,7 @@ export function scoreFile(
       // At or above it (or ceiling unknown): it counts, as if untriaged.
       reason = undefined;
     }
-    if (m.status === "NoCoverage" && reachedInFull.has(k)) {
+    if (!invalidLater && m.status === "NoCoverage" && reachedInFull.has(k)) {
       deferred++;
       deferredMutants.push({ mutant: m, why: "full-run" });
       continue;
@@ -341,6 +456,8 @@ export function scoreFile(
     deferred,
     deferredMutants,
     fullStale,
+    invalidLaterLayer,
+    unnamedKillers,
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
@@ -380,13 +497,26 @@ function collect(paths: string[]): string[] {
   return out;
 }
 
+/** Test id -> test, from a report's `testFiles` (Stryker JSON schema). */
+export function testIndex(r: Report): Record<string, TestRef> {
+  const out: Record<string, TestRef> = {};
+  for (const [path, tf] of Object.entries(r.testFiles ?? {})) {
+    for (const t of tf.tests ?? []) {
+      out[t.id] = { name: t.name, file: path };
+    }
+  }
+
+  return out;
+}
+
 /** Every file in the reports, by its report path (a later report wins). */
 export function loadFiles(reportPaths: string[]): Map<string, ReportFile> {
   const files = new Map<string, ReportFile>();
   for (const rp of reportPaths) {
     const r = JSON.parse(readFileSync(rp, "utf8")) as Report;
+    const tests = testIndex(r);
     for (const [file, data] of Object.entries(r.files ?? {})) {
-      files.set(file, data);
+      files.set(file, { ...data, tests });
     }
   }
 
@@ -420,6 +550,7 @@ export function scoreReports(
           triage,
           full?.get(file),
           layer === "row" ? rowLayer : layer,
+          full !== undefined,
         ),
       );
     }
@@ -471,6 +602,52 @@ export function formatDeferred(rows: FileScore[]): string {
     "```",
     "",
     "</details>",
+  ].join("\n");
+}
+
+const where = (file: string, m: Mutant): string =>
+  `${basename(file)}:${m.location.start.line}:${m.location.start.column} ${m.mutatorName}`;
+
+/** `later-layer` entries the full run does not kill: they count as untriaged. */
+export function formatInvalidLaterLayer(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.invalidLaterLayer.map(
+      (i) =>
+        `${where(r.file, i.mutant)} (later-layer ${i.layer}; full run: ${i.fullStatus})`,
+    ),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `later-layer without a full-run kill (${lines.length}): INVALID, counted as untriaged. No test kills these in the full run, so deferring them hides untested code. Kill the mutant, or triage it with another reason.`,
+    "```",
+    ...lines,
+    "```",
+  ].join("\n");
+}
+
+/** Warnings: valid `later-layer` entries whose note names none of the killing tests. */
+export function formatUnnamedKillers(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.unnamedKillers.map((u) => {
+      const shown = u.killers.slice(0, 3).join("; ");
+      const more =
+        u.killers.length > 3 ? `; +${u.killers.length - 3} more` : "";
+
+      return `${where(r.file, u.mutant)} (later-layer ${u.layer}): killed by ${shown}${more}`;
+    }),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `WARNING: later-layer note does not name a killing test (${lines.length}). Not a failure; name the test so a reviewer can find it.`,
+    "```",
+    ...lines,
+    "```",
   ].join("\n");
 }
 
@@ -558,6 +735,15 @@ export function run(args: string[], root: string): RunResult {
           `Not in the full report: ${notInFull.join(", ")} (nothing deferred there).`,
         ]
       : []),
+    ...(full
+      ? []
+      : [
+          "No --full report: later-layer entries are unvalidated (not checked for a full-run kill).",
+        ]),
+    ...(formatInvalidLaterLayer(rows)
+      ? ["", formatInvalidLaterLayer(rows)]
+      : []),
+    ...(formatUnnamedKillers(rows) ? ["", formatUnnamedKillers(rows)] : []),
     ...(formatDeferred(rows) ? ["", formatDeferred(rows)] : []),
   ].join("\n");
   const missing = (only ?? []).filter(

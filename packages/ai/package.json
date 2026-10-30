@@ -36,7 +36,8 @@
     "openai",
     "anthropic",
     "ollama",
-    "gemini"
+    "gemini",
+    "workers-ai"
   ],
   "sideEffects": false,
   "type": "module",
@@ -92,6 +93,16 @@
       "import": {
         "types": "./dist/ollama.d.ts",
         "default": "./dist/ollama.js"
+      }
+    },
+    "./workers-ai": {
+      "require": {
+        "types": "./dist/workers-ai.d.cts",
+        "default": "./dist/workers-ai.cjs"
+      },
+      "import": {
+        "types": "./dist/workers-ai.d.ts",
+        "default": "./dist/workers-ai.js"
       }
     },
     "./gemini": {

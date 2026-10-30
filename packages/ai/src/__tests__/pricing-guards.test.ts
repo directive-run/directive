@@ -1287,6 +1287,10 @@ describe("pricing surface registry", () => {
       "Publishes an all-zero rate table via toTokenPricingTable — local models bill nothing. No cap, no ledger, no metrics.",
     ],
     [
+      "ai:adapters/workers-ai.ts",
+      "Publishes a rate table via toTokenPricingTable and copies the binding's reported input/output counts onto TokenUsage. No cap, no ledger, no metrics.",
+    ],
+    [
       "ai:structured-output.ts",
       "Sums token counts across the attempts one call makes when a model's answer will not parse, so the caller learns what the whole call cost rather than what its last attempt cost. It holds no rates, keeps no ledger, and charges nothing — a surface downstream prices the total it reports. Reads through normalizeTokenUsage rather than off the object, so the two cache-write spellings are reconciled in the one place that owns that rule.",
     ],

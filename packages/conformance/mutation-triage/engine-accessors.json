@@ -1,0 +1,618 @@
+[
+  {
+    "line": 46,
+    "col": 50,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by declared dependencies a derivation registered after the effect is picked up"
+  },
+  {
+    "line": 47,
+    "col": 15,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it"
+  },
+  {
+    "line": 49,
+    "col": 13,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by Derivations dynamic definitions assign overrides an existing derivation (value changes)"
+  },
+  {
+    "line": 51,
+    "col": 17,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by Derivations dynamic definitions unregister removes a dynamic derivation"
+  },
+  {
+    "line": 52,
+    "col": 11,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by Derivations dynamic definitions call recomputes and returns the value"
+  },
+  {
+    "line": 53,
+    "col": 16,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by Derivations dynamic definitions register adds a new derivation, accessible via system.derive"
+  },
+  {
+    "line": 54,
+    "col": 18,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by Derivations dynamic definitions register adds a new derivation, accessible via system.derive"
+  },
+  {
+    "line": 59,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 59,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 59,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 63,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Derivation names are checked against BLOCKED_PROPS when the module is built, so no derivation is named like a blocked property and the later checks return undefined for it as well."
+  },
+  {
+    "line": 63,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Derivation names are checked against BLOCKED_PROPS when the module is built, so no derivation is named like a blocked property and the later checks return undefined for it as well."
+  },
+  {
+    "line": 70,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "Dynamic derivation methods on system.derive (register, assign, unregister, call, isDynamic, listDynamic) — killed in the full run by a fact and a derivation with the same name resolves an effect's declared derivation name when the derivation arrives after it"
+  },
+  {
+    "line": 81,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 81,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 81,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 85,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 85,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 94,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 94,
+    "col": 27,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 94,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A symbol key falls through every later check to the same answer (undefined or false), so the early return changes nothing."
+  },
+  {
+    "line": 98,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 98,
+    "col": 36,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 106,
+    "col": 11,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 109,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 110,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 112,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 115,
+    "col": 22,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap returning undefined is treated as false, same as returning false."
+  },
+  {
+    "line": 116,
+    "col": 14,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Reflection on the derive view (a Proxy): the L1 differential scenario compares it with 1.35, but it is a proxy mechanic, not a 2.0 contract, so no black-box test pins it."
+  },
+  {
+    "line": 148,
+    "col": 64,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 153,
+    "col": 5,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 154,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 155,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 155,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 155,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof prop !== \"symbol\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 155,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 155,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 159,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 159,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 159,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 163,
+    "col": 55,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 164,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 167,
+    "col": 37,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 168,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 168,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 168,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof prop !== \"symbol\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 168,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 168,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 169,
+    "col": 18,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 172,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 172,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 172,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 173,
+    "col": 18,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 177,
+    "col": 17,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 180,
+    "col": 58,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 181,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 181,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 181,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof prop !== \"symbol\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 181,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 181,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 185,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 185,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 185,
+    "col": 38,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 188,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 188,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 188,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 189,
+    "col": 18,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 189,
+    "col": 34,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 189,
+    "col": 52,
+    "mutator": "BooleanLiteral",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 193,
+    "col": 13,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 194,
+    "col": 16,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 196,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 197,
+    "col": 16,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 199,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 202,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  },
+  {
+    "line": 203,
+    "col": 16,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "internals-only",
+    "note": "createEventsAccessor builds engine.events, which only createEngine (/internals) exposes; createSystem builds system.events from its own proxy, so no public path reaches this code."
+  }
+]

@@ -21,7 +21,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "system.read(id) reaches the manager with any id, and an unknown one is rejected by the guard in initState (line 480) or, behind it, the one in computeDerivation (line 509), both throwing the same error; with either removed the other still throws, and a state left behind for an unknown name is never read, so no public read distinguishes them."
   },
   {
     "line": 509,
@@ -29,7 +29,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "system.read(id) reaches the manager with any id, and an unknown one is rejected by the guard in initState (line 480) or, behind it, the one in computeDerivation (line 509), both throwing the same error; with either removed the other still throws, and a state left behind for an unknown name is never read, so no public read distinguishes them."
   },
   {
     "line": 866,
@@ -517,7 +517,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "system.read(id) reaches the manager with any id, and an unknown one is rejected by the guard in initState (line 480) or, behind it, the one in computeDerivation (line 509), both throwing the same error; with either removed the other still throws, and a state left behind for an unknown name is never read, so no public read distinguishes them."
   },
   {
     "line": 492,
@@ -533,7 +533,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Unknown-derivation guard is defensive; the engine rejects unknown ids before reaching the manager."
+    "note": "system.read(id) reaches the manager with any id, and an unknown one is rejected by the guard in initState (line 480) or, behind it, the one in computeDerivation (line 509), both throwing the same error; with either removed the other still throws, and a state left behind for an unknown name is never read, so no public read distinguishes them."
   },
   {
     "line": 486,
@@ -1332,24 +1332,27 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Only a data-form compute (predicate or template, L11) is not a function; at L1 compute is always a function, so forcing this branch changes nothing a layer-1 test can reach."
+    "reason": "later-layer",
+    "note": "A compute that is not a function reaches the data-form and rejection branches of the object-form unwrap, which only a runtime register or assign (L10) or a data form (L11) can supply; at L0-L1 every compute is a function — killed in the full run by registering and replacing derivations at runtime rejects a null or non-object compute",
+    "layer": "L10"
   },
   {
     "line": 283,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "Wrapper fallthrough and meta storage: an object form without a function compute, or with meta (L9), is not reachable with L0-L1 features."
+    "reason": "later-layer",
+    "note": "Stores the meta of an object-form derivation { compute, meta }; meta is read only through system.meta (L9) — killed in the full run by registering and replacing derivations at runtime a function-valued entry and an object-form entry both run",
+    "layer": "L9"
   },
   {
     "line": 326,
     "col": 24,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Initial value of the all-invalidated flag, read only by collectInvalidated, which feeds constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "Initial value of the all-invalidated flag, read only by collectInvalidated, which feeds the first wake-up of an effect that declares a derivation dependency (L4) — killed in the full run by startup + wake behaviour by dep kind derivation dep",
+    "layer": "L4"
   },
   {
     "line": 368,
@@ -1364,192 +1367,99 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "onCompute feeds plugin hooks (L3)."
+    "reason": "later-layer",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "layer": "L3"
   },
   {
     "line": 583,
     "col": 22,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "onCompute feeds plugin hooks (L3)."
+    "reason": "later-layer",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "layer": "L3"
   },
   {
     "line": 584,
     "col": 9,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "not-observable",
-    "note": "onCompute feeds plugin hooks (L3)."
-  },
-  {
-    "line": 665,
-    "col": 18,
-    "mutator": "BooleanLiteral",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Re-entrancy guard of the notification flush: the engine's own fact-notification loop guard (100 passes) fires first for any listener loop a public API can build."
-  },
-  {
-    "line": 671,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "The flush backstop (100 passes): the engine's own fact-notification loop guard fires first for any listener loop a public API can build."
-  },
-  {
-    "line": 671,
-    "col": 13,
-    "mutator": "UpdateOperator",
-    "replacement": "--iterations",
-    "reason": "not-observable",
-    "note": "The flush backstop (100 passes): the engine's own fact-notification loop guard fires first for any listener loop a public API can build."
-  },
-  {
-    "line": 735,
-    "col": 11,
-    "mutator": "LogicalOperator",
-    "replacement": "!state && state.isStale",
-    "reason": "not-observable",
-    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
-  },
-  {
-    "line": 735,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
-  },
-  {
-    "line": 735,
-    "col": 36,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Skipping an already-stale node; the difference shows only in plugin invalidation hooks (L3) or, for the missing-state case, never (a linked derivation always has state)."
+    "reason": "later-layer",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "layer": "L3"
   },
   {
     "line": 783,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 783,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 783,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "currentTrackingKind() !== \"observer\"",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 783,
-    "col": 37,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 817,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 817,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "currentTrackingKind() !== \"observer\"",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "A derivation read by another derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a derivation read only by another derivation is not watched",
+    "layer": "L9"
   },
   {
     "line": 817,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 817,
-    "col": 37,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "Marks a derivation read from outside a derivation body as watched, for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "A membership test inside a derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test inside a derivation does not",
+    "layer": "L9"
   },
   {
     "line": 913,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Outside a tracking frame trackAccess is a no-op, and marking observed is for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1030,
-    "col": 37,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "getProxy is used for the derived parameter of constraints and effects (L2, L4)."
+    "reason": "later-layer",
+    "note": "A system.derive read inside a derivation body is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a derivation read through system.derive from a body is not watched",
+    "layer": "L9"
   },
   {
     "line": 1075,
     "col": 55,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1076,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1076,
     "col": 11,
     "mutator": "EqualityOperator",
     "replacement": "observedIds.size !== 0",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1087,
     "col": 37,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1088,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1093,
@@ -1564,8 +1474,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1093,
@@ -1588,95 +1499,62 @@
     "col": 29,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "layer": "L9"
   },
   {
     "line": 1112,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "layer": "L9"
   },
   {
     "line": 1112,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "layer": "L9"
   },
   {
     "line": 1112,
     "col": 11,
     "mutator": "EqualityOperator",
     "replacement": "observedIds.size !== 0",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "layer": "L9"
   },
   {
     "line": 1112,
     "col": 35,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "layer": "L9"
   },
   {
     "line": 1126,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) — killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
+    "layer": "L13"
   },
   {
     "line": 1126,
     "col": 35,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1140,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1175,
-    "col": 14,
-    "mutator": "EqualityOperator",
-    "replacement": "queue.length >= 0",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1177,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1179,
-    "col": 15,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
-  },
-  {
-    "line": 1179,
-    "col": 15,
-    "mutator": "EqualityOperator",
-    "replacement": "++reached < watched",
-    "reason": "not-observable",
-    "note": "Observed-derivation bookkeeping (retainObserved, observedCount, collectInvalidated): bounds the invalidation walk for constraint and effect wake-up (L2, L4)."
+    "reason": "later-layer",
+    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) — killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
+    "layer": "L13"
   }
 ]
