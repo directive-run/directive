@@ -420,6 +420,12 @@
       "rule": "L3",
       "pin": true
     },
+    "tests/core/l8-system-oracle.test.ts": {
+      "rule": "L8"
+    },
+    "tests/core/l8-system-oracle-production.test.ts": {
+      "rule": "L8"
+    },
     "tests/core/error-boundary.test.ts": {
       "rule": "L3"
     },
