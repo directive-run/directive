@@ -6,11 +6,15 @@
  *   (`after` dependency resolved, `start()`), when it is async without
  *   declared deps (every pass), or on the first evaluation (all of them).
  * - Order: priority (higher first), then `after` dependencies first. A
- *   constraint waits on an `after` dependency until that one's latest
- *   evaluation did not fire, or its requirement resolved (GATE-1 quirk e:
- *   1.35 forgets the "did not fire" answer after one pass, so a dependent
- *   asked again later waits forever). While it waits it carries its last
- *   requirements forward.
+ *   constraint waits on an `after` dependency only while that one may still
+ *   act, read from its current state each time the dependent is asked
+ *   (GATE-1 quirk e; 1.35 keeps sticky flags, so a dependent waits forever
+ *   on one that never fires, or runs early after one re-fires). The
+ *   dependency stops blocking when it is disabled, or it has answered and
+ *   every requirement it now emits has resolved (none when it did not
+ *   fire). Each change to that state (its answer, a requirement resolving,
+ *   disable) asks the dependents it was holding back again. While a
+ *   constraint waits it carries its last requirements forward.
  * - A `when` or `require` that throws keeps the deps it read, so the write
  *   that fixes it wakes it (1.35 H1).
  * - Dependencies are tracked through the system tracker: fact keys and
@@ -62,10 +66,14 @@ export interface Constraints {
   unaffected(changed: Set<string>): RequirementWithId[] | null;
   /** What the constraint read last time: fact keys and prefixed derivation ids. */
   depsOf(id: string): Set<string> | undefined;
-  markResolved(id: string): void;
+  /** A requirement's run completed: it no longer holds back dependents. */
+  markResolved(req: RequirementWithId): void;
+  /** A requirement left the set: if it is asked again, it must resolve again. */
+  forget(requirementId: string): void;
   markAllDirty(): void;
   hasDirty(): boolean;
-  disable(id: string): void;
+  /** True when a dependent it held back is now free (ask for a pass). */
+  disable(id: string): boolean;
   enable(id: string): void;
   isDisabled(id: string): boolean;
 }
@@ -120,8 +128,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   const whenDeps = new Map<string, Set<string>>();
   const dirty = new Set<string>();
   const disabled = new Set<string>();
-  const resolved = new Set<string>();
-  const noFire = new Set<string>();
+  /** Requirement ids whose run completed while they stayed in the set. */
+  const met = new Set<string>();
+  /** Asked (or never asked) and not answered yet: it may still act. */
+  const unanswered = new Set(ids);
   /** Held back by an `after` dependency when last asked. */
   const held = new Set<string>();
   const asyncIds = new Set(ids.filter((id) => defs[id]!.async));
@@ -331,7 +341,6 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     if (read !== undefined) {
       setDeps(id, read);
     }
-    noFire.add(id);
     last.set(id, EMPTY);
   }
   function answer(
@@ -342,12 +351,12 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     if (disabled.has(id)) {
       return;
     }
+    unanswered.delete(id);
     if (!active) {
       inactive(id);
 
       return;
     }
-    noFire.delete(id);
     const read = whenDeps.get(id);
     try {
       const { reqs, read: requireRead } = requirementsOf(id);
@@ -364,7 +373,6 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         onError(id, error.original);
         // What `when` and `require` read, so the write that fixes either wakes it.
         setDeps(id, new Set([...(read ?? []), ...error.deps]));
-        noFire.add(id);
         last.set(id, EMPTY);
 
         return;
@@ -386,11 +394,24 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
 
   // --- one evaluation pass (1.35's shape, so it awaits where 1.35 does) ----
-  const afterReady = (id: string) =>
-    (defs[id]!.after ?? []).every(
-      (dep) =>
-        !defs[dep] || disabled.has(dep) || noFire.has(dep) || resolved.has(dep),
-    );
+  /** `dep` may still act: enabled, and unanswered or a requirement unresolved. */
+  const blocks = (dep: string) =>
+    !!defs[dep] &&
+    !disabled.has(dep) &&
+    (unanswered.has(dep) || (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
+  const afterReady = (id: string) => !(defs[id]!.after ?? []).some(blocks);
+  /** Ask again each held-back constraint that nothing blocks any more. */
+  const release = () => {
+    let freed = false;
+    for (const id of held) {
+      if (!disabled.has(id) && afterReady(id)) {
+        dirty.add(id);
+        freed = true;
+      }
+    }
+
+    return freed;
+  };
   async function settle(
     pairs: [string, Promise<boolean>][],
     into: Map<string, RequirementWithId>,
@@ -482,10 +503,11 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
           }
         }
       }
-      // Quirk e: a constraint asked again forgets whether it fired; one not
-      // asked keeps its answer, so a dependent asked alone is not held back.
+      // Quirk e: one asked now holds its dependents back until it answers;
+      // one not asked keeps its answer, so a dependent asked alone is held
+      // only while that answer's requirements are unresolved.
       for (const id of todo) {
-        noFire.delete(id);
+        unanswered.add(id);
       }
       for (let rounds = todo.length + 1; todo.length > 0 && rounds > 0; ) {
         const before = todo.length;
@@ -495,14 +517,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         }
         rounds--;
       }
-      // Quirk e: one held back on a constraint that has now answered
-      // without firing is not left waiting for a write it does not read; it
-      // is asked on the next pass (the part schedules one when dirty).
-      for (const id of held) {
-        if (afterReady(id)) {
-          dirty.add(id);
-        }
-      }
+      // Quirk e: one held back on a constraint that has now answered is not
+      // left waiting for a write it may not read; it is asked on the next
+      // pass (the part schedules one when dirty).
+      release();
 
       return [...into.values()];
     },
@@ -534,14 +552,22 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       return into.size === 0 ? EMPTY : [...into.values()];
     },
     depsOf: (id) => deps.get(id),
-    markResolved(id) {
-      resolved.add(id);
+    markResolved(req) {
+      met.add(req.id);
+      // As 1.35, the asking constraint's dependents are asked again; so are
+      // those of any other constraint that emits the same requirement.
+      const emitters = ids.filter(
+        (id) =>
+          id === req.fromConstraint ||
+          (last.get(id) ?? EMPTY).some((r) => r.id === req.id),
+      );
       for (const other of ids) {
-        if (defs[other]!.after?.includes(id)) {
+        if (defs[other]!.after?.some((dep) => emitters.includes(dep))) {
           dirty.add(other);
         }
       }
     },
+    forget: (id) => met.delete(id),
     markAllDirty() {
       for (const id of ids) {
         dirty.add(id);
@@ -556,7 +582,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
           );
         }
 
-        return;
+        return false;
       }
       disabled.add(id);
       // As 1.35: its requirements leave the next pass, and what it read no
@@ -564,6 +590,9 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       last.delete(id);
       setDeps(id, new Set());
       whenDeps.delete(id);
+
+      // Quirk e: it no longer holds anything back.
+      return release();
     },
     enable(id) {
       if (!defs[id]) {
@@ -576,6 +605,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         return;
       }
       if (disabled.delete(id)) {
+        // Unanswered until it is asked: its dependents wait for its answer.
+        unanswered.add(id);
         dirty.add(id);
       }
     },

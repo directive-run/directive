@@ -4,11 +4,15 @@
  * - One run per requirement id in flight; a second dispatch of the same id
  *   is dropped.
  * - Exactly one outcome per run: complete, cancel or error. The in-flight
- *   slot is the one source of truth: `cancel` empties it and reports the
- *   cancel; `end` reports complete or error only while the slot still holds
- *   the run. So a run canceled while it waits to retry reports the cancel
- *   and nothing else (GATE-1 quirk b: 1.35 reports the cancel, then an
- *   error).
+ *   slot is the one source of truth, and each outcome empties it before it
+ *   reports: `cancel` for a cancel; `end` for complete or error, only while
+ *   the slot still holds the run. So a run canceled while it waits to retry
+ *   reports the cancel and nothing else (GATE-1 quirk b: 1.35 reports the
+ *   cancel, then an error), and a pass that commits while a completion is
+ *   being reported finds no run to cancel.
+ * - A timeout ends the run: it aborts the run's signal (the reason is the
+ *   timeout error, so `isTimeout(signal.reason)`), reports one error, and
+ *   keeps the run's later writes (only supersede drops them, L2b).
  * - Timeouts and retry waits are timers on the kernel clock, owned by this
  *   system (disposing the kernel clears them).
  *
@@ -19,7 +23,7 @@
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
-import { withTimeout } from "./constraints.js";
+import { isTimeout, withTimeout } from "./constraints.js";
 import type { Requirement, RequirementWithId } from "./requirements.js";
 import type { Facts } from "./types.js";
 
@@ -59,7 +63,7 @@ export interface ResolversOptions {
   emit: (at: string, data: () => Record<string, unknown>) => void;
   onComplete: (run: Run) => void;
   onError: (run: Run, error: Error) => void;
-  /** A run left flight on its own (not canceled). */
+  /** A run left flight on its own (not canceled), before its outcome. */
   onEnd: () => void;
 }
 
@@ -98,16 +102,28 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     emit("requirement.canceled", () => ({ req: run.req_ }));
   };
 
-  /** Complete or error: reported only while the slot still holds the run. */
+  /**
+   * Complete or error, only while the slot still holds the run. The run
+   * leaves flight before the outcome is reported, so nothing that runs
+   * meanwhile (a pass that retracts it, a stop) can report a second one.
+   */
   const end = (run: Run, error?: Error) => {
     if (inflight.get(run.req_.id) !== run) {
       return;
     }
-    if (error) {
-      options.onError(run, error);
-    } else {
+    inflight.delete(run.req_.id);
+    options.onEnd();
+    if (!error) {
       options.onComplete(run);
+
+      return;
     }
+    if (isTimeout(error)) {
+      // The timeout ends the run: its body sees the abort, and what it
+      // writes afterwards (a `finally` cleanup) still lands.
+      run.controller_.abort(error);
+    }
+    options.onError(run, error);
   };
 
   /** Wait on the kernel clock; an abort wakes it early. */
@@ -215,7 +231,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       inflight.set(req.id, run);
       emit("resolver.start", () => ({ resolver: resolverId, req }));
       execute(def, run).finally(() => {
-        // Only this run's own slot: a cancel already emptied it.
+        // A fallback: `end` or a cancel has emptied the slot already,
+        // unless the run failed before it reached `end`.
         if (inflight.get(req.id) === run) {
           inflight.delete(req.id);
           options.onEnd();

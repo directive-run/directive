@@ -94,7 +94,7 @@ export const withReconcile: SystemPart = (ctx) => {
         req: run.req_,
         resolver: run.resolver_,
       }));
-      constraints.markResolved(run.req_.fromConstraint);
+      constraints.markResolved(run.req_);
     },
     onError(run, error) {
       // 1.35 passes the requirement as the error's context.
@@ -143,6 +143,7 @@ export const withReconcile: SystemPart = (ctx) => {
       }
       for (const req of removed) {
         resolvers.abort(req.id);
+        constraints.forget(req.id);
       }
       for (const req of added) {
         if (system.isRunning) {
@@ -206,7 +207,12 @@ export const withReconcile: SystemPart = (ctx) => {
   };
   kernel.define("reconcile", feature);
   system.constraints = {
-    disable: (id: string) => constraints.disable(id),
+    disable(id: string) {
+      // Quirk e: a dependent it held back is asked again.
+      if (constraints.disable(id)) {
+        schedule();
+      }
+    },
     enable(id: string) {
       constraints.enable(id);
       schedule();
