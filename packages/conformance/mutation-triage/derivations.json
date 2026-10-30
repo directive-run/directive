@@ -1333,7 +1333,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "A compute that is not a function reaches the data-form and rejection branches of the object-form unwrap, which only a runtime register or assign (L10) or a data form (L11) can supply; at L0-L1 every compute is a function — killed in the full run by registering and replacing derivations at runtime rejects a null or non-object compute",
+    "note": "A compute that is not a function reaches the data-form and rejection branches of the object-form unwrap, which only a runtime register or assign (L10) or a data form (L11) can supply; at L0-L1 every compute is a function \u2014 killed in the full run by registering and replacing derivations at runtime rejects a null or non-object compute",
     "layer": "L10"
   },
   {
@@ -1342,7 +1342,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "Stores the meta of an object-form derivation { compute, meta }; meta is read only through system.meta (L9) — killed in the full run by registering and replacing derivations at runtime a function-valued entry and an object-form entry both run",
+    "note": "Stores the meta of an object-form derivation { compute, meta }; meta is read only through system.meta (L9) \u2014 killed in the full run by registering and replacing derivations at runtime a function-valued entry and an object-form entry both run",
     "layer": "L9"
   },
   {
@@ -1351,7 +1351,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "Initial value of the all-invalidated flag, read only by collectInvalidated, which feeds the first wake-up of an effect that declares a derivation dependency (L4) — killed in the full run by startup + wake behaviour by dep kind derivation dep",
+    "note": "Initial value of the all-invalidated flag, read only by collectInvalidated, which feeds the first wake-up of an effect that declares a derivation dependency (L4) \u2014 killed in the full run by startup + wake behaviour by dep kind derivation dep",
     "layer": "L4"
   },
   {
@@ -1368,7 +1368,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) \u2014 killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
     "layer": "L3"
   },
   {
@@ -1377,7 +1377,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) \u2014 killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
     "layer": "L3"
   },
   {
@@ -1386,7 +1386,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) — killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
+    "note": "onCompute feeds the onDerivationCompute plugin hook and the trace (plugins, L3) \u2014 killed in the full run by a derivation reports its dependencies readably names a derivation it read without the internal separator",
     "layer": "L3"
   },
   {
@@ -1395,7 +1395,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "A derivation read by another derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a derivation read only by another derivation is not watched",
+    "note": "A derivation read by another derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched a derivation read only by another derivation is not watched",
     "layer": "L9"
   },
   {
@@ -1404,7 +1404,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "A membership test inside a derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a membership test inside a derivation does not",
+    "note": "A membership test inside a derivation is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched a membership test inside a derivation does not",
     "layer": "L9"
   },
   {
@@ -1413,7 +1413,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "A system.derive read inside a derivation body is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) — killed in the full run by derivations: only outside readers make a derivation watched a derivation read through system.derive from a body is not watched",
+    "note": "A system.derive read inside a derivation body is an internal edge and is not marked watched; the watched count shows only through system.inspect() (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched a derivation read through system.derive from a body is not watched",
     "layer": "L9"
   },
   {
@@ -1422,7 +1422,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1431,7 +1431,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1440,7 +1440,7 @@
     "mutator": "EqualityOperator",
     "replacement": "observedIds.size !== 0",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1449,7 +1449,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1458,7 +1458,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1475,7 +1475,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1500,7 +1500,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) — killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
+    "note": "retainObserved prunes and observedCount reports the watched set, shown only through system.inspect().observedDerivations (L9) \u2014 killed in the full run by the watched set shrinks when readers stop reading a gate that closes gives its value back",
     "layer": "L9"
   },
   {
@@ -1509,7 +1509,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
     "layer": "L9"
   },
   {
@@ -1518,7 +1518,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
     "layer": "L9"
   },
   {
@@ -1527,7 +1527,7 @@
     "mutator": "EqualityOperator",
     "replacement": "observedIds.size !== 0",
     "reason": "later-layer",
-    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
     "layer": "L9"
   },
   {
@@ -1536,7 +1536,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) — killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
+    "note": "pendingInvalidationCount answers 0 when nothing is watched, shown only through system.inspect().pendingInvalidations (L9) \u2014 killed in the full run by derivations: only outside readers make a derivation watched nothing pending when nothing is watched; one thing when one is",
     "layer": "L9"
   },
   {
@@ -1545,7 +1545,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) — killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
+    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) \u2014 killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
     "layer": "L13"
   },
   {
@@ -1554,7 +1554,25 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) — killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
+    "note": "collectInvalidated's nothing-watched shortcut only bounds the cost of the invalidation walk, shown only by the cost test (L13) \u2014 killed in the full run by invalidation cost does not pay for the size of a graph nothing is watching",
     "layer": "L13"
+  },
+  {
+    "line": 1189,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2)."
+  },
+  {
+    "line": 1190,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L2",
+    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2)."
   }
 ]
