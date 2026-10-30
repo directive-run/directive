@@ -680,6 +680,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-proxies-oracle-gates.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l3-proxies-oracle-production.test.ts",
     "category": "black-box",
     "cases": 4,
