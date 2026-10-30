@@ -120,7 +120,8 @@ counts only kills from tests that run on v2 at that layer:
 `scripts/mutation-score.ts` takes Stryker JSON reports (files or directories)
 and prints, per file, killed (+timeout), survived, no coverage, the raw score
 and the gate score. The gate score is killed / all non-ignored mutants, less those triaged
-`equivalent` or `internals-only` (below). A
+`equivalent`, `internals-only` or `proxy-mechanics`, and less those deferred
+to a later layer (below). A
 mutant is ignored as message text when it is a `StringLiteral` mutant on a
 line that builds an `Error`/`TypeError`/`RangeError`, calls `console.`,
 `warn(` or `devWarn`, or has a `message:` key, or whose original literal
@@ -130,17 +131,27 @@ triage file.
 
 Triage files live at `packages/conformance/mutation-triage/<basename>.json`:
 `[{ "line": n, "col": n, "mutator": "...", "replacement": "...", "reason":
-"equivalent|internals-only|dev-only|not-observable|perf-only|v1-bug|later-layer", "layer": "Ln" (later-layer only), "note": "..." }]`,
+"equivalent|internals-only|proxy-mechanics|dev-only|not-observable|perf-only|v1-bug|later-layer|feature-layer", "layer": "Ln" (later-layer and feature-layer), "mechanic": "trap-result|descriptor|identity|cache" (proxy-mechanics), "note": "..." }]`,
 matched to report mutants by line + col + mutator + replacement (the report's
 own numbers). No survivor stays unexplained: kill it with a conformance
 scenario or triage it with a reason.
 
-Two reasons leave the score, as in standard mutation scoring: `equivalent`
-(no test of any kind could tell the mutant from the original) and
-`internals-only` (the code is reached only through `/internals`, which 2.0
-need not reproduce; the note names why no public path reaches it). Every
-other reason stays in the denominator, so triage cannot lift a file over 80%.
-A reviewer verifies each excluded entry before it merges.
+Three reasons leave the score: `equivalent` (no test of any kind could tell
+the mutant from the original), `internals-only` (the code is reached only
+through `/internals`, which 2.0 need not reproduce; the note names why no
+public path reaches it) and `proxy-mechanics` (GATE-1.md, decision 4: the
+mutant changes only a view's Proxy mechanics, which `contracts/STABILITY.md`
+says are not part of the contract). A `proxy-mechanics` entry names its
+`mechanic`, from the list in `contracts/STABILITY.md` ("Not part of the
+contract: view mechanics"): `trap-result`, `descriptor`, `identity` or
+`cache`, each within the limits stated there. In particular a trap result
+that decides whether a write, delete or define throws is contract (strict
+code throws on `false`), `in` is contract for every key, and caching a value
+is never `proxy-mechanics`. It is proved like `equivalent`: with the mutant
+applied by hand, the whole suite at the file's ceiling passes, and no read,
+write, `in`, key listing, spread, iteration or thrown refusal changes. Every other reason stays in the denominator, so triage
+cannot lift a file over 80%. A reviewer verifies each excluded entry before
+it merges.
 
 `later-layer` (with a required `layer`, e.g. `{"reason": "later-layer",
 "layer": "L4", "note": "prev capture"}`) marks code for a later layer's
@@ -171,7 +182,47 @@ killing tests, by its test name or file basename; if it names none, the output
 prints a warning listing the killers (it does not fail). Without `--full`
 nothing is validated, and the output says so.
 
-Triage keys are line + col + mutator + replacement, so a 1.35 edit that shifts lines moves mutants out from under their entries. An entry that matches no mutant in the file's report therefore fails the file. This does not catch an entry that shifts onto a different mutant with the same line, col, mutator and replacement; after a 1.35 edit, re-check the notes of entries below it, and the output lists it under "Triage matching no mutant": re-key it to the mutant it describes, or delete it. The output also lists every unexplained mutant (no kill, no deferral, no triage).
+`feature-layer` (with a required `layer` and a note naming the feature;
+GATE-1.md, decision 4) scores a mutant at the layer of the feature it
+implements when no test kills it yet: code no test reaches, or code that
+tests run but cannot observe until that feature exists (history bookkeeping
+on every write, introspection records). Below its layer it is deferred like
+`later-layer`; at or above it, it counts. It is not validated against the
+full run, because its killing test does not exist yet. A mutant that a test
+at or below the file's row can observe is never `feature-layer`: kill it.
+The score output prints the deferred count per layer, and warns when a
+full-run test at or below the entry's layer already kills it (then make it
+`later-layer` and name the test).
+
+**The layer gate collects every deferral.** Before layer Ln is built,
+dispatch the nightly with `gate: Ln` (Actions, "Mutation testing (nightly)",
+Run workflow). Every shard whose row is below Ln runs at ceiling Ln, so only
+tests at or below Ln can kill; the summary then runs
+
+    tsx scripts/mutation-score.ts --gate Ln --at <those reports>
+
+which reads every triage file (whatever `--files` or the ceiling reports
+say) and exits 1 while any `later-layer` or `feature-layer` entry for Ln or
+below is not Killed or Timeout in that run. The gate is read off the run,
+not inferred from `killedBy`: Stryker stops at a mutant's first failing
+test, so `killedBy` names one killer, not every one. On every pull request,
+`scripts/__tests__/triage-files.test.ts` validates every triage file and
+fails on a `feature-layer` entry for a layer at or below `current`.
+
+**One entry, one mutant.** Two mutants can share line + col + mutator +
+replacement (a whole condition and its first operand). An excluded or
+deferred entry that would cover more than one missed mutant fails the file;
+give it `endLine` and `endCol` (the report's end position), one entry per
+mutant, each proved on its own.
+
+Triage keys are line + col + mutator + replacement, so a 1.35 edit that
+shifts lines moves mutants out from under their entries. An entry that
+matches no mutant in the file's report fails the file, and the output lists
+it under "Triage matching no mutant": re-key it to the mutant it describes,
+or delete it. This does not catch an entry that shifts onto a different
+mutant with the same line, col, mutator and replacement, so after a 1.35
+edit re-check the notes of the entries below it. The output also lists every
+unexplained mutant (no kill, no deferral, no triage).
 
 The score output lists every deferred mutant (`file:line:col mutator`, in a
 collapsible block). Reviewer step: spot-check that each listed line really

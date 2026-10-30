@@ -63,6 +63,33 @@ approvedBy, date }` to `api-changes.json`, then `oracle:update`, with the
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 
+## Not part of the contract: view mechanics
+
+Decided at the Phase 1 gate (`GATE-1.md`, decision 4). The views a system
+hands out (`system.facts`, `system.derive`, `system.events`, a resolver's
+`ctx.deps`, the read-only and prev views) are Proxies in 1.35; 2.0 builds
+them from compiled accessors.
+
+**Contract.** Reading and writing every declared key; `in` for every key,
+declared or not; `Object.keys`, spread, `for...in`, `JSON.stringify` and
+iteration order; every write, delete or `Object.defineProperty` that 1.35
+refuses must still throw (in strict code a trap that returns `false` is what
+makes it throw); and every read, through any view, reads the same live state
+a fresh view would.
+
+**Not contract** (a mutant that changes only these is `proxy-mechanics`):
+
+- `trap-result`: a trap's return value where it changes nothing above: the
+  trap throws before it returns, or the result reaches only `Reflect.*`
+  called directly on the view, never an ordinary assignment, `delete`, `in`
+  or define.
+- `descriptor`: the flags `Object.getOwnPropertyDescriptor` reports, as long
+  as key listings, spread and every throw above are unchanged.
+- `identity`: whether two reads of a view return the same object.
+- `cache`: a memo of a view object (not of a value) that changes only
+  identity or cost. Caching a value is never `proxy-mechanics`: a cached view
+  that reads stale state breaks the contract.
+
 ## Known 1.35 bugs (kept, not frozen as intent)
 
 - `onFactDelete` is declared but never emitted (`diff/unfired-hooks.json`).
