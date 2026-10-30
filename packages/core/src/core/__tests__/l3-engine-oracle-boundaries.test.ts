@@ -70,7 +70,6 @@ describe("a module with a dangerous key is refused, naming where it is", () => {
       "resolvers",
       { resolvers: { constructor: { requirement: "X", resolve: noop } } },
     ],
-    ["sources", { sources: { constructor: {} } }],
   ];
 
   it.each(sections)("a dangerous key in %s", (section, body) => {
@@ -141,6 +140,20 @@ function stuckSystem(maxWaitHolder: {
   } as never);
   return createSystem({ module: mod } as never) as any;
 }
+
+// Sources are an L5 feature: kept in their own describe so the placement of
+// the L3 sections above is not lifted to L5.
+describe("a source with a dangerous key is refused, naming where it is", () => {
+  it("a dangerous key in sources", () => {
+    const mod = createModule("bad", {
+      schema: emptySchema,
+      sources: { constructor: {} },
+    } as never);
+    expect(() => createSystem({ module: mod } as never)).toThrow(
+      /"constructor".*sources/,
+    );
+  });
+});
 
 describe("settle() that gives up says what it was waiting for", () => {
   it("names the resolver still running and the requirement that is unmet", async () => {

@@ -655,7 +655,7 @@
   {
     "file": "src/core/__tests__/l3-engine-oracle-boundaries.test.ts",
     "category": "black-box",
-    "cases": 13,
+    "cases": 14,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

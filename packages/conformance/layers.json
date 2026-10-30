@@ -7249,11 +7249,15 @@
       "rule": "L3",
       "tests": {
         "a module with a dangerous key is refused, naming where it is > \"a dangerous key in %s\"": {
-          "layer": "L5",
-          "by": ["option sources"],
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
           "dynamic": true
         },
         "a module with a dangerous key is refused, naming where it is > a name starting with $ is only reserved for facts: events, derivations and effects may use it": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a source with a dangerous key is refused, naming where it is > a dangerous key in sources": {
           "layer": "L5",
           "by": ["option sources"]
         },
