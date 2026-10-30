@@ -15,6 +15,7 @@ import {
   formatOrphanTriage,
   formatTable,
   formatUnexplained,
+  gateDebt,
   isMessageText,
   rowLayers,
   run,
@@ -125,6 +126,97 @@ describe("mutation-score", () => {
     expect(s.pass).toBe(false);
     expect(scoreFile("a.ts", big, [ok]).pass).toBe(true);
     expect(formatOrphanTriage([s])).toContain("a.ts:8:5 EqualityOperator");
+  });
+
+  describe("feature-layer and proxy-mechanics (GATE-1 decision 4)", () => {
+    const big: ReportFile = {
+      source,
+      mutants: [
+        ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+        mut(5, 5, 10, "Survived", "EqualityOperator", "y >= 2"),
+      ],
+    };
+    const fe = (layer: string): TriageEntry => ({
+      line: 5,
+      col: 5,
+      mutator: "EqualityOperator",
+      replacement: "y >= 2",
+      reason: "feature-layer",
+      layer,
+      note: "history snapshot bookkeeping",
+    });
+
+    it("defers a feature-layer mutant below its layer and counts it at or above", () => {
+      const below = scoreFile("a.ts", big, [fe("L8")], undefined, 3);
+      expect([below.deferred, below.survived, below.gateScore]).toEqual([
+        1, 0, 100,
+      ]);
+      expect(below.deferredMutants[0]!.why).toBe("feature-layer");
+      expect(below.openFeatureLayer).toHaveLength(1);
+      const at = scoreFile("a.ts", big, [fe("L8")], undefined, 8);
+      expect([at.deferred, at.survived]).toEqual([0, 1]);
+      expect(at.unexplained).toHaveLength(1);
+      expect(at.pass).toBe(false);
+    });
+
+    it("warns when a full-run test already kills a feature-layer mutant, and closes the debt", () => {
+      const full: ReportFile = {
+        source,
+        mutants: [mut(5, 5, 10, "Killed", "EqualityOperator", "y >= 2")],
+      };
+      const s = scoreFile("a.ts", big, [fe("L8")], full, 3);
+      expect(s.killedFeatureLayer).toHaveLength(1);
+      expect(s.openFeatureLayer).toEqual([]);
+      expect(gateDebt([s], 8)).toEqual([]);
+    });
+
+    it("--gate Ln fails on open feature-layer debt at or below Ln only", () => {
+      const s = scoreFile(
+        "a.ts",
+        big,
+        [fe("L8")],
+        { source, mutants: big.mutants },
+        3,
+      );
+      expect(gateDebt([s], 7)).toEqual([]);
+      expect(gateDebt([s], 8)).toHaveLength(1);
+      expect(gateDebt([s], 8)[0]).toContain(
+        "feature-layer L8; full run: Survived",
+      );
+    });
+
+    it("rejects a feature-layer entry without a layer above the row, or without a note", () => {
+      expect(() => validateTriage("a.ts", [fe("L3")], 3)).toThrow(/not above/);
+      expect(() =>
+        validateTriage("a.ts", [{ ...fe("L8"), note: " " }], 3),
+      ).toThrow(/feature-layer needs a note/);
+      expect(() => validateTriage("a.ts", [fe("L8")], 3)).not.toThrow();
+    });
+
+    it("excludes proxy-mechanics like equivalent, and requires a mechanic and a note", () => {
+      const pm: TriageEntry = {
+        line: 5,
+        col: 5,
+        mutator: "EqualityOperator",
+        replacement: "y >= 2",
+        reason: "proxy-mechanics",
+        mechanic: "trap-result",
+        note: "set trap returns true instead of false; the suite at L3 passes with it",
+      };
+      const s = scoreFile("a.ts", big, [pm]);
+      expect([s.excluded, s.survived, s.gateScore, s.pass]).toEqual([
+        1,
+        0,
+        100,
+        true,
+      ]);
+      expect(() =>
+        validateTriage("a.ts", [{ ...pm, mechanic: undefined }], 3),
+      ).toThrow(/proxy-mechanics needs mechanic/);
+      expect(() => validateTriage("a.ts", [{ ...pm, note: "" }], 3)).toThrow(
+        /proxy-mechanics needs a note/,
+      );
+    });
   });
 
   it("lists unexplained survivors", () => {
@@ -583,6 +675,57 @@ describe("CLI (run)", () => {
 
     return root;
   };
+
+  it("--gate Ln needs --full and fails while feature-layer debt for Ln is open", () => {
+    const root = mkdtempSync(join(tmpdir(), "mutscore-gate-"));
+    mkdirSync(join(root, "mutation-triage"));
+    mkdirSync(join(root, "reports"));
+    mkdirSync(join(root, "full"));
+    writeFileSync(
+      join(root, "MUTATION.md"),
+      "| Layer | Files |\n|---|---|\n| L3 | engine.ts |\n",
+    );
+    writeFileSync(
+      join(root, "mutation-triage", "engine.json"),
+      JSON.stringify([
+        {
+          line: 4,
+          col: 5,
+          mutator: "EqualityOperator",
+          replacement: "x >= 1",
+          reason: "feature-layer",
+          layer: "L8",
+          note: "history snapshot bookkeeping",
+        },
+      ]),
+    );
+    const report = (status: string) =>
+      JSON.stringify({
+        files: {
+          "src/engine.ts": {
+            source,
+            mutants: [
+              ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+              mut(4, 5, 10, status, "EqualityOperator", "x >= 1"),
+            ],
+          },
+        },
+      });
+    writeFileSync(join(root, "reports", "r.json"), report("Survived"));
+    writeFileSync(join(root, "full", "f.json"), report("Survived"));
+    const full = join(root, "full");
+    expect(run(["--gate", "L8"], root).code).toBe(1);
+    const row = run(["--check", "--layer", "row", "--full", full], root);
+    expect(row.code).toBe(0);
+    expect(row.out).toContain("L8 1");
+    expect(run(["--gate", "L7", "--full", full], root).code).toBe(0);
+    const at8 = run(["--gate", "L8", "--full", full], root);
+    expect(at8.code).toBe(1);
+    expect(at8.out).toContain("Layer gate L8: FAIL");
+    // The L8 tests now kill it: the debt is paid.
+    writeFileSync(join(root, "full", "f.json"), report("Killed"));
+    expect(run(["--gate", "L8", "--full", full], root).code).toBe(0);
+  });
 
   it("--layer Ln below the entry's layer defers it; at or above it counts", () => {
     const root = setup();

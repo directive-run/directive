@@ -63,6 +63,22 @@ approvedBy, date }` to `api-changes.json`, then `oracle:update`, with the
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 
+## Not part of the contract: view mechanics
+
+Decided at the Phase 1 gate (`GATE-1.md`, decision 4). The views a system
+hands out (`system.facts`, `system.derive`, `system.events`, a resolver's
+`ctx.deps`, the read-only and prev views) are Proxies in 1.35; 2.0 builds
+them from compiled accessors. A user may rely on what a view does: reading
+and writing declared keys, `in` and `Object.keys` for them, iteration order,
+and an undeclared or refused write throwing. A user may not rely on:
+
+- whether two reads return the same view object (identity, caching);
+- what `Object.getOwnPropertyDescriptor` reports for a key;
+- the boolean a trap returns to `Reflect.set`, `Reflect.deleteProperty`,
+  `Reflect.defineProperty` or `Reflect.has`, beyond a refused write throwing.
+
+Mutants that change only these are triaged `proxy-mechanics` (MUTATION.md).
+
 ## Known 1.35 bugs (kept, not frozen as intent)
 
 - `onFactDelete` is declared but never emitted (`diff/unfired-hooks.json`).

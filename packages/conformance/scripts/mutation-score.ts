@@ -2,7 +2,7 @@
  * Per-file mutation score with a gate that ignores message text.
  *
  *   tsx scripts/mutation-score.ts [--files a.ts,b.ts] [--check] [--layer Ln|row]
- *     [--full <report.json | dir>] <report.json | dir>...
+ *     [--gate Ln] [--full <report.json | dir>] <report.json | dir>...
  *
  * gate score = killed (+timeout) / all non-ignored mutants. A file PASSES
  * when its gate score is >= 80% AND every remaining non-ignored Survived or
@@ -43,6 +43,19 @@
  * and `testFiles` (Stryker JSON), the entry's note must also name one of the
  * killing tests (its name or file basename); if not, it is listed as a
  * warning only. Without `--full` later-layer entries are unvalidated.
+ *
+ * `feature-layer` (with `layer`, GATE-1.md decision 4): the code implements a
+ * later layer's feature and no test kills it yet. It is deferred below that
+ * layer like `later-layer`, but not validated against the full run, because
+ * the killing test does not exist yet. That debt is collected by
+ * `--gate Ln` (needs `--full`): every `feature-layer` entry for Ln or below
+ * must be Killed or Timeout in the full run, or the command exits 1. Run it
+ * before building layer Ln. An entry a full-run test already kills is
+ * listed as a warning (make it `later-layer` and name the test).
+ *
+ * `proxy-mechanics` (with `mechanic`): the mutant changes only a view's Proxy
+ * mechanics, which 2.0 does not reproduce (STABILITY.md). Excluded, like
+ * `equivalent`, and proved the same way.
  */
 
 import {
@@ -100,17 +113,59 @@ export interface TriageEntry {
     | "not-observable"
     | "perf-only"
     | "v1-bug"
-    | "later-layer";
-  /** `later-layer` only: the layer whose feature the code belongs to. */
+    | "later-layer"
+    | "feature-layer"
+    | "proxy-mechanics";
+  /**
+   * `later-layer` and `feature-layer`: the layer whose feature the code
+   * belongs to.
+   */
   layer?: string;
+  /** `proxy-mechanics` only: which view mechanic the mutant changes. */
+  mechanic?: ProxyMechanic;
   note?: string;
 }
 
+/**
+ * The view mechanics 2.0 does not reproduce (contracts/STABILITY.md, "Not
+ * part of the contract: view mechanics"; GATE-1.md, decision 4).
+ */
+export const PROXY_MECHANICS = [
+  "trap-result",
+  "descriptor",
+  "identity",
+  "cache",
+] as const;
+export type ProxyMechanic = (typeof PROXY_MECHANICS)[number];
+
 export interface DeferredMutant {
   mutant: Mutant;
-  /** "full-run": NoCoverage here, reached in the full run. "later-layer": triaged to a later layer. */
-  why: "full-run" | "later-layer";
+  /**
+   * "full-run": NoCoverage here, reached in the full run. "later-layer":
+   * triaged to a later layer, with a full-run killer. "feature-layer":
+   * triaged to the layer of its feature, with no killing test yet: that
+   * layer's gate must kill it.
+   */
+  why: "full-run" | "later-layer" | "feature-layer";
   layer?: string;
+}
+
+/**
+ * A `feature-layer` entry the full run does not kill yet: debt that the
+ * entry's layer gate collects (`--gate Ln`).
+ */
+export interface OpenFeatureLayer {
+  mutant: Mutant;
+  layer: string;
+  /** The mutant's status in the full run, or why it cannot be looked up. */
+  fullStatus: string;
+}
+
+/** A `feature-layer` entry whose mutant a full-run test already kills. */
+export interface KilledFeatureLayer {
+  mutant: Mutant;
+  layer: string;
+  killers: string[];
 }
 
 /** A `later-layer` entry whose mutant the full run does not kill. */
@@ -147,6 +202,10 @@ export interface FileScore {
   invalidLaterLayer: InvalidLaterLayer[];
   /** Warnings: the note names none of the full run's killing tests. */
   unnamedKillers: UnnamedKiller[];
+  /** Warnings: `feature-layer` entries a full-run test kills (use later-layer). */
+  killedFeatureLayer: KilledFeatureLayer[];
+  /** `feature-layer` entries no full-run test kills yet (all layers). */
+  openFeatureLayer: OpenFeatureLayer[];
   rawScore: number;
   gateScore: number;
   unexplained: Mutant[];
@@ -162,12 +221,14 @@ export interface FileScore {
 
 /**
  * Triage reasons that leave the score: no test can kill an equivalent mutant,
- * and code only `/internals` reaches is not part of what 2.0 must reproduce.
- * Every other reason stays in the denominator.
+ * code only `/internals` reaches is not part of what 2.0 must reproduce, and
+ * neither are a view's Proxy mechanics (STABILITY.md). Every other reason
+ * stays in the denominator.
  */
 const EXCLUDED = new Set<TriageEntry["reason"]>([
   "equivalent",
   "internals-only",
+  "proxy-mechanics",
 ]);
 
 const MESSAGE_LINE =
@@ -234,28 +295,44 @@ export function validateTriage(
   rowLayer: number | undefined,
 ): void {
   for (const t of triage) {
-    if (t.reason !== "later-layer") {
+    const at = `${basename(file)} ${t.line}:${t.col} ${t.mutator}`;
+    if (t.reason === "proxy-mechanics") {
+      if (!PROXY_MECHANICS.includes(t.mechanic as ProxyMechanic)) {
+        throw new Error(
+          `triage ${at}: proxy-mechanics needs mechanic ${PROXY_MECHANICS.join(" | ")}, got ${JSON.stringify(t.mechanic)}`,
+        );
+      }
+      if (typeof t.note !== "string" || t.note.trim() === "") {
+        throw new Error(
+          `triage ${at}: proxy-mechanics needs a note saying what the mutant changes and that the suite at the file's ceiling passes with it applied`,
+        );
+      }
       continue;
     }
-    const at = `${basename(file)} ${t.line}:${t.col} ${t.mutator}`;
+    if (t.reason !== "later-layer" && t.reason !== "feature-layer") {
+      continue;
+    }
+    const r = t.reason;
     if (typeof t.layer !== "string" || !LAYER.test(t.layer)) {
       throw new Error(
-        `triage ${at}: later-layer needs layer L0..L13, got ${JSON.stringify(t.layer)}`,
+        `triage ${at}: ${r} needs layer L0..L13, got ${JSON.stringify(t.layer)}`,
       );
     }
     if (typeof t.note !== "string" || t.note.trim() === "") {
       throw new Error(
-        `triage ${at}: later-layer needs a note naming the later feature and the test that kills it in the full run`,
+        r === "later-layer"
+          ? `triage ${at}: later-layer needs a note naming the later feature and the test that kills it in the full run`
+          : `triage ${at}: feature-layer needs a note naming the later feature the code implements`,
       );
     }
     if (rowLayer === undefined) {
       throw new Error(
-        `triage ${at}: later-layer, but ${basename(file)} has no row in MUTATION.md`,
+        `triage ${at}: ${r}, but ${basename(file)} has no row in MUTATION.md`,
       );
     }
     if (layerNum(t.layer) <= rowLayer) {
       throw new Error(
-        `triage ${at}: later-layer ${t.layer} is not above the file's layer L${rowLayer} (MUTATION.md): mislabelled`,
+        `triage ${at}: ${r} ${t.layer} is not above the file's layer L${rowLayer} (MUTATION.md): mislabelled`,
       );
     }
   }
@@ -346,6 +423,8 @@ export function scoreFile(
   }
   const invalidLaterLayer: InvalidLaterLayer[] = [];
   const unnamedKillers: UnnamedKiller[] = [];
+  const killedFeatureLayer: KilledFeatureLayer[] = [];
+  const openFeatureLayer: OpenFeatureLayer[] = [];
   let deferred = 0;
   const deferredMutants: DeferredMutant[] = [];
   let killed = 0;
@@ -418,6 +497,44 @@ export function scoreFile(
         }
       }
     }
+    if (reason === "feature-layer") {
+      const inFull = fullByKey.get(k) ?? [];
+      const killers = inFull.filter(isDetected);
+      if (killers.length === 0) {
+        openFeatureLayer.push({
+          mutant: m,
+          layer: entry!.layer ?? "L0",
+          fullStatus: !full
+            ? "no full report"
+            : fullStale
+              ? "stale full report"
+              : (inFull[0]?.status ?? "not in the full report"),
+        });
+      }
+      if (killers.length > 0) {
+        // Evidence exists: the entry should be later-layer, naming it.
+        killedFeatureLayer.push({
+          mutant: m,
+          layer: entry!.layer ?? "L0",
+          killers: killersOf(killers, full?.tests).map(
+            (t) => `${t.name} [${t.base}]`,
+          ),
+        });
+      }
+      // Below its layer: deferred to that layer's gate, which must kill it.
+      if (ceiling !== undefined && ceiling < layerNum(entry!.layer ?? "L0")) {
+        triagedCount++;
+        deferred++;
+        deferredMutants.push({
+          mutant: m,
+          why: "feature-layer",
+          layer: entry!.layer,
+        });
+        continue;
+      }
+      // At or above it (or ceiling unknown): it counts, as if untriaged.
+      reason = undefined;
+    }
     if (reason === "later-layer") {
       // Below its layer: a later feature's code, deferred to that layer.
       if (ceiling !== undefined && ceiling < layerNum(entry!.layer ?? "L0")) {
@@ -469,6 +586,8 @@ export function scoreFile(
     fullStale,
     invalidLaterLayer,
     unnamedKillers,
+    killedFeatureLayer,
+    openFeatureLayer,
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
@@ -640,6 +759,64 @@ export function formatUnexplained(rows: FileScore[]): string {
   ].join("\n");
 }
 
+/**
+ * `feature-layer` deferrals per layer: code with no killing test yet, which
+ * that layer's gate must kill. Printed so the debt stays visible.
+ */
+export function formatFeatureLayerDebt(rows: FileScore[]): string {
+  const byLayer = new Map<string, number>();
+  for (const r of rows) {
+    for (const d of r.deferredMutants) {
+      if (d.why === "feature-layer" && d.layer) {
+        byLayer.set(d.layer, (byLayer.get(d.layer) ?? 0) + 1);
+      }
+    }
+  }
+  if (byLayer.size === 0) {
+    return "";
+  }
+  const parts = [...byLayer]
+    .sort((a, b) => layerNum(a[0]) - layerNum(b[0]))
+    .map(([layer, n]) => `${layer} ${n}`);
+
+  return `Deferred to their feature's layer with no killing test yet (that layer's gate must kill them): ${parts.join(", ")}.`;
+}
+
+/**
+ * `--gate Ln`: `feature-layer` entries for Ln or below that the full run does
+ * not kill. Before layer Ln is built, its tests must kill all of them.
+ */
+export function gateDebt(rows: FileScore[], gate: number): string[] {
+  return rows.flatMap((r) =>
+    r.openFeatureLayer
+      .filter((o) => layerNum(o.layer) <= gate)
+      .map(
+        (o) =>
+          `${where(r.file, o.mutant)} (feature-layer ${o.layer}; full run: ${o.fullStatus})`,
+      ),
+  );
+}
+
+/** Warnings: `feature-layer` entries a full-run test already kills. */
+export function formatKilledFeatureLayer(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.killedFeatureLayer.map(
+      (f) =>
+        `${where(r.file, f.mutant)} (feature-layer ${f.layer}): killed by ${f.killers.slice(0, 3).join("; ")}`,
+    ),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `WARNING: feature-layer entry has a full-run killer (${lines.length}). Not a failure; make it later-layer and name the test.`,
+    "```",
+    ...lines,
+    "```",
+  ].join("\n");
+}
+
 /** Triage entries that match no mutant in the report: stale keys. */
 export function formatOrphanTriage(rows: FileScore[]): string {
   const lines = rows.flatMap((r) =>
@@ -717,6 +894,7 @@ export function run(args: string[], root: string): RunResult {
   let only: string[] | undefined;
   const fullPaths: string[] = [];
   let layer: number | "row" | undefined;
+  let gate: number | undefined;
   const paths: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
@@ -732,6 +910,12 @@ export function run(args: string[], root: string): RunResult {
         );
       }
       layer = v === "row" ? "row" : layerNum(v);
+    } else if (a === "--gate") {
+      const v = args[++i] ?? "";
+      if (!LAYER.test(v)) {
+        return fail(`mutation-score: --gate must be L0..L13, got "${v}"`);
+      }
+      gate = layerNum(v);
     } else if (a === "--full") {
       const p = args[++i];
       if (p === undefined) {
@@ -741,6 +925,11 @@ export function run(args: string[], root: string): RunResult {
     } else {
       paths.push(a);
     }
+  }
+  if (gate !== undefined && fullPaths.length === 0) {
+    return fail(
+      "mutation-score: --gate needs --full: the layer's debt is checked against a full run that includes its tests",
+    );
   }
   const reports = collect(paths.length ? paths : [join(root, "reports")]);
   const full = fullPaths.length ? loadFiles(collect(fullPaths)) : undefined;
@@ -798,8 +987,25 @@ export function run(args: string[], root: string): RunResult {
       ? ["", formatInvalidLaterLayer(rows)]
       : []),
     ...(formatUnnamedKillers(rows) ? ["", formatUnnamedKillers(rows)] : []),
+    ...(formatKilledFeatureLayer(rows)
+      ? ["", formatKilledFeatureLayer(rows)]
+      : []),
+    ...(formatFeatureLayerDebt(rows) ? ["", formatFeatureLayerDebt(rows)] : []),
     ...(formatDeferred(rows) ? ["", formatDeferred(rows)] : []),
   ].join("\n");
+  const debt = gate === undefined ? [] : gateDebt(rows, gate);
+  const gateOut =
+    gate === undefined
+      ? ""
+      : debt.length === 0
+        ? `\nLayer gate L${gate}: no open feature-layer entries at or below L${gate}.`
+        : [
+            "",
+            `Layer gate L${gate}: FAIL. ${debt.length} feature-layer entries at or below L${gate} are not killed in the full run. Write the tests that kill them before building L${gate}.`,
+            "```",
+            ...debt,
+            "```",
+          ].join("\n");
   const missing = (only ?? []).filter(
     (name) => !rows.some((r) => basename(r.file) === name),
   );
@@ -810,10 +1016,14 @@ export function run(args: string[], root: string): RunResult {
         : `mutation-score: not in any report: ${missing.join(", ")}`,
     );
 
-    return { code: 1, out, err };
+    return { code: 1, out: out + gateOut, err };
   }
 
-  return { code: check && rows.some((r) => !r.pass) ? 1 : 0, out, err };
+  return {
+    code: (check && rows.some((r) => !r.pass)) || debt.length > 0 ? 1 : 0,
+    out: out + gateOut,
+    err,
+  };
 }
 
 function main(): void {
