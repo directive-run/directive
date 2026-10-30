@@ -387,6 +387,14 @@
     "tests/core/system-async-lifecycle.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-system-oracle.test.ts": {
+      "rule": "L3",
+      "pin": true
+    },
+    "tests/core/l3-system-oracle-production.test.ts": {
+      "rule": "L3",
+      "pin": true
+    },
     "tests/core/error-boundary.test.ts": {
       "rule": "L3"
     },

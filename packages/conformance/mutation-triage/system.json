@@ -1,0 +1,485 @@
+[
+  {
+    "line": 62,
+    "col": 49,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "`result` is the module order handed to the map at line 358. A stray first name has no module (`modulesMap[name]` is undefined), so that map's `if (!mod) return null` and the non-null filter drop it: the engine gets the same modules in the same order."
+  },
+  {
+    "line": 63,
+    "col": 26,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "Message wording only: `path` only feeds the cycle printed in the circular-dependency error (indexOf/slice for display): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+  },
+  {
+    "line": 82,
+    "col": 9,
+    "mutator": "OptionalChaining",
+    "replacement": "mod.crossModuleDeps",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 90,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "Message wording only: `path` only feeds the cycle printed in the circular-dependency error (stale entries only lengthen the printed list): message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+  },
+  {
+    "line": 91,
+    "col": 5,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "equivalent",
+    "note": "`visited` is tested before `visiting`, and a finished module is always in `visited`, so a `visiting` entry left behind is never read."
+  },
+  {
+    "line": 111,
+    "col": 26,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "equivalent",
+    "note": "An extra key that never changes in a module's subscription list: the listener is never called for it. The one place it shows is a module with no facts and no derivations, where subscribeModule would warn and return a no-op instead of subscribing to nothing; the listener never fires either way."
+  },
+  {
+    "line": 187,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Twin guard: createSingleModuleSystem repeats the same `!mod` check (line 1072) with the same error, so skipping this one throws the same error one call later."
+  },
+  {
+    "line": 187,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Twin guard: createSingleModuleSystem repeats the same `!mod` check (line 1072) with the same error, so an empty block here throws the same error one call later."
+  },
+  {
+    "line": 206,
+    "col": 9,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "Message wording only: A line of the multi-line array-modules error text: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+  },
+  {
+    "line": 215,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only a falsy or non-object `modules` value (outside the types) tells it apart: the `in` check then throws a TypeError where the original goes on to build (0, \"\") or to fail later (undefined, null) with another TypeError."
+  },
+  {
+    "line": 215,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Only a truthy non-object `modules` value (outside the types) tells it apart: the `in` check then throws a TypeError where the original goes on to build or fail later."
+  },
+  {
+    "line": 240,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotModules option on a namespaced system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 240,
+    "col": 5,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "`options.history` is only read as `historyConfig?.snapshotModules`; a property read on `true`, a string or null/undefined (guarded by `?.`) gives undefined, the same as the null the original stores."
+  },
+  {
+    "line": 240,
+    "col": 5,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof options.history !== \"object\"",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotModules option on a namespaced system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 240,
+    "col": 32,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "history.snapshotModules option on a namespaced system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+  },
+  {
+    "line": 246,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "`undefined <= 0` is false, so the `!== undefined` guard changes nothing."
+  },
+  {
+    "line": 263,
+    "col": 39,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "equivalent",
+    "note": "Message wording only: The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+  },
+  {
+    "line": 272,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "dev warning for an unknown history.snapshotModules entry — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules dev warning for unknown module name"
+  },
+  {
+    "line": 285,
+    "col": 42,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "\"auto\" is never compared: anything that is not an array or \"declaration\" takes the dependency-order branch, and \"\" does too."
+  },
+  {
+    "line": 321,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 337,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "perf-only",
+    "note": "moduleNames cache: recomputing Object.keys(modulesMap) on every read returns an equal array; only the cost differs."
+  },
+  {
+    "line": 358,
+    "col": 23,
+    "mutator": "MethodExpression",
+    "replacement": "orderedNamespaces.map(namespace => {\n  const mod = modulesMap[namespace];\n  if (!mod) return null; // TypeScript guard - should never happen\n\n  const flat = prefixModuleDefinition({\n    mod,\n    namespace,\n    snapshotModulesSet\n  });\n  flatByNamespace.set(namespace, flat);\n  return flat;\n})",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 361,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 368,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "flatByNamespace bookkeeping that unregisterModule reads — killed in the full run by unregister-module.test.ts: unregisterModule removes the namespace and its facts"
+  },
+  {
+    "line": 372,
+    "col": 48,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 375,
+    "col": 42,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Both are reached only with a truthy tickMs, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so `tickMs > 0` always holds for a number; only a non-numeric tickMs (outside the types) differs."
+  },
+  {
+    "line": 375,
+    "col": 42,
+    "mutator": "EqualityOperator",
+    "replacement": "options.tickMs >= 0",
+    "reason": "equivalent",
+    "note": "Both are reached only with a truthy tickMs, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so `tickMs > 0` always holds for a number; only a non-numeric tickMs (outside the types) differs."
+  },
+  {
+    "line": 417,
+    "col": 37,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "equivalent",
+    "note": "Message wording only: The module list printed in a development warning: message text only: it changes what the error or warning says, not whether it is thrown or what runs after it."
+  },
+  {
+    "line": 424,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "isPrototypeSafe returns true for null, undefined and every non-object, so `!isPrototypeSafe(facts)` is false wherever the guards would have skipped it."
+  },
+  {
+    "line": 424,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "isPrototypeSafe returns true for null, undefined and every non-object, so `!isPrototypeSafe(facts)` is false wherever the guards would have skipped it."
+  },
+  {
+    "line": 432,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead guard: BLOCKED_PROPS and isPrototypeSafe's dangerous keys are the same three names, and isPrototypeSafe (line 424) has already thrown for any of them in these facts."
+  },
+  {
+    "line": 458,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L6",
+    "note": "hydrate() facts applied at init in a namespaced system — killed in the full run by system.test.ts: InitialFacts & Hydration hydrate applies facts before start in namespaced mode"
+  },
+  {
+    "line": 469,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "reached only by an undefined entry in `modules` (outside the types): in development the crossModuleDeps check at line 253 reads `mod.crossModuleDeps` first and throws a TypeError, in production the entry is skipped; an accident of TypeScript guards (see the comment on line 361), not a behaviour to pin"
+  },
+  {
+    "line": 1015,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "The engine always defines `notify`, so the `if` is always taken."
+  },
+  {
+    "line": 1072,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Twin guard: createSystem already throws the same error for a missing module at line 187, so this check is never the one that fires."
+  },
+  {
+    "line": 1072,
+    "col": 13,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "Unreachable: createSingleModuleSystem is private and only entered after createSystem's own `!options.module` check at line 187 has passed."
+  },
+  {
+    "line": 1079,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "`undefined <= 0` is false, so the `!== undefined` guard changes nothing."
+  },
+  {
+    "line": 1104,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "options.tickMs || options.tickMs > 0",
+    "reason": "equivalent",
+    "note": "With tickMs undefined both forms are false, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so they agree for every number."
+  },
+  {
+    "line": 1104,
+    "col": 27,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Both are reached only with a truthy tickMs, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so `tickMs > 0` always holds for a number; only a non-numeric tickMs (outside the types) differs."
+  },
+  {
+    "line": 1104,
+    "col": 27,
+    "mutator": "EqualityOperator",
+    "replacement": "options.tickMs >= 0",
+    "reason": "equivalent",
+    "note": "Both are reached only with a truthy tickMs, and a tickMs <= 0 was refused earlier (lines 246 and 1079), so `tickMs > 0` always holds for a number; only a non-numeric tickMs (outside the types) differs."
+  },
+  {
+    "line": 1115,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "dev warning that history.snapshotModules has no effect in a single-module system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules dev warning for single-module system"
+  },
+  {
+    "line": 1115,
+    "col": 7,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "`options.history` is only read as `singleHistoryConfig?.snapshotModules`; a property read on `true`, a string or null/undefined (guarded by `?.`) gives undefined, the same as the null the original stores."
+  },
+  {
+    "line": 1115,
+    "col": 7,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof options.history !== \"object\"",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "dev warning that history.snapshotModules has no effect in a single-module system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules dev warning for single-module system"
+  },
+  {
+    "line": 1115,
+    "col": 34,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "dev warning that history.snapshotModules has no effect in a single-module system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules dev warning for single-module system"
+  },
+  {
+    "line": 1116,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "dev warning that history.snapshotModules has no effect in a single-module system — killed in the full run by snapshot-events.test.ts: history.snapshotEvents history.snapshotModules dev warning for single-module system"
+  },
+  {
+    "line": 1163,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "Dead guard: BLOCKED_PROPS and isPrototypeSafe's dangerous keys are the same three names, and isPrototypeSafe (line 1084) has already thrown for any of them in initialFacts."
+  },
+  {
+    "line": 1168,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L6",
+    "note": "hydrate() facts applied at init in a single-module system — killed in the full run by ssr.test.ts: SSR hydrate() before start() round-trip applies hydrated facts on start"
+  },
+  {
+    "line": 1203,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The symbol early return of the has trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1203,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "The symbol early return of the has trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1203,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "The symbol early return of the has trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1210,
+    "col": 50,
+    "mutator": "BooleanLiteral",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Differs only when mod.events is falsy, and createModule always fills events ({} by default), so no module built through the public API reaches the other branch. proxy mechanics, not a 2.0 contract: the has trap (`'inc' in system.events`); the result of `in` on the events view is reflection, not an event contract."
+  },
+  {
+    "line": 1213,
+    "col": 55,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "not-observable",
+    "note": "Differs only when mod.events is falsy, and createModule always fills events ({} by default), so no module built through the public API reaches the other branch. proxy mechanics, not a 2.0 contract: the ownKeys trap (`Object.keys(system.events)`); the key list of the events view is reflection, not an event contract."
+  },
+  {
+    "line": 1216,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "equivalent",
+    "note": "The symbol early return of the getOwnPropertyDescriptor trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1216,
+    "col": 29,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "equivalent",
+    "note": "The symbol early return of the getOwnPropertyDescriptor trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1216,
+    "col": 39,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "The symbol early return of the getOwnPropertyDescriptor trap: a symbol falls through to `prop in mod.events` (or the descriptor lookup), which is false for it because event names are strings."
+  },
+  {
+    "line": 1228,
+    "col": 13,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
+  },
+  {
+    "line": 1231,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
+  },
+  {
+    "line": 1234,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
+  },
+  {
+    "line": 1240,
+    "col": 24,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "A trap that returns undefined is read as false, the same as the original `return false`: strict-mode writes, deletes and defines throw a TypeError either way."
+  }
+]
