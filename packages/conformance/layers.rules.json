@@ -178,6 +178,9 @@
     "tests/core/l3-small-oracle-accessors.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-small-oracle-clock-timer.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/l3-small-oracle-plugins.test.ts": {
       "rule": "L3"
     },

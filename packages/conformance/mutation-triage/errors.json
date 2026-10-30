@@ -140,8 +140,16 @@
     "col": 7,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "failuresAfterSatisfied is a WeakSet: has() on null or a primitive returns false instead of throwing, so the typeof and null guards change nothing. Hand-run: survived the L3 oracle tests."
+    "reason": "dev-only",
+    "note": "Changes only dev-warning wording. A resolver that satisfies its requirement and then throws a function whose prototype is Error.prototype passes instanceof Error and enters the WeakSet; with the mutant the warning loses its 'stays unmet' clause. No other observable difference (whole conformance:local suite at MUTATION_LAYER=L3 passes with the mutant)."
+  },
+  {
+    "line": 357,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof error === \"object\" || error !== null",
+    "reason": "dev-only",
+    "note": "Changes only dev-warning wording. A resolver that satisfies its requirement and then throws a function whose prototype is Error.prototype passes instanceof Error and enters the WeakSet; with the mutant the warning loses its 'stays unmet' clause. No other observable difference (whole conformance:local suite at MUTATION_LAYER=L3 passes with the mutant)."
   },
   {
     "line": 358,
