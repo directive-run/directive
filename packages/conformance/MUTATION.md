@@ -171,6 +171,8 @@ killing tests, by its test name or file basename; if it names none, the output
 prints a warning listing the killers (it does not fail). Without `--full`
 nothing is validated, and the output says so.
 
+Triage keys are line + col + mutator + replacement, so a 1.35 edit that shifts lines moves mutants out from under their entries, and a shifted entry could land on a different mutant. An entry that matches no mutant in the file's report therefore fails the file, and the output lists it under "Triage matching no mutant": re-key it to the mutant it describes, or delete it. The output also lists every unexplained mutant (no kill, no deferral, no triage).
+
 The score output lists every deferred mutant (`file:line:col mutator`, in a
 collapsible block). Reviewer step: spot-check that each listed line really
 belongs to a later layer's feature (open the line, read the entry's note),
