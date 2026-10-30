@@ -11,6 +11,7 @@ import {
   type ReportFile,
   type TriageEntry,
   formatDeferred,
+  formatInvalidLaterLayer,
   formatTable,
   isMessageText,
   rowLayers,
@@ -307,6 +308,204 @@ describe("mutation-score", () => {
       ]);
     });
   });
+
+  describe("later-layer validation against the full run", () => {
+    // Ceiling run: line 4 survived, line 5 not reached below the ceiling.
+    const ceilingRun: ReportFile = {
+      source,
+      mutants: [
+        ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+        mut(4, 5, 10, "Survived", "EqualityOperator", "x >= 1"),
+        mut(5, 5, 10, "NoCoverage", "EqualityOperator", "y >= 2"),
+      ],
+    };
+    const entry = (line: number, replacement: string, note: string) =>
+      ({
+        line,
+        col: 5,
+        mutator: "EqualityOperator",
+        replacement,
+        reason: "later-layer",
+        layer: "L4",
+        note,
+      }) satisfies TriageEntry;
+    const note = "prev capture; killed by prev-capture.test.ts";
+    const triage = [entry(4, "x >= 1", note), entry(5, "y >= 2", note)];
+    const tests = {
+      t1: {
+        name: "prev capture restores",
+        file: "tests/core/prev-capture.test.ts",
+      },
+    };
+    const fullWith = (
+      line4: string,
+      line5: string,
+      killedBy: string[] = ["t1"],
+    ): ReportFile => ({
+      source,
+      tests,
+      mutants: [
+        ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+        { ...mut(4, 5, 10, line4, "EqualityOperator", "x >= 1"), killedBy },
+        { ...mut(5, 5, 10, line5, "EqualityOperator", "y >= 2"), killedBy },
+      ],
+    });
+
+    it("defers a later-layer entry the full run kills (Killed or Timeout)", () => {
+      for (const status of ["Killed", "Timeout"]) {
+        const s = scoreFile(
+          "a.ts",
+          ceilingRun,
+          triage,
+          fullWith(status, status),
+          1,
+        );
+        expect([s.deferred, s.survived, s.noCoverage]).toEqual([2, 0, 0]);
+        expect(s.invalidLaterLayer).toEqual([]);
+        expect(s.unnamedKillers).toEqual([]);
+        expect(s.pass).toBe(true);
+      }
+    });
+
+    it("counts an entry the full run does not kill, and lists it", () => {
+      // Survived or NoCoverage in the full run: a test reaches it (or none
+      // does), but none kills it. Not deferred, not even by the full-run rule.
+      for (const status of ["Survived", "NoCoverage"]) {
+        const s = scoreFile(
+          "a.ts",
+          ceilingRun,
+          triage,
+          fullWith(status, status),
+          1,
+        );
+        expect([s.deferred, s.survived, s.noCoverage]).toEqual([0, 1, 1]);
+        expect(s.unexplained).toHaveLength(2);
+        expect(s.pass).toBe(false);
+        expect(s.invalidLaterLayer.map((i) => i.fullStatus)).toEqual([
+          status,
+          status,
+        ]);
+        const text = formatInvalidLaterLayer([s]);
+        expect(text).toContain("later-layer without a full-run kill (2)");
+        expect(text).toContain(
+          `a.ts:4:5 EqualityOperator (later-layer L4; full run: ${status})`,
+        );
+        expect(text).toContain(
+          `a.ts:5:5 EqualityOperator (later-layer L4; full run: ${status})`,
+        );
+      }
+    });
+
+    it("an invalid entry on a NoCoverage mutant is not rescued by the full-run rule", () => {
+      // Without the entry the full-run rule defers a NoCoverage mutant the
+      // full run reaches; with the false later-layer claim it must surface.
+      const bare = scoreFile(
+        "a.ts",
+        ceilingRun,
+        [],
+        fullWith("Killed", "Survived"),
+        1,
+      );
+      expect(bare.deferred).toBe(1);
+      const claimed = scoreFile(
+        "a.ts",
+        ceilingRun,
+        [entry(5, "y >= 2", note)],
+        fullWith("Killed", "Survived"),
+        1,
+      );
+      expect([claimed.deferred, claimed.invalidLaterLayer.length]).toEqual([
+        0, 1,
+      ]);
+      expect(claimed.unexplained.map((m) => m.location.start.line)).toContain(
+        5,
+      );
+    });
+
+    it("treats an entry as invalid when the full report lacks the mutant, the file or the same source", () => {
+      const missing = scoreFile(
+        "a.ts",
+        ceilingRun,
+        triage,
+        { source, mutants: [] },
+        1,
+      );
+      expect(missing.invalidLaterLayer.map((i) => i.fullStatus)).toEqual([
+        "not in the full report",
+        "not in the full report",
+      ]);
+      // --full given but this file is not in it: scoreFile(..., undefined, 1, true).
+      const noFile = scoreFile("a.ts", ceilingRun, triage, undefined, 1, true);
+      expect(noFile.invalidLaterLayer).toHaveLength(2);
+      expect(noFile.pass).toBe(false);
+      const stale = scoreFile(
+        "a.ts",
+        ceilingRun,
+        triage,
+        { ...fullWith("Killed", "Killed"), source: `${source}\n` },
+        1,
+      );
+      expect(stale.invalidLaterLayer.map((i) => i.fullStatus)).toEqual([
+        "stale full report",
+        "stale full report",
+      ]);
+      expect(stale.deferred).toBe(0);
+    });
+
+    it("warns, without failing, when the note names none of the killing tests", () => {
+      const vague = [
+        entry(4, "x >= 1", "later feature, covered elsewhere"),
+        entry(5, "y >= 2", "see the Prev Capture Restores test"),
+      ];
+      const s = scoreFile(
+        "a.ts",
+        ceilingRun,
+        vague,
+        fullWith("Killed", "Killed"),
+        1,
+      );
+      expect(s.pass).toBe(true);
+      expect(s.deferred).toBe(2);
+      expect(s.invalidLaterLayer).toEqual([]);
+      // Line 4 names nothing; line 5 names the test (case-insensitive).
+      expect(s.unnamedKillers.map((u) => u.mutant.location.start.line)).toEqual(
+        [4],
+      );
+      expect(s.unnamedKillers[0]!.killers).toEqual([
+        "prev capture restores [prev-capture.test.ts]",
+      ]);
+    });
+
+    it("names the killer by file basename too, and cannot warn without killedBy or testFiles", () => {
+      const byFile = scoreFile(
+        "a.ts",
+        ceilingRun,
+        triage,
+        fullWith("Killed", "Killed"),
+        1,
+      );
+      expect(byFile.unnamedKillers).toEqual([]);
+      const vague = [entry(4, "x >= 1", "later feature")];
+      const noIds = fullWith("Killed", "Killed", []);
+      expect(
+        scoreFile("a.ts", ceilingRun, vague, noIds, 1).unnamedKillers,
+      ).toEqual([]);
+      const noTests = { ...fullWith("Killed", "Killed"), tests: undefined };
+      expect(
+        scoreFile("a.ts", ceilingRun, vague, noTests, 1).unnamedKillers,
+      ).toEqual([]);
+    });
+
+    it("without a full report nothing is validated and behaviour is unchanged", () => {
+      const s = scoreFile("a.ts", ceilingRun, triage, undefined, 1);
+      expect([s.deferred, s.invalidLaterLayer, s.unnamedKillers]).toEqual([
+        2,
+        [],
+        [],
+      ]);
+      expect(s.pass).toBe(true);
+    });
+  });
 });
 
 describe("CLI (run)", () => {
@@ -380,5 +579,93 @@ describe("CLI (run)", () => {
     expect(r.code).toBe(1);
     expect(r.err.join("\n")).toMatch(/needs a note/);
     expect(run(["--layer", "L99"], root).code).toBe(1);
+  });
+
+  /** A full report for setup()'s facts.ts, with the line-4 mutant in `status`. */
+  const writeFull = (root: string, status: string, killedBy?: string[]) => {
+    const dir = join(root, "full");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "f.json"),
+      JSON.stringify({
+        testFiles: {
+          "tests/core/prev-capture.test.ts": {
+            tests: [{ id: "7", name: "prev capture restores" }],
+          },
+        },
+        files: {
+          "src/facts.ts": {
+            source,
+            mutants: [
+              ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+              {
+                ...mut(4, 5, 10, status, "EqualityOperator", "x >= 1"),
+                ...(killedBy ? { killedBy } : {}),
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    return dir;
+  };
+
+  it("--full: a later-layer entry the full run kills stays deferred", () => {
+    const root = setup();
+    const full = writeFull(root, "Killed", ["7"]);
+    const r = run(["--check", "--layer", "row", "--full", full], root);
+    expect(r.err).toEqual([]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("facts.ts:4:5 EqualityOperator (later-layer L4)");
+    expect(r.out).not.toContain("later-layer without a full-run kill");
+    expect(r.out).not.toContain("WARNING");
+    expect(r.out).not.toContain("unvalidated");
+  });
+
+  it("--full: a later-layer entry the full run does not kill fails the gate and is listed", () => {
+    const root = setup();
+    for (const status of ["Survived", "NoCoverage"]) {
+      const full = writeFull(root, status);
+      const r = run(["--check", "--layer", "row", "--full", full], root);
+      expect(r.code).toBe(1);
+      expect(r.out).toContain("later-layer without a full-run kill (1)");
+      expect(r.out).toContain(
+        `facts.ts:4:5 EqualityOperator (later-layer L4; full run: ${status})`,
+      );
+      expect(r.out).not.toContain("<details>");
+    }
+  });
+
+  it("--full: a note that names no killing test warns but passes", () => {
+    const root = setup("a later feature");
+    const full = writeFull(root, "Killed", ["7"]);
+    const r = run(["--check", "--layer", "row", "--full", full], root);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(
+      "WARNING: later-layer note does not name a killing test (1)",
+    );
+    expect(r.out).toContain("prev capture restores [prev-capture.test.ts]");
+  });
+
+  it("--full: a file missing from the full report cannot vouch for its later-layer entries", () => {
+    const root = setup();
+    const dir = join(root, "full");
+    mkdirSync(dir);
+    writeFileSync(
+      join(dir, "other.json"),
+      JSON.stringify({ files: { "src/other.ts": { source, mutants: [] } } }),
+    );
+    const r = run(["--check", "--layer", "row", "--full", dir], root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("full run: not in the full report");
+  });
+
+  it("without --full: unchanged, plus a note that later-layer entries are unvalidated", () => {
+    const root = setup();
+    const r = run(["--check", "--layer", "row"], root);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("later-layer entries are unvalidated");
+    expect(r.out).not.toContain("later-layer without a full-run kill");
   });
 });

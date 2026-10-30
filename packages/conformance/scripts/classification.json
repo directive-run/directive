@@ -536,6 +536,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l1-derivations-effects.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l1-derivations-gate.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l1-derivations.test.ts",
     "category": "black-box",
     "cases": 20,
@@ -581,9 +599,81 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l2-constraints-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
+    "category": "black-box",
+    "cases": 53,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-requirements-oracle.test.ts",
     "category": "black-box",
     "cases": 23,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-engine-oracle.test.ts",
+    "category": "black-box",
+    "cases": 49,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-errors-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 2,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-errors-oracle.test.ts",
+    "category": "black-box",
+    "cases": 28,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-accessors.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-plugins.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-schema-builders.test.ts",
+    "category": "black-box",
+    "cases": 17,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

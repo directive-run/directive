@@ -2,6 +2,7 @@
   "pins": [
     "tests/core/constraint-reevaluation.test.ts",
     "tests/core/constraints.test.ts",
+    "tests/core/l1-derivations-effects.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l3-system-oracle-production.test.ts",
     "tests/core/l3-system-oracle.test.ts",
@@ -18,6 +19,7 @@
   "instruments": {
     "tests/core/constraint-reevaluation.test.ts": ["option plugins"],
     "tests/core/constraints.test.ts": [],
+    "tests/core/l1-derivations-effects.test.ts": ["option effect prev"],
     "tests/core/l2-requirements-oracle.test.ts": ["member .inspect"],
     "tests/core/l3-system-oracle-production.test.ts": [],
     "tests/core/l3-system-oracle.test.ts": [],
@@ -36,6 +38,7 @@
   "allowAbove": {
     "tests/core/constraint-reevaluation.test.ts": ["option error boundary"],
     "tests/core/constraints.test.ts": [],
+    "tests/core/l1-derivations-effects.test.ts": ["option derive data form"],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l3-system-oracle-production.test.ts": [],
     "tests/core/l3-system-oracle.test.ts": [],
@@ -96,6 +99,17 @@
       "normalize requirements > null/undefined require produces empty requirements": "L2",
       "normalize requirements > array require passes through": "L2",
       "owner attribution on predicate throws > rethrows a `$matches: string` throw with the constraint ID": "L2"
+    },
+    "tests/core/l1-derivations-effects.test.ts": {
+      "an effect reading a derivation > re-runs when the derivation changes": "L0",
+      "an effect reading a derivation > re-runs when the end of a derivation chain changes": "L0",
+      "an effect reading a derivation > is not re-run by a write the derivation does not depend on": "L0",
+      "an effect reading a derivation > re-runs when it only tested the derivation's membership": "L0",
+      "an effect reading a derivation > then a fact depends on that fact too": "L0",
+      "two effects reading derivations > of one fact are both re-run when it changes": "L0",
+      "two effects reading derivations > of different facts: a write to one re-runs only its effect": "L0",
+      "a derivation reading a derivation > then a fact depends on that fact too": "L0",
+      "a derivation whose compute is not a function > is refused when the system is built": "L11"
     },
     "tests/core/l2-requirements-oracle.test.ts": {
       "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",

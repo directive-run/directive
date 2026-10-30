@@ -50,6 +50,50 @@ describe("L1 fixes", () => {
 
     expect((createSystem({ module: mod }) as any)._mode).toBe("single");
   });
+
+  describe("the events view is locked like facts and derive (1.35 parity)", () => {
+    const events = () =>
+      createSystem({
+        module: createModule("ev", {
+          schema: {
+            facts: { x: t.number() },
+            derivations: {},
+            events: { ping: t.object() },
+            requirements: {},
+          },
+          events: { ping: () => {} },
+        } as any),
+      }).events as Record<string | symbol, unknown>;
+
+    it("knows no symbol and no prototype-chain name", () => {
+      const ev = events();
+      const sym = Symbol("s");
+      for (const name of ["constructor", "__proto__", "prototype", sym]) {
+        expect(ev[name]).toBeUndefined();
+        expect(name in ev).toBe(false);
+        expect(Object.getOwnPropertyDescriptor(ev, name)).toBeUndefined();
+      }
+      expect(Object.getPrototypeOf(ev)).toBeNull();
+      expect(Object.keys(ev)).toEqual(["ping"]);
+      expect(typeof ev.ping).toBe("function");
+    });
+
+    it("cannot be written, deleted, redefined or re-parented", () => {
+      const ev = events();
+      expect(() => {
+        ev.z = 1;
+      }).toThrow(TypeError);
+      expect(() => {
+        delete ev.ping;
+      }).toThrow(TypeError);
+      expect(() => Object.defineProperty(ev, "z", { value: 1 })).toThrow(
+        TypeError,
+      );
+      expect(() => Object.setPrototypeOf(ev, {})).toThrow(TypeError);
+      expect(Object.keys(ev)).toEqual(["ping"]);
+      expect(typeof ev.ping).toBe("function");
+    });
+  });
 });
 
 describe("membership test on derived tracks", () => {
@@ -217,5 +261,103 @@ describe("membership test on derived tracks", () => {
     expect(system.read("x")).toEqual([2, true, true]);
     expect(system.read("y")).toEqual([2, true]);
     expect(runs).toEqual({ x: 2, y: 2 });
+  });
+});
+
+describe("a derivation that loses its last reader", () => {
+  // Every sequence asserted here is what the published 1.35 does with the same
+  // module (probed side by side): a derivation keeps its cached value, and its
+  // place in the invalidation walk, until it computes again. It does not
+  // matter who stops reading it.
+  function make(derive: Record<string, (f: any, d: any) => number>) {
+    const log: string[] = [];
+    const runs = { d1: 0 };
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.number(), b: t.number() },
+        derivations: { d0: t.number(), d1: t.number(), d2: t.number() },
+        events: {},
+        requirements: {},
+      },
+      init: (f: any) => {
+        f.a = 0;
+        f.b = 0;
+      },
+      derive: {
+        ...derive,
+        d1: (f: any, d: any) => {
+          runs.d1++;
+
+          return derive.d1!(f, d);
+        },
+      },
+    } as any);
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "log",
+          onDerivationCompute: (id: string) => log.push(`compute ${id}`),
+          onDerivationInvalidate: (id: string) => log.push(`invalidate ${id}`),
+        },
+      ],
+    } as any) as any;
+    system.start?.();
+    system.subscribe(["d1"], () => log.push("notify d1"));
+
+    return { system, log, runs };
+  }
+
+  it("is not run again after the reader that held it threw before reaching it", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { system, log, runs } = make({
+      d0: (f) => {
+        if (f.a === 1) {
+          throw new Error("boom");
+        }
+
+        return f.a;
+      },
+      d1: (f) => f.b,
+      // Reads d0, which throws, so it never gets to d1.
+      d2: (_f, d) => d.d0 + d.d1,
+    });
+    expect(system.read("d2")).toBe(0);
+    system.facts.a = 1;
+    expect(() => system.read("d2")).toThrow("boom");
+    log.length = 0;
+
+    expect(system.read("d1")).toBe(0);
+    expect(log).toEqual([]);
+    expect(runs.d1).toBe(1);
+
+    // It is still wired to its fact: a write reaches its subscribers.
+    system.facts.b = 5;
+    expect(log).toEqual(["invalidate d1", "notify d1"]);
+    expect(system.read("d1")).toBe(5);
+    expect(runs.d1).toBe(2);
+  });
+
+  it("still hears about a write after its only reader stopped reading it", () => {
+    const { system, log, runs } = make({
+      d0: (f) => f.a,
+      d1: (f) => f.b,
+      // Reads d1 only while a is 0.
+      d2: (_f, d) => (d.d0 === 0 ? d.d1 : -1),
+    });
+    expect(system.read("d2")).toBe(0);
+    system.facts.a = 1;
+    expect(system.read("d2")).toBe(-1);
+    log.length = 0;
+
+    expect(system.read("d1")).toBe(0);
+    expect(log).toEqual([]);
+    expect(runs.d1).toBe(1);
+
+    system.facts.b = 5;
+    expect(log).toEqual(["invalidate d1", "notify d1"]);
+    expect(system.read("d1")).toBe(5);
+    expect(runs.d1).toBe(2);
   });
 });

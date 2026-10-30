@@ -124,10 +124,12 @@ const engines = {
     entry: new URL("../../core/src/index.ts", import.meta.url).pathname,
   },
 };
-// The same inlining tsup.config.ts does (keep in step): esbuild does not fold
+// The same transform tsup.config.ts does (keep in step): esbuild does not fold
 // an imported constant across modules, so resolving `#is-development` to
-// dev-false.ts would leave every dev message in the measured bundle. Writing
-// the expression out at each use lets NODE_ENV="production" fold it.
+// dev-false.ts would leave every dev message in the measured bundle. The check
+// becomes a module constant (in a pure call) and each use
+// `(__directiveDev && NODE_ENV !== "production")`, which NODE_ENV="production"
+// folds.
 const IS_DEV_IMPORT =
   /^import\s+isDevelopment\s+from\s+["']#is-development["'];?$/m;
 const DEV_CHECK =
@@ -143,8 +145,15 @@ const inlineIsDevelopment = {
 
       return {
         contents: source
-          .replace(IS_DEV_IMPORT, "")
-          .replace(/\bisDevelopment\b/g, `(${DEV_CHECK})`),
+          .replace(IS_DEV_IMPORT, "\0")
+          .replace(
+            /\bisDevelopment\b/g,
+            '(__directiveDev && process.env.NODE_ENV !== "production")',
+          )
+          .replace(
+            "\0",
+            `const __directiveDev = /* @__PURE__ */ (() => (${DEV_CHECK}))();`,
+          ),
         loader: "ts",
       };
     });
