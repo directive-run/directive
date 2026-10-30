@@ -9,9 +9,30 @@ const IS_DEVELOPMENT_IMPORT =
 const IS_DEVELOPMENT_USE = /\bisDevelopment\b/g;
 
 /**
- * Write the dev check out in full at each use of `isDevelopment` (as core's
- * build does), so a consumer's bundler folds it and drops dev-only code.
+ * The dev check, evaluated once per module and still folded by a consumer's
+ * bundler. The import becomes a module-level constant holding the check
+ * (`expression`, in a pure call a bundler drops once nothing reads it), and
+ * each use of `isDevelopment` becomes `(DEV && NODE_ENV !== "production")`:
+ * - Unbundled, a production or browser run stops at the constant, so a hot
+ *   path never reads Node's slow `process.env` (a development run reads it,
+ *   as every use did before).
+ * - A bundler defining `process.env.NODE_ENV` as "production" turns each use
+ *   into `(DEV && false)`, folds it and drops the dev code behind it.
+ * scripts/size.mjs measures the same transform (keep the two in step).
  */
+const devTransform = (source: string, expression: string): string =>
+  source
+    // Where the import was, so it is defined before any module-level use.
+    .replace(IS_DEVELOPMENT_IMPORT, "\0")
+    .replace(
+      IS_DEVELOPMENT_USE,
+      '(__directiveDev && process.env.NODE_ENV !== "production")',
+    )
+    .replace(
+      "\0",
+      `const __directiveDev = /* @__PURE__ */ (() => (${expression}))();`,
+    );
+
 function inlineIsDevelopment(expression: string): EsbuildPlugin {
   return {
     name: "inline-is-development",
@@ -23,9 +44,7 @@ function inlineIsDevelopment(expression: string): EsbuildPlugin {
         }
 
         return {
-          contents: source
-            .replace(IS_DEVELOPMENT_IMPORT, "")
-            .replace(IS_DEVELOPMENT_USE, `(${expression})`),
+          contents: devTransform(source, expression),
           loader: "ts",
         };
       });
