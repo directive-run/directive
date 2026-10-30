@@ -7985,6 +7985,114 @@
             "option derivations",
             "option init"
           ]
+        },
+        "system.derive reflection on names that are not derivations > a symbol is never a derivation": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "system.derive reflection on names that are not derivations > an unknown name is not an own key, and a derivation is": {
+          "layer": "L1",
+          "by": ["reflection"]
+        },
+        "system.derive reflection on names that are not derivations > the names that guard against prototype pollution are not derivations": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        }
+      }
+    },
+    "tests/core/l3-small-oracle-clock-timer.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "virtualClock deadlines > fires a callback whose deadline is exactly the instant advanced to": {
+          "layer": "L3",
+          "by": ["import virtualClock"]
+        },
+        "virtualClock deadlines > fires a callback due exactly at the end of a larger advance, after earlier ones": {
+          "layer": "L3",
+          "by": ["import virtualClock"]
+        },
+        "timer state transitions leave the wrong status alone > startTimer on a running timer changes nothing, so it keeps its start": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > startTimer on a paused timer changes nothing, so it stays paused": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > registerRepeat on a paused timer changes nothing": {
+          "layer": "L3",
+          "by": [
+            "import initialTimerState",
+            "import pauseTimer",
+            "import registerRepeat",
+            "import startTimer"
+          ]
+        },
+        "timer state transitions leave the wrong status alone > resumeTimer on a completed timer leaves it completed": {
+          "layer": "L3",
+          "by": [
+            "import completeTimer",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import resumeTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > excludes every earlier pause when the timer is paused again": {
+          "layer": "L3",
+          "by": [
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import resumeTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > only a paused timer is frozen: a completed one keeps counting against the clock": {
+          "layer": "L3",
+          "by": [
+            "import completeTimer",
+            "import elapsedMs",
+            "import initialTimerState",
+            "import pauseTimer",
+            "import startTimer"
+          ]
+        },
+        "elapsed time > a paused timer that never recorded when it paused counts against the clock": {
+          "layer": "L3",
+          "by": ["import elapsedMs"]
+        },
+        "elapsed time > resumeTimer on a paused timer that never recorded when it paused changes nothing": {
+          "layer": "L3",
+          "by": ["import resumeTimer"]
+        },
+        "timerOps > remainingMs counts the configured total down from the start": {
+          "layer": "L3",
+          "by": ["import remainingMs", "import timerOps"]
         }
       }
     },

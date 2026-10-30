@@ -144,6 +144,14 @@
     "note": "failuresAfterSatisfied is a WeakSet: has() on null or a primitive returns false instead of throwing, so the typeof and null guards change nothing. Hand-run: survived the L3 oracle tests."
   },
   {
+    "line": 357,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof error === \"object\" || error !== null",
+    "reason": "equivalent",
+    "note": "The `typeof`/`!== null` guard only narrows the type for WeakSet.has. The set holds nothing but Error objects (noteFailureAfterSatisfied is called with a resolver's normalized Error), and WeakSet.has returns false for a primitive, a function or null without throwing. So `(a || b) && has(error)` gives the same `satisfied` as `a && b && has(error)` for every input. Same reasoning as the 357:7 and 358:7 ConditionalExpression entries. Applied by hand, the whole conformance:local suite at MUTATION_LAYER=L3 passes."
+  },
+  {
     "line": 358,
     "col": 7,
     "mutator": "ConditionalExpression",

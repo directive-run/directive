@@ -691,7 +691,16 @@
   {
     "file": "src/core/__tests__/l3-small-oracle-accessors.test.ts",
     "category": "black-box",
-    "cases": 4,
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-clock-timer.test.ts",
+    "category": "black-box",
+    "cases": 11,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
