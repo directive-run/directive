@@ -698,7 +698,23 @@
         "system.derive > `in` is true for a derivation and false for anything else",
         "system.derive > a derived value cannot be assigned",
         "system.derive > lists exactly the derivations when enumerated or spread",
-        "system.derive > reads a known derivation and gives undefined for an unknown name"
+        "system.derive > reads a known derivation and gives undefined for an unknown name",
+        "system.derive reflection on names that are not derivations > a symbol is never a derivation",
+        "system.derive reflection on names that are not derivations > an unknown name is not an own key, and a derivation is",
+        "system.derive reflection on names that are not derivations > the names that guard against prototype pollution are not derivations"
+      ],
+      "tests/core/l3-small-oracle-clock-timer.test.ts": [
+        "elapsed time > a paused timer that never recorded when it paused counts against the clock",
+        "elapsed time > a timer completed while paused reports the elapsed time it had",
+        "elapsed time > excludes every earlier pause when the timer is paused again",
+        "elapsed time > resumeTimer on a paused timer that never recorded when it paused changes nothing",
+        "timer state transitions leave the wrong status alone > registerRepeat on a paused timer changes nothing",
+        "timer state transitions leave the wrong status alone > resumeTimer on a completed timer leaves it completed",
+        "timer state transitions leave the wrong status alone > startTimer on a paused timer changes nothing, so it stays paused",
+        "timer state transitions leave the wrong status alone > startTimer on a running timer changes nothing, so it keeps its start",
+        "timerOps > remainingMs counts the configured total down from the start",
+        "virtualClock deadlines > fires a callback due exactly at the end of a larger advance, after earlier ones",
+        "virtualClock deadlines > fires a callback whose deadline is exactly the instant advanced to"
       ],
       "tests/core/l3-small-oracle-plugins.test.ts": [
         "plugin onInit > a plugin without onInit starts quietly",
