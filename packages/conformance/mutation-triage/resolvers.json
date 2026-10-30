@@ -507,36 +507,6 @@
   {
     "line": 686,
     "col": 7,
-    "endLine": 688,
-    "endCol": 27,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasStringRequirement: whole guard replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
-  },
-  {
-    "line": 686,
-    "col": 7,
-    "endLine": 687,
-    "endCol": 19,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasStringRequirement: first two operands replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
-  },
-  {
-    "line": 686,
-    "col": 7,
-    "endLine": 686,
-    "endCol": 30,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasStringRequirement: first operand `typeof def === \"object\"` replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
-  },
-  {
-    "line": 686,
-    "col": 7,
     "mutator": "LogicalOperator",
     "replacement": "typeof def === \"object\" && def !== null || \"requirement\" in def",
     "reason": "not-observable",
@@ -557,36 +527,6 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
-  },
-  {
-    "line": 698,
-    "col": 7,
-    "endLine": 700,
-    "endCol": 27,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasFunctionRequirement: whole guard replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
-  },
-  {
-    "line": 698,
-    "col": 7,
-    "endLine": 699,
-    "endCol": 19,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasFunctionRequirement: first two operands replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
-  },
-  {
-    "line": 698,
-    "col": 7,
-    "endLine": 698,
-    "endCol": 30,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "hasFunctionRequirement: first operand `typeof def === \"object\"` replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
   },
   {
     "line": 698,
@@ -1410,7 +1350,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "note": "batch fallback (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "note": "resolveBatch retry loop (runBatchRetryLoop) (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
     "layer": "L7"
   },
   {
@@ -1421,7 +1361,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "note": "batch fallback: a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "note": "resolveBatch retry loop (runBatchRetryLoop): a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
     "layer": "L7"
   },
   {
@@ -1929,9 +1869,8 @@
     "endCol": 8,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "assignDefinition on a resolver that does not exist throws (dynamic assign, the L10 definitions registry). No test calls it; an L10 test will.",
-    "layer": "L10"
+    "reason": "equivalent",
+    "note": "Dead code: the `if (!definitions[id])` guard in the resolvers manager's assign path. engine-definitions.ts applyAssign (~404) throws for an unknown id before it reaches the manager, so no input runs this block (#262 review). The suite passes with it emptied at L2 and with no ceiling."
   },
   {
     "line": 2368,
