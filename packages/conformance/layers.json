@@ -7546,6 +7546,152 @@
         }
       }
     },
+    "tests/core/l3-small-oracle-accessors.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "system.derive > reads a known derivation and gives undefined for an unknown name": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "system.derive > `in` is true for a derivation and false for anything else": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "system.derive > lists exactly the derivations when enumerated or spread": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        },
+        "system.derive > a derived value cannot be assigned": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "option derivations",
+            "option init"
+          ]
+        }
+      }
+    },
+    "tests/core/l3-small-oracle-plugins.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "plugin onInit > runs once per plugin, in registration order, each awaited before the next": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "plugin onInit > is handed the system": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "plugin onInit > a plugin without onInit starts quietly": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "plugin onInit > a throwing or rejecting onInit is reported, and the next plugin still starts": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
+    "tests/core/l3-small-oracle-schema-builders.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "string length and pattern > minLength accepts the exact length and more, rejects less": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "string length and pattern > maxLength accepts the exact length and less, rejects more": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "string length and pattern > pattern accepts only what the expression matches": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "string length and pattern > each constraint keeps the type check and the ones before it": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "nullable and optional keep the inner constraints > nullable accepts null and a value the inner type accepts": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "nullable and optional keep the inner constraints > optional accepts undefined and a value the inner type accepts": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "nullable and optional keep the inner constraints > t.nullable and t.optional wrap a type the same way": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "containers check every element against every constraint > an array of constrained elements": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "containers check every element against every constraint > an object shape with a constrained member": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "containers check every element against every constraint > a record of constrained values": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "containers check every element against every constraint > a tuple checks length, position and constraints": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "enum > accepts only its listed strings": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "enum > a valid enum and a valid tuple are built without a warning": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "uuid, email and url > uuid matches a whole uuid, in either case, and nothing else": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "uuid, email and url > email needs one address with no whitespace, and a string": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "uuid, email and url > url accepts an absolute url string, not text, numbers or URL objects": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "any and unknown > accept every value": {
+          "layer": "L0",
+          "by": ["import t"]
+        }
+      }
+    },
     "tests/core/meta-query-does-not-watch.test.ts": {
       "category": "black-box",
       "rule": "L9",

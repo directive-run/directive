@@ -653,6 +653,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-small-oracle-accessors.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-plugins.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-small-oracle-schema-builders.test.ts",
+    "category": "black-box",
+    "cases": 17,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/meta-query-does-not-watch.test.ts",
     "category": "black-box",
     "cases": 2,
