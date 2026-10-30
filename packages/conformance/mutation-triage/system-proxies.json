@@ -1,5 +1,13 @@
 [
   {
+    "line": 24,
+    "col": 26,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
     "line": 56,
     "col": 40,
     "mutator": "StringLiteral",
@@ -304,12 +312,28 @@
     "note": "Proxy cache for the namespaced facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
   },
   {
+    "line": 368,
+    "col": 67,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
     "line": 369,
     "col": 11,
     "mutator": "ArrayDeclaration",
     "replacement": "[]",
     "reason": "not-observable",
     "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 369,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 369,
@@ -329,6 +353,14 @@
   },
   {
     "line": 370,
+    "col": 16,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 370,
     "col": 32,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
@@ -342,6 +374,14 @@
     "replacement": "[]",
     "reason": "not-observable",
     "note": "Role wording appears only in the cross-module write warning text; message text is not pinned."
+  },
+  {
+    "line": 371,
+    "col": 12,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 371,
@@ -406,6 +446,97 @@
     "replacement": ";",
     "reason": "not-observable",
     "note": "Proxy cache for the cross-module facts view: wrapper identity only (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 427,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "Only a test above the L3 ceiling kills it in the full run: blackbox-cross-module-deps.test.ts 'a module sees exactly its declared dependencies a derivation reads declared deps' (placed at L4); the code serves that layer's feature and L3 tests merely execute it."
+  },
+  {
+    "line": 427,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "Only a test above the L3 ceiling kills it in the full run: blackbox-cross-module-deps.test.ts 'a module sees exactly its declared dependencies a derivation reads declared deps' (placed at L4); the code serves that layer's feature and L3 tests merely execute it."
+  },
+  {
+    "line": 429,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "Only a test above the L3 ceiling kills it in the full run: blackbox-cross-module-deps.test.ts 'a module sees exactly its declared dependencies a derivation reads declared deps' (placed at L4); the code serves that layer's feature and L3 tests merely execute it."
+  },
+  {
+    "line": 430,
+    "col": 13,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 438,
+    "col": 19,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "The cross-module top-level `set` only adds a development warning: without it the trap still answers falsy, so the write throws the same TypeError."
+  },
+  {
+    "line": 439,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Same development warning as the line above."
+  },
+  {
+    "line": 439,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "dev-only",
+    "note": "Same development warning as the line above."
+  },
+  {
+    "line": 439,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Same development warning as the line above."
+  },
+  {
+    "line": 442,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 443,
+    "col": 11,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "dev-only",
+    "note": "Message text of the warning above."
+  },
+  {
+    "line": 444,
+    "col": 13,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 454,
@@ -641,25 +772,9 @@
   },
   {
     "line": 574,
-    "col": 12,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 574,
     "col": 22,
     "mutator": "StringLiteral",
     "replacement": "``",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 575,
-    "col": 22,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
     "reason": "not-observable",
     "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
   },
@@ -672,50 +787,10 @@
     "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
   },
   {
-    "line": 577,
-    "col": 47,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 578,
-    "col": 15,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
     "line": 578,
     "col": 15,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 578,
-    "col": 15,
-    "mutator": "MethodExpression",
-    "replacement": "key.endsWith(prefix)",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 578,
-    "col": 39,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
-  },
-  {
-    "line": 579,
-    "col": 23,
-    "mutator": "MethodExpression",
-    "replacement": "key",
     "reason": "not-observable",
     "note": "`in` and key list of a dependency view (ctx.deps.<ns>); no existing test pins reflection on it, so it is not a contract (proxy mechanics, not a 2.0 contract)."
   },
@@ -726,6 +801,14 @@
     "replacement": "``",
     "reason": "not-observable",
     "note": "Cache key of a resolver dependency view; a collision only matters if two calls share one facts handle, and the engine hands each call its own (proxy mechanics, not a 2.0 contract)."
+  },
+  {
+    "line": 613,
+    "col": 11,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 637,
@@ -768,28 +851,20 @@
     "note": "Development warning for a resolver reading an undeclared ctx.deps name; no 2.0 diagnostic exists to pin yet."
   },
   {
-    "line": 666,
-    "col": 14,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
+    "line": 651,
+    "col": 163,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
     "reason": "not-observable",
-    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
-    "line": 667,
-    "col": 18,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
+    "line": 660,
+    "col": 15,
+    "mutator": "StringLiteral",
+    "replacement": "``",
     "reason": "not-observable",
-    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
-  },
-  {
-    "line": 667,
-    "col": 24,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[]",
-    "reason": "not-observable",
-    "note": "ctx.deps view built for the resolver: its `in` and key list are not pinned (proxy mechanics, not a 2.0 contract); the refusal to write is pinned."
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 688,
@@ -808,6 +883,22 @@
     "note": "Names the owning module in the refusal message only; message text is not pinned."
   },
   {
+    "line": 722,
+    "col": 15,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 724,
+    "col": 13,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
     "line": 733,
     "col": 18,
     "mutator": "ConditionalExpression",
@@ -822,6 +913,22 @@
     "replacement": "false",
     "reason": "equivalent",
     "note": "Looking up the null key the guard would have short-circuited answers false, the same as the short-circuit."
+  },
+  {
+    "line": 742,
+    "col": 15,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "A foreign key through the scoped $store still ends in a refused write in development (the raw store rejects a null key); only the refusal's message differs. In production the mutant writes a stray null key no namespaced view can list."
+  },
+  {
+    "line": 742,
+    "col": 30,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Same as the guard condition on this line."
   },
   {
     "line": 763,
@@ -888,6 +995,14 @@
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
   {
+    "line": 845,
+    "col": 5,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
     "line": 870,
     "col": 60,
     "mutator": "StringLiteral",
@@ -896,12 +1011,28 @@
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
   {
-    "line": 900,
-    "col": 19,
-    "mutator": "ArrayDeclaration",
-    "replacement": "[]",
+    "line": 885,
+    "col": 7,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
     "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
+    "note": "Message-only: the view's write handler decides the error wording, the write is refused regardless."
+  },
+  {
+    "line": 893,
+    "col": 12,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Message-only: a falsy trap answer still refuses the write with a TypeError."
+  },
+  {
+    "line": 894,
+    "col": 15,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "not-observable",
+    "note": "Message-only: a falsy trap answer still refuses the delete with a TypeError."
   },
   {
     "line": 900,
@@ -912,82 +1043,10 @@
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
   {
-    "line": 902,
-    "col": 55,
-    "mutator": "ObjectLiteral",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 903,
-    "col": 20,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 904,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 904,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 904,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "prop !== \"self\"",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
     "line": 904,
     "col": 20,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 904,
-    "col": 28,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 907,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 907,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 907,
-    "col": 34,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
     "reason": "not-observable",
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
@@ -1048,6 +1107,14 @@
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
   {
+    "line": 917,
+    "col": 13,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
     "line": 923,
     "col": 10,
     "mutator": "ArrowFunction",
@@ -1065,57 +1132,9 @@
   },
   {
     "line": 925,
-    "col": 10,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 925,
-    "col": 20,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test. This key matches two mutants: the whole `||` condition and its first operand `prop === \"self\"` both start here."
-  },
-  {
-    "line": 925,
-    "col": 20,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 925,
-    "col": 20,
-    "mutator": "EqualityOperator",
-    "replacement": "prop !== \"self\"",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 925,
-    "col": 20,
-    "mutator": "LogicalOperator",
-    "replacement": "prop === \"self\" && depNamesSet.has(prop)",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 925,
     "col": 29,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "not-observable",
-    "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
-  },
-  {
-    "line": 926,
-    "col": 14,
-    "mutator": "ArrowFunction",
-    "replacement": "() => undefined",
     "reason": "not-observable",
     "note": "Source key/active gate view (sources are the plan's L5): no test reaches it in either run, and the only test is white-box (multi-module-correctness). Needs an L5 source-gate test."
   },
@@ -1313,6 +1332,14 @@
   },
   {
     "line": 1087,
+    "col": 9,
+    "mutator": "StringLiteral",
+    "replacement": "``",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 1087,
     "col": 31,
     "mutator": "ArrowFunction",
     "replacement": "() => undefined",
@@ -1326,6 +1353,22 @@
     "replacement": "``",
     "reason": "dev-only",
     "note": "Development warning for reading a derivation name as a module; no 2.0 diagnostic exists to pin yet."
+  },
+  {
+    "line": 1087,
+    "col": 53,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
+  },
+  {
+    "line": 1090,
+    "col": 479,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "not-observable",
+    "note": "Text of a diagnostic message, or a label that only appears in one; message text is not pinned."
   },
   {
     "line": 1101,
@@ -1397,7 +1440,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1405,7 +1448,7 @@
     "mutator": "BooleanLiteral",
     "replacement": "result._root",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1413,7 +1456,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1421,7 +1464,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   },
   {
     "line": 1252,
@@ -1429,6 +1472,6 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "not-observable",
-    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no ≤L3 path stores such a fact in a composed system. Needs an L6 test."
+    "note": "Snapshot export (getSnapshot/hydrate, L6) of a fact stored without a namespace: no test in either run reaches it, and no \u2264L3 path stores such a fact in a composed system. Needs an L6 test."
   }
 ]

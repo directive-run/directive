@@ -150,6 +150,13 @@ export interface FileScore {
   rawScore: number;
   gateScore: number;
   unexplained: Mutant[];
+  /**
+   * Triage entries whose key matches no mutant of this file's report. The
+   * keys are line + col, so a 1.35 edit that shifts lines orphans them, and a
+   * shifted entry could land on a different mutant: the file fails until they
+   * are re-keyed or removed.
+   */
+  orphanTriage: TriageEntry[];
   pass: boolean;
 }
 
@@ -444,6 +451,10 @@ export function scoreFile(
   }
   const denom = killed + survived + noCoverage;
   const gateScore = denom ? (100 * killed) / denom : 100;
+  const present = new Set(data.mutants.map(mutantKey));
+  const orphanTriage = triage.filter(
+    (t) => !present.has(key(t.line, t.col, t.mutator, t.replacement)),
+  );
 
   return {
     file,
@@ -461,11 +472,13 @@ export function scoreFile(
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
+    orphanTriage,
     // A file whose every counted mutant was excluded or deferred has
     // proved nothing at this layer.
     pass:
       gateScore >= GATE &&
       unexplained.length === 0 &&
+      orphanTriage.length === 0 &&
       !(denom === 0 && excluded + deferred > 0),
   };
 }
@@ -608,6 +621,45 @@ export function formatDeferred(rows: FileScore[]): string {
 const where = (file: string, m: Mutant): string =>
   `${basename(file)}:${m.location.start.line}:${m.location.start.column} ${m.mutatorName}`;
 
+/** Survivors and NoCoverage mutants with no kill, no deferral and no triage. */
+export function formatUnexplained(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.unexplained.map(
+      (m) => `${where(r.file, m)} -> ${m.replacement ?? ""} (${m.status})`,
+    ),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `Unexplained (${lines.length}): kill each with a test or triage it.`,
+    "```",
+    ...lines,
+    "```",
+  ].join("\n");
+}
+
+/** Triage entries that match no mutant in the report: stale keys. */
+export function formatOrphanTriage(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.orphanTriage.map(
+      (t) =>
+        `${basename(r.file)}:${t.line}:${t.col} ${t.mutator} -> ${t.replacement} (${t.reason})`,
+    ),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `Triage matching no mutant (${lines.length}): FAIL. The source moved under these keys (line:col), or the mutant is gone. Re-key each to the mutant it describes, or delete it.`,
+    "```",
+    ...lines,
+    "```",
+  ].join("\n");
+}
+
 /** `later-layer` entries the full run does not kill: they count as untriaged. */
 export function formatInvalidLaterLayer(rows: FileScore[]): string {
   const lines = rows.flatMap((r) =>
@@ -740,6 +792,8 @@ export function run(args: string[], root: string): RunResult {
       : [
           "No --full report: later-layer entries are unvalidated (not checked for a full-run kill).",
         ]),
+    ...(formatUnexplained(rows) ? ["", formatUnexplained(rows)] : []),
+    ...(formatOrphanTriage(rows) ? ["", formatOrphanTriage(rows)] : []),
     ...(formatInvalidLaterLayer(rows)
       ? ["", formatInvalidLaterLayer(rows)]
       : []),
