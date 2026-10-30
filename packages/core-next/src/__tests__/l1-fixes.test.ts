@@ -86,9 +86,9 @@ describe("L1 fixes", () => {
       expect(() => {
         delete ev.ping;
       }).toThrow(TypeError);
-      expect(() =>
-        Object.defineProperty(ev, "z", { value: 1 }),
-      ).toThrow(TypeError);
+      expect(() => Object.defineProperty(ev, "z", { value: 1 })).toThrow(
+        TypeError,
+      );
       expect(() => Object.setPrototypeOf(ev, {})).toThrow(TypeError);
       expect(Object.keys(ev)).toEqual(["ping"]);
       expect(typeof ev.ping).toBe("function");
