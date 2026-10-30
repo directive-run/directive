@@ -8,6 +8,7 @@ export default defineConfig({
     openai: "src/adapters/openai.ts",
     ollama: "src/adapters/ollama.ts",
     gemini: "src/adapters/gemini.ts",
+    "workers-ai": "src/adapters/workers-ai.ts",
     "multi-agent": "src/multi-agent-export.ts",
     predicate: "src/predicate-export.ts",
     guardrails: "src/guardrails-export.ts",
