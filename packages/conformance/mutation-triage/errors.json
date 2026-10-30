@@ -90,10 +90,22 @@
   {
     "line": 349,
     "col": 7,
+    "endLine": 350,
+    "endCol": 14,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "Only resolver errors carry a context (engine.ts passes the requirement for resolvers and nothing for the other sources), so `context &&` is already falsy for every other source; this variant differs only when a non-resolver source has a context. Hand-run: survived the L3 oracle tests."
+    "note": "Operands `source === \"resolver\" && context` replaced by true: a resolver error always carries its requirement as context, so `context` is never falsy there. Only resolver errors carry a context (engine.ts passes the requirement for resolvers and nothing for the other sources) and no public call builds the error boundary with other arguments, so this differs only for a direct call of the internal manager. Hand-run: the dev warning text is identical for effect, constraint, derivation and resolver failures."
+  },
+  {
+    "line": 349,
+    "col": 7,
+    "endLine": 349,
+    "endCol": 28,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "First operand `source === \"resolver\"` replaced by true: a non-resolver source never carries a context, so `context` still ends the chain. Only resolver errors carry a context (engine.ts passes the requirement for resolvers and nothing for the other sources) and no public call builds the error boundary with other arguments, so this differs only for a direct call of the internal manager. Hand-run: the dev warning text is identical for effect, constraint, derivation and resolver failures."
   },
   {
     "line": 349,

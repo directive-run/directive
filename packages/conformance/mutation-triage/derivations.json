@@ -730,24 +730,28 @@
   {
     "line": 810,
     "col": 11,
+    "endLine": 810,
+    "endCol": 62,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+    "reason": "not-observable",
+    "note": "`has` trap, whole guard replaced by false. Differs only for a Symbol-keyed derivation (a name the type does not allow): Object.assign copies symbol keys into the definitions, so without the symbol guard the lookup finds the key. For every string name the guard changes nothing, because createSystem refuses __proto__, constructor and prototype as derivation names and `definitions` has a null prototype. Hand-run: `sym in derived` answers false in 1.35 and throws with this mutant."
+  },
+  {
+    "line": 810,
+    "col": 11,
+    "endLine": 810,
+    "endCol": 35,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "`has` trap, first operand `typeof prop === \"symbol\"` replaced by false. Differs only for a Symbol-keyed derivation (a name the type does not allow): Object.assign copies symbol keys into the definitions, so without the symbol guard the lookup finds the key. For every string name the guard changes nothing, because createSystem refuses __proto__, constructor and prototype as derivation names and `definitions` has a null prototype. Hand-run: `sym in derived` answers false in 1.35 and throws with this mutant."
   },
   {
     "line": 810,
     "col": 11,
     "mutator": "LogicalOperator",
     "replacement": "typeof prop === \"symbol\" && BLOCKED_PROPS.has(prop)",
-    "reason": "equivalent",
-    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
-  },
-  {
-    "line": 810,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
     "reason": "equivalent",
     "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
   },
@@ -762,24 +766,28 @@
   {
     "line": 841,
     "col": 11,
+    "endLine": 841,
+    "endCol": 62,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
+    "reason": "not-observable",
+    "note": "`getOwnPropertyDescriptor` trap, whole guard replaced by false. Differs only for a Symbol-keyed derivation (a name the type does not allow): Object.assign copies symbol keys into the definitions, so without the symbol guard the lookup finds the key. For every string name the guard changes nothing, because createSystem refuses __proto__, constructor and prototype as derivation names and `definitions` has a null prototype. Hand-run: no descriptor is reported for a Symbol-keyed derivation in 1.35; this mutant reports one."
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "endLine": 841,
+    "endCol": 35,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "not-observable",
+    "note": "`getOwnPropertyDescriptor` trap, first operand `typeof prop === \"symbol\"` replaced by false. Differs only for a Symbol-keyed derivation (a name the type does not allow): Object.assign copies symbol keys into the definitions, so without the symbol guard the lookup finds the key. For every string name the guard changes nothing, because createSystem refuses __proto__, constructor and prototype as derivation names and `definitions` has a null prototype. Hand-run: no descriptor is reported for a Symbol-keyed derivation in 1.35; this mutant reports one."
   },
   {
     "line": 841,
     "col": 11,
     "mutator": "LogicalOperator",
     "replacement": "typeof prop === \"symbol\" && BLOCKED_PROPS.has(prop)",
-    "reason": "equivalent",
-    "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
-  },
-  {
-    "line": 841,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
     "reason": "equivalent",
     "note": "definitions is a null-prototype object, so blocked names are absent and the lookup alone gives the same answer."
   },
@@ -1563,8 +1571,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L2",
-    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2)."
+    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2).",
+    "layer": "L2"
   },
   {
     "line": 1190,
@@ -1572,7 +1580,7 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "layer": "L2",
-    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2)."
+    "note": "Waking constraints that read derivations: the `seen` guard in the walk over derived dependents. Only constraints (L2) consume this walk. Full-run killer: mutants-derivations.test.ts \"derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond\" (placed L2).",
+    "layer": "L2"
   }
 ]

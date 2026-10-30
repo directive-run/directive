@@ -210,10 +210,22 @@
   {
     "line": 387,
     "col": 11,
+    "endLine": 387,
+    "endCol": 51,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "internals-only",
-    "note": "Differs only when `recorded` is null, which is production. takeMutation is called only from development-gated code (effects, sources, dependency views), so the null case is reached only by calling the internal helper directly; with a non-null empty map the loop does nothing and returns null either way."
+    "note": "Whole guard replaced by false. `recorded` is null only in production, where takeMutation is never called: its callers (effects checkInPlaceMutation, the dependency views of system-module-transform) run inside `isDevelopment` blocks. With a non-null empty map the loop does nothing and returns null either way, so only a direct call of the internal helper with a null record tells it apart (it would iterate null)."
+  },
+  {
+    "line": 387,
+    "col": 11,
+    "endLine": 387,
+    "endCol": 28,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "First operand `recorded === null` replaced by false. `recorded` is null only in production, where takeMutation is never called: its callers (effects checkInPlaceMutation, the dependency views of system-module-transform) run inside `isDevelopment` blocks. Only a direct call of the internal helper with a null record tells it apart (it would read `.size` of null)."
   },
   {
     "line": 387,

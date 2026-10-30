@@ -8040,6 +8040,10 @@
           "layer": "L1",
           "by": ["option modules"]
         },
+        "object-form events in a composed system > runs a function event as that function even when it carries a handler property of its own": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
         "derivations, effects and flat access in a composed system > computes a derivation given as an object with a compute function": {
           "layer": "L1",
           "by": ["option modules"]

@@ -709,7 +709,7 @@
   {
     "file": "src/core/__tests__/l3-proxies-oracle-transform.test.ts",
     "category": "black-box",
-    "cases": 17,
+    "cases": 18,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
