@@ -1,5 +1,13 @@
 # @directive-run/core
 
+## 1.36.0
+
+### Patch Changes
+
+- [#174](https://github.com/directive-run/directive/pull/174) [`7eb552d`](https://github.com/directive-run/directive/commit/7eb552d071036804b116527d4ef8458b6c838111) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Export `ClobberSummaryEvent` from `@directive-run/core/plugins`. It is the parameter type of `clobberAlertPlugin({ onSummary })`, which could not be named without reaching into an internal module.
+
+- [#178](https://github.com/directive-run/directive/pull/178) [`ae6fdc0`](https://github.com/directive-run/directive/commit/ae6fdc086015286f251e002ec45cfc91957b9cda) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Package metadata: each export now declares types per condition (`.d.cts` for `require`), so CommonJS consumers get CommonJS type declarations instead of the ESM ones. The repository URL now uses the `git+https://…git` form. No runtime change.
+
 ## 1.35.0
 
 ### Minor Changes

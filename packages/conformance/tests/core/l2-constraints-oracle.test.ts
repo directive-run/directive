@@ -636,7 +636,13 @@ describe("after", () => {
     log.length = 0;
     system.start();
     await system.settle();
-    expect(starts()).toEqual(["first", "second", "third"]);
+    // The dependency is asked first and every constraint runs again. Whether
+    // `second` waits for `first`'s new requirement to resolve is quirk (e) in
+    // contracts/GATE-1.md: 1.35 remembers the old resolution (first, second,
+    // third), 2.0 waits (first, third, second). Not pinned here; core-next
+    // pins the 2.0 behaviour and the L2 gate records the divergence.
+    expect(starts()[0]).toBe("first");
+    expect([...starts()].sort()).toEqual(["first", "second", "third"]);
     system.destroy();
   });
 
