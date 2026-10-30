@@ -116,6 +116,16 @@ export interface SystemContext {
   readonly tracker: Tracker;
   /** Report an error from `source` (the default strategy: skip). */
   reportError(source: ErrorSource, sourceId: string, error: unknown): void;
+  /** Ask for a reconcile pass, through the kernel's scheduler. */
+  schedule(): void;
+  /**
+   * Watch a derivation named in declared deps: every invalidation upstream
+   * of it wakes the reader, even while it stays stale (nothing computes it
+   * for the reader). 1.35's observed set, for declared deps.
+   */
+  watch(id: string): void;
+  /** Tell settle listeners that `isSettled` may have changed. */
+  settled(): void;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -125,6 +135,22 @@ export type SystemPart = (ctx: SystemContext) => void;
 export interface EffectsFeature {
   runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
   cleanupAll(): void;
+}
+
+/** The L2 reconcile feature (reconcile.ts) as the pass drives it. */
+export interface ReconcileFeature {
+  /** Pass start, before effects. */
+  begin_(): void;
+  /** After effects: the requirements now (a promise only when it must wait). */
+  evaluate_(passKeys: Set<string>): any[] | Promise<any[]>;
+  /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
+  commit_(current: any[]): Record<string, unknown>;
+  /** A run is in flight: not settled. */
+  busy_(): boolean;
+  start_(): void;
+  stop_(): void;
+  /** The settle-timeout details, around the core's own. */
+  details_(core: string[]): string[];
 }
 
 declare module "../kernel.js" {
@@ -222,6 +248,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const { graph, hooks, clock } = kernel;
   const features = kernel.features as {
     effects?: EffectsFeature;
+    reconcile?: ReconcileFeature;
     validate?: (key: string, value: unknown) => void;
     plugins?: { deliver_(event: KernelEvent): void };
   };
@@ -258,6 +285,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
+  /** A part asked for a pass while one ran (a run ended, `enable()`). */
+  let again = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
   const notifySettle = () => settleListeners.forEach((fn) => fn());
@@ -267,6 +296,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   const byNode = new Map<ReactiveNode, Derivation>();
   const listeners: Listeners = new Map();
   const pending = new Set<string>();
+  /** Derivations named in declared deps (SystemContext.watch). */
+  const watched = new Set<string>();
   let holdDepth = 0;
 
   /** Tell the subscribers of every derivation that went stale. */
@@ -341,6 +372,11 @@ export function createSystemCore<const M extends ModuleSchema>(
             }
             seen.add(node);
             if (!d.live_ || d.stale_) {
+              if (d.stale_ && watched.has(d.id_)) {
+                // Still stale, so nothing below it moves, but a body that
+                // named it in its deps hears every change upstream (1.35).
+                changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
+              }
               continue;
             }
             d.stale_ = true;
@@ -653,9 +689,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       return;
     }
     reconciling = true;
+    again = false;
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
+    const l2 = features.reconcile;
+    l2?.begin_();
     try {
       if (live()) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
@@ -670,14 +709,26 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (done) {
         await done;
       }
+      let result;
+      if (l2) {
+        // 1.35 awaits constraint evaluation only when it must; the diff,
+        // the dispatch and the pass end then share one continuation.
+        const asked = l2.evaluate_(passKeys);
+        result = l2.commit_(asked instanceof Promise ? await asked : asked);
+      }
       if (live()) {
         emit("reconcile.end", {
-          result: { unmet: [], inflight: [], completed: [], canceled: [] },
+          result: result ?? {
+            unmet: [],
+            inflight: [],
+            completed: [],
+            canceled: [],
+          },
         });
       }
     } finally {
       reconciling = false;
-      if (changedKeys.size > 0) {
+      if (changedKeys.size > 0 || again) {
         scheduleReconcile();
       }
       notifySettle();
@@ -685,7 +736,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
 
   // --- the system ----------------------------------------------------------
-  const isSettled = () => !scheduled && !reconciling;
+  const isSettled = () =>
+    !scheduled && !reconciling && !features.reconcile?.busy_();
   const warnUnknown = (method: string, id: string) =>
     console.warn(`[Directive] ${method}: unknown key "${id}"`);
   /** A clock timer owned by this system; returns its canceller. */
@@ -754,12 +806,14 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       system.initialize();
       running = true;
+      features.reconcile?.start_();
       emit("system.start", { system });
       scheduleReconcile();
     },
     stop() {
       if (running) {
         running = false;
+        features.reconcile?.stop_();
         features.effects?.cleanupAll();
         emit("system.stop", { system });
       }
@@ -886,11 +940,11 @@ export function createSystemCore<const M extends ModuleSchema>(
           const details = [
             reconciling && "reconciliation in progress",
             scheduled && "reconcile scheduled",
-          ].filter(Boolean);
+          ].filter(Boolean) as string[];
           finish();
           reject(
             new Error(
-              `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+              `[Directive] settle() timed out after ${maxWait}ms. ${(features.reconcile?.details_(details) ?? details).join("; ")}`,
             ),
           );
         });
@@ -924,6 +978,12 @@ export function createSystemCore<const M extends ModuleSchema>(
     derived: derive,
     tracker,
     reportError,
+    schedule() {
+      again = true;
+      scheduleReconcile();
+    },
+    settled: notifySettle,
+    watch: (id) => watched.add(id),
   };
   for (const part of parts) {
     part(ctx);

@@ -47,6 +47,17 @@ const HOOKS: Record<string, string[]> = {
   "effect.run": ["onEffectRun", "id"],
   "effect.error": ["onEffectError", "id", "error"],
   "effect.write-blocked": ["onEffectWriteBlocked", "id", "key"],
+  // L2: reconcile.ts.
+  "constraint.evaluate": ["onConstraintEvaluate", "id", "active"],
+  "constraint.error": ["onConstraintError", "id", "error"],
+  "requirement.created": ["onRequirementCreated", "req"],
+  "requirement.met": ["onRequirementMet", "req", "resolver"],
+  "requirement.canceled": ["onRequirementCanceled", "req"],
+  "resolver.start": ["onResolverStart", "resolver", "req"],
+  "resolver.complete": ["onResolverComplete", "resolver", "req", "duration"],
+  "resolver.error": ["onResolverError", "resolver", "req", "error"],
+  "resolver.retry": ["onResolverRetry", "resolver", "req", "attempt"],
+  "resolver.cancel": ["onResolverCancel", "resolver", "req"],
 };
 
 const logError = (plugin: Plugin, hook: string, error: unknown): void => {
