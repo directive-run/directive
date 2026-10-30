@@ -6653,11 +6653,6 @@
           "layer": "L2",
           "by": ["option constraints", "option resolvers"],
           "pulledDown": ["member .inspect (L9)", "option plugins (L3)"]
-        },
-        "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
-          "layer": "L2",
-          "by": ["option constraints", "option resolvers"],
-          "pulledDown": ["member .inspect (L9)"]
         }
       }
     },
@@ -8387,6 +8382,16 @@
         "zeroConfig > an errorBoundary given alongside wins over the zeroConfig defaults": {
           "layer": "L3",
           "by": ["option error boundary", "option plugins"]
+        }
+      }
+    },
+    "tests/core/l9-constraints-observed-derivations.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "tests": {
+        "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
+          "layer": "L9",
+          "by": ["member .inspect"]
         }
       }
     },

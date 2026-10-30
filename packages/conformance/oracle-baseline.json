@@ -134,8 +134,7 @@
       "inspect() reports each constraint > keeps counting across passes: each pass that finds it active adds one": "L2",
       "inspect() reports each constraint > shows a constraint whose when threw as not active": "L2",
       "inspect() reports each constraint > reports an async constraint the same way, and not active once its when rejects": "L2",
-      "a when that returns a promise without async: true > is reported to plugins and to inspect() with the answer it resolved to, every time it is asked": "L2",
-      "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": "L2"
+      "a when that returns a promise without async: true > is reported to plugins and to inspect() with the answer it resolved to, every time it is asked": "L2"
     },
     "tests/core/l2-requirements-oracle.test.ts": {
       "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",

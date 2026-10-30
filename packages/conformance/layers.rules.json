@@ -498,6 +498,9 @@
     "tests/core/navigation-side-effects.test.ts": {
       "rule": "L8"
     },
+    "tests/core/l9-constraints-observed-derivations.test.ts": {
+      "rule": "L9"
+    },
     "tests/core/trace.test.ts": {
       "rule": "L9"
     },
