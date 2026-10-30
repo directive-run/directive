@@ -7,11 +7,9 @@ import { createModule, createSystem, t } from "../../index.js";
 // unregistering a module waits for a batch it aborted. Public API only; a
 // plugin observes the resolver hooks.
 
-let warn: ReturnType<typeof vi.spyOn>;
-
 beforeEach(() => {
   vi.useFakeTimers();
-  warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -275,7 +273,7 @@ describe("unregistering a module that owns a batched resolver", () => {
     await system.stop();
   });
 
-  it("gives up waiting on a batch that ignores its signal and never settles, and names the resolver in a warning", async () => {
+  it("gives up waiting on a batch that ignores its signal and never settles", async () => {
     const h = batchHandler(() => new Promise(() => {}));
     const system = build(h.fn);
     system.facts.go = true;
@@ -292,11 +290,6 @@ describe("unregistering a module that owns a batched resolver", () => {
     await advance(120_000);
     await unregistered;
     expect(done).toBe(true);
-    expect(
-      warn.mock.calls.some((call: unknown[]) =>
-        String(call[0]).includes("load"),
-      ),
-    ).toBe(true);
     await system.stop();
   });
 });

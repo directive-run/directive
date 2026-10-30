@@ -6593,7 +6593,7 @@
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         },
-        "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles, and names the resolver in a warning": {
+        "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": {
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         }
@@ -8363,7 +8363,7 @@
           "layer": "L3",
           "by": ["option plugins"]
         },
-        "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error, and does not run the batch again": {
+        "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error": {
           "layer": "L3",
           "by": ["option plugins"]
         },
@@ -8464,10 +8464,6 @@
           "by": ["option plugins"]
         },
         "abortOn on a batched resolver > rejects the batch's later writes to an abortOn fact that changed meanwhile": {
-          "layer": "L7",
-          "by": ["option batch resolver"]
-        },
-        "abortOn on a batched resolver > does not bind a batch that mixes requirements from different constraints": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },

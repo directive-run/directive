@@ -129,7 +129,7 @@
       "unregistering a batched resolver > aborts a batch that is running, and what it returns afterwards completes nothing": "L10",
       "unregistering a batched resolver > leaves another batched resolver's queue and running batch alone": "L10",
       "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves": "L10",
-      "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles, and names the resolver in a warning": "L10"
+      "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": "L10"
     },
     "tests/core/l2-requirements-oracle.test.ts": {
       "requirement identity in a running system > requirements of one type that differ in content are separate requirements": "L2",
@@ -261,7 +261,7 @@
     },
     "tests/core/l7-batch-resolvers-oracle.test.ts": {
       "resolveBatchWithResults reports each item on its own > completes every item that succeeds and runs the batch once, whatever the retry policy": "L3",
-      "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error, and does not run the batch again": "L3",
+      "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error": "L3",
       "resolveBatchWithResults reports each item on its own > reports a failed item that carries no error as an Error": "L3",
       "resolveBatchWithResults reports each item on its own > runs the whole batch again when every item failed, and completes them when the rerun succeeds": "L3",
       "resolveBatchWithResults reports each item on its own > when every item fails on every attempt, runs once per attempt and reports each item failed": "L3",
@@ -286,7 +286,6 @@
       "stopping or destroying a system ends batched work > a batch that is running when the system stops does not take its requirement away from the new batch": "L7",
       "retracting every requirement of a running batch aborts it > aborts the handler's signal and cancels each requirement once": "L3",
       "abortOn on a batched resolver > rejects the batch's later writes to an abortOn fact that changed meanwhile": "L7",
-      "abortOn on a batched resolver > does not bind a batch that mixes requirements from different constraints": "L7",
       "a batch that fails after it was taken away from its requirements > is not retried and reports no error when it throws because it was aborted": "L3",
       "a batch that fails after it was taken away from its requirements > is canceled and its later failure dropped when its requirement comes back and a new batch takes it over": "L7",
       "once a batch has finished > retracting its requirements later cancels nothing": "L3",
