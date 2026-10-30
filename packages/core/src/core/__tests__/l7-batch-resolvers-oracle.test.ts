@@ -951,3 +951,39 @@ describe("a batch that fails after it was taken away from its requirements", () 
     system.destroy();
   });
 });
+
+describe("once a batch has finished", () => {
+  it("retracting its requirements later cancels nothing", async () => {
+    const h = handler();
+    const { system, log } = build({
+      batch: { enabled: true, windowMs: 10 },
+      resolveBatch: h.fn,
+    });
+    system.facts.want = ["a", "b"];
+    await advance(50);
+    expect(sorted(log.completes)).toEqual(["a", "b"]);
+
+    system.facts.want = [];
+    await advance(50);
+
+    expect(log.cancels).toEqual([]);
+    expect(h.contexts[0].signal.aborted).toBe(false);
+    system.destroy();
+  });
+
+  it.each(["stop", "destroy"] as const)("%s() cancels nothing", async (how) => {
+    const h = handler();
+    const { system, log } = build({
+      batch: { enabled: true, windowMs: 10 },
+      resolveBatch: h.fn,
+    });
+    system.facts.want = ["a", "b"];
+    await advance(50);
+    expect(sorted(log.completes)).toEqual(["a", "b"]);
+
+    system[how]();
+
+    expect(log.cancels).toEqual([]);
+    expect(h.contexts[0].signal.aborted).toBe(false);
+  });
+});

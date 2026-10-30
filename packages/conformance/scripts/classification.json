@@ -745,7 +745,7 @@
   {
     "file": "src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
     "category": "black-box",
-    "cases": 29,
+    "cases": 31,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
