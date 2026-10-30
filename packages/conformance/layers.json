@@ -8694,6 +8694,42 @@
         }
       }
     },
+    "tests/core/l8-system-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "tests": {
+        "history and hydrate() in production > zeroConfig keeps a history that was asked for, and does not turn one on by itself": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly": {
+          "layer": "L8",
+          "by": ["member .history"]
+        }
+      }
+    },
+    "tests/core/l8-system-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "tests": {
+        "zeroConfig and history > turns history on in development when none is asked for, and leaves an explicit false alone": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history.snapshotModules in a namespaced system > is quiet for entries that name a module of the system, and warns once for one that names none": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "hydrate() data in a single-module system > is applied over initialFacts when it is clean": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        },
+        "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        }
+      }
+    },
     "tests/core/l9-constraints-observed-derivations.test.ts": {
       "category": "black-box",
       "rule": "L9",
