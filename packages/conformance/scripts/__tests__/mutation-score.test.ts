@@ -277,6 +277,20 @@ describe("mutation-score", () => {
           },
         ],
       ]);
+      // Twins of entry 4 (same key, another end): one kill does not pay both.
+      const twin = new Map(at);
+      twin.set("src/engine.ts", {
+        ...at.get("src/engine.ts")!,
+        mutants: [
+          ...at.get("src/engine.ts")!.mutants,
+          mut(4, 5, 20, "Survived", "EqualityOperator", "x >= 1"),
+        ],
+      });
+      expect(
+        gateDebt(dir, twin, 4).some(
+          (d) => d.entry.line === 4 && d.file === "engine.ts",
+        ),
+      ).toBe(true);
       const debt = gateDebt(dir, at, 4);
       expect(debt.map((d) => `${d.file}:${d.entry.line} ${d.why}`)).toEqual([
         "absent.ts:4 file not in the L4 gate run",
