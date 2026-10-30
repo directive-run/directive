@@ -7864,6 +7864,44 @@
         }
       }
     },
+    "tests/core/l3-proxies-oracle-gates.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "a source gate in a composed system > reads the module's own facts by bare name, and reflects them": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source gate in a composed system > with crossModuleDeps reads under self and the dependency's name": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a resolver's ctx.deps > lists the declared dependencies, and each one's facts": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a resolver's ctx.deps > reports an in-place change to the second dependency read": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a resolver's ctx.deps > reports an in-place change made before the dependency is read again": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "a view of a composed system refuses a symbol-keyed write > throws on assign and on delete": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "batch resolvers in a composed system > resolveBatch writes through the module's own facts": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "batch resolvers in a composed system > resolveBatchWithResults writes through the module's own facts": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        }
+      }
+    },
     "tests/core/l3-proxies-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L3",
@@ -8653,6 +8691,42 @@
           "layer": "L3",
           "by": ["option plugins"],
           "dynamic": true
+        }
+      }
+    },
+    "tests/core/l8-system-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "tests": {
+        "history and hydrate() in production > zeroConfig keeps a history that was asked for, and does not turn one on by itself": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly": {
+          "layer": "L8",
+          "by": ["member .history"]
+        }
+      }
+    },
+    "tests/core/l8-system-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "tests": {
+        "zeroConfig and history > turns history on in development when none is asked for, and leaves an explicit false alone": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history.snapshotModules in a namespaced system > is quiet for entries that name a module of the system, and warns once for one that names none": {
+          "layer": "L8",
+          "by": ["option history"]
+        },
+        "hydrate() data in a single-module system > is applied over initialFacts when it is clean": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        },
+        "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
         }
       }
     },
