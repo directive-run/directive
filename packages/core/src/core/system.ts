@@ -1038,14 +1038,13 @@ function bindEnginePassthroughs(system: any, engine: any): void {
  * Emit a dev-mode warning if system.start() is never called.
  */
 function warnIfNotStarted(system: any): void {
-  if (
-    isDevelopment &&
-    // Explicit checks, not `process.env?.NODE_ENV`: Stryker's instrumented
-    // optional chain reads `.NODE_ENV` off an undefined `env` (l3-system shard).
-    (typeof process === "undefined" ||
-      !process.env ||
-      process.env.NODE_ENV !== "test")
-  ) {
+  // A plain local, not an optional chain on process: Stryker's instrumented
+  // optional chain throws when a process shim has no env (l3-system shard).
+  if (!isDevelopment) {
+    return;
+  }
+  const env = typeof process === "undefined" ? undefined : process.env;
+  if (env === undefined || env.NODE_ENV !== "test") {
     setTimeout(() => {
       if (!system.isRunning && !system.isInitialized) {
         console.warn(
