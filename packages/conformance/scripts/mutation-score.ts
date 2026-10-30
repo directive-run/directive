@@ -885,8 +885,11 @@ export function gateDebt(
       );
       if (ms.length === 0) {
         owe(`no such mutant in the L${gate} gate run (stale key)`);
-      } else if (!ms.some(isDetected)) {
-        owe(`not killed by the tests at or below L${gate} (${ms[0]!.status})`);
+      } else if (!ms.every(isDetected)) {
+        // Every mutant the entry covers must be killed: an entry without an
+        // end position may cover twins, and one kill does not pay for both.
+        const left = ms.find((m) => !isDetected(m))!;
+        owe(`not killed by the tests at or below L${gate} (${left.status})`);
       }
     }
   }
