@@ -489,6 +489,14 @@
     "tests/core/batched-resolver-retracting-own-requirement.test.ts": {
       "rule": "L7"
     },
+    "tests/core/l7-batch-resolvers-oracle.test.ts": {
+      "rule": "L7",
+      "pin": true
+    },
+    "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": {
+      "rule": "L10",
+      "pin": true
+    },
     "tests/utils/history.test.ts": {
       "rule": "L8"
     },

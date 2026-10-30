@@ -599,6 +599,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l10-batch-resolvers-dynamic-oracle.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-constraints-oracle-production.test.ts",
     "category": "black-box",
     "cases": 5,
@@ -746,6 +755,15 @@
     "file": "src/core/__tests__/l3-system-oracle.test.ts",
     "category": "black-box",
     "cases": 46,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
+    "category": "black-box",
+    "cases": 30,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
