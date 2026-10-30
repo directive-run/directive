@@ -12,7 +12,9 @@ import {
   type TriageEntry,
   formatDeferred,
   formatInvalidLaterLayer,
+  formatOrphanTriage,
   formatTable,
+  formatUnexplained,
   isMessageText,
   rowLayers,
   run,
@@ -100,6 +102,38 @@ describe("mutation-score", () => {
     expect(triaged.pass).toBe(true);
     expect(formatTable([triaged])).toContain("PASS");
   });
+  it("fails a file whose triage entry matches no mutant (a shifted line), and lists it", () => {
+    const big: ReportFile = {
+      source,
+      mutants: [
+        ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
+        mut(5, 5, 10, "Survived", "EqualityOperator", "y >= 2"),
+      ],
+    };
+    const ok: TriageEntry = {
+      line: 5,
+      col: 5,
+      mutator: "EqualityOperator",
+      replacement: "y >= 2",
+      reason: "not-observable",
+    };
+    // The same entry three lines down, as after a 1.35 edit above it.
+    const shifted: TriageEntry = { ...ok, line: 8 };
+    const s = scoreFile("a.ts", big, [ok, shifted]);
+    expect(s.gateScore).toBe(80);
+    expect(s.orphanTriage).toEqual([shifted]);
+    expect(s.pass).toBe(false);
+    expect(scoreFile("a.ts", big, [ok]).pass).toBe(true);
+    expect(formatOrphanTriage([s])).toContain("a.ts:8:5 EqualityOperator");
+  });
+
+  it("lists unexplained survivors", () => {
+    const s = scoreFile("a.ts", file, []);
+    expect(formatUnexplained([s])).toContain(
+      "a.ts:5:5 EqualityOperator -> y >= 2 (Survived)",
+    );
+  });
+
   it("leaves equivalent and internals-only mutants out of the score; other triage stays in", () => {
     const entry = (reason: "equivalent" | "internals-only" | "perf-only") => ({
       line: 5,
