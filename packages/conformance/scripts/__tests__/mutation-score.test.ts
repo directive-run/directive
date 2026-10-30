@@ -152,37 +152,22 @@ describe("mutation-score", () => {
         1, 0, 100,
       ]);
       expect(below.deferredMutants[0]!.why).toBe("feature-layer");
-      expect(below.openFeatureLayer).toHaveLength(1);
+      expect(formatDeferred([below])).toContain("(feature-layer L8)");
       const at = scoreFile("a.ts", big, [fe("L8")], undefined, 8);
       expect([at.deferred, at.survived]).toEqual([0, 1]);
       expect(at.unexplained).toHaveLength(1);
       expect(at.pass).toBe(false);
     });
 
-    it("warns when a full-run test already kills a feature-layer mutant, and closes the debt", () => {
+    it("warns when a full-run test already kills a feature-layer mutant", () => {
       const full: ReportFile = {
         source,
         mutants: [mut(5, 5, 10, "Killed", "EqualityOperator", "y >= 2")],
       };
       const s = scoreFile("a.ts", big, [fe("L8")], full, 3);
       expect(s.killedFeatureLayer).toHaveLength(1);
-      expect(s.openFeatureLayer).toEqual([]);
-      expect(gateDebt([s], 8)).toEqual([]);
-    });
-
-    it("--gate Ln fails on open feature-layer debt at or below Ln only", () => {
-      const s = scoreFile(
-        "a.ts",
-        big,
-        [fe("L8")],
-        { source, mutants: big.mutants },
-        3,
-      );
-      expect(gateDebt([s], 7)).toEqual([]);
-      expect(gateDebt([s], 8)).toHaveLength(1);
-      expect(gateDebt([s], 8)[0]).toContain(
-        "feature-layer L8; full run: Survived",
-      );
+      // Still deferred: the warning is a hint to make it later-layer.
+      expect(s.deferred).toBe(1);
     });
 
     it("rejects a feature-layer entry without a layer above the row, or without a note", () => {
@@ -191,6 +176,36 @@ describe("mutation-score", () => {
         validateTriage("a.ts", [{ ...fe("L8"), note: " " }], 3),
       ).toThrow(/feature-layer needs a note/);
       expect(() => validateTriage("a.ts", [fe("L8")], 3)).not.toThrow();
+    });
+
+    it("fails an excluded or deferred entry that matches two missed mutants, unless it names the end", () => {
+      const twin: ReportFile = {
+        source,
+        mutants: [
+          ...Array.from({ length: 8 }, () => mut(3, 11, 17, "Killed")),
+          mut(5, 5, 10, "Survived", "EqualityOperator", "y >= 2"),
+          mut(5, 5, 20, "Survived", "EqualityOperator", "y >= 2"),
+        ],
+      };
+      const eq: TriageEntry = {
+        line: 5,
+        col: 5,
+        mutator: "EqualityOperator",
+        replacement: "y >= 2",
+        reason: "equivalent",
+      };
+      const s = scoreFile("a.ts", twin, [eq]);
+      expect(s.ambiguousTriage).toEqual([{ entry: eq, count: 2 }]);
+      expect(s.pass).toBe(false);
+      // Naming the end covers one mutant; the other stays unexplained.
+      const one = scoreFile("a.ts", twin, [{ ...eq, endLine: 5, endCol: 10 }]);
+      expect(one.ambiguousTriage).toEqual([]);
+      expect([one.excluded, one.unexplained.length]).toEqual([1, 1]);
+      // A counted reason may cover both: it does not change the score.
+      expect(
+        scoreFile("a.ts", twin, [{ ...eq, reason: "not-observable" }])
+          .ambiguousTriage,
+      ).toEqual([]);
     });
 
     it("excludes proxy-mechanics like equivalent, and requires a mechanic and a note", () => {
@@ -216,6 +231,60 @@ describe("mutation-score", () => {
       expect(() => validateTriage("a.ts", [{ ...pm, note: "" }], 3)).toThrow(
         /proxy-mechanics needs a note/,
       );
+    });
+  });
+
+  describe("--gate debt, read from every triage file and the gate run", () => {
+    it("owes every entry at or below the gate that the run at that ceiling does not kill", () => {
+      const dir = mkdtempSync(join(tmpdir(), "mutscore-debt-"));
+      const entry = (line: number, reason: string, layer: string) => ({
+        line,
+        col: 5,
+        mutator: "EqualityOperator",
+        replacement: "x >= 1",
+        reason,
+        layer,
+        note: "feature note, killed by x",
+      });
+      writeFileSync(
+        join(dir, "engine.json"),
+        JSON.stringify([
+          entry(4, "later-layer", "L4"), // killed in the L4 run: paid
+          entry(5, "later-layer", "L4"), // its killer is above L4: owed
+          entry(6, "feature-layer", "L4"), // not killed: owed
+          entry(7, "feature-layer", "L9"), // above the gate: not checked
+          entry(8, "later-layer", "L2"), // stale key: owed
+        ]),
+      );
+      writeFileSync(
+        join(dir, "absent.json"),
+        JSON.stringify([entry(4, "feature-layer", "L3")]),
+      );
+      const m = (line: number, status: string) =>
+        mut(line, 5, 10, status, "EqualityOperator", "x >= 1");
+      // A run at ceiling L4: tests above L4 did not run.
+      const at = new Map<string, ReportFile>([
+        [
+          "src/engine.ts",
+          {
+            source,
+            mutants: [
+              m(4, "Killed"),
+              m(5, "Survived"),
+              m(6, "NoCoverage"),
+              m(7, "Survived"),
+            ],
+          },
+        ],
+      ]);
+      const debt = gateDebt(dir, at, 4);
+      expect(debt.map((d) => `${d.file}:${d.entry.line} ${d.why}`)).toEqual([
+        "absent.ts:4 file not in the L4 gate run",
+        "engine.ts:5 not killed by the tests at or below L4 (Survived)",
+        "engine.ts:6 not killed by the tests at or below L4 (NoCoverage)",
+        "engine.ts:8 no such mutant in the L4 gate run (stale key)",
+      ]);
+      expect(gateDebt(dir, at, 1)).toEqual([]);
     });
   });
 
@@ -676,11 +745,10 @@ describe("CLI (run)", () => {
     return root;
   };
 
-  it("--gate Ln needs --full and fails while feature-layer debt for Ln is open", () => {
+  it("--gate Ln needs --at, reads every triage file, and fails while debt for Ln is open", () => {
     const root = mkdtempSync(join(tmpdir(), "mutscore-gate-"));
     mkdirSync(join(root, "mutation-triage"));
-    mkdirSync(join(root, "reports"));
-    mkdirSync(join(root, "full"));
+    mkdirSync(join(root, "gate"));
     writeFileSync(
       join(root, "MUTATION.md"),
       "| Layer | Files |\n|---|---|\n| L3 | engine.ts |\n",
@@ -704,27 +772,27 @@ describe("CLI (run)", () => {
         files: {
           "src/engine.ts": {
             source,
-            mutants: [
-              ...Array.from({ length: 4 }, () => mut(3, 11, 17, "Killed")),
-              mut(4, 5, 10, status, "EqualityOperator", "x >= 1"),
-            ],
+            mutants: [mut(4, 5, 10, status, "EqualityOperator", "x >= 1")],
           },
         },
       });
-    writeFileSync(join(root, "reports", "r.json"), report("Survived"));
-    writeFileSync(join(root, "full", "f.json"), report("Survived"));
-    const full = join(root, "full");
-    expect(run(["--gate", "L8"], root).code).toBe(1);
-    const row = run(["--check", "--layer", "row", "--full", full], root);
-    expect(row.code).toBe(0);
-    expect(row.out).toContain("L8 1");
-    expect(run(["--gate", "L7", "--full", full], root).code).toBe(0);
-    const at8 = run(["--gate", "L8", "--full", full], root);
+    const gate = join(root, "gate");
+    // Without --at: refused, with the reason.
+    const noAt = run(["--gate", "L7"], root);
+    expect(noAt.code).toBe(1);
+    expect(noAt.err.join(" ")).toContain("--gate Ln needs --at");
+    writeFileSync(join(gate, "g.json"), report("Survived"));
+    // Below the entry's layer nothing is owed yet.
+    expect(run(["--gate", "L7", "--at", gate], root).code).toBe(0);
+    const at8 = run(["--gate", "L8", "--at", gate], root);
     expect(at8.code).toBe(1);
     expect(at8.out).toContain("Layer gate L8: FAIL");
-    // The L8 tests now kill it: the debt is paid.
-    writeFileSync(join(root, "full", "f.json"), report("Killed"));
-    expect(run(["--gate", "L8", "--full", full], root).code).toBe(0);
+    expect(at8.out).toContain("engine.ts:4:5 EqualityOperator");
+    // The L8 run kills it: paid.
+    writeFileSync(join(gate, "g.json"), report("Killed"));
+    const paid = run(["--gate", "L8", "--at", gate], root);
+    expect(paid.code).toBe(0);
+    expect(paid.out).toContain("Layer gate L8: every");
   });
 
   it("--layer Ln below the entry's layer defers it; at or above it counts", () => {

@@ -2,7 +2,8 @@
  * Per-file mutation score with a gate that ignores message text.
  *
  *   tsx scripts/mutation-score.ts [--files a.ts,b.ts] [--check] [--layer Ln|row]
- *     [--gate Ln] [--full <report.json | dir>] <report.json | dir>...
+ *     [--full <report.json | dir>] <report.json | dir>...
+ *   tsx scripts/mutation-score.ts --gate Ln --at <reports from a run at ceiling Ln>
  *
  * gate score = killed (+timeout) / all non-ignored mutants. A file PASSES
  * when its gate score is >= 80% AND every remaining non-ignored Survived or
@@ -47,11 +48,18 @@
  * `feature-layer` (with `layer`, GATE-1.md decision 4): the code implements a
  * later layer's feature and no test kills it yet. It is deferred below that
  * layer like `later-layer`, but not validated against the full run, because
- * the killing test does not exist yet. That debt is collected by
- * `--gate Ln` (needs `--full`): every `feature-layer` entry for Ln or below
- * must be Killed or Timeout in the full run, or the command exits 1. Run it
- * before building layer Ln. An entry a full-run test already kills is
- * listed as a warning (make it `later-layer` and name the test).
+ * the killing test does not exist yet. An entry that a full-run test already
+ * kills is listed as a warning (make it `later-layer` and name the test).
+ *
+ * `--gate Ln --at <reports>` collects the debt before layer Ln is built:
+ * every `later-layer` and `feature-layer` entry for Ln or below, in every
+ * triage file, must be Killed or Timeout in reports from a run at ceiling Ln
+ * (only tests at or below Ln run there). Otherwise it exits 1 and lists
+ * each one. See gateDebt.
+ *
+ * Excluded and deferred entries must each cover one mutant: when two share
+ * line + col + mutator + replacement, the entry names its `endLine` /
+ * `endCol`, or the file fails.
  *
  * `proxy-mechanics` (with `mechanic`): the mutant changes only a view's Proxy
  * mechanics, which 2.0 does not reproduce (STABILITY.md). Excluded, like
@@ -123,6 +131,13 @@ export interface TriageEntry {
   layer?: string;
   /** `proxy-mechanics` only: which view mechanic the mutant changes. */
   mechanic?: ProxyMechanic;
+  /**
+   * The mutant's end position, when two mutants share line + col + mutator +
+   * replacement (e.g. a whole condition and its first operand). Required
+   * then for a reason that changes the score (excluded or deferred).
+   */
+  endLine?: number;
+  endCol?: number;
   note?: string;
 }
 
@@ -150,15 +165,17 @@ export interface DeferredMutant {
   layer?: string;
 }
 
-/**
- * A `feature-layer` entry the full run does not kill yet: debt that the
- * entry's layer gate collects (`--gate Ln`).
- */
-export interface OpenFeatureLayer {
-  mutant: Mutant;
-  layer: string;
-  /** The mutant's status in the full run, or why it cannot be looked up. */
-  fullStatus: string;
+/** A triage entry that covers more than one missed mutant. */
+export interface AmbiguousTriage {
+  entry: TriageEntry;
+  count: number;
+}
+
+/** A deferred entry (`later-layer` / `feature-layer`) still owed at a gate. */
+export interface GateDebt {
+  file: string;
+  entry: TriageEntry;
+  why: string;
 }
 
 /** A `feature-layer` entry whose mutant a full-run test already kills. */
@@ -204,8 +221,11 @@ export interface FileScore {
   unnamedKillers: UnnamedKiller[];
   /** Warnings: `feature-layer` entries a full-run test kills (use later-layer). */
   killedFeatureLayer: KilledFeatureLayer[];
-  /** `feature-layer` entries no full-run test kills yet (all layers). */
-  openFeatureLayer: OpenFeatureLayer[];
+  /**
+   * Entries that change the score (excluded or deferred) but match more than
+   * one missed mutant: add `endLine` / `endCol`. The file fails.
+   */
+  ambiguousTriage: AmbiguousTriage[];
   rawScore: number;
   gateScore: number;
   unexplained: Mutant[];
@@ -269,6 +289,14 @@ export function isMessageText(m: Mutant, source: string | undefined): boolean {
 function key(line: number, col: number, mutator: string, repl: string): string {
   return `${line}:${col}:${mutator}:${repl}`;
 }
+
+/**
+ * A mutant's position including its end: the ceiling and full reports come
+ * from the same source, so this names one mutant in both, even where two
+ * share line + col + mutator + replacement.
+ */
+const mutantAt = (m: Mutant): string =>
+  `${mutantKey(m)}@${m.location.end.line}:${m.location.end.column}`;
 
 const mutantKey = (m: Mutant): string =>
   key(
@@ -395,9 +423,25 @@ export function scoreFile(
    */
   validateLater: boolean = full !== undefined,
 ): FileScore {
-  const triaged = new Map(
-    triage.map((t) => [key(t.line, t.col, t.mutator, t.replacement), t]),
-  );
+  const byKey = new Map<string, TriageEntry[]>();
+  for (const t of triage) {
+    const k = key(t.line, t.col, t.mutator, t.replacement);
+    byKey.set(k, [...(byKey.get(k) ?? []), t]);
+  }
+  const endMatches = (t: TriageEntry, m: Mutant): boolean =>
+    t.endLine === m.location.end.line && t.endCol === m.location.end.column;
+  const entryFor = (m: Mutant): TriageEntry | undefined => {
+    const list = byKey.get(mutantKey(m));
+    if (!list) {
+      return undefined;
+    }
+
+    return (
+      list.find((t) => t.endLine !== undefined && endMatches(t, m)) ??
+      list.find((t) => t.endLine === undefined)
+    );
+  };
+  const triaged = { get: (_k: string, m: Mutant) => entryFor(m) };
   // A full report of different source has different mutants at the same
   // positions: it cannot vouch for anything, so nothing is deferred.
   // A report that lacks `source` cannot be checked, so it is stale too.
@@ -410,21 +454,20 @@ export function scoreFile(
     full && !fullStale
       ? full.mutants
           .filter((m) => m.status !== "NoCoverage")
-          .map((m) => mutantKey(m))
+          .map((m) => mutantAt(m))
       : [],
   );
   const fullByKey = new Map<string, Mutant[]>();
   if (full && !fullStale) {
     for (const m of full.mutants) {
-      const list = fullByKey.get(mutantKey(m)) ?? [];
+      const list = fullByKey.get(mutantAt(m)) ?? [];
       list.push(m);
-      fullByKey.set(mutantKey(m), list);
+      fullByKey.set(mutantAt(m), list);
     }
   }
   const invalidLaterLayer: InvalidLaterLayer[] = [];
   const unnamedKillers: UnnamedKiller[] = [];
   const killedFeatureLayer: KilledFeatureLayer[] = [];
-  const openFeatureLayer: OpenFeatureLayer[] = [];
   let deferred = 0;
   const deferredMutants: DeferredMutant[] = [];
   let killed = 0;
@@ -454,8 +497,8 @@ export function scoreFile(
       killed++;
       continue;
     }
-    const k = mutantKey(m);
-    const entry = triaged.get(k);
+    const k = mutantAt(m);
+    const entry = triaged.get(k, m);
     let reason = entry?.reason;
     if (reason !== undefined && EXCLUDED.has(reason)) {
       triagedCount++;
@@ -498,19 +541,7 @@ export function scoreFile(
       }
     }
     if (reason === "feature-layer") {
-      const inFull = fullByKey.get(k) ?? [];
-      const killers = inFull.filter(isDetected);
-      if (killers.length === 0) {
-        openFeatureLayer.push({
-          mutant: m,
-          layer: entry!.layer ?? "L0",
-          fullStatus: !full
-            ? "no full report"
-            : fullStale
-              ? "stale full report"
-              : (inFull[0]?.status ?? "not in the full report"),
-        });
-      }
+      const killers = (fullByKey.get(k) ?? []).filter(isDetected);
       if (killers.length > 0) {
         // Evidence exists: the entry should be later-layer, naming it.
         killedFeatureLayer.push({
@@ -568,10 +599,28 @@ export function scoreFile(
   }
   const denom = killed + survived + noCoverage;
   const gateScore = denom ? (100 * killed) / denom : 100;
-  const present = new Set(data.mutants.map(mutantKey));
+  const matching = (t: TriageEntry, ms: Mutant[]): Mutant[] =>
+    ms.filter(
+      (m) =>
+        mutantKey(m) === key(t.line, t.col, t.mutator, t.replacement) &&
+        (t.endLine === undefined || endMatches(t, m)),
+    );
   const orphanTriage = triage.filter(
-    (t) => !present.has(key(t.line, t.col, t.mutator, t.replacement)),
+    (t) => matching(t, data.mutants).length === 0,
   );
+  const missed = data.mutants.filter(
+    (m) => m.status === "Survived" || m.status === "NoCoverage",
+  );
+  const ambiguousTriage: AmbiguousTriage[] = triage
+    .filter(
+      (t) =>
+        t.endLine === undefined &&
+        (EXCLUDED.has(t.reason) ||
+          t.reason === "later-layer" ||
+          t.reason === "feature-layer"),
+    )
+    .map((t) => ({ entry: t, count: matching(t, missed).length }))
+    .filter((a) => a.count > 1);
 
   return {
     file,
@@ -587,7 +636,7 @@ export function scoreFile(
     invalidLaterLayer,
     unnamedKillers,
     killedFeatureLayer,
-    openFeatureLayer,
+    ambiguousTriage,
     rawScore: raw ? (100 * rawKilled) / raw : 100,
     gateScore,
     unexplained,
@@ -598,6 +647,7 @@ export function scoreFile(
       gateScore >= GATE &&
       unexplained.length === 0 &&
       orphanTriage.length === 0 &&
+      ambiguousTriage.length === 0 &&
       !(denom === 0 && excluded + deferred > 0),
   };
 }
@@ -692,8 +742,9 @@ export function scoreReports(
 }
 
 /**
- * `deferred` counts NoCoverage the full report reaches and `later-layer`
- * triage below its layer; "stale" when the full report's source differs.
+ * `deferred` counts NoCoverage the full report reaches, and `later-layer` and
+ * `feature-layer` triage below its layer; "stale" when the full report's
+ * source differs.
  */
 export function formatTable(rows: FileScore[]): string {
   const pct = (n: number): string => `${n.toFixed(1)}%`;
@@ -718,7 +769,7 @@ export function formatDeferred(rows: FileScore[]): string {
     for (const d of r.deferredMutants) {
       const { line, column } = d.mutant.location.start;
       lines.push(
-        `${basename(r.file)}:${line}:${column} ${d.mutant.mutatorName} (${d.why === "later-layer" ? `later-layer ${d.layer}` : "reached in full run"})`,
+        `${basename(r.file)}:${line}:${column} ${d.mutant.mutatorName} (${d.why === "full-run" ? "reached in full run" : `${d.why} ${d.layer}`})`,
       );
     }
   }
@@ -783,18 +834,64 @@ export function formatFeatureLayerDebt(rows: FileScore[]): string {
 }
 
 /**
- * `--gate Ln`: `feature-layer` entries for Ln or below that the full run does
- * not kill. Before layer Ln is built, its tests must kill all of them.
+ * `--gate Ln --at <reports>`: before layer Ln is built, every deferred entry
+ * for Ln or below (`later-layer` and `feature-layer`, in every triage file)
+ * must be Killed or Timeout in `at`: reports from a run whose ceiling is Ln
+ * (MUTATION_LAYER=Ln), so only tests at or below Ln could kill it. That is
+ * the rule itself, read off the run, not inferred from `killedBy` (Stryker
+ * stops at the first failing test, so `killedBy` names one killer, not
+ * all). Read from the triage files, so neither `--files` nor the ceiling
+ * reports can hide an entry.
  */
-export function gateDebt(rows: FileScore[], gate: number): string[] {
-  return rows.flatMap((r) =>
-    r.openFeatureLayer
-      .filter((o) => layerNum(o.layer) <= gate)
-      .map(
-        (o) =>
-          `${where(r.file, o.mutant)} (feature-layer ${o.layer}; full run: ${o.fullStatus})`,
-      ),
-  );
+export function gateDebt(
+  triageDir: string,
+  at: Map<string, ReportFile>,
+  gate: number,
+): GateDebt[] {
+  const out: GateDebt[] = [];
+  const byBase = new Map<string, ReportFile>();
+  for (const [file, data] of at) {
+    byBase.set(basename(file, ".ts"), data);
+  }
+  const names = existsSync(triageDir)
+    ? readdirSync(triageDir).filter((n) => n.endsWith(".json"))
+    : [];
+  for (const n of names.sort()) {
+    const base = basename(n, ".json");
+    const entries = JSON.parse(
+      readFileSync(join(triageDir, n), "utf8"),
+    ) as TriageEntry[];
+    const data = byBase.get(base);
+    for (const t of entries) {
+      if (
+        (t.reason !== "later-layer" && t.reason !== "feature-layer") ||
+        layerNum(t.layer ?? "L0") > gate
+      ) {
+        continue;
+      }
+      const owe = (why: string): void => {
+        out.push({ file: `${base}.ts`, entry: t, why });
+      };
+      if (!data) {
+        owe(`file not in the L${gate} gate run`);
+        continue;
+      }
+      const ms = data.mutants.filter(
+        (m) =>
+          mutantKey(m) === key(t.line, t.col, t.mutator, t.replacement) &&
+          (t.endLine === undefined ||
+            (m.location.end.line === t.endLine &&
+              m.location.end.column === t.endCol)),
+      );
+      if (ms.length === 0) {
+        owe(`no such mutant in the L${gate} gate run (stale key)`);
+      } else if (!ms.some(isDetected)) {
+        owe(`not killed by the tests at or below L${gate} (${ms[0]!.status})`);
+      }
+    }
+  }
+
+  return out;
 }
 
 /** Warnings: `feature-layer` entries a full-run test already kills. */
@@ -811,6 +908,26 @@ export function formatKilledFeatureLayer(rows: FileScore[]): string {
 
   return [
     `WARNING: feature-layer entry has a full-run killer (${lines.length}). Not a failure; make it later-layer and name the test.`,
+    "```",
+    ...lines,
+    "```",
+  ].join("\n");
+}
+
+/** Entries that change the score but cover more than one missed mutant. */
+export function formatAmbiguousTriage(rows: FileScore[]): string {
+  const lines = rows.flatMap((r) =>
+    r.ambiguousTriage.map(
+      (a) =>
+        `${basename(r.file)}:${a.entry.line}:${a.entry.col} ${a.entry.mutator} -> ${a.entry.replacement} (${a.entry.reason}): ${a.count} mutants`,
+    ),
+  );
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    `Triage covering more than one mutant (${lines.length}): FAIL. An excluded or deferred entry must cover one proven mutant. Add endLine/endCol (the report's end position) to each, one entry per mutant.`,
     "```",
     ...lines,
     "```",
@@ -895,6 +1012,7 @@ export function run(args: string[], root: string): RunResult {
   const fullPaths: string[] = [];
   let layer: number | "row" | undefined;
   let gate: number | undefined;
+  const atPaths: string[] = [];
   const paths: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
@@ -916,6 +1034,12 @@ export function run(args: string[], root: string): RunResult {
         return fail(`mutation-score: --gate must be L0..L13, got "${v}"`);
       }
       gate = layerNum(v);
+    } else if (a === "--at") {
+      const p = args[++i];
+      if (p === undefined) {
+        return fail("mutation-score: --at needs a report or directory");
+      }
+      atPaths.push(p);
     } else if (a === "--full") {
       const p = args[++i];
       if (p === undefined) {
@@ -926,10 +1050,28 @@ export function run(args: string[], root: string): RunResult {
       paths.push(a);
     }
   }
-  if (gate !== undefined && fullPaths.length === 0) {
+  if (gate !== undefined && atPaths.length === 0) {
     return fail(
-      "mutation-score: --gate needs --full: the layer's debt is checked against a full run that includes its tests",
+      "mutation-score: --gate Ln needs --at <reports from a run at ceiling Ln> (mutation-nightly with gate: Ln)",
     );
+  }
+  if (gate !== undefined) {
+    const at = loadFiles(collect(atPaths));
+    const debt = gateDebt(join(root, "mutation-triage"), at, gate).map(
+      (d) =>
+        `${d.file}:${d.entry.line}:${d.entry.col} ${d.entry.mutator} (${d.entry.reason} ${d.entry.layer}): ${d.why}`,
+    );
+    const out =
+      debt.length === 0
+        ? `Layer gate L${gate}: every later-layer and feature-layer entry at or below L${gate} is killed by the tests at or below L${gate}.`
+        : [
+            `Layer gate L${gate}: FAIL. ${debt.length} deferred entries at or below L${gate} are not killed by the tests at or below L${gate}. Kill each with a test at its layer, or correct its layer, before building L${gate}.`,
+            "```",
+            ...debt,
+            "```",
+          ].join("\n");
+
+    return { code: debt.length > 0 ? 1 : 0, out, err };
   }
   const reports = collect(paths.length ? paths : [join(root, "reports")]);
   const full = fullPaths.length ? loadFiles(collect(fullPaths)) : undefined;
@@ -964,7 +1106,7 @@ export function run(args: string[], root: string): RunResult {
       ? "Deferred: NoCoverage here but reached above the ceiling in the full run, or later-layer triage below its layer; not in the gate score."
       : "No --full report: every NoCoverage mutant counts.",
     layer === undefined
-      ? "No --layer: later-layer triage counts as untriaged."
+      ? "No --layer: later-layer and feature-layer triage counts as untriaged."
       : `Ceiling: ${layer === "row" ? "each file's MUTATION.md row" : `L${layer}`}.`,
     ...(stale.length
       ? [
@@ -983,6 +1125,7 @@ export function run(args: string[], root: string): RunResult {
         ]),
     ...(formatUnexplained(rows) ? ["", formatUnexplained(rows)] : []),
     ...(formatOrphanTriage(rows) ? ["", formatOrphanTriage(rows)] : []),
+    ...(formatAmbiguousTriage(rows) ? ["", formatAmbiguousTriage(rows)] : []),
     ...(formatInvalidLaterLayer(rows)
       ? ["", formatInvalidLaterLayer(rows)]
       : []),
@@ -993,19 +1136,6 @@ export function run(args: string[], root: string): RunResult {
     ...(formatFeatureLayerDebt(rows) ? ["", formatFeatureLayerDebt(rows)] : []),
     ...(formatDeferred(rows) ? ["", formatDeferred(rows)] : []),
   ].join("\n");
-  const debt = gate === undefined ? [] : gateDebt(rows, gate);
-  const gateOut =
-    gate === undefined
-      ? ""
-      : debt.length === 0
-        ? `\nLayer gate L${gate}: no open feature-layer entries at or below L${gate}.`
-        : [
-            "",
-            `Layer gate L${gate}: FAIL. ${debt.length} feature-layer entries at or below L${gate} are not killed in the full run. Write the tests that kill them before building L${gate}.`,
-            "```",
-            ...debt,
-            "```",
-          ].join("\n");
   const missing = (only ?? []).filter(
     (name) => !rows.some((r) => basename(r.file) === name),
   );
@@ -1016,14 +1146,10 @@ export function run(args: string[], root: string): RunResult {
         : `mutation-score: not in any report: ${missing.join(", ")}`,
     );
 
-    return { code: 1, out: out + gateOut, err };
+    return { code: 1, out, err };
   }
 
-  return {
-    code: (check && rows.some((r) => !r.pass)) || debt.length > 0 ? 1 : 0,
-    out: out + gateOut,
-    err,
-  };
+  return { code: check && rows.some((r) => !r.pass) ? 1 : 0, out, err };
 }
 
 function main(): void {

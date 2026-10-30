@@ -32,16 +32,25 @@ on:
         type: choice
         options: [layer, none]
         default: layer
+      gate:
+        description: "Ln: the layer gate before building Ln (shards below Ln run at ceiling Ln, then mutation-score --gate Ln). Empty: off."
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
-  FULL: ${{ github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none' }}
+  # A gate run (MUTATION.md, "The layer gate collects every deferral") is
+  # never a full run.
+  GATE: ${{ inputs.gate || '' }}
+  FULL: ${{ !inputs.gate && (github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none') }}
+  # The artifact and cache name prefix: full-, gate-Ln-, or none.
+  PREFIX: ${{ inputs.gate && format('gate-{0}-', inputs.gate) || ((github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none') && 'full-' || '') }}
 
 jobs:
   mutate:
-    name: mutate (${{ matrix.shard }}${{ (github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none') && ', full' || '' }})
+    name: mutate (${{ matrix.shard }}${{ inputs.gate && format(', gate {0}', inputs.gate) || ((github.event.schedule == '11 3 * * 0' || inputs.ceiling == 'none') && ', full' || '') }})
     runs-on: ubuntu-latest
     timeout-minutes: 330
     strategy:
@@ -116,35 +125,50 @@ jobs:
           # tests may kill, so results cached under the old placement are
           # not reused.
           # A full run's results differ from a ceiling run's: its own cache.
-          key: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
-          restore-keys: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-
+          key: mutation-${{ env.PREFIX }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
+          restore-keys: mutation-${{ env.PREFIX }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-
 
       - name: Mutate
+        id: mutate
         env:
           LAYER: ${{ matrix.layer }}
         run: |
-          # The full run sets no ceiling: every non-internals test counts.
-          if [ "$FULL" != "true" ]; then export MUTATION_LAYER="$LAYER"; fi
+          if [ -n "$GATE" ]; then
+            # A gate run: only shards below the gate layer hold entries it
+            # checks, and they run at the gate's ceiling.
+            if ! echo "$GATE" | grep -Eq '^L([0-9]|1[0-3])$'; then
+              echo "gate must be L0..L13, got '$GATE'" >&2; exit 1
+            fi
+            if [ "${LAYER#L}" -ge "${GATE#L}" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "shard ${{ matrix.shard }} ($LAYER) is not below the gate $GATE"
+              exit 0
+            fi
+            export MUTATION_LAYER="$GATE"
+          elif [ "$FULL" != "true" ]; then
+            # The full run sets no ceiling: every non-internals test counts.
+            export MUTATION_LAYER="$LAYER"
+          fi
           pnpm --filter @directive-run/conformance mutate:file "${{ matrix.mutate }}"
 
       - name: Save incremental cache
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.mutate.outputs.skip != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/conformance/.stryker-cache
-          key: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
+          key: mutation-${{ env.PREFIX }}${{ matrix.shard }}-${{ hashFiles('packages/conformance/layers.json') }}-${{ github.run_id }}
 
       - name: Name the reports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.mutate.outputs.skip != 'true' }}
         run: |
           cd packages/conformance/reports/mutation
           mv mutation.json "${{ matrix.shard }}.json"
           mv mutation.html "${{ matrix.shard }}.html"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.mutate.outputs.skip != 'true' }}
         with:
-          name: mutation-${{ env.FULL == 'true' && 'full-' || '' }}${{ matrix.shard }}
+          name: mutation-${{ env.PREFIX }}${{ matrix.shard }}
           path: |
             packages/conformance/reports/mutation/${{ matrix.shard }}.json
             packages/conformance/reports/mutation/${{ matrix.shard }}.html
@@ -178,7 +202,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ${{ env.FULL == 'true' && 'mutation-full-*' || 'mutation-l*' }}
+          pattern: ${{ env.GATE != '' && format('mutation-gate-{0}-*', env.GATE) || (env.FULL == 'true' && 'mutation-full-*' || 'mutation-l*') }}
           path: reports
           merge-multiple: true
 
@@ -186,7 +210,7 @@ jobs:
       # needs the latest full-run report of each shard (any run: the newest
       # unexpired artifact of that name). None yet: nothing is deferred.
       - name: Fetch the latest full-run reports
-        if: ${{ env.FULL != 'true' }}
+        if: ${{ env.FULL != 'true' && env.GATE == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -204,7 +228,10 @@ jobs:
       - name: Print scores
         run: |
           score="npx --yes tsx@4.21.0 packages/conformance/scripts/mutation-score.ts"
-          if [ "$FULL" = "true" ]; then
+          if [ -n "$GATE" ]; then
+            # The layer gate: blocking for this run (exit 1 while debt is owed).
+            $score --gate "$GATE" --at reports
+          elif [ "$FULL" = "true" ]; then
             $score reports
           elif ls full/*.json > /dev/null 2>&1; then
             # Each shard ran at its MUTATION.md row's layer.
