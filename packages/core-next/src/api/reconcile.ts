@@ -97,7 +97,8 @@ export const withReconcile: SystemPart = (ctx) => {
       constraints.markResolved(run.req_.fromConstraint);
     },
     onError(run, error) {
-      reportError("resolver", run.resolver_, error);
+      // 1.35 passes the requirement as the error's context.
+      reportError("resolver", run.resolver_, error, run.req_);
       emit("resolver.error", () => ({
         resolver: run.resolver_,
         req: run.req_,
@@ -166,8 +167,12 @@ export const withReconcile: SystemPart = (ctx) => {
           startedAt: run.startedAt_,
         })),
         completed: [],
-        // As 1.35: the run is gone by now, so its resolver is "unknown".
-        canceled: removed.map((r) => ({ id: r.id, resolverId: "unknown" })),
+        // As 1.35: a canceled run is gone by now, so its resolver is
+        // "unknown"; one still in flight (L2b: satisfied) is named.
+        canceled: removed.map((r) => ({
+          id: r.id,
+          resolverId: resolvers.inflight.get(r.id)?.resolver_ ?? "unknown",
+        })),
       };
     },
     busy_: () => resolvers.inflight.size > 0,

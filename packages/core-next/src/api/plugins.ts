@@ -48,7 +48,7 @@ const HOOKS: Record<string, string[]> = {
   "effect.error": ["onEffectError", "id", "error"],
   "effect.write-blocked": ["onEffectWriteBlocked", "id", "key"],
   // L2: reconcile.ts.
-  "constraint.evaluate": ["onConstraintEvaluate", "id", "active"],
+  "constraint.evaluate": ["onConstraintEvaluate", "id", "active", "explain"],
   "constraint.error": ["onConstraintError", "id", "error"],
   "requirement.created": ["onRequirementCreated", "req"],
   "requirement.met": ["onRequirementMet", "req", "resolver"],

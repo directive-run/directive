@@ -115,7 +115,12 @@ export interface SystemContext {
   readonly derived: Record<string, unknown>;
   readonly tracker: Tracker;
   /** Report an error from `source` (the default strategy: skip). */
-  reportError(source: ErrorSource, sourceId: string, error: unknown): void;
+  reportError(
+    source: ErrorSource,
+    sourceId: string,
+    error: unknown,
+    context?: unknown,
+  ): void;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
@@ -506,6 +511,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     source: ErrorSource,
     sourceId: string,
     error: unknown,
+    context?: unknown,
   ): void {
     const wrapped =
       error instanceof DirectiveError
@@ -514,7 +520,7 @@ export function createSystemCore<const M extends ModuleSchema>(
             messageOf(error),
             source,
             sourceId,
-            undefined,
+            context,
             source !== "system",
           );
     emit("error", { error: wrapped });
