@@ -1040,7 +1040,11 @@ function bindEnginePassthroughs(system: any, engine: any): void {
 function warnIfNotStarted(system: any): void {
   if (
     isDevelopment &&
-    (typeof process === "undefined" || process.env?.NODE_ENV !== "test")
+    // Explicit checks, not `process.env?.NODE_ENV`: Stryker's instrumented
+    // optional chain reads `.NODE_ENV` off an undefined `env` (l3-system shard).
+    (typeof process === "undefined" ||
+      !process.env ||
+      process.env.NODE_ENV !== "test")
   ) {
     setTimeout(() => {
       if (!system.isRunning && !system.isInitialized) {
