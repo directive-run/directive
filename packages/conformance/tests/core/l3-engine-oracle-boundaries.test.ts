@@ -114,7 +114,9 @@ describe("a module with a dangerous key is refused, naming where it is", () => {
   });
 });
 
-function stuckSystem(maxWaitHolder: { hold: ReturnType<typeof deferred> }) {
+function stuckSystem(maxWaitHolder: {
+  hold: ReturnType<typeof deferred<void>>;
+}) {
   const mod = createModule("stuck", {
     schema: {
       facts: { go: t.boolean() },

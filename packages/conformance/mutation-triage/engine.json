@@ -1674,5 +1674,430 @@
     "reason": "later-layer",
     "note": "hydration scope (hydrate) — killed in the full run by tests/plugins/hydration-scope.test.ts > the hydration capability marks restored values as hydration with persistence listed first",
     "layer": "L6"
+  },
+  {
+    "line": 121,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 120,
+    "col": 52,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 121,
+    "col": 9,
+    "mutator": "EqualityOperator",
+    "replacement": "typeof raw === \"object\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 121,
+    "col": 24,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 119,
+    "col": 9,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 353,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms.test.ts > event patch — data form sets facts from literals, $ref payload copies, and $template strings"
+  },
+  {
+    "line": 839,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — snapshot / history.navigate lifecycle captures system.history.navigate on goBack"
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 841,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "effectsManager.runningEffect() === null",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1165,
+    "col": 13,
+    "mutator": "EqualityOperator",
+    "replacement": "attempts < MAX_EFFECT_RETRIES",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > the retry strategy for an effect stops after three retries in a row"
+  },
+  {
+    "line": 1168,
+    "col": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/blackbox-effects-production.test.ts > effects in production a retried failing effect does not warn when the retries run out"
+  },
+  {
+    "line": 1218,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms-namespaced.test.ts > namespaced resolver key — KeySelector via dynamic register dedups equivalent requirements by selected fields"
+  },
+  {
+    "line": 1293,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/engine.test.ts > constraint-binding (RFC-0003) — engine integration `abortOn` on an async constraint is ignored — the clobber lands"
+  },
+  {
+    "line": 1293,
+    "col": 9,
+    "mutator": "LogicalOperator",
+    "replacement": "state?.isAsync && def.async",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/engine.test.ts > constraint-binding (RFC-0003) — engine integration emits `constraint.binding.disabled` (reason: async-promoted) when `when()` returns a Promise but async wasn't declared"
+  },
+  {
+    "line": 1291,
+    "col": 10,
+    "mutator": "OptionalChaining",
+    "replacement": "def.abortOn",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/unregister-module.test.ts > unregisterModule aborts an in-flight resolver that watches the signal"
+  },
+  {
+    "line": 1622,
+    "col": 35,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken"
+  },
+  {
+    "line": 1623,
+    "col": 11,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken"
+  },
+  {
+    "line": 1732,
+    "col": 29,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack"
+  },
+  {
+    "line": 1732,
+    "col": 29,
+    "mutator": "LogicalOperator",
+    "replacement": "effectPhaseWrites > 0 || otherPhaseWrites === 0",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack"
+  },
+  {
+    "line": 1732,
+    "col": 29,
+    "mutator": "EqualityOperator",
+    "replacement": "effectPhaseWrites >= 0",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack"
+  },
+  {
+    "line": 1750,
+    "col": 44,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1751,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1751,
+    "col": 13,
+    "mutator": "BooleanLiteral",
+    "replacement": "effectOriginKeys.has(key)",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1760,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1767,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1767,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "kept.size <= 0",
+    "reason": "later-layer",
+    "layer": "L4",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > cutting a self-waking chain keeps a write that is not the chain's own"
+  },
+  {
+    "line": 1867,
+    "col": 31,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation does not re-dispatch resolvers for the rewound state"
+  },
+  {
+    "line": 1873,
+    "col": 13,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L8",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > requirements after a history navigation does not re-dispatch resolvers for the rewound state"
+  },
+  {
+    "line": 1924,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L10",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/blackbox-effects.test.ts > cleanup replacing a definition cleans up the old one first"
+  },
+  {
+    "line": 2246,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/watched-set-shrinks.test.ts > the watched set shrinks when readers stop reading a gate that closes gives its value back"
+  },
+  {
+    "line": 2246,
+    "col": 51,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/watched-set-shrinks.test.ts > the watched set shrinks when readers stop reading a gate that closes gives its value back"
+  },
+  {
+    "line": 2250,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/watched-set-shrinks.test.ts > the watched set shrinks when readers stop reading a gate that closes gives its value back"
+  },
+  {
+    "line": 2246,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "derivationsManager.observedCount() <= 0",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/watched-set-shrinks.test.ts > the watched set shrinks when readers stop reading a gate that closes gives its value back"
+  },
+  {
+    "line": 2363,
+    "col": 9,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/multi-module-correctness.prod.test.ts > production build still records a publish with no handler as an unknown-event drop"
+  },
+  {
+    "line": 3787,
+    "col": 67,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L12",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger — captures observation events captures constraint.evaluate with whenSpec + whenExplain"
+  },
+  {
+    "line": 3794,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "later-layer",
+    "layer": "L11",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/doctor.test.ts > doctor.checkAbortOn — abortOn/bind awareness F1: real system.inspect().constraints[].abortOn is populated and doctor flags it"
+  },
+  {
+    "line": 3796,
+    "col": 18,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L11",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/doctor.test.ts > doctor.checkAbortOn — abortOn/bind awareness F1: real system.inspect().constraints[].abortOn is populated and doctor flags it"
+  },
+  {
+    "line": 3798,
+    "col": 21,
+    "mutator": "LogicalOperator",
+    "replacement": "s.lastResult && false",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/data-forms-namespaced.test.ts > dynamic constraint register — data-form when register accepts a data `when` and evaluates it correctly"
+  },
+  {
+    "line": 3813,
+    "col": 59,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/utils/testing-utils.test.ts > createCoverageTracker tracks constraints hit"
+  },
+  {
+    "line": 3813,
+    "col": 75,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "layer": "L13",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/engine.test.ts > Engine — Inspect inspect returns resolverDefs info"
+  },
+  {
+    "line": 3825,
+    "col": 55,
+    "mutator": "ArrowFunction",
+    "replacement": "() => undefined",
+    "reason": "later-layer",
+    "layer": "L9",
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/multi-module-correctness.prod.test.ts > production build still records a publish with no handler as an unknown-event drop"
+  },
+  {
+    "line": 1489,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1489,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1489,
+    "col": 33,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1489,
+    "col": 11,
+    "mutator": "EqualityOperator",
+    "replacement": "strategy !== \"retry\"",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1491,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1492,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
+  },
+  {
+    "line": 1489,
+    "col": 24,
+    "mutator": "StringLiteral",
+    "replacement": "\"\"",
+    "reason": "v1-bug",
+    "note": "onResolverError \"retry\" removes the requirement from previousRequirements and reschedules a pass, but the failed resolver is never dispatched again (probe: plugin sees start, error, then empty passes; the resolver ran once). The branch changes nothing a user can see, so no test can tell it from its mutants."
   }
 ]
