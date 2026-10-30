@@ -184,12 +184,28 @@
     "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
   },
   {
+    "line": 401,
+    "col": 36,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Stryker limit: DEFAULT_RETRY is a module-level constant built when the module loads, before the mutant is activated, so the report shows Survived. Applied by hand it is killed: 117 tests fail at MUTATION_LAYER=L2 (221 unceilinged), among them every test whose resolver sets no retry (e.g. 'a predicate takes only what it accepts; later resolvers take the rest' in l2-resolvers-oracle.test.ts), because attempts becomes undefined and the resolver never runs."
+  },
+  {
     "line": 403,
     "col": 12,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "equivalent",
     "note": "An empty backoff name falls to the default branch, which waits initialDelay, exactly what \"none\" does."
+  },
+  {
+    "line": 417,
+    "col": 36,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "Stryker limit: DEFAULT_BATCH is a module-level constant built when the module loads, before the mutant is activated, so the report shows Survived. Applied by hand the whole unceilinged suite (2422 tests) still passes: no test pins the default batch config (windowMs falls back to undefined). Not equivalent: a batch with no windowMs must still gather requirements that arrive a few ms apart into one call. Gap for the L7 batch slice, not an L2 behaviour."
   },
   {
     "line": 418,
@@ -454,6 +470,22 @@
     "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
   },
   {
+    "line": 686,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof def === \"object\" && def !== null || \"requirement\" in def",
+    "reason": "not-observable",
+    "note": "Malformed resolver definitions never reach this guard through createSystem: a null/undefined definition throws a TypeError at construction and a primitive one fails 'must define resolve()'. Only a primitive registered dynamically (L10 register()) gets here, where this mutant throws on the next lookup instead of ignoring it. Proved by hand: whole suite passes, L2 ceiling and unceilinged. Pinning that a nonsense definition is ignored is not behaviour 2.0 need copy."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof def === \"object\" || def !== null",
+    "reason": "not-observable",
+    "note": "Same guard as the string-requirement type guard above (hasStringRequirement): only a primitive definition registered dynamically (L10) can tell the mutant apart; createSystem rejects null and primitive definitions at construction. Proved by hand: whole suite passes, L2 ceiling and unceilinged."
+  },
+  {
     "line": 687,
     "col": 7,
     "mutator": "ConditionalExpression",
@@ -468,6 +500,22 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof def === \"object\" && def !== null || \"requirement\" in def",
+    "reason": "not-observable",
+    "note": "Same as the string-requirement guard (hasFunctionRequirement): only a primitive definition registered dynamically (L10) can tell the mutant apart; createSystem rejects null and primitive definitions at construction. Proved by hand: whole suite passes, L2 ceiling and unceilinged."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "mutator": "LogicalOperator",
+    "replacement": "typeof def === \"object\" || def !== null",
+    "reason": "not-observable",
+    "note": "Same as the function-requirement guard above: only a primitive definition registered dynamically (L10) can tell the mutant apart; createSystem rejects null and primitive definitions at construction. Proved by hand: whole suite passes, L2 ceiling and unceilinged."
   },
   {
     "line": 699,
@@ -1075,8 +1123,8 @@
     "col": 16,
     "mutator": "ObjectLiteral",
     "replacement": "{}",
-    "reason": "not-observable",
-    "note": "Relabeled from v1-bug: not one of GATE-0's four recorded 1.35 bugs, so it is counted, not treated as a known bug. Only changes the error a run canceled during its backoff reports. 1.35 reports the last error after that cancel (observed in l2-resolvers-oracle), which is itself questionable, so no test pins it."
+    "reason": "v1-bug",
+    "note": "Known 1.35 bug: a run canceled during its retry backoff reports the cancel and then also an error (after the wait, processRetryError returns {action:'abort', error}, the retry loop breaks and recordError reports the last error). The mutant changes only that error report, so only the buggy path can tell it apart; the oracle does not pin it correct (l2-resolvers-oracle observes it without asserting). Stays counted."
   },
   {
     "line": 1218,
@@ -1183,6 +1231,15 @@
     "note": "startedAt is set in the same synchronous step that starts the run, so Date.now() returns the same value."
   },
   {
+    "line": 1374,
+    "col": 23,
+    "mutator": "OptionalChaining",
+    "replacement": "inflight.get(req.id).startedAt",
+    "reason": "later-layer",
+    "layer": "L7",
+    "note": "executeResolve runs without an in-flight entry only from the batch.enabled-without-resolveBatch fallback, a batch feature. Killed in the full run by 'batch + resolve fallback resolves requirements individually when batch.enabled but no resolveBatch' [batch-resolve-fallback.test.ts]; proved by hand: 4 tests fail unceilinged, none at the L2 ceiling."
+  },
+  {
     "line": 1377,
     "col": 11,
     "mutator": "ConditionalExpression",
@@ -1279,6 +1336,14 @@
     "note": "liveRuns only decides whether write counts are kept and pass maps rotated; a finished run left in it costs bookkeeping, and its own .finally removes it anyway."
   },
   {
+    "line": 1962,
+    "col": 9,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "The slot is overwritten by inflight.set a few lines later whenever the requirement still has a resolver, and a batch resolver never holds one. It matters only if the resolver stopped matching meanwhile (a dynamic assign, L10): the stale entry then lives until the aborted run's own finally removes it. Proved by hand: whole suite passes, L2 ceiling and unceilinged. Observable only through inspect().inflight (L9) for that moment."
+  },
+  {
     "line": 1963,
     "col": 30,
     "mutator": "ObjectLiteral",
@@ -1333,7 +1398,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L7",
-    "note": "Batched resolvers — killed in the full run by attribution is per run one batch's write does not shield another batch of the same definition"
+    "note": "Batched resolvers (L7): the branch that hands a requirement to the batch queue instead of starting a single run. Killed in the full run by 'unregisterModule waits for an in-flight batched resolver and aborts it' [unregister-module.test.ts]."
   },
   {
     "line": 2011,
@@ -1629,12 +1694,28 @@
     "note": "Batched resolvers — killed in the full run by resolver outcomes a batch that satisfied its requirement is superseded when it returns"
   },
   {
+    "line": 2446,
+    "col": 21,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "destroy() runs after system.destroy() has already called stop(), which aborts every resolver; what is left is the statuses map (read only by inspect()/explain(), L9) and the resolver cache, neither used again on a destroyed system. Proved by hand: whole suite passes, L2 ceiling and unceilinged."
+  },
+  {
     "line": 2447,
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "equivalent",
     "note": "destroy() runs after stop(), which already called abortAll(), so nothing is in flight; resolversByType is read only by findResolver, which a destroyed system never calls again. (statuses.clear() is a different case: explain() can read statuses after destroy, so it is not listed here.)"
+  },
+  {
+    "line": 2448,
+    "col": 7,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "not-observable",
+    "note": "statuses are read only by inspect()/explain() (L9) and a destroyed system is not asked. Proved by hand: whole suite passes, L2 ceiling and unceilinged."
   },
   {
     "line": 2449,

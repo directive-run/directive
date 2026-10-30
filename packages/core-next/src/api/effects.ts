@@ -236,15 +236,22 @@ export function createEffectsManager<S extends Schema>(
     console.error(`[Directive] Effect "${state.id}" threw an error:`, error);
   }
 
-  /** Dev: an async auto-tracked effect that read nothing before its first await. */
+  /**
+   * Development: an async auto-tracked effect that read nothing before its
+   * first await. The whole body is behind the dev flag: a nested function
+   * declaration is not tree-shaken, so a gated call site alone would leave the
+   * warning text in a production bundle (scripts/size.mjs guards this).
+   */
   function warnAsyncAutoTracked(id: string, deps: Set<unknown>): void {
-    if (deps.size > 0 || warnedAsync.has(id)) {
-      return;
+    if (isDevelopment) {
+      if (deps.size > 0 || warnedAsync.has(id)) {
+        return;
+      }
+      warnedAsync.add(id);
+      console.warn(
+        `[Directive] Async effect "${id}" recorded no dependencies, so it runs on every reconcile. Auto-tracking cannot see across an \`await\` — the tracking context closes when the body returns its promise — and this effect read nothing before its first one. Add \`deps: ["key1", "key2"]\`, or move the reads above the first \`await\`.`,
+      );
     }
-    warnedAsync.add(id);
-    console.warn(
-      `[Directive] Async effect "${id}" recorded no dependencies, so it runs on every reconcile. Auto-tracking cannot see across an \`await\` — the tracking context closes when the body returns its promise — and this effect read nothing before its first one. Add \`deps: ["key1", "key2"]\`, or move the reads above the first \`await\`.`,
-    );
   }
 
   /**
