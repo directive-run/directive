@@ -360,6 +360,42 @@ describe("object-form events in a composed system", () => {
     expect(system.facts.m.status).toBe("object:y");
     expect(system.facts.m.count).toBe(2);
   });
+
+  it("runs a function event as that function even when it carries a handler property of its own", async () => {
+    quiet();
+    const seen: string[] = [];
+    const go = Object.assign(
+      () => {
+        seen.push("function");
+      },
+      {
+        handler: () => {
+          seen.push("property");
+        },
+      },
+    );
+    const m = createModule("m", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: {},
+        events: { go: {} },
+        requirements: {},
+      },
+      init: (f: any) => {
+        f.n = 0;
+      },
+      events: { go },
+    } as any);
+    const other = createModule("other", config() as any);
+    const system = createSystem({ modules: { m, other } } as never) as any;
+    system.start();
+    await settle(system);
+
+    system.events.m.go();
+    await settle(system);
+
+    expect(seen).toEqual(["function"]);
+  });
 });
 
 describe("derivations, effects and flat access in a composed system", () => {

@@ -42,10 +42,42 @@
   {
     "line": 46,
     "col": 5,
+    "endLine": 49,
+    "endCol": 55,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable."
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable. Mutant: `reason !== null && typeof reason === \"object\" && \"kind\" in reason && (reason as { kind: un` -> true."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "endLine": 48,
+    "endCol": 21,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable. Mutant: `reason !== null && typeof reason === \"object\" && \"kind\" in reason` -> true."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "endLine": 47,
+    "endCol": 31,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable. Mutant: `reason !== null && typeof reason === \"object\"` -> true."
+  },
+  {
+    "line": 46,
+    "col": 5,
+    "endLine": 46,
+    "endCol": 20,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "equivalent",
+    "note": "Dead in 1.35: handleRetryError, readClobberReason's only caller, starts only while the run's signal is not aborted (executeResolve's catch returns on abort first, and so does the batch retry loop), so readClobberReason always returns undefined there and the aborted / clobbered branch never runs. The documented \"clobbered\" shouldRetry reason is unreachable. Mutant: `reason !== null` -> true."
   },
   {
     "line": 46,
@@ -293,8 +325,8 @@
     "mutator": "BooleanLiteral",
     "replacement": "def.batch?.enabled",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch",
+    "layer": "L7"
   },
   {
     "line": 569,
@@ -302,8 +334,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)",
+    "layer": "L7"
   },
   {
     "line": 569,
@@ -311,8 +343,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by batch + resolve fallback emits dev warning when batch.enabled without resolveBatch",
+    "layer": "L7"
   },
   {
     "line": 569,
@@ -320,8 +352,8 @@
     "mutator": "LogicalOperator",
     "replacement": "!def.batch?.enabled && def.resolveBatch",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)",
+    "layer": "L7"
   },
   {
     "line": 569,
@@ -329,8 +361,8 @@
     "mutator": "LogicalOperator",
     "replacement": "(!def.batch?.enabled || def.resolveBatch) && def.resolveBatchWithResults",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)",
+    "layer": "L7"
   },
   {
     "line": 572,
@@ -338,8 +370,19 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batch config validation (batch.enabled without resolveBatch) — killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)"
+    "note": "Batch config validation (batch.enabled without resolveBatch) \u2014 killed in the full run by a loading flag survives a failure after satisfying a satisfied batch that times out: the finally lands (L10)",
+    "layer": "L7"
+  },
+  {
+    "line": 580,
+    "col": 12,
+    "endLine": 584,
+    "endCol": 6,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "batch.enabled with no resolve(), resolveBatch() or resolveBatchWithResults() is refused when the manager is built. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
   },
   {
     "line": 671,
@@ -464,10 +507,32 @@
   {
     "line": 686,
     "col": 7,
+    "endLine": 688,
+    "endCol": 27,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+    "reason": "not-observable",
+    "note": "hasStringRequirement: whole guard replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "endLine": 687,
+    "endCol": 19,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "hasStringRequirement: first two operands replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
+  },
+  {
+    "line": 686,
+    "col": 7,
+    "endLine": 686,
+    "endCol": 30,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "hasStringRequirement: first operand `typeof def === \"object\"` replaced by true. Differs only for a resolver defined as a function object that carries `requirement: \"X\"` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
   },
   {
     "line": 686,
@@ -496,10 +561,32 @@
   {
     "line": 698,
     "col": 7,
+    "endLine": 700,
+    "endCol": 27,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "Resolver definitions are always objects, so the object / non-null guards cannot fail, and a string requirement never reaches the function check."
+    "reason": "not-observable",
+    "note": "hasFunctionRequirement: whole guard replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "endLine": 699,
+    "endCol": 19,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "hasFunctionRequirement: first two operands replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
+  },
+  {
+    "line": 698,
+    "col": 7,
+    "endLine": 698,
+    "endCol": 30,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "hasFunctionRequirement: first operand `typeof def === \"object\"` replaced by true. Differs only for a resolver defined as a function object that carries `requirement: (req) => ...` and `resolve` properties, which is outside ResolversDef: 1.35 skips it (no resolver found for the requirement, a dev warning) and this mutant would run it. Non-objects never reach the guard (createSystem refuses a string, number or null resolver). Hand-run with Object.assign(async () => {}, { requirement, resolve }): 1.35 runs nothing, the mutant runs resolve."
   },
   {
     "line": 698,
@@ -696,10 +783,22 @@
   {
     "line": 801,
     "col": 9,
+    "endLine": 801,
+    "endCol": 61,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "equivalent",
-    "note": "The engine always supplies getConstraintBinding and every dispatched requirement carries fromConstraint; a missing or empty binding yields facts without owned fields, which pass every write through, so skipping the guard changes nothing."
+    "reason": "internals-only",
+    "note": "Whole guard replaced by false. Differs only when the resolver manager is built without `getConstraintBinding`, which only a direct call of the internal createResolversManager does: the engine always supplies it, `getConstraintBinding(undefined)` answers undefined for a requirement with no `fromConstraint`, and `req` is never null (both callers pass a dispatched requirement), so the binding is still null."
+  },
+  {
+    "line": 801,
+    "col": 9,
+    "endLine": 801,
+    "endCol": 38,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "First two operands `!getConstraintBinding || !req` replaced by false. Differs only when the resolver manager is built without `getConstraintBinding`, which only a direct call of the internal createResolversManager does: the engine always supplies it, `getConstraintBinding(undefined)` answers undefined for a requirement with no `fromConstraint`, and `req` is never null (both callers pass a dispatched requirement), so the binding is still null."
   },
   {
     "line": 801,
@@ -859,8 +958,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Write recording for a context without a controller or requirement ids (dynamic call / batch) — killed in the full run by Resolvers dynamic definitions assign overrides an existing resolver"
+    "note": "Write recording for a context without a controller or requirement ids (dynamic call / batch) \u2014 killed in the full run by Resolvers dynamic definitions assign overrides an existing resolver",
+    "layer": "L13"
   },
   {
     "line": 1135,
@@ -1236,8 +1335,8 @@
     "mutator": "OptionalChaining",
     "replacement": "inflight.get(req.id).startedAt",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "executeResolve runs without an in-flight entry only from the batch.enabled-without-resolveBatch fallback, a batch feature. Killed in the full run by 'batch + resolve fallback resolves requirements individually when batch.enabled but no resolveBatch' [batch-resolve-fallback.test.ts]; proved by hand: 4 tests fail unceilinged, none at the L2 ceiling."
+    "note": "executeResolve runs without an in-flight entry only from the batch.enabled-without-resolveBatch fallback, a batch feature. Killed in the full run by 'batch + resolve fallback resolves requirements individually when batch.enabled but no resolveBatch' [batch-resolve-fallback.test.ts]; proved by hand: 4 tests fail unceilinged, none at the L2 ceiling.",
+    "layer": "L7"
   },
   {
     "line": 1377,
@@ -1302,6 +1401,92 @@
     "replacement": "onRetry(resolverId, req, next)",
     "reason": "internals-only",
     "note": "The engine always supplies this callback, so the missing-callback branch is only reachable by constructing the resolvers manager directly from /internals."
+  },
+  {
+    "line": 1669,
+    "col": 38,
+    "endLine": 1671,
+    "endCol": 8,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "batch fallback (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
+  },
+  {
+    "line": 1672,
+    "col": 65,
+    "endLine": 1674,
+    "endCol": 8,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "batch fallback: a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
+  },
+  {
+    "line": 1727,
+    "col": 15,
+    "endLine": 1729,
+    "endCol": 6,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "executeBatch's `!def` guard: executeBatch is only called from processBatch with a queue taken from `batches`, and a definition is only removed by unregisterDefinition, which first cancels the resolver's timer and deletes its queue (the engine deletes the same object afterwards), so no queued batch outlives its definition. NoCoverage in the ceiling and full runs; the suite passes with the mutant applied, at L2 and with no ceiling."
+  },
+  {
+    "line": 1840,
+    "col": 46,
+    "endLine": 1842,
+    "endCol": 8,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "supersedeSatisfiedBatches: a batch whose run is not yet satisfied is skipped rather than superseded. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
+  },
+  {
+    "line": 1870,
+    "col": 15,
+    "endLine": 1872,
+    "endCol": 6,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "addToBatch's `!def` guard: its only caller reads `def` from the same definitions object and checks def.batch?.enabled just before, so def is never undefined here. NoCoverage in the ceiling and full runs; the suite passes with the mutant applied, at L2 and with no ceiling."
+  },
+  {
+    "line": 1880,
+    "col": 52,
+    "endLine": 1883,
+    "endCol": 6,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "batch queue hard cap: a queue already at the effective maximum is flushed before the next requirement joins. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
+  },
+  {
+    "line": 1881,
+    "col": 7,
+    "endLine": 1881,
+    "endCol": 30,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "feature-layer",
+    "note": "batch queue hard cap: the pending batch timer is cleared before the forced flush. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
+  },
+  {
+    "line": 1882,
+    "col": 7,
+    "endLine": 1882,
+    "endCol": 32,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "feature-layer",
+    "note": "batch queue hard cap: the full queue is processed (forced flush). No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "layer": "L7"
   },
   {
     "line": 1956,
@@ -1397,8 +1582,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batched resolvers (L7): the branch that hands a requirement to the batch queue instead of starting a single run. Killed in the full run by 'unregisterModule waits for an in-flight batched resolver and aborts it' [unregister-module.test.ts]."
+    "note": "Batched resolvers (L7): the branch that hands a requirement to the batch queue instead of starting a single run. Killed in the full run by 'unregisterModule waits for an in-flight batched resolver and aborts it' [unregister-module.test.ts].",
+    "layer": "L7"
   },
   {
     "line": 2011,
@@ -1502,8 +1687,8 @@
     "mutator": "ObjectLiteral",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L10",
-    "note": "Draining in-flight resolvers on unregisterModule — killed in the full run by unregisterModule resolves only once in-flight resolvers have drained"
+    "note": "Draining in-flight resolvers on unregisterModule \u2014 killed in the full run by unregisterModule resolves only once in-flight resolvers have drained",
+    "layer": "L10"
   },
   {
     "line": 2093,
@@ -1551,8 +1736,41 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batched resolvers — killed in the full run by attribution is per run one batch's write does not shield another batch of the same definition"
+    "note": "Batched resolvers \u2014 killed in the full run by attribution is per run one batch's write does not shield another batch of the same definition",
+    "layer": "L7"
+  },
+  {
+    "line": 2213,
+    "col": 7,
+    "endLine": 2213,
+    "endCol": 23,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Batch resolvers (L7): batches.clear() in stop()/destroy(): queued batches are dropped; killed in the full run by l7-batch-resolvers-oracle.test.ts > stopping or destroying a system ends batched work stop() cancels the requirements of a queued batch and the handler never runs, even through settle().",
+    "layer": "L7"
+  },
+  {
+    "line": 2230,
+    "col": 7,
+    "endLine": 2230,
+    "endCol": 29,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Batch resolvers (L7): batchInflight.clear() after stop()/destroy() cancels in-flight batches; killed in the full run by l7-batch-resolvers-oracle.test.ts > stopping or destroying a system ends batched work destroy() aborts a batch that is running and cancels each of its requirements once.",
+    "layer": "L7"
+  },
+  {
+    "line": 2231,
+    "col": 7,
+    "endLine": 2231,
+    "endCol": 26,
+    "mutator": "CallExpression",
+    "replacement": ";",
+    "reason": "later-layer",
+    "note": "Batch resolvers (L7): reqToBatch.clear() after stop()/destroy() cancels in-flight batches; killed in the full run by l7-batch-resolvers-oracle.test.ts > stopping or destroying a system ends batched work a batch that is running when the system stops does not take its requirement away from the new batch.",
+    "layer": "L7"
   },
   {
     "line": 2233,
@@ -1568,7 +1786,7 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "getStatus for an id not in flight: inspect() asks only for in-flight ids; explain() (data forms, L13) asks for others — killed in the full run by data-forms.test.ts 'data-form introspection explain(requirementId) renders the predicate clause tree with ✓/✗'.",
+    "note": "getStatus for an id not in flight: inspect() asks only for in-flight ids; explain() (data forms, L13) asks for others \u2014 killed in the full run by data-forms.test.ts 'data-form introspection explain(requirementId) renders the predicate clause tree with \u2713/\u2717'.",
     "layer": "L13"
   },
   {
@@ -1665,8 +1883,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batched resolvers — killed in the full run by a batched resolver whose own write retracts its requirement is not canceled"
+    "note": "Batched resolvers \u2014 killed in the full run by a batched resolver whose own write retracts its requirement is not canceled",
+    "layer": "L7"
   },
   {
     "line": 2309,
@@ -1690,8 +1908,40 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Batched resolvers — killed in the full run by resolver outcomes a batch that satisfied its requirement is superseded when it returns"
+    "note": "Batched resolvers \u2014 killed in the full run by resolver outcomes a batch that satisfied its requirement is superseded when it returns",
+    "layer": "L7"
+  },
+  {
+    "line": 2336,
+    "col": 34,
+    "endLine": 2344,
+    "endCol": 6,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "later-layer",
+    "note": "Batch resolvers (L7): hasPendingBatches(): settle() uses it to wait for and run a queued batch now; killed in the full run by l7-batch-resolvers-oracle.test.ts > the batch window settle() runs a queued batch now instead of waiting out the window.",
+    "layer": "L3"
+  },
+  {
+    "line": 2355,
+    "col": 29,
+    "endLine": 2359,
+    "endCol": 8,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "note": "assignDefinition on a resolver that does not exist throws (dynamic assign, the L10 definitions registry). No test calls it; an L10 test will.",
+    "layer": "L10"
+  },
+  {
+    "line": 2368,
+    "col": 29,
+    "endLine": 2370,
+    "endCol": 8,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "equivalent",
+    "note": "unregisterDefinition of an id with no definition: past the guard the function finds no in-flight run, no in-flight batch and no queue for that id (unregister removes them with the definition), deletes nothing, and only clears the resolver-by-type cache and runs the idempotent status trim, so the outcome is the same. NoCoverage in the ceiling and full runs; the suite passes with the mutant applied, at L2 and with no ceiling."
   },
   {
     "line": 2446,

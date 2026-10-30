@@ -45,8 +45,8 @@
     "mutator": "ArrayDeclaration",
     "replacement": "[]",
     "reason": "later-layer",
-    "layer": "L10",
-    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) \u2014 killed in the full run by unregisterModule frees the namespace again when registerModule itself fails"
+    "note": "Dangerous-key refusal for a module's sources section (sources are the plan's L5; the refusal is reached through registerModule, L10) \u2014 killed in the full run by unregisterModule frees the namespace again when registerModule itself fails",
+    "layer": "L10"
   },
   {
     "line": 116,
@@ -147,10 +147,22 @@
   {
     "line": 306,
     "col": 7,
+    "endLine": 306,
+    "endCol": 46,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "internals-only",
-    "note": "The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals. This key matches two mutants: the whole `||` condition and its first operand `derive === undefined` both start here."
+    "note": "Whole `||` condition replaced by false. The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
+  },
+  {
+    "line": 306,
+    "col": 7,
+    "endLine": 306,
+    "endCol": 27,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "internals-only",
+    "note": "First operand `derive === undefined` replaced by false (a null store still throws, an undefined one reaches the proxy). The engine always supplies the derive store; the missing-store branch is only reachable by invoking a transformed definition directly from /internals."
   },
   {
     "line": 306,
@@ -190,8 +202,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 343,
@@ -199,8 +211,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 344,
@@ -216,8 +228,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 348,
@@ -225,16 +237,28 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 348,
     "col": 11,
+    "endLine": 348,
+    "endCol": 67,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "Whole condition replaced by true. A function (or missing) `when` is rewritten into a copy `{ ...def, when }`, and prefixPredicateSpec returns a function unchanged, so a plain definition behaves identically. The copy drops what a spread does not carry, so it differs only for a constraint definition whose `require` or other fields are inherited from a prototype or non-enumerable (hand-run with Object.create({ require }): 1.35 runs the resolver, the mutant does not). Plain config objects never have that shape."
+  },
+  {
+    "line": 348,
+    "col": 11,
+    "endLine": 348,
+    "endCol": 33,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "A function (or missing) `when` that is rewritten anyway comes back unchanged from prefixPredicateSpec, so the copied definition is identical. This key matches two mutants: the whole `&&` condition and its first operand `def.when !== undefined` both start here."
+    "note": "First operand `def.when !== undefined` replaced by true. With `when` undefined the definition is copied with `when: undefined` and goes on to the same missing-predicate error as the uncopied one (hand-run: identical error); a function `when` is still skipped by the second operand."
   },
   {
     "line": 348,
@@ -242,8 +266,8 @@
     "mutator": "EqualityOperator",
     "replacement": "def.when === undefined",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 348,
@@ -267,8 +291,8 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof def.when === \"function\"",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 348,
@@ -284,8 +308,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 358,
@@ -301,8 +325,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 364,
@@ -318,8 +342,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 365,
@@ -335,8 +359,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 369,
@@ -344,16 +368,28 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 369,
     "col": 9,
+    "endLine": 369,
+    "endCol": 72,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "A derivation without a compute property falls through every later test to the same `next[key] = raw`. This key matches two mutants: the whole `&&` condition and its first operand `raw` both start here."
+    "note": "Whole condition replaced by true. A derivation without an own compute property falls through every later test (typeof c === \"function\", isTemplate, isPredicate) to the same `next[key] = raw`; hand-run with null, a function carrying a compute property, and the object form: identical results."
+  },
+  {
+    "line": 369,
+    "col": 9,
+    "endLine": 369,
+    "endCol": 39,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "not-observable",
+    "note": "First operand `raw` replaced by true. Differs only for a null derivation entry (a type error): `Object.hasOwn(null, ...)` then throws a TypeError while the system is built, where 1.35 throws a TypeError when the derivation is first read. Every other value is unchanged (hand-run)."
   },
   {
     "line": 369,
@@ -385,8 +421,8 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 369,
@@ -394,8 +430,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 369,
@@ -403,8 +439,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 372,
@@ -412,8 +448,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 378,
@@ -429,8 +465,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 378,
@@ -438,8 +474,8 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof c !== \"function\"",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced derivation compute \u2014 data forms computes boolean derivations from a p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 378,
@@ -479,8 +515,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 404,
@@ -496,8 +532,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 410,
@@ -513,8 +549,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 411,
@@ -530,8 +566,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 414,
@@ -539,8 +575,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 414,
@@ -572,8 +608,8 @@
     "mutator": "EqualityOperator",
     "replacement": "typeof raw !== \"object\"",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 414,
@@ -581,8 +617,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 414,
@@ -590,8 +626,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 416,
@@ -599,8 +635,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 422,
@@ -608,8 +644,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 422,
@@ -641,8 +677,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 424,
@@ -650,8 +686,8 @@
     "mutator": "StringLiteral",
     "replacement": "``",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event handler + patch \u2014 dev warn dev-warns when both `handler` and `p' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 428,
@@ -659,8 +695,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced event patch \u2014 data form sets facts from literals, $ref payload copies' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 443,
@@ -676,8 +712,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 450,
@@ -693,8 +729,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact",
+    "layer": "L11"
   },
   {
     "line": 456,
@@ -702,8 +738,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 457,
@@ -719,8 +755,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 461,
@@ -728,8 +764,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 461,
@@ -745,8 +781,8 @@
     "mutator": "EqualityOperator",
     "replacement": "def.on === undefined",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 461,
@@ -762,8 +798,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced effect on \u2014 data trigger runs only when the predicate currently holds' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 471,
@@ -784,11 +820,46 @@
   {
     "line": 477,
     "col": 5,
+    "endLine": 480,
+    "endCol": 28,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "data-form constraint `when` composed under a namespace (L13 data forms); L3 tests merely execute it. Mutant `constraints === mod.constraints && derive === mod.derive && events === mod.events && effec` -> true: killed in the full run by data-forms-namespaced.test.ts > namespaced constraint when \u2014 data form fires when the predicate holds and produces requirements.",
+    "layer": "L13"
+  },
+  {
+    "line": 477,
+    "col": 5,
+    "endLine": 479,
+    "endCol": 26,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "data-form constraint `when` composed under a namespace (L13 data forms); L3 tests merely execute it. Mutant `constraints === mod.constraints && derive === mod.derive && events === mod.events` -> true: killed in the full run by l3-proxies-oracle-transform.test.ts > data-form constraint `when` in a composed system evaluates every form against the module's own facts.",
+    "layer": "L11"
+  },
+  {
+    "line": 477,
+    "col": 5,
+    "endLine": 478,
+    "endCol": 26,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "data-form constraint `when` composed under a namespace (L13 data forms); L3 tests merely execute it. Mutant `constraints === mod.constraints && derive === mod.derive` -> true: killed in the full run by l3-proxies-oracle-transform.test.ts > data-form constraint `when` in a composed system evaluates every form against the module's own facts.",
+    "layer": "L11"
+  },
+  {
+    "line": 477,
+    "col": 5,
+    "endLine": 477,
+    "endCol": 36,
+    "mutator": "ConditionalExpression",
+    "replacement": "true",
+    "reason": "later-layer",
+    "note": "data-form constraint `when` composed under a namespace (L13 data forms); L3 tests merely execute it. Mutant `constraints === mod.constraints` -> true: killed in the full run by l3-proxies-oracle-transform.test.ts > data-form constraint `when` in a composed system evaluates every form against the module's own facts.",
+    "layer": "L11"
   },
   {
     "line": 477,
@@ -796,8 +867,8 @@
     "mutator": "EqualityOperator",
     "replacement": "constraints !== mod.constraints",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 477,
@@ -805,8 +876,8 @@
     "mutator": "LogicalOperator",
     "replacement": "constraints === mod.constraints && derive === mod.derive && events === mod.events || effects === mod.effects",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 477,
@@ -814,8 +885,8 @@
     "mutator": "LogicalOperator",
     "replacement": "constraints === mod.constraints && derive === mod.derive || events === mod.events",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 477,
@@ -823,8 +894,8 @@
     "mutator": "LogicalOperator",
     "replacement": "constraints === mod.constraints || derive === mod.derive",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: l3-proxies-oracle-transform.test.ts 'data-form constraint `when` in a composed system evaluates every form against th' (placed at L11); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L11"
   },
   {
     "line": 478,
@@ -832,8 +903,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 478,
@@ -841,8 +912,8 @@
     "mutator": "EqualityOperator",
     "replacement": "derive !== mod.derive",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced derivation compute \u2014 data forms computes boolean derivations from a predicate and string derivations from a template",
+    "layer": "L11"
   },
   {
     "line": 479,
@@ -850,8 +921,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 479,
@@ -859,8 +930,8 @@
     "mutator": "EqualityOperator",
     "replacement": "events !== mod.events",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced event patch \u2014 data form sets facts from literals, $ref payload copies, and $template strings",
+    "layer": "L11"
   },
   {
     "line": 480,
@@ -868,8 +939,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact",
+    "layer": "L11"
   },
   {
     "line": 480,
@@ -877,8 +948,8 @@
     "mutator": "EqualityOperator",
     "replacement": "effects !== mod.effects",
     "reason": "later-layer",
-    "layer": "L11",
-    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact"
+    "note": "Data forms in a namespaced module (constraint when, derivation compute, event patch, effect on); the data-forms tests are placed L13 only because they import flushMicrotasks \u2014 killed in the full run by namespaced effect on \u2014 data trigger runs only when the predicate currently holds for its own module's fact",
+    "layer": "L11"
   },
   {
     "line": 481,
@@ -946,30 +1017,6 @@
   },
   {
     "line": 572,
-    "col": 7,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be. This key matches two mutants: the whole `&&` condition and its first operand `typeof raw === \"object\"` both start here. Only the whole-condition mutant survives; the first-conjunct one is killed by twelve tests at or below L3."
-  },
-  {
-    "line": 572,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "typeof raw === \"object\" && raw !== null || Object.hasOwn(raw, \"handler\")",
-    "reason": "equivalent",
-    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
-  },
-  {
-    "line": 572,
-    "col": 7,
-    "mutator": "LogicalOperator",
-    "replacement": "typeof raw === \"object\" || raw !== null",
-    "reason": "equivalent",
-    "note": "Object.hasOwn(raw, \"handler\") alone decides for every function or object an event can be; the type tests in front of it only guard values an event cannot be."
-  },
-  {
-    "line": 572,
     "col": 34,
     "mutator": "ConditionalExpression",
     "replacement": "true",
@@ -990,8 +1037,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L13",
-    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: data-forms-namespaced.test.ts 'namespaced constraint when \u2014 data form fires when the predicate holds and produc' (placed at L13); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L13"
   },
   {
     "line": 764,
@@ -1015,8 +1062,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 786,
@@ -1024,8 +1071,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 786,
@@ -1033,8 +1080,8 @@
     "mutator": "LogicalOperator",
     "replacement": "resolverDef.resolveBatch || {\n  resolveBatch: async (reqs: unknown[], ctx: {\n    facts: unknown;\n    signal: AbortSignal;\n  }) => {\n    await run(ctx, wrapped => resolverDef.resolveBatch!(reqs, wrapped));\n  }\n}",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 794,
@@ -1042,8 +1089,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatchWithResults writes through the module's own ' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatchWithResults writes through the module's own ' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 794,
@@ -1051,8 +1098,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatchWithResults writes through the module's own ' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatchWithResults writes through the module's own ' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 794,
@@ -1060,8 +1107,8 @@
     "mutator": "LogicalOperator",
     "replacement": "resolverDef.resolveBatchWithResults || {\n  resolveBatchWithResults: async (reqs: unknown[], ctx: {\n    facts: unknown;\n    signal: AbortSignal;\n  }) => {\n    return run(ctx, wrapped => resolverDef.resolveBatchWithResults!(reqs, wrapped));\n  }\n}",
     "reason": "later-layer",
-    "layer": "L7",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'batch resolvers in a composed system > resolveBatch writes through the module's own facts' (placed at L7); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L7"
   },
   {
     "line": 832,
@@ -1085,8 +1132,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L4",
-    "note": "Only a test above the L3 ceiling kills it in the full run: blackbox-cross-module-deps.test.ts 'a module sees exactly its declared dependencies an effect reads declared deps an' (placed at L4); the code serves that layer's feature and L3 tests merely execute it."
+    "note": "Only a test above the L3 ceiling kills it in the full run: blackbox-cross-module-deps.test.ts 'a module sees exactly its declared dependencies an effect reads declared deps an' (placed at L4); the code serves that layer's feature and L3 tests merely execute it.",
+    "layer": "L4"
   },
   {
     "line": 945,
@@ -1094,8 +1141,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L5",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'a source gate in a composed system > reads the module's own facts by bare name, and reflects th' (placed at L5); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'a source gate in a composed system > reads the module's own facts by bare name, and reflects th' (placed at L5); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L5"
   },
   {
     "line": 947,
@@ -1103,8 +1150,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L5",
-    "note": "Killed by l3-proxies-oracle-gates.test.ts 'a source gate in a composed system > reads the module's own facts by bare name, and reflects th' (placed at L5); proved by hand. L3 tests reach this code and miss the mutant."
+    "note": "Killed by l3-proxies-oracle-gates.test.ts 'a source gate in a composed system > reads the module's own facts by bare name, and reflects th' (placed at L5); proved by hand. L3 tests reach this code and miss the mutant.",
+    "layer": "L5"
   },
   {
     "line": 954,
@@ -1136,8 +1183,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots",
+    "layer": "L8"
   },
   {
     "line": 1010,
@@ -1145,8 +1192,8 @@
     "mutator": "ObjectLiteral",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots",
+    "layer": "L8"
   },
   {
     "line": 1012,
@@ -1154,8 +1201,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents history.snapshotModules only listed modules create snapshots",
+    "layer": "L8"
   },
   {
     "line": 1012,
@@ -1163,8 +1210,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L8",
-    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents multi-module: each module controls its own events"
+    "note": "history.snapshotEvents / snapshotModules (L8) \u2014 killed in the full run by history.snapshotEvents multi-module: each module controls its own events",
+    "layer": "L8"
   },
   {
     "line": 1014,

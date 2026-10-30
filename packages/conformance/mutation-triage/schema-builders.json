@@ -13,8 +13,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L6",
-    "note": "Type name of t.boolean(), read by schema introspection (getKind) \u2014 killed in the full run by getKind \u2014 primitive builders t.boolean() \u2192 { kind: 'boolean' }"
+    "note": "Type name of t.boolean(), read by schema introspection (getKind) \u2014 killed in the full run by getKind \u2014 primitive builders t.boolean() \u2192 { kind: 'boolean' }",
+    "layer": "L6"
   },
   {
     "line": 605,
@@ -51,18 +51,22 @@
   {
     "line": 755,
     "col": 36,
+    "endLine": 755,
+    "endCol": 65,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+    "note": "Whole check replaced by true. nonNull appends this check to a chain whose first validator is the base object check, which rejects null and undefined, and every validator must pass; `.optional()` and `.nullable()` return types without nonNull, so no chain reaches it with null or undefined allowed. Hand-run: the null and undefined errors are identical."
   },
   {
     "line": 755,
     "col": 36,
+    "endLine": 755,
+    "endCol": 46,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "equivalent",
-    "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+    "note": "First operand `v !== null` replaced by true. nonNull appends this check to a chain whose first validator is the base object check, which rejects null and undefined, and every validator must pass; `.optional()` and `.nullable()` return types without nonNull, so no chain reaches it with null or undefined allowed. Hand-run: the null and undefined errors are identical."
   },
   {
     "line": 755,
