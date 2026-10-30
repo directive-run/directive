@@ -7020,7 +7020,7 @@
       "category": "black-box",
       "rule": "L2",
       "tests": {
-        "a resolver definition that is a function, not an object > \"with %s: its resolve is never run\"": {
+        "a resolver definition that is a function, not an object > \"with %s: its resolve is never run, and a plain resolver still is\"": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"],
           "dynamic": true
