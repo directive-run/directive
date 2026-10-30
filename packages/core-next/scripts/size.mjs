@@ -18,8 +18,10 @@ const esbuildPath = createRequire(require.resolve("tsup")).resolve("esbuild");
 const esbuild = await import(pathToFileURL(esbuildPath).href);
 const { build, transform, version } = esbuild.default ?? esbuild;
 
-// Dev-only diagnostic text, derived from the source so no list can go stale.
-// A "dev-gated region" is whatever only runs when `isDevelopment` is true: the
+// Dev-only diagnostic text, derived two ways and guarded as the union.
+//
+// 1. From the source (devOnlyNeedles), by intent. A "dev-gated region" is
+// whatever only runs when `isDevelopment` is true: the
 // `then` of `if (isDevelopment ...)`, the true arm of `isDevelopment ? a : b`,
 // the right of `isDevelopment && x`, and any function whose every use is inside
 // such a region (a nested function declaration is NOT tree-shaken by esbuild,
@@ -27,7 +29,23 @@ const { build, transform, version } = esbuild.default ?? esbuild;
 // call site is folded away). A string in a gated region and in no ungated code
 // is dev-only. Needles are the printable-ASCII runs of those strings (escapes
 // such as \u2014 and quote style differ between source and minified output).
+// The analysis is per file and sees only direct uses, so it misses a dev-only
+// function that calls itself or is called only from another file.
+//
+// 2. From the bundler (the loop over `sourceRuns` below): every text run in the
+// source that a development bundle contains and a production bundle does not.
+// This sees what esbuild really drops, so it covers what the analysis cannot,
+// but it describes the current source: a gate removed from a call site makes
+// that string reach production, and it silently falls out of this set. That is
+// what DEV_STRINGS_MIN is for.
 const NEEDLE_MIN = 20;
+// The number of dev-only strings the two derivations found together when this
+// was last updated. The guard fails when it finds fewer, because a string that
+// leaves the derived set has either started shipping (a gate was removed) or
+// been deleted. If you deleted dev text on purpose, lower this number in the
+// same commit; if you added dev text, raise it to the count the guard prints.
+const DEV_STRINGS_MIN = 64;
+const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = join(dir, e.name);
@@ -121,7 +139,7 @@ function devOnlyNeedles(srcDir) {
   const ungated = open.join("\n");
   const needles = new Set();
   for (const text of dev) {
-    for (const run of text.split(/[^\x20-\x7e]|["'`\\]/)) {
+    for (const run of text.split(RUN_SPLIT)) {
       if (run.length >= NEEDLE_MIN && !ungated.includes(run)) {
         needles.add(run);
       }
@@ -129,6 +147,33 @@ function devOnlyNeedles(srcDir) {
   }
 
   return [...needles].sort();
+}
+// Every printable-ASCII run of NEEDLE_MIN or more in any string in the source,
+// gated or not: the candidates the bundlers are asked about.
+function sourceRuns(srcDir) {
+  const runs = new Set();
+  for (const file of sourcesIn(srcDir)) {
+    const walk = (n) => {
+      if (isTextNode(n)) {
+        for (const run of n.text.split(RUN_SPLIT)) {
+          if (run.length >= NEEDLE_MIN) {
+            runs.add(run);
+          }
+        }
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(
+      ts.createSourceFile(
+        file,
+        readFileSync(file, "utf8"),
+        ts.ScriptTarget.ES2022,
+        true,
+      ),
+    );
+  }
+
+  return runs;
 }
 
 const entry = new URL("../src/graph.ts", import.meta.url).pathname;
@@ -275,42 +320,59 @@ const inlineIsDevelopment = {
     });
   },
 };
-// The guard. Text in dev-gated code (see devOnlyNeedles) must not be in a
-// production bundle. "Validation failed" / "Unknown fact key" are not dev-gated
-// (they stay in validateValue on purpose, `validate: true` opts in at runtime),
-// so they are not in the list. The control makes a silent pass impossible: the
-// list must be non-empty, and a development bundle must contain every string in
-// it, so the production bundle's lack of one is the bundler's doing and not a
-// needle that matches nothing.
-const devNeedles = devOnlyNeedles(src);
-const devBundle = await build({
-  stdin: {
-    contents:
-      'export * as a from "./index.ts"; export * as b from "./internals.ts";',
-    resolveDir: src,
-    loader: "ts",
-  },
-  bundle: true,
-  minify: true,
-  format: "esm",
-  target: "es2022",
-  write: false,
-  logLevel: "silent",
-  mangleProps: /_$/,
-  // Minified, esbuild would otherwise define NODE_ENV as "production" itself.
-  define: { "process.env.NODE_ENV": '"development"' },
-  plugins: [inlineIsDevelopment],
-});
-const blind = devNeedles.filter(
-  (n) => !Buffer.from(devBundle.outputFiles[0].contents).includes(n),
+// The guard. Text in dev-gated code must not be in a production bundle.
+// "Validation failed" / "Unknown fact key" are not dev-gated (they stay in
+// validateValue on purpose, `validate: true` opts in at runtime), so they are
+// in neither list. The list is the union of the source analysis
+// (devOnlyNeedles) and what the bundler drops (sourceRuns present in the
+// development bundle, absent from the production one). Two controls make a
+// silent pass impossible: a development bundle must contain every string in the
+// list, so the production bundle's lack of one is the bundler's doing and not a
+// needle that matches nothing; and the list must hold at least DEV_STRINGS_MIN
+// strings, so an under-derived list fails loudly.
+const entryContents =
+  'export * as a from "./index.ts"; export * as b from "./internals.ts";';
+const bundleEntry = async (nodeEnv) =>
+  Buffer.from(
+    (
+      await build({
+        stdin: { contents: entryContents, resolveDir: src, loader: "ts" },
+        bundle: true,
+        minify: true,
+        format: "esm",
+        target: "es2022",
+        write: false,
+        logLevel: "silent",
+        mangleProps: /_$/,
+        // Minified, esbuild would otherwise define NODE_ENV as "production" itself.
+        define: { "process.env.NODE_ENV": JSON.stringify(nodeEnv) },
+        plugins: [inlineIsDevelopment],
+      })
+    ).outputFiles[0].contents,
+  );
+const devBundle = await bundleEntry("development");
+const prodBundle = await bundleEntry("production");
+const analysed = devOnlyNeedles(src);
+const dropped = [...sourceRuns(src)].filter(
+  (run) => devBundle.includes(run) && !prodBundle.includes(run),
 );
-if (devNeedles.length === 0 || blind.length > 0) {
+const devNeedles = [...new Set([...analysed, ...dropped])].sort();
+const blind = devNeedles.filter((n) => !devBundle.includes(n));
+if (blind.length > 0) {
   console.error(
     `dev-string check is blind: ${devNeedles.length} strings derived, absent from a development bundle: ${JSON.stringify(blind)}`,
   );
   process.exitCode = 1;
 }
-console.log(`dev-only strings guarded: ${devNeedles.length}`);
+if (devNeedles.length < DEV_STRINGS_MIN) {
+  console.error(
+    `dev-string check is under-derived: ${devNeedles.length} dev-only strings found, at least ${DEV_STRINGS_MIN} expected. Either a dev-gated string now reaches a production bundle (a gate was removed: a message you expect to be dev-only is missing from the list below), or dev text was deleted (then lower DEV_STRINGS_MIN in scripts/size.mjs). Found:\n${devNeedles.map((n) => `  ${JSON.stringify(n)}`).join("\n")}`,
+  );
+  process.exitCode = 1;
+}
+console.log(
+  `dev-only strings guarded: ${devNeedles.length} (${analysed.length} from source analysis, ${dropped.length} dropped by the bundler, floor ${DEV_STRINGS_MIN}${devNeedles.length > DEV_STRINGS_MIN ? `; raise DEV_STRINGS_MIN to ${devNeedles.length}` : ""})`,
+);
 function assertNoDevStrings(label, bytes) {
   const shipped = devNeedles.filter((n) => Buffer.from(bytes).includes(n));
   if (shipped.length > 0) {
