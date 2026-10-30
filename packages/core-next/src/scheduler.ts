@@ -212,13 +212,16 @@ export function createScheduler(options: SchedulerOptions = {}): Scheduler {
           flushLane(lane);
         }
       } else if (lane !== "manual" && !armed.has(lane)) {
-        // Hosts are looked up on first use of their lane.
-        armed.add(lane);
-        (lane === "micro"
+        // Hosts are looked up on first use of their lane. The callback
+        // captures this block's `l`, not the parameter: a capture of `lane`
+        // would allocate a context on every request, armed or not.
+        const l = lane;
+        armed.add(l);
+        (l === "micro"
           ? micro
-          : (options[lane] ?? hostTimeout(lane === "frame" ? 16 : 0)))(() => {
-          armed.delete(lane);
-          flushLane(lane);
+          : (options[l] ?? hostTimeout(l === "frame" ? 16 : 0)))(() => {
+          armed.delete(l);
+          flushLane(l);
         });
       }
     },
