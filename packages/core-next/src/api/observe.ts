@@ -81,7 +81,11 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
     }
     case "requirement.met":
       return [
-        { type, id: (event.req as { id: string }).id, byResolver: event.resolver },
+        {
+          type,
+          id: (event.req as { id: string }).id,
+          byResolver: event.resolver,
+        },
       ];
     case "requirement.canceled":
       return [{ type, id: (event.req as { id: string }).id }];

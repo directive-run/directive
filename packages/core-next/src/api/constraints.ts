@@ -398,7 +398,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   const blocks = (dep: string) =>
     !!defs[dep] &&
     !disabled.has(dep) &&
-    (unanswered.has(dep) || (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
+    (unanswered.has(dep) ||
+      (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
   const afterReady = (id: string) => !(defs[id]!.after ?? []).some(blocks);
   /** Ask again each held-back constraint that nothing blocks any more. */
   const release = () => {

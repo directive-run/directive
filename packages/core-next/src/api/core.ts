@@ -715,7 +715,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (done) {
         await done;
       }
-      let result;
+      let result: Record<string, unknown> | undefined;
       if (l2) {
         // 1.35 awaits constraint evaluation only when it must; the diff,
         // the dispatch and the pass end then share one continuation.
