@@ -1,0 +1,474 @@
+[
+  {
+    "group": "quirk-p",
+    "why": "Seed 5's ceiling phase: onResolverError \"retry-later\"; 2.0 re-dispatches the requirement (row p).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 1,
+              "delay": 0,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 0,
+              "delay": 1,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": -2,
+              "delay": 20,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 6
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": -1,
+              "throwsAt": 7
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 4,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 2,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 2,
+              "atLeast": 1,
+              "crossAtLeast": 1,
+              "priority": 1,
+              "writes": 1,
+              "value": 1,
+              "delay": 5,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 3
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": "retry-later",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "advance",
+          "ms": 1500
+        }
+      ]
+    }
+  },
+  {
+    "group": "quirk-j",
+    "why": "Seed 5's ceiling phase: stop() then start() re-dispatches a still-wanted requirement on 2.0 (quirk j).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": 0,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 2,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 2,
+              "value": 1,
+              "delay": 20,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 3
+            },
+            {
+              "fact": 2,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 1,
+              "value": 6,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 50
+            },
+            {
+              "fact": 2,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 2,
+              "value": 6,
+              "delay": 1,
+              "fails": 1,
+              "retry": 2,
+              "timeout": null
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0, 1, 2],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [2],
+              "derived": [],
+              "threshold": 3,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 3,
+              "crossAtLeast": 3,
+              "priority": 2,
+              "writes": 2,
+              "value": 0,
+              "delay": 5,
+              "fails": 2,
+              "retry": 1,
+              "timeout": 10
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 2,
+              "value": 0,
+              "delay": 20,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 3
+            },
+            {
+              "fact": 1,
+              "atLeast": 1,
+              "crossAtLeast": 0,
+              "priority": 2,
+              "writes": 0,
+              "value": 3,
+              "delay": 5,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 67778656,
+          "value": -2
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 506604660,
+          "value": 6
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 1847976335,
+          "value": 2
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1151604181,
+          "value": 0
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[583209121, 6], [990008354, 1], [1197945402, 0]]
+        },
+        {
+          "op": "stop"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1239461407,
+          "value": 6
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "start"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 324846566,
+          "value": 3
+        },
+        {
+          "op": "settle"
+        }
+      ]
+    }
+  },
+  {
+    "group": "quirk-t",
+    "why": "Seed 2's ceiling phase: a pass retracts a run after it reported complete, before it left flight; 1.35 also reports a cancel (row t, third path).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 0,
+              "throwsAt": 8
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 6,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [1],
+              "threshold": 6,
+              "throwsAt": 7
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": -1,
+              "delay": 1,
+              "fails": 1,
+              "retry": 1,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 10
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 6,
+              "delay": 1,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": 4
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "tick"
+        },
+        {
+          "op": "advance",
+          "ms": 1500
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1397286281,
+          "value": -1
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1268345284,
+          "value": 3
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 717863401,
+          "value": 0
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[250824855, 4], [750604705, 1], [1798772623, 3]]
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[729987248, -1]]
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1236644929,
+          "value": 3
+        }
+      ]
+    }
+  }
+]

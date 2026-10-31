@@ -81,6 +81,7 @@
     "start() after destroy() arms a tick interval on its own": "L3",
     "stop() from a plugin's onResolverComplete: complete, then cancel": "L3",
     "stop() from a module's onResolverError: error, then cancel": "L3",
+    "a run retracted after it reported complete: complete, then cancel": "L2",
     "deps at startup: an effect runs once on start, then on its deps only": "L4",
     "an `on` predicate gates an effect; derived values read inside run": "L4",
     "effects disable, enable and run in declaration order": "L4",

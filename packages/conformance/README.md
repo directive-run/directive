@@ -246,9 +246,9 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `constraintRetryLater` | `errorBoundary.onConstraintError` is `"retry-later"` and the case has a constraint. Never set today: the model always passes `"skip"` |
 | `retryPolicy` | some resolver has a `retry` policy (more than one attempt) |
 | `timeout` | some resolver has a `timeout` |
-| `restart` | the steps have a `stop` with a `start` after it (a `destroy` then `start` is not a restart) |
-| `disable` | some `errorBoundary` strategy is `"disable"` (resolvers and effects) |
-| `throw` | some `errorBoundary` strategy is `"throw"` (resolvers; effects then skip) |
+| `restart` | the steps have a `stop` with a `start` after it and no `destroy` anywhere before that `start` (1.35 ignores `start()` after `destroy()`) |
+| `disable` | some `errorBoundary` strategy is `"disable"` and the case has what it applies to: a resolver (`onResolverError`) or an effect (`onEffectError`) |
+| `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

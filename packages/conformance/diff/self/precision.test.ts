@@ -184,19 +184,49 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     ]);
   });
 
-  it("restart needs a stop with a start after it", () => {
+  it("restart needs a stop with a start after it and no destroy", () => {
     const steps = (...ops: Array<"stop" | "start" | "settle" | "destroy">) =>
       specTriggers(spec({ steps: ops.map((op) => ({ op })) }));
 
     expect(steps("stop", "start")).toEqual(["restart"]);
     expect(steps("stop", "settle", "start")).toEqual(["restart"]);
+    expect(steps("start", "stop", "start")).toEqual(["restart"]);
     expect(steps("start", "stop")).toEqual([]);
+    expect(steps("start", "start")).toEqual([]);
     expect(steps("destroy", "start")).toEqual([]);
+    // A destroy between the stop and the start: the start is ignored.
+    expect(steps("stop", "destroy", "start")).toEqual([]);
+    // A destroyed system is never restarted, whatever follows.
+    expect(steps("destroy", "stop", "start")).toEqual([]);
   });
 
-  it("disable and throw are their strategies", () => {
+  const effect = {
+    reads: [0],
+    explicitDeps: false,
+    cleanup: false,
+    throwsAt: null,
+  };
+  const withEffect = (boundary: FuzzSpec["boundary"], c = [constraint()]) => {
+    const s = spec({ boundary }, c);
+
+    return {
+      ...s,
+      modules: s.modules.map((m) => ({ ...m, effects: [effect] })),
+    };
+  };
+
+  it("disable and throw are their strategies, on a resolver that exists", () => {
     expect(specTriggers(spec({ boundary: "disable" }))).toEqual(["disable"]);
     expect(specTriggers(spec({ boundary: "throw" }))).toEqual(["throw"]);
+    // No resolver and no effect: the strategy applies to nothing.
+    expect(specTriggers(spec({ boundary: "disable" }, []))).toEqual([]);
+    expect(specTriggers(spec({ boundary: "throw" }, []))).toEqual([]);
+  });
+
+  it("disable also counts an effect; throw does not (effects skip then)", () => {
+    expect(specTriggers(withEffect("disable", []))).toEqual(["disable"]);
+    expect(specTriggers(withEffect("throw", []))).toEqual([]);
+    expect(specTriggers(withEffect("throw"))).toEqual(["throw"]);
   });
 
   it("toScenario gives the case its triggers", () => {
