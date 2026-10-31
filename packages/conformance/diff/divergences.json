@@ -44,13 +44,12 @@
     "date": "2026-10-30"
   },
   {
-    "id": "l2-quirk-b-console-warn-missing",
+    "id": "l2-quirk-b-console-warn",
     "scenario": "fuzz",
     "stream": "console",
     "kind": "warn",
     "engine": "v2",
-    "op": "missing",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the default-strategy warning that the resolver threw, which 1.35 adds after the cancel and 2.0 does not.",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2).",
     "approvedBy": "",
     "date": "2026-10-30"
   },
