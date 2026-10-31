@@ -488,8 +488,11 @@ function moduleDef(
         attempt += 1;
         const n = attempt;
         external([`${id}.r${i}`, "start", n]);
+        // Aborts are recorded under their own kind, "aborted", so a
+        // divergence entry can cover abort records alone (as the hand
+        // scenarios do) without covering every record of this resolver.
         context.signal?.addEventListener?.("abort", () =>
-          external([`${id}.r${i}`, "aborted", n]),
+          external(["aborted", `${id}.r${i}`, n]),
         );
         if (c.delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, c.delay));
