@@ -23,8 +23,11 @@
  * - A satisfied run is not canceled: it stays in flight (stop aborts it,
  *   settle waits), is not retried, and reports one outcome when it ends.
  * - Each attempt has its own `context.signal`, a child of the run's: a
- *   cancel, supersede, clobber or stop() aborts the run, and so the
- *   attempt. A timeout aborts only the attempt, its reason the timeout
+ *   cancel, supersede, clobber or stop() aborts the run, and so every
+ *   attempt it made, ended or not, with the run's reason (1.35's attempts
+ *   share the run's one signal, so each one's listeners hear the cancel).
+ *   One listener on the run's signal relays it, however many attempts.
+ *   A timeout aborts only the attempt, its reason the timeout
  *   error (candidate n, approved; 1.35 leaves the signal clean), so the next
  *   attempt starts unaborted; a satisfied run's attempt gets 1.35's plain
  *   abort instead. The outcome is still read from the run's
@@ -457,6 +460,24 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     /** Unbound: one view for every attempt. Bound: one per attempt, as 1.35. */
     let shared: Facts<any> | null = null;
     let last: Error | undefined;
+    /**
+     * Every attempt's own signal (candidate n). The run's abort reaches
+     * each one, ended or not, with the run's reason, as 1.35's one shared
+     * signal does; an attempt its timeout aborted keeps that reason. One
+     * listener for the run, so they do not grow with the attempts.
+     */
+    const children: AbortController[] = [];
+    signal.addEventListener(
+      "abort",
+      () => {
+        for (const child of children) {
+          if (!child.signal.aborted) {
+            child.abort(signal.reason);
+          }
+        }
+      },
+      { once: true },
+    );
     for (let attempt = 1; attempt <= attempts; attempt++) {
       // Aborted while it waited (canceled, superseded): no outcome here.
       if (signal.aborted) {
@@ -473,18 +494,14 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       const facts = keys
         ? options.factsFor(run, bind(run, keys, baseline))
         : (shared ??= options.factsFor(run));
-      // The attempt's own signal (candidate n): the run's abort reaches it.
       const child = new AbortController();
-      const relay = () => child.abort(signal.reason);
-      signal.addEventListener("abort", relay, { once: true });
+      children.push(child);
       const context = {
         facts,
         signal: child.signal,
         snapshot: () => facts.$snapshot(),
         requeue: () => options.onRequeue(run.req_.id),
       };
-      // The attempt ends after its retry wait: a cancel then still reaches
-      // it (as 1.35's one signal does), and its relay leaves the run's.
       try {
         await invoke(def, run, context);
         // Aborted while it ran: that was its one outcome (1.35). For a
@@ -525,8 +542,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         if (!go) {
           break;
         }
-      } finally {
-        signal.removeEventListener("abort", relay);
       }
     }
     report(run, last);
