@@ -673,7 +673,7 @@
   {
     "file": "src/core/__tests__/l3-engine-oracle-clusters.test.ts",
     "category": "black-box",
-    "cases": 5,
+    "cases": 6,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

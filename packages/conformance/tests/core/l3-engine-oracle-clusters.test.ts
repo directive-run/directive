@@ -196,6 +196,37 @@ describe("when()", () => {
   });
 });
 
+describe("when() that times out", () => {
+  it("rejects, and stops asking its predicate after that", async () => {
+    vi.useFakeTimers();
+    const sys = counterSystem();
+    sys.start();
+    let asked = 0;
+    const outcome: string[] = [];
+    const done = sys
+      .when(
+        () => {
+          asked++;
+          return false;
+        },
+        { timeout: 100 },
+      )
+      .then(
+        () => outcome.push("resolved"),
+        () => outcome.push("rejected"),
+      );
+    await vi.advanceTimersByTimeAsync(150);
+    await done;
+    expect(outcome).toEqual(["rejected"]);
+    const askedAtTimeout = asked;
+    sys.facts.n = 1;
+    sys.facts.n = 2;
+    await vi.advanceTimersByTimeAsync(10);
+    expect(asked).toBe(askedAtTimeout);
+    sys.destroy();
+  });
+});
+
 describe("destroy() with a resolver in flight", () => {
   it("a settlement listener hears nothing after destroy()", async () => {
     let release: () => void = () => {};

@@ -7362,6 +7362,16 @@
             "option init"
           ]
         },
+        "when() that times out > rejects, and stops asking its predicate after that": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
         "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()": {
           "layer": "L3",
           "by": ["member .onSettledChange"]
