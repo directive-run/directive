@@ -1,6 +1,6 @@
 {
   "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0–L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
-  "current": "L1",
+  "current": "L2",
   "$scenarios": "Each differential scenario (diff/scenarios/), by title, and the layer it needs: the highest feature it uses on the plan's ladder. On v2 the diff project runs only scenarios at or below `current`; fuzz cases are placed by the features they use (diff/fuzz/model.ts specLayer); diff/self/ always runs. Checked by the census (lib/census.ts checkScenarioLayers).",
   "scenarios": {
     "derivation chain recomputes once per change": "L0",
@@ -52,6 +52,7 @@
     "a timeout fires exactly at its deadline": "L2",
     "a loading flag set and cleared around a satisfied, timed-out run": "L2",
     "full and equal jitter draw from the seeded random": "L2",
+    "two jittered retry chains at once keep their own order": "L2",
     "requeue runs a resolver again for the same requirement": "L2",
     "shouldRetry sees why each attempt aborted": "L2",
     "a write to an abortOn fact changed meanwhile is rejected (clobber)": "L2",

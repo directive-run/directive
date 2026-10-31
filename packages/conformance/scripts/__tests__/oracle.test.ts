@@ -445,7 +445,7 @@ describe("the differential project", () => {
 
     it("accepts the committed scenario layers, divergences and hook list", () => {
       expect(checkScenarioLayers(copy)).toEqual([]);
-      expect(checkDivergences(copy, new Set())).toEqual([]);
+      expect(checkDivergences(copy, null)).toEqual([]);
       expect(
         checkHooksFired(
           copy,

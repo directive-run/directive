@@ -137,6 +137,12 @@ export const withReconcile: SystemPart = (context) => {
    * most 3; a completed run, a retraction or stop() starts it over.
    */
   const redo = new Map<string, number>();
+  /**
+   * Candidate (p)'s bound, kept like quirk (a)'s count: retry-later requeues
+   * in a row per requirement id, at most `maxRetries`, started over by the
+   * same three things. Past it, it runs again only when raised anew.
+   */
+  const later = new Map<string, number>();
   /** Requirement ids a run asked to dispatch again (`context.requeue()`). */
   const requeued = new Set<string>();
   /** The requirement set the last commit acted on, by id. */
@@ -171,6 +177,7 @@ export const withReconcile: SystemPart = (context) => {
         run.resolver_,
       );
       redo.delete(run.req_.id);
+      later.delete(run.req_.id);
       constraints.markResolved(run.req_);
       if (!previous.has(run.req_.id)) {
         // A satisfied or detached run: its requirement left the set
@@ -422,6 +429,7 @@ export const withReconcile: SystemPart = (context) => {
       }
       constraints.forget(req.id);
       redo.delete(req.id);
+      later.delete(req.id);
     }
   }
   /** `stamp` changed some key in the closed window, or tried to (dropped). */
@@ -560,6 +568,16 @@ export const withReconcile: SystemPart = (context) => {
     busy_: () => resolvers.inflight.size > 0,
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
+    requeue_(id, max) {
+      // A retracted requirement is not requeued; one in flight has a run.
+      if (previous.has(id) && !resolvers.inflight.has(id)) {
+        const times = (later.get(id) ?? 0) + 1;
+        if (times <= max) {
+          later.set(id, times);
+          requeued.add(id);
+        }
+      }
+    },
     stop_() {
       // A requirement canceled here stays in the set, as in 1.35: inspect()
       // still lists it, and the pass after start() cancels it if it is no
@@ -571,6 +589,7 @@ export const withReconcile: SystemPart = (context) => {
       // A requeue asked by a run just canceled is not carried into start().
       requeued.clear();
       redo.clear();
+      later.clear();
     },
     inspect_: () => ({
       unmet: [...previous.values()],
