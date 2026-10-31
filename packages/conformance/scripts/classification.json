@@ -682,7 +682,7 @@
   {
     "file": "src/core/__tests__/l3-engine-oracle-effect-chain.test.ts",
     "category": "black-box",
-    "cases": 8,
+    "cases": 9,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
