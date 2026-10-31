@@ -908,9 +908,9 @@ describe("the harness lock", () => {
     ).toMatch(/aheadOfV1\.json differs/);
   });
 
-  // An engine PR may change the lock alongside a signed divergence (lib/guard.ts
-  // rule 3). The changed-file list says no other harness file changed; this
-  // says the lock cannot claim otherwise.
+  // An engine PR may change the lock alongside a signed divergence
+  // (lib/guard.ts rule 3). The changed-file list says no other harness file
+  // changed; this says the lock cannot claim otherwise.
   it("rejects a lock edited for files that did not change", () => {
     const path = join(copy, "harness.lock.json");
     const before = readFileSync(path, "utf8");
@@ -1195,10 +1195,9 @@ describe("the oracle guard", () => {
       ).toMatch(/changes d1 without approvedBy/);
     });
 
-    it("fails a removed entry", () => {
-      expect(guard(text(other, entry), text(entry)).join("\n")).toMatch(
-        /removes d0/,
-      );
+    it("passes a removed entry: removal only tightens the oracle", () => {
+      expect(guard(text(other, entry), text(entry))).toEqual([]);
+      expect(guard(text(other), text(), [engine, div])).toEqual([]);
     });
 
     it("fails divergences.json with any other harness file", () => {
@@ -1248,7 +1247,8 @@ describe("the oracle guard", () => {
 
     it("leaves harness-only PRs as they were", () => {
       const { approvedBy: _, ...unsigned } = entry;
-      // The census, not the PR guard, judges entries when core-next is untouched.
+      // The census, not the PR guard, judges entries when core-next is
+      // untouched.
       for (const data of [
         { base: text(entry), head: text(unsigned) },
         { base: text(entry), head: "[{" },

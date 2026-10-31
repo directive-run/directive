@@ -18,9 +18,11 @@
  *    The harness files such a PR changes may be only diff/divergences.json,
  *    with or without harness.lock.json (the lock never changes alone), and
  *    every entry it adds or changes (same id, any field different, compared
- *    with the base) must have a non-empty `approvedBy`. It may not remove an
- *    entry: removal tightens the oracle, but the exception is kept to what was
- *    approved. The census still fails an entry that covers no real difference,
+ *    with the base) must have a non-empty `approvedBy`. Removing an entry is
+ *    allowed: it only tightens the oracle (an engine fix that closes a
+ *    divergence must drop its entry, or the entry goes stale), and the census
+ *    fails the PR if the difference is still there. The census still fails an
+ *    entry that covers no real difference,
  *    and rule 2's label still applies. Both ends of divergences.json are read
  *    as data; anything the guard cannot parse fails closed.
  */
@@ -291,14 +293,14 @@ function canonical(value: unknown): string {
 
 /**
  * Every entry added or changed between the base and head is signed
- * (non-empty approvedBy), and none is removed. Fails closed on anything it
- * cannot read.
+ * (non-empty approvedBy). A removed entry needs no signature: it only
+ * tightens the oracle. Fails closed on anything it cannot read.
  */
 function checkSignedDivergences(divergences?: {
   base: string | null;
   head: string | null;
 }): string[] {
-  const why = `alongside packages/core-next, ${DIVERGENCES_FILE} may only add or change signed entries`;
+  const why = `alongside packages/core-next, ${DIVERGENCES_FILE} may only add or change signed entries, or remove entries`;
   if (!divergences) {
     return [
       `${DIVERGENCES_FILE} changed but its base and head were not provided`,
@@ -328,13 +330,6 @@ function checkSignedDivergences(divergences?: {
     if (!signed) {
       failures.push(
         `${DIVERGENCES_FILE} ${before === undefined ? "adds" : "changes"} ${id} without approvedBy; ${why}`,
-      );
-    }
-  }
-  for (const id of base.keys()) {
-    if (!head.has(id)) {
-      failures.push(
-        `${DIVERGENCES_FILE} removes ${id}; ${why} (remove entries in their own PR labelled ${LABEL})`,
       );
     }
   }

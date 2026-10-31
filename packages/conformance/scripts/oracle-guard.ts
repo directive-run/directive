@@ -5,12 +5,13 @@
  * correctness baseline only tightens, and the harness matches its lock.
  *
  * PR mode (`--pr`; .github/workflows/oracle-guard.yml): the label rule and
- * the core-next/harness path rule, with its signed-divergences exception. It runs from the BASE branch under
- * pull_request_target and reads the head only as data through the GitHub
- * API — the changed-file list, the labels in the event payload, and
- * pnpm-lock.yaml, v2-passing.json and diff/divergences.json at both ends as
- * text (each only when the PR changes it). Nothing from the head is
- * executed, so a PR cannot change the rules that judge it.
+ * the core-next/harness path rule, with its signed-divergences exception. It
+ * runs from the BASE branch under pull_request_target and reads the head
+ * only as data through the GitHub API — the changed-file list, the labels in
+ * the event payload, and pnpm-lock.yaml, v2-passing.json and
+ * diff/divergences.json at both ends as text (each only when the PR changes
+ * it). Nothing from the head is executed, so a PR cannot change the rules
+ * that judge it.
  *
  * Usage: pnpm --filter @directive-run/conformance oracle:guard [--pr]
  */

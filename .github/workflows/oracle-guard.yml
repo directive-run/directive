@@ -4,7 +4,7 @@ name: Oracle guard
 # a PR that changes the harness needs the `oracle-change` label, and a PR that
 # touches packages/core-next may not also touch the conformance harness,
 # except to add or change signed entries in diff/divergences.json (with
-# harness.lock.json); such a PR may not remove an entry.
+# harness.lock.json), or to remove entries (removal only tightens).
 #
 # Why pull_request_target, and why it is safe here:
 # - The guard must not run the PR's own code, or a PR could rewrite the rules
