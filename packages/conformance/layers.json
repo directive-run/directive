@@ -7330,6 +7330,66 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-clusters.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "two abort-bound resolvers started by one pass > the second may not overwrite the first's write to a fact they both bind": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "retry-later with a constraint and a resolver both waiting > each is retried as itself: the throwing constraint is asked again": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
+        "retry-later with a constraint and a resolver both waiting > a resolver that shares the constraint's name and is skipped does not stop the retry": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
+        "when() > stops asking its predicate once it has resolved": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "when() > with a timeout, resolving first means it never rejects later": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "when() that times out > rejects, and stops asking its predicate after that": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()": {
+          "layer": "L3",
+          "by": ["member .onSettledChange"]
+        },
+        "a constraint whose abortOn lists no facts > is not bound: its run is aborted when the requirement is retracted": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "stopAsync() and retry-later > a retry waiting at stopAsync() does not come back after a restart": {
+          "layer": "L3",
+          "by": ["member .stopAsync", "option error boundary", "option plugins"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle-effect-chain.test.ts": {
       "category": "black-box",
       "rule": "L3",

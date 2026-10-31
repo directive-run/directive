@@ -671,6 +671,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-engine-oracle-clusters.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l3-engine-oracle-effect-chain.test.ts",
     "category": "black-box",
     "cases": 8,
