@@ -171,8 +171,11 @@ describe('L3b "throw" keeps 1.35\'s surfaces (E10)', () => {
 
   it("resolver: an unhandled rejection carrying the DirectiveError; no plugin or module hook", async () => {
     const unhandled = catchUnhandled();
+    let sys: any;
     try {
-      const { sys, heard, moduleHook } = throwing("resolver");
+      const made = throwing("resolver");
+      sys = made.sys;
+      const { heard, moduleHook } = made;
       sys.start();
       await sys.settle();
       sys.facts.x = 1;
@@ -188,8 +191,12 @@ describe('L3b "throw" keeps 1.35\'s surfaces (E10)', () => {
       expect(heard).toEqual(["recovery:throw"]);
       expect(moduleHook).toEqual([]);
       await expect(sys.settle()).resolves.toBeUndefined();
-      sys.destroy();
     } finally {
+      // Node reports a rejection after the turn that made it. Stay on one
+      // more turn, so a late one (a failed assertion above) lands here and
+      // not on vitest's own handler, then put the listeners back.
+      await macrotask();
+      sys?.destroy();
       unhandled.restore();
     }
   });
