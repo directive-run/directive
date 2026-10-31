@@ -11,8 +11,17 @@
  *
  * - Retry-later keeps one entry and one attempt count per source id, as 1.35
  *   does: two requirements of one resolver share them. A due entry runs a
- *   pass; a constraint's is asked again by name. A resolver is not run
- *   again (1.35's behaviour; candidate (p) is not approved).
+ *   pass; a constraint's is asked again by name. Candidate (p), approved:
+ *   a resolver's entry also keeps the ids of the requirements that failed
+ *   while it waited (a later failure carries them forward), and when it is
+ *   due each one still raised is requeued, so the pass after the due one
+ *   dispatches it again (1.35 never runs it again). A retracted id is not
+ *   requeued. The bound is per requirement: at most `maxRetries`
+ *   re-dispatches in a row, started over by a completed run of it, its
+ *   retraction or stop() (reconcile.ts, like quirk a's count). The shared
+ *   count still decides when the entry is due, the fallback and the
+ *   reported attempts; since it starts over when used up, it alone would
+ *   let one id of two run more than `maxRetries` times.
  * - The poller is 1.35's interval, `min(max(delayMs, 250), 500)` ms, on the
  *   kernel clock: owned by the system, re-armed only while something waits,
  *   and not keeping a Node process alive (`keepAlive: false`). It is not
@@ -80,8 +89,11 @@ export const withErrorBoundary =
       backoffMultiplier = 2,
       maxDelayMs = 30000,
     } = config.retryLater ?? {};
-    /** Waiting retry-later entries by source id: [source, due time]. */
-    const waiting = new Map<string, [ErrorSource, number]>();
+    /**
+     * Waiting retry-later entries by source id: [source, due time, the ids
+     * of the requirements that failed while it waited (a resolver's)].
+     */
+    const waiting = new Map<string, [ErrorSource, number, Set<string>]>();
     /** Retry-later attempts by source id, for at most 1000 sources (1.35). */
     const attempts = new Map<string, number>();
     /** The poller's timer on the kernel clock; 0 when not polling. */
@@ -89,10 +101,10 @@ export const withErrorBoundary =
     const fire = () => {
       poller = 0;
       const now = clock.now();
-      const due: [string, ErrorSource][] = [];
-      for (const [id, [source, at]] of waiting) {
+      const due: [string, ErrorSource, Set<string>][] = [];
+      for (const [id, [source, at, ids]] of waiting) {
         if (at <= now) {
-          due.push([id, source]);
+          due.push([id, source, ids]);
           waiting.delete(id);
         }
       }
@@ -101,13 +113,18 @@ export const withErrorBoundary =
       if (waiting.size > 0) {
         poll();
       }
-      for (const [id, source] of due) {
+      const { reconcile } = kernel.features as {
+        reconcile?: ReconcileFeature;
+      };
+      for (const [id, source, ids] of due) {
         // A constraint is asked again by name: a pass with no changed keys
         // would carry its last answer forward (1.35).
         if (source === "constraint") {
-          (
-            kernel.features as { reconcile?: ReconcileFeature }
-          ).reconcile?.dirty_(id);
+          reconcile?.dirty_(id);
+        }
+        // (p): the due pass applies the requeue, the next one dispatches.
+        for (const req of ids) {
+          reconcile?.requeue_(req, maxRetries);
         }
         context.schedule();
       }
@@ -122,7 +139,7 @@ export const withErrorBoundary =
         });
       }
     };
-    context.decide_ = (source, sourceId, error, wrapped, _info, warn) => {
+    context.decide_ = (source, sourceId, error, wrapped, info, warn) => {
       try {
         config.onError?.(wrapped);
       } catch (e) {
@@ -157,6 +174,11 @@ export const withErrorBoundary =
           attempts.delete(attempts.keys().next().value!);
         }
         if (attempt <= maxRetries) {
+          // Carried forward from the entry this one replaces (p).
+          const ids = waiting.get(sourceId)?.[2] ?? new Set<string>();
+          if (source === "resolver") {
+            ids.add((info as { id: string }).id);
+          }
           waiting.set(sourceId, [
             source,
             clock.now() +
@@ -164,6 +186,7 @@ export const withErrorBoundary =
                 delayMs * backoffMultiplier ** (attempt - 1),
                 maxDelayMs,
               ),
+            ids,
           ]);
           poll();
         } else {

@@ -225,6 +225,12 @@ export interface ReconcileFeature {
   stop_(): void;
   /** A due retry-later constraint is asked again in the next pass. */
   dirty_(id: string): void;
+  /**
+   * A due retry-later resolver's requirement (candidate p): dispatched
+   * again, through the requeue set, if it is still raised and not in flight,
+   * at most `max` times in a row.
+   */
+  requeue_(requirementId: string, max: number): void;
   /** The settle-timeout details, around the core's own. */
   details_(core: string[]): string[];
   /** inspect()'s L2 sections, as 1.35 reports them. */
@@ -869,8 +875,11 @@ export function createSystemCore<const M extends ModuleSchema>(
     scheduleReconcile();
   };
   const writers: Writers = { record: null };
+  /** Where a write comes from: 1.35 files loaded facts as "hydrate". */
+  let origin = "authored";
   const store = createFactsStore({
     schema,
+    originOf: () => origin,
     graph,
     tracker,
     writers,
@@ -1209,13 +1218,19 @@ export function createSystemCore<const M extends ModuleSchema>(
         const set = (key: string, value: unknown) => {
           (facts as Record<string, unknown>)[key] = value;
         };
+        // Filed as "hydrate", per write: loaded, not decided by this run.
         store.batch(() => {
-          if (initial) {
-            load(initial, set);
-          }
-          if (hydrated) {
-            load(hydrated, set, true);
-            hydrated = null;
+          origin = "hydrate";
+          try {
+            if (initial) {
+              load(initial, set);
+            }
+            if (hydrated) {
+              load(hydrated, set, true);
+              hydrated = null;
+            }
+          } finally {
+            origin = "authored";
           }
         });
       }
@@ -1479,7 +1494,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   if (isDevelopment) {
     // 1.35's never-started warning (system.ts:1040–1056), on the kernel
-    // clock. Unowned (owner 0), so destroy() leaves it to fire, as 1.35 does.
+    // clock. Owned by the system, so destroy() clears it (candidate r,
+    // approved; 1.35 warns even after destroy()).
     const env = typeof process === "undefined" ? undefined : process.env;
     if (env === undefined || env.NODE_ENV !== "test") {
       clock.setTimeout(
@@ -1491,7 +1507,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         },
         0,
-        { kind: "dev" },
+        { owner: kernel.owner, kind: "dev" },
       );
     }
   }
