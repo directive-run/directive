@@ -110,6 +110,12 @@ export type Decide = (
   warn: () => void,
 ) => Strategy;
 
+/** Where records go once the kernel is gone: the plugins part. */
+interface Tail {
+  deliver_(event: KernelEvent): void;
+  wants_(at: string): boolean;
+}
+
 interface Derivation {
   id_: string;
   node_: ReactiveNode;
@@ -424,7 +430,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     effects?: EffectsFeature;
     reconcile?: ReconcileFeature;
     validate?: (key: string, value: unknown) => void;
-    plugins?: { deliver_(event: KernelEvent): void };
+    plugins?: Tail;
     errors?: ErrorsFeature;
   };
   const tracker: Tracker = { deps: null };
@@ -432,16 +438,17 @@ export function createSystemCore<const M extends ModuleSchema>(
    * After destroy the kernel's stream is gone, but as in 1.35 plugins and
    * observers still hear writes: records go straight to the plugins.
    */
-  let tail: ((event: KernelEvent) => void) | null = null;
+  let tail: Tail | null = null;
   /**
-   * True while a record has a reader. Every emitter on a hot path asks first,
-   * so with nothing listening a record (and its closure) is never built.
+   * True when a record of kind `at` has a reader now (P3): every emitter on
+   * a hot path asks first, so a record (and its closure) nobody's hook
+   * reads is never built.
    */
-  const live = () => tail !== null || hooks.live;
+  const wants = (at: string) => (tail ? tail.wants_(at) : hooks.wants(at));
   /** One record on the kernel's stream, for plugins and observers alike. */
   const emit = (at: string, data?: Record<string, unknown>) =>
     tail
-      ? tail({ ...data, t: clock.now(), seq: 0, sys: kernel.id, at })
+      ? tail.deliver_({ ...data, t: clock.now(), seq: 0, sys: kernel.id, at })
       : hooks.emit(at, data);
 
   let running = false;
@@ -581,7 +588,7 @@ export function createSystemCore<const M extends ModuleSchema>(
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
             node.flags |= Flags.Dirty;
-            if (live()) {
+            if (wants("derivation.invalidate")) {
               emit("derivation.invalidate", { id: d.id_ });
             }
             pending.add(d.id_);
@@ -597,12 +604,54 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         }
       }
+      // A watched derivation that stays stale is behind the frontier the
+      // walk stops at, yet a body that named it hears every change to what
+      // it reads, through any depth (1.35's closure). Only watched ones pay.
+      if (watched.size > 0) {
+        for (const id of watched) {
+          const d = derivations.get(id);
+          if (d?.stale_) {
+            const reads = closureOf(d);
+            if (keys.some((key) => reads.has(factNodes.get(key)!))) {
+              changedKeys.add(DERIVATION_DEP_PREFIX + id);
+            }
+          }
+        }
+      }
     } finally {
       release();
     }
   }
 
+  /**
+   * The fact nodes a watched derivation reads, directly or through other
+   * derivations. Kept until any derivation computes (only a compute moves
+   * an edge).
+   */
+  let closures = new Map<string, Set<ReactiveNode>>();
+  function closureOf(d: Derivation): Set<ReactiveNode> {
+    let reads = closures.get(d.id_);
+    if (!reads) {
+      closures.set(d.id_, (reads = new Set()));
+      const seen = new Set<ReactiveNode>();
+      const stack: ReactiveNode[] = [d.node_];
+      while (stack.length > 0) {
+        for (let l = stack.pop()!.deps; l; l = l.nextDep) {
+          const source = l.source;
+          if (!seen.has(source)) {
+            seen.add(source);
+            byNode.has(source) ? stack.push(source) : reads.add(source);
+          }
+        }
+      }
+    }
+
+    return reads;
+  }
   function compute(d: Derivation): unknown {
+    if (closures.size > 0) {
+      closures = new Map();
+    }
     try {
       const { value, deps } = withTracking(tracker, () =>
         deriveDefs[d.id_]!(facts, derive),
@@ -610,7 +659,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       d.live_ = true;
       d.stale_ = false;
       d.deps_ = deps;
-      if (live()) {
+      if (wants("derivation.compute")) {
         emit("derivation.compute", {
           id: d.id_,
           value,
@@ -664,6 +713,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
+    if (d.node_.flags & Flags.Running) {
+      // 1.35's text (derivations.ts:514–517), not the graph's.
+      throw new Error(
+        `[Directive] Circular dependency detected in derivation: ${id}`,
+      );
+    }
 
     return graph.read(d.node_);
   }
@@ -720,7 +775,16 @@ export function createSystemCore<const M extends ModuleSchema>(
             info,
             source !== "system",
           );
-    emit("error", { error: wrapped });
+    if (wants("error")) {
+      // The v1 record fields; the hook still gets only the error.
+      emit("error", {
+        error: wrapped,
+        code: `E_${source.toUpperCase()}`,
+        phase: source,
+        nodeId: sourceId,
+        cause: error,
+      });
+    }
     const warn = () => {
       if (isDevelopment) {
         const option =
@@ -769,10 +833,19 @@ export function createSystemCore<const M extends ModuleSchema>(
 
   // --- facts ---------------------------------------------------------------
   const factNodes = new Map<string, ReactiveNode>();
-  let batchHeld = false;
-  const endBatch = () => {
-    if (batchHeld) {
-      batchHeld = false;
+  /**
+   * Open batch holds, innermost last: whether each was released yet. As in
+   * 1.35 (engine.ts:631–697), a plugin writing from `onFactsBatch` opens a
+   * batch inside its parent's announcement window; with one flag the nested
+   * batch took the parent's release, and every derivation notification was
+   * held from then on.
+   */
+  const holds: boolean[] = [];
+  /** Release the innermost hold, once (from `onBatch`). */
+  const releaseHold = () => {
+    const top = holds.length - 1;
+    if (top >= 0 && !holds[top]) {
+      holds[top] = true;
       release();
     }
   };
@@ -805,13 +878,16 @@ export function createSystemCore<const M extends ModuleSchema>(
     validator: isDevelopment
       ? (key, value) => features.validate?.(key, value)
       : undefined,
-    onChange(key, value, prev) {
+    onChange(key, value, prev, by) {
       holdDepth++;
       try {
         one[0] = key;
         invalidate(one);
-        if (live()) {
-          emit("fact.set", { key, value, prev });
+        if (wants("fact.set")) {
+          emit(
+            "fact.set",
+            by ? { key, value, prev, by } : { key, value, prev },
+          );
         }
       } finally {
         release();
@@ -825,18 +901,24 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
     onBatchStart() {
       holdDepth++;
-      batchHeld = true;
+      holds.push(false);
     },
-    onBatch(changes: FactChange[]) {
-      if (live()) {
-        emit("fact.batch", { changes });
+    onBatch(changes: FactChange[], by) {
+      if (wants("fact.batch")) {
+        emit("fact.batch", by ? { changes, by } : { changes });
       }
       const keys = changes.map((c) => c.key);
       invalidate(keys);
-      endBatch();
+      releaseHold();
       changed(keys);
     },
-    onBatchEnd: endBatch,
+    // Unwinds this batch's frame: the batch that wrote nothing (no
+    // `onBatch`) and the one that threw still give their hold back.
+    onBatchEnd() {
+      if (holds.pop() === false) {
+        release();
+      }
+    },
   });
   /** Non-JSON warnings already given, shared by every facts view. */
   const nonJson = new Set<string>();
@@ -951,7 +1033,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     const l2 = features.reconcile;
     l2?.begin_();
     try {
-      if (live()) {
+      if (wants("reconcile.start")) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
       effectsOpen = true;
@@ -973,7 +1055,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           passKeys,
         );
       }
-      if (live()) {
+      if (wants("reconcile.end")) {
         emit("reconcile.end", {
           result: result ?? {
             unmet: [],
@@ -1219,7 +1301,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       const plugins = features.plugins;
       kernel.dispose();
       if (plugins) {
-        tail = plugins.deliver_;
+        tail = plugins;
       }
     },
     dispatch(event: SystemEvent) {

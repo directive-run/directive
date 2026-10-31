@@ -44,7 +44,12 @@ export const KERNEL_VERSION = 1;
 /** Event kinds. Open: features add their own strings. */
 export type EventKind = "flush" | "dispose" | (string & {});
 
-/** One record on the event stream. */
+/**
+ * One record on the event stream: the `v: 1` shape ({@link serializeEvent}).
+ * Every field past `at` is optional and additive. A host never sees a record
+ * itself in the alphas: plugins get 1.35's hook arguments and observers
+ * 1.35's observation events, both picked field by field.
+ */
 export interface KernelEvent {
   /** Clock time when emitted. */
   t: number;
@@ -54,10 +59,35 @@ export interface KernelEvent {
   sys: number;
   /** What happened. */
   at: EventKind;
+  /**
+   * `fact.set` and `fact.batch`: the writer's stamp (a resolver run's id),
+   * when there is one; a batch carries it when every change in it shares it.
+   * Absent for 0, the unattributed writer.
+   */
+  by?: number;
+  /** Reserved: `"local"`, `"remote"` or `"restore"`. Never set in the alphas. */
+  origin?: "local" | "remote" | "restore";
+  /** `error`: a stable code, `E_` and the phase in capitals. */
+  code?: string;
+  /** `error`: where it was thrown. */
+  phase?: "constraint" | "effect" | "derivation" | "resolver" | "system";
+  /** `error`: the id of the source that threw. */
+  nodeId?: string;
+  /** `error`: the thrown value, as thrown. */
+  cause?: unknown;
+  /** `error.recovery`: the strategy applied. */
+  strategy?: string;
   [field: string]: unknown;
 }
 
-export type Listener = (event: KernelEvent) => void;
+/**
+ * A listener. One with `wants_` says which kinds it reads: an emitter asks
+ * {@link Hooks.wants} before building a record. It is still handed every
+ * record that is built.
+ */
+export type Listener = ((event: KernelEvent) => void) & {
+  wants_?: (at: EventKind) => boolean;
+};
 
 export interface Hooks {
   /** Emit a record. Fields in `data` are copied onto it. */
@@ -72,6 +102,13 @@ export interface Hooks {
    * an expensive record nobody reads.
    */
   readonly live: boolean;
+  /**
+   * True when a record of kind `at` has a reader now: a listener without
+   * `wants_`, or one whose `wants_(at)` says yes. Asked when the record is
+   * due, never cached, so a reader that changes its mind is heard at once.
+   * With nothing on the sink it is one length check.
+   */
+  wants(at: EventKind): boolean;
 }
 
 /** The wire form of a record: `{...event, v: 1}` (`v` always wins). */
@@ -260,6 +297,17 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     sink_: sink,
     get live() {
       return sink.listeners.length > 0;
+    },
+    wants(at) {
+      const list = sink.listeners;
+      for (let i = 0; i < list.length; i++) {
+        const want = list[i]!.wants_;
+        if (!want || want(at)) {
+          return true;
+        }
+      }
+
+      return false;
     },
     emit(at, data) {
       const seq = ++sink.seq;

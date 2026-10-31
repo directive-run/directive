@@ -94,7 +94,10 @@ export function elapsedMs(state: TimerFactState, nowMs: number): number {
   //     stays false past the deadline)
   //   - make remainingMs report values > the configured ms total
   //   - silently wrap into pausedDurationMs accumulation downstream
-  if (state.status === "paused" && state.pausedAtMs !== null) {
+  // Quirk (f), approved at GATE-1: frozen whenever a pause moment is held,
+  // so a timer completed while paused (completeTimer keeps pausedAtMs)
+  // stops counting too. 1.35 froze only while `status === "paused"`.
+  if (state.pausedAtMs !== null) {
     return Math.max(
       0,
       state.pausedAtMs - state.startedAtMs - state.pausedDurationMs,
