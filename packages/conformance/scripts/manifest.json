@@ -75,6 +75,7 @@
   "tests/core/l3-proxies-oracle-gates.test.ts": "packages/core/src/core/__tests__/l3-proxies-oracle-gates.test.ts",
   "tests/core/l3-proxies-oracle-production.test.ts": "packages/core/src/core/__tests__/l3-proxies-oracle-production.test.ts",
   "tests/core/l3-proxies-oracle-transform.test.ts": "packages/core/src/core/__tests__/l3-proxies-oracle-transform.test.ts",
+  "tests/core/l3-proxies-oracle-views.test.ts": "packages/core/src/core/__tests__/l3-proxies-oracle-views.test.ts",
   "tests/core/l3-proxies-oracle.test.ts": "packages/core/src/core/__tests__/l3-proxies-oracle.test.ts",
   "tests/core/l3-small-oracle-accessors.test.ts": "packages/core/src/core/__tests__/l3-small-oracle-accessors.test.ts",
   "tests/core/l3-small-oracle-clock-timer.test.ts": "packages/core/src/core/__tests__/l3-small-oracle-clock-timer.test.ts",
