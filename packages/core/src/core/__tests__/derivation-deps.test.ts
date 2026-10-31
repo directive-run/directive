@@ -784,6 +784,16 @@ describe("invalidation cost", () => {
    *
    * Measured on the machine this was written on: 1.2× with the skip in place,
    * 12.6× without it. The threshold sits an order of magnitude away from both.
+   *
+   * Each size is measured several times, alternating small and large, and the
+   * two figures compared are the *minimum* of each. A single measurement of
+   * each size lets one burst of contention from other work on the machine land
+   * in either figure and swing the ratio past the threshold in either
+   * direction — under parallel load the one-run version failed about every
+   * other run. Contention only ever adds time, so the fastest run is the one
+   * least disturbed, and alternating means a slow stretch of the machine
+   * reaches both sizes instead of just one. Removing the skip makes every
+   * large run slower, so it still moves the minimum.
    */
   it("does not pay for the size of a graph nothing is watching", async () => {
     const passes = 2000;
@@ -819,8 +829,15 @@ describe("invalidation cost", () => {
     await costOf(2);
     await costOf(1000);
 
-    const small = await costOf(2);
-    const large = await costOf(1000);
+    // Alternating, so a slow stretch of the machine reaches both sizes, and
+    // the minimum of each, because other work can only add time to a run.
+    const rounds = 7;
+    let small = Number.POSITIVE_INFINITY;
+    let large = Number.POSITIVE_INFINITY;
+    for (let round = 0; round < rounds; round++) {
+      small = Math.min(small, await costOf(2));
+      large = Math.min(large, await costOf(1000));
+    }
 
     // 500 times the derivations, and it does not cost 500 times as much — or
     // three times as much. Without the skip, the closure out from the changed
