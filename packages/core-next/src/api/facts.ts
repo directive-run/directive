@@ -64,9 +64,9 @@ export interface Writers {
 
 /**
  * RFC-0003 binding: asked before a run's write to `key` lands (a delete
- * passes `undefined`); false drops it (a clobber).
+ * passes `undefined` and `deleting`); false drops it (a clobber).
  */
-export type Allow = (key: string, value: unknown) => boolean;
+export type Allow = (key: string, value: unknown, deleting?: true) => boolean;
 
 /** A facts view whose writes carry one stamp (a resolver run). */
 export interface Writer {
@@ -587,7 +587,7 @@ export function createFactsProxy<S extends Schema>(
       if (reserved(prop)) {
         return false;
       }
-      if (allow && !allow(prop, undefined)) {
+      if (allow && !allow(prop, undefined, true)) {
         return true;
       }
       s.delete(prop, stamp);

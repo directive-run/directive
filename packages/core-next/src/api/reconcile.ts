@@ -33,6 +33,10 @@ import { DERIVATION_DEP_PREFIX } from "./facts.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
 
+/** Slots in a bound key's `[stamp, changes, dropped]` count triples. */
+const CHANGED = 1;
+const DROPPED = 2;
+
 declare module "../kernel.js" {
   interface KernelFeatures {
     /** Added by `withReconcile` (reconcile.ts). */
@@ -142,6 +146,8 @@ export const withReconcile: SystemPart = (context) => {
     store: context.store,
     factsFor: context.factsFor,
     peek: (key) => context.store.get(key),
+    has: (key) => context.store.has(key),
+    onDrop: (key, stamp) => tally(key, stamp, DROPPED),
     bindingOf,
     clock,
     owner: kernel.owner,
@@ -206,6 +212,37 @@ export const withReconcile: SystemPart = (context) => {
   // nothing unless a second writer changes the same key in one window.
   let open = new Map<string, number | number[]>();
   let closed = new Map<string, number | number[]>();
+  // --- bound keys: counted (RFC-0003 with RFC row 1) ----------------------
+  // 1.35 counts a run's write to a bound key as its own even when the
+  // binding drops it, and compares counts: the removed runs' writes to a key
+  // must number its changes. So a key the runs changed nothing of, but that
+  // one of them tried to change after another writer did, is still theirs.
+  // Only a bound key can drop a write, so only bound keys are counted, per
+  // writer: flat `[stamp, changes, dropped]` triples, double buffered like
+  // the stamps. Every other key is answered by the stamps alone.
+  const boundKeys = bindings
+    ? new Set(
+        Object.values(constraintDefs).flatMap((def) => def?.abortOn ?? []),
+      )
+    : null;
+  let openTally = new Map<string, number[]>();
+  let closedTally = new Map<string, number[]>();
+  const tally = (key: string, stamp: number, slot: 1 | 2) => {
+    const counts = openTally.get(key);
+    if (counts === undefined) {
+      openTally.set(key, [stamp, slot === CHANGED ? 1 : 0, slot - 1]);
+
+      return;
+    }
+    for (let i = 0; i < counts.length; i += 3) {
+      if (counts[i] === stamp) {
+        counts[i + slot]!++;
+
+        return;
+      }
+    }
+    counts.push(stamp, slot === CHANGED ? 1 : 0, slot - 1);
+  };
   if (Object.keys(resolverDefs).length > 0) {
     context.writers.record = (key, stamp) => {
       // As 1.35: a write counts only while a run is in flight (or detached
@@ -213,6 +250,9 @@ export const withReconcile: SystemPart = (context) => {
       // first run starts) is nobody's.
       if (resolvers.inflight.size === 0 && resolvers.detached.size === 0) {
         return;
+      }
+      if (boundKeys?.has(key)) {
+        tally(key, stamp, CHANGED);
       }
       const by = open.get(key);
       if (by === undefined) {
@@ -228,6 +268,22 @@ export const withReconcile: SystemPart = (context) => {
   }
   /** Every write to `key` in the closed window came from one of `joint`. */
   const ownedBy = (key: string, joint: ReadonlySet<number>) => {
+    const counts = closedTally.get(key);
+    if (counts !== undefined) {
+      // 1.35's count test: the joint runs' changes plus their dropped writes
+      // equal all its changes, so the drops make up for the other writers'.
+      let others = 0;
+      let dropped = 0;
+      for (let i = 0; i < counts.length; i += 3) {
+        if (joint.has(counts[i]!)) {
+          dropped += counts[i + DROPPED]!;
+        } else {
+          others += counts[i + CHANGED]!;
+        }
+      }
+
+      return others === dropped;
+    }
     const by = closed.get(key);
     if (by === undefined) {
       // Changed while no run was in flight: uncounted, as in 1.35, so it
@@ -290,7 +346,7 @@ export const withReconcile: SystemPart = (context) => {
     // The runs whose requirements disappeared and that wrote this pass own
     // the pass's changes jointly (keyed siblings writing one fact).
     const joint = new Set<number>();
-    if (closed.size > 0) {
+    if (closed.size > 0 || closedTally.size > 0) {
       for (const req of removed) {
         const run = runFor(req.id);
         if (run && wrote(run.stamp_)) {
@@ -323,11 +379,18 @@ export const withReconcile: SystemPart = (context) => {
       constraints.forget(req.id);
     }
   }
-  /** `stamp` changed some key in the closed window. */
+  /** `stamp` changed some key in the closed window, or tried to (dropped). */
   const wrote = (stamp: number) => {
     for (const by of closed.values()) {
       if (by === stamp || (typeof by !== "number" && by.includes(stamp))) {
         return true;
+      }
+    }
+    for (const counts of closedTally.values()) {
+      for (let i = 0; i < counts.length; i += 3) {
+        if (counts[i] === stamp && counts[i + DROPPED]! > 0) {
+          return true;
+        }
       }
     }
 
@@ -341,6 +404,12 @@ export const withReconcile: SystemPart = (context) => {
       closed = open;
       done.clear();
       open = done;
+      if (boundKeys !== null) {
+        const counted = closedTally;
+        closedTally = openTally;
+        counted.clear();
+        openTally = counted;
+      }
     },
     evaluate_: (passKeys) =>
       constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys),

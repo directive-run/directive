@@ -471,3 +471,98 @@ describe("binding on an async constraint", () => {
     system.destroy();
   });
 });
+
+describe("a dropped write still counts as the run's own (1.35's recordRunWrites)", () => {
+  /**
+   * `when: go && k === 0`, bound to k. The first run's body: another writer
+   * sets k to 5, the run writes `drop` to k (dropped, a clobber), then it
+   * waits; once released it writes other and n. Later runs write n.
+   */
+  function scenario(drop: number, outside: number[] = [5]) {
+    const g = gate();
+    let runs = 0;
+    let signal: AbortSignal | undefined;
+    const built = build({
+      constraints: {
+        load: {
+          when: (f: any) => f.go && f.k === 0,
+          require: { type: "LOAD" },
+          abortOn: ["k"],
+        },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          resolve: async (_req: unknown, context: any) => {
+            runs++;
+            if (runs > 1) {
+              context.facts.n = runs;
+
+              return;
+            }
+            signal = context.signal;
+            for (const value of outside) {
+              built.system.facts.k = value;
+            }
+            context.facts.k = drop;
+            await g.promise;
+            context.facts.other = 7;
+            context.facts.n = 70;
+          },
+        },
+      },
+    });
+
+    return {
+      ...built,
+      signal: () => signal,
+      async play() {
+        built.system.start();
+        built.system.facts.go = true;
+        await flush();
+        // The requirement comes back while the first run still waits.
+        built.system.facts.k = 0;
+        await flush();
+        g.open();
+        await flush();
+      },
+    };
+  }
+
+  it("a changing write the binding dropped makes up for the other writer's change: satisfied, then superseded", async () => {
+    const { system, log, signal, play } = scenario(6);
+    await play();
+    expect(signal()?.aborted).toBe(true);
+    expect(log.rejected).toHaveLength(1);
+    // Satisfied, so still in flight when the requirement came back: the new
+    // run supersedes it and its late writes drop.
+    expect(log.order).toEqual([
+      "start:load",
+      "cancel:load",
+      "start:load",
+      "complete:load",
+    ]);
+    expect([system.facts.k, system.facts.other, system.facts.n]).toEqual([
+      0, 0, 2,
+    ]);
+    system.destroy();
+  });
+
+  it("a dropped write of the value already there is not counted: detached, its late writes land", async () => {
+    const { system, log, play } = scenario(5);
+    await play();
+    expect(log.order).toEqual(["start:load", "start:load", "complete:load"]);
+    expect([system.facts.k, system.facts.other, system.facts.n]).toEqual([
+      0, 7, 70,
+    ]);
+    system.destroy();
+  });
+
+  it("counts, not writers: one dropped write does not make up for three changes", async () => {
+    const { system, log, play } = scenario(6, [5, 4, 5]);
+    await play();
+    expect(log.order).toEqual(["start:load", "start:load", "complete:load"]);
+    expect([system.facts.other, system.facts.n]).toEqual([7, 70]);
+    system.destroy();
+  });
+});

@@ -39,12 +39,13 @@ const { build, transform, version } = esbuild.default ?? esbuild;
 // that string reach production, and it silently falls out of this set. That is
 // what DEV_STRINGS_MIN is for.
 const NEEDLE_MIN = 20;
-// The number of dev-only strings the two derivations found together when this
-// was last updated. The guard fails when it finds fewer, because a string that
-// leaves the derived set has either started shipping (a gate was removed) or
-// been deleted. If you deleted dev text on purpose, lower this number in the
-// same commit; if you added dev text, raise it to the count the guard prints.
-const DEV_STRINGS_MIN = 76;
+// The number of dev-only strings the two derivations find together: an exact
+// count, not a floor that can fall behind. The guard fails when it finds fewer,
+// because a string that leaves the derived set has either started shipping (a
+// gate was removed) or been deleted; `--check` also fails when it finds more,
+// so the count rises with the dev text and a later removal is caught. Set it to
+// the count the guard prints, in the commit that adds or deletes dev text.
+const DEV_STRINGS_MIN = 81;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -328,7 +329,7 @@ const inlineIsDevelopment = {
 // development bundle, absent from the production one). Two controls make a
 // silent pass impossible: a development bundle must contain every string in the
 // list, so the production bundle's lack of one is the bundler's doing and not a
-// needle that matches nothing; and the list must hold at least DEV_STRINGS_MIN
+// needle that matches nothing; and the list must hold exactly DEV_STRINGS_MIN
 // strings, so an under-derived list fails loudly.
 const entryContents =
   'export * as a from "./index.ts"; export * as b from "./internals.ts";';
@@ -364,14 +365,23 @@ if (blind.length > 0) {
   );
   process.exitCode = 1;
 }
-if (devNeedles.length < DEV_STRINGS_MIN) {
-  console.error(
-    `dev-string check is under-derived: ${devNeedles.length} dev-only strings found, at least ${DEV_STRINGS_MIN} expected. Either a dev-gated string now reaches a production bundle (a gate was removed: a message you expect to be dev-only is missing from the list below), or dev text was deleted (then lower DEV_STRINGS_MIN in scripts/size.mjs). Found:\n${devNeedles.map((n) => `  ${JSON.stringify(n)}`).join("\n")}`,
-  );
-  process.exitCode = 1;
+if (devNeedles.length !== DEV_STRINGS_MIN) {
+  const fewer = devNeedles.length < DEV_STRINGS_MIN;
+  const message = fewer
+    ? `dev-string check is under-derived: ${devNeedles.length} dev-only strings found, ${DEV_STRINGS_MIN} expected. Either a dev-gated string now reaches a production bundle (a gate was removed: a message you expect to be dev-only is missing from the list below), or dev text was deleted on purpose (then set DEV_STRINGS_MIN to ${devNeedles.length} in scripts/size.mjs).`
+    : `dev-string check is behind: ${devNeedles.length} dev-only strings found, ${DEV_STRINGS_MIN} expected. Dev text was added: set DEV_STRINGS_MIN to ${devNeedles.length} in scripts/size.mjs, so a gate removed later fails here.`;
+  // Fewer always fails; more fails under --check (CI), so the count cannot lag.
+  if (fewer || process.argv.includes("--check")) {
+    console.error(
+      `${message} Found:\n${devNeedles.map((n) => `  ${JSON.stringify(n)}`).join("\n")}`,
+    );
+    process.exitCode = 1;
+  } else {
+    console.warn(message);
+  }
 }
 console.log(
-  `dev-only strings guarded: ${devNeedles.length} (${analysed.length} from source analysis, ${dropped.length} dropped by the bundler, floor ${DEV_STRINGS_MIN}${devNeedles.length > DEV_STRINGS_MIN ? `; raise DEV_STRINGS_MIN to ${devNeedles.length}` : ""})`,
+  `dev-only strings guarded: ${devNeedles.length} (${analysed.length} from source analysis, ${dropped.length} dropped by the bundler, expected ${DEV_STRINGS_MIN})`,
 );
 function assertNoDevStrings(label, bytes) {
   const shipped = devNeedles.filter((n) => Buffer.from(bytes).includes(n));

@@ -43,7 +43,9 @@
  *   actual }`, and `resolver.write.rejected` reports it (ten per attempt,
  *   then one summary). Writes to other keys land. An aborted run reports
  *   no outcome, as 1.35. Only the run's own writes are checked: binding
- *   never stops another writer.
+ *   never stops another writer. A dropped write that would have changed
+ *   its key still counts as the run's own for own-write satisfaction, as
+ *   in 1.35 (reconcile.ts).
  * - Detach: a bound run whose requirement is retracted leaves flight but is
  *   not aborted. It runs to the end, retries included, and reports its
  *   outcome; the requirement can be dispatched again meanwhile.
@@ -111,8 +113,15 @@ export interface ResolversOptions {
   store: { batch(fn: () => void): void };
   /** A facts view whose writes carry the run's stamp, each asked of `allow`. */
   factsFor: (writer: Writer, allow?: Allow) => Facts<any>;
-  /** A fact's current value. */
+  /** A fact's current value, and whether it is set. */
   peek: (key: string) => unknown;
+  has: (key: string) => boolean;
+  /**
+   * The binding dropped a write by the run with `stamp` that would have
+   * changed `key`. 1.35 still counts it as the run's own write when it asks
+   * whether the run satisfied its requirement (reconcile.ts).
+   */
+  onDrop: (key: string, stamp: number) => void;
   /** The keys a requirement's constraint binds (`abortOn`), if any. */
   bindingOf: (req: RequirementWithId) => readonly string[] | undefined;
   clock: Clock;
@@ -298,21 +307,34 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     /** Keys it lost to another writer: one-shot, later writes drop too. */
     let lost: Set<string> | null = null;
     let clobbers = 0;
+    /**
+     * 1.35's recordRunWrites sits outside the binding, so a dropped write
+     * that would have changed the key (a delete: the key is set) still
+     * counts as the run's own.
+     */
+    const drop = (key: string, actual: unknown, value: unknown, del?: true) => {
+      if (del ? options.has(key) : !Object.is(actual, value)) {
+        options.onDrop(key, run.stamp_);
+      }
+    };
 
-    return (key, value) => {
+    return (key, value, deleting) => {
       if (!expected.has(key)) {
         return true;
       }
+      const actual = options.peek(key);
       if (lost?.has(key)) {
+        drop(key, actual, value, deleting);
+
         return false;
       }
       const want = expected.get(key);
-      const actual = options.peek(key);
       if (Object.is(actual, want)) {
         expected.set(key, value);
 
         return true;
       }
+      drop(key, actual, value, deleting);
       (lost ??= new Set()).add(key);
       const detail = { fact: key, expected: want, actual };
       // Ten reports, then one summary; each before the abort, so a
