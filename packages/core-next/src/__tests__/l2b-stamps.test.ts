@@ -359,3 +359,121 @@ describe("settle() and stop()", () => {
     system.destroy();
   });
 });
+
+describe("own writes as 1.35 counts them", () => {
+  it("a write made before the first run starts does not count against the run", async () => {
+    const { log, plugin: base } = outcomes();
+    const g = gate();
+    let signal: AbortSignal | undefined;
+    let wrote = false;
+    const box: { system?: any } = {};
+    const plugin = {
+      ...base,
+      onRequirementMet: () => log.order.push("met"),
+      // Runs before the run is dispatched: no run is in flight yet.
+      onRequirementCreated: () => {
+        if (!wrote) {
+          wrote = true;
+          box.system.facts.y = 1;
+        }
+      },
+    };
+    const { system } = build(
+      {
+        schema: {
+          facts: { y: t.number(), go: t.boolean(), done: t.boolean() },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        init: (f: any) => {
+          f.y = 0;
+          f.go = false;
+          f.done = false;
+        },
+        derive: {},
+        constraints: {
+          load: {
+            when: (f: any) => f.y >= 0 && f.go && !f.done,
+            require: { type: "LOAD" },
+          },
+        },
+        resolvers: {
+          load: {
+            requirement: "LOAD",
+            resolve: async (_req: unknown, context: any) => {
+              signal = context.signal;
+              // The same window as the plugin's write to y.
+              context.facts.done = true;
+              await g.promise;
+            },
+          },
+        },
+      },
+      plugin,
+    );
+    box.system = system;
+    system.start();
+    system.facts.go = true;
+    await flush();
+    await flush();
+    expect(wrote).toBe(true);
+    expect(log.order).toEqual(["start"]);
+    expect(signal?.aborted).toBe(false);
+    g.open();
+    await flush();
+    expect(log.order).toEqual(["start", "complete", "met"]);
+    expect(signal?.aborted).toBe(false);
+    system.destroy();
+  });
+
+  it("a run that finishes inside the pass its own write started is satisfied there, in one pass", async () => {
+    const { log, plugin: base } = outcomes();
+    let starts = 0;
+    const ends: any[] = [];
+    const plugin = {
+      ...base,
+      onReconcileStart: () => starts++,
+      onReconcileEnd: (result: unknown) => ends.push(result),
+    };
+    const { system } = build(
+      {
+        constraints: {
+          load: {
+            when: (f: any) => f.want && f.n === 0,
+            require: { type: "LOAD" },
+          },
+        },
+        resolvers: {
+          load: {
+            requirement: "LOAD",
+            resolve: async (_req: unknown, context: any) => {
+              await Promise.resolve();
+              // Its last act: the pass this starts is open when it ends.
+              context.facts.n = 1;
+            },
+          },
+        },
+      },
+      plugin,
+    );
+    system.start();
+    await flush();
+    const before = { starts, ends: ends.length };
+    system.facts.want = true;
+    await flush();
+    await flush();
+    expect(log.order).toEqual(["start", "complete"]);
+    // One pass dispatches, one sees the run's own write; none after.
+    expect(starts - before.starts).toBe(2);
+    expect(ends.length - before.ends).toBe(2);
+    const last = ends.at(-1);
+    // As 1.35: the removed requirement names its resolver, never "unknown",
+    // and the run is still listed for this pass. No cancel was reported.
+    expect(last.canceled.map((c: any) => c.resolverId)).toEqual(["load"]);
+    expect(last.inflight.map((r: any) => r.resolverId)).toEqual(["load"]);
+    expect(last.unmet).toEqual([]);
+    expect(system.isSettled).toBe(true);
+    system.destroy();
+  });
+});

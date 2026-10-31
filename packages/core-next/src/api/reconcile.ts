@@ -85,6 +85,17 @@ export const withReconcile: SystemPart = (context) => {
   const requeued = new Set<string>();
   /** The requirement set the last commit acted on, by id. */
   let previous = new Map<string, RequirementWithId>();
+  /** Between `begin_` and `commit_`. */
+  let passOpen = false;
+  /**
+   * Runs that ended on their own (complete or error) while a pass was open,
+   * by requirement id. Their slot is empty already (one outcome), but the
+   * pass's commit still decides for them, as 1.35's commit does for a run
+   * that has reported its outcome and not yet left its in-flight map: whether
+   * its own writes satisfied its requirement, and whether its end needs a
+   * pass.
+   */
+  const ended = new Map<string, Run>();
   const resolvers = createResolvers({
     defs: resolverDefs,
     store: context.store,
@@ -127,14 +138,22 @@ export const withReconcile: SystemPart = (context) => {
     },
     onEnd(run) {
       settled();
-      // As 1.35: a satisfied run's finish changes nothing a pass acts on,
-      // unless it left a requeue or a dirty constraint behind.
-      if (!run.satisfied_ || requeued.size > 0 || constraints.hasDirty()) {
+      if (passOpen) {
+        // The open pass's commit decides for it (see `ended`).
+        ended.set(run.req_.id, run);
+      } else if (needsPass(run)) {
         schedule();
       }
     },
     onRequeue: (id) => requeued.add(id),
   });
+
+  /**
+   * As 1.35: a satisfied run's finish changes nothing a pass acts on, unless
+   * it left a requeue or a dirty constraint behind.
+   */
+  const needsPass = (run: Run) =>
+    !run.satisfied_ || requeued.size > 0 || constraints.hasDirty();
 
   // --- writer stamps (RFC row 1) -------------------------------------------
   // key → who changed it: one stamp, or several once a second writer comes.
@@ -145,6 +164,11 @@ export const withReconcile: SystemPart = (context) => {
   let closed = new Map<string, number | number[]>();
   if (Object.keys(resolverDefs).length > 0) {
     context.writers.record = (key, stamp) => {
+      // As 1.35: a write counts only while a run is in flight. One made with
+      // none (a plugin writing before the first run starts) is nobody's.
+      if (resolvers.inflight.size === 0) {
+        return;
+      }
       const by = open.get(key);
       if (by === undefined) {
         open.set(key, stamp);
@@ -161,8 +185,9 @@ export const withReconcile: SystemPart = (context) => {
   const ownedBy = (key: string, joint: ReadonlySet<number>) => {
     const by = closed.get(key);
     if (by === undefined) {
-      // A change nobody stamped: not a run's.
-      return false;
+      // Changed while no run was in flight: uncounted, as in 1.35, so it
+      // does not count against the runs.
+      return true;
     }
     if (typeof by === "number") {
       return joint.has(by);
@@ -213,6 +238,8 @@ export const withReconcile: SystemPart = (context) => {
 
     return owned(read) && changed > 0;
   }
+  /** The run in flight for `id`, or one that ended in this pass. */
+  const runFor = (id: string) => resolvers.inflight.get(id) ?? ended.get(id);
   /** Retract each removed requirement: satisfied runs go on, others cancel. */
   function retract(removed: RequirementWithId[], passKeys: Set<string>) {
     // The runs whose requirements disappeared and that wrote this pass own
@@ -220,19 +247,24 @@ export const withReconcile: SystemPart = (context) => {
     const joint = new Set<number>();
     if (closed.size > 0) {
       for (const req of removed) {
-        const run = resolvers.inflight.get(req.id);
+        const run = runFor(req.id);
         if (run && wrote(run.stamp_)) {
           joint.add(run.stamp_);
         }
       }
     }
     for (const req of removed) {
-      const run = resolvers.inflight.get(req.id);
+      const run = runFor(req.id);
       if (run && joint.size > 0 && satisfied(run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
         // stays in flight (stop aborts it, settle waits), is not retried,
-        // and is superseded if the requirement comes back.
-        resolvers.satisfy(req.id);
+        // and is superseded if the requirement comes back. One that ended
+        // in this pass has reported its outcome; it is only marked.
+        run.satisfied_ = true;
+      } else if (ended.get(req.id) === run) {
+        // Ended in this pass, not by its own write: its outcome stands
+        // (one per run). 1.35 would cancel it as well.
+        ended.delete(req.id);
       } else {
         resolvers.abort(req.id);
       }
@@ -252,6 +284,7 @@ export const withReconcile: SystemPart = (context) => {
 
   const feature: ReconcileFeature = {
     begin_() {
+      passOpen = true;
       const done = closed;
       closed = open;
       done.clear();
@@ -294,13 +327,15 @@ export const withReconcile: SystemPart = (context) => {
         }
       }
       previous = next;
+      passOpen = false;
       if (requeued.size > 0) {
         // Applied once the requeuing run is out of flight (RFC row 7): a
         // run still going would drop the dispatch as a duplicate, and the
-        // requeue would be lost. Its end schedules the pass that applies it.
+        // requeue would be lost. Its end schedules the pass that applies it;
+        // for a run that ended in this pass, that is the next one, as 1.35.
         let applied = false;
         for (const id of requeued) {
-          if (!resolvers.inflight.has(id)) {
+          if (!resolvers.inflight.has(id) && !ended.has(id)) {
             previous.delete(id);
             requeued.delete(id);
             applied = true;
@@ -315,10 +350,22 @@ export const withReconcile: SystemPart = (context) => {
         // A constraint held back by `after` was released (quirk e).
         schedule();
       }
-      const inflight = [...resolvers.inflight.values()];
-
-      return {
-        unmet: current.filter((r) => !resolvers.inflight.has(r.id)),
+      // A run that ended in this pass is listed as 1.35 lists it, still in
+      // flight, in dispatch order (stamps rise with each dispatch).
+      let inflight = [...resolvers.inflight.values()];
+      let pending = false;
+      if (ended.size > 0) {
+        inflight = [...inflight, ...ended.values()].sort(
+          (a, b) => a.stamp_ - b.stamp_,
+        );
+        for (const run of ended.values()) {
+          pending ||= needsPass(run);
+        }
+      }
+      const listed = (id: string) =>
+        resolvers.inflight.has(id) || ended.has(id);
+      const result = {
+        unmet: current.filter((r) => !listed(r.id)),
         inflight: inflight.map((run) => ({
           id: run.req_.id,
           resolverId: run.resolver_,
@@ -326,12 +373,19 @@ export const withReconcile: SystemPart = (context) => {
         })),
         completed: [],
         // As 1.35: a canceled run is gone by now, so its resolver is
-        // "unknown"; one still in flight (L2b: satisfied) is named.
+        // "unknown"; one still listed (satisfied) is named.
         canceled: removed.map((r) => ({
           id: r.id,
-          resolverId: resolvers.inflight.get(r.id)?.resolver_ ?? "unknown",
+          resolverId: runFor(r.id)?.resolver_ ?? "unknown",
         })),
       };
+      ended.clear();
+      if (pending) {
+        // A run that ended in this pass needs one after it.
+        schedule();
+      }
+
+      return result;
     },
     busy_: () => resolvers.inflight.size > 0,
     start_: () => constraints.markAllDirty(),

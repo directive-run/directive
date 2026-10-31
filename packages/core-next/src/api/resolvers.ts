@@ -110,8 +110,6 @@ export interface Resolvers {
   abort(requirementId: string): void;
   /** Cancel every run in flight; returns their requirement ids. */
   abortAll(): string[];
-  /** Its own writes retracted the requirement: the run is not canceled. */
-  satisfy(requirementId: string): void;
   /** The run in flight for a requirement. */
   inflight: ReadonlyMap<string, Run>;
 }
@@ -369,12 +367,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       }
 
       return ids;
-    },
-    satisfy(requirementId) {
-      const run = inflight.get(requirementId);
-      if (run) {
-        run.satisfied_ = true;
-      }
     },
   };
 }
