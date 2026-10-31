@@ -1024,7 +1024,13 @@ export function createSystemCore<const M extends ModuleSchema>(
     watch: (id) => watched.add(id),
     writers,
     factsFor: (writer) =>
-      createFactsProxy(store, schema, tracker, nonJson, writer) as Facts<Schema>,
+      createFactsProxy(
+        store,
+        schema,
+        tracker,
+        nonJson,
+        writer,
+      ) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
   };
   for (const part of parts) {
