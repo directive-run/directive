@@ -75,6 +75,8 @@ export interface Constraints {
   /** A requirement left the set: if it is asked again, it must resolve again. */
   forget(requirementId: string): void;
   markAllDirty(): void;
+  /** Ask `id` again in the next pass (a due retry-later, 1.35's markDirty). */
+  markDirty(id: string): void;
   hasDirty(): boolean;
   /** True when a dependent it held back is now free (ask for a pass). */
   disable(id: string): boolean;
@@ -615,6 +617,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         dirty.add(id);
       }
     },
+    markDirty: (id) => dirty.add(id),
     hasDirty: () => [...dirty].some((id) => !disabled.has(id)),
     disable(id) {
       if (!defs[id]) {

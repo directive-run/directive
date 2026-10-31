@@ -34,6 +34,12 @@ export interface TimerRecord {
 export interface TimerOptions {
   owner?: number;
   kind?: string;
+  /**
+   * False: the timer alone does not keep the host process alive (the real
+   * clock calls the host handle's `unref`, where it has one). Default true.
+   * A host concern, not state, so it is not in {@link TimerRecord}.
+   */
+  keepAlive?: boolean;
 }
 
 export interface Clock {
@@ -262,6 +268,9 @@ export function createClock(options: RealClockOptions = {}): Clock {
         },
         Math.max(0, ms),
       );
+      if (options?.keepAlive === false) {
+        (timer[1] as { unref?: () => void } | undefined)?.unref?.();
+      }
 
       return id;
     },

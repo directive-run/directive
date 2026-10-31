@@ -6,6 +6,8 @@
  * layers add.
  */
 
+import type { ErrorBoundaryConfig } from "./errors.js";
+
 /** Optional metadata on any definition (labels, tags) for tooling. */
 export interface DefinitionMeta {
   label?: string;
@@ -181,6 +183,10 @@ export interface SystemOptions<M extends ModuleSchema> {
   tickMs?: number;
   /** Facts applied at start, after the module inits (namespaced: by module). */
   initialFacts?: Record<string, unknown>;
+  /** What happens when a constraint, resolver, effect or derivation throws. */
+  errorBoundary?: ErrorBoundaryConfig;
+  /** 1.35's zero-config defaults (at L3: every source skips). */
+  zeroConfig?: boolean;
   [key: string]: unknown;
 }
 

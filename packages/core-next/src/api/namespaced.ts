@@ -428,6 +428,8 @@ export function createNamespacedSystem(
   const effects: Rec = {};
   const constraints: Rec = {};
   const resolvers: Rec = {};
+  /** Each resolver's module, for its onResolverError hook (1.35). */
+  const owners: Rec = {};
   const inits: Array<(src: Rec) => void> = [];
   const namespaceKeys = new Map<string, string[]>();
   for (const ns of ordered) {
@@ -573,6 +575,7 @@ export function createNamespacedSystem(
       string,
       Rec,
     ][]) {
+      owners[p(key)] = mod;
       resolvers[p(key)] = {
         ...def,
         ...(def.resolve && {
@@ -637,6 +640,7 @@ export function createNamespacedSystem(
       }
     },
     modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
+    owners_: owners,
     derive,
     events,
     effects,

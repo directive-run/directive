@@ -93,6 +93,23 @@ export class DirectiveError extends Error {
 
 export { createModule } from "./module.js";
 
+/** What happens after an error (1.35's RecoveryStrategy). */
+export type Strategy = "skip" | "retry" | "retry-later" | "disable" | "throw";
+
+/**
+ * The error boundary's decision (errors.ts): called after the `error` record,
+ * before `error.recovery`. `warn` gives the development warning for an error
+ * nothing handles.
+ */
+export type Decide = (
+  source: ErrorSource,
+  sourceId: string,
+  error: unknown,
+  wrapped: DirectiveError,
+  context: unknown,
+  warn: () => void,
+) => Strategy;
+
 interface Derivation {
   id_: string;
   node_: ReactiveNode;
@@ -122,7 +139,11 @@ export interface SystemContext {
   readonly store: FactsStore<any>;
   readonly derived: Record<string, unknown>;
   readonly tracker: Tracker;
-  /** Report an error from `source` (the default strategy: skip). */
+  /**
+   * Report an error from `source`: returns the strategy for the caller to
+   * act on (skip without an error boundary). Under "throw" it throws the
+   * DirectiveError instead, after the records, as 1.35 does.
+   */
   reportError(
     source: ErrorSource,
     sourceId: string,
@@ -130,7 +151,9 @@ export interface SystemContext {
     context?: unknown,
     /** A run that failed after its own write satisfied its requirement. */
     satisfied?: boolean,
-  ): void;
+  ): Strategy;
+  /** Set by the error boundary part (errors.ts); absent, everything skips. */
+  decide_?: Decide;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
@@ -162,6 +185,19 @@ export type SystemPart = (context: SystemContext) => void;
 export interface EffectsFeature {
   runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
   cleanupAll(): void;
+  /** An effect waits to run again (the "retry" strategy): pass again. */
+  reruns_(): boolean;
+  /** A pass from an ordinary write: failing effects get their retries back. */
+  fresh_(): void;
+}
+
+/** The error boundary (errors.ts) as the lifecycle drives it. */
+export interface ErrorsFeature {
+  start_(): void;
+  /** Ends retry-later polling and drops the waiting entries (1.35). */
+  stop_(): void;
+  /** A resolver completed: its retry-later budget and entry go. */
+  clear_(resolverId: string): void;
 }
 
 /** The L2 reconcile feature (reconcile.ts) as the pass drives it. */
@@ -181,6 +217,8 @@ export interface ReconcileFeature {
   busy_(): boolean;
   start_(): void;
   stop_(): void;
+  /** A due retry-later constraint is asked again in the next pass. */
+  dirty_(id: string): void;
   /** The settle-timeout details, around the core's own. */
   details_(core: string[]): string[];
   /** inspect()'s L2 sections, as 1.35 reports them. */
@@ -387,6 +425,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     reconcile?: ReconcileFeature;
     validate?: (key: string, value: unknown) => void;
     plugins?: { deliver_(event: KernelEvent): void };
+    errors?: ErrorsFeature;
   };
   const tracker: Tracker = { deps: null };
   /**
@@ -582,9 +621,10 @@ export function createSystemCore<const M extends ModuleSchema>(
       return value;
     } catch (error) {
       d.live_ = true;
-      reportError("derivation", d.id_, error);
-      // 1.35 keeps a throwing derivation stale: the next read runs it again.
+      // 1.35 keeps a throwing derivation stale: the next read runs it again,
+      // which is also all "retry" asks. Marked first: "throw" leaves here.
       d.node_.flags |= Flags.Dirty;
+      context.reportError("derivation", d.id_, error);
       throw error;
     }
   }
@@ -659,16 +699,17 @@ export function createSystemCore<const M extends ModuleSchema>(
   );
 
   // --- errors ------------------------------------------------------------
-  // The default strategy (skip) for every source an L0 system has. Each
-  // error reaches onError, then onErrorRecovery; dev warns once per source.
+  // Each error reaches onError, then onErrorRecovery with its strategy:
+  // skip, unless an error boundary part decides. Dev warns once per source
+  // when nothing handles it.
   const warned = new Set<string>();
   function reportError(
     source: ErrorSource,
     sourceId: string,
     error: unknown,
-    context?: unknown,
+    info?: unknown,
     satisfied = false,
-  ): void {
+  ): Strategy {
     const wrapped =
       error instanceof DirectiveError
         ? error
@@ -676,39 +717,54 @@ export function createSystemCore<const M extends ModuleSchema>(
             messageOf(error),
             source,
             sourceId,
-            context,
+            info,
             source !== "system",
           );
     emit("error", { error: wrapped });
-    if (isDevelopment) {
-      const option =
-        source === "derivation"
-          ? "onDerivationError"
-          : source === "constraint"
-            ? "onConstraintError"
-            : source === "resolver"
-              ? "onResolverError"
-              : null;
-      const key = `${source}:${sourceId}`;
-      if (option && !warned.has(key)) {
-        warned.add(key);
-        // As 1.35: the first 1000 sources are remembered, then the oldest goes.
-        if (warned.size > 1000) {
-          warned.delete(warned.values().next().value!);
+    const warn = () => {
+      if (isDevelopment) {
+        const option =
+          source === "derivation"
+            ? "onDerivationError"
+            : source === "constraint"
+              ? "onConstraintError"
+              : source === "resolver"
+                ? "onResolverError"
+                : null;
+        const key = `${source}:${sourceId}`;
+        if (option && !warned.has(key)) {
+          warned.add(key);
+          // As 1.35: the first 1000 sources are remembered, then the oldest goes.
+          if (warned.size > 1000) {
+            warned.delete(warned.values().next().value!);
+          }
+          const type = (
+            info as { requirement?: { type?: unknown } } | undefined
+          )?.requirement?.type;
+          const consequence =
+            source === "resolver" && typeof type === "string" && !satisfied
+              ? ` Requirement "${type}" stays unmet.`
+              : "";
+          console.warn(
+            `[Directive] ${source} "${sourceId}" threw: ${messageOf(error).replace(/[.!?]+\s*$/, "")}.${consequence} The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
+          );
         }
-        const type = (
-          context as { requirement?: { type?: unknown } } | undefined
-        )?.requirement?.type;
-        const consequence =
-          source === "resolver" && typeof type === "string" && !satisfied
-            ? ` Requirement "${type}" stays unmet.`
-            : "";
-        console.warn(
-          `[Directive] ${source} "${sourceId}" threw: ${messageOf(error).replace(/[.!?]+\s*$/, "")}.${consequence} The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
-        );
       }
+    };
+    const decide = context.decide_;
+    let strategy: Strategy = "skip";
+    if (decide) {
+      strategy = decide(source, sourceId, error, wrapped, info, warn);
+    } else {
+      warn();
     }
-    emit("error.recovery", { error: wrapped, strategy: "skip" });
+    emit("error.recovery", { error: wrapped, strategy });
+    if (strategy === "throw") {
+      // 1.35 throws before the caller's next line, so no source hook runs.
+      throw wrapped;
+    }
+
+    return strategy;
   }
 
   // --- facts ---------------------------------------------------------------
@@ -852,6 +908,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       return;
     }
     chain = writtenByEffect && !writtenElsewhere ? chain + 1 : 0;
+    if (writtenElsewhere) {
+      features.effects?.fresh_();
+    }
     writtenByEffect = writtenElsewhere = false;
     if (chain > 100) {
       if (isDevelopment) {
@@ -931,7 +990,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     } finally {
       reconciling = false;
-      if (changedKeys.size > 0 || again) {
+      if (changedKeys.size > 0 || again || features.effects?.reruns_()) {
         scheduleReconcile();
       }
       notifySettle();
@@ -964,6 +1023,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
     running = false;
     resetChain();
+    features.errors?.stop_();
     features.reconcile?.stop_();
 
     return true;
@@ -1108,6 +1168,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       features.reconcile?.start_();
       emit("system.start", { system });
+      features.errors?.start_();
       scheduleReconcile();
       if (tickKey && tickMs) {
         // 1.35's setInterval: a repeating timer on the kernel clock, owned by

@@ -13,6 +13,7 @@ import {
   createSystemCore,
 } from "./core.js";
 import { withEffects } from "./effects.js";
+import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withInspect } from "./inspect.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
@@ -45,6 +46,20 @@ export function createSystem<const M extends ModuleSchema>(
   if (isDevelopment) {
     // Writes are checked in development only, so production drops the part.
     parts.unshift(withValidation);
+  }
+  // 1.35's zeroConfig sets the four sources to skip; an explicit
+  // errorBoundary wins. Without either, the core skips every error.
+  const boundary: ErrorBoundaryConfig | undefined = options.zeroConfig
+    ? {
+        onConstraintError: "skip",
+        onResolverError: "skip",
+        onEffectError: "skip",
+        onDerivationError: "skip",
+        ...options.errorBoundary,
+      }
+    : options.errorBoundary;
+  if (boundary) {
+    parts.unshift(withErrorBoundary(boundary));
   }
 
   if ("module" in options) {
