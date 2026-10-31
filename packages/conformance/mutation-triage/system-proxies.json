@@ -181,12 +181,44 @@
     "note": "Memo of the per-module facts view, keyed by store and namespace. The view reads the live store, so dropping or bypassing the memo changes only whether two reads return the same object. Proved by hand: ceiling suite passes; probe of reads, writes, deletes, in, key listings, spread, JSON, for...in and refused writes is identical, only view identity differs."
   },
   {
+    "line": 272,
+    "col": 11,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace. The fact store beneath warns for the same write (under its flat key), so with this mutant the user still sees a warning; only the warning count or the name it carries tell the two apart, and tests here do not pin either."
+  },
+  {
+    "line": 272,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace. The fact store beneath warns for the same write (under its flat key), so with this mutant the user still sees a warning; only the warning count or the name it carries tell the two apart, and tests here do not pin either."
+  },
+  {
+    "line": 274,
+    "col": 13,
+    "mutator": "ConditionalExpression",
+    "replacement": "false",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace. The fact store beneath warns for the same write (under its flat key), so with this mutant the user still sees a warning; only the warning count or the name it carries tell the two apart, and tests here do not pin either."
+  },
+  {
     "line": 274,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "dev-only",
     "note": "Development warning for a non-JSON value written through a namespace; the fact store warns again one layer down, so only the warning count (an implementation detail) tells these apart."
+  },
+  {
+    "line": 274,
+    "col": 26,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "dev-only",
+    "note": "Development warning for a non-JSON value written through a namespace. The fact store beneath warns for the same write (under its flat key), so with this mutant the user still sees a warning; only the warning count or the name it carries tell the two apart, and tests here do not pin either."
   },
   {
     "line": 306,

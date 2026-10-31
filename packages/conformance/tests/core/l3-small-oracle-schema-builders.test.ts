@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Black-box tests for the schema builders' validators: what each `t.*` type
 // accepts and rejects, through the `_validators` every SchemaType exposes.
 // No message text, no dev-mode diagnostics beyond "a valid call stays quiet".
+// The last block reads the name each type gives itself (`_typeName`, public on
+// ExtendedSchemaType) and checks that a failed write names it.
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -207,5 +209,57 @@ describe("any and unknown", () => {
       expect(accepts(t.any(), value)).toBe(true);
       expect(accepts(t.unknown(), value)).toBe(true);
     }
+  });
+});
+
+/** The name a type gives itself, which a validation error repeats. */
+function nameOf(schema: unknown): string | undefined {
+  return (schema as { _typeName?: string })._typeName;
+}
+
+/** A schema type from outside the builders (no name of its own). */
+const nameless = { _type: undefined, _validators: [] } as never;
+
+describe("each builder names its type", () => {
+  it("the scalar and format builders", () => {
+    expect(nameOf(t.string())).toBe("string");
+    expect(nameOf(t.number())).toBe("number");
+    expect(nameOf(t.boolean())).toBe("boolean");
+    expect(nameOf(t.date())).toBe("Date");
+    expect(nameOf(t.uuid())).toBe("uuid");
+    expect(nameOf(t.email())).toBe("email");
+    expect(nameOf(t.url())).toBe("url");
+    expect(nameOf(t.bigint())).toBe("bigint");
+    expect(nameOf(t.any())).toBe("any");
+    expect(nameOf(t.unknown())).toBe("unknown");
+  });
+
+  it("the container builders", () => {
+    expect(nameOf(t.array())).toBe("array");
+    expect(nameOf(t.array<string>().of(t.string()))).toBe("array");
+    expect(nameOf(t.object())).toBe("object");
+  });
+
+  it("enum lists its values and literal shows its value", () => {
+    expect(nameOf(t.enum("idle", "busy"))).toBe("enum(idle|busy)");
+    expect(nameOf(t.enum("only"))).toBe("enum(only)");
+    expect(nameOf(t.literal("user"))).toBe("literal(user)");
+    expect(nameOf(t.literal(7))).toBe("literal(7)");
+    expect(nameOf(t.literal(false))).toBe("literal(false)");
+  });
+
+  it("a wrapper names what it wraps", () => {
+    expect(nameOf(t.nullable(t.string()))).toBe("string | null");
+    expect(nameOf(t.optional(t.number()))).toBe("number | undefined");
+    expect(nameOf(t.record(t.boolean()))).toBe("Record<string, boolean>");
+    expect(nameOf(t.tuple(t.string(), t.number()))).toBe("[string, number]");
+    expect(nameOf(t.tuple(t.date()))).toBe("[Date]");
+  });
+
+  it("a wrapper around a type with no name calls it unknown", () => {
+    expect(nameOf(t.nullable(nameless))).toBe("unknown | null");
+    expect(nameOf(t.optional(nameless))).toBe("unknown | undefined");
+    expect(nameOf(t.record(nameless))).toBe("Record<string, unknown>");
+    expect(nameOf(t.tuple(nameless, t.string()))).toBe("[unknown, string]");
   });
 });
