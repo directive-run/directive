@@ -250,11 +250,16 @@ export function createSystemCore<const M extends ModuleSchema>(
   let reconciling = false;
   // 1.35's effect-chain cut: passes started only by writes made while
   // effects ran are an effect waking itself; after 100 the chain is cut.
-  // Writes since the last pass: from an effect, or from elsewhere.
+  // Writes since the last pass: from an effect, or from elsewhere. The
+  // effects phase stays open while the pass awaits its async effects, so a
+  // write landing then (a caller's, while an effect awaits) counts as made
+  // while effects ran, as in 1.35.
   let effectsOpen = false;
   let writtenByEffect = false;
   let writtenElsewhere = false;
   let chain = 0;
+  /** The keys the chain's previous pass started with; null outside a chain. */
+  let chainKeys: Set<string> | null = null;
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
@@ -646,8 +651,26 @@ export function createSystemCore<const M extends ModuleSchema>(
           `[Directive] Effects kept waking each other for 100 passes in a row, so the chain was stopped. An effect is dispatching an event (or writing through a captured system) that changes something an effect reads. Move that change into the event handler or resolver that causes it. Changed: ${[...changedKeys].slice(0, 5).join(", ")}`,
         );
       }
+      // As in 1.35, drop what the chain carried: its derivation changes and
+      // the keys its previous pass started with. A fact written for the first
+      // time is someone else's write: it is kept, and its pass is not part of
+      // a chain, so the chain does not start again.
+      const kept: string[] = [];
+      for (const key of changedKeys) {
+        if (!key.startsWith(DERIVATION_DEP_PREFIX) && !chainKeys?.has(key)) {
+          kept.push(key);
+        }
+      }
       changedKeys.clear();
       chain = 0;
+      chainKeys = null;
+      if (kept.length > 0) {
+        for (const key of kept) {
+          changedKeys.add(key);
+        }
+        writtenElsewhere = true;
+        scheduleReconcile();
+      }
       notifySettle();
 
       return;
@@ -656,19 +679,19 @@ export function createSystemCore<const M extends ModuleSchema>(
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
+    chainKeys = chain > 0 ? passKeys : null;
     try {
       if (live()) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
       effectsOpen = true;
-      let done: Promise<void> | undefined;
       try {
-        done = features.effects?.runEffectsFast(passKeys);
+        const done = features.effects?.runEffectsFast(passKeys);
+        if (done) {
+          await done;
+        }
       } finally {
         effectsOpen = false;
-      }
-      if (done) {
-        await done;
       }
       if (live()) {
         emit("reconcile.end", {

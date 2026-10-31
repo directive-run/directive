@@ -1755,24 +1755,6 @@
     "layer": "L12"
   },
   {
-    "line": 1165,
-    "col": 13,
-    "mutator": "EqualityOperator",
-    "replacement": "attempts < MAX_EFFECT_RETRIES",
-    "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/effect-reconcile-boundaries.test.ts > the retry strategy for an effect stops after three retries in a row",
-    "layer": "L4"
-  },
-  {
-    "line": 1168,
-    "col": 20,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/core/blackbox-effects-production.test.ts > effects in production a retried failing effect does not warn when the retries run out",
-    "layer": "L4"
-  },
-  {
     "line": 1218,
     "col": 9,
     "mutator": "ConditionalExpression",

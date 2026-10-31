@@ -7,12 +7,16 @@
  *
  * - The cut drops what the chain itself carried, and the derivation changes
  *   it caused. A write that is not the chain's own (made while effects ran,
- *   but from outside any effect's body) is kept and processed after the cut.
+ *   but from outside any effect's body) is kept and processed after the cut,
+ *   in a pass that does not start the chain again.
+ * - A write made while an async effect awaits is made while effects ran: it
+ *   does not restart the chain's count.
  * - Only passes started by effect writes alone form a chain: a long run of
  *   ordinary writes, or a chain whose every pass also carries a write made
  *   outside the effects, is never cut.
  * - After the cut the system reports that it settled.
- * - An ordinary write gives a failing effect its retries back.
+ * - A failing effect under "retry" is retried three times in a row, and an
+ *   ordinary write gives it its retries back.
  *
  * The exact chain bound and warning text are not contracts; the tests find
  * the pass the cut lands on by probing, and never pin how long a chain runs.
@@ -55,7 +59,7 @@ interface ChainOptions {
  */
 function chain(options: ChainOptions = {}) {
   const seenB: number[] = [];
-  const counts = { late: 0, atCutLate: -1 };
+  const counts = { echo: 0, late: 0, atCutLate: -1 };
   const mod = createModule("m", {
     schema: {
       facts: { n: t.number(), b: t.number() },
@@ -74,6 +78,7 @@ function chain(options: ChainOptions = {}) {
       echo: {
         run: (facts) => {
           if (facts.n > 0) {
+            counts.echo++;
             system.events.bump();
           }
         },
@@ -112,18 +117,22 @@ async function runChain(c: ReturnType<typeof chain>) {
   await tick();
 }
 
-/** Where the cut lands, by run counts, on a chain with no extra writes. */
+/**
+ * Where the cut lands, by run counts, on a chain with no extra writes, and
+ * the `n` the chain ends on.
+ */
 async function probeCut() {
   const probe = chain();
   onCutWarning(() => {
     probe.counts.atCutLate = probe.counts.late;
   });
   await runChain(probe);
+  const n = probe.system.facts.n;
   await probe.system.stop();
   vi.restoreAllMocks();
   expect(probe.counts.atCutLate).toBeGreaterThan(10);
 
-  return probe.counts;
+  return { ...probe.counts, n };
 }
 
 describe("the cut drops only what the chain carried", () => {
@@ -133,11 +142,42 @@ describe("the cut drops only what the chain carried", () => {
     // Write `b` from the last `late` run before the cut, so it is carried
     // into the pass that is cut.
     const c = chain({ lateWriteOn: probe.atCutLate });
-    onCutWarning(() => {});
+    let echoAtCut = -1;
+    let seenAtCut = -1;
+    onCutWarning(() => {
+      echoAtCut = c.counts.echo;
+      seenAtCut = c.seenB.length;
+    });
     await runChain(c);
 
     expect(c.system.facts.b).toBe(5);
+    // The kept write is processed after the cut: `watchB` runs once for it.
+    expect(seenAtCut).toBeGreaterThan(0);
+    expect(c.seenB.slice(seenAtCut)).toEqual([5]);
+    // That pass does not start the chain again: `echo` never runs after the
+    // cut, and the chain ends where it does without the write.
+    expect(c.counts.echo).toBe(echoAtCut);
+    expect(c.system.facts.n).toBe(probe.n);
+
+    await c.system.stop();
+  });
+
+  it("a write made while an async effect awaits does not restart the chain's count", async () => {
+    const probe = await probeCut();
+
+    // Early in the chain: `late` writes `b` after its await, while the pass
+    // still waits for it.
+    const c = chain({ lateWriteOn: 5 });
+    let lateAtCut = -1;
+    onCutWarning(() => {
+      lateAtCut = c.counts.late;
+    });
+    await runChain(c);
+
     expect(c.seenB).toContain(5);
+    // The cut lands where it does without the write.
+    expect(lateAtCut).toBe(probe.atCutLate);
+    expect(c.system.facts.n).toBe(probe.n);
 
     await c.system.stop();
   });
@@ -345,6 +385,43 @@ describe("after the cut", () => {
 });
 
 describe("the retry strategy for an effect", () => {
+  it("retries a failing effect three times in a row, then leaves it until its next change", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let runs = 0;
+    const mod = createModule("r", {
+      schema: { facts: { n: t.number() } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      effects: {
+        failing: {
+          run: (facts) => {
+            if (facts.n === 0) {
+              return;
+            }
+            runs++;
+            throw new Error("always fails");
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      errorBoundary: { onEffectError: "retry" },
+    });
+    await system.start();
+    await system.settle();
+    await tick();
+
+    system.facts.n = 1;
+    await system.settle();
+    await tick();
+
+    expect(runs).toBe(4);
+    await system.stop();
+  });
+
   it("an ordinary write gives a failing effect its retries back", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
