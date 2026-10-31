@@ -8584,6 +8584,35 @@
         "any and unknown > accept every value": {
           "layer": "L0",
           "by": ["import t"]
+        },
+        "each builder names its type > the scalar and format builders": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > the container builders": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > enum lists its values and literal shows its value": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > a wrapper names what it wraps": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > a wrapper around a type with no name calls it unknown": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "a failed write names the type the fact was declared with > in the error, whichever builder declared it": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts"
+          ]
         }
       }
     },

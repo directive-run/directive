@@ -808,7 +808,7 @@
   {
     "file": "src/core/__tests__/l3-small-oracle-schema-builders.test.ts",
     "category": "black-box",
-    "cases": 17,
+    "cases": 23,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
