@@ -39,6 +39,36 @@ export const BLOCKED_PROPS: ReadonlySet<string> = Object.freeze(
   new Set(["__proto__", "constructor", "prototype"]),
 );
 
+/**
+ * 1.35's isPrototypeSafe (utils.ts:291): no blocked key at any depth of a
+ * loaded value, failing safe past depth 50. A value seen higher up the
+ * current path (a cycle) is not walked again.
+ */
+export const isPrototypeSafe = (
+  value: unknown,
+  depth = 0,
+  path = new WeakSet<object>(),
+): boolean => {
+  if (depth > 50) {
+    return false;
+  }
+  if (value === null || typeof value !== "object" || path.has(value)) {
+    return true;
+  }
+  path.add(value);
+  for (const key of Object.keys(value)) {
+    if (
+      BLOCKED_PROPS.has(key) ||
+      !isPrototypeSafe((value as Record<string, unknown>)[key], depth + 1, path)
+    ) {
+      return false;
+    }
+  }
+  path.delete(value);
+
+  return true;
+};
+
 /** Per-system tracking: what the running derivation or effect read. */
 export interface Tracker {
   /** Fact keys and `\u001F`-prefixed derivation ids read in this frame. */

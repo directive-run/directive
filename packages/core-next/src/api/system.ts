@@ -6,7 +6,12 @@
  */
 
 import isDevelopment from "#is-development";
-import { type ErrorSource, type SystemPart, createSystemCore } from "./core.js";
+import {
+  type ErrorSource,
+  type SystemPart,
+  checkTick,
+  createSystemCore,
+} from "./core.js";
 import { withEffects } from "./effects.js";
 import { withInspect } from "./inspect.js";
 import { createNamespacedSystem } from "./namespaced.js";
@@ -23,6 +28,11 @@ export type { ErrorSource };
 export function createSystem<const M extends ModuleSchema>(
   options: SystemOptions<M>,
 ): System<M> {
+  if (!options || (!("module" in options) && !("modules" in options))) {
+    throw new Error(
+      "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",
+    );
+  }
   const parts: SystemPart[] = [
     withEffects,
     // L2: constraints -> requirements -> resolvers.
@@ -37,11 +47,6 @@ export function createSystem<const M extends ModuleSchema>(
     parts.unshift(withValidation);
   }
 
-  if (!options || (!("module" in options) && !("modules" in options))) {
-    throw new Error(
-      "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",
-    );
-  }
   if ("module" in options) {
     return createSystemCore(options, parts);
   }
@@ -61,6 +66,8 @@ export function createSystem<const M extends ModuleSchema>(
       "[Directive] A single module was passed to `modules:`. For a single module, use `module:` instead:\n\n  createSystem({ module: myModule })\n\nFor multiple modules, wrap in an object:\n  createSystem({ modules: { myName: myModule } })",
     );
   }
+
+  checkTick(options.tickMs);
 
   return createNamespacedSystem(options, parts) as System<M>;
 }

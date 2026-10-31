@@ -17,7 +17,12 @@ import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { createSystemCore } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
-import { BLOCKED_PROPS, detectNonJsonValueType, warnNonJson } from "./facts.js";
+import {
+  BLOCKED_PROPS,
+  detectNonJsonValueType,
+  isPrototypeSafe,
+  warnNonJson,
+} from "./facts.js";
 import { createCheckedReadView } from "./readonly.js";
 import type { ModuleDefinition, System, SystemOptions } from "./types.js";
 
@@ -597,6 +602,40 @@ export function createNamespacedSystem(
     id: ordered.join(","),
     schema: { facts, derivations, events: {} },
     inits_: inits,
+    hooks_: ordered.map((ns) => modules[ns]!.hooks).filter(Boolean),
+    // 1.35 ticks the first module, in init order, that has a `tick` event.
+    tick_: Object.keys(events).find((key) => key.endsWith(`${SEPARATOR}tick`)),
+    // 1.35's applyNamespacedFacts (system.ts:398–440), run at start.
+    load_(src: Rec, set: (key: string, value: unknown) => void) {
+      for (const [ns, values] of Object.entries(src)) {
+        if (BLOCKED_PROPS.has(ns)) {
+          if (isDevelopment) {
+            console.warn(
+              `[Directive] initialFacts/hydrate contains blocked namespace "${ns}". Skipping.`,
+            );
+          }
+          continue;
+        }
+        if (!known(ns)) {
+          if (isDevelopment) {
+            console.warn(
+              `[Directive] initialFacts/hydrate contains unknown namespace "${ns}". Available modules: ${names().join(", ")}`,
+            );
+          }
+          continue;
+        }
+        if (values && typeof values === "object" && !isPrototypeSafe(values)) {
+          throw new Error(
+            `[Directive] initialFacts/hydrate for namespace "${ns}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`,
+          );
+        }
+        for (const [key, value] of Object.entries(values as Rec)) {
+          if (!BLOCKED_PROPS.has(key)) {
+            set(ns + SEPARATOR + key, value);
+          }
+        }
+      }
+    },
     modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
     derive,
     events,

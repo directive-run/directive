@@ -41,6 +41,7 @@ import {
   createFactsProxy,
   createFactsStore,
   describeDep,
+  isPrototypeSafe,
   listen,
   view,
   withTracking,
@@ -202,6 +203,55 @@ declare module "../kernel.js" {
 
 type Fn = (...args: any[]) => any;
 
+/** A module's lifecycle hooks (1.35's `ModuleHooks`, the L3 subset). */
+type Hooks = {
+  [K in "onInit" | "onStart" | "onStop"]?: (system: unknown) => void;
+};
+
+/**
+ * What the namespaced form (namespaced.ts) adds to the one flat module it
+ * hands the core: each module's init and hooks in init order, how its
+ * nested `initialFacts` are applied, and the event `tickMs` dispatches.
+ */
+interface Flat {
+  inits_?: Fn[];
+  hooks_?: Hooks[];
+  load_?: Load;
+  tick_?: string;
+}
+
+/** Applies loaded facts (`initialFacts`, then `hydrate`'s) through `set`. */
+type Load = (
+  src: Record<string, unknown>,
+  set: (key: string, value: unknown) => void,
+  hydrated?: boolean,
+) => void;
+
+/** The single-module form's loader (1.35 system.ts:1163–1188). */
+const loadFlat: Load = (src, set, hydrated) => {
+  if (hydrated && !isPrototypeSafe(src)) {
+    if (isDevelopment) {
+      console.warn(
+        "[Directive] hydrate() data contains potentially dangerous keys. Skipping.",
+      );
+    }
+
+    return;
+  }
+  for (const [key, value] of Object.entries(src)) {
+    if (!BLOCKED_PROPS.has(key)) {
+      set(key, value);
+    }
+  }
+};
+
+/** 1.35 refuses a zero or negative `tickMs` when the system is created. */
+export const checkTick = (ms: number | undefined): void => {
+  if (ms !== undefined && ms <= 0) {
+    throw new Error("[Directive] tickMs must be a positive number");
+  }
+};
+
 /** A module's definitions by id, each as its function (`fn` or `{ [key]: fn }`). */
 const defsOf = (
   src: Record<string, unknown> | undefined,
@@ -245,12 +295,29 @@ export function createSystemCore<const M extends ModuleSchema>(
   parts: readonly SystemPart[] = [],
   kernelOptions?: KernelOptions,
 ): System<M> {
-  const module = options.module as ModuleDefinition<ModuleSchema>;
+  const module = options.module as ModuleDefinition<ModuleSchema> & Flat;
   if (!module) {
     throw new Error(
       `[Directive] createSystem requires a module. Got: ${typeof module}`,
     );
   }
+  const tickMs = options.tickMs;
+  if (!module.load_) {
+    // The namespaced form checks it in createSystem, before its module
+    // checks (1.35's order), so a flattened module is not checked twice.
+    checkTick(tickMs);
+  }
+  const load = module.load_ ?? loadFlat;
+  if (
+    !module.load_ &&
+    options.initialFacts &&
+    !isPrototypeSafe(options.initialFacts)
+  ) {
+    throw new Error(
+      "[Directive] initialFacts contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+    );
+  }
+  const hooks_ = module.hooks_ ?? (module.hooks ? [module.hooks as Hooks] : []);
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
   // A security boundary (1.35): runs in every environment.
   for (const [section, obj] of [
@@ -268,9 +335,19 @@ export function createSystemCore<const M extends ModuleSchema>(
           `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
         );
       }
+      if (section === "schema" && key.startsWith("$")) {
+        throw new Error(
+          `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
+        );
+      }
     }
   }
   if (isDevelopment) {
+    if (Object.keys(module.crossModuleDeps ?? {}).length > 0) {
+      console.warn(
+        "[Directive] Single module mode ignores crossModuleDeps. Use multiple modules if cross-module access is needed: createSystem({ modules: { ... } })",
+      );
+    }
     for (const key in schema) {
       if (module.derive && Object.hasOwn(module.derive, key)) {
         console.warn(
@@ -281,6 +358,20 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   const deriveDefs = defsOf(module.derive, "compute");
   const eventDefs = defsOf(module.events, "handler");
+  // The event `tickMs` dispatches: the first module's with a `tick` event.
+  // (`load_` marks the namespaced form; a quoted "tick_" would not be mangled.)
+  const tickKey = module.load_
+    ? module.tick_
+    : "tick" in eventDefs
+      ? "tick"
+      : undefined;
+  if (isDevelopment && tickMs && !tickKey) {
+    console.warn(
+      module.load_
+        ? `[Directive] tickMs is set to ${tickMs}ms but no module defines a "tick" event handler.`
+        : `[Directive] tickMs is set to ${tickMs}ms but module has no "tick" event handler.`,
+    );
+  }
 
   // 1.35 reports wall-clock times (a run's startedAt, a constraint's
   // lastActiveAt): a system's own real clock reads Date.now, as the timer
@@ -318,6 +409,14 @@ export function createSystemCore<const M extends ModuleSchema>(
   let initializing = false;
   let initialized = false;
   let destroyed = false;
+  /** Set where the first completed pass ends (1.35 engine.ts:2201–2207). */
+  let ready = false;
+  let readyPromise: Promise<void> | null = null;
+  let readyResolve: (() => void) | null = null;
+  /** What `hydrate()` loaded, applied by the next initialize. */
+  let hydrated: Record<string, unknown> | null = null;
+  /** The pending `tickMs` timer on the kernel clock; 0 when none. */
+  let tickTimer = 0;
   let scheduled = false;
   let reconciling = false;
   // 1.35's effect-chain cut: passes started only by writes made while
@@ -825,6 +924,11 @@ export function createSystemCore<const M extends ModuleSchema>(
           },
         });
       }
+      if (!ready) {
+        ready = true;
+        readyResolve?.();
+        readyResolve = null;
+      }
     } finally {
       reconciling = false;
       if (changedKeys.size > 0 || again) {
@@ -844,6 +948,50 @@ export function createSystemCore<const M extends ModuleSchema>(
     const id = clock.setTimeout(fn, ms, { owner: kernel.owner });
 
     return () => clock.clearTimeout(id);
+  };
+  // A stop in 1.35's two halves. `halt` ends the run (tick timer, running
+  // flag, in-flight runs aborted); `stopped` runs the effect cleanups, onStop
+  // and the stop event. stop() runs both at once; stopAsync() awaits between
+  // them, so its cleanups run a microtask after the caller's next line.
+  /** Ends the run; false when it was not running. */
+  const halt = (): boolean => {
+    if (tickTimer) {
+      clock.clearTimeout(tickTimer);
+      tickTimer = 0;
+    }
+    if (!running) {
+      return false;
+    }
+    running = false;
+    resetChain();
+    features.reconcile?.stop_();
+
+    return true;
+  };
+  const stopped = () => {
+    features.effects?.cleanupAll();
+    for (const hooks of hooks_) {
+      hooks.onStop?.(system);
+    }
+    emit("system.stop", { system });
+    // A settle() waiting on the runs just ended hears that they did.
+    notifySettle();
+  };
+  /** 1.35's engine stopAsync: the sync half, one await, then the rest. */
+  const stopEngineAsync = async () => {
+    if (halt()) {
+      // L5: the source unsubscribes are awaited here (1.35's cleanupAllAsync).
+      await Promise.resolve();
+      stopped();
+    }
+  };
+  /** 1.35's engine destroyAsync: awaits its own stopAsync, then tears down. */
+  const destroyEngineAsync = async () => {
+    if (destroyed) {
+      return;
+    }
+    await stopEngineAsync();
+    system.destroy();
   };
   const system = {
     _mode: "single",
@@ -868,7 +1016,37 @@ export function createSystemCore<const M extends ModuleSchema>(
       return initialized;
     },
     get isReady() {
-      return initialized;
+      return ready;
+    },
+    // The L9 slots, here so the system has 1.35's shape from L3 on: trace
+    // reads null (no trace configured) and meta is the meta object.
+    get trace() {
+      return null;
+    },
+    meta: {},
+    whenReady(): Promise<void> {
+      return ready
+        ? Promise.resolve()
+        : running
+          ? (readyPromise ??= new Promise<void>((resolve) => {
+              readyResolve = resolve;
+            }))
+          : Promise.reject(
+              new Error(
+                "[Directive] whenReady() called before start(). Call system.start() first, then await system.whenReady().",
+              ),
+            );
+    },
+    async hydrate(loader: () => unknown) {
+      if (running) {
+        throw new Error(
+          "[Directive] hydrate() must be called before start(). The system is already running.",
+        );
+      }
+      const result = await loader();
+      if (result && typeof result === "object") {
+        hydrated = result as Record<string, unknown>;
+      }
     },
     initialize() {
       if (initialized) {
@@ -879,6 +1057,25 @@ export function createSystemCore<const M extends ModuleSchema>(
       for (const init of (module as { inits_?: Fn[] }).inits_ ??
         (module.init ? [module.init] : [])) {
         store.batch(() => init(facts));
+      }
+      // 1.35 applies initialFacts, then hydrate's facts, after the inits
+      // and before the first pass, in one batch.
+      const initial = options.initialFacts as
+        | Record<string, unknown>
+        | undefined;
+      if (initial || hydrated) {
+        const set = (key: string, value: unknown) => {
+          (facts as Record<string, unknown>)[key] = value;
+        };
+        store.batch(() => {
+          if (initial) {
+            load(initial, set);
+          }
+          if (hydrated) {
+            load(hydrated, set, true);
+            hydrated = null;
+          }
+        });
       }
       initializing = false;
       initialized = true;
@@ -906,24 +1103,48 @@ export function createSystemCore<const M extends ModuleSchema>(
       system.initialize();
       running = true;
       resetChain();
+      for (const hooks of hooks_) {
+        hooks.onStart?.(system);
+      }
       features.reconcile?.start_();
       emit("system.start", { system });
       scheduleReconcile();
-    },
-    stop() {
-      if (running) {
-        running = false;
-        resetChain();
-        features.reconcile?.stop_();
-        features.effects?.cleanupAll();
-        emit("system.stop", { system });
-        // A settle() waiting on the runs just ended hears that they did.
-        notifySettle();
+      if (tickKey && tickMs) {
+        // 1.35's setInterval: a repeating timer on the kernel clock, owned by
+        // the system so destroy() clears it. Re-armed before the dispatch, so
+        // a throwing tick handler does not end the interval.
+        const arm = () => {
+          tickTimer = clock.setTimeout(
+            () => {
+              arm();
+              system.dispatch({ type: tickKey });
+            },
+            tickMs,
+            { owner: kernel.owner, kind: "tick" },
+          );
+        };
+        arm();
       }
     },
-    /** 1.35's async stop (RFC 0009): nothing to await before sources (L5). */
+    stop() {
+      if (halt()) {
+        stopped();
+      }
+    },
+    /**
+     * 1.35's async stop (RFC 0009): the system wrapper awaits the engine's,
+     * so it resolves two microtasks after the cleanups run.
+     */
     async stopAsync() {
-      system.stop();
+      await stopEngineAsync();
+    },
+    /**
+     * 1.35's async destroy (RFC 0009): stopAsync, then the engine's async
+     * destroy (which awaits its own no-op stopAsync before tearing down).
+     */
+    async destroyAsync() {
+      await system.stopAsync();
+      await destroyEngineAsync();
     },
     destroy() {
       if (destroyed) {
@@ -1108,6 +1329,28 @@ export function createSystemCore<const M extends ModuleSchema>(
   };
   for (const part of parts) {
     part(context);
+  }
+  // After the plugins' onInit has begun, as in 1.35 (engine.ts:4906–4909).
+  for (const hooks of hooks_) {
+    hooks.onInit?.(system);
+  }
+  if (isDevelopment) {
+    // 1.35's never-started warning (system.ts:1040–1056), on the kernel
+    // clock. Unowned (owner 0), so destroy() leaves it to fire, as 1.35 does.
+    const env = typeof process === "undefined" ? undefined : process.env;
+    if (env === undefined || env.NODE_ENV !== "test") {
+      clock.setTimeout(
+        () => {
+          if (!running && !initialized) {
+            console.warn(
+              "[Directive] System created but start() was never called. Constraints, resolvers, and effects will not run until you call system.start().",
+            );
+          }
+        },
+        0,
+        { kind: "dev" },
+      );
+    }
   }
 
   return system as unknown as System<M>;
