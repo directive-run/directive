@@ -424,7 +424,7 @@ describe("(n) a timeout's reason, and the attempts' listeners", () => {
     });
   }
 
-  it("each attempt leaves no abort listener on the run's signal", async () => {
+  it("the run's signal holds one abort listener, however many attempts", async () => {
     const clock = createVirtualClock();
     const counts: number[] = [];
     let runSignal: AbortSignal | undefined;
@@ -465,11 +465,107 @@ describe("(n) a timeout's reason, and the attempts' listeners", () => {
     });
     await flush();
     await advance(clock, 10, 20, 30, 40, 100);
-    // Only the attempt's own relay while it runs: none left by the last
-    // attempt or by a retry wait.
+    // The run's one relay: none added per attempt or left by a retry wait.
     expect(counts).toEqual([1, 1, 1, 1]);
     expect(errors).toBe(1);
-    expect(getEventListeners(runSignal!, "abort")).toHaveLength(0);
+    expect(getEventListeners(runSignal!, "abort")).toHaveLength(1);
+  });
+});
+
+describe("a run's cancel aborts every attempt's signal, as 1.35 (parity, outside n)", () => {
+  /**
+   * Fuzz case 205 (seed 24301): attempt 1 fails, attempt 2 is in flight,
+   * then the run is canceled. 1.35's attempts share the run's one signal,
+   * so both attempts' listeners hear the cancel, with its one reason.
+   */
+  /** Each attempt but the last throws or times out; the last runs on. */
+  function attempts(...failures: ("throws" | "times out")[]) {
+    const signals: AbortSignal[] = [];
+    const heard: string[] = [];
+    const { system, clock, order } = build({
+      constraints: {
+        c: { when: (f: any) => f.a, require: { type: "LOAD" } },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          timeout: 50,
+          retry: { attempts: 3, backoff: "none", initialDelay: 10 },
+          resolve: (_req: unknown, ctx: any) => {
+            const n = signals.push(ctx.signal);
+            ctx.signal.addEventListener("abort", () =>
+              heard.push(`aborted ${n}`),
+            );
+            if (failures[n - 1] === "throws") {
+              return Promise.reject(new Error("down"));
+            }
+
+            return new Promise(() => {});
+          },
+        },
+      },
+    });
+
+    return { system, clock, order, signals, heard };
+  }
+
+  for (const how of ["retraction", "stop()"] as const) {
+    it(`attempt 1 throws, attempt 2 runs, then ${how}: both attempts' listeners fire once, with the cancel's reason`, async () => {
+      const { system, clock, order, signals, heard } = attempts("throws");
+      system.start();
+      system.facts.a = true;
+      await flush();
+      await advance(clock, 10);
+      expect(signals).toHaveLength(2);
+      expect(heard).toEqual([]);
+      if (how === "retraction") {
+        system.facts.a = false;
+        await flush();
+      } else {
+        system.stop();
+      }
+      expect(heard).toEqual(["aborted 1", "aborted 2"]);
+      // One reason, 1.35's plain AbortError, the same for both attempts.
+      const reason = signals[0]!.reason as Error;
+      expect(reason.name).toBe("AbortError");
+      expect(signals[1]!.reason).toBe(reason);
+      await advance(clock, 200);
+      expect(heard).toEqual(["aborted 1", "aborted 2"]);
+      expect(order.filter((o) => o !== "pass")).toEqual([
+        "start",
+        "retry",
+        "cancel",
+      ]);
+      system.destroy();
+    });
+  }
+
+  it("attempt 1 times out (n), attempt 2 throws, attempt 3 runs, then stop(): attempts 2 and 3 hear it; attempt 1 keeps the timeout's reason", async () => {
+    const { system, clock, order, signals, heard } = attempts(
+      "times out",
+      "throws",
+    );
+    system.start();
+    system.facts.a = true;
+    await flush();
+    await advance(clock, 50, 60, 70);
+    expect(signals).toHaveLength(3);
+    expect(heard).toEqual(["aborted 1"]);
+    system.stop();
+    expect(heard).toEqual(["aborted 1", "aborted 2", "aborted 3"]);
+    expect((signals[0]!.reason as Error).message).toMatch(
+      /timed out after 50ms/,
+    );
+    const reason = signals[1]!.reason as Error;
+    expect(reason.name).toBe("AbortError");
+    expect(signals[2]!.reason).toBe(reason);
+    expect(order.filter((o) => o !== "pass")).toEqual([
+      "start",
+      "retry",
+      "retry",
+      "cancel",
+    ]);
+    system.destroy();
   });
 });
 
