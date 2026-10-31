@@ -29,6 +29,7 @@ import { Node, Project, type SourceFile } from "ts-morph";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
+  FUZZ_TRIGGERS,
   FUZZ_V2_FLOOR as V2_FLOOR,
   maxRunaways,
 } from "./fuzz.js";
@@ -802,6 +803,8 @@ export interface DivergenceEntry {
   op?: string;
   path?: string;
   ends?: boolean;
+  when?: string[];
+  group?: string;
   reason: string;
   approvedBy: string;
   date: string;
@@ -816,7 +819,15 @@ const DIVERGENCE_REQUIRED = [
   "scenario",
   "stream",
 ];
-const DIVERGENCE_OPTIONAL = ["ends", "engine", "op", "path", "step"];
+const DIVERGENCE_OPTIONAL = [
+  "ends",
+  "engine",
+  "group",
+  "op",
+  "path",
+  "step",
+  "when",
+];
 const STREAMS = [
   "hook",
   "observe",
@@ -842,7 +853,18 @@ const STREAMS = [
  * entry for scenario "fuzz", and only a narrow one: for engine "v2" (1.35
  * compared with 1.35, the workspace engine, is never stopped), with an `op`,
  * and with a `path` when the op is "changed" (a field, not the whole entry).
- * An `ends` entry that never stopped a case is stale like any other.
+ * An `ends` entry that never stopped a case is stale like any other, and it
+ * must carry `when`.
+ *
+ * `when` (fuzz only) lists trigger names (lib/fuzz.ts `FUZZ_TRIGGERS`): the
+ * entry applies only to fuzz cases that have all of them. It must be a
+ * non-empty list of known names, each once.
+ *
+ * `group` (fuzz only) names one signed decision spread over several entries
+ * (the shapes one quirk shows in different cases). An entry of a group is
+ * stale only when no entry of the group covered a difference; an entry with
+ * no group is checked alone. The entries of a group must share `approvedBy`
+ * and `when`.
  */
 export function checkDivergences(
   conformanceRoot: string,
@@ -860,6 +882,26 @@ export function checkDivergences(
     return ["diff/divergences.json: must be an array"];
   }
   const ids = new Set<string>();
+  // A group is used when any of its entries is; its signature (approvedBy
+  // and when) is its first entry's, and every other entry must match it.
+  const usedGroups = new Set<string>();
+  const groupSignature = new Map<string, { id: string; signature: string }>();
+  const signatureOf = (e: Partial<DivergenceEntry>) =>
+    JSON.stringify([
+      e.approvedBy,
+      Array.isArray(e.when) ? [...e.when].sort() : (e.when ?? null),
+    ]);
+  for (const raw of entries) {
+    const e = (raw ?? {}) as Partial<DivergenceEntry>;
+    if (
+      used &&
+      typeof e.group === "string" &&
+      typeof e.id === "string" &&
+      used.has(e.id)
+    ) {
+      usedGroups.add(e.group);
+    }
+  }
   for (const [i, raw] of entries.entries()) {
     const e = (raw ?? {}) as Partial<DivergenceEntry>;
     const label = typeof e.id === "string" && e.id ? e.id : `entry ${i}`;
@@ -934,11 +976,69 @@ export function checkDivergences(
         );
       }
     }
+    if (e.ends !== undefined && e.when === undefined) {
+      fail(
+        `${label} has ends, so it must say when (the triggers a case needs for its quirk): an \`ends\` entry for every fuzz case would stop cases that cannot show the quirk`,
+      );
+    }
+    if (e.when !== undefined) {
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has when, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}"); a hand scenario has no triggers`,
+        );
+      }
+      const known: readonly string[] = FUZZ_TRIGGERS;
+      if (
+        !Array.isArray(e.when) ||
+        e.when.length === 0 ||
+        e.when.some((t) => typeof t !== "string")
+      ) {
+        fail(`${label} when must be a non-empty list of trigger names`);
+      } else {
+        for (const t of e.when.filter((t) => !known.includes(t))) {
+          fail(
+            `${label} when has unknown trigger "${t}" (one of ${known.join(", ")})`,
+          );
+        }
+        if (new Set(e.when).size !== e.when.length) {
+          fail(`${label} when lists a trigger twice`);
+        }
+      }
+    }
+    if (e.group !== undefined) {
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has group, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}")`,
+        );
+      }
+      if (typeof e.group !== "string" || !e.group.trim()) {
+        fail(`${label} group must be a non-empty name`);
+      } else {
+        const first = groupSignature.get(e.group);
+        if (!first) {
+          groupSignature.set(e.group, { id: label, signature: signatureOf(e) });
+        } else if (first.signature !== signatureOf(e)) {
+          fail(
+            `${label} is in group "${e.group}" but its approvedBy or when differs from ${first.id}'s: a group is one signed decision`,
+          );
+        }
+      }
+    }
     if (typeof e.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
       fail(`${label} needs a YYYY-MM-DD date`);
     }
-    if (used && typeof e.id === "string" && e.id && !used.has(e.id)) {
-      fail(`${label} covers no difference in this run (stale); remove it`);
+    if (
+      used &&
+      typeof e.id === "string" &&
+      e.id &&
+      !used.has(e.id) &&
+      !(typeof e.group === "string" && usedGroups.has(e.group))
+    ) {
+      fail(
+        typeof e.group === "string"
+          ? `${label} covers no difference in this run, and nor does any entry of its group "${e.group}" (stale); remove the group`
+          : `${label} covers no difference in this run (stale); remove it`,
+      );
     }
   }
 

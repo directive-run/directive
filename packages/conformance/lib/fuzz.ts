@@ -35,3 +35,24 @@ export const FUZZ_V2_FLOOR = 60;
 export function maxRunaways(cases: number): number {
   return Math.max(Math.floor(cases / 100), 2);
 }
+
+/**
+ * The trigger names a fuzz divergence's `when` may list (diff/divergences.json;
+ * README "Divergences"). Each fuzz case computes the set it has from its spec
+ * (diff/fuzz/model.ts `specTriggers`, where each one is defined); an entry
+ * with `when` applies only to the cases that have every trigger it lists.
+ * Here, apart from the model, so the census can check the names without
+ * loading the fuzzer.
+ */
+export const FUZZ_TRIGGERS = [
+  "resolverRetry",
+  "resolverRetryLater",
+  "constraintRetryLater",
+  "retryPolicy",
+  "timeout",
+  "restart",
+  "disable",
+  "throw",
+] as const;
+
+export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

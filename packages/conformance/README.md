@@ -101,7 +101,11 @@ the traces to agree.
   derivations and effects, cleanups, every boundary strategy, sources,
   history, trace) and step sequences (writes, batches, Dates, publishes,
   stop/start/destroy mid-run, snapshot/restore, back/forward, a second
-  system in the same engine instance). PR CI runs the fixed seed for 205
+  system in the same engine instance). A resolver's start, write and abort
+  are external records under their own kinds, `["start" | "wrote" |
+  "aborted", "<module>.r<index>", attempt]`, so the comparison pairs a start
+  only with a start, and an entry's kind does not depend on the resolver's
+  id. PR CI runs the fixed seed for 205
   cases across every layer (`FUZZ_DEFAULT_RUNS`); the census fails fewer than
   200 compared (`lib/fuzz.ts` `FUZZ_FLOOR`) or more than max(1% of cases, 2)
   runaways — and `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a
@@ -225,7 +229,42 @@ early shows. `ends` is valid only on a signed entry for scenario `fuzz`
 with engine `v2`, an `op`, and a `path` when the op is `changed` (the
 census rejects it anywhere else, and rejects a hand scenario titled
 `fuzz`): hand scenarios are always compared to their end. An `ends` entry
-that never stopped a case is stale like any other.
+that never stopped a case is stale like any other, and it must carry
+`when` (below), so it stops only the cases that can show its quirk.
+
+A fuzz entry may say `when: [<trigger>, …]`: it then covers a difference
+only in a fuzz case that has every trigger it lists (diff/scenario.ts
+`covers`). Without `when`, a fuzz entry applies to every fuzz case,
+including the many that cannot show its quirk. Each case computes its
+triggers from its spec (diff/fuzz/model.ts `specTriggers`; the names are
+lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
+
+| Trigger | The case has it when |
+| --- | --- |
+| `resolverRetry` | `errorBoundary.onResolverError` is `"retry"` and the case has a resolver |
+| `resolverRetryLater` | `errorBoundary.onResolverError` is `"retry-later"` and the case has a resolver |
+| `constraintRetryLater` | `errorBoundary.onConstraintError` is `"retry-later"` and the case has a constraint. Never set today: the model always passes `"skip"` |
+| `retryPolicy` | some resolver has a `retry` policy (more than one attempt) |
+| `timeout` | some resolver has a `timeout` |
+| `restart` | the steps have a `stop` with a `start` after it (a `destroy` then `start` is not a restart) |
+| `disable` | some `errorBoundary` strategy is `"disable"` (resolvers and effects) |
+| `throw` | some `errorBoundary` strategy is `"throw"` (resolvers; effects then skip) |
+
+The model passes every strategy as a string; a function strategy would
+make `specTriggers` throw rather than guess. The census rejects an unknown
+trigger, an empty or repeated list, and `when` on an entry for a hand
+scenario (a hand scenario has no triggers, so such an entry would cover
+nothing).
+
+A fuzz entry may also say `group: "<id>"` (for example `"quirk-a"`): one
+signed decision whose quirk shows in several shapes, one entry per shape.
+The census counts every entry of a group as used when any entry of the
+group covered a difference in the run, because one seed shows only some of
+the shapes; an entry with no group is checked alone. The entries of a
+group must have the same `approvedBy` and the same `when` (the census
+rejects a group that differs), and a group none of whose entries covered
+anything is stale as a whole. `group` changes only the stale check, never
+what an entry covers.
 
 ## Frozen 1.35 contracts (`contracts/`)
 
