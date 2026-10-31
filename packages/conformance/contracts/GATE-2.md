@@ -49,7 +49,8 @@ keeping every step and every comparison:
    `approvedBy` is "Jason Comes" and its `reason` ends with "Signed 2026-11-01
    on the owner's instruction: he approved this row on the decisions page ...
    and asked Claude to sign for him." Only entries for rows he approved are
-   signed (a, b, f, j, n, p, s, t at L3). A difference that matches no
+   signed (a, b, f, j, p, s, t at L3; the entries for b and n were signed at
+   the L2 gate, and the n entries are still the L2 ones). A difference that matches no
    approved row stops the gate and goes to him unsigned.
 2. **The oracle guard allows signed entries in an engine PR (#290).** A PR
    that touches core-next may change `diff/divergences.json` (with or without
@@ -69,15 +70,55 @@ keeping every step and every comparison:
 
 ## Found while raising the gate
 
-- Five L2 quirk-b entries covered nothing at the L3 fixed seed, so the census
-  failed them as stale and they were removed: the console-warning entry and the
-  four "changed" entries that pair 1.35's extra error with another run's.
-  Removing an entry needs no signature. The classes still occur at other seeds.
+- Four L2 quirk-b entries (the "changed" ones, which pair 1.35's extra error
+  with another run's) covered nothing at the L3 fixed seed, so the census
+  failed them as stale and they were removed. Removing an entry needs no
+  signature. These classes are rare at other seeds; they are not covered
+  there (see the last item). The L2 console-warning entry
+  (`l2-quirk-b-console-warn`) was removed the same way and is restored as it
+  is on main: approved fix o (#294, one development warning for a non-JSON
+  write through a module) shows at L3 as a missing or extra console warning,
+  and that entry covers it.
 - Quirk b also shows under the `"throw"` strategy (the extra error 1.35 adds
-  after a cancel surfaces as an unhandled error) and under `"disable"` (it
-  disables the constraint). Both are covered by `l3-quirk-b-fuzz-*`.
-- The fuzz now reaches the error-boundary strategies, so quirks a and p cascade
-  through whole traces. The fixed-seed entries cover exactly what that seed
-  shows. Other seeds show the same quirks with other indexes and ordering, so
-  the nightly fuzz is expected to fail until those classes are decided: the PR
-  description counts them.
+  after a cancel surfaces as an unhandled error) and under `"disable"`. Under
+  `"disable"`, 1.35's extra error also disabled the constraint, while 2.0 keeps
+  it enabled (a consequence of b), so the constraint's evaluations and its
+  `inspect()` entry differ for the rest of the case. The `"throw"` records
+  are ordinary entries (`l3-quirk-b-fuzz-error-unhandled-*`); the `"disable"`
+  cascade is ended by the `observe` `resolver.error` entry below.
+- The fuzz reaches the error-boundary strategies, so quirks a and p (and b
+  under `"disable"`) cascade through whole traces. Entries written per
+  record at one seed failed at every other seed, so the gate uses `ends`
+  entries instead (the rule below).
+
+## The `ends` rule (#296)
+
+A signed fuzz entry with `ends: true` stops the comparison of a fuzz case at
+the first difference it covers, on that engine. The owner's decision behind it:
+"The fuzz compares a case exactly up to its first approved-quirk difference,
+then stops comparing that case." The case is compared exactly up to that
+difference: an uncovered difference before it, or beside it, still fails; a
+difference after it is not compared; the case still counts toward the fuzz
+floors; and other engines are compared in full. `ends` is valid only on a
+signed entry for scenario `fuzz`, engine `v2`, with an `op` (and a `path` when
+the op is `changed`). An `ends` entry that never stopped a case is stale like
+any other, which is why an entry can exist only for a class the fixed seed
+shows. The census prints how many cases ended early, at which step on average
+and how many at step 0.
+
+| Entry | Quirk | Ends a fuzz case at |
+| --- | --- | --- |
+| `l3-quirk-a-fuzz-hook-onReconcileStart-extra` | a and p | the `onReconcileStart` hook call only 2.0 makes, for the re-dispatch (op `extra`) |
+| `l2-quirk-b-observe-resolver-error-missing` | b | the `resolver.error` observe event 1.35 adds after the cancel, the last of its four extra records (op `missing`); the other three stay ordinary entries |
+
+## Still open: classes the fixed seed does not show
+
+An entry for a class that the fixed seed does not show is stale there, and the
+census fails it, so these cannot be covered. Seeds 1 to 20 at the PR's run count
+show them (the PR description counts them): the resolver's own `start` record
+(`external`, kind `<module>.r<n>`, one kind per resolver) as quirk a's first
+difference in four "retry" cases; the quirk-b "changed" pairings; an
+`aborted` record that differs in the resolver (`data[1]`), not only the attempt
+number; quirk j's extra `onResolverStart` after `stop()` then `start()`; and the
+records that follow an unhandled error under `"throw"`. The nightly fuzz fails
+on them until the owner decides how to cover them.
