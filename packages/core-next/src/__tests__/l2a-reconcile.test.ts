@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isTimeout } from "../api/constraints.js";
+import { isTimeout } from "../api/timeout.js";
 import { createModule, createSystemCore } from "../api/core.js";
 import { withPlugins } from "../api/plugins.js";
 import { withReconcile } from "../api/reconcile.js";
