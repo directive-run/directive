@@ -26,7 +26,8 @@
  *   cancel, supersede, clobber or stop() aborts the run, and so the
  *   attempt. A timeout aborts only the attempt, its reason the timeout
  *   error (candidate n, approved; 1.35 leaves the signal clean), so the next
- *   attempt starts unaborted. The outcome is still read from the run's
+ *   attempt starts unaborted; a satisfied run's attempt gets 1.35's plain
+ *   abort instead. The outcome is still read from the run's
  *   signal: a timeout is reported as the error it is, never as a cancel, and
  *   the body's later writes land. Cancel keeps them too, so a
  *   `finally { loading = false }` lands; only a supersede drops them.
@@ -288,15 +289,20 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   /** Wait on the kernel clock; an abort wakes it early. */
   const wait = (ms: number, signal: AbortSignal) =>
     new Promise<void>((resolve) => {
-      const timer = clock.setTimeout(resolve, ms, { owner, kind: "retry" });
-      signal.addEventListener(
-        "abort",
+      const wake = () => {
+        clock.clearTimeout(timer);
+        resolve();
+      };
+      // Each listener leaves the run's signal when its wait ends.
+      const timer = clock.setTimeout(
         () => {
-          clock.clearTimeout(timer);
+          signal.removeEventListener("abort", wake);
           resolve();
         },
-        { once: true },
+        ms,
+        { owner, kind: "retry" },
       );
+      signal.addEventListener("abort", wake, { once: true });
     });
 
   /** The sync start runs in one batch (one pass for its writes), as in 1.35. */
@@ -469,15 +475,16 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         : (shared ??= options.factsFor(run));
       // The attempt's own signal (candidate n): the run's abort reaches it.
       const child = new AbortController();
-      signal.addEventListener("abort", () => child.abort(signal.reason), {
-        once: true,
-      });
+      const relay = () => child.abort(signal.reason);
+      signal.addEventListener("abort", relay, { once: true });
       const context = {
         facts,
         signal: child.signal,
         snapshot: () => facts.$snapshot(),
         requeue: () => options.onRequeue(run.req_.id),
       };
+      // The attempt ends after its retry wait: a cancel then still reaches
+      // it (as 1.35's one signal does), and its relay leaves the run's.
       try {
         await invoke(def, run, context);
         // Aborted while it ran: that was its one outcome (1.35). For a
@@ -493,16 +500,17 @@ export function createResolvers(options: ResolversOptions): Resolvers {
           return;
         }
         last = toError(error);
+        if (run.satisfied_) {
+          // It failed after satisfying its requirement: 1.35 aborts it
+          // plainly (a timeout too: the attempt's reason is then the plain
+          // AbortError, as 1.35's), reports the failure once, and what it
+          // writes afterwards (a `finally` cleanup) still lands.
+          run.controller_.abort();
+          break;
+        }
         if (isTimeout(last)) {
           // Only this attempt gave up: the run goes on to its retry or error.
           child.abort(last);
-        }
-        if (run.satisfied_) {
-          // It failed after satisfying its requirement: 1.35 aborts it
-          // plainly (a timeout alone does not), reports the failure once,
-          // and what it writes afterwards (a `finally` cleanup) still lands.
-          run.controller_.abort();
-          break;
         }
         // Canceled or clobbered while it ran: no outcome here.
         if (signal.aborted) {
@@ -517,6 +525,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         if (!go) {
           break;
         }
+      } finally {
+        signal.removeEventListener("abort", relay);
       }
     }
     report(run, last);

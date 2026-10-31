@@ -227,9 +227,10 @@ export interface ReconcileFeature {
   dirty_(id: string): void;
   /**
    * A due retry-later resolver's requirement (candidate p): dispatched
-   * again, through the requeue set, if it is still raised and not in flight.
+   * again, through the requeue set, if it is still raised and not in flight,
+   * at most `max` times in a row.
    */
-  requeue_(requirementId: string): void;
+  requeue_(requirementId: string, max: number): void;
   /** The settle-timeout details, around the core's own. */
   details_(core: string[]): string[];
   /** inspect()'s L2 sections, as 1.35 reports them. */

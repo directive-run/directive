@@ -16,7 +16,12 @@
  *   while it waited (a later failure carries them forward), and when it is
  *   due each one still raised is requeued, so the pass after the due one
  *   dispatches it again (1.35 never runs it again). A retracted id is not
- *   requeued; `maxRetries` bounds the re-runs.
+ *   requeued. The bound is per requirement: at most `maxRetries`
+ *   re-dispatches in a row, started over by a completed run of it, its
+ *   retraction or stop() (reconcile.ts, like quirk a's count). The shared
+ *   count still decides when the entry is due, the fallback and the
+ *   reported attempts; since it starts over when used up, it alone would
+ *   let one id of two run more than `maxRetries` times.
  * - The poller is 1.35's interval, `min(max(delayMs, 250), 500)` ms, on the
  *   kernel clock: owned by the system, re-armed only while something waits,
  *   and not keeping a Node process alive (`keepAlive: false`). It is not
@@ -119,7 +124,7 @@ export const withErrorBoundary =
         }
         // (p): the due pass applies the requeue, the next one dispatches.
         for (const req of ids) {
-          reconcile?.requeue_(req);
+          reconcile?.requeue_(req, maxRetries);
         }
         context.schedule();
       }
