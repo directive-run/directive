@@ -671,6 +671,42 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-engine-oracle-effect-chain.test.ts",
+    "category": "black-box",
+    "cases": 8,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-engine-oracle-evict.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-engine-oracle-inspect.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-engine-oracle-own-write.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l3-engine-oracle.test.ts",
     "category": "black-box",
     "cases": 49,
@@ -682,7 +718,7 @@
   {
     "file": "src/core/__tests__/l3-errors-oracle-production.test.ts",
     "category": "black-box",
-    "cases": 2,
+    "cases": 3,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

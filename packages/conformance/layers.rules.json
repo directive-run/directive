@@ -403,6 +403,18 @@
     "tests/core/l3-engine-oracle-boundaries.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-engine-oracle-own-write.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-engine-oracle-inspect.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-engine-oracle-evict.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-engine-oracle-effect-chain.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/system.test.ts": {
       "rule": "L3"
     },
