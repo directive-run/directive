@@ -7,11 +7,11 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isTimeout } from "../api/constraints.js";
 import { createModule, createSystemCore } from "../api/core.js";
 import { withPlugins } from "../api/plugins.js";
 import { withReconcile } from "../api/reconcile.js";
 import { t } from "../api/schema-builders.js";
+import { isTimeout } from "../api/timeout.js";
 import { createVirtualClock } from "../clock.js";
 import { createScheduler } from "../scheduler.js";
 

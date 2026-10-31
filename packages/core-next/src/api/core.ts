@@ -34,6 +34,8 @@ import {
   LOCKED,
   type Listeners,
   type Tracker,
+  type Writer,
+  type Writers,
   createFactsProxy,
   createFactsStore,
   describeDep,
@@ -41,6 +43,7 @@ import {
   view,
   withTracking,
 } from "./facts.js";
+import type { RequirementWithId } from "./requirements.js";
 import type {
   FactChange,
   Facts,
@@ -94,6 +97,8 @@ interface Derivation {
   stale_: boolean;
   /** Has computed at least once (1.35 creates its state on first read). */
   live_: boolean;
+  /** What it read when it last computed (the tracker's set, kept). */
+  deps_?: Set<string>;
   /**
    * What a membership test (`"id" in derived`) reads: made on the first test,
    * never written. It is the edge a read would leave, without the read that
@@ -131,6 +136,15 @@ export interface SystemContext {
   watch(id: string): void;
   /** Tell settle listeners that `isSettled` may have changed. */
   settled(): void;
+  /** The store reports each changing write and its stamp here (reconcile). */
+  readonly writers: Writers;
+  /** A facts view whose writes carry `writer`'s stamp (a resolver run). */
+  factsFor(writer: Writer): Facts<Schema>;
+  /**
+   * What a derivation read when it last computed: fact keys and prefixed
+   * derivation ids (own-write satisfaction follows them to the facts).
+   */
+  derivationDeps(id: string): ReadonlySet<string> | undefined;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -147,9 +161,14 @@ export interface ReconcileFeature {
   /** Pass start, before effects. */
   begin_(): void;
   /** After effects: the requirements now (a promise only when it must wait). */
-  evaluate_(passKeys: Set<string>): any[] | Promise<any[]>;
+  evaluate_(
+    passKeys: Set<string>,
+  ): RequirementWithId[] | Promise<RequirementWithId[]>;
   /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
-  commit_(current: any[]): Record<string, unknown>;
+  commit_(
+    current: RequirementWithId[],
+    passKeys: Set<string>,
+  ): Record<string, unknown>;
   /** A run is in flight: not settled. */
   busy_(): boolean;
   start_(): void;
@@ -416,6 +435,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      d.deps_ = deps;
       if (live()) {
         emit("derivation.compute", {
           id: d.id_,
@@ -572,10 +592,12 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
     scheduleReconcile();
   };
+  const writers: Writers = { record: null };
   const store = createFactsStore({
     schema,
     graph,
     tracker,
+    writers,
     nodes: factNodes,
     validator: isDevelopment
       ? (key, value) => features.validate?.(key, value)
@@ -613,7 +635,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
     onBatchEnd: endBatch,
   });
-  const facts = createFactsProxy(store, schema, tracker, new Set());
+  /** Non-JSON warnings already given, shared by every facts view. */
+  const nonJson = new Set<string>();
+  const facts = createFactsProxy(store, schema, tracker, nonJson);
 
   // --- reconcile -------------------------------------------------------------
   function scheduleReconcile(): void {
@@ -720,7 +744,10 @@ export function createSystemCore<const M extends ModuleSchema>(
         // 1.35 awaits constraint evaluation only when it must; the diff,
         // the dispatch and the pass end then share one continuation.
         const asked = l2.evaluate_(passKeys);
-        result = l2.commit_(asked instanceof Promise ? await asked : asked);
+        result = l2.commit_(
+          asked instanceof Promise ? await asked : asked,
+          passKeys,
+        );
       }
       if (live()) {
         emit("reconcile.end", {
@@ -822,6 +849,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         features.reconcile?.stop_();
         features.effects?.cleanupAll();
         emit("system.stop", { system });
+        // A settle() waiting on the runs just ended hears that they did.
+        notifySettle();
       }
     },
     destroy() {
@@ -943,10 +972,13 @@ export function createSystemCore<const M extends ModuleSchema>(
         };
         const cancel = after(maxWait, () => {
           // Read before finish(): its state is what timed out.
-          const details = [
-            reconciling && "reconciliation in progress",
-            scheduled && "reconcile scheduled",
-          ].filter(Boolean) as string[];
+          const details: string[] = [];
+          if (reconciling) {
+            details.push("reconciliation in progress");
+          }
+          if (scheduled) {
+            details.push("reconcile scheduled");
+          }
           finish();
           reject(
             new Error(
@@ -990,6 +1022,16 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
     settled: notifySettle,
     watch: (id) => watched.add(id),
+    writers,
+    factsFor: (writer) =>
+      createFactsProxy(
+        store,
+        schema,
+        tracker,
+        nonJson,
+        writer,
+      ) as Facts<Schema>,
+    derivationDeps: (id) => derivations.get(id)?.deps_,
   };
   for (const part of parts) {
     part(ctx);

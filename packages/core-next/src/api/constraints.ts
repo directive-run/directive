@@ -31,6 +31,7 @@ import {
   type RequirementWithId,
   requirementId,
 } from "./requirements.js";
+import { withTimeout } from "./timeout.js";
 
 type Fn = (...args: any[]) => any;
 
@@ -86,36 +87,8 @@ class RequireError {
   ) {}
 }
 
-const TIMEOUT: unique symbol = Symbol();
-export const isTimeout = (error: unknown): boolean =>
-  !!(error as Record<symbol, unknown> | null)?.[TIMEOUT];
-
-/** Reject with a marked error after `ms` on the kernel clock, owned by `owner`. */
-export function withTimeout<T>(
-  clock: Clock,
-  owner: number,
-  value: T | Promise<T>,
-  ms: number,
-  message: string,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = clock.setTimeout(
-      () => reject(Object.assign(new Error(message), { [TIMEOUT]: true })),
-      ms,
-      { owner, kind: "timeout" },
-    );
-    Promise.resolve(value).then(
-      (v) => {
-        clock.clearTimeout(timer);
-        resolve(v);
-      },
-      (error) => {
-        clock.clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
+/** An async constraint's `when` gives up after this long, unless it sets `timeout`. */
+const ASYNC_WHEN_TIMEOUT_MS = 5000;
 
 const EMPTY: RequirementWithId[] = [];
 
@@ -210,6 +183,23 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
 
   // --- evaluating one constraint -------------------------------------------
   const call = (fn: Fn) => fn(facts, derived);
+  /** `fn`, tracked; a throw is caught and kept with what it read before it. */
+  function tracked(fn: Fn) {
+    let threw = false;
+    let thrown: unknown;
+    const { value, deps } = withTracking(tracker, () => {
+      try {
+        return call(fn);
+      } catch (error) {
+        threw = true;
+        thrown = error;
+
+        return undefined;
+      }
+    });
+
+    return { value, deps, threw, thrown };
+  }
   /** `when`, tracked; the deps are kept when it throws. */
   function when(id: string, def: ConstraintDef): boolean | Promise<boolean> {
     if (def.deps) {
@@ -217,24 +207,13 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
 
       return call(def.when);
     }
-    let threw = false;
-    let thrown: unknown;
-    const tracked = withTracking(tracker, () => {
-      try {
-        return call(def.when);
-      } catch (error) {
-        threw = true;
-        thrown = error;
-
-        return false;
-      }
-    });
-    whenDeps.set(id, tracked.deps);
-    if (threw) {
-      throw thrown;
+    const read = tracked(def.when);
+    whenDeps.set(id, read.deps);
+    if (read.threw) {
+      throw read.thrown;
     }
 
-    return tracked.value;
+    return read.value as boolean | Promise<boolean>;
   }
   function evaluateSync(id: string): boolean | Promise<boolean> {
     try {
@@ -282,8 +261,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         options.clock,
         options.owner,
         call(def.when) as Promise<boolean>,
-        def.timeout ?? 5000,
-        `Constraint "${id}" timed out after ${def.timeout ?? 5000}ms`,
+        def.timeout ?? ASYNC_WHEN_TIMEOUT_MS,
+        `Constraint "${id}" timed out after ${def.timeout ?? ASYNC_WHEN_TIMEOUT_MS}ms`,
       );
       onEvaluate(id, active);
 
@@ -304,23 +283,12 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     let out: unknown = spec;
     let read = new Set<string>();
     if (typeof spec === "function") {
-      let threw = false;
-      let thrown: unknown;
-      const tracked = withTracking(tracker, () => {
-        try {
-          return call(spec as Fn);
-        } catch (error) {
-          threw = true;
-          thrown = error;
-
-          return [];
-        }
-      });
-      if (threw) {
-        throw new RequireError(thrown, tracked.deps);
+      const result = tracked(spec as Fn);
+      if (result.threw) {
+        throw new RequireError(result.thrown, result.deps);
       }
-      out = tracked.value;
-      read = tracked.deps;
+      out = result.value;
+      read = result.deps;
     }
     const reqs =
       out == null
