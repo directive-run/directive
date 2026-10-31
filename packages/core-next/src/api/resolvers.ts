@@ -200,8 +200,10 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     }
     if (abort) {
       // The failure ends the run: its body sees the abort, and what it
-      // writes afterwards (a `finally` cleanup) still lands.
-      run.controller_.abort(error);
+      // writes afterwards (a `finally` cleanup) still lands. A timeout is
+      // the reason (L2a); a run that had satisfied its requirement is
+      // aborted plainly, as 1.35 does.
+      run.controller_.abort(run.satisfied_ ? undefined : error);
     }
     options.onError(run, error);
   };
