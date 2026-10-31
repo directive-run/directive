@@ -295,25 +295,36 @@ describe("the census", () => {
   });
 
   it("accepts a v2 test in a file importing an unbuilt entry it never reaches", () => {
-    const rel = "tests/core/derivation-deps.test.ts";
-    const reached = reachingUnbuilt(rel);
-    const name =
-      "derivation dependencies > re-runs an effect that reads a derivation and no facts";
-    expect(
-      unbuiltSpecifiers(
-        readFileSync(join(conformance, rel), "utf8"),
-        v2Entries(repoRoot),
+    // Synthetic, so the check does not depend on which entries core-next has
+    // built yet: one unbuilt entry, one test that calls into it, one that
+    // never does.
+    const entries = [
+      { specifier: "@directive-run/core/not-built-yet", file: "/x/unbuilt.ts" },
+      { specifier: "@directive-run/core", file: "/x/index.ts" },
+    ];
+    const src = [
+      'import { describe, it } from "vitest";',
+      'import { createSystem } from "@directive-run/core";',
+      'import { helper } from "@directive-run/core/not-built-yet";',
+      'describe("d", () => {',
+      '  it("reaches it", () => { helper(); });',
+      '  it("never reaches it", () => { createSystem({}); });',
+      "});",
+    ].join("\n");
+    expect(unbuiltSpecifiers(src, entries)).toEqual([
+      "@directive-run/core/not-built-yet",
+    ]);
+    const reached = unbuiltReached(
+      new Project({ useInMemoryFileSystem: true }).createSourceFile(
+        "/tests/core/synthetic.test.ts",
+        src,
       ),
-    ).toEqual(["@directive-run/core/testing"]);
-    expect(reached.has(name)).toBe(false);
-    // Every test that calls flushMicrotasks reaches it.
-    const reaching = [...reached.keys()];
-    expect(reaching.length).toBeGreaterThan(0);
-    expect(
-      reaching.every((k) =>
-        reached.get(k)?.includes("@directive-run/core/testing"),
-      ),
-    ).toBe(true);
+      entries,
+    );
+    expect(reached.has("d > never reaches it")).toBe(false);
+    expect(reached.get("d > reaches it")).toEqual([
+      "@directive-run/core/not-built-yet",
+    ]);
   });
 
   it("fails when a project produced no report", () => {
