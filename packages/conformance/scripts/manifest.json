@@ -73,6 +73,7 @@
   "tests/core/l3-engine-oracle-effect-chain.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle-effect-chain.test.ts",
   "tests/core/l3-engine-oracle-evict.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle-evict.test.ts",
   "tests/core/l3-engine-oracle-inspect.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle-inspect.test.ts",
+  "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle-lifecycle-pins.test.ts",
   "tests/core/l3-engine-oracle-own-write.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle-own-write.test.ts",
   "tests/core/l3-engine-oracle.test.ts": "packages/core/src/core/__tests__/l3-engine-oracle.test.ts",
   "tests/core/l3-errors-oracle-production.test.ts": "packages/core/src/core/__tests__/l3-errors-oracle-production.test.ts",
