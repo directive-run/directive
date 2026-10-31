@@ -7330,6 +7330,56 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-evict.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "start() while evict() is running > is ignored: the system does not start": {
+          "layer": "L10",
+          "by": ["member .evict"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-inspect.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "inspect() lists the definitions > names every fact, event, derivation, effect and module": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "inspect() lists the definitions > lists each constraint, with abortOn only when it names facts": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "inspect() lists the definitions > names the requirement a resolver answers, and marks a predicate": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-own-write.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "runs retracted together in one pass > each is satisfied by the others' writes as well as its own": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "runs retracted together in one pass > a run that wrote nothing is canceled, whoever else made its requirement go away": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "onReconcileEnd > reports a run the pass canceled by its requirement id, and what is in flight": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "onReconcileEnd > lists a retracted requirement whose run is no longer in flight, with a resolver id": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle.test.ts": {
       "category": "black-box",
       "rule": "L3",
