@@ -202,6 +202,27 @@ harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review. It is the one harness
 file an engine PR may change (see "Engine and oracle land separately").
 
+An entry may also say `ends: true`: the approved quirk it covers ends the
+comparison of a fuzz case. It exists for a quirk whose consequences
+cascade: when 2.0 re-dispatches a resolver that 1.35 does not (or the other
+way round), every later record of that case differs, differently for each
+seed, so entries written per record at the PR seed fail the nightly seeds,
+and entries wide enough for every seed would hide unrelated differences in
+every fuzz case. In each fuzz case, on each engine, the differences are
+walked in trace order (`Position` in `diff/compare.ts`: step, then phase,
+then how many matched records come before it, then how far past the last
+one it is; a changed record takes the earlier of its two positions, and the
+stop the later). An uncovered one is reported and a covered one passes, as
+before; the first one whose covering entry has `ends` stops the walk: it
+passes, and every difference after it in both traces is not compared. One
+before it, or at the same position in the other trace, is still checked,
+other engines are compared in full, and the case still counts toward the
+fuzz floors. The run prints where each case ended as an advisory. `ends` is
+valid only on a signed entry for scenario `fuzz` (the census rejects it
+anywhere else, and rejects a hand scenario titled `fuzz`): hand scenarios
+are always compared to their end. An `ends` entry that never stopped a case
+is stale like any other.
+
 ## Frozen 1.35 contracts (`contracts/`)
 
 What 2.0 must keep, as checks: see `contracts/STABILITY.md` for the tiers,

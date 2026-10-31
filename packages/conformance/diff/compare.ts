@@ -39,6 +39,10 @@
  * resolver's bounds. `min` and `max` are compared exactly. A `$draw`
  * anywhere else is a scenario error: it is neither masked nor checked, so a
  * marker can never hide a value that is not bounds-checked.
+ *
+ * Every difference also carries when it happens (`Position`, from the
+ * alignment), so a fuzz case can be compared exactly up to a difference a
+ * signed `ends` divergence covers and no further (scenario.ts `explain`).
  */
 
 import type { Json } from "./normalize.js";
@@ -80,6 +84,89 @@ export interface Difference {
   candidate?: Json;
   /** Trace positions, for context. */
   at: { reference?: number; candidate?: number };
+  /**
+   * When it happens (`Position`): the earliest and the latest of the
+   * positions its records have in the two traces. A missing or extra entry
+   * is in one trace, so both are its position there; a changed one is in
+   * both.
+   */
+  span: { from: Position; to: Position };
+}
+
+// ---------------------------------------------------------------------------
+// Trace position
+
+/**
+ * Where in a trace a record happens, comparable across the two traces of a
+ * comparison: `[step, phase, matched, after]`, compared left to right.
+ *
+ * - `step` and `phase` (setup 0, sync 1, async 2) are the record's segment:
+ *   every step marker is in both traces, so a record in an earlier step
+ *   happened earlier, whatever came before it.
+ * - `matched` counts the records of its trace, up to and including it, that
+ *   the alignment matched with one in the other trace (any stream). Both
+ *   traces hold the same matched records in every segment, so this is the
+ *   shared clock: the same in both traces up to the first difference, and
+ *   it is not thrown off by records one trace has and the other lacks.
+ * - `after` is 0 for a matched record; for an unmatched one, how many
+ *   records of its own trace it comes after since the last matched record
+ *   (or the segment's start): the first record a trace has that the other
+ *   lacks is 1, the next 2.
+ *
+ * So the first record each trace has in place of the other's is at the
+ * same position in both, the record after it is later, and a matched
+ * record is later than the unmatched ones just before it.
+ */
+export type Position = readonly [
+  step: number,
+  phase: number,
+  matched: number,
+  after: number,
+];
+
+const PHASE_RANK: Record<Keyed["phase"], number> = {
+  setup: 0,
+  sync: 1,
+  async: 2,
+};
+
+/** Negative when `a` is earlier than `b`, zero at the same position. */
+export function comparePositions(a: Position, b: Position): number {
+  for (let i = 0; i < 4; i++) {
+    const d = (a[i] as number) - (b[i] as number);
+    if (d !== 0) {
+      return d;
+    }
+  }
+
+  return 0;
+}
+
+/** Each keyed record's position, given which of them the alignment matched. */
+function positions(
+  keyed: Keyed[],
+  matched: ReadonlySet<Keyed>,
+): Map<Keyed, Position> {
+  const out = new Map<Keyed, Position>();
+  let count = 0;
+  let after = 0;
+  let segment = "";
+  for (const k of keyed) {
+    const key = `${k.step}\u0000${k.phase}`;
+    if (key !== segment) {
+      segment = key;
+      after = 0;
+    }
+    if (matched.has(k)) {
+      count++;
+      after = 0;
+    } else {
+      after++;
+    }
+    out.set(k, [k.step, PHASE_RANK[k.phase], count, after]);
+  }
+
+  return out;
 }
 
 function kindOf(entry: TraceEntry): [Stream, string] | null {
@@ -540,11 +627,31 @@ function compareWith(
 ): Difference[] {
   const left = keyTrace(reference);
   const right = keyTrace(candidate);
-  const out: Difference[] = [];
-  for (const stream of STREAMS) {
+  const aligned = STREAMS.map((stream) => {
     const a = left.filter((k) => k.stream === stream);
     const b = right.filter((k) => k.stream === stream);
-    const pairs = lcs(a.map(keyOf), b.map(keyOf));
+
+    return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf)) };
+  });
+  const matchedLeft = new Set<Keyed>();
+  const matchedRight = new Set<Keyed>();
+  for (const { a, b, pairs } of aligned) {
+    for (const [i, j] of pairs) {
+      matchedLeft.add(a[i] as Keyed);
+      matchedRight.add(b[j] as Keyed);
+    }
+  }
+  const at = new Map([
+    ...positions(left, matchedLeft),
+    ...positions(right, matchedRight),
+  ]);
+  const one = (k: Keyed) => {
+    const p = at.get(k) as Position;
+
+    return { from: p, to: p };
+  };
+  const out: Difference[] = [];
+  for (const { stream, a, b, pairs } of aligned) {
     const matchedA = new Set(pairs.map(([i]) => i));
     const matchedB = new Set(pairs.map(([, j]) => j));
     const base = (k: Keyed) => ({
@@ -563,12 +670,18 @@ function compareWith(
         candidate?: Json;
       }> = [];
       diffJson(project(ka.entry), project(kb.entry), "", fields);
+      const [pa, pb] = [at.get(ka) as Position, at.get(kb) as Position];
+      const span =
+        comparePositions(pa, pb) <= 0
+          ? { from: pa, to: pb }
+          : { from: pb, to: pa };
       for (const f of fields) {
         out.push({
           ...base(ka),
           op: "changed",
           ...f,
           at: { reference: ka.index, candidate: kb.index },
+          span,
         });
       }
     }
@@ -579,6 +692,7 @@ function compareWith(
           op: "missing",
           reference: project(k.entry),
           at: { reference: k.index },
+          span: one(k),
         });
       }
     });
@@ -589,6 +703,7 @@ function compareWith(
           op: "extra",
           candidate: project(k.entry),
           at: { candidate: k.index },
+          span: one(k),
         });
       }
     });

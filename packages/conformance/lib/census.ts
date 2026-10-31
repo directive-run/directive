@@ -710,6 +710,12 @@ export function diffTestFiles(conformanceRoot: string): string[] {
 
 const LAYER = /^L(?:[0-9]|1[0-3])$/;
 
+/**
+ * The name every fuzz case runs under (diff/fuzz/model.ts `toScenario`):
+ * the one scenario an `ends` divergence may name, and no hand scenario's.
+ */
+const FUZZ_SCENARIO = "fuzz";
+
 /** Every `scenario(title, …)` title in diff/, with its file. */
 export function scenarioTitles(
   conformanceRoot: string,
@@ -763,6 +769,11 @@ export function checkScenarioLayers(conformanceRoot: string): string[] {
       failures.push(`${file}: scenario title "${title}" is used twice`);
     }
     seen.add(title);
+    if (title === FUZZ_SCENARIO) {
+      failures.push(
+        `${file}: scenario title "${FUZZ_SCENARIO}" is the fuzz cases' name (divergences for it, \`ends\` included, would apply to this scenario); rename it`,
+      );
+    }
     const layer = placed[title];
     if (typeof layer !== "string" || !LAYER.test(layer)) {
       failures.push(
@@ -790,6 +801,7 @@ export interface DivergenceEntry {
   step?: number;
   op?: string;
   path?: string;
+  ends?: boolean;
   reason: string;
   approvedBy: string;
   date: string;
@@ -804,7 +816,7 @@ const DIVERGENCE_REQUIRED = [
   "scenario",
   "stream",
 ];
-const DIVERGENCE_OPTIONAL = ["engine", "op", "path", "step"];
+const DIVERGENCE_OPTIONAL = ["ends", "engine", "op", "path", "step"];
 const STREAMS = [
   "hook",
   "observe",
@@ -824,6 +836,11 @@ const STREAMS = [
  * at least one difference, or null when not known: an entry that covers
  * nothing is stale and fails, so the file can only describe differences
  * that still exist.
+ *
+ * `ends: true` stops the comparison of a fuzz case at the difference the
+ * entry covers (diff/scenario.ts `explain`), so it is valid only on a signed
+ * entry for scenario "fuzz"; an `ends` entry that never stopped a case is
+ * stale like any other.
  */
 export function checkDivergences(
   conformanceRoot: string,
@@ -885,6 +902,21 @@ export function checkDivergences(
     }
     if (typeof e.approvedBy !== "string" || !e.approvedBy.trim()) {
       fail(`${label} needs approvedBy (the person who signed it off)`);
+    }
+    if (e.ends !== undefined) {
+      if (e.ends !== true) {
+        fail(`${label} ends must be true when given`);
+      }
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has ends, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}"); a hand scenario is compared to its end`,
+        );
+      }
+      if (typeof e.approvedBy !== "string" || !e.approvedBy.trim()) {
+        fail(
+          `${label} has ends, which stops comparing a fuzz case, so it must be signed (approvedBy)`,
+        );
+      }
     }
     if (typeof e.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
       fail(`${label} needs a YYYY-MM-DD date`);

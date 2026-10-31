@@ -32,6 +32,10 @@
  * run (a generator drifting into runaways would compare nothing). A case the reference settles but an engine
  * under test does not is a hang, and fails.
  *
+ * A case an `ends` divergence stops (diff/scenario.ts `explain`: an approved
+ * quirk whose consequences cascade) is compared up to that difference, and
+ * counts as compared like any other (`tallyCase`).
+ *
  * The cases compared on v2 are counted from what each run compared, not from
  * how the case was generated, and must reach FUZZ_V2_FLOOR (here and in the
  * census) whenever v2 has built a layer.
@@ -47,11 +51,13 @@ import {
   v2Cases,
 } from "../../lib/fuzz.js";
 import {
+  type FuzzTally,
   RUN_BUDGET,
   currentLayer,
   logFuzz,
   logResult,
   runScenario,
+  tallyCase,
 } from "../scenario.js";
 import { specArbitrary, toScenario } from "./model.js";
 
@@ -93,27 +99,18 @@ describe("differential fuzz", () => {
     console.info(
       `[diff fuzz] seed ${SEED}, ${RUNS + upToCurrent} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
     );
-    let ran = 0;
-    let runaway = 0;
-    let onV2 = 0;
-    let mostFired = 0;
+    const tally: FuzzTally = { ran: 0, runaway: 0, onV2: 0, mostFired: 0 };
     const started = Date.now();
     try {
       for (const phase of phases) {
         try {
           await fc.assert(
             fc.asyncProperty(phase.arbitrary, async (spec) => {
-              ran++;
               const result = await runScenario(toScenario(spec));
+              tallyCase(tally, result);
               if (result.runaway) {
-                runaway++;
-
                 return;
               }
-              if (result.compared.includes("v2")) {
-                onV2++;
-              }
-              mostFired = Math.max(mostFired, result.fired);
               logResult(result);
               if (!result.ok) {
                 throw new Error(
@@ -131,18 +128,19 @@ describe("differential fuzz", () => {
         }
       }
     } finally {
+      const { ran, runaway, onV2, mostFired } = tally;
       console.info(
         `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (reference passed ${RUN_BUDGET} timer callbacks; discarded), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}); most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       logFuzz(SEED, ran - runaway, runaway, onV2);
     }
     expect(
-      runaway,
-      `too many runaway cases (limit max(1% of ${ran}, 2))`,
-    ).toBeLessThanOrEqual(maxRunaways(ran));
+      tally.runaway,
+      `too many runaway cases (limit max(1% of ${tally.ran}, 2))`,
+    ).toBeLessThanOrEqual(maxRunaways(tally.ran));
     if (current !== null) {
       expect(
-        onV2,
+        tally.onV2,
         `v2 is built up to ${current}, so at least ${FUZZ_V2_FLOOR} fuzz cases must be compared on it`,
       ).toBeGreaterThanOrEqual(FUZZ_V2_FLOOR);
     }
