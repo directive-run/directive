@@ -8,7 +8,8 @@
  * after it, that an ordinary entry, another engine and a hand scenario never
  * stop, that a difference in the same gap as the stop, in the other trace,
  * is still compared, that the census accepts `ends` only on a signed, narrow
- * fuzz entry (engine "v2", an op, a path for "changed") and finds it stale
+ * fuzz entry (engine "v2", an op, a path for "changed"; `when`, proved in
+ * precision.test.ts) and finds it stale
  * when it never stopped a case, and that an ended case still counts toward
  * the fuzz floors and is shown on the census's fuzz line.
  */
@@ -477,6 +478,10 @@ describe("the census accepts `ends` only on a signed fuzz entry", () => {
   const root = mkdtempSync(join(tmpdir(), "conformance-ends-"));
   mkdirSync(join(root, "diff"), { recursive: true });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
+  // The census also requires `when` on an `ends` entry (diff/self/
+  // precision.test.ts proves that rule); every entry here has one.
+  const scoped = (id: string, kind: string, more: Partial<Divergence> = {}) =>
+    ends(id, kind, { when: ["timeout"], ...more });
   const census = (entries: unknown[], used: string[] | null = null) => {
     writeFileSync(join(root, "diff/divergences.json"), JSON.stringify(entries));
 
@@ -484,55 +489,55 @@ describe("the census accepts `ends` only on a signed fuzz entry", () => {
   };
 
   it("control: a signed, narrow fuzz entry with `ends` that stopped a case passes", () => {
-    expect(census([ends("q-ends", "q")], ["q-ends"])).toBe("");
+    expect(census([scoped("q-ends", "q")], ["q-ends"])).toBe("");
     expect(
       census(
-        [ends("q-ends", "q", { op: "changed", path: "data[1]" })],
+        [scoped("q-ends", "q", { op: "changed", path: "data[1]" })],
         ["q-ends"],
       ),
     ).toBe("");
   });
 
   it("rejects `ends` without engine v2 (1.35 against 1.35 is never stopped)", () => {
-    expect(census([ends("q-ends", "q", { engine: undefined })])).toMatch(
+    expect(census([scoped("q-ends", "q", { engine: undefined })])).toMatch(
       /q-ends has ends, so it must say engine "v2"/,
     );
-    expect(census([ends("q-ends", "q", { engine: "local" })])).toMatch(
+    expect(census([scoped("q-ends", "q", { engine: "local" })])).toMatch(
       /q-ends has ends, so it must say engine "v2"/,
     );
   });
 
   it("rejects `ends` without an op", () => {
-    expect(census([ends("q-ends", "q", { op: undefined })])).toMatch(
+    expect(census([scoped("q-ends", "q", { op: undefined })])).toMatch(
       /q-ends has ends, so it must say which op/,
     );
   });
 
   it("rejects `ends` with op changed and no path", () => {
-    expect(census([ends("q-ends", "q", { op: "changed" })])).toMatch(
+    expect(census([scoped("q-ends", "q", { op: "changed" })])).toMatch(
       /q-ends has ends with op "changed", so it must say the path/,
     );
   });
 
   it("rejects `ends` on an entry for a hand scenario", () => {
-    expect(census([ends("q-ends", "q", { scenario: "a hand one" })])).toMatch(
+    expect(census([scoped("q-ends", "q", { scenario: "a hand one" })])).toMatch(
       /q-ends has ends, which only a fuzz entry may have/,
     );
   });
 
   it("rejects `ends` without approvedBy", () => {
-    const text = census([ends("q-ends", "q", { approvedBy: "" })]);
+    const text = census([scoped("q-ends", "q", { approvedBy: "" })]);
     expect(text).toMatch(/q-ends has ends, .* must be signed \(approvedBy\)/);
   });
 
   it("rejects `ends` that is not true", () => {
-    expect(census([ends("q-ends", "q", { ends: false })])).toMatch(
+    expect(census([scoped("q-ends", "q", { ends: false })])).toMatch(
       /q-ends ends must be true/,
     );
   });
 
   it("finds an `ends` entry that never stopped a case stale", () => {
-    expect(census([ends("q-ends", "q")], [])).toMatch(
+    expect(census([scoped("q-ends", "q")], [])).toMatch(
       /q-ends covers no difference in this run \(stale\)/,
     );
   });
