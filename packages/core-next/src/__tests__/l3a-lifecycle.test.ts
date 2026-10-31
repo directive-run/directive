@@ -202,8 +202,10 @@ describe("L3a timers on the kernel clock (S7, C1, C2)", () => {
     );
     sys.start();
     const owned = () => clock.timers().filter((timer) => timer.owner !== 0);
-    expect(owned().map((timer) => timer.kind)).toEqual(["tick"]);
+    // (r): the never-started check is the system's too, until it fires.
+    expect(owned().map((timer) => timer.kind)).toEqual(["dev", "tick"]);
     clock.advanceTo(300);
+    expect(owned().map((timer) => timer.kind)).toEqual(["tick"]);
     expect(sys.facts.count).toBe(3);
     sys.stop();
     expect(owned()).toEqual([]);
@@ -215,22 +217,53 @@ describe("L3a timers on the kernel clock (S7, C1, C2)", () => {
     expect(sys.facts.count).toBe(3);
   });
 
-  it("a system created and destroyed without start() still warns in development (1.35)", () => {
+  it("(r) approved: destroy() cancels the never-started warning (1.35 warns anyway)", () => {
     vi.stubEnv("NODE_ENV", "development");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const clock = createVirtualClock();
     const sys: any = createSystemCore({ module: counter() } as never, [], {
       clock,
     });
-    // Unowned, so the kernel's dispose leaves it.
-    expect(clock.timers()).toMatchObject([{ owner: 0, kind: "dev" }]);
+    // Owned by the system, so the kernel's dispose clears it.
+    expect(clock.timers()).toMatchObject([{ kind: "dev" }]);
+    expect(clock.timers()[0]!.owner).not.toBe(0);
     sys.destroy();
+    expect(clock.timers()).toEqual([]);
+    clock.advanceTo(1);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("(r): a system created and neither started nor destroyed still warns, once", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const clock = createVirtualClock();
+    const kept: any = createSystemCore({ module: counter() } as never, [], {
+      clock,
+    });
+    const gone: any = createSystemCore({ module: counter() } as never, [], {
+      clock,
+    });
+    gone.destroy();
     clock.advanceTo(1);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]![0])).toContain(
       "start() was never called",
     );
+    clock.advanceTo(100);
+    expect(warn).toHaveBeenCalledTimes(1);
+    kept.destroy();
+  });
+
+  it("(r): destroyAsync() cancels it too", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const clock = createVirtualClock();
+    const sys: any = createSystemCore({ module: counter() } as never, [], {
+      clock,
+    });
+    await sys.destroyAsync();
+    clock.advanceTo(1);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("NODE_ENV=test sets no never-started timer at all", () => {

@@ -127,8 +127,9 @@ export function startTimer(
   state: TimerFactState,
   nowMs: number,
 ): TimerFactState {
-  if (state.status === "running") return state;
-  if (state.status === "paused") return state;
+  // Candidate (q), approved: a completed timer stays completed, as this
+  // doc says. 1.35 started it again.
+  if (state.status !== "idle") return state;
   return {
     ...state,
     startedAtMs: nowMs,

@@ -243,16 +243,21 @@ describe("timers: quirk (f) only", () => {
     expect(elapsedMs(done, 500)).toBe(500);
   });
 
-  it("(q) not approved: startTimer on a completed timer starts it again, as 1.35", () => {
+  it("(q) approved: startTimer on a completed timer returns it unchanged (1.35 starts it again)", () => {
     const done = completeTimer(startTimer(initialTimerState(), 0));
     const again = startTimer(done, 300);
-    expect(again.status).toBe("running");
-    expect(again.startedAtMs).toBe(300);
+    expect(again).toBe(done);
+    expect(again.status).toBe("completed");
+    expect(again.startedAtMs).toBe(0);
+    // reset() first, as its doc says, and it starts.
+    const fresh = startTimer(initialTimerState(), 300);
+    expect(fresh.status).toBe("running");
+    expect(fresh.startedAtMs).toBe(300);
   });
 });
 
-describe("(n) not approved: a timeout leaves the attempt's signal alone", () => {
-  it("does not abort context.signal when a resolver times out", async () => {
+describe("(n) approved: a timeout aborts the attempt's signal", () => {
+  it("aborts context.signal, with the timeout error as its reason, and still reports an error", async () => {
     let signal: AbortSignal | undefined;
     const errors: unknown[] = [];
     const mod = createModule("n", {
@@ -295,7 +300,9 @@ describe("(n) not approved: a timeout leaves the attempt's signal alone", () => 
     }
     expect(errors).toHaveLength(1);
     expect(String(errors[0])).toMatch(/timed out/);
-    expect(signal?.aborted).toBe(false);
+    // 1.35 leaves the signal clean, so the body's work keeps going.
+    expect(signal?.aborted).toBe(true);
+    expect(String(signal?.reason)).toMatch(/timed out after 10ms/);
     sys.destroy();
   });
 });
