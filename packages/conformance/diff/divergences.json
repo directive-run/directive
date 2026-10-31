@@ -6,8 +6,8 @@
     "kind": "onError",
     "engine": "v2",
     "op": "missing",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onError hook call, which 1.35 adds after the cancel and 2.0 does not.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onError hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -17,8 +17,8 @@
     "kind": "onResolverError",
     "engine": "v2",
     "op": "missing",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onResolverError hook call, which 1.35 adds after the cancel and 2.0 does not.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onResolverError hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -28,8 +28,8 @@
     "kind": "onErrorRecovery",
     "engine": "v2",
     "op": "missing",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onErrorRecovery hook call, which 1.35 adds after the cancel and 2.0 does not.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onErrorRecovery hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -39,8 +39,8 @@
     "kind": "resolver.error",
     "engine": "v2",
     "op": "missing",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the resolver.error observe event, which 1.35 adds after the cancel and 2.0 does not.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the resolver.error observe event, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -49,8 +49,8 @@
     "stream": "console",
     "kind": "warn",
     "engine": "v2",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2).",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -61,8 +61,8 @@
     "engine": "v2",
     "op": "changed",
     "path": "args[0].$error",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onError call with another run's onError call in the same step, so the difference shows as changed error (its message, source and context) instead of missing.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onError call with another run's onError call in the same step, so the difference shows as changed error (its message, source and context) instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -73,8 +73,8 @@
     "engine": "v2",
     "op": "changed",
     "path": "args[0].$error",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onErrorRecovery call with another run's onErrorRecovery call in the same step, so the difference shows as changed error (its message, source and context) instead of missing.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onErrorRecovery call with another run's onErrorRecovery call in the same step, so the difference shows as changed error (its message, source and context) instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -84,8 +84,8 @@
     "kind": "onResolverError",
     "engine": "v2",
     "op": "changed",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onResolverError call with another run's onResolverError call in the same step, so the difference shows as changed resolver, requirement and error instead of missing.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onResolverError call with another run's onResolverError call in the same step, so the difference shows as changed resolver, requirement and error instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   },
   {
@@ -95,8 +95,8 @@
     "kind": "resolver.error",
     "engine": "v2",
     "op": "changed",
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra resolver.error event with another run's resolver.error event in the same step, so the difference shows as changed resolver, requirement and error instead of missing.",
-    "approvedBy": "",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra resolver.error event with another run's resolver.error event in the same step, so the difference shows as changed resolver, requirement and error instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
     "date": "2026-10-30"
   }
 ]
