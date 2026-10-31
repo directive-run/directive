@@ -45,7 +45,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 92;
+const DEV_STRINGS_MIN = 106;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -394,6 +394,42 @@ function assertNoDevStrings(label, bytes) {
 }
 if (distBytes) {
   assertNoDevStrings("dist/index.js", distBytes);
+}
+// The development and production builds as shipped (tsup.config.ts), not as
+// this script bundles them. Production is selected by the `production` export
+// condition with no bundler setting, so it must hold none of the dev text
+// itself; development holds all of it (the same control as above: a production
+// build with no dev text is only evidence if the development build has it).
+// Every .js file in the build directory is read, the chunks included.
+const builtBytes = (name) => {
+  const dir = new URL(`../dist/${name}/`, import.meta.url).pathname;
+  const files = existsSync(dir)
+    ? readdirSync(dir).filter((f) => f.endsWith(".js"))
+    : [];
+  if (!files.includes("index.js")) {
+    console.error(
+      `dist/${name} has no index.js: run \`pnpm --filter @directive-run/core-next build\``,
+    );
+    process.exitCode = 1;
+  }
+
+  return Buffer.concat(files.map((f) => readFileSync(join(dir, f))));
+};
+if (distBytes) {
+  const production = builtBytes("production");
+  const development = builtBytes("development");
+  assertNoDevStrings("dist/production", production);
+  const inDevelopment = devNeedles.filter((n) => development.includes(n));
+  if (inDevelopment.length !== DEV_STRINGS_MIN) {
+    const absent = devNeedles.filter((n) => !development.includes(n));
+    console.error(
+      `dist/development holds ${inDevelopment.length} of the ${DEV_STRINGS_MIN} dev-only strings, expected all of them. Missing:\n${absent.map((n) => `  ${JSON.stringify(n)}`).join("\n")}`,
+    );
+    process.exitCode = 1;
+  }
+  console.log(
+    `dist/production: ${devNeedles.filter((n) => production.includes(n)).length} dev-only strings (expected 0, ${gzipSync(production, { level: 9 }).length} B gzip); dist/development: ${inDevelopment.length} of ${DEV_STRINGS_MIN}`,
+  );
 }
 async function measure(label, contents, resolveDir, engine) {
   const out = await build({

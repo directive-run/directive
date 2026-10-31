@@ -671,9 +671,18 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-engine-oracle-clusters.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l3-engine-oracle-effect-chain.test.ts",
     "category": "black-box",
-    "cases": 8,
+    "cases": 9,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -692,6 +701,15 @@
     "file": "src/core/__tests__/l3-engine-oracle-inspect.test.ts",
     "category": "black-box",
     "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-engine-oracle-lifecycle-pins.test.ts",
+    "category": "black-box",
+    "cases": 5,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -808,7 +826,7 @@
   {
     "file": "src/core/__tests__/l3-small-oracle-schema-builders.test.ts",
     "category": "black-box",
-    "cases": 17,
+    "cases": 22,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

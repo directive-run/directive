@@ -6,8 +6,14 @@
  */
 
 import isDevelopment from "#is-development";
-import { type ErrorSource, type SystemPart, createSystemCore } from "./core.js";
+import {
+  type ErrorSource,
+  type SystemPart,
+  checkTick,
+  createSystemCore,
+} from "./core.js";
 import { withEffects } from "./effects.js";
+import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withInspect } from "./inspect.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
@@ -23,6 +29,11 @@ export type { ErrorSource };
 export function createSystem<const M extends ModuleSchema>(
   options: SystemOptions<M>,
 ): System<M> {
+  if (!options || (!("module" in options) && !("modules" in options))) {
+    throw new Error(
+      "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",
+    );
+  }
   const parts: SystemPart[] = [
     withEffects,
     // L2: constraints -> requirements -> resolvers.
@@ -36,12 +47,21 @@ export function createSystem<const M extends ModuleSchema>(
     // Writes are checked in development only, so production drops the part.
     parts.unshift(withValidation);
   }
-
-  if (!options || (!("module" in options) && !("modules" in options))) {
-    throw new Error(
-      "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",
-    );
+  // 1.35's zeroConfig sets the four sources to skip; an explicit
+  // errorBoundary wins. Without either, the core skips every error.
+  const boundary: ErrorBoundaryConfig | undefined = options.zeroConfig
+    ? {
+        onConstraintError: "skip",
+        onResolverError: "skip",
+        onEffectError: "skip",
+        onDerivationError: "skip",
+        ...options.errorBoundary,
+      }
+    : options.errorBoundary;
+  if (boundary) {
+    parts.unshift(withErrorBoundary(boundary));
   }
+
   if ("module" in options) {
     return createSystemCore(options, parts);
   }
@@ -61,6 +81,8 @@ export function createSystem<const M extends ModuleSchema>(
       "[Directive] A single module was passed to `modules:`. For a single module, use `module:` instead:\n\n  createSystem({ module: myModule })\n\nFor multiple modules, wrap in an object:\n  createSystem({ modules: { myName: myModule } })",
     );
   }
+
+  checkTick(options.tickMs);
 
   return createNamespacedSystem(options, parts) as System<M>;
 }

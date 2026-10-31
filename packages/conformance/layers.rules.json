@@ -52,6 +52,7 @@
     "a timeout fires exactly at its deadline": "L2",
     "a loading flag set and cleared around a satisfied, timed-out run": "L2",
     "full and equal jitter draw from the seeded random": "L2",
+    "two jittered retry chains at once keep their own order": "L2",
     "requeue runs a resolver again for the same requirement": "L2",
     "shouldRetry sees why each attempt aborted": "L2",
     "a write to an abortOn fact changed meanwhile is rejected (clobber)": "L2",
@@ -73,6 +74,11 @@
     "notify: guardrail and clobber-loop channels reach plugins": "L3",
     "async stop and destroy wait for in-flight runs; evict": "L3",
     "settle(maxWait) gives up on a resolver that never finishes": "L3",
+    "a timer completed while paused: elapsed time after the clock moves": "L3",
+    "a second start() arms a second tick interval, and stop() leaves one running": "L3",
+    "start() after destroy() arms a tick interval on its own": "L3",
+    "stop() from a plugin's onResolverComplete: complete, then cancel": "L3",
+    "stop() from a module's onResolverError: error, then cancel": "L3",
     "deps at startup: an effect runs once on start, then on its deps only": "L4",
     "an `on` predicate gates an effect; derived values read inside run": "L4",
     "effects disable, enable and run in declaration order": "L4",
@@ -403,6 +409,9 @@
     "tests/core/l3-engine-oracle-boundaries.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/l3-engine-oracle-own-write.test.ts": {
       "rule": "L3"
     },
@@ -413,6 +422,9 @@
       "rule": "L3"
     },
     "tests/core/l3-engine-oracle-effect-chain.test.ts": {
+      "rule": "L3"
+    },
+    "tests/core/l3-engine-oracle-clusters.test.ts": {
       "rule": "L3"
     },
     "tests/core/system.test.ts": {

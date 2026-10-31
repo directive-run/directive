@@ -18,16 +18,40 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "development": {
+        "import": "./dist/development/index.js"
+      },
+      "production": {
+        "import": "./dist/production/index.js"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js"
+      "development": {
+        "import": "./dist/development/testing.js"
+      },
+      "production": {
+        "import": "./dist/production/testing.js"
+      },
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
     },
     "./internals": {
-      "types": "./dist/internals.d.ts",
-      "import": "./dist/internals.js"
+      "development": {
+        "import": "./dist/development/internals.js"
+      },
+      "production": {
+        "import": "./dist/production/internals.js"
+      },
+      "import": {
+        "types": "./dist/internals.d.ts",
+        "default": "./dist/internals.js"
+      }
     }
   },
   "files": ["dist"],

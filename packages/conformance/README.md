@@ -168,6 +168,23 @@ unique literal title (the census counts them) and a layer in
 | Pending timers after destroy | contract | exact |
 | Interleaving across streams (a hook vs an observe event) | incidental | advisory, printed when the streams agree |
 | How many microtask rounds a `tick` flushes | incidental | do not checkpoint mid-chain |
+| A retry's jitter draw: the wait a scenario reports as `[resolverId, attempt, { $draw, min, max }]` (an `external` entry), and the `duration` of that resolver's completion (`onResolverComplete` argument 2, `resolver.complete`) | incidental | the `$draw` and `duration` values are advisory; `min`, `max` and the rest strict; the draw must lie in `[min, max]` and each duration in the sum of its resolver's bounds, in both streams, on every engine, the reference too |
+
+A jitter draw is incidental because two valid engines draw different
+numbers from the same seeded `Math.random` (1.35 draws twice before its first
+jitter, 2.0 does not), not because the delay is unchecked: the scenario states
+the bounds (`base` is the backoff delay, clamped to `maxDelay`, before jitter;
+`full`: 0 to `base`; `equal`: `base / 2` to `base`; `{ maxMs }`: `base` to
+`base + maxMs`) and `runScenario` fails a draw outside them, and a completion
+`duration` outside the sum of its resolver's bounds, whether the hook or the
+observe event reports it. The masked set and the checked set are the same
+set: a `$draw` is masked only as the third element of a three-element
+`external` array whose marker has exactly the keys `$draw`, `min` and `max`
+(which is the one thing `runScenario` bounds-checks), and a `$draw` anywhere
+else is a scenario error, never masked. Such a scenario starts each jittered
+resolver at a fixed time, so no later start time or order of events depends
+on a draw; the bounds of chains that run at once must keep their attempts
+apart for the same reason. A drawn resolver completes once per scenario.
 
 Advisories are printed with the scenario and never fail it. Changing this
 table, or `diff/compare.ts`, changes the contract: it is an oracle change

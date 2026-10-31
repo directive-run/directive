@@ -6,6 +6,8 @@
  * layers add.
  */
 
+import type { ErrorBoundaryConfig } from "./errors.js";
+
 /** Optional metadata on any definition (labels, tags) for tooling. */
 export interface DefinitionMeta {
   label?: string;
@@ -177,6 +179,14 @@ export interface SystemOptions<M extends ModuleSchema> {
   /** Module init order: by crossModuleDeps (default), declaration, or explicit. */
   initOrder?: "auto" | "declaration" | string[];
   plugins?: Plugin[];
+  /** Dispatch `tick` every this many ms while running. */
+  tickMs?: number;
+  /** Facts applied at start, after the module inits (namespaced: by module). */
+  initialFacts?: Record<string, unknown>;
+  /** What happens when a constraint, resolver, effect or derivation throws. */
+  errorBoundary?: ErrorBoundaryConfig;
+  /** 1.35's zero-config defaults (at L3: every source skips). */
+  zeroConfig?: boolean;
   [key: string]: unknown;
 }
 
@@ -189,6 +199,13 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly isRunning: boolean;
   readonly isSettled: boolean;
   readonly isInitialized: boolean;
+  /** True once the first reconcile pass has completed. */
+  readonly isReady: boolean;
+  /** Resolves once the system is ready; rejects before `start()`. */
+  whenReady(): Promise<void>;
+  /** Load facts before `start()`; they apply after `initialFacts`. */
+  hydrate(loader: () => unknown): Promise<void>;
+  destroyAsync(): Promise<void>;
   start(): void;
   stop(): void;
   destroy(): void;

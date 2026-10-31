@@ -1,0 +1,225 @@
+/**
+ * The error boundary (1.35's errors.ts): which strategy each error gets, the
+ * retry-later queue and its poller. A part, installed only when the system
+ * has an `errorBoundary` (or `zeroConfig`); without it every error is
+ * skipped by the core's own `reportError`.
+ *
+ * It only decides. The core's `reportError` emits the records around the
+ * decision and throws under "throw"; each caller acts on the strategy it
+ * gets back, at the place 1.35's engine does (core.ts for derivations,
+ * effects.ts, reconcile.ts for constraints and resolvers).
+ *
+ * - Retry-later keeps one entry and one attempt count per source id, as 1.35
+ *   does: two requirements of one resolver share them. A due entry runs a
+ *   pass; a constraint's is asked again by name. Candidate (p), approved:
+ *   a resolver's entry also keeps the ids of the requirements that failed
+ *   while it waited (a later failure carries them forward), and when it is
+ *   due each one still raised is requeued, so the pass after the due one
+ *   dispatches it again (1.35 never runs it again). A retracted id is not
+ *   requeued. The bound is per requirement: at most `maxRetries`
+ *   re-dispatches in a row, started over by a completed run of it, its
+ *   retraction or stop() (reconcile.ts, like quirk a's count). The shared
+ *   count still decides when the entry is due, the fallback and the
+ *   reported attempts; since it starts over when used up, it alone would
+ *   let one id of two run more than `maxRetries` times.
+ * - The poller is 1.35's interval, `min(max(delayMs, 250), 500)` ms, on the
+ *   kernel clock: owned by the system, re-armed only while something waits,
+ *   and not keeping a Node process alive (`keepAlive: false`). It is not
+ *   part of `isSettled`, so `settle()` resolves while an entry waits.
+ */
+
+import isDevelopment from "#is-development";
+import type {
+  DirectiveError,
+  ErrorSource,
+  ErrorsFeature,
+  ReconcileFeature,
+  Strategy,
+  SystemPart,
+} from "./core.js";
+
+/** A strategy, or a function of the error and the source id that picks one. */
+export type ErrorHandler =
+  | Strategy
+  | ((error: Error, id: string) => Strategy | undefined | void);
+
+export interface RetryLaterConfig {
+  /** Delay before the first retry (default 1000 ms). */
+  delayMs?: number;
+  /** Retries before falling back to "skip" (default 3). */
+  maxRetries?: number;
+  /** Each retry waits this much longer (default 2). */
+  backoffMultiplier?: number;
+  /** Longest delay (default 30000 ms). */
+  maxDelayMs?: number;
+}
+
+export interface ErrorBoundaryConfig {
+  onConstraintError?: ErrorHandler;
+  onResolverError?: ErrorHandler;
+  onEffectError?: ErrorHandler;
+  onDerivationError?: ErrorHandler;
+  /** Hears every error, after the plugins' onError. */
+  onError?: (error: DirectiveError) => void;
+  retryLater?: RetryLaterConfig;
+}
+
+declare module "../kernel.js" {
+  interface KernelFeatures {
+    /** Added by `withErrorBoundary` (errors.ts). */
+    errors: ErrorsFeature;
+  }
+}
+
+const OPTION = {
+  constraint: "onConstraintError",
+  resolver: "onResolverError",
+  effect: "onEffectError",
+  derivation: "onDerivationError",
+} as const;
+
+export const withErrorBoundary =
+  (config: ErrorBoundaryConfig): SystemPart =>
+  (context) => {
+    const { kernel, system } = context;
+    const { clock } = kernel;
+    const {
+      delayMs = 1000,
+      maxRetries = 3,
+      backoffMultiplier = 2,
+      maxDelayMs = 30000,
+    } = config.retryLater ?? {};
+    /**
+     * Waiting retry-later entries by source id: [source, due time, the ids
+     * of the requirements that failed while it waited (a resolver's)].
+     */
+    const waiting = new Map<string, [ErrorSource, number, Set<string>]>();
+    /** Retry-later attempts by source id, for at most 1000 sources (1.35). */
+    const attempts = new Map<string, number>();
+    /** The poller's timer on the kernel clock; 0 when not polling. */
+    let poller = 0;
+    const fire = () => {
+      poller = 0;
+      const now = clock.now();
+      const due: [string, ErrorSource, Set<string>][] = [];
+      for (const [id, [source, at, ids]] of waiting) {
+        if (at <= now) {
+          due.push([id, source, ids]);
+          waiting.delete(id);
+        }
+      }
+      // 1.35's interval keeps going while anything waits, and stops after
+      // the poll that finds nothing left.
+      if (waiting.size > 0) {
+        poll();
+      }
+      const { reconcile } = kernel.features as {
+        reconcile?: ReconcileFeature;
+      };
+      for (const [id, source, ids] of due) {
+        // A constraint is asked again by name: a pass with no changed keys
+        // would carry its last answer forward (1.35).
+        if (source === "constraint") {
+          reconcile?.dirty_(id);
+        }
+        // (p): the due pass applies the requeue, the next one dispatches.
+        for (const req of ids) {
+          reconcile?.requeue_(req, maxRetries);
+        }
+        context.schedule();
+      }
+    };
+    /** Start polling unless it is already, or the system is not running. */
+    const poll = () => {
+      if (!poller && system.isRunning) {
+        poller = clock.setTimeout(fire, Math.min(Math.max(delayMs, 250), 500), {
+          owner: kernel.owner,
+          kind: "retry-later",
+          keepAlive: false,
+        });
+      }
+    };
+    context.decide_ = (source, sourceId, error, wrapped, info, warn) => {
+      try {
+        config.onError?.(wrapped);
+      } catch (e) {
+        console.error("[Directive] Error in config.onError callback:", e);
+      }
+      const handler = config[OPTION[source as keyof typeof OPTION]];
+      let strategy: Strategy =
+        typeof handler === "string"
+          ? handler
+          : source === "system"
+            ? "throw"
+            : "skip";
+      if (typeof handler === "function") {
+        // The handler hears what was thrown, as an Error; anything but a
+        // string back is a skip, and so is a handler that throws.
+        try {
+          const result = handler(
+            error instanceof Error ? error : new Error(String(error)),
+            sourceId,
+          );
+          if (typeof result === "string") {
+            strategy = result;
+          }
+        } catch (e) {
+          console.error("[Directive] Error in error handler callback:", e);
+        }
+      }
+      if (strategy === "retry-later") {
+        const attempt = (attempts.get(sourceId) ?? 0) + 1;
+        attempts.set(sourceId, attempt);
+        if (attempts.size > 1000) {
+          attempts.delete(attempts.keys().next().value!);
+        }
+        if (attempt <= maxRetries) {
+          // Carried forward from the entry this one replaces (p).
+          const ids = waiting.get(sourceId)?.[2] ?? new Set<string>();
+          if (source === "resolver") {
+            ids.add((info as { id: string }).id);
+          }
+          waiting.set(sourceId, [
+            source,
+            clock.now() +
+              Math.min(
+                delayMs * backoffMultiplier ** (attempt - 1),
+                maxDelayMs,
+              ),
+            ids,
+          ]);
+          poll();
+        } else {
+          attempts.delete(sourceId);
+          if (isDevelopment) {
+            console.warn(
+              `[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
+            );
+          }
+          strategy = "skip";
+        }
+      }
+      if (strategy === "skip" && handler === undefined && !config.onError) {
+        warn();
+      }
+
+      return strategy;
+    };
+    kernel.define("errors", {
+      start_() {
+        // 1.35 polls from start() when retryLater is configured.
+        if (config.retryLater) {
+          poll();
+        }
+      },
+      stop_() {
+        clock.clearTimeout(poller);
+        poller = 0;
+        waiting.clear();
+      },
+      clear_(id) {
+        attempts.delete(id);
+        waiting.delete(id);
+      },
+    });
+  };

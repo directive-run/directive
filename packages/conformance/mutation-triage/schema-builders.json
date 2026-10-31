@@ -8,13 +8,75 @@
     "note": "Every caller of createSchemaType passes its validators, so the default is never used."
   },
   {
-    "line": 574,
-    "col": 7,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "note": "Type name of t.boolean(), read by schema introspection (getKind) \u2014 killed in the full run by getKind \u2014 primitive builders t.boolean() \u2192 { kind: 'boolean' }",
-    "layer": "L6"
+    "line": 205,
+    "col": 63,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 206,
+    "col": 30,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 206,
+    "col": 35,
+    "mutator": "LogicalOperator",
+    "replacement": "refinements && []",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 206,
+    "col": 50,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[\"Stryker was here\"]",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 206,
+    "col": 55,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 208,
+    "col": 9,
+    "mutator": "ArrayDeclaration",
+    "replacement": "[]",
+    "reason": "feature-layer",
+    "layer": "L6",
+    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+  },
+  {
+    "line": 245,
+    "col": 55,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "layer": "L9",
+    "note": "`.meta()` on the base chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
+  },
+  {
+    "line": 318,
+    "col": 18,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "The whole `t` object replaced by {}: every t.*() call then throws, so the suite fails with the mutant applied by hand (exit 1). Stryker runs a static top-level initialiser against few covering tests and reports it Survived; it cannot be killed in the report."
   },
   {
     "line": 605,
@@ -47,6 +109,15 @@
     "replacement": "+1",
     "reason": "not-observable",
     "note": "Index of the failing array element; it only feeds _lastFailedIndex, read to build the dev validation message."
+  },
+  {
+    "line": 686,
+    "col": 59,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "layer": "L9",
+    "note": "`.meta()` on the array chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
   },
   {
     "line": 755,
@@ -83,6 +154,15 @@
     "replacement": "true",
     "reason": "equivalent",
     "note": "nonNull's check repeats the base object validator, which already rejects null and undefined."
+  },
+  {
+    "line": 778,
+    "col": 59,
+    "mutator": "BlockStatement",
+    "replacement": "{}",
+    "reason": "feature-layer",
+    "layer": "L9",
+    "note": "`.meta()` on the object chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
   },
   {
     "line": 812,

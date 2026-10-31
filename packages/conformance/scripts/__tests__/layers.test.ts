@@ -111,4 +111,83 @@ describe("layer placement", () => {
     expect(out["when chosen"]!.layer).toBe("L2");
     expect(out["when either"]!.layer).toBe("L2");
   });
+  it("places a batch option built through a helper at L7", () => {
+    const out = {
+      // The resolver's options are an argument of the helper, so no
+      // `resolvers.<id>` stands above `batch` in the key path.
+      ...place(`
+        declare const build: (resolver: Record<string, unknown>) => any;
+        check("argument", () => { build({ batch: { enabled: true, windowMs: 10 } }); });
+      `),
+      // Named: a file-level constant, a local constant, a shorthand.
+      ...place(`
+        declare const build: (resolver: Record<string, unknown>) => any;
+        const common = { batch: { enabled: true, windowMs: 10 } };
+        check("constant", () => { build({ ...common }); });
+      `),
+      ...place(`
+        declare const build: (resolver: Record<string, unknown>) => any;
+        check("shorthand", () => {
+          const batch = { enabled: true, windowMs: 10 } as const;
+          build({ batch });
+        });
+      `),
+      // The helper itself builds the definition and passes `batch` on.
+      ...place(`
+        const define = (batch: unknown) => ({ resolvers: { r: { requirement: "R", batch } } });
+        check("passed on", () => { system.compose(define({ enabled: true })); });
+      `),
+    };
+    for (const name of ["argument", "constant", "shorthand"]) {
+      expect(out[name]).toMatchObject({
+        layer: "L7",
+        by: ["option batch resolver"],
+      });
+    }
+    // `batch` handed on by name is a value we cannot see: still the resolver
+    // definition's own `resolvers.<id>.batch` key, which is how it was found.
+    expect(out["passed on"]!.layer).toBe("L7");
+  });
+
+  it("places the L9 members trace and meta read through a helper at L9", () => {
+    const out = {
+      ...place(`
+        const status = (s: any) => s.trace;
+        check("trace", () => { status(system); });
+      `),
+      ...place(`
+        const read = () => system.meta;
+        check("meta", () => { read(); });
+      `),
+    };
+    expect(out.trace).toMatchObject({ layer: "L9", by: ["member .trace"] });
+    expect(out.meta).toMatchObject({ layer: "L9", by: ["member .meta"] });
+  });
+
+  it("leaves a batch that is not a resolver's batch config at L0", () => {
+    const out = {
+      // The L0 batch of facts, a flag, a function and an array of items.
+      ...place(`
+        check("system batch", () => { system.batch(() => {}); });
+      `),
+      ...place(`
+        declare const withOptions: (a: unknown, b: unknown) => void;
+        check("flag", () => { withOptions({}, { batch: true }); });
+      `),
+      ...place(`
+        check("function", () => { const store = { batch: (fn: () => void) => fn() }; store.batch(() => {}); });
+      `),
+      ...place(`
+        declare const rows: unknown[];
+        check("array", () => { const payload = { batch: rows }; void payload; });
+      `),
+      // A fact named like the option.
+      ...place(`
+        check("fact", () => { system.compose({ schema: { facts: { batch: { enabled: true } } } }); });
+      `),
+    };
+    for (const name of ["system batch", "flag", "function", "array", "fact"]) {
+      expect(out[name]!.layer).toBe("L0");
+    }
+  });
 });

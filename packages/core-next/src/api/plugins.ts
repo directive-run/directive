@@ -5,9 +5,17 @@
  * hook, calling every plugin in registration order and logging (never
  * rethrowing) a plugin's error. It listens only while a plugin is
  * registered, so a system with none builds no records.
+ *
+ * As in 1.35 (plugins.ts:305–308), each call walks a snapshot of the list
+ * and reads the hook off the plugin object when it calls it, so a hook added
+ * after `register` fires and a deleted one stops. Its `wants_` answers the
+ * kernel's {@link Hooks.wants} the same way, reading `plugin[hook]` across
+ * the list when a record is due: one property read per plugin, nothing kept,
+ * so a record nobody's hook reads is never built.
  */
 
-import type { KernelEvent } from "../kernel.js";
+import isDevelopment from "#is-development";
+import type { EventKind, KernelEvent } from "../kernel.js";
 import type { SystemPart } from "./core.js";
 import type { Plugin } from "./types.js";
 
@@ -22,6 +30,8 @@ export interface PluginManager {
   unregister(name: string): void;
   /** Deliver a record straight to the plugins (after the kernel is gone). */
   deliver_(event: KernelEvent): void;
+  /** True when a registered plugin reads records of kind `at` now. */
+  wants_(at: EventKind): boolean;
 }
 
 declare module "../kernel.js" {
@@ -64,6 +74,22 @@ const HOOKS: Record<string, string[]> = {
   "resolver.retry": ["onResolverRetry", "resolver", "req", "attempt"],
   "resolver.cancel": ["onResolverCancel", "resolver", "req"],
   "resolver.write.rejected": ["onResolverWriteRejected", "event"],
+  // L3: system.notify, defined below.
+  "guardrail.blocked": [
+    "onGuardrailBlocked",
+    "plugin",
+    "key",
+    "kind",
+    "count",
+    "category",
+  ],
+  "guardrail.coverage": [
+    "onGuardrailCoverage",
+    "plugin",
+    "screenedCount",
+    "screenedDigest",
+    "reason",
+  ],
 };
 
 const logError = (plugin: Plugin, hook: string, error: unknown): void => {
@@ -109,6 +135,18 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
   return ({ kernel, system }) => {
     const plugins: StreamPlugin[] = [];
     let off: (() => void) | null = null;
+    const wants = (at: EventKind): boolean => {
+      const hook = HOOKS[at]?.[0];
+      if (hook) {
+        for (const plugin of plugins) {
+          if (plugin.event_ || plugin[hook]) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
     const dispatch = (event: KernelEvent): void => {
       const spec = HOOKS[event.at];
       if (!spec) {
@@ -140,9 +178,10 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
           plugins.splice(index, 1);
         }
         plugins.push(plugin);
-        off ??= kernel.hooks.on(dispatch);
+        off ??= kernel.hooks.on(Object.assign(dispatch, { wants_: wants }));
       },
       deliver_: dispatch,
+      wants_: wants,
       unregister(name) {
         const index = plugins.findIndex((p) => p.name === name);
         if (index !== -1) {
@@ -155,6 +194,59 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
       },
     };
     kernel.define("plugins", manager);
+    // 1.35's system.notify (engine.ts:2823–2880): silent once destroyed or
+    // with no plugin; a blocked report must name a registered plugin, and its
+    // re-entry through the hooks stops at depth 4.
+    let depth = 0;
+    system.notify = {
+      guardrailBlocked(
+        plugin: string,
+        key: string,
+        kind: string,
+        count: number,
+        category?: string,
+      ) {
+        if (kernel.disposed || plugins.length === 0 || depth >= 4) {
+          return;
+        }
+        if (!plugins.some((p) => p.name === plugin)) {
+          if (isDevelopment) {
+            console.warn(
+              `[Directive] system.notify.guardrailBlocked called with unknown plugin "${plugin}". Event dropped.`,
+            );
+          }
+
+          return;
+        }
+        depth++;
+        try {
+          kernel.hooks.emit("guardrail.blocked", {
+            plugin,
+            key,
+            kind,
+            count,
+            category,
+          });
+        } finally {
+          depth--;
+        }
+      },
+      guardrailCoverage(
+        plugin: string,
+        screenedCount: number,
+        screenedDigest: string,
+        reason: string,
+      ) {
+        if (!kernel.disposed && plugins.length > 0) {
+          kernel.hooks.emit("guardrail.coverage", {
+            plugin,
+            screenedCount,
+            screenedDigest,
+            reason,
+          });
+        }
+      },
+    };
     for (const plugin of initial) {
       manager.register(plugin);
     }

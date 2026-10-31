@@ -51,6 +51,12 @@ export {
   createSystem,
 } from "./api/system.js";
 export type { ErrorSource } from "./api/system.js";
+export type { Strategy as RecoveryStrategy } from "./api/core.js";
+export type {
+  ErrorBoundaryConfig,
+  ErrorHandler,
+  RetryLaterConfig,
+} from "./api/errors.js";
 export {
   RequirementSet,
   forType,

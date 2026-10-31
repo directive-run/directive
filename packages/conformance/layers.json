@@ -7330,6 +7330,66 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-clusters.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "two abort-bound resolvers started by one pass > the second may not overwrite the first's write to a fact they both bind": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "retry-later with a constraint and a resolver both waiting > each is retried as itself: the throwing constraint is asked again": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
+        "retry-later with a constraint and a resolver both waiting > a resolver that shares the constraint's name and is skipped does not stop the retry": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
+        "when() > stops asking its predicate once it has resolved": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "when() > with a timeout, resolving first means it never rejects later": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "when() that times out > rejects, and stops asking its predicate after that": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()": {
+          "layer": "L3",
+          "by": ["member .onSettledChange"]
+        },
+        "a constraint whose abortOn lists no facts > is not bound: its run is aborted when the requirement is retracted": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "stopAsync() and retry-later > a retry waiting at stopAsync() does not come back after a restart": {
+          "layer": "L3",
+          "by": ["member .stopAsync", "option error boundary", "option plugins"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle-effect-chain.test.ts": {
       "category": "black-box",
       "rule": "L3",
@@ -7401,6 +7461,18 @@
         "the retry strategy for an effect > an ordinary write gives a failing effect its retries back": {
           "layer": "L3",
           "by": ["option error boundary"]
+        },
+        "stop() and start() start the chain over > counts the chain from zero again, so a restart gets the same length as a fresh start": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "option effects",
+            "option events",
+            "option init"
+          ]
         }
       }
     },
@@ -7429,6 +7501,32 @@
         "inspect() lists the definitions > names the requirement a resolver answers, and marks a predicate": {
           "layer": "L9",
           "by": ["member .inspect"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "readiness timing > isReady is false for the whole first pass and true only once it has ended": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "readiness timing > whenReady() is one shared promise while it waits": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "readiness timing > stays ready after stop(), and a restart is still ready from its first pass": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "namespaced module onStart > every module's onStart runs on start(), in registration order": {
+          "layer": "L3",
+          "by": ["option module hooks"]
+        },
+        "namespaced module onStart > a module with no onStart does not stop the ones after it": {
+          "layer": "L3",
+          "by": ["option module hooks"]
         }
       }
     },
@@ -8584,6 +8682,26 @@
         "any and unknown > accept every value": {
           "layer": "L0",
           "by": ["import t"]
+        },
+        "each builder names its type > the scalar and format builders": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > the container builders": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > enum lists its values and literal shows its value": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > a wrapper names what it wraps": {
+          "layer": "L0",
+          "by": ["import t"]
+        },
+        "each builder names its type > a wrapper around a type with no name calls it unknown": {
+          "layer": "L0",
+          "by": ["import t"]
         }
       }
     },
@@ -8832,128 +8950,128 @@
       "pin": true,
       "tests": {
         "resolveBatchWithResults reports each item on its own > completes every item that succeeds and runs the batch once, whatever the retry policy": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > reports a failed item that carries no error as an Error": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > runs the whole batch again when every item failed, and completes them when the rerun succeeds": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > when every item fails on every attempt, runs once per attempt and reports each item failed": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > fails the whole batch when the results do not match the requirements in number": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolveBatchWithResults reports each item on its own > drops the results of a batch that was aborted while it ran": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a whole-batch failure retries the batch and reports every requirement > retries after the backoff and tells each requirement about each retry": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a whole-batch failure retries the batch and reports every requirement > when the attempts run out, errors every requirement once, with the last error": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a whole-batch failure retries the batch and reports every requirement > stops retrying when shouldRetry says no": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a whole-batch failure retries the batch and reports every requirement > does not run the batch again once a retry wait finds its requirements aborted": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a whole-batch failure retries the batch and reports every requirement > does not retry a batch that already satisfied its requirement before it failed": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
         "a batch that never settles times out > \"%s: batch.timeoutMs fails every requirement, and wins over the resolver timeout\"": {
-          "layer": "L3",
-          "by": ["option plugins"],
+          "layer": "L7",
+          "by": ["option batch resolver"],
           "dynamic": true
         },
         "a batch that never settles times out > \"%s: with no batch.timeoutMs, the resolver timeout applies\"": {
-          "layer": "L3",
-          "by": ["option plugins"],
+          "layer": "L7",
+          "by": ["option batch resolver"],
           "dynamic": true
         },
         "the batch window > by default collects requirements raised close together into one call and runs ones raised later in another": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "the batch window > windowMs holds requirements back until it has passed": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "the batch window > maxSize runs a full batch at once and leaves the rest to the window": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "the batch window > takes a retracted requirement out of the batch before it runs": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "the batch window > never runs the handler with no requirements when the only queued one is retracted": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "the batch window > settle() runs a queued batch now instead of waiting out the window": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "stopping or destroying a system ends batched work > \"%s() cancels the requirements of a queued batch and the handler never runs, even through settle()\"": {
-          "layer": "L3",
-          "by": ["option plugins"],
+          "layer": "L7",
+          "by": ["option batch resolver"],
           "dynamic": true
         },
         "stopping or destroying a system ends batched work > \"%s() aborts a batch that is running and cancels each of its requirements once\"": {
-          "layer": "L3",
-          "by": ["option plugins"],
+          "layer": "L7",
+          "by": ["option batch resolver"],
           "dynamic": true
         },
         "stopping or destroying a system ends batched work > a second stop() does not cancel a batch that the first stop() already canceled": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "stopping or destroying a system ends batched work > a batch that is running when the system stops does not take its requirement away from the new batch": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
         "retracting every requirement of a running batch aborts it > aborts the handler's signal and cancels each requirement once": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "abortOn on a batched resolver > rejects the batch's later writes to an abortOn fact that changed meanwhile": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
         "a batch that fails after it was taken away from its requirements > is not retried and reports no error when it throws because it was aborted": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "a batch that fails after it was taken away from its requirements > is canceled and its later failure dropped when its requirement comes back and a new batch takes it over": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
         "once a batch has finished > retracting its requirements later cancels nothing": {
-          "layer": "L3",
-          "by": ["option plugins"]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "once a batch has finished > \"%s() cancels nothing\"": {
-          "layer": "L3",
-          "by": ["option plugins"],
+          "layer": "L7",
+          "by": ["option batch resolver"],
           "dynamic": true
         }
       }
@@ -11986,25 +12104,16 @@
           ]
         },
         "batch resolution > resolver with batch.enabled queues requirements": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "batch resolution > processBatches executes queued batch resolvers": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "batch resolution > hasPendingBatches returns true when queued": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "resolver matching > string requirement matches by type": {
           "layer": "L2",
@@ -12285,25 +12394,16 @@
           "by": ["import flushMicrotasks"]
         },
         "batch resolver in-flight cancellation > cancel(reqId) aborts an in-flight batch via the shared controller": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "batch resolver in-flight cancellation > cancelAll() aborts every in-flight batch": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         },
         "batch resolver in-flight cancellation > in-flight cancel cleans up the reverse index so the same reqId can be re-resolved later": {
-          "layer": "L2",
-          "by": [
-            "import createResolversManager",
-            "import generateRequirementId"
-          ]
+          "layer": "L7",
+          "by": ["option batch resolver"]
         }
       }
     },

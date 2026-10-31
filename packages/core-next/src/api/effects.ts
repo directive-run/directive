@@ -9,7 +9,7 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import { type Tracker, describeDep } from "./facts.js";
+import { DERIVATION_DEP_PREFIX, type Tracker, describeDep } from "./facts.js";
 import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
@@ -27,6 +27,11 @@ export interface CreateEffectsOptions<S extends Schema> {
   wantsRunDeps?: () => boolean;
   onError?: (id: string, error: unknown) => void;
   onWriteBlocked?: (id: string, key: string) => void;
+  /**
+   * The key a declared dependency name stands for: a derivation's own dep
+   * key (1.35's resolveDeps), else the name itself, a fact key.
+   */
+  depKey?: (name: string) => string;
 }
 
 export interface EffectsManager {
@@ -39,6 +44,9 @@ export interface EffectsManager {
   disable(id: string): void;
   enable(id: string): void;
   isEnabled(id: string): boolean;
+  /** Run `id` in the next pass whatever changed (1.35's requestRerun). */
+  rerun_(id: string): void;
+  reruns_(): boolean;
 }
 
 interface EffectState {
@@ -53,6 +61,19 @@ interface EffectState {
 
 function writeMessage(id: string, key: string, inPlace?: boolean): string {
   return `[Directive] effect "${id}" ${inPlace ? `changed "${key}" in place` : `tried to write "${key}"`}. Effects only talk to the outside world and cannot change facts. Use an event handler for a change caused by input (events: { move: (facts) => { facts.${key.split(".")[0]} = … } }), a derivation for a value computed from other facts, or a resolver for work a constraint requires. For data that comes back from async work, publish it from a source or write it in a resolver. See https://directive.run/docs/effects#effects-never-write-facts`;
+}
+
+/** 1.35's isPredicate (predicate.ts:52–125): a plain object, or clauses. */
+function isPredicate(v: unknown): boolean {
+  const plain = (o: unknown) =>
+    typeof o === "object" &&
+    o !== null &&
+    !Array.isArray(o) &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(o));
+
+  return Array.isArray(v)
+    ? v.every((c) => plain(c) && "fact" in c && "op" in c)
+    : plain(v);
 }
 
 /** What `onRun` gets when `wantsRunDeps` says it will not read the list. */
@@ -121,13 +142,22 @@ export function createEffectsManager<S extends Schema>(
     (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
   );
 
+  const depKey = options.depKey ?? ((name: string) => name);
   for (const id of Object.keys(definitions)) {
-    const deps = definitions[id]?.deps as string[] | undefined;
+    const def = definitions[id];
+    const deps = def?.deps as string[] | undefined;
+    // As 1.35's initState: a data-form `on` that is no predicate is a user
+    // error, thrown rather than ignored.
+    if (!deps && def?.on !== undefined && !isPredicate(def.on)) {
+      throw new Error(
+        `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
+      );
+    }
     states.set(id, {
       id,
       enabled: true,
       explicit: Array.isArray(deps),
-      deps: Array.isArray(deps) ? new Set(deps) : null,
+      deps: Array.isArray(deps) ? new Set(deps.map(depKey)) : null,
       cleanup: null,
     });
   }
@@ -354,13 +384,17 @@ export function createEffectsManager<S extends Schema>(
       })
       .catch((error) => report(state, error));
 
+  /** Effects asked to run again, taken by the next pass's selection. */
+  const reruns = new Set<string>();
   function select(changed: Set<string>): EffectState[] {
     const out: EffectState[] = [];
+    const again = reruns.size > 0 ? new Set(reruns) : null;
+    reruns.clear();
     for (const state of states.values()) {
       if (!state.enabled) {
         continue;
       }
-      if (state.deps) {
+      if (state.deps && !again?.has(state.id)) {
         let hit = false;
         for (const key of state.deps) {
           if (changed.has(key)) {
@@ -437,6 +471,12 @@ export function createEffectsManager<S extends Schema>(
       }
     },
     isEnabled: (id) => states.get(id)?.enabled ?? false,
+    rerun_(id) {
+      if (states.has(id)) {
+        reruns.add(id);
+      }
+    },
+    reruns_: () => reruns.size > 0,
   };
 }
 
@@ -446,33 +486,67 @@ export function createEffectsManager<S extends Schema>(
  * runs. A system without this part bundles none of the manager.
  */
 export const withEffects: SystemPart = (ctx) => {
-  const { kernel, reportError } = ctx;
+  const { kernel } = ctx;
   const { hooks } = kernel;
+  /** Retries in a row per effect under "retry"; an ordinary write resets. */
+  const retries = new Map<string, number>();
+  const derivations = ctx.module.derive ?? {};
   const manager = createEffectsManager({
+    // A derivation named in `deps` wakes the effect when it goes stale, and
+    // every change upstream while it stays stale (core.ts `watched`).
+    depKey(name) {
+      if (!Object.hasOwn(derivations, name)) {
+        return name;
+      }
+      ctx.watch(name);
+
+      return DERIVATION_DEP_PREFIX + name;
+    },
     definitions: (ctx.module.effects ?? {}) as Record<string, any>,
     facts: ctx.facts,
     store: ctx.store,
     derived: ctx.derived,
     tracker: ctx.tracker,
     onRun(id) {
-      if (hooks.live) {
+      if (hooks.wants("effect.run")) {
         hooks.emit("effect.run", { id });
       }
     },
     // The hook reports the id only: no dependency list is built per run.
     wantsRunDeps: () => false,
     onError(id, error) {
-      // As in 1.35: the error boundary hears it before the effect hook.
-      reportError("effect", id, error);
-      if (hooks.live) {
+      // As in 1.35: the error boundary hears it before the effect hook, and
+      // the strategy acts after it.
+      const strategy = ctx.reportError("effect", id, error);
+      if (hooks.wants("effect.error")) {
         hooks.emit("effect.error", { id, error });
+      }
+      if (strategy === "disable") {
+        manager.disable(id);
+      }
+      if (strategy === "retry") {
+        // Bounded, as 1.35 (MAX_EFFECT_RETRIES): one that fails every time
+        // would otherwise run again for as long as the process does.
+        const attempts = (retries.get(id) ?? 0) + 1;
+        retries.set(id, attempts);
+        if (attempts <= 3) {
+          manager.rerun_(id);
+          ctx.schedule();
+        } else if (isDevelopment) {
+          console.warn(
+            `[Directive] effect "${id}" failed 3 retries in a row; it will run again on its next change.`,
+          );
+        }
       }
     },
     onWriteBlocked(id, key) {
-      if (hooks.live) {
+      if (hooks.wants("effect.write-blocked")) {
         hooks.emit("effect.write-blocked", { id, key });
       }
     },
   });
-  kernel.define("effects", manager);
+  kernel.define(
+    "effects",
+    Object.assign(manager, { fresh_: () => retries.clear() }),
+  );
 };

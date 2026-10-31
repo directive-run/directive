@@ -39,6 +39,36 @@ export const BLOCKED_PROPS: ReadonlySet<string> = Object.freeze(
   new Set(["__proto__", "constructor", "prototype"]),
 );
 
+/**
+ * 1.35's isPrototypeSafe (utils.ts:291): no blocked key at any depth of a
+ * loaded value, failing safe past depth 50. A value seen higher up the
+ * current path (a cycle) is not walked again.
+ */
+export const isPrototypeSafe = (
+  value: unknown,
+  depth = 0,
+  path = new WeakSet<object>(),
+): boolean => {
+  if (depth > 50) {
+    return false;
+  }
+  if (value === null || typeof value !== "object" || path.has(value)) {
+    return true;
+  }
+  path.add(value);
+  for (const key of Object.keys(value)) {
+    if (
+      BLOCKED_PROPS.has(key) ||
+      !isPrototypeSafe((value as Record<string, unknown>)[key], depth + 1, path)
+    ) {
+      return false;
+    }
+  }
+  path.delete(value);
+
+  return true;
+};
+
 /** Per-system tracking: what the running derivation or effect read. */
 export interface Tracker {
   /** Fact keys and `\u001F`-prefixed derivation ids read in this frame. */
@@ -179,8 +209,10 @@ export interface CreateFactsStoreOptions<S extends Schema> {
    * (validate.ts), so a store without one never bundles validation.
    */
   validator?: (key: string, value: unknown) => void;
-  onChange?: (key: string, value: unknown, prev: unknown) => void;
-  onBatch?: (changes: FactChange[]) => void;
+  /** `by`: the write's stamp (0 when unattributed). */
+  onChange?: (key: string, value: unknown, prev: unknown, by: Stamp) => void;
+  /** `by`: the stamp every change shares, else 0. */
+  onBatch?: (changes: FactChange[], by: Stamp) => void;
   onWrite?: (key: string) => void;
   onBatchStart?: () => void;
   onBatchEnd?: () => void;
@@ -234,8 +266,10 @@ export function createFactsStore<S extends Schema>(
   const changes: FactChange[] = [];
   const dirty = new Set<string>();
   let notifying = false;
-  /** Writes made while notifying: [key, value, prev]. */
-  const pending: [string, unknown, unknown][] = [];
+  /** Writes made while notifying: [key, value, prev, stamp]. */
+  const pending: [string, unknown, unknown, Stamp][] = [];
+  /** The open batch's shared stamp: -1 before its first write, 0 if mixed. */
+  let batchBy = -1;
 
   const node = (key: string): ReactiveNode => {
     let n = nodes.get(key);
@@ -263,6 +297,7 @@ export function createFactsStore<S extends Schema>(
     key?: string,
     value?: unknown,
     prev?: unknown,
+    by: Stamp = 0,
   ): void {
     notifying = true;
     try {
@@ -271,7 +306,7 @@ export function createFactsStore<S extends Schema>(
           notify(listeners, k);
         }
       } else {
-        onChange?.(key!, value, prev);
+        onChange?.(key!, value, prev, by);
         notify(listeners, key!);
       }
       notify(listeners, ALL);
@@ -285,8 +320,8 @@ export function createFactsStore<S extends Schema>(
             { [RUNAWAY]: true },
           );
         }
-        for (const [key, value, prev] of pending.splice(0)) {
-          onChange?.(key, value, prev);
+        for (const [key, value, prev, stamp] of pending.splice(0)) {
+          onChange?.(key, value, prev, stamp);
           notify(listeners, key);
         }
         notify(listeners, ALL);
@@ -301,13 +336,15 @@ export function createFactsStore<S extends Schema>(
     value: unknown,
     prev: unknown,
     type: "set" | "delete",
+    stamp: Stamp,
   ): void {
     if (batching > 0) {
       changes.push({ key, value, prev, type, origin: originOf() });
       dirty.add(key);
+      batchBy = batchBy < 0 || batchBy === stamp ? stamp : 0;
       onWrite?.(key);
     } else if (notifying) {
-      pending.push([key, value, prev]);
+      pending.push([key, value, prev, stamp]);
     } else {
       run(
         ". A listener is repeatedly mutating facts that re-trigger notifications",
@@ -315,6 +352,7 @@ export function createFactsStore<S extends Schema>(
         key,
         value,
         prev,
+        stamp,
       );
     }
   }
@@ -327,9 +365,11 @@ export function createFactsStore<S extends Schema>(
     }
     const batch = changes.splice(0);
     const keys = [...dirty];
+    const by = batchBy < 0 ? 0 : batchBy;
     dirty.clear();
+    batchBy = -1;
     if (onBatch) {
-      onBatch(batch);
+      onBatch(batch, by);
     }
     run(" during flush", keys);
   }
@@ -351,7 +391,7 @@ export function createFactsStore<S extends Schema>(
         present.add(key);
         graph.write(n, value);
         writers.record?.(key, stamp);
-        record(key, value, prev, "set");
+        record(key, value, prev, "set", stamp);
       }
     },
     delete(key: string, stamp: Stamp = 0) {
@@ -361,7 +401,7 @@ export function createFactsStore<S extends Schema>(
       // Deleting an absent key changes nothing its writer can claim.
       writers.record?.(key, had ? stamp : 0);
       graph.write(n, undefined);
-      record(key, undefined, prev, "delete");
+      record(key, undefined, prev, "delete", had ? stamp : 0);
     },
     batch(fn: () => void) {
       const outermost = !batching++;
