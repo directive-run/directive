@@ -321,7 +321,8 @@ deliberate act, made visible on the pull request:
   makes an approved difference visible may carry its entry: the PR's harness
   files may be only `diff/divergences.json`, with or without
   `harness.lock.json` (never the lock alone), and every entry it adds or
-  changes (by `id`, against the base) must have a non-empty `approvedBy`.
+  changes (by `id`, against the base) must have a non-empty `approvedBy`,
+  and a changed entry must be signed afresh (a new `approvedBy` or `date`).
   Removing an entry needs no signature, since it only tightens the oracle
   (an engine fix that closes a divergence drops its entry in the same PR).
   The label is still required, the census still

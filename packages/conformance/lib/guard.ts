@@ -18,7 +18,9 @@
  *    The harness files such a PR changes may be only diff/divergences.json,
  *    with or without harness.lock.json (the lock never changes alone), and
  *    every entry it adds or changes (same id, any field different, compared
- *    with the base) must have a non-empty `approvedBy`. Removing an entry is
+ *    with the base) must have a non-empty `approvedBy`, and a changed entry
+ *    must be signed afresh (its `approvedBy` or `date` differs from the
+ *    base's). Removing an entry is
  *    allowed: it only tightens the oracle (an engine fix that closes a
  *    divergence must drop its entry, or the entry goes stale), and the census
  *    fails the PR if the difference is still there. The census still fails an
@@ -330,6 +332,17 @@ function checkSignedDivergences(divergences?: {
     if (!signed) {
       failures.push(
         `${DIVERGENCES_FILE} ${before === undefined ? "adds" : "changes"} ${id} without approvedBy; ${why}`,
+      );
+    } else if (
+      before !== undefined &&
+      entry.approvedBy === before.approvedBy &&
+      entry.date === before.date
+    ) {
+      // A changed entry is signed afresh: an edit that keeps the old
+      // signature and date (say, dropping `op` to widen it) was never
+      // signed off.
+      failures.push(
+        `${DIVERGENCES_FILE} changes ${id} but keeps its old approvedBy and date; a changed entry needs a fresh sign-off; ${why}`,
       );
     }
   }

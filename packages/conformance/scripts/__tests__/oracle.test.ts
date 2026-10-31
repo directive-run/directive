@@ -1162,9 +1162,19 @@ describe("the oracle guard", () => {
       expect(guard(null, text(entry))).toEqual([]);
     });
 
-    it("passes a signed changed entry, and ignores key order", () => {
-      const widened = { ...entry, reason: "2.0 warns once per key and path" };
+    it("passes a changed entry signed afresh, and ignores key order", () => {
+      const widened = {
+        ...entry,
+        reason: "2.0 warns once per key and path",
+        date: "2026-11-02",
+      };
       expect(guard(text(entry), text(widened))).toEqual([]);
+      expect(
+        guard(
+          text(entry),
+          text({ ...widened, date: entry.date, approvedBy: "Jason Comes" }),
+        ),
+      ).toEqual([]);
       const { id, ...rest } = entry;
       expect(guard(text(entry), text({ ...rest, id }))).toEqual([]);
     });
@@ -1193,6 +1203,28 @@ describe("the oracle guard", () => {
       expect(
         guard(text(entry), text({ ...entry, approvedBy: "" })).join("\n"),
       ).toMatch(/changes d1 without approvedBy/);
+    });
+
+    it("fails a changed entry that keeps its old signature and date", () => {
+      const { kind: _, ...widened } = entry;
+      expect(guard(text(entry), text(widened)).join("\n")).toMatch(
+        /changes d1 but keeps its old approvedBy and date/,
+      );
+      expect(
+        guard(text(entry), text({ ...entry, reason: "wider" })).join("\n"),
+      ).toMatch(/needs a fresh sign-off/);
+    });
+
+    it("checks the added entry when one is removed or renamed", () => {
+      const { approvedBy: _, ...unsigned } = entry;
+      expect(
+        guard(text(other, entry), text(entry, { ...unsigned, id: "d9" })).join(
+          "\n",
+        ),
+      ).toMatch(/adds d9 without approvedBy/);
+      expect(
+        guard(text(entry), text({ ...unsigned, id: "d2" })).join("\n"),
+      ).toMatch(/adds d2 without approvedBy/);
     });
 
     it("passes a removed entry: removal only tightens the oracle", () => {
