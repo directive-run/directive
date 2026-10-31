@@ -5,11 +5,13 @@
  * correctness baseline only tightens, and the harness matches its lock.
  *
  * PR mode (`--pr`; .github/workflows/oracle-guard.yml): the label rule and
- * the core-next/harness path rule. It runs from the BASE branch under
- * pull_request_target and reads the head only as data through the GitHub
- * API — the changed-file list, the labels in the event payload, and
- * pnpm-lock.yaml at both ends as text. Nothing from the head is executed,
- * so a PR cannot change the rules that judge it.
+ * the core-next/harness path rule, with its signed-divergences exception. It
+ * runs from the BASE branch under pull_request_target and reads the head
+ * only as data through the GitHub API — the changed-file list, the labels in
+ * the event payload, and pnpm-lock.yaml, v2-passing.json and
+ * diff/divergences.json at both ends as text (each only when the PR changes
+ * it). Nothing from the head is executed, so a PR cannot change the rules
+ * that judge it.
  *
  * Usage: pnpm --filter @directive-run/conformance oracle:guard [--pr]
  */
@@ -17,7 +19,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { defaultRepoRoot } from "../lib/core-entries.js";
-import { checkBaseline, checkPullRequest } from "../lib/guard.js";
+import {
+  DIVERGENCES_FILE,
+  checkBaseline,
+  checkPullRequest,
+} from "../lib/guard.js";
 import { checkLock } from "../lib/harness.js";
 
 const conformanceRoot = join(defaultRepoRoot, "packages/conformance");
@@ -79,11 +85,10 @@ if (process.argv.includes("--pr")) {
     ? { base: await lockAt(pr.base.sha), head: await lockAt(pr.head.sha) }
     : undefined;
 
-  // v2-passing.json at both ends, as data (null: the base has none yet).
-  const ratchetPath = "packages/conformance/v2-passing.json";
-  const ratchetAt = async (sha: string) => {
+  // A file's text at a commit, as data (null: absent at that commit).
+  const textAt = async (path: string, sha: string) => {
     const res = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${ratchetPath}?ref=${sha}`,
+      `https://api.github.com/repos/${repo}/contents/${path}?ref=${sha}`,
       {
         headers: {
           authorization: `Bearer ${token}`,
@@ -95,20 +100,34 @@ if (process.argv.includes("--pr")) {
       return null;
     }
     if (!res.ok) {
-      throw new Error(`GitHub API contents/${ratchetPath}: ${res.status}`);
+      throw new Error(`GitHub API contents/${path}: ${res.status}`);
     }
 
     return res.text();
   };
+
+  // v2-passing.json at both ends (null base: the base has none yet).
+  const ratchetPath = "packages/conformance/v2-passing.json";
   const ratchet = changed.includes(ratchetPath)
     ? {
-        base: await ratchetAt(pr.base.sha),
-        head: (await ratchetAt(pr.head.sha)) ?? '{"tests":{}}',
+        base: await textAt(ratchetPath, pr.base.sha),
+        head: (await textAt(ratchetPath, pr.head.sha)) ?? '{"tests":{}}',
+      }
+    : undefined;
+
+  // diff/divergences.json at both ends, for rule 3's signed-entry exception.
+  const divergencesPath = `packages/conformance/${DIVERGENCES_FILE}`;
+  const divergences = changed.includes(divergencesPath)
+    ? {
+        base: await textAt(divergencesPath, pr.base.sha),
+        head: await textAt(divergencesPath, pr.head.sha),
       }
     : undefined;
 
   const labels = pr.labels.map((l) => l.name);
-  failures.push(...checkPullRequest(changed, labels, lockfile, ratchet));
+  failures.push(
+    ...checkPullRequest(changed, labels, lockfile, ratchet, divergences),
+  );
   console.log(
     `[oracle-guard] PR #${pr.number}: ${changed.length} changed files, labels: ${labels.join(", ") || "none"}`,
   );

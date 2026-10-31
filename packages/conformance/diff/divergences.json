@@ -1,1 +1,172 @@
-[]
+[
+  {
+    "id": "l2-quirk-b-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onError hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onResolverError hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onErrorRecovery hook call, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-observe-resolver-error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the resolver.error observe event, which 1.35 adds after the cancel and 2.0 does not. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-console-warn",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onError call with another run's onError call in the same step, so the difference shows as changed error (its message, source and context) instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onErrorRecovery call with another run's onErrorRecovery call in the same step, so the difference shows as changed error (its message, source and context) instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "changed",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onResolverError call with another run's onResolverError call in the same step, so the difference shows as changed resolver, requirement and error instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-observe-resolver-error-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "changed",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra resolver.error event with another run's resolver.error event in the same step, so the difference shows as changed resolver, requirement and error instead of missing. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-n-timeout-cleanup-write",
+    "scenario": "a timeout aborts the run but keeps its cleanup write",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers the one external \"aborted\" record in step 2 of this scenario: the scenario records an \"aborted\" when the resolver's signal aborts, and 2.0 records one more, at the 20ms timeout, where 1.35 records none. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  },
+  {
+    "id": "l2-quirk-n-timeout-deadline",
+    "scenario": "a timeout fires exactly at its deadline",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers the one external \"aborted\" record in step 5 of this scenario: the scenario records an \"aborted\" when the resolver's signal aborts, and 2.0 records one more, at the 20ms deadline, where 1.35 records none. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  },
+  {
+    "id": "l2-quirk-n-should-retry-why",
+    "scenario": "shouldRetry sees why each attempt aborted",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers the one external \"aborted\" record in step 2 of this scenario: the scenario records an \"aborted\" when the resolver's signal aborts, and 2.0 records one more, when the attempt times out after 15ms, where 1.35 records none. The \"shouldRetry\" record that follows it is the same on both engines. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  },
+  {
+    "id": "l2-quirk-n-fuzz-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record (the fuzz model records one when a resolver attempt's signal aborts) that 2.0 has and 1.35 does not: the record of an attempt that timed out, made when its timeout fires. Every such record in the fixed-seed run was checked: the resolver has a timeout no longer than its delay, and a retry or the timeout error follows it. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  },
+  {
+    "id": "l2-quirk-n-fuzz-aborted-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record that 1.35 has and 2.0 does not, at that position. It is the same abort moved earlier: a run is canceled after an attempt timed out. 1.35 never aborted the timed-out attempt, so its cancel aborts that attempt then; 2.0 aborted it at its timeout (the extra record), and a signal aborts once, so the cancel does not repeat it. Every such record in the fixed-seed run has its twin on 2.0 at the timeout. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  },
+  {
+    "id": "l2-quirk-n-fuzz-aborted-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[2]",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record whose attempt number differs (data[2]): the comparison pairs a run's cancel-time abort of an earlier attempt on 1.35 with the cancel-time abort of the later attempt on 2.0, because 2.0 already aborted the earlier one at its timeout. It is the same moved abort as the extra and missing entries, with the attempt number as the only difference. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-01"
+  }
+]

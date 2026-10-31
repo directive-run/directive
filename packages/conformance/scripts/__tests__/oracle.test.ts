@@ -445,7 +445,7 @@ describe("the differential project", () => {
 
     it("accepts the committed scenario layers, divergences and hook list", () => {
       expect(checkScenarioLayers(copy)).toEqual([]);
-      expect(checkDivergences(copy, new Set())).toEqual([]);
+      expect(checkDivergences(copy, null)).toEqual([]);
       expect(
         checkHooksFired(
           copy,
@@ -907,6 +907,32 @@ describe("the harness lock", () => {
       ),
     ).toMatch(/aheadOfV1\.json differs/);
   });
+
+  // An engine PR may change the lock alongside a signed divergence
+  // (lib/guard.ts rule 3). The changed-file list says no other harness file
+  // changed; this says the lock cannot claim otherwise.
+  it("rejects a lock edited for files that did not change", () => {
+    const path = join(copy, "harness.lock.json");
+    const before = readFileSync(path, "utf8");
+    const edit = (change: (files: Record<string, string>) => void) => {
+      const lock = JSON.parse(before) as { files: Record<string, string> };
+      change(lock.files);
+
+      return tampered(
+        () => writeFileSync(path, JSON.stringify(lock)),
+        () => writeFileSync(path, before),
+      );
+    };
+    expect(edit((f) => (f["diff/compare.ts"] = "0".repeat(64)))).toMatch(
+      /diff\/compare\.ts differs from harness\.lock\.json/,
+    );
+    expect(edit((f) => Reflect.deleteProperty(f, "lib/census.ts"))).toMatch(
+      /lib\/census\.ts is not in harness\.lock\.json/,
+    );
+    expect(edit((f) => (f["diff/extra.ts"] = "0".repeat(64)))).toMatch(
+      /diff\/extra\.ts is in the lock but missing/,
+    );
+  });
 });
 
 describe("the oracle guard", () => {
@@ -1102,6 +1128,178 @@ describe("the oracle guard", () => {
         [],
       ),
     ).toEqual([]);
+  });
+
+  // Rule 3's one exception (Jason, 2026-11-01): signed divergences may land
+  // with the engine change that makes them visible.
+  describe("signed divergences alongside packages/core-next", () => {
+    const engine = "packages/core-next/src/kernel.ts";
+    const div = "packages/conformance/diff/divergences.json";
+    const lock = "packages/conformance/harness.lock.json";
+    const label = ["oracle-change"];
+    const entry = {
+      id: "d1",
+      scenario: "warn-on-write",
+      stream: "warnings",
+      kind: "warning",
+      reason: "2.0 warns once per key, as approved",
+      approvedBy: "Jason",
+      date: "2026-11-01",
+    };
+    const other = { ...entry, id: "d0", kind: "error" };
+    const text = (...entries: unknown[]) => JSON.stringify(entries);
+    const guard = (
+      base: string | null,
+      head: string | null,
+      changed = [engine, div, lock],
+      labels = label,
+    ) =>
+      checkPullRequest(changed, labels, undefined, undefined, { base, head });
+
+    it("passes a signed new entry, with or without the lock", () => {
+      expect(guard(text(other), text(other, entry))).toEqual([]);
+      expect(guard(text(), text(entry), [engine, div])).toEqual([]);
+      expect(guard(null, text(entry))).toEqual([]);
+    });
+
+    it("passes a changed entry signed afresh, and ignores key order", () => {
+      const widened = {
+        ...entry,
+        reason: "2.0 warns once per key and path",
+        date: "2026-11-02",
+      };
+      expect(guard(text(entry), text(widened))).toEqual([]);
+      expect(
+        guard(
+          text(entry),
+          text({ ...widened, date: entry.date, approvedBy: "Jason Comes" }),
+        ),
+      ).toEqual([]);
+      const { id, ...rest } = entry;
+      expect(guard(text(entry), text({ ...rest, id }))).toEqual([]);
+    });
+
+    it("still needs the oracle-change label", () => {
+      expect(guard(text(), text(entry), undefined, []).join("\n")).toMatch(
+        /needs the oracle-change label/,
+      );
+    });
+
+    it("fails an unsigned new entry", () => {
+      const { approvedBy: _, ...unsigned } = entry;
+      expect(guard(text(), text(unsigned)).join("\n")).toMatch(
+        /adds d1 without approvedBy/,
+      );
+      expect(
+        guard(text(), text({ ...entry, approvedBy: " " })).join("\n"),
+      ).toMatch(/adds d1 without approvedBy/);
+    });
+
+    it("fails a changed entry whose approvedBy was removed", () => {
+      const { approvedBy: _, ...unsigned } = entry;
+      expect(guard(text(entry), text(unsigned)).join("\n")).toMatch(
+        /changes d1 without approvedBy/,
+      );
+      expect(
+        guard(text(entry), text({ ...entry, approvedBy: "" })).join("\n"),
+      ).toMatch(/changes d1 without approvedBy/);
+    });
+
+    it("fails a changed entry that keeps its old signature and date", () => {
+      const { kind: _, ...widened } = entry;
+      expect(guard(text(entry), text(widened)).join("\n")).toMatch(
+        /changes d1 but keeps its old approvedBy and date/,
+      );
+      expect(
+        guard(text(entry), text({ ...entry, reason: "wider" })).join("\n"),
+      ).toMatch(/needs a fresh sign-off/);
+    });
+
+    it("checks the added entry when one is removed or renamed", () => {
+      const { approvedBy: _, ...unsigned } = entry;
+      expect(
+        guard(text(other, entry), text(entry, { ...unsigned, id: "d9" })).join(
+          "\n",
+        ),
+      ).toMatch(/adds d9 without approvedBy/);
+      expect(
+        guard(text(entry), text({ ...unsigned, id: "d2" })).join("\n"),
+      ).toMatch(/adds d2 without approvedBy/);
+    });
+
+    it("passes a removed entry: removal only tightens the oracle", () => {
+      expect(guard(text(other, entry), text(entry))).toEqual([]);
+      expect(guard(text(other), text(), [engine, div])).toEqual([]);
+    });
+
+    it("fails divergences.json with any other harness file", () => {
+      for (const harness of [
+        "packages/conformance/diff/compare.ts",
+        "packages/conformance/diff/scenario.ts",
+        "packages/conformance/lib/census.ts",
+        "packages/conformance/lib/guard.ts",
+        "packages/conformance/scripts/census.ts",
+        "packages/conformance/layers.rules.json",
+        "packages/conformance/oracle-baseline.json",
+      ]) {
+        expect(
+          guard(text(), text(entry), [engine, div, lock, harness]).join("\n"),
+          harness,
+        ).toMatch(
+          /changes packages\/core-next and the conformance harness \(packages\/conformance\//,
+        );
+      }
+    });
+
+    it("fails harness.lock.json without divergences.json", () => {
+      expect(guard(null, null, [engine, lock]).join("\n")).toMatch(
+        /harness\.lock\.json without diff\/divergences\.json/,
+      );
+    });
+
+    it("fails closed on a head it cannot read", () => {
+      for (const [head, why] of [
+        ["[{", /not valid JSON at the head/],
+        ['{"d1": {}}', /must be an array at the head/],
+        [text({ ...entry, id: "" }), /entry 0 has no id at the head/],
+        [text(entry, entry), /duplicate id d1 at the head/],
+        [null, /deleted at the head/],
+      ] as const) {
+        expect(guard(text(), head).join("\n"), String(head)).toMatch(why);
+      }
+      expect(guard("[{", text(entry)).join("\n")).toMatch(
+        /not valid JSON at the base/,
+      );
+      expect(
+        checkPullRequest([engine, div], label, undefined, undefined).join("\n"),
+      ).toMatch(
+        /divergences\.json changed but its base and head were not provided/,
+      );
+    });
+
+    it("leaves harness-only PRs as they were", () => {
+      const { approvedBy: _, ...unsigned } = entry;
+      // The census, not the PR guard, judges entries when core-next is
+      // untouched.
+      for (const data of [
+        { base: text(entry), head: text(unsigned) },
+        { base: text(entry), head: "[{" },
+        undefined,
+      ]) {
+        expect(
+          checkPullRequest([div, lock], label, undefined, undefined, data),
+        ).toEqual([]);
+        expect(
+          checkPullRequest(
+            [div, "packages/conformance/diff/compare.ts"],
+            [],
+            undefined,
+            undefined,
+            data,
+          ).join("\n"),
+        ).toMatch(/needs the oracle-change label/);
+      }
+    });
   });
 });
 
