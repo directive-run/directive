@@ -127,6 +127,26 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       return [{ type, id: event.id, error: event.error }];
     case "effect.write-blocked":
       return [{ type, id: event.id, key: event.key }];
+    // L3: system.notify (plugins.ts), shaped as 1.35's observer shapes them.
+    case "guardrail.blocked": {
+      const { plugin, key, kind, count, category } = event;
+
+      return [
+        {
+          type,
+          plugin,
+          key,
+          kind,
+          count,
+          ...(category !== undefined ? { category } : {}),
+        },
+      ];
+    }
+    case "guardrail.coverage": {
+      const { plugin, screenedCount, screenedDigest, reason } = event;
+
+      return [{ type, plugin, screenedCount, screenedDigest, reason }];
+    }
     default:
       return [];
   }

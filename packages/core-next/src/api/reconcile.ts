@@ -64,7 +64,7 @@ export const withReconcile: SystemPart = (context) => {
   }
   const { hooks, clock, rng } = kernel;
   const emit = (at: string, data: () => Record<string, unknown>) => {
-    if (hooks.live) {
+    if (hooks.wants(at)) {
       hooks.emit(at, data());
     }
   };
