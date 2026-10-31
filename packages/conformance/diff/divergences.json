@@ -1,1 +1,103 @@
-[]
+[
+  {
+    "id": "l2-quirk-b-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onError hook call, which 1.35 adds after the cancel and 2.0 does not.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onResolverError hook call, which 1.35 adds after the cancel and 2.0 does not.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the onErrorRecovery hook call, which 1.35 adds after the cancel and 2.0 does not.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-observe-resolver-error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the resolver.error observe event, which 1.35 adds after the cancel and 2.0 does not.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-console-warn-missing",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "missing",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the default-strategy warning that the resolver threw, which 1.35 adds after the cancel and 2.0 does not.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onError call with another run's onError call in the same step, so the difference shows as changed error (its message, source and context) instead of missing.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onErrorRecovery call with another run's onErrorRecovery call in the same step, so the difference shows as changed error (its message, source and context) instead of missing.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "changed",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra onResolverError call with another run's onResolverError call in the same step, so the difference shows as changed resolver, requirement and error instead of missing.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  },
+  {
+    "id": "l2-quirk-b-observe-resolver-error-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "changed",
+    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. The comparison pairs 1.35's extra resolver.error event with another run's resolver.error event in the same step, so the difference shows as changed resolver, requirement and error instead of missing.",
+    "approvedBy": "",
+    "date": "2026-10-30"
+  }
+]
