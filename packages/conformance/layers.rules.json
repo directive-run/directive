@@ -403,6 +403,9 @@
     "tests/core/l3-engine-oracle-boundaries.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/l3-engine-oracle-own-write.test.ts": {
       "rule": "L3"
     },
