@@ -1,7 +1,7 @@
 // Ported from packages/core/src/core/__tests__/l3-small-oracle-schema-builders.test.ts by packages/conformance/scripts/port.ts.
 // Do not edit by hand: change the original and re-run the port.
 
-import { createModule, createSystem, t } from "@directive-run/core";
+import { t } from "@directive-run/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Black-box tests for the schema builders' validators: what each `t.*` type
@@ -261,55 +261,5 @@ describe("each builder names its type", () => {
     expect(nameOf(t.optional(nameless))).toBe("unknown | undefined");
     expect(nameOf(t.record(nameless))).toBe("Record<string, unknown>");
     expect(nameOf(t.tuple(nameless, t.string()))).toBe("[unknown, string]");
-  });
-});
-
-describe("a failed write names the type the fact was declared with", () => {
-  it("in the error, whichever builder declared it", async () => {
-    const facts = {
-      when: t.date(),
-      id: t.uuid(),
-      mail: t.email(),
-      site: t.url(),
-      big: t.bigint(),
-      state: t.enum("idle", "busy"),
-      kind: t.literal("user"),
-      list: t.array<string>().of(t.string()),
-      shape: t.object<{ a: string }>(),
-      maybe: t.nullable(t.string()),
-      scores: t.record(t.number()),
-      pair: t.tuple(t.string(), t.number()),
-    };
-    const system = createSystem({
-      module: createModule("m", { schema: { facts: facts as never } }),
-    } as never) as any;
-    await system.start();
-
-    const expected: Record<string, string> = {
-      when: "Date",
-      id: "uuid",
-      mail: "email",
-      site: "url",
-      big: "bigint",
-      state: "enum\\(idle\\|busy\\)",
-      kind: "literal\\(user\\)",
-      list: "array",
-      shape: "object",
-      maybe: "string \\| null",
-      scores: "Record<string, number>",
-      pair: "\\[string, number\\]",
-    };
-    for (const [key, name] of Object.entries(expected)) {
-      let message = "";
-      try {
-        system.facts[key] = 12345.5;
-      } catch (error) {
-        message = (error as Error).message;
-      }
-      expect(message, key).toMatch(
-        new RegExp(`for "${key}": expected ${name},`),
-      );
-    }
-    await system.stop();
   });
 });
