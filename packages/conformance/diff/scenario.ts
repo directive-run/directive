@@ -43,6 +43,7 @@ import {
   compareContract,
   compareFull,
   drawProblems,
+  drawnResolvers,
   interleaving,
 } from "./compare.js";
 import "./coverage.js";
@@ -737,12 +738,14 @@ export async function runScenario(
 
   const nondeterministic = compareFull(first, again, "v1 (second run)");
   // A drawn delay is incidental to the comparison but must stay in bounds,
-  // on the reference and on every engine under test.
+  // on the reference and on every engine under test: the same values the
+  // comparison masks (the reference's drawn resolvers) are checked.
+  const drawn = drawnResolvers(first);
   for (const [engine, trace] of [
     [reference.name, first],
     ...Object.entries(theirs),
   ] as [string, TraceEntry[]][]) {
-    for (const problem of drawProblems(trace)) {
+    for (const problem of drawProblems(trace, drawn)) {
       problems.push(`${engine} in scenario "${def.name}": ${problem}`);
     }
   }

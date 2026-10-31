@@ -27,12 +27,18 @@
  *
  * One kind of value is masked only because a scenario marks it: a delay
  * drawn at random by a retry's `jitter`. The scenario reports each wait as
- * `[resolverId, attempt, { $draw, min, max }]` in an `external` entry. Two
- * valid engines may draw different numbers from the same seed, so the draw
- * is advisory, as is the `duration` the engine reports when that resolver
- * completes (the sum of its waits); `drawProblems` still requires the draw,
- * and that duration, to lie inside the bounds, on every engine (the
- * reference too), and `min` and `max` are compared exactly.
+ * `[resolverId, attempt, { $draw, min, max }]` in an `external` entry (a
+ * three-element array, the marker at index 2 with exactly those three keys:
+ * `drawMarker`). Two valid engines may draw different numbers from the same
+ * seed, so the `$draw` value is advisory, as is the `duration` the engine
+ * reports when that resolver completes (the sum of its waits), in both the
+ * `onResolverComplete` hook (argument 2) and the `resolver.complete`
+ * observe event. Those are the only values masked, and `drawProblems`
+ * checks every one of them, on every engine (the reference too): the draw
+ * lies in [min, max] and each completion duration in the sum of its
+ * resolver's bounds. `min` and `max` are compared exactly. A `$draw`
+ * anywhere else is a scenario error: it is neither masked nor checked, so a
+ * marker can never hide a value that is not bounds-checked.
  */
 
 import type { Json } from "./normalize.js";
@@ -179,40 +185,107 @@ function mask(value: Json, fields: ReadonlySet<string>): Json {
 const INSPECT_FIELDS = new Set<string>(INCIDENTAL_INSPECT_FIELDS);
 const NONE = new Set<string>();
 
-/**
- * Keep shape, mask the `$draw` value of every drawn-delay marker (min and
- * max stay exact). Nothing else in the data is touched.
- */
-function maskDraws(value: Json): Json {
-  if (Array.isArray(value)) {
-    return value.map(maskDraws);
-  }
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-  const out: Record<string, Json> = {};
-  for (const [key, v] of Object.entries(value)) {
-    out[key] = key === "$draw" ? tag(v) : maskDraws(v);
-  }
-
-  return out;
-}
-
 const isObject = (v: Json | undefined): v is Record<string, Json> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** A drawn retry wait, as a scenario reports it (see the header). */
+interface DrawMarker {
+  resolver: string;
+  attempt: number;
+  draw: number;
+  min: number;
+  max: number;
+}
+
+/**
+ * The one position a `$draw` is allowed: an `external` entry whose data is
+ * exactly `[resolverId, attempt, { $draw, min, max }]`. Masking and the
+ * bounds check both start here, so they cover the same set.
+ */
+function drawMarker(entry: TraceEntry): DrawMarker | null {
+  if (
+    entry.k !== "external" ||
+    !Array.isArray(entry.data) ||
+    entry.data.length !== 3
+  ) {
+    return null;
+  }
+  const [resolver, attempt, marker] = entry.data;
+  if (
+    typeof resolver !== "string" ||
+    typeof attempt !== "number" ||
+    !isObject(marker) ||
+    Object.keys(marker).sort().join() !== "$draw,max,min"
+  ) {
+    return null;
+  }
+  const { $draw: draw, min, max } = marker;
+  if (
+    typeof draw !== "number" ||
+    typeof min !== "number" ||
+    typeof max !== "number"
+  ) {
+    return null;
+  }
+
+  return { resolver, attempt, draw, min, max };
+}
+
+/** Whether `$draw` appears as a key anywhere inside `value`. */
+function hasDraw(value: Json | undefined): boolean {
+  if (Array.isArray(value)) {
+    return value.some(hasDraw);
+  }
+  if (isObject(value)) {
+    return Object.entries(value).some(([k, v]) => k === "$draw" || hasDraw(v));
+  }
+
+  return false;
+}
+
+/** Position of the duration in `onResolverComplete(resolver, req, duration)`. */
+const HOOK_DURATION_ARG = 2;
+
+/** A resolver completion, in either stream, and the duration it reports. */
+function completion(entry: TraceEntry): {
+  via: "hook" | "observe";
+  resolver: string;
+  duration: Json | undefined;
+} | null {
+  if (
+    entry.k === "hook" &&
+    entry.hook === "onResolverComplete" &&
+    typeof entry.args[0] === "string"
+  ) {
+    return {
+      via: "hook",
+      resolver: entry.args[0],
+      duration: entry.args[HOOK_DURATION_ARG],
+    };
+  }
+  if (
+    entry.k === "observe" &&
+    isObject(entry.event) &&
+    entry.event.type === "resolver.complete" &&
+    typeof entry.event.resolver === "string"
+  ) {
+    return {
+      via: "observe",
+      resolver: entry.event.resolver,
+      duration: entry.event.duration,
+    };
+  }
+
+  return null;
+}
 
 /** Resolvers whose retry waits a scenario reports as drawn (see the header). */
 export function drawnResolvers(trace: TraceEntry[]): Set<string> {
   const out = new Set<string>();
   for (const entry of trace) {
-    if (
-      entry.k === "external" &&
-      Array.isArray(entry.data) &&
-      typeof entry.data[0] === "string" &&
-      isObject(entry.data[2]) &&
-      "$draw" in entry.data[2]
-    ) {
-      out.add(entry.data[0]);
+    const marker = drawMarker(entry);
+    if (marker) {
+      out.add(marker.resolver);
     }
   }
 
@@ -225,38 +298,46 @@ export function contract(
   drawn: ReadonlySet<string> = new Set(),
 ): Json {
   switch (entry.k) {
-    case "external":
-      return { k: "external", data: maskDraws(entry.data) };
+    case "external": {
+      // Only the checked position is masked: the marker's `$draw` value.
+      const marker = drawMarker(entry);
+      if (marker) {
+        return {
+          k: "external",
+          data: [
+            marker.resolver,
+            marker.attempt,
+            { $draw: tag(marker.draw), min: marker.min, max: marker.max },
+          ],
+        };
+      }
+
+      return mask(entry as unknown as Json, NONE);
+    }
     case "hook":
+    case "observe": {
       // How long a drawn resolver took is the sum of its drawn waits.
-      if (
-        entry.hook === "onResolverComplete" &&
-        typeof entry.args[0] === "string" &&
-        drawn.has(entry.args[0])
-      ) {
+      const done = completion(entry);
+      if (!done || !drawn.has(done.resolver)) {
+        return mask(entry as unknown as Json, NONE);
+      }
+      if (entry.k === "hook") {
         return {
           k: "hook",
           hook: entry.hook,
-          args: entry.args.map((a, i) => (i === 2 ? tag(a) : a)),
+          args: entry.args.map((a, i) =>
+            i === HOOK_DURATION_ARG ? tag(a) : a,
+          ),
         };
       }
 
-      return mask(entry as unknown as Json, NONE);
-    case "observe": {
-      const event = entry.event;
-      if (
-        isObject(event) &&
-        event.type === "resolver.complete" &&
-        typeof event.resolver === "string" &&
-        drawn.has(event.resolver)
-      ) {
-        return {
-          k: "observe",
-          event: { ...event, duration: tag(event.duration) },
-        };
-      }
-
-      return mask(entry as unknown as Json, NONE);
+      return {
+        k: "observe",
+        event: {
+          ...(entry.event as Record<string, Json>),
+          duration: tag(done.duration),
+        },
+      };
     }
     case "state":
       return mask(
@@ -287,52 +368,65 @@ export function contract(
 
 /**
  * What is still asserted of a drawn value, on every trace passed in (the
- * reference's too): each drawn-delay marker (`{ $draw, min, max }`, in an
- * `external` entry) lies inside [min, max], and so does the duration the
- * engine reports when a drawn resolver completes, against the sum of that
- * resolver's bounds.
+ * reference's too), for exactly the values `contract` masks:
+ *
+ * - each drawn-delay marker (`[resolverId, attempt, { $draw, min, max }]`)
+ *   lies inside [min, max];
+ * - the duration a drawn resolver reports when it completes lies inside the
+ *   sum of that resolver's bounds, in the `onResolverComplete` hook and in
+ *   the `resolver.complete` observe event alike (a resolver completing twice
+ *   in one stream is an error: the sum would span two chains);
+ * - a `$draw` anywhere else is an error, so it cannot be masked unchecked.
+ *
+ * `drawn` is the set `contract` masks (the reference's drawn resolvers);
+ * this trace's own drawn resolvers are checked too.
  */
-export function drawProblems(trace: TraceEntry[]): string[] {
+export function drawProblems(
+  trace: TraceEntry[],
+  drawn: ReadonlySet<string> = drawnResolvers(trace),
+): string[] {
   const out: string[] = [];
   const sums = new Map<string, [number, number]>();
+  const watched = new Set(drawn);
   for (const [index, entry] of trace.entries()) {
-    if (entry.k !== "external" || !Array.isArray(entry.data)) {
-      continue;
-    }
-    const [resolver, , marker] = entry.data;
-    if (!isObject(marker) || !("$draw" in marker)) {
-      continue;
-    }
-    const { $draw: drawn, min, max } = marker;
-    if (
-      typeof drawn !== "number" ||
-      typeof min !== "number" ||
-      typeof max !== "number" ||
-      !(min <= drawn && drawn <= max)
-    ) {
-      out.push(
-        `external #${index}: ${JSON.stringify(entry.data)} is outside [min, max]`,
-      );
-    }
-    if (typeof resolver === "string" && typeof min === "number") {
-      const sum = sums.get(resolver) ?? [0, 0];
-      sums.set(resolver, [sum[0] + min, sum[1] + (max as number)]);
-    }
-  }
-  for (const [index, entry] of trace.entries()) {
-    const event = entry.k === "observe" ? entry.event : null;
-    if (
-      isObject(event) &&
-      event.type === "resolver.complete" &&
-      typeof event.resolver === "string"
-    ) {
-      const sum = sums.get(event.resolver);
-      const took = event.duration;
-      if (sum && (typeof took !== "number" || took < sum[0] || took > sum[1])) {
+    const marker = drawMarker(entry);
+    if (!marker) {
+      if (hasDraw(entry as unknown as Json)) {
         out.push(
-          `observe #${index}: resolver "${event.resolver}" took ${JSON.stringify(took)} ms, outside its drawn waits' [${sum[0]}, ${sum[1]}]`,
+          `${entry.k} #${index}: ${JSON.stringify(entry)} has a "$draw" outside [resolverId, attempt, { $draw, min, max }] in an external entry, where it would be unchecked`,
         );
       }
+      continue;
+    }
+    watched.add(marker.resolver);
+    if (!(marker.min <= marker.draw && marker.draw <= marker.max)) {
+      out.push(
+        `external #${index}: ${JSON.stringify((entry as { data: Json }).data)} is outside [min, max]`,
+      );
+    }
+    const sum = sums.get(marker.resolver) ?? [0, 0];
+    sums.set(marker.resolver, [sum[0] + marker.min, sum[1] + marker.max]);
+  }
+  const seen = new Set<string>();
+  for (const [index, entry] of trace.entries()) {
+    const done = completion(entry);
+    if (!done || !watched.has(done.resolver)) {
+      continue;
+    }
+    const key = `${done.via} ${done.resolver}`;
+    if (seen.has(key)) {
+      out.push(
+        `${done.via} #${index}: resolver "${done.resolver}" completed more than once; its drawn waits' sum would span two chains`,
+      );
+      continue;
+    }
+    seen.add(key);
+    const [low, high] = sums.get(done.resolver) ?? [0, 0];
+    const took = done.duration;
+    if (typeof took !== "number" || took < low || took > high) {
+      out.push(
+        `${done.via} #${index}: resolver "${done.resolver}" took ${JSON.stringify(took)} ms, outside its drawn waits' [${low}, ${high}]`,
+      );
     }
   }
 
