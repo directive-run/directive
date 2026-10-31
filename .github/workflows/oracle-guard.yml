@@ -2,15 +2,20 @@ name: Oracle guard
 
 # Rules for changing the conformance oracle (packages/conformance/lib/guard.ts):
 # a PR that changes the harness needs the `oracle-change` label, and a PR that
-# touches packages/core-next may not also touch the conformance harness.
+# touches packages/core-next may not also touch the conformance harness,
+# except to add or change signed entries in diff/divergences.json (with
+# harness.lock.json), or to remove entries (removal only tightens).
 #
 # Why pull_request_target, and why it is safe here:
 # - The guard must not run the PR's own code, or a PR could rewrite the rules
 #   that judge it. pull_request_target runs this workflow, and the checkout
 #   below, from the BASE branch.
 # - The head is only ever read as data through the API: its changed-file
-#   list, the labels in the event payload, and pnpm-lock.yaml as text. It is
-#   never checked out, installed, or executed.
+#   list, the labels in the event payload, and pnpm-lock.yaml,
+#   packages/conformance/v2-passing.json and
+#   packages/conformance/diff/divergences.json as text (base and head, each
+#   only when the PR changes it). It is never checked out, installed, or
+#   executed.
 # - The token is read-only (permissions below) and no secrets are used, so
 #   there is nothing for a fork's PR to exfiltrate.
 # - labeled/unlabeled re-run the guard when the label is added or removed.
