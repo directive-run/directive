@@ -7330,6 +7330,113 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-effect-chain.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "the cut drops only what the chain carried > keeps a write that is not the chain's own": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "the cut drops only what the chain carried > drops the derivation changes the chain carried: a later unrelated write does not replay them": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what counts as a chain > a long run of ordinary writes, each answered by an effect's write, is never cut": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
+        },
+        "what counts as a chain > a chain whose every pass also carries a write made outside the effects is never cut": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "after the cut > onSettledChange hears that the system settled": {
+          "layer": "L3",
+          "by": ["member .onSettledChange"]
+        },
+        "the retry strategy for an effect > an ordinary write gives a failing effect its retries back": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-evict.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "start() while evict() is running > is ignored: the system does not start": {
+          "layer": "L10",
+          "by": ["member .evict"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-inspect.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "inspect() lists the definitions > names every fact, event, derivation, effect and module": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "inspect() lists the definitions > lists each constraint, with abortOn only when it names facts": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        },
+        "inspect() lists the definitions > names the requirement a resolver answers, and marks a predicate": {
+          "layer": "L9",
+          "by": ["member .inspect"]
+        }
+      }
+    },
+    "tests/core/l3-engine-oracle-own-write.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "runs retracted together in one pass > each is satisfied by the others' writes as well as its own": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "runs retracted together in one pass > a run that wrote nothing is canceled, whoever else made its requirement go away": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "onReconcileEnd > reports a run the pass canceled by its requirement id, and what is in flight": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "onReconcileEnd > lists a retracted requirement whose run is no longer in flight, with a resolver id": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle.test.ts": {
       "category": "black-box",
       "rule": "L3",
