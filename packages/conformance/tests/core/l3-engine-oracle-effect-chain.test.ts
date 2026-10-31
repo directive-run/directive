@@ -20,6 +20,8 @@
  * - After the cut the system reports that it settled.
  * - A failing effect under "retry" is retried three times in a row, and an
  *   ordinary write gives it its retries back.
+ * - stop() and start() start the chain over: a chain stopped partway and
+ *   restarted gets as many runs before the cut as one that started fresh.
  *
  * The exact chain bound and warning text are not contracts; the tests find
  * the pass the cut lands on by probing, and never pin how long a chain runs.
@@ -466,5 +468,85 @@ describe("the retry strategy for an effect", () => {
 
     expect(runs - first).toBe(first);
     await system.stop();
+  });
+});
+
+describe("stop() and start() start the chain over", () => {
+  /**
+   * `echo` keeps dispatching `bump` while n > 0, and stops the system, from
+   * inside its own run, when n reaches `stopAt`. `cutAt` is the number of
+   * `echo` runs when the chain-cut warning was printed.
+   */
+  function echoSystem(stopAt: number | null) {
+    const counts = { echo: 0, cutAt: -1 };
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number() }, events: { bump: {} } },
+      init: (facts) => {
+        facts.n = 0;
+      },
+      events: {
+        bump: (facts) => {
+          facts.n = facts.n + 1;
+        },
+      },
+      effects: {
+        echo: {
+          run: (facts) => {
+            if (facts.n > 0 && counts.cutAt < 0) {
+              counts.echo++;
+              if (facts.n === stopAt) {
+                system.stop();
+              }
+              system.events.bump();
+            }
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod });
+    onCutWarning(() => {
+      counts.cutAt = counts.echo;
+    });
+
+    return { system, counts };
+  }
+
+  it("counts the chain from zero again, so a restart gets the same length as a fresh start", async () => {
+    // A chain that is never interrupted: how many `echo` runs it gets.
+    const fresh = echoSystem(null);
+    fresh.system.start();
+    fresh.system.events.bump();
+    for (let i = 0; i < 40 && fresh.counts.cutAt < 0; i++) {
+      await tick();
+    }
+    const freshRuns = fresh.counts.cutAt;
+    expect(freshRuns).toBeGreaterThan(20);
+    fresh.system.destroy();
+    vi.restoreAllMocks();
+
+    // The same chain, stopped from inside `echo` partway along.
+    const stopAt = Math.floor(freshRuns / 2);
+    const c = echoSystem(stopAt);
+    c.system.start();
+    c.system.events.bump();
+    for (let i = 0; i < 20 && c.system.isRunning; i++) {
+      await tick();
+    }
+    expect(c.system.isRunning).toBe(false);
+    expect(c.counts.cutAt).toBe(-1);
+    const before = c.counts.echo;
+    expect(before).toBe(stopAt);
+
+    c.system.start();
+    for (let i = 0; i < 40 && c.counts.cutAt < 0; i++) {
+      await tick();
+    }
+
+    // The restarted chain is cut: it is not left running for ever ...
+    expect(c.counts.cutAt).toBeGreaterThan(-1);
+    // ... and it gets as many runs as a chain that started fresh, not what
+    // was left of the one that was stopped.
+    expect(c.counts.cutAt - before).toBe(freshRuns);
+    c.system.destroy();
   });
 });

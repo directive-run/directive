@@ -7461,6 +7461,18 @@
         "the retry strategy for an effect > an ordinary write gives a failing effect its retries back": {
           "layer": "L3",
           "by": ["option error boundary"]
+        },
+        "stop() and start() start the chain over > counts the chain from zero again, so a restart gets the same length as a fresh start": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "option effects",
+            "option events",
+            "option init"
+          ]
         }
       }
     },
