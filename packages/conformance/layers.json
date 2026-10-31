@@ -7330,6 +7330,63 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-effect-chain.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "the cut drops only what the chain carried > keeps a write that is not the chain's own": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "the cut drops only what the chain carried > drops the derivation changes the chain carried: a later unrelated write does not replay them": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .events",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option events",
+            "option init"
+          ]
+        },
+        "what counts as a chain > a long run of ordinary writes, each answered by an effect's write, is never cut": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
+        },
+        "what counts as a chain > a chain whose every pass also carries a write made outside the effects is never cut": {
+          "layer": "L3",
+          "by": ["option plugins"]
+        },
+        "after the cut > onSettledChange hears that the system settled": {
+          "layer": "L3",
+          "by": ["member .onSettledChange"]
+        },
+        "the retry strategy for an effect > an ordinary write gives a failing effect its retries back": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle-evict.test.ts": {
       "category": "black-box",
       "rule": "L3",
