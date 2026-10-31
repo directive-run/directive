@@ -21,6 +21,7 @@
  */
 
 import isDevelopment from "#is-development";
+import { createClock } from "../clock.js";
 import { Flags, Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
@@ -126,6 +127,8 @@ export interface SystemContext {
     sourceId: string,
     error: unknown,
     context?: unknown,
+    /** A run that failed after its own write satisfied its requirement. */
+    satisfied?: boolean,
   ): void;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
@@ -152,7 +155,7 @@ export interface SystemContext {
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
-export type SystemPart = (ctx: SystemContext) => void;
+export type SystemPart = (context: SystemContext) => void;
 
 /** The effects feature as the reconcile pass drives it. */
 export interface EffectsFeature {
@@ -179,6 +182,13 @@ export interface ReconcileFeature {
   stop_(): void;
   /** The settle-timeout details, around the core's own. */
   details_(core: string[]): string[];
+  /** inspect()'s L2 sections, as 1.35 reports them. */
+  inspect_(): {
+    unmet: RequirementWithId[];
+    inflight: { id: string; resolverId: string; startedAt: number }[];
+    constraints: Record<string, unknown>[];
+    resolvers: Record<string, Record<string, unknown>>;
+  };
 }
 
 declare module "../kernel.js" {
@@ -272,7 +282,14 @@ export function createSystemCore<const M extends ModuleSchema>(
   const deriveDefs = defsOf(module.derive, "compute");
   const eventDefs = defsOf(module.events, "handler");
 
-  const kernel = createKernel(kernelOptions);
+  // 1.35 reports wall-clock times (a run's startedAt, a constraint's
+  // lastActiveAt): a system's own real clock reads Date.now, as the timer
+  // facts' default clock does (api/clock.ts).
+  const kernel = createKernel(
+    kernelOptions?.clock || kernelOptions?.parent
+      ? kernelOptions
+      : { ...kernelOptions, clock: createClock({ now: () => Date.now() }) },
+  );
   const { graph, hooks, clock } = kernel;
   const features = kernel.features as {
     effects?: EffectsFeature;
@@ -313,12 +330,22 @@ export function createSystemCore<const M extends ModuleSchema>(
   let writtenByEffect = false;
   let writtenElsewhere = false;
   let chain = 0;
+  /** 1.35 starts a chain over on start() and stop(). */
+  const resetChain = () => {
+    chain = 0;
+    chainKeys = null;
+    writtenByEffect = writtenElsewhere = false;
+  };
   /** The keys the chain's previous pass started with; null outside a chain. */
   let chainKeys: Set<string> | null = null;
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
-  /** A part asked for a pass while one ran (a run ended, `enable()`). */
+  /**
+   * A part asked for a pass while one ran (a run ended, `enable()`), on a
+   * lane other than `micro`. On `micro` the ask is 1.35's scheduleReconcile:
+   * dropped if its microtask finds the pass still open.
+   */
   let again = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
@@ -541,6 +568,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     sourceId: string,
     error: unknown,
     context?: unknown,
+    satisfied = false,
   ): void {
     const wrapped =
       error instanceof DirectiveError
@@ -565,8 +593,19 @@ export function createSystemCore<const M extends ModuleSchema>(
       const key = `${source}:${sourceId}`;
       if (option && !warned.has(key)) {
         warned.add(key);
+        // As 1.35: the first 1000 sources are remembered, then the oldest goes.
+        if (warned.size > 1000) {
+          warned.delete(warned.values().next().value!);
+        }
+        const type = (
+          context as { requirement?: { type?: unknown } } | undefined
+        )?.requirement?.type;
+        const consequence =
+          source === "resolver" && typeof type === "string" && !satisfied
+            ? ` Requirement "${type}" stays unmet.`
+            : "";
         console.warn(
-          `[Directive] ${source} "${sourceId}" threw: ${messageOf(error).replace(/[.!?]+\s*$/, "")}. The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
+          `[Directive] ${source} "${sourceId}" threw: ${messageOf(error).replace(/[.!?]+\s*$/, "")}.${consequence} The default error strategy skips it silently. Configure errorBoundary.${option} (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.`,
         );
       }
     }
@@ -866,6 +905,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       system.initialize();
       running = true;
+      resetChain();
       features.reconcile?.start_();
       emit("system.start", { system });
       scheduleReconcile();
@@ -873,12 +913,17 @@ export function createSystemCore<const M extends ModuleSchema>(
     stop() {
       if (running) {
         running = false;
+        resetChain();
         features.reconcile?.stop_();
         features.effects?.cleanupAll();
         emit("system.stop", { system });
         // A settle() waiting on the runs just ended hears that they did.
         notifySettle();
       }
+    },
+    /** 1.35's async stop (RFC 0009): nothing to await before sources (L5). */
+    async stopAsync() {
+      system.stop();
     },
     destroy() {
       if (destroyed) {
@@ -1034,7 +1079,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       };
     },
   };
-  const ctx: SystemContext = {
+  const context: SystemContext = {
     kernel,
     module,
     system,
@@ -1044,7 +1089,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     tracker,
     reportError,
     schedule() {
-      again = true;
+      again = kernel.lane !== "micro";
       scheduleReconcile();
     },
     settled: notifySettle,
@@ -1062,7 +1107,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     derivationDeps: (id) => derivations.get(id)?.deps_,
   };
   for (const part of parts) {
-    part(ctx);
+    part(context);
   }
 
   return system as unknown as System<M>;

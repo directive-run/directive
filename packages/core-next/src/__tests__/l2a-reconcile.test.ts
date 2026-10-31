@@ -11,7 +11,6 @@ import { createModule, createSystemCore } from "../api/core.js";
 import { withPlugins } from "../api/plugins.js";
 import { withReconcile } from "../api/reconcile.js";
 import { t } from "../api/schema-builders.js";
-import { isTimeout } from "../api/timeout.js";
 import { createVirtualClock } from "../clock.js";
 import { createScheduler } from "../scheduler.js";
 
@@ -172,8 +171,10 @@ describe("quirk b: exactly one outcome per run", () => {
     system.start();
     system.facts.want = true;
     await flush();
+    // As 1.35's withTimeout: a plain timer, cleared when the race settles,
+    // not by stop or destroy (the fuzz harness counts timers at teardown).
     const timeout = clock.timers().find((tm) => tm.kind === "timeout");
-    expect(timeout?.owner).toBeGreaterThan(0);
+    expect(timeout?.owner).toBe(0);
     clock.advanceTo(60);
     await flush();
     expect(log).toMatchObject({ errors: 1, canceled: 0, completed: 0 });
@@ -218,7 +219,7 @@ describe("quirk b: exactly one outcome per run", () => {
     });
   }
 
-  it("a timeout aborts the run's signal, reports one error and keeps its later writes", async () => {
+  it("a timeout leaves the run's signal alone, reports one error and keeps its later writes (1.35)", async () => {
     const { log, plugin } = outcomes();
     const g = gate();
     let signal: AbortSignal | undefined;
@@ -251,13 +252,15 @@ describe("quirk b: exactly one outcome per run", () => {
     expect(signal?.aborted).toBe(false);
     clock.advanceTo(60);
     await flush();
-    expect(signal?.aborted).toBe(true);
-    expect(isTimeout(signal?.reason)).toBe(true);
+    // 1.35: withTimeout never touches the run's controller, so the body is
+    // not told (aborting it is a candidate quirk, not built).
+    expect(signal?.aborted).toBe(false);
     expect(log.order).toEqual(["start", "error"]);
     // The body's cleanup write after the timeout lands (only supersede drops).
     g.open();
     await flush();
     expect(system.facts.n).toBe(-1);
+    expect(signal?.aborted).toBe(false);
     expect(log.order).toEqual(["start", "error"]);
     system.destroy();
   });
@@ -464,6 +467,139 @@ describe("zero cost when unused", () => {
     const { system } = build({}, { name: "none" });
     system.start();
     expect(system.constraints).toBeUndefined();
+    system.destroy();
+  });
+});
+
+describe("passes follow each settled run, microtask for microtask (1.35)", () => {
+  // Fix round of #272 (DIFF_FUZZ_SEED=1): two runs dispatched in one pass,
+  // one completes and one throws. 1.35 reports the error two microtasks
+  // later than the completion (processRetryError, handleRetryError), and
+  // each run asks for its pass as it leaves flight, so each gets its own.
+  it("a completion and an error get a pass each", async () => {
+    const order: string[] = [];
+    const plugin = {
+      name: "order",
+      onReconcileStart: () => order.push("pass"),
+      onRequirementMet: () => order.push("met"),
+      onResolverError: () => order.push("error"),
+    };
+    const { system } = build(
+      {
+        constraints: {
+          a: { when: (f: any) => f.n >= 0, require: { type: "A" } },
+          b: { when: (f: any) => f.n >= 0, require: { type: "B" } },
+        },
+        resolvers: {
+          a: { requirement: "A", resolve: async () => {} },
+          b: {
+            requirement: "B",
+            resolve: async () => {
+              throw new Error("b");
+            },
+          },
+        },
+      },
+      plugin,
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    system.start();
+    await flush();
+    expect(order).toEqual(["pass", "met", "pass", "error", "pass"]);
+    system.destroy();
+  });
+
+  // Fix round of #272: a run that leaves flight while a pass awaits an async
+  // constraint asks for a pass whose microtask finds that pass still open,
+  // so 1.35 drops it; no extra pass, so no extra constraint hits.
+  it("a run that ends while a pass is open asks for no extra pass", async () => {
+    const g = gate();
+    let passes = 0;
+    /** Times each constraint was found active: inspect()'s hitCount. */
+    const hits: Record<string, number> = {};
+    const plugin = {
+      name: "count",
+      onReconcileStart: () => passes++,
+      onConstraintEvaluate: (id: string, active: boolean) => {
+        if (active) {
+          hits[id] = (hits[id] ?? 0) + 1;
+        }
+      },
+    };
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { system } = build(
+      {
+        constraints: {
+          // No deps: evaluated in every pass (it warns in development).
+          slow: {
+            async: true,
+            when: async (f: any) => {
+              await g.promise;
+
+              return f.want;
+            },
+            require: { type: "SLOW" },
+          },
+          fast: { when: (f: any) => f.go, require: { type: "FAST" } },
+        },
+        resolvers: {
+          slow: { requirement: "SLOW", resolve: async () => {} },
+          fast: {
+            requirement: "FAST",
+            resolve: async () => {
+              await g.promise;
+            },
+          },
+        },
+      },
+      plugin,
+    );
+    system.start();
+    system.facts.want = true;
+    system.facts.go = true;
+    await flush();
+    system.facts.go = false;
+    await flush();
+    g.open();
+    await flush();
+    await flush();
+    expect({ passes, hits }).toEqual({ passes: 2, hits: { slow: 2, fast: 1 } });
+    system.destroy();
+  });
+});
+
+describe("affected constraints are evaluated in 1.35's order", () => {
+  // Fix round of #272 (fuzz seed 24301, case 30): 1.35's updateDependencies
+  // leaves the key index alone when a constraint's deps are unchanged, so
+  // only a constraint whose deps changed moves to the end of a key's set.
+  it("a constraint whose deps changed is evaluated after the unchanged ones", async () => {
+    const order: string[] = [];
+    const plugin = {
+      name: "order",
+      onConstraintEvaluate: (id: string) => order.push(id),
+    };
+    const { system } = build(
+      {
+        constraints: {
+          c0: { when: (f: any) => f.n < 0, require: { type: "X" } },
+          // Reads `want` only once n >= 1: its deps change in the second pass.
+          c1: { when: (f: any) => f.n >= 1 && f.want, require: { type: "X" } },
+          c2: { when: (f: any) => f.n < 0, require: { type: "X" } },
+        },
+        resolvers: {},
+      },
+      plugin,
+    );
+    system.start();
+    await flush();
+    order.push("|");
+    system.facts.n = 1;
+    await flush();
+    order.push("|");
+    system.facts.n = 2;
+    await flush();
+    expect(order.join(" ")).toBe("c0 c1 c2 | c0 c1 c2 | c0 c2 c1");
     system.destroy();
   });
 });

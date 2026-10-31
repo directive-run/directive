@@ -51,6 +51,18 @@ export {
   createSystem,
 } from "./api/system.js";
 export type { ErrorSource } from "./api/system.js";
+export {
+  RequirementSet,
+  forType,
+  generateRequirementId,
+  isRequirementType,
+  req,
+} from "./api/requirements.js";
+export type {
+  Requirement,
+  RequirementKeyFn,
+  RequirementWithId,
+} from "./api/requirements.js";
 export { t } from "./api/schema-builders.js";
 export type * from "./api/schema-builders.js";
 export type * from "./api/types.js";
