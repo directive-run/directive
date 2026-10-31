@@ -98,11 +98,6 @@ export interface Hooks {
    */
   on(fn: Listener): () => void;
   /**
-   * True while anything listens on the sink: an emitter can skip building
-   * an expensive record nobody reads.
-   */
-  readonly live: boolean;
-  /**
    * True when a record of kind `at` has a reader now: a listener without
    * `wants_`, or one whose `wants_(at)` says yes. Asked when the record is
    * due, never cached, so a reader that changes its mind is heard at once.
@@ -295,9 +290,6 @@ export function createKernel(options: KernelOptions = {}): Kernel {
 
   const hooks: SinkHooks = {
     sink_: sink,
-    get live() {
-      return sink.listeners.length > 0;
-    },
     wants(at) {
       const list = sink.listeners;
       for (let i = 0; i < list.length; i++) {
