@@ -613,8 +613,7 @@ export function createFactsProxy<S extends Schema>(
       if (isDevelopment) {
         const nonJson = detectNonJsonValueType(value);
         if (nonJson) {
-          // A module's fact by its module-qualified name, `ns.key` (o).
-          warnNonJson(warned, prop.replace("::", "."), nonJson);
+          warnNonJson(warned, prop, nonJson);
         }
       }
       s.set(prop, value, stamp);

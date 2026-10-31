@@ -7,7 +7,6 @@
  * - (p) Under "retry-later" a due entry re-dispatches each requirement it
  *   recorded that is still raised (1.35 never runs the resolver again), at
  *   most `maxRetries` times in a row per requirement.
- * - (o) A non-JSON write through a module warns once, by `module.key`.
  *
  * (q) and (r) are pinned beside their 1.35 neighbours (l3c, l3a).
  */
@@ -20,7 +19,6 @@ import { withPlugins } from "../api/plugins.js";
 import { withReconcile } from "../api/reconcile.js";
 import { createResolvers } from "../api/resolvers.js";
 import { t } from "../api/schema-builders.js";
-import { createSystem } from "../api/system.js";
 import { createVirtualClock } from "../clock.js";
 import { createScheduler } from "../scheduler.js";
 
@@ -379,68 +377,6 @@ describe("(p) approved: retry-later re-dispatches the resolver", () => {
     // It completed, and that dropped the entry: no third run.
     expect(calls).toBe(2);
     system.destroy();
-  });
-});
-
-describe("(o) approved: a non-JSON write through a module warns once", () => {
-  it("by the module-qualified name, never the internal separator, from a module's facts and a resolver's", async () => {
-    const warns: string[] = [];
-    vi.spyOn(console, "warn").mockImplementation((m: unknown) => {
-      warns.push(String(m).split("\n")[0]!);
-    });
-    const mod = createModule("mod", {
-      schema: {
-        facts: { d: t.object(), m: t.object(), go: t.boolean() },
-        requirements: { SET: {} },
-      },
-      init: (f: any) => {
-        f.d = {};
-        f.m = {};
-        f.go = false;
-      },
-      constraints: {
-        c: { when: (f: any) => f.go, require: { type: "SET" } },
-      },
-      resolvers: {
-        set: {
-          requirement: "SET",
-          resolve: async (_req: unknown, ctx: any) => {
-            ctx.facts.m = new Map();
-            ctx.facts.go = false;
-          },
-        },
-      },
-    } as never);
-    const sys: any = createSystem({ modules: { mod } } as never);
-    sys.start();
-    sys.facts.mod.d = new Date();
-    sys.facts.mod.go = true;
-    await sys.settle();
-    expect(warns.filter((w) => w.includes("instance"))).toEqual([
-      '[Directive] Fact "mod.d" assigned a Date instance.',
-      '[Directive] Fact "mod.m" assigned a Map instance.',
-    ]);
-    expect(warns.some((w) => w.includes("::"))).toBe(false);
-    sys.destroy();
-  });
-
-  it("a single module's fact keeps its plain name", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const sys: any = createSystem({
-      module: createModule("solo", {
-        schema: { facts: { s: t.object() } },
-        init: (f: any) => {
-          f.s = {};
-        },
-      }),
-    } as never);
-    sys.start();
-    sys.facts.s = new Set();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]![0])).toContain(
-      'Fact "s" assigned a Set instance.',
-    );
-    sys.destroy();
   });
 });
 
