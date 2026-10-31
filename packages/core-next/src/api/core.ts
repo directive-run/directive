@@ -29,6 +29,7 @@ import {
   createKernel,
 } from "../kernel.js";
 import {
+  type Allow,
   BLOCKED_PROPS,
   DERIVATION_DEP_PREFIX,
   LOCKED,
@@ -138,8 +139,11 @@ export interface SystemContext {
   settled(): void;
   /** The store reports each changing write and its stamp here (reconcile). */
   readonly writers: Writers;
-  /** A facts view whose writes carry `writer`'s stamp (a resolver run). */
-  factsFor(writer: Writer): Facts<Schema>;
+  /**
+   * A facts view whose writes carry `writer`'s stamp (a resolver run), each
+   * asked of `allow` first when the run is bound (RFC-0003).
+   */
+  factsFor(writer: Writer, allow?: Allow): Facts<Schema>;
   /**
    * What a derivation read when it last computed: fact keys and prefixed
    * derivation ids (own-write satisfaction follows them to the facts).
@@ -1023,13 +1027,14 @@ export function createSystemCore<const M extends ModuleSchema>(
     settled: notifySettle,
     watch: (id) => watched.add(id),
     writers,
-    factsFor: (writer) =>
+    factsFor: (writer, allow) =>
       createFactsProxy(
         store,
         schema,
         tracker,
         nonJson,
         writer,
+        allow,
       ) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
   };

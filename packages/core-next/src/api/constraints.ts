@@ -43,6 +43,8 @@ export interface ConstraintDef {
   async?: boolean;
   deps?: string[];
   timeout?: number;
+  /** RFC-0003: the facts its resolver's run is bound to (reconcile.ts). */
+  abortOn?: readonly string[];
 }
 
 export interface ConstraintsOptions {
@@ -67,6 +69,8 @@ export interface Constraints {
   unaffected(changed: Set<string>): RequirementWithId[] | null;
   /** What the constraint read last time: fact keys and prefixed derivation ids. */
   depsOf(id: string): Set<string> | undefined;
+  /** Declared async, or found async when its `when` returned a promise. */
+  isAsync(id: string): boolean;
   /** A requirement's run completed: it no longer holds back dependents. */
   markResolved(req: RequirementWithId): void;
   /** A requirement left the set: if it is asked again, it must resolve again. */
@@ -521,6 +525,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       return into.size === 0 ? EMPTY : [...into.values()];
     },
     depsOf: (id) => deps.get(id),
+    isAsync: (id) => asyncIds.has(id),
     markResolved(req) {
       met.add(req.id);
       // As 1.35, the asking constraint's dependents are asked again; so are

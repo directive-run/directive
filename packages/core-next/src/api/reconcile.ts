@@ -15,8 +15,10 @@
  * 3. `commit_` (same continuation as the core's pass end): diff against the
  *    previous set. A removed requirement whose run's own writes were the
  *    only change to what its constraint read is satisfied (RFC row 1); any
- *    other is canceled. Each added one is dispatched, then requeues are
- *    applied; answers the `onReconcileEnd` result.
+ *    other is canceled, or detached when its constraint is bound (RFC-0003).
+ *    Each added one is dispatched with one baseline of the bound keys, read
+ *    before any of them starts, then requeues are applied; answers the
+ *    `onReconcileEnd` result.
  *
  * Follow-up passes (a run ended, a requeue, `enable()`) go through the core's
  * `schedule`, which asks the kernel's scheduler, so systems sharing one
@@ -24,6 +26,7 @@
  * resolvers defines no feature, so its pass is the L1 pass.
  */
 
+import isDevelopment from "#is-development";
 import { type ConstraintDef, createConstraints } from "./constraints.js";
 import type { ReconcileFeature, SystemPart } from "./core.js";
 import { DERIVATION_DEP_PREFIX } from "./facts.js";
@@ -64,6 +67,44 @@ export const withReconcile: SystemPart = (context) => {
     }
   }
   const derivationIds = new Set(Object.keys(module.derive ?? {}));
+  /** Some constraint lists `abortOn` keys: only then is a baseline read. */
+  const bindings = Object.values(constraintDefs).some(
+    (def) => (def?.abortOn?.length ?? 0) > 0,
+  );
+  /** `id::reason` pairs already reported as binding disabled (1.35). */
+  const disabledBinding = new Set<string>();
+  /**
+   * 1.35's getConstraintBinding: the constraint's `abortOn` keys, unless it
+   * is async (declared, or found async at runtime). An async constraint
+   * awaits between its answer and the dispatch, so it cannot be bound; that
+   * is reported once per constraint and reason.
+   */
+  const bindingOf = (req: RequirementWithId): readonly string[] | undefined => {
+    const id = req.fromConstraint;
+    const def = bindings && id ? constraintDefs[id] : undefined;
+    const keys = def?.abortOn;
+    if (!keys || keys.length === 0) {
+      return undefined;
+    }
+    if (!def.async && !constraints.isAsync(id!)) {
+      return keys;
+    }
+    const reason = def.async ? "async-declared" : "async-promoted";
+    const once = `${id}::${reason}`;
+    if (!disabledBinding.has(once)) {
+      disabledBinding.add(once);
+      if (isDevelopment) {
+        console.warn(
+          reason === "async-promoted"
+            ? `[Directive] constraint '${id}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+            : `[Directive] Constraint "${id}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound. To enable abortOn, switch to a synchronous function-form when or a data-form when (always sync), and drop \`async: true\`.`,
+        );
+      }
+      emit("constraint.binding.disabled", () => ({ id, reason }));
+    }
+
+    return undefined;
+  };
   const constraints = createConstraints({
     defs: constraintDefs,
     facts: context.facts,
@@ -100,6 +141,8 @@ export const withReconcile: SystemPart = (context) => {
     defs: resolverDefs,
     store: context.store,
     factsFor: context.factsFor,
+    peek: (key) => context.store.get(key),
+    bindingOf,
     clock,
     owner: kernel.owner,
     // The kernel's seeded rng when it has one; else the host's, read at
@@ -118,11 +161,12 @@ export const withReconcile: SystemPart = (context) => {
       }));
       constraints.markResolved(run.req_);
       if (!previous.has(run.req_.id)) {
-        // A satisfied run: its requirement left the set already, so if it
-        // is asked again it must resolve again.
+        // A satisfied or detached run: its requirement left the set
+        // already, so if it is asked again it must resolve again.
         constraints.forget(run.req_.id);
-        if (constraints.hasDirty()) {
-          // Its `after` dependents are asked again (1.35).
+        if (!run.detached_ && constraints.hasDirty()) {
+          // Its `after` dependents are asked again (1.35). A detached run's
+          // end asks for no pass in 1.35.
           schedule();
         }
       }
@@ -164,9 +208,10 @@ export const withReconcile: SystemPart = (context) => {
   let closed = new Map<string, number | number[]>();
   if (Object.keys(resolverDefs).length > 0) {
     context.writers.record = (key, stamp) => {
-      // As 1.35: a write counts only while a run is in flight. One made with
-      // none (a plugin writing before the first run starts) is nobody's.
-      if (resolvers.inflight.size === 0) {
+      // As 1.35: a write counts only while a run is in flight (or detached
+      // and still going). One made with none (a plugin writing before the
+      // first run starts) is nobody's.
+      if (resolvers.inflight.size === 0 && resolvers.detached.size === 0) {
         return;
       }
       const by = open.get(key);
@@ -254,6 +299,8 @@ export const withReconcile: SystemPart = (context) => {
       }
     }
     for (const req of removed) {
+      // Looked up first, as 1.35 does: it may report a disabled binding.
+      const bound = bindingOf(req);
       const run = runFor(req.id);
       if (run && joint.size > 0 && satisfied(run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
@@ -265,6 +312,11 @@ export const withReconcile: SystemPart = (context) => {
         // Ended in this pass, not by its own write: its outcome stands
         // (one per run). 1.35 would cancel it as well.
         ended.delete(req.id);
+      } else if (bound) {
+        // RFC-0003: not aborted, so its data writes land (the binding still
+        // drops a clobbered key); out of flight, so the requirement can be
+        // dispatched again.
+        resolvers.detach(req.id);
       } else {
         resolvers.abort(req.id);
       }
@@ -318,9 +370,25 @@ export const withReconcile: SystemPart = (context) => {
       if (removed.length > 0) {
         retract(removed, passKeys);
       }
+      // One baseline for every run this pass dispatches, read before the
+      // first starts: a run's synchronous write to a key a later sibling is
+      // bound to is then a clobber for that sibling (1.35). Only the bound
+      // keys are read, and nothing at all without a binding.
+      let baseline: Record<string, unknown> | undefined;
+      if (bindings) {
+        for (const req of added) {
+          const keys = bindingOf(req);
+          if (keys) {
+            baseline ??= Object.create(null) as Record<string, unknown>;
+            for (const key of keys) {
+              baseline[key] = context.store.get(key);
+            }
+          }
+        }
+      }
       for (const req of added) {
         if (system.isRunning) {
-          resolvers.resolve(req);
+          resolvers.resolve(req, baseline);
         } else {
           // Stopped while this pass waited: left for start() to dispatch.
           next.delete(req.id);

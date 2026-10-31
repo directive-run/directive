@@ -62,6 +62,12 @@ export interface Writers {
   record: ((key: string, stamp: Stamp) => void) | null;
 }
 
+/**
+ * RFC-0003 binding: asked before a run's write to `key` lands (a delete
+ * passes `undefined`); false drops it (a clobber).
+ */
+export type Allow = (key: string, value: unknown) => boolean;
+
 /** A facts view whose writes carry one stamp (a resolver run). */
 export interface Writer {
   readonly stamp_: Stamp;
@@ -512,6 +518,7 @@ export function createFactsProxy<S extends Schema>(
   tracker: Tracker = { deps: null },
   warned: Set<string> = new Set(),
   writer?: Writer,
+  allow?: Allow,
 ): Facts<S> {
   const stamp = writer ? writer.stamp_ : 0;
   const nested = new WeakMap<object, object>();
@@ -559,6 +566,10 @@ export function createFactsProxy<S extends Schema>(
       if (reserved(prop)) {
         return false;
       }
+      if (allow && !allow(prop, value)) {
+        // Dropped, not refused: a strict-mode body does not throw.
+        return true;
+      }
       if (isDevelopment) {
         const nonJson = detectNonJsonValueType(value);
         if (nonJson) {
@@ -575,6 +586,9 @@ export function createFactsProxy<S extends Schema>(
       }
       if (reserved(prop)) {
         return false;
+      }
+      if (allow && !allow(prop, undefined)) {
+        return true;
       }
       s.delete(prop, stamp);
 

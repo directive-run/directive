@@ -74,6 +74,14 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       return [{ type, id: event.id, active: event.active }];
     case "constraint.error":
       return [{ type, id: event.id, error: event.error }];
+    case "constraint.binding.disabled":
+      return [{ type, id: event.id, reason: event.reason }];
+    case "resolver.write.rejected": {
+      // As 1.35: the hook's event, with the requirement by id.
+      const { req, ...rest } = event.event as { req: { id: string } };
+
+      return [{ type, ...rest, requirementId: req.id }];
+    }
     case "requirement.created": {
       const req = event.req as { id: string; requirement: { type: string } };
 
