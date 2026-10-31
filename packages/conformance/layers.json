@@ -7330,6 +7330,44 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-clusters.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "two abort-bound resolvers started by one pass > the second may not overwrite the first's write to a fact they both bind": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "retry-later with a constraint and a resolver both waiting > each is retried as itself: the throwing constraint is asked again": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
+        "when() > stops asking its predicate once it has resolved": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "when() > with a timeout, resolving first means it never rejects later": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()": {
+          "layer": "L3",
+          "by": ["member .onSettledChange"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle-effect-chain.test.ts": {
       "category": "black-box",
       "rule": "L3",
