@@ -295,7 +295,7 @@ function expectedAlias(
     const entries = !v2
       ? coreEntries(repoRoot)
       : dist
-        ? v2DistEntries(repoRoot)
+        ? v2DistEntries(repoRoot, build)
         : v2Entries(repoRoot);
     for (const entry of entries) {
       out[exactSource(entry.specifier)] = entry.file;

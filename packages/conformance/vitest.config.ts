@@ -123,9 +123,12 @@ function v2Alias(): Alias {
   ];
 }
 
-/** `@directive-run/core[/sub]` → core-next's built dist (lib/core-entries.ts v2DistEntries). */
-function v2DistAlias(): Alias {
-  const entries = v2DistEntries();
+/**
+ * `@directive-run/core[/sub]` → core-next's built dist for `condition`
+ * (lib/core-entries.ts v2DistEntries), the same build v1Alias picks of 1.35.
+ */
+function v2DistAlias(condition: "development" | "production"): Alias {
+  const entries = v2DistEntries(undefined, condition);
 
   return [
     // Nothing in dist imports it (the build writes the check out), but a
@@ -215,7 +218,7 @@ export default defineConfig({
         "conformance:v2:dist",
         "v2",
         "development",
-        v2DistAlias(),
+        v2DistAlias("development"),
         TESTS,
         PROD,
         { DIRECTIVE_V2_TARGET: "dist" },
@@ -224,7 +227,7 @@ export default defineConfig({
         "conformance:v2:dist:prod",
         "v2",
         "production",
-        v2DistAlias(),
+        v2DistAlias("production"),
         PROD,
         [],
         { DIRECTIVE_V2_TARGET: "dist", NODE_ENV: "production" },
