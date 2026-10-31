@@ -14,18 +14,27 @@
  *    vitest (lib/lockfile.ts).
  * 3. A pull request that touches packages/core-next may not also touch the
  *    harness: the oracle changes in its own pull request, never alongside the
- *    engine it judges.
+ *    engine it judges. One exception (Jason, 2026-11-01): signed divergences.
+ *    The harness files such a PR changes may be only diff/divergences.json,
+ *    with or without harness.lock.json (the lock never changes alone), and
+ *    every entry it adds or changes (same id, any field different, compared
+ *    with the base) must have a non-empty `approvedBy`. It may not remove an
+ *    entry: removal tightens the oracle, but the exception is kept to what was
+ *    approved. The census still fails an entry that covers no real difference,
+ *    and rule 2's label still applies. Both ends of divergences.json are read
+ *    as data; anything the guard cannot parse fails closed.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isHarnessPath } from "./harness.js";
+import { LOCK_FILE, isHarnessPath } from "./harness.js";
 import { oracleLockHash } from "./lockfile.js";
 import { RATCHET_FILE, type Ratchet, checkShrink } from "./ratchet.js";
 
 export const BASELINE_FILE = "oracle-baseline.json";
 export const LABEL = "oracle-change";
 const PREFIX = "packages/conformance/";
+export const DIVERGENCES_FILE = "diff/divergences.json";
 
 interface Rules {
   rules: Record<
@@ -148,13 +157,15 @@ function isConformanceHarness(path: string): boolean {
 
 /**
  * Pull-request rules over the changed paths (repo-relative), the labels, and
- * pnpm-lock.yaml at the base and head when the PR changes it.
+ * the text at the base and head of pnpm-lock.yaml, v2-passing.json and
+ * diff/divergences.json when the PR changes them (null: absent at that end).
  */
 export function checkPullRequest(
   changedFiles: string[],
   labels: string[],
   lockfile?: { base: string; head: string },
   ratchet?: { base: string | null; head: string },
+  divergences?: { base: string | null; head: string | null },
 ): string[] {
   const failures: string[] = [];
   // The v2 ratchet only grows: a removal needs a reason and the label.
@@ -183,9 +194,7 @@ export function checkPullRequest(
     f.startsWith("packages/core-next/"),
   );
   if (engine.length > 0 && conformance.length > 0) {
-    failures.push(
-      `this PR changes packages/core-next and the conformance harness (${conformance.join(", ")}); land oracle changes in their own PR`,
-    );
+    failures.push(...checkEngineHarness(conformance, divergences));
   }
 
   const harness = [...conformance, ...changedFiles.filter(isOutsideHarness)];
@@ -204,6 +213,130 @@ export function checkPullRequest(
     failures.push(
       `this PR changes the oracle (${harness.join(", ")}) and needs the ${LABEL} label`,
     );
+  }
+
+  return failures;
+}
+
+/**
+ * Rule 3 for a PR that changes packages/core-next and the harness files
+ * `conformance` (repo-relative): only signed divergences may ride along.
+ */
+function checkEngineHarness(
+  conformance: string[],
+  divergences?: { base: string | null; head: string | null },
+): string[] {
+  const signedFile = `${PREFIX}${DIVERGENCES_FILE}`;
+  const others = conformance.filter(
+    (f) => f !== signedFile && f !== `${PREFIX}${LOCK_FILE}`,
+  );
+  if (others.length > 0) {
+    return [
+      `this PR changes packages/core-next and the conformance harness (${others.join(", ")}); land oracle changes in their own PR (only signed ${DIVERGENCES_FILE} entries, with ${LOCK_FILE}, may change alongside the engine)`,
+    ];
+  }
+  if (!conformance.includes(signedFile)) {
+    return [
+      `this PR changes packages/core-next and ${LOCK_FILE} without ${DIVERGENCES_FILE}; alongside the engine the lock may change only for a signed divergence`,
+    ];
+  }
+
+  return checkSignedDivergences(divergences);
+}
+
+type ById = Map<string, Record<string, unknown>>;
+
+/** Entries keyed by id, or why the guard cannot trust the text. */
+function divergencesById(text: string, end: string): ById | string {
+  let entries: unknown;
+  try {
+    entries = JSON.parse(text);
+  } catch {
+    return `${DIVERGENCES_FILE} is not valid JSON at the ${end}`;
+  }
+  if (!Array.isArray(entries)) {
+    return `${DIVERGENCES_FILE} must be an array at the ${end}`;
+  }
+  const out: ById = new Map();
+  for (const [i, raw] of entries.entries()) {
+    const id = (raw as { id?: unknown } | null)?.id;
+    if (typeof id !== "string" || !id) {
+      return `${DIVERGENCES_FILE} entry ${i} has no id at the ${end}`;
+    }
+    if (out.has(id)) {
+      return `${DIVERGENCES_FILE} has duplicate id ${id} at the ${end}`;
+    }
+    out.set(id, raw as Record<string, unknown>);
+  }
+
+  return out;
+}
+
+/** Key-order-independent JSON, so a reordered entry is not a changed one. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    return `{${Object.keys(record)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical(record[k])}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+/**
+ * Every entry added or changed between the base and head is signed
+ * (non-empty approvedBy), and none is removed. Fails closed on anything it
+ * cannot read.
+ */
+function checkSignedDivergences(divergences?: {
+  base: string | null;
+  head: string | null;
+}): string[] {
+  const why = `alongside packages/core-next, ${DIVERGENCES_FILE} may only add or change signed entries`;
+  if (!divergences) {
+    return [
+      `${DIVERGENCES_FILE} changed but its base and head were not provided`,
+    ];
+  }
+  if (divergences.head === null) {
+    return [`${DIVERGENCES_FILE} is deleted at the head; ${why}`];
+  }
+  const head = divergencesById(divergences.head, "head");
+  const base =
+    divergences.base === null
+      ? new Map()
+      : divergencesById(divergences.base, "base");
+  if (typeof head === "string" || typeof base === "string") {
+    return [
+      `${[head, base].filter((x) => typeof x === "string").join("; ")}; the guard cannot check its signatures`,
+    ];
+  }
+  const failures: string[] = [];
+  for (const [id, entry] of head) {
+    const before = base.get(id);
+    if (before !== undefined && canonical(before) === canonical(entry)) {
+      continue;
+    }
+    const signed =
+      typeof entry.approvedBy === "string" && entry.approvedBy.trim() !== "";
+    if (!signed) {
+      failures.push(
+        `${DIVERGENCES_FILE} ${before === undefined ? "adds" : "changes"} ${id} without approvedBy; ${why}`,
+      );
+    }
+  }
+  for (const id of base.keys()) {
+    if (!head.has(id)) {
+      failures.push(
+        `${DIVERGENCES_FILE} removes ${id}; ${why} (remove entries in their own PR labelled ${LABEL})`,
+      );
+    }
   }
 
   return failures;

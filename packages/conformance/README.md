@@ -182,7 +182,8 @@ approves every entry; an agent never adds one, and never fills in
 `approvedBy`.** The census fails an entry that is incomplete or unsigned,
 or that covered no difference in the run (stale). The file is part of the
 harness, so adding one needs `oracle:update` and the `oracle-change`
-label, and CODEOWNERS puts it under Jason's review.
+label, and CODEOWNERS puts it under Jason's review. It is the one harness
+file an engine PR may change (see "Engine and oracle land separately").
 
 ## Frozen 1.35 contracts (`contracts/`)
 
@@ -299,8 +300,9 @@ deliberate act, made visible on the pull request:
 - **The guard never runs the PR's code.** `.github/workflows/oracle-guard.yml`
   uses `pull_request_target`: the workflow and the scripts it runs come from
   the base branch. The head is read only as data through the GitHub API (the
-  changed-file list, the labels in the event payload, `pnpm-lock.yaml` as
-  text) and is never checked out, installed or executed. The token is
+  changed-file list, the labels in the event payload, and `pnpm-lock.yaml`,
+  `v2-passing.json` and `diff/divergences.json` at both ends as text) and is
+  never checked out, installed or executed. The token is
   read-only and no secrets are used. A PR therefore cannot rewrite the rule
   that judges it; a change to the guard takes effect from the PR after it
   merges.
@@ -315,6 +317,14 @@ deliberate act, made visible on the pull request:
 - **Engine and oracle land separately.** A PR that touches
   `packages/core-next/**` and any of the package's harness files fails, label
   or not. Ported `tests/` may change alongside the engine.
+- **Except signed divergences (Jason, 2026-11-01).** An engine change that
+  makes an approved difference visible may carry its entry: the PR's harness
+  files may be only `diff/divergences.json`, with or without
+  `harness.lock.json` (never the lock alone), and every entry it adds or
+  changes (by `id`, against the base) must have a non-empty `approvedBy`. It
+  may not remove an entry. The label is still required, the census still
+  fails an entry that covers no real difference, and a head the guard cannot
+  parse fails closed.
 
 To change the harness: edit, run `oracle:update`, run `pnpm conformance`,
 open the PR with the `oracle-change` label, and say in the description what
@@ -345,7 +355,7 @@ the oracle now accepts that it did not before.
 | diff: a stale divergence | An approved difference no longer occurs | Remove the entry |
 | ratchet: a listed test no longer passes | core-next regressed something it once passed (on source, or only in the built dist: a mangled member, the folded dev check) | Fix core-next; removing the entry needs a reason and the `oracle-change` label |
 | oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |
-| Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together | Label it if the change is deliberate; split engine and oracle PRs |
+| Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together (beyond signed divergences) | Label it if the change is deliberate; split engine and oracle PRs, or have Jason sign the divergence |
 
 ## The v1 pin rule
 
