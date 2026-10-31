@@ -139,26 +139,85 @@ suite("L2 resolver rules at their edges", () => {
     ],
   );
 
+  // The three jitter forms run one after another, each started by a step at
+  // a fixed time (after the one before has finished, at any draw), so neither
+  // the order of events nor a start time depends on a draw. What a
+  // retry waited is the time between two attempts; it is recorded as a
+  // `$draw` with its bounds, so the exact random draw is incidental (two
+  // valid engines draw differently from the same seed: README "What the
+  // trace freezes") while the delay must still lie in [min, max] on every
+  // engine. `base` is the backoff delay before jitter, clamped to the
+  // default maxDelay (30000).
   scenario(
     "full and equal jitter draw from the seeded random",
     ({ core: { createModule, t }, external }) => {
-      const attempts: Record<string, number> = { full: 0, equal: 0 };
+      const attempts: Record<string, number> = {};
+      const lastAt: Record<string, number> = {};
+      const MAX_DELAY = 30000;
+      const exponential = (initial: number) => (failed: number) =>
+        Math.min(initial * 2 ** (failed - 1), MAX_DELAY);
+      const linear = (initial: number) => (failed: number) =>
+        Math.min(initial * failed, MAX_DELAY);
+      // [min, max] of the wait after `base`, per jitter form.
+      const full = (base: number): [number, number] => [0, base];
+      const equal = (base: number): [number, number] => [base / 2, base];
+      const additive =
+        (maxMs: number) =>
+        (base: number): [number, number] => [base, base + maxMs];
+
+      const attempt = (
+        name: string,
+        baseOf: (failed: number) => number,
+        bounds: (base: number) => [number, number],
+      ) => {
+        attempts[name] = (attempts[name] ?? 0) + 1;
+        const now = Date.now();
+        if (attempts[name] === 1) {
+          external([name, 1]);
+        } else {
+          const [min, max] = bounds(baseOf(attempts[name] - 1));
+          external([
+            name,
+            attempts[name],
+            { $draw: now - (lastAt[name] as number), min, max },
+          ]);
+        }
+        lastAt[name] = now;
+
+        return attempts[name] as number;
+      };
 
       return {
         module: createModule("m", {
           schema: {
-            facts: { full: t.boolean(), equal: t.boolean() },
+            facts: {
+              full: t.boolean(),
+              equal: t.boolean(),
+              half: t.boolean(),
+              go2: t.boolean(),
+              go3: t.boolean(),
+            },
             derivations: {},
             events: {},
-            requirements: { FULL: {}, EQUAL: {} },
+            requirements: { FULL: {}, EQUAL: {}, HALF: {} },
           },
           init: (facts: any) => {
             facts.full = false;
             facts.equal = false;
+            facts.half = false;
+            facts.go2 = false;
+            facts.go3 = false;
           },
           constraints: {
             full: { when: (f: any) => !f.full, require: { type: "FULL" } },
-            equal: { when: (f: any) => !f.equal, require: { type: "EQUAL" } },
+            equal: {
+              when: (f: any) => f.go2 && !f.equal,
+              require: { type: "EQUAL" },
+            },
+            half: {
+              when: (f: any) => f.go3 && !f.half,
+              require: { type: "HALF" },
+            },
           },
           resolvers: {
             full: {
@@ -170,14 +229,13 @@ suite("L2 resolver rules at their edges", () => {
                 jitter: "full",
               },
               resolve: async (_req: unknown, context: any) => {
-                attempts.full = (attempts.full ?? 0) + 1;
-                external(["full", attempts.full, Date.now()]);
-                if (attempts.full < 4) {
+                if (attempt("full", exponential(40), full) < 4) {
                   throw new Error("again");
                 }
                 context.facts.full = true;
               },
             },
+            // jitter { maxMs }: the draw is added on top of the delay.
             equal: {
               requirement: "EQUAL",
               retry: {
@@ -187,19 +245,40 @@ suite("L2 resolver rules at their edges", () => {
                 jitter: { maxMs: 25 },
               },
               resolve: async (_req: unknown, context: any) => {
-                attempts.equal = (attempts.equal ?? 0) + 1;
-                external(["equal", attempts.equal, Date.now()]);
-                if (attempts.equal < 3) {
+                if (attempt("equal", linear(30), additive(25)) < 3) {
                   throw new Error("again");
                 }
                 context.facts.equal = true;
+              },
+            },
+            half: {
+              requirement: "HALF",
+              retry: {
+                attempts: 4,
+                backoff: "exponential",
+                initialDelay: 20,
+                jitter: "equal",
+              },
+              resolve: async (_req: unknown, context: any) => {
+                if (attempt("half", exponential(20), equal) < 4) {
+                  throw new Error("again");
+                }
+                context.facts.half = true;
               },
             },
           },
         } as any),
       };
     },
-    [{ op: "start" }, { op: "settle" }],
+    [
+      { op: "start" },
+      // full finishes by 280 ms, equal by 140 ms, at any draw.
+      { op: "advance", ms: 300 },
+      { op: "set", key: "go2", value: true },
+      { op: "advance", ms: 300 },
+      { op: "set", key: "go3", value: true },
+      { op: "settle" },
+    ],
   );
 
   scenario(

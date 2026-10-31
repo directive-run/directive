@@ -42,6 +42,7 @@ import {
   type Difference,
   compareContract,
   compareFull,
+  drawProblems,
   interleaving,
 } from "./compare.js";
 import "./coverage.js";
@@ -735,6 +736,16 @@ export async function runScenario(
   }
 
   const nondeterministic = compareFull(first, again, "v1 (second run)");
+  // A drawn delay is incidental to the comparison but must stay in bounds,
+  // on the reference and on every engine under test.
+  for (const [engine, trace] of [
+    [reference.name, first],
+    ...Object.entries(theirs),
+  ] as [string, TraceEntry[]][]) {
+    for (const problem of drawProblems(trace)) {
+      problems.push(`${engine} in scenario "${def.name}": ${problem}`);
+    }
+  }
   const differences: Difference[] = [];
   const advisories: string[] = [];
   for (const [engine, trace] of Object.entries(theirs)) {
@@ -786,6 +797,7 @@ export async function runScenario(
     name: def.name,
     ok:
       hung.length === 0 &&
+      problems.length === 0 &&
       nondeterministic.length === 0 &&
       unexplained.length === 0,
     nondeterministic,

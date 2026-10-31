@@ -24,6 +24,15 @@
  * keeping their presence and type so the shape stays strict. Differences in
  * the masked parts, and in how the streams interleave, are reported as
  * advisory: printed, never failing.
+ *
+ * One kind of value is masked only because a scenario marks it: a delay
+ * drawn at random by a retry's `jitter`. The scenario reports each wait as
+ * `[resolverId, attempt, { $draw, min, max }]` in an `external` entry. Two
+ * valid engines may draw different numbers from the same seed, so the draw
+ * is advisory, as is the `duration` the engine reports when that resolver
+ * completes (the sum of its waits); `drawProblems` still requires the draw,
+ * and that duration, to lie inside the bounds, on every engine (the
+ * reference too), and `min` and `max` are compared exactly.
  */
 
 import type { Json } from "./normalize.js";
@@ -170,9 +179,85 @@ function mask(value: Json, fields: ReadonlySet<string>): Json {
 const INSPECT_FIELDS = new Set<string>(INCIDENTAL_INSPECT_FIELDS);
 const NONE = new Set<string>();
 
+/**
+ * Keep shape, mask the `$draw` value of every drawn-delay marker (min and
+ * max stay exact). Nothing else in the data is touched.
+ */
+function maskDraws(value: Json): Json {
+  if (Array.isArray(value)) {
+    return value.map(maskDraws);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const out: Record<string, Json> = {};
+  for (const [key, v] of Object.entries(value)) {
+    out[key] = key === "$draw" ? tag(v) : maskDraws(v);
+  }
+
+  return out;
+}
+
+const isObject = (v: Json | undefined): v is Record<string, Json> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Resolvers whose retry waits a scenario reports as drawn (see the header). */
+export function drawnResolvers(trace: TraceEntry[]): Set<string> {
+  const out = new Set<string>();
+  for (const entry of trace) {
+    if (
+      entry.k === "external" &&
+      Array.isArray(entry.data) &&
+      typeof entry.data[0] === "string" &&
+      isObject(entry.data[2]) &&
+      "$draw" in entry.data[2]
+    ) {
+      out.add(entry.data[0]);
+    }
+  }
+
+  return out;
+}
+
 /** The part of an entry that is a contract. */
-export function contract(entry: TraceEntry): Json {
+export function contract(
+  entry: TraceEntry,
+  drawn: ReadonlySet<string> = new Set(),
+): Json {
   switch (entry.k) {
+    case "external":
+      return { k: "external", data: maskDraws(entry.data) };
+    case "hook":
+      // How long a drawn resolver took is the sum of its drawn waits.
+      if (
+        entry.hook === "onResolverComplete" &&
+        typeof entry.args[0] === "string" &&
+        drawn.has(entry.args[0])
+      ) {
+        return {
+          k: "hook",
+          hook: entry.hook,
+          args: entry.args.map((a, i) => (i === 2 ? tag(a) : a)),
+        };
+      }
+
+      return mask(entry as unknown as Json, NONE);
+    case "observe": {
+      const event = entry.event;
+      if (
+        isObject(event) &&
+        event.type === "resolver.complete" &&
+        typeof event.resolver === "string" &&
+        drawn.has(event.resolver)
+      ) {
+        return {
+          k: "observe",
+          event: { ...event, duration: tag(event.duration) },
+        };
+      }
+
+      return mask(entry as unknown as Json, NONE);
+    }
     case "state":
       return mask(
         {
@@ -195,6 +280,63 @@ export function contract(entry: TraceEntry): Json {
     default:
       return mask(entry as unknown as Json, NONE);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Drawn values
+
+/**
+ * What is still asserted of a drawn value, on every trace passed in (the
+ * reference's too): each drawn-delay marker (`{ $draw, min, max }`, in an
+ * `external` entry) lies inside [min, max], and so does the duration the
+ * engine reports when a drawn resolver completes, against the sum of that
+ * resolver's bounds.
+ */
+export function drawProblems(trace: TraceEntry[]): string[] {
+  const out: string[] = [];
+  const sums = new Map<string, [number, number]>();
+  for (const [index, entry] of trace.entries()) {
+    if (entry.k !== "external" || !Array.isArray(entry.data)) {
+      continue;
+    }
+    const [resolver, , marker] = entry.data;
+    if (!isObject(marker) || !("$draw" in marker)) {
+      continue;
+    }
+    const { $draw: drawn, min, max } = marker;
+    if (
+      typeof drawn !== "number" ||
+      typeof min !== "number" ||
+      typeof max !== "number" ||
+      !(min <= drawn && drawn <= max)
+    ) {
+      out.push(
+        `external #${index}: ${JSON.stringify(entry.data)} is outside [min, max]`,
+      );
+    }
+    if (typeof resolver === "string" && typeof min === "number") {
+      const sum = sums.get(resolver) ?? [0, 0];
+      sums.set(resolver, [sum[0] + min, sum[1] + (max as number)]);
+    }
+  }
+  for (const [index, entry] of trace.entries()) {
+    const event = entry.k === "observe" ? entry.event : null;
+    if (
+      isObject(event) &&
+      event.type === "resolver.complete" &&
+      typeof event.resolver === "string"
+    ) {
+      const sum = sums.get(event.resolver);
+      const took = event.duration;
+      if (sum && (typeof took !== "number" || took < sum[0] || took > sum[1])) {
+        out.push(
+          `observe #${index}: resolver "${event.resolver}" took ${JSON.stringify(took)} ms, outside its drawn waits' [${sum[0]}, ${sum[1]}]`,
+        );
+      }
+    }
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +513,9 @@ export function compareContract(
   candidate: TraceEntry[],
   engine: string,
 ): Difference[] {
-  return compareWith(reference, candidate, engine, contract);
+  const drawn = drawnResolvers(reference);
+
+  return compareWith(reference, candidate, engine, (e) => contract(e, drawn));
 }
 
 /** Every difference, incidental parts included (for determinism and advisories). */
