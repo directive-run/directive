@@ -39,6 +39,9 @@ export interface EffectsManager {
   disable(id: string): void;
   enable(id: string): void;
   isEnabled(id: string): boolean;
+  /** Run `id` in the next pass whatever changed (1.35's requestRerun). */
+  rerun_(id: string): void;
+  reruns_(): boolean;
 }
 
 interface EffectState {
@@ -354,13 +357,17 @@ export function createEffectsManager<S extends Schema>(
       })
       .catch((error) => report(state, error));
 
+  /** Effects asked to run again, taken by the next pass's selection. */
+  const reruns = new Set<string>();
   function select(changed: Set<string>): EffectState[] {
     const out: EffectState[] = [];
+    const again = reruns.size > 0 ? new Set(reruns) : null;
+    reruns.clear();
     for (const state of states.values()) {
       if (!state.enabled) {
         continue;
       }
-      if (state.deps) {
+      if (state.deps && !again?.has(state.id)) {
         let hit = false;
         for (const key of state.deps) {
           if (changed.has(key)) {
@@ -437,6 +444,12 @@ export function createEffectsManager<S extends Schema>(
       }
     },
     isEnabled: (id) => states.get(id)?.enabled ?? false,
+    rerun_(id) {
+      if (states.has(id)) {
+        reruns.add(id);
+      }
+    },
+    reruns_: () => reruns.size > 0,
   };
 }
 
@@ -446,8 +459,10 @@ export function createEffectsManager<S extends Schema>(
  * runs. A system without this part bundles none of the manager.
  */
 export const withEffects: SystemPart = (ctx) => {
-  const { kernel, reportError } = ctx;
+  const { kernel } = ctx;
   const { hooks } = kernel;
+  /** Retries in a row per effect under "retry"; an ordinary write resets. */
+  const retries = new Map<string, number>();
   const manager = createEffectsManager({
     definitions: (ctx.module.effects ?? {}) as Record<string, any>,
     facts: ctx.facts,
@@ -462,10 +477,28 @@ export const withEffects: SystemPart = (ctx) => {
     // The hook reports the id only: no dependency list is built per run.
     wantsRunDeps: () => false,
     onError(id, error) {
-      // As in 1.35: the error boundary hears it before the effect hook.
-      reportError("effect", id, error);
+      // As in 1.35: the error boundary hears it before the effect hook, and
+      // the strategy acts after it.
+      const strategy = ctx.reportError("effect", id, error);
       if (hooks.live) {
         hooks.emit("effect.error", { id, error });
+      }
+      if (strategy === "disable") {
+        manager.disable(id);
+      }
+      if (strategy === "retry") {
+        // Bounded, as 1.35 (MAX_EFFECT_RETRIES): one that fails every time
+        // would otherwise run again for as long as the process does.
+        const attempts = (retries.get(id) ?? 0) + 1;
+        retries.set(id, attempts);
+        if (attempts <= 3) {
+          manager.rerun_(id);
+          ctx.schedule();
+        } else if (isDevelopment) {
+          console.warn(
+            `[Directive] effect "${id}" failed 3 retries in a row; it will run again on its next change.`,
+          );
+        }
       }
     },
     onWriteBlocked(id, key) {
@@ -474,5 +507,8 @@ export const withEffects: SystemPart = (ctx) => {
       }
     },
   });
-  kernel.define("effects", manager);
+  kernel.define(
+    "effects",
+    Object.assign(manager, { fresh_: () => retries.clear() }),
+  );
 };

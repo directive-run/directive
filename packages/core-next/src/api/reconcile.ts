@@ -31,10 +31,11 @@
 
 import isDevelopment from "#is-development";
 import { type ConstraintDef, createConstraints } from "./constraints.js";
-import type { ReconcileFeature, SystemPart } from "./core.js";
+import type { ErrorsFeature, ReconcileFeature, SystemPart } from "./core.js";
 import { DERIVATION_DEP_PREFIX, describeDep } from "./facts.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
+import type { ModuleDefinition } from "./types.js";
 
 /** Slots in a bound key's `[stamp, changes, dropped]` count triples. */
 const CHANGED = 1;
@@ -124,10 +125,18 @@ export const withReconcile: SystemPart = (context) => {
     onEvaluate: (id, active) =>
       emit("constraint.evaluate", () => ({ id, active })),
     onError(id, error) {
-      reportError("constraint", id, error);
+      const strategy = reportError("constraint", id, error);
       emit("constraint.error", () => ({ id, error }));
+      if (strategy === "disable") {
+        constraints.disable(id);
+      }
     },
   });
+  /**
+   * Quirk (a): re-dispatches in a row per requirement id under "retry", at
+   * most 3; a completed run, a retraction or stop() starts it over.
+   */
+  const redo = new Map<string, number>();
   /** Requirement ids a run asked to dispatch again (`context.requeue()`). */
   const requeued = new Set<string>();
   /** The requirement set the last commit acted on, by id. */
@@ -156,6 +165,10 @@ export const withReconcile: SystemPart = (context) => {
         req: run.req_,
         resolver: run.resolver_,
       }));
+      (kernel.features as { errors?: ErrorsFeature }).errors?.clear_(
+        run.resolver_,
+      );
+      redo.delete(run.req_.id);
       constraints.markResolved(run.req_);
       if (!previous.has(run.req_.id)) {
         // A satisfied or detached run: its requirement left the set
@@ -165,13 +178,60 @@ export const withReconcile: SystemPart = (context) => {
       }
     },
     onError(run, error) {
-      // 1.35 passes the requirement as the error's context.
-      reportError("resolver", run.resolver_, error, run.req_, run.satisfied_);
-      emit("resolver.error", () => ({
-        resolver: run.resolver_,
-        req: run.req_,
+      const req = run.req_;
+      // 1.35 passes the requirement as the error's context. Under "throw"
+      // this throws, so nothing below runs (no hook, no module hook).
+      const strategy = reportError(
+        "resolver",
+        run.resolver_,
         error,
-      }));
+        req,
+        run.satisfied_,
+      );
+      emit("resolver.error", () => ({ resolver: run.resolver_, req, error }));
+      if (strategy === "disable") {
+        constraints.disable(req.fromConstraint);
+      }
+      if (strategy === "retry") {
+        // 1.35: the next diff sees it as added, and the pass this asks for
+        // runs while the run is in flight, so it drops the dispatch.
+        previous.delete(req.id);
+        schedule();
+        // Quirk (a): the requeue applies once the run is out of flight, so
+        // the pass after its end re-dispatches it, if it is still raised.
+        const times = (redo.get(req.id) ?? 0) + 1;
+        if (times <= 4) {
+          redo.set(req.id, times);
+          if (times < 4) {
+            requeued.add(req.id);
+          } else if (isDevelopment) {
+            console.warn(
+              `[Directive] resolver "${run.resolver_}" failed 3 retries in a row; it will run again when its requirement is raised anew.`,
+            );
+          }
+        }
+      }
+      // The module's own hook: an observer, after the engine has acted. A
+      // throwing hook is isolated and logged with the module's id (1.35).
+      const owner =
+        (module as { owners_?: Record<string, ModuleDefinition> }).owners_?.[
+          run.resolver_
+        ] ?? module;
+      const hook = (
+        owner.hooks as
+          | { onResolverError?: (e: Error, r: unknown, c: object) => void }
+          | undefined
+      )?.onResolverError;
+      if (hook) {
+        try {
+          hook(error, req.requirement, { facts: context.facts });
+        } catch (hookError) {
+          console.error(
+            `[Directive] onResolverError hook for module "${owner.id}" threw:`,
+            hookError,
+          );
+        }
+      }
     },
     onEnd(run) {
       // 1.35's onResolutionComplete. A pass asked for while one is open is
@@ -359,6 +419,7 @@ export const withReconcile: SystemPart = (context) => {
         resolvers.abort(req.id);
       }
       constraints.forget(req.id);
+      redo.delete(req.id);
     }
   }
   /** `stamp` changed some key in the closed window, or tried to (dropped). */
@@ -486,6 +547,7 @@ export const withReconcile: SystemPart = (context) => {
     },
     busy_: () => resolvers.inflight.size > 0,
     start_: () => constraints.markAllDirty(),
+    dirty_: (id) => constraints.markDirty(id),
     stop_() {
       // Quirk j: a requirement canceled here leaves the set, so the pass
       // after start() sees it as added and dispatches it again if it is
@@ -495,6 +557,7 @@ export const withReconcile: SystemPart = (context) => {
       }
       // A requeue asked by a run just canceled is not carried into start().
       requeued.clear();
+      redo.clear();
     },
     inspect_: () => ({
       unmet: [...previous.values()],
