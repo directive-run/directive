@@ -219,7 +219,7 @@ describe("quirk b: exactly one outcome per run", () => {
     });
   }
 
-  it("a timeout leaves the run's signal alone, reports one error and keeps its later writes (1.35)", async () => {
+  it("a timeout aborts the attempt's signal (candidate n), reports one error, not a cancel, and keeps its later writes", async () => {
     const { log, plugin } = outcomes();
     const g = gate();
     let signal: AbortSignal | undefined;
@@ -252,15 +252,15 @@ describe("quirk b: exactly one outcome per run", () => {
     expect(signal?.aborted).toBe(false);
     clock.advanceTo(60);
     await flush();
-    // 1.35: withTimeout never touches the run's controller, so the body is
-    // not told (aborting it is a candidate quirk, not built).
-    expect(signal?.aborted).toBe(false);
+    // (n), approved: the body is told (1.35 leaves the signal clean). The
+    // outcome is still the error, read from the run's signal, not a cancel.
+    expect(signal?.aborted).toBe(true);
+    expect(String(signal?.reason)).toMatch(/timed out after 50ms/);
     expect(log.order).toEqual(["start", "error"]);
     // The body's cleanup write after the timeout lands (only supersede drops).
     g.open();
     await flush();
     expect(system.facts.n).toBe(-1);
-    expect(signal?.aborted).toBe(false);
     expect(log.order).toEqual(["start", "error"]);
     system.destroy();
   });

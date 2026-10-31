@@ -17,12 +17,7 @@ import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { createSystemCore } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
-import {
-  BLOCKED_PROPS,
-  detectNonJsonValueType,
-  isPrototypeSafe,
-  warnNonJson,
-} from "./facts.js";
+import { BLOCKED_PROPS, isPrototypeSafe } from "./facts.js";
 import { createCheckedReadView } from "./readonly.js";
 import type { ModuleDefinition, System, SystemOptions } from "./types.js";
 
@@ -201,12 +196,8 @@ export function createNamespacedSystem(
             ? src[key]
             : src[prefix + key],
         set(key, value) {
-          if (isDevelopment) {
-            const type = detectNonJsonValueType(value);
-            if (type) {
-              warnNonJson(warned, `${ns}.${key}`, type);
-            }
-          }
+          // The facts view below warns of a non-JSON value once, by the
+          // module-qualified name (candidate o; 1.35 warns twice).
           src[prefix + key] = value;
 
           return true;

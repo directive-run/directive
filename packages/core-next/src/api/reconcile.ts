@@ -560,6 +560,12 @@ export const withReconcile: SystemPart = (context) => {
     busy_: () => resolvers.inflight.size > 0,
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
+    requeue_(id) {
+      // A retracted requirement is not requeued; one in flight has a run.
+      if (previous.has(id) && !resolvers.inflight.has(id)) {
+        requeued.add(id);
+      }
+    },
     stop_() {
       // A requirement canceled here stays in the set, as in 1.35: inspect()
       // still lists it, and the pass after start() cancels it if it is no

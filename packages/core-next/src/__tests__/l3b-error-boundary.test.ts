@@ -8,7 +8,7 @@ import { createSystem } from "../api/system.js";
 import { createClock } from "../clock.js";
 
 // L3b: the error boundary. "throw" keeps 1.35's surfaces per source (E10),
-// quirk (a) and its cap, retry-later's "never runs again" for a resolver,
+// quirk (a) and its cap, retry-later's re-run of a resolver (candidate p),
 // settle() while an entry waits (S8), and the poller's keep-alive (C5).
 
 afterEach(() => {
@@ -399,18 +399,26 @@ function waiting() {
 }
 
 describe("L3b retry-later (E8, E9, S8)", () => {
-  it("a failed resolver never runs again (1.35; candidate (p) not approved), though its due entry runs a pass", async () => {
+  it("(p) approved: a failed resolver runs again when its entry is due, not before, at most maxRetries times (1.35 never runs it again)", async () => {
     vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const w = waiting();
     w.sys.start();
     w.sys.facts.go = true;
     await vi.advanceTimersByTimeAsync(10);
     expect(w.calls()).toBe(1);
     const before = w.passes();
-    await vi.advanceTimersByTimeAsync(3000);
-
-    expect(w.passes()).toBeGreaterThan(before);
+    // Due at 300 ms, found by the 300 ms poll: nothing runs before it.
+    await vi.advanceTimersByTimeAsync(250);
     expect(w.calls()).toBe(1);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(w.passes()).toBeGreaterThan(before);
+    expect(w.calls()).toBe(2);
+    // maxRetries 5: five re-runs, then "skip"; the requirement stays raised.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(w.calls()).toBe(6);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(w.calls()).toBe(6);
     w.sys.destroy();
   });
 

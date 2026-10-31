@@ -22,9 +22,13 @@
  *   run's.
  * - A satisfied run is not canceled: it stays in flight (stop aborts it,
  *   settle waits), is not retried, and reports one outcome when it ends.
- * - A timeout fails the attempt as 1.35 does: the run's signal is not
- *   aborted (its body is not told), one error is reported, and the body's
- *   later writes land. Cancel keeps them too, so a
+ * - Each attempt has its own `context.signal`, a child of the run's: a
+ *   cancel, supersede, clobber or stop() aborts the run, and so the
+ *   attempt. A timeout aborts only the attempt, its reason the timeout
+ *   error (candidate n, approved; 1.35 leaves the signal clean), so the next
+ *   attempt starts unaborted. The outcome is still read from the run's
+ *   signal: a timeout is reported as the error it is, never as a cancel, and
+ *   the body's later writes land. Cancel keeps them too, so a
  *   `finally { loading = false }` lands; only a supersede drops them.
  * - Retry: backoff (none, linear, exponential), the `maxDelay` clamp, then
  *   jitter (none, full, equal, `{ maxMs }`), at least 1 ms. The waits are
@@ -442,15 +446,10 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   ): Promise<void> {
     const policy = def.retry;
     const attempts = policy?.attempts ?? 1;
+    /** The run's signal: every outcome below is read from it, never the attempt's. */
     const { signal } = run.controller_;
-    const contextOf = (facts: Facts<any>) => ({
-      facts,
-      signal,
-      snapshot: () => facts.$snapshot(),
-      requeue: () => options.onRequeue(run.req_.id),
-    });
     /** Unbound: one view for every attempt. Bound: one per attempt, as 1.35. */
-    let shared: object | null = null;
+    let shared: Facts<any> | null = null;
     let last: Error | undefined;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       // Aborted while it waited (canceled, superseded): no outcome here.
@@ -465,9 +464,20 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       run.attempt_ = attempt;
       // Asked each attempt, as 1.35: a constraint found async since loses it.
       const keys = options.bindingOf(run.req_);
-      const context = keys
-        ? contextOf(options.factsFor(run, bind(run, keys, baseline)))
-        : (shared ??= contextOf(options.factsFor(run)));
+      const facts = keys
+        ? options.factsFor(run, bind(run, keys, baseline))
+        : (shared ??= options.factsFor(run));
+      // The attempt's own signal (candidate n): the run's abort reaches it.
+      const child = new AbortController();
+      signal.addEventListener("abort", () => child.abort(signal.reason), {
+        once: true,
+      });
+      const context = {
+        facts,
+        signal: child.signal,
+        snapshot: () => facts.$snapshot(),
+        requeue: () => options.onRequeue(run.req_.id),
+      };
       try {
         await invoke(def, run, context);
         // Aborted while it ran: that was its one outcome (1.35). For a
@@ -483,6 +493,10 @@ export function createResolvers(options: ResolversOptions): Resolvers {
           return;
         }
         last = toError(error);
+        if (isTimeout(last)) {
+          // Only this attempt gave up: the run goes on to its retry or error.
+          child.abort(last);
+        }
         if (run.satisfied_) {
           // It failed after satisfying its requirement: 1.35 aborts it
           // plainly (a timeout alone does not), reports the failure once,
