@@ -116,4 +116,42 @@ describe("the error boundary in production", () => {
     expect(warn).not.toHaveBeenCalled();
     system.destroy();
   });
+
+  it("a failing effect under retry gives up silently once its retries are used", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let runs = 0;
+    const mod = createModule("e", {
+      schema: { facts: { n: t.number() } },
+      init: (facts: any) => {
+        facts.n = 0;
+      },
+      effects: {
+        failing: {
+          run: (facts: any) => {
+            if (facts.n === 0) {
+              return;
+            }
+            runs++;
+            throw new Error("always fails");
+          },
+        },
+      },
+    });
+    const system = createSystem({
+      module: mod,
+      errorBoundary: { onEffectError: "retry" },
+    });
+    await system.start();
+    await system.settle();
+    system.facts.n = 1;
+    for (let i = 0; i < 10; i++) {
+      await system.settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    expect(runs).toBeGreaterThan(1);
+    expect(warn).not.toHaveBeenCalled();
+    await system.stop();
+  });
 });
