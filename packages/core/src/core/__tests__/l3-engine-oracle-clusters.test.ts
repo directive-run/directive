@@ -8,8 +8,11 @@
  * - retry-later keeps a waiting constraint's retry and a waiting resolver's
  *   retry apart: each is retried as itself.
  * - `when()` stops asking its predicate once it has resolved.
+ * - when() that times out stops asking its predicate.
  * - destroy() of a system with a resolver in flight: nothing is announced to a
  *   settlement listener afterwards.
+ * - A constraint whose `abortOn` lists no facts is not bound.
+ * - A retry-later waiting at stopAsync() does not come back after a restart.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -133,7 +136,8 @@ describe("retry-later with a constraint and a resolver both waiting", () => {
     await vi.advanceTimersByTimeAsync(50);
     expect(loads).toBe(1);
     const askedBefore = flakyAsked;
-    await vi.advanceTimersByTimeAsync(400);
+    // Well past the delay, whatever the poll's cadence.
+    await vi.advanceTimersByTimeAsync(1000);
     expect(flakyAsked).toBeGreaterThan(askedBefore);
     sys.destroy();
   });
@@ -270,5 +274,99 @@ describe("destroy() with a resolver in flight", () => {
     release();
     for (let i = 0; i < 5; i++) await flush();
     expect(heard).toBe(heardAtDestroy);
+  });
+});
+
+describe("a constraint whose abortOn lists no facts", () => {
+  it("is not bound: its run is aborted when the requirement is retracted", async () => {
+    let signal: AbortSignal | undefined;
+    const mod = createModule("unbound", {
+      schema: {
+        facts: { go: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { LOAD: {} },
+      },
+      init: (facts: any) => {
+        facts.go = false;
+      },
+      constraints: {
+        load: {
+          when: (facts: any) => facts.go,
+          require: { type: "LOAD" },
+          abortOn: [],
+        },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          resolve: async (_req: any, context: any) => {
+            signal = context.signal;
+            await new Promise(() => {});
+          },
+        },
+      },
+    } as never);
+    const sys = createSystem({ module: mod } as never) as any;
+    sys.start();
+    sys.facts.go = true;
+    await flush();
+    expect(signal?.aborted).toBe(false);
+    sys.facts.go = false;
+    await flush();
+    expect(signal?.aborted).toBe(true);
+    sys.destroy();
+  });
+});
+
+describe("stopAsync() and retry-later", () => {
+  it("a retry waiting at stopAsync() does not come back after a restart", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let passes = 0;
+    const mod = createModule("later", {
+      schema: {
+        facts: { go: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { LOAD: {} },
+      },
+      init: (facts: any) => {
+        facts.go = false;
+      },
+      constraints: {
+        load: {
+          when: (facts: any) => facts.go,
+          require: { type: "LOAD" },
+        },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          resolve: async () => {
+            throw new Error("always");
+          },
+        },
+      },
+    } as never);
+    const sys = createSystem({
+      module: mod,
+      plugins: [{ name: "passes", onReconcileStart: () => void passes++ }],
+      errorBoundary: {
+        onResolverError: "retry-later",
+        retryLater: { delayMs: 300 },
+      },
+    } as never) as any;
+    sys.start();
+    sys.facts.go = true;
+    await vi.advanceTimersByTimeAsync(50);
+    await sys.stopAsync();
+    sys.facts.go = false;
+    sys.start();
+    await vi.advanceTimersByTimeAsync(50);
+    const afterRestart = passes;
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(passes).toBe(afterRestart);
+    sys.destroy();
   });
 });

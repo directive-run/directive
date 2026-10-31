@@ -7375,6 +7375,14 @@
         "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()": {
           "layer": "L3",
           "by": ["member .onSettledChange"]
+        },
+        "a constraint whose abortOn lists no facts > is not bound: its run is aborted when the requirement is retracted": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "stopAsync() and retry-later > a retry waiting at stopAsync() does not come back after a restart": {
+          "layer": "L3",
+          "by": ["member .stopAsync", "option error boundary", "option plugins"]
         }
       }
     },
