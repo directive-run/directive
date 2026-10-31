@@ -74,8 +74,9 @@ them from compiled accessors.
 declared or not; `Object.keys`, spread, `for...in`, `JSON.stringify` and
 iteration order; every write, delete or `Object.defineProperty` that 1.35
 refuses must still throw (in strict code a trap that returns `false` is what
-makes it throw); and every read, through any view, reads the same live state
-a fresh view would.
+makes it throw); every read, through any view, reads the same live state
+a fresh view would; and `Object.hasOwn` / `hasOwnProperty` on a view never
+throws.
 
 **Not contract** (a mutant that changes only these is `proxy-mechanics`):
 

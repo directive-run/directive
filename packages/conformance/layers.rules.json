@@ -433,6 +433,9 @@
     "tests/core/l3-proxies-oracle-gates.test.ts": {
       "rule": "L3"
     },
+    "tests/core/l3-proxies-oracle-views.test.ts": {
+      "rule": "L3"
+    },
     "tests/core/l3-system-oracle.test.ts": {
       "rule": "L3",
       "pin": true

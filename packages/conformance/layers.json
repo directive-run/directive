@@ -8114,6 +8114,10 @@
         "a composed system in a production build > still refuses a module with a prototype-walking key": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
+        },
+        "a view in a production build hides the names it must never serve > answers `in` and reads as absent for the prototype-walking names a store holds": {
+          "layer": "L1",
+          "by": ["option modules"]
         }
       }
     },
@@ -8193,6 +8197,48 @@
         "a bare module in a composed system > joins with no init, derivations, events, effects, constraints or resolvers": {
           "layer": "L1",
           "by": ["option modules"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle-views.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "every listing of a view's names agrees > for a composed system's own views": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "every listing of a view's names agrees > for the views a module's own code receives": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "every listing of a view's names agrees > for the views a resolver receives": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "an event view answers `in` and reflection quietly > answers `in` false for a name an event view was never asked for": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "an event view answers `in` and reflection quietly > lets a library ask an event view whether it owns a name": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a resolver in each module of one system > each sees its own facts and its own dependencies": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a resolver in each module of one system > each sees only the dependencies it declared": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a development build warns about the same mistake once > for a non-JSON fact written through a module, once per fact": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a development build warns about the same mistake once > for a write through a cross-module view, once per name": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
         }
       }
     },

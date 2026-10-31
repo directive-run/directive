@@ -54,8 +54,13 @@ export interface FactsSnapshot<S extends Schema = Schema> {
 export interface FactsStore<S extends Schema = Schema> {
   get<K extends keyof InferSchema<S>>(key: K): InferSchema<S>[K] | undefined;
   has(key: keyof InferSchema<S>): boolean;
-  set<K extends keyof InferSchema<S>>(key: K, value: InferSchema<S>[K]): void;
-  delete(key: keyof InferSchema<S>): void;
+  /** `stamp`: who wrote it (a resolver run's id); 0, the default, is anyone. */
+  set<K extends keyof InferSchema<S>>(
+    key: K,
+    value: InferSchema<S>[K],
+    stamp?: number,
+  ): void;
+  delete(key: keyof InferSchema<S>, stamp?: number): void;
   batch(fn: () => void): void;
   subscribe(
     keys: Array<keyof InferSchema<S>>,
