@@ -7504,6 +7504,32 @@
         }
       }
     },
+    "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "readiness timing > isReady is false for the whole first pass and true only once it has ended": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "readiness timing > whenReady() is one shared promise while it waits": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "readiness timing > stays ready after stop(), and a restart is still ready from its first pass": {
+          "layer": "L3",
+          "by": ["member .whenReady", "option module hooks", "option plugins"]
+        },
+        "namespaced module onStart > every module's onStart runs on start(), in registration order": {
+          "layer": "L3",
+          "by": ["option module hooks"]
+        },
+        "namespaced module onStart > a module with no onStart does not stop the ones after it": {
+          "layer": "L3",
+          "by": ["option module hooks"]
+        }
+      }
+    },
     "tests/core/l3-engine-oracle-own-write.test.ts": {
       "category": "black-box",
       "rule": "L3",

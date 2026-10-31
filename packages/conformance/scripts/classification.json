@@ -707,6 +707,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l3-engine-oracle-lifecycle-pins.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l3-engine-oracle-own-write.test.ts",
     "category": "black-box",
     "cases": 4,
