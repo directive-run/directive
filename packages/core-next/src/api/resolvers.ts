@@ -29,17 +29,33 @@
  *   timers on the kernel clock owned by this system (disposing the kernel
  *   clears them), and jitter draws from the kernel's seeded rng when it has
  *   one. `shouldRetry(error, attempt, { reason })` hears "error" or
- *   "timeout"; a canceled run is never retried (1.35: the cancel is its
- *   outcome), and "clobbered" comes with constraint binding (L2c).
+ *   "timeout"; a canceled or clobbered run is never retried (1.35: an
+ *   aborted run ends before its retry policy is asked, so a single run's
+ *   `shouldRetry` never hears "clobbered" either).
  * - `context.requeue()` asks for the requirement to be dispatched again;
  *   the pass applies it once this run is out of flight.
+ * - Constraint binding (RFC-0003): a run whose constraint lists `abortOn`
+ *   keys is bound to them. Each attempt compares, by value, the key's value
+ *   with the one it expects: the dispatch pass's baseline, then its own
+ *   last write that landed. If something else changed it, the write is
+ *   dropped, every later write to that key by the attempt is dropped too,
+ *   the run's signal aborts with `{ kind: "clobbered", fact, expected,
+ *   actual }`, and `resolver.write.rejected` reports it (ten per attempt,
+ *   then one summary). Writes to other keys land. An aborted run reports
+ *   no outcome, as 1.35. Only the run's own writes are checked: binding
+ *   never stops another writer. A dropped write that would have changed
+ *   its key still counts as the run's own for own-write satisfaction, as
+ *   in 1.35 (reconcile.ts).
+ * - Detach: a bound run whose requirement is retracted leaves flight but is
+ *   not aborted. It runs to the end, retries included, and reports its
+ *   outcome; the requirement can be dispatched again meanwhile.
  *
- * Not here yet: constraint binding (L2c); batch resolvers (L7).
+ * Not here yet: batch resolvers (L7), and binding for them (quirk k).
  */
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
-import type { Writer } from "./facts.js";
+import type { Allow, Writer } from "./facts.js";
 import type { Requirement, RequirementWithId } from "./requirements.js";
 import { isTimeout, withTimeout } from "./timeout.js";
 import type { Facts } from "./types.js";
@@ -84,14 +100,30 @@ export interface Run extends Writer {
   satisfied_: boolean;
   /** Superseded: a newer run owns the requirement, later writes drop. */
   dropped_: boolean;
+  /** Out of flight but not aborted (RFC-0003): it still reports its outcome. */
+  detached_: boolean;
 }
+
+/** 1.35's per-attempt cap on clobber reports, then one summary. */
+const CLOBBER_EMIT_CAP = 10;
 
 export interface ResolversOptions {
   defs: Record<string, ResolverDef>;
   /** Read-only uses (`snapshot`) and the store a run batches its start in. */
   store: { batch(fn: () => void): void };
-  /** A facts view whose writes carry the run's stamp. */
-  factsFor: (writer: Writer) => Facts<any>;
+  /** A facts view whose writes carry the run's stamp, each asked of `allow`. */
+  factsFor: (writer: Writer, allow?: Allow) => Facts<any>;
+  /** A fact's current value, and whether it is set. */
+  peek: (key: string) => unknown;
+  has: (key: string) => boolean;
+  /**
+   * The binding dropped a write by the run with `stamp` that would have
+   * changed `key`. 1.35 still counts it as the run's own write when it asks
+   * whether the run satisfied its requirement (reconcile.ts).
+   */
+  onDrop: (key: string, stamp: number) => void;
+  /** The keys a requirement's constraint binds (`abortOn`), if any. */
+  bindingOf: (req: RequirementWithId) => readonly string[] | undefined;
   clock: Clock;
   owner: number;
   /** In [0, 1): the kernel's seeded rng when it has one. */
@@ -106,8 +138,16 @@ export interface ResolversOptions {
 }
 
 export interface Resolvers {
-  resolve(req: RequirementWithId): void;
+  /** `baseline`: the bound keys' values before this pass dispatched anything. */
+  resolve(
+    req: RequirementWithId,
+    baseline?: Readonly<Record<string, unknown>>,
+  ): void;
   abort(requirementId: string): void;
+  /** Take a run out of flight without aborting it (RFC-0003). */
+  detach(requirementId: string): void;
+  /** Detached runs still going. */
+  detached: ReadonlySet<Run>;
   /** Cancel every run in flight; returns their requirement ids. */
   abortAll(): string[];
   /** The run in flight for a requirement. */
@@ -158,6 +198,7 @@ const toError = (error: unknown): Error =>
 export function createResolvers(options: ResolversOptions): Resolvers {
   const { defs, store, clock, owner, emit } = options;
   const inflight = new Map<string, Run>();
+  const detached = new Set<Run>();
   /** The last stamp handed out: run ids start at 1 (0 is unattributed). */
   let stamps = 0;
 
@@ -186,11 +227,15 @@ export function createResolvers(options: ResolversOptions): Resolvers {
    * meanwhile (a pass that retracts it, a stop) can report a second one.
    */
   const end = (run: Run, error?: Error, abort?: boolean) => {
-    if (inflight.get(run.req_.id) !== run) {
+    if (run.detached_) {
+      // Its slot went at the detach; 1.35 asks for no pass after it.
+      detached.delete(run);
+    } else if (inflight.get(run.req_.id) === run) {
+      inflight.delete(run.req_.id);
+      options.onEnd(run);
+    } else {
       return;
     }
-    inflight.delete(run.req_.id);
-    options.onEnd(run);
     if (!error) {
       options.onComplete(run);
 
@@ -243,42 +288,129 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     await pending;
   }
 
+  /**
+   * One attempt's binding (1.35's createBoundFacts): what it expects each
+   * bound key to hold, seeded from the dispatch pass's baseline. A write
+   * lands while the key still holds that value; the expected value moves to
+   * the write before it lands, so a listener that changes the key during
+   * the write is caught at the next one.
+   */
+  function bind(
+    run: Run,
+    keys: readonly string[],
+    baseline: Readonly<Record<string, unknown>> | undefined,
+  ): Allow {
+    const expected = new Map<string, unknown>();
+    for (const key of keys) {
+      expected.set(key, baseline ? baseline[key] : options.peek(key));
+    }
+    /** Keys it lost to another writer: one-shot, later writes drop too. */
+    let lost: Set<string> | null = null;
+    let clobbers = 0;
+    /**
+     * 1.35's recordRunWrites sits outside the binding, so a dropped write
+     * that would have changed the key (a delete: the key is set) still
+     * counts as the run's own.
+     */
+    const drop = (key: string, actual: unknown, value: unknown, del?: true) => {
+      if (del ? options.has(key) : !Object.is(actual, value)) {
+        options.onDrop(key, run.stamp_);
+      }
+    };
+
+    return (key, value, deleting) => {
+      if (!expected.has(key)) {
+        return true;
+      }
+      const actual = options.peek(key);
+      if (lost?.has(key)) {
+        drop(key, actual, value, deleting);
+
+        return false;
+      }
+      const want = expected.get(key);
+      if (Object.is(actual, want)) {
+        expected.set(key, value);
+
+        return true;
+      }
+      drop(key, actual, value, deleting);
+      (lost ??= new Set()).add(key);
+      const detail = { fact: key, expected: want, actual };
+      // Ten reports, then one summary; each before the abort, so a
+      // listener sees the run unaborted.
+      if (++clobbers <= CLOBBER_EMIT_CAP + 1) {
+        const capped = clobbers > CLOBBER_EMIT_CAP;
+        emit("resolver.write.rejected", () => ({
+          event: {
+            kind: capped ? "summary" : "rejection",
+            resolver: run.resolver_,
+            req: run.req_,
+            reason: "clobbered",
+            // 1.35 sends its summary at the first report past the cap.
+            ...(capped ? { dropped: 1 } : detail),
+          },
+        }));
+      }
+      run.controller_.abort({ kind: "clobbered", ...detail });
+
+      return false;
+    };
+  }
+
   /** 1.35's executeResolve: the retry loop, ending in `end` exactly once. */
-  async function execute(def: ResolverDef, run: Run): Promise<void> {
+  async function execute(
+    def: ResolverDef,
+    run: Run,
+    baseline: Readonly<Record<string, unknown>> | undefined,
+  ): Promise<void> {
     const policy = def.retry;
     const attempts = policy?.attempts ?? 1;
     const { signal } = run.controller_;
-    const facts = options.factsFor(run);
-    const context = {
+    const contextOf = (facts: Facts<any>) => ({
       facts,
       signal,
       snapshot: () => facts.$snapshot(),
       requeue: () => options.onRequeue(run.req_.id),
-    };
+    });
+    /** Unbound: one view for every attempt. Bound: one per attempt, as 1.35. */
+    let shared: object | null = null;
     let last: Error | undefined;
     /** The failure ends the body too: abort its signal with the error. */
     let abort = false;
+    /** Aborted while it ran (canceled, superseded, clobbered): no outcome. */
+    let quiet = false;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       // Satisfied while it waited to retry: nothing is left to retry for.
       // The last failure is reported once; the body had ended already.
       if (attempt > 1 && run.satisfied_) {
         break;
       }
+      // Asked each attempt, as 1.35: a constraint found async since loses it.
+      const keys = options.bindingOf(run.req_);
+      const context = keys
+        ? contextOf(options.factsFor(run, bind(run, keys, baseline)))
+        : (shared ??= contextOf(options.factsFor(run)));
       try {
         await invoke(def, run, context);
         last = undefined;
+        // Aborted while it ran: that was its one outcome (1.35). For a
+        // clobbered run it is no outcome at all; it just leaves flight.
+        quiet = signal.aborted;
         break;
       } catch (error) {
         last = toError(error);
-        // Canceled or superseded while it ran: that was its one outcome.
-        if (signal.aborted) {
+        const timedOut = isTimeout(error);
+        // It failed after satisfying its requirement (1.35, checked before
+        // the abort), or a timeout ends its last attempt (L2a): its body
+        // still runs, so abort it. A superseded run has no outcome.
+        abort = run.satisfied_ || timedOut;
+        if (run.satisfied_ && !run.dropped_) {
           break;
         }
-        const timedOut = isTimeout(error);
-        // It failed after satisfying its requirement (1.35), or a timeout
-        // ends its last attempt (L2a): its body still runs, so abort it.
-        abort = run.satisfied_ || timedOut;
-        if (run.satisfied_) {
+        // Canceled, superseded or clobbered while it ran: no outcome here.
+        if (signal.aborted) {
+          quiet = true;
           break;
         }
         const reason = timedOut ? "timeout" : "error";
@@ -292,6 +424,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
           abort = false;
           await wait(delayFor(policy!, attempt, options.random), signal);
           if (signal.aborted) {
+            quiet = true;
             break;
           }
           emit("resolver.retry", () => ({
@@ -302,12 +435,15 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         }
       }
     }
-    end(run, last, abort);
+    if (!quiet) {
+      end(run, last, abort);
+    }
   }
 
   return {
     inflight,
-    resolve(req) {
+    detached,
+    resolve(req, baseline) {
       const current = inflight.get(req.id);
       if (current) {
         if (!current.satisfied_) {
@@ -342,17 +478,27 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         startedAt_: clock.now(),
         satisfied_: false,
         dropped_: false,
+        detached_: false,
       };
       inflight.set(req.id, run);
       emit("resolver.start", () => ({ resolver: resolverId, req }));
-      execute(def, run).finally(() => {
-        // A fallback: `end` or a cancel has emptied the slot already,
-        // unless the run failed before it reached `end`.
+      execute(def, run, baseline).finally(() => {
+        // `end` or a cancel has emptied the slot already, unless the run
+        // was aborted while it ran (no outcome) or failed before `end`.
+        detached.delete(run);
         if (inflight.get(req.id) === run) {
           inflight.delete(req.id);
           options.onEnd(run);
         }
       });
+    },
+    detach(requirementId) {
+      const run = inflight.get(requirementId);
+      if (run) {
+        inflight.delete(requirementId);
+        run.detached_ = true;
+        detached.add(run);
+      }
     },
     abort(requirementId) {
       const run = inflight.get(requirementId);

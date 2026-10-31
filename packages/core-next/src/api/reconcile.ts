@@ -15,8 +15,10 @@
  * 3. `commit_` (same continuation as the core's pass end): diff against the
  *    previous set. A removed requirement whose run's own writes were the
  *    only change to what its constraint read is satisfied (RFC row 1); any
- *    other is canceled. Each added one is dispatched, then requeues are
- *    applied; answers the `onReconcileEnd` result.
+ *    other is canceled, or detached when its constraint is bound (RFC-0003).
+ *    Each added one is dispatched with one baseline of the bound keys, read
+ *    before any of them starts, then requeues are applied; answers the
+ *    `onReconcileEnd` result.
  *
  * Follow-up passes (a run ended, a requeue, `enable()`) go through the core's
  * `schedule`, which asks the kernel's scheduler, so systems sharing one
@@ -24,11 +26,16 @@
  * resolvers defines no feature, so its pass is the L1 pass.
  */
 
+import isDevelopment from "#is-development";
 import { type ConstraintDef, createConstraints } from "./constraints.js";
 import type { ReconcileFeature, SystemPart } from "./core.js";
 import { DERIVATION_DEP_PREFIX } from "./facts.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
+
+/** Slots in a bound key's `[stamp, changes, dropped]` count triples. */
+const CHANGED = 1;
+const DROPPED = 2;
 
 declare module "../kernel.js" {
   interface KernelFeatures {
@@ -64,6 +71,44 @@ export const withReconcile: SystemPart = (context) => {
     }
   }
   const derivationIds = new Set(Object.keys(module.derive ?? {}));
+  /** Some constraint lists `abortOn` keys: only then is a baseline read. */
+  const bindings = Object.values(constraintDefs).some(
+    (def) => (def?.abortOn?.length ?? 0) > 0,
+  );
+  /** `id::reason` pairs already reported as binding disabled (1.35). */
+  const disabledBinding = new Set<string>();
+  /**
+   * 1.35's getConstraintBinding: the constraint's `abortOn` keys, unless it
+   * is async (declared, or found async at runtime). An async constraint
+   * awaits between its answer and the dispatch, so it cannot be bound; that
+   * is reported once per constraint and reason.
+   */
+  const bindingOf = (req: RequirementWithId): readonly string[] | undefined => {
+    const id = req.fromConstraint;
+    const def = bindings && id ? constraintDefs[id] : undefined;
+    const keys = def?.abortOn;
+    if (!keys || keys.length === 0) {
+      return undefined;
+    }
+    if (!def.async && !constraints.isAsync(id!)) {
+      return keys;
+    }
+    const reason = def.async ? "async-declared" : "async-promoted";
+    const once = `${id}::${reason}`;
+    if (!disabledBinding.has(once)) {
+      disabledBinding.add(once);
+      if (isDevelopment) {
+        console.warn(
+          reason === "async-promoted"
+            ? `[Directive] constraint '${id}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+            : `[Directive] Constraint "${id}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound. To enable abortOn, switch to a synchronous function-form when or a data-form when (always sync), and drop \`async: true\`.`,
+        );
+      }
+      emit("constraint.binding.disabled", () => ({ id, reason }));
+    }
+
+    return undefined;
+  };
   const constraints = createConstraints({
     defs: constraintDefs,
     facts: context.facts,
@@ -100,6 +145,10 @@ export const withReconcile: SystemPart = (context) => {
     defs: resolverDefs,
     store: context.store,
     factsFor: context.factsFor,
+    peek: (key) => context.store.get(key),
+    has: (key) => context.store.has(key),
+    onDrop: (key, stamp) => tally(key, stamp, DROPPED),
+    bindingOf,
     clock,
     owner: kernel.owner,
     // The kernel's seeded rng when it has one; else the host's, read at
@@ -118,11 +167,12 @@ export const withReconcile: SystemPart = (context) => {
       }));
       constraints.markResolved(run.req_);
       if (!previous.has(run.req_.id)) {
-        // A satisfied run: its requirement left the set already, so if it
-        // is asked again it must resolve again.
+        // A satisfied or detached run: its requirement left the set
+        // already, so if it is asked again it must resolve again.
         constraints.forget(run.req_.id);
-        if (constraints.hasDirty()) {
-          // Its `after` dependents are asked again (1.35).
+        if (!run.detached_ && constraints.hasDirty()) {
+          // Its `after` dependents are asked again (1.35). A detached run's
+          // end asks for no pass in 1.35.
           schedule();
         }
       }
@@ -162,12 +212,47 @@ export const withReconcile: SystemPart = (context) => {
   // nothing unless a second writer changes the same key in one window.
   let open = new Map<string, number | number[]>();
   let closed = new Map<string, number | number[]>();
+  // --- bound keys: counted (RFC-0003 with RFC row 1) ----------------------
+  // 1.35 counts a run's write to a bound key as its own even when the
+  // binding drops it, and compares counts: the removed runs' writes to a key
+  // must number its changes. So a key the runs changed nothing of, but that
+  // one of them tried to change after another writer did, is still theirs.
+  // Only a bound key can drop a write, so only bound keys are counted, per
+  // writer: flat `[stamp, changes, dropped]` triples, double buffered like
+  // the stamps. Every other key is answered by the stamps alone.
+  const boundKeys = bindings
+    ? new Set(
+        Object.values(constraintDefs).flatMap((def) => def?.abortOn ?? []),
+      )
+    : null;
+  let openTally = new Map<string, number[]>();
+  let closedTally = new Map<string, number[]>();
+  const tally = (key: string, stamp: number, slot: 1 | 2) => {
+    const counts = openTally.get(key);
+    if (counts === undefined) {
+      openTally.set(key, [stamp, slot === CHANGED ? 1 : 0, slot - 1]);
+
+      return;
+    }
+    for (let i = 0; i < counts.length; i += 3) {
+      if (counts[i] === stamp) {
+        counts[i + slot]!++;
+
+        return;
+      }
+    }
+    counts.push(stamp, slot === CHANGED ? 1 : 0, slot - 1);
+  };
   if (Object.keys(resolverDefs).length > 0) {
     context.writers.record = (key, stamp) => {
-      // As 1.35: a write counts only while a run is in flight. One made with
-      // none (a plugin writing before the first run starts) is nobody's.
-      if (resolvers.inflight.size === 0) {
+      // As 1.35: a write counts only while a run is in flight (or detached
+      // and still going). One made with none (a plugin writing before the
+      // first run starts) is nobody's.
+      if (resolvers.inflight.size === 0 && resolvers.detached.size === 0) {
         return;
+      }
+      if (boundKeys?.has(key)) {
+        tally(key, stamp, CHANGED);
       }
       const by = open.get(key);
       if (by === undefined) {
@@ -183,6 +268,22 @@ export const withReconcile: SystemPart = (context) => {
   }
   /** Every write to `key` in the closed window came from one of `joint`. */
   const ownedBy = (key: string, joint: ReadonlySet<number>) => {
+    const counts = closedTally.get(key);
+    if (counts !== undefined) {
+      // 1.35's count test: the joint runs' changes plus their dropped writes
+      // equal all its changes, so the drops make up for the other writers'.
+      let others = 0;
+      let dropped = 0;
+      for (let i = 0; i < counts.length; i += 3) {
+        if (joint.has(counts[i]!)) {
+          dropped += counts[i + DROPPED]!;
+        } else {
+          others += counts[i + CHANGED]!;
+        }
+      }
+
+      return others === dropped;
+    }
     const by = closed.get(key);
     if (by === undefined) {
       // Changed while no run was in flight: uncounted, as in 1.35, so it
@@ -245,7 +346,7 @@ export const withReconcile: SystemPart = (context) => {
     // The runs whose requirements disappeared and that wrote this pass own
     // the pass's changes jointly (keyed siblings writing one fact).
     const joint = new Set<number>();
-    if (closed.size > 0) {
+    if (closed.size > 0 || closedTally.size > 0) {
       for (const req of removed) {
         const run = runFor(req.id);
         if (run && wrote(run.stamp_)) {
@@ -254,6 +355,8 @@ export const withReconcile: SystemPart = (context) => {
       }
     }
     for (const req of removed) {
+      // Looked up first, as 1.35 does: it may report a disabled binding.
+      const bound = bindingOf(req);
       const run = runFor(req.id);
       if (run && joint.size > 0 && satisfied(run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
@@ -265,17 +368,29 @@ export const withReconcile: SystemPart = (context) => {
         // Ended in this pass, not by its own write: its outcome stands
         // (one per run). 1.35 would cancel it as well.
         ended.delete(req.id);
+      } else if (bound) {
+        // RFC-0003: not aborted, so its data writes land (the binding still
+        // drops a clobbered key); out of flight, so the requirement can be
+        // dispatched again.
+        resolvers.detach(req.id);
       } else {
         resolvers.abort(req.id);
       }
       constraints.forget(req.id);
     }
   }
-  /** `stamp` changed some key in the closed window. */
+  /** `stamp` changed some key in the closed window, or tried to (dropped). */
   const wrote = (stamp: number) => {
     for (const by of closed.values()) {
       if (by === stamp || (typeof by !== "number" && by.includes(stamp))) {
         return true;
+      }
+    }
+    for (const counts of closedTally.values()) {
+      for (let i = 0; i < counts.length; i += 3) {
+        if (counts[i] === stamp && counts[i + DROPPED]! > 0) {
+          return true;
+        }
       }
     }
 
@@ -289,6 +404,12 @@ export const withReconcile: SystemPart = (context) => {
       closed = open;
       done.clear();
       open = done;
+      if (boundKeys !== null) {
+        const counted = closedTally;
+        closedTally = openTally;
+        counted.clear();
+        openTally = counted;
+      }
     },
     evaluate_: (passKeys) =>
       constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys),
@@ -318,9 +439,25 @@ export const withReconcile: SystemPart = (context) => {
       if (removed.length > 0) {
         retract(removed, passKeys);
       }
+      // One baseline for every run this pass dispatches, read before the
+      // first starts: a run's synchronous write to a key a later sibling is
+      // bound to is then a clobber for that sibling (1.35). Only the bound
+      // keys are read, and nothing at all without a binding.
+      let baseline: Record<string, unknown> | undefined;
+      if (bindings) {
+        for (const req of added) {
+          const keys = bindingOf(req);
+          if (keys) {
+            baseline ??= Object.create(null) as Record<string, unknown>;
+            for (const key of keys) {
+              baseline[key] = context.store.get(key);
+            }
+          }
+        }
+      }
       for (const req of added) {
         if (system.isRunning) {
-          resolvers.resolve(req);
+          resolvers.resolve(req, baseline);
         } else {
           // Stopped while this pass waited: left for start() to dispatch.
           next.delete(req.id);

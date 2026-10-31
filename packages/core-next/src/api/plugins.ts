@@ -50,6 +50,11 @@ const HOOKS: Record<string, string[]> = {
   // L2: reconcile.ts.
   "constraint.evaluate": ["onConstraintEvaluate", "id", "active", "explain"],
   "constraint.error": ["onConstraintError", "id", "error"],
+  "constraint.binding.disabled": [
+    "onConstraintBindingDisabled",
+    "id",
+    "reason",
+  ],
   "requirement.created": ["onRequirementCreated", "req"],
   "requirement.met": ["onRequirementMet", "req", "resolver"],
   "requirement.canceled": ["onRequirementCanceled", "req"],
@@ -58,6 +63,7 @@ const HOOKS: Record<string, string[]> = {
   "resolver.error": ["onResolverError", "resolver", "req", "error"],
   "resolver.retry": ["onResolverRetry", "resolver", "req", "attempt"],
   "resolver.cancel": ["onResolverCancel", "resolver", "req"],
+  "resolver.write.rejected": ["onResolverWriteRejected", "event"],
 };
 
 const logError = (plugin: Plugin, hook: string, error: unknown): void => {
