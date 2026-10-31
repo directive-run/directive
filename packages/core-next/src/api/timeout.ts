@@ -1,7 +1,9 @@
 /**
  * Timeouts on the kernel clock, shared by async constraints and resolvers
- * (L2). The timer is owned by the system, so disposing the kernel clears
- * it, and a virtual clock makes it deterministic.
+ * (L2). 1.35's withTimeout, await for await: a race with a timer, cleared
+ * once the race settles. As in 1.35 the timer is not cleared by stop or
+ * destroy (a run canceled meanwhile ignores it when it fires); a virtual
+ * clock makes it deterministic.
  */
 
 import type { Clock } from "../clock.js";
@@ -12,29 +14,24 @@ const TIMEOUT: unique symbol = Symbol();
 export const isTimeout = (error: unknown): boolean =>
   !!(error as Record<symbol, unknown> | null)?.[TIMEOUT];
 
-/** Reject with a marked error after `ms` on the kernel clock, owned by `owner`. */
-export function withTimeout<T>(
+/** Reject with a marked error after `ms` on the kernel clock. */
+export async function withTimeout<T>(
   clock: Clock,
-  owner: number,
   value: T | Promise<T>,
   ms: number,
   message: string,
 ): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = clock.setTimeout(
+  let timer = 0;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = clock.setTimeout(
       () => reject(Object.assign(new Error(message), { [TIMEOUT]: true })),
       ms,
-      { owner, kind: "timeout" },
-    );
-    Promise.resolve(value).then(
-      (v) => {
-        clock.clearTimeout(timer);
-        resolve(v);
-      },
-      (error) => {
-        clock.clearTimeout(timer);
-        reject(error);
-      },
+      { kind: "timeout" },
     );
   });
+  try {
+    return await Promise.race([value, timedOut]);
+  } finally {
+    clock.clearTimeout(timer);
+  }
 }

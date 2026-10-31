@@ -38,7 +38,9 @@ function loader(name: string, deps?: Record<string, unknown>) {
     },
     constraints: {
       load: {
-        when: (facts: any) => (deps ? facts.self.go : facts.go) && !(deps ? facts.self.done : facts.done),
+        when: (facts: any) =>
+          (deps ? facts.self.go : facts.go) &&
+          !(deps ? facts.self.done : facts.done),
         require: { type: "LOAD", from: name },
       },
     },
@@ -192,7 +194,9 @@ describe("a data-form when with $changed", () => {
       );
     }
     expect(() =>
-      createSystem({ modules: { n: withWhen({ x: { $changed: true } }) } } as never),
+      createSystem({
+        modules: { n: withWhen({ x: { $changed: true } }) },
+      } as never),
     ).toThrow('[Directive] constraint "n::c": $changed is effects-only');
   });
 
@@ -244,7 +248,10 @@ describe("inspect() and the last L2 gaps", () => {
     await flush();
     expect(statuses).toMatchObject([{ state: "pending" }]);
     const view = system.inspect();
-    expect(view.resolvers["R:{}"]).toMatchObject({ state: "running", attempt: 1 });
+    expect(view.resolvers["R:{}"]).toMatchObject({
+      state: "running",
+      attempt: 1,
+    });
     expect(view.unmet.map((r: any) => r.id)).toEqual(["R:{}"]);
     expect(view.inflight).toMatchObject([{ id: "R:{}", resolverId: "r" }]);
     expect(view.constraints).toMatchObject([

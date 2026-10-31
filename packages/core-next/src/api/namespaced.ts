@@ -522,7 +522,10 @@ export function createNamespacedSystem(
             deps: depsOf(context.facts, ns, deps),
           }
         : { ...context, facts: resolverFactsOf(context.facts, ns) };
-    const run = async (context: Rec, call: (wrapped: Rec) => Promise<unknown>) => {
+    const run = async (
+      context: Rec,
+      call: (wrapped: Rec) => Promise<unknown>,
+    ) => {
       const wrapped = wrap(context);
       if (isDevelopment && deps.length > 0) {
         // A value handed out through context.deps changed in place is

@@ -57,7 +57,6 @@ export interface ConstraintsOptions {
   /** A derivation named in declared deps (see SystemContext.watch). */
   watch: (id: string) => void;
   clock: Clock;
-  owner: number;
   onEvaluate: (id: string, active: boolean) => void;
   onError: (id: string, error: unknown) => void;
 }
@@ -220,8 +219,26 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         return DERIVATION_DEP_PREFIX + n;
       }),
     );
+  /**
+   * 1.35's updateDependencies: unchanged deps (same keys, not none) leave the
+   * index alone, so a constraint keeps its place in each key's set, and the
+   * order a pass evaluates affected constraints in is 1.35's.
+   */
   function setDeps(id: string, next: Set<string>): void {
-    for (const key of deps.get(id) ?? []) {
+    const prev = deps.get(id);
+    if (prev !== undefined && prev.size === next.size && prev.size > 0) {
+      let same = true;
+      for (const key of next) {
+        if (!prev.has(key)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        return;
+      }
+    }
+    for (const key of prev ?? []) {
       byKey.get(key)?.delete(id);
     }
     deps.set(id, next);
@@ -315,7 +332,6 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     try {
       const active = await withTimeout(
         options.clock,
-        options.owner,
         call(def.when) as Promise<boolean>,
         def.timeout ?? ASYNC_WHEN_TIMEOUT_MS,
         `Constraint "${id}" timed out after ${def.timeout ?? ASYNC_WHEN_TIMEOUT_MS}ms`,
@@ -661,10 +677,7 @@ function hasChanged(
   }
   if (Array.isArray(spec)) {
     return spec.some(
-      (c) =>
-        isObject(c) &&
-        typeof c.fact === "string" &&
-        c.op === "$changed",
+      (c) => isObject(c) && typeof c.fact === "string" && c.op === "$changed",
     );
   }
   if (

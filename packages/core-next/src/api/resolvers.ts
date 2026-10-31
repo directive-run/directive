@@ -6,13 +6,15 @@
  *   write. Then the requirement is back, and the new dispatch supersedes
  *   the old run: it is canceled (its one outcome) and its later writes are
  *   dropped, so it cannot overwrite the new run's result.
- * - Exactly one outcome per run: complete, cancel or error. The in-flight
- *   slot is the one source of truth, and each outcome empties it before it
- *   reports: `cancel` for a cancel (and a supersede); `end` for complete or
- *   error, only while the slot still holds the run. So a run canceled while
- *   it waits to retry reports the cancel and nothing else (GATE-1 quirk b:
- *   1.35 reports the cancel, then an error), and a pass that commits while
- *   a completion is being reported finds no run to cancel.
+ * - Exactly one outcome per run: complete, cancel or error, guarded by the
+ *   run's `done_` mark. So a run canceled while it waits to retry reports
+ *   the cancel and nothing else (GATE-1 quirk b: 1.35 reports the cancel,
+ *   then an error), and a run canceled after it reported (a pass retracts
+ *   it before it leaves flight) reports nothing more.
+ * - The timing is 1.35's, microtask for microtask: the retry loop has
+ *   executeResolve's shape (an error is reported after processRetryError
+ *   and handleRetryError resolve), and a run leaves flight, asking for a
+ *   pass, in the `finally` after its outcome. The passes follow from it.
  * - Each run is a writer: its `context.facts` passes the run's id as the
  *   stamp of every write it makes (`store.set(key, value, stamp)`), so the
  *   pass can tell whether a run's own writes retracted its requirement. A
@@ -20,9 +22,9 @@
  *   run's.
  * - A satisfied run is not canceled: it stays in flight (stop aborts it,
  *   settle waits), is not retried, and reports one outcome when it ends.
- * - A timeout ends the run: it aborts the run's signal (the reason is the
- *   timeout error, so `isTimeout(signal.reason)`), reports one error, and
- *   keeps the run's later writes. Cancel keeps them too, so a
+ * - A timeout fails the attempt as 1.35 does: the run's signal is not
+ *   aborted (its body is not told), one error is reported, and the body's
+ *   later writes land. Cancel keeps them too, so a
  *   `finally { loading = false }` lands; only a supersede drops them.
  * - Retry: backoff (none, linear, exponential), the `maxDelay` clamp, then
  *   jitter (none, full, equal, `{ maxMs }`), at least 1 ms. The waits are
@@ -107,6 +109,8 @@ export interface Run extends Writer {
   detached_: boolean;
   /** The attempt running, 0 while pending (inspect()'s status). */
   attempt_: number;
+  /** Its one outcome has been reported. */
+  done_: boolean;
 }
 
 /** 1.35's per-attempt cap on clobber reports, then one summary. */
@@ -137,7 +141,7 @@ export interface ResolversOptions {
   emit: (at: string, data: () => Record<string, unknown>) => void;
   onComplete: (run: Run) => void;
   onError: (run: Run, error: Error) => void;
-  /** A run left flight on its own (not canceled), before its outcome. */
+  /** A run left flight on its own (not canceled), after its outcome. */
   onEnd: (run: Run) => void;
   onRequeue: (requirementId: string) => void;
 }
@@ -146,14 +150,14 @@ export interface Resolvers {
   /** `baseline`: the bound keys' values before this pass dispatched anything. */
   resolve(
     req: RequirementWithId,
-    baseline?: Readonly<Record<string, unknown>>,
+    baseline?: ReadonlyMap<string, unknown>,
   ): void;
   abort(requirementId: string): void;
   /** Take a run out of flight without aborting it (RFC-0003). */
   detach(requirementId: string): void;
   /** Detached runs still going. */
   detached: ReadonlySet<Run>;
-  /** Cancel every run in flight; returns their requirement ids. */
+  /** Cancel every run in flight; returns the ids of those with no outcome yet. */
   abortAll(): string[];
   /** The run in flight for a requirement. */
   inflight: ReadonlyMap<string, Run>;
@@ -210,7 +214,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
           `[Directive] Resolver "${id}" must define either resolve() or resolveBatch(). Add one of these methods to handle requirements.`,
         );
       }
-      if (def.batch?.enabled && !def.resolveBatch && !def.resolveBatchWithResults) {
+      if (
+        def.batch?.enabled &&
+        !def.resolveBatch &&
+        !def.resolveBatchWithResults
+      ) {
         if (!def.resolve) {
           throw new Error(
             `[Directive] Resolver "${id}" has batch.enabled=true but no resolve(), resolveBatch(), or resolveBatchWithResults() method.`,
@@ -243,42 +251,34 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     return null;
   };
 
-  /** A cancel is a run's outcome: it empties the slot, so nothing follows. */
+  /**
+   * Take a run out of flight and abort it. The cancel is its outcome unless
+   * it reported one already (1.35 would report the cancel as well).
+   */
   const cancel = (run: Run) => {
     inflight.delete(run.req_.id);
     run.controller_.abort();
-    emit("resolver.cancel", () => ({ resolver: run.resolver_, req: run.req_ }));
-    emit("requirement.canceled", () => ({ req: run.req_ }));
+    if (!run.done_) {
+      run.done_ = true;
+      emit("resolver.cancel", () => ({
+        resolver: run.resolver_,
+        req: run.req_,
+      }));
+      emit("requirement.canceled", () => ({ req: run.req_ }));
+    }
   };
 
-  /**
-   * Complete or error, only while the slot still holds the run. The run
-   * leaves flight before the outcome is reported, so nothing that runs
-   * meanwhile (a pass that retracts it, a stop) can report a second one.
-   */
-  const end = (run: Run, error?: Error, abort?: boolean) => {
-    if (run.detached_) {
-      // Its slot went at the detach; 1.35 asks for no pass after it.
-      detached.delete(run);
-    } else if (inflight.get(run.req_.id) === run) {
-      inflight.delete(run.req_.id);
-      options.onEnd(run);
+  /** Complete or error: the run's one outcome. It leaves flight later. */
+  const report = (run: Run, error?: Error) => {
+    if (run.done_) {
+      return;
+    }
+    run.done_ = true;
+    if (error) {
+      options.onError(run, error);
     } else {
-      return;
-    }
-    if (!error) {
       options.onComplete(run);
-
-      return;
     }
-    if (abort) {
-      // The failure ends the run: its body sees the abort, and what it
-      // writes afterwards (a `finally` cleanup) still lands. A timeout is
-      // the reason (L2a); a run that had satisfied its requirement is
-      // aborted plainly, as 1.35 does.
-      run.controller_.abort(run.satisfied_ ? undefined : error);
-    }
-    options.onError(run, error);
   };
 
   /** Wait on the kernel clock; an abort wakes it early. */
@@ -307,7 +307,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     if (def.timeout && def.timeout > 0) {
       await withTimeout(
         clock,
-        owner,
         pending,
         def.timeout,
         `Resolver "${run.resolver_}" timed out after ${def.timeout}ms`,
@@ -328,11 +327,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   function bind(
     run: Run,
     keys: readonly string[],
-    baseline: Readonly<Record<string, unknown>> | undefined,
+    baseline: ReadonlyMap<string, unknown> | undefined,
   ): Allow {
     const expected = new Map<string, unknown>();
     for (const key of keys) {
-      expected.set(key, baseline ? baseline[key] : options.peek(key));
+      expected.set(key, baseline ? baseline.get(key) : options.peek(key));
     }
     /** Keys it lost to another writer: one-shot, later writes drop too. */
     let lost: Set<string> | null = null;
@@ -388,11 +387,58 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     };
   }
 
-  /** 1.35's executeResolve: the retry loop, ending in `end` exactly once. */
+  /**
+   * 1.35's handleRetryError, for a run not aborted: the retry hook, then
+   * the backoff wait. False ends the retries (the hook said no, or the run
+   * was aborted while it waited).
+   */
+  async function backoff(
+    policy: RetryPolicy | undefined,
+    error: Error,
+    attempt: number,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    const reason = isTimeout(error) ? "timeout" : "error";
+    if (
+      policy?.shouldRetry &&
+      !policy.shouldRetry(error, attempt, { reason })
+    ) {
+      return false;
+    }
+    // A second attempt exists only under a retry policy.
+    if (policy && attempt < policy.attempts) {
+      await wait(delayFor(policy, attempt, options.random), signal);
+
+      return !signal.aborted;
+    }
+
+    return true;
+  }
+
+  /** 1.35's processRetryError: the backoff, then the retry report. */
+  async function retryStep(
+    run: Run,
+    policy: RetryPolicy | undefined,
+    error: Error,
+    attempt: number,
+  ): Promise<boolean> {
+    const go = await backoff(policy, error, attempt, run.controller_.signal);
+    if (go && policy && attempt < policy.attempts) {
+      emit("resolver.retry", () => ({
+        resolver: run.resolver_,
+        req: run.req_,
+        attempt: attempt + 1,
+      }));
+    }
+
+    return go;
+  }
+
+  /** 1.35's executeResolve: the retry loop, ending in one `report` at most. */
   async function execute(
     def: ResolverDef,
     run: Run,
-    baseline: Readonly<Record<string, unknown>> | undefined,
+    baseline: ReadonlyMap<string, unknown> | undefined,
   ): Promise<void> {
     const policy = def.retry;
     const attempts = policy?.attempts ?? 1;
@@ -406,11 +452,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     /** Unbound: one view for every attempt. Bound: one per attempt, as 1.35. */
     let shared: object | null = null;
     let last: Error | undefined;
-    /** The failure ends the body too: abort its signal with the error. */
-    let abort = false;
-    /** Aborted while it ran (canceled, superseded, clobbered): no outcome. */
-    let quiet = false;
     for (let attempt = 1; attempt <= attempts; attempt++) {
+      // Aborted while it waited (canceled, superseded): no outcome here.
+      if (signal.aborted) {
+        return;
+      }
       // Satisfied while it waited to retry: nothing is left to retry for.
       // The last failure is reported once; the body had ended already.
       if (attempt > 1 && run.satisfied_) {
@@ -424,52 +470,42 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         : (shared ??= contextOf(options.factsFor(run)));
       try {
         await invoke(def, run, context);
-        last = undefined;
         // Aborted while it ran: that was its one outcome (1.35). For a
         // clobbered run it is no outcome at all; it just leaves flight.
-        quiet = signal.aborted;
-        break;
+        if (!signal.aborted) {
+          report(run);
+        }
+
+        return;
       } catch (error) {
+        // Superseded: a newer run owns the requirement.
+        if (run.dropped_) {
+          return;
+        }
         last = toError(error);
-        const timedOut = isTimeout(error);
-        // It failed after satisfying its requirement (1.35, checked before
-        // the abort), or a timeout ends its last attempt (L2a): its body
-        // still runs, so abort it. A superseded run has no outcome.
-        abort = run.satisfied_ || timedOut;
-        if (run.satisfied_ && !run.dropped_) {
+        if (run.satisfied_) {
+          // It failed after satisfying its requirement: 1.35 aborts it
+          // plainly (a timeout alone does not), reports the failure once,
+          // and what it writes afterwards (a `finally` cleanup) still lands.
+          run.controller_.abort();
           break;
         }
-        // Canceled, superseded or clobbered while it ran: no outcome here.
+        // Canceled or clobbered while it ran: no outcome here.
         if (signal.aborted) {
-          quiet = true;
-          break;
+          return;
         }
-        const reason = timedOut ? "timeout" : "error";
-        if (
-          policy?.shouldRetry &&
-          !policy.shouldRetry(last, attempt, { reason })
-        ) {
-          break;
+        const go = await retryStep(run, policy, last, attempt);
+        // Quirk b: canceled while it waited to retry; the cancel was its
+        // one outcome (1.35 reports the error as well).
+        if (signal.aborted) {
+          return;
         }
-        // A second attempt exists only under a retry policy.
-        if (policy && attempt < attempts) {
-          abort = false;
-          await wait(delayFor(policy, attempt, options.random), signal);
-          if (signal.aborted) {
-            quiet = true;
-            break;
-          }
-          emit("resolver.retry", () => ({
-            resolver: run.resolver_,
-            req: run.req_,
-            attempt: attempt + 1,
-          }));
+        if (!go) {
+          break;
         }
       }
     }
-    if (!quiet) {
-      end(run, last, abort);
-    }
+    report(run, last);
   }
 
   return {
@@ -512,12 +548,14 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         dropped_: false,
         detached_: false,
         attempt_: 0,
+        done_: false,
       };
       inflight.set(req.id, run);
       emit("resolver.start", () => ({ resolver: resolverId, req }));
       execute(def, run, baseline).finally(() => {
-        // `end` or a cancel has emptied the slot already, unless the run
-        // was aborted while it ran (no outcome) or failed before `end`.
+        // 1.35 leaves flight here, a microtask after the outcome: a run
+        // canceled or detached meanwhile has left already and asks for no
+        // pass.
         detached.delete(run);
         if (inflight.get(req.id) === run) {
           inflight.delete(req.id);
@@ -540,8 +578,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       }
     },
     abortAll() {
-      const ids = [...inflight.keys()];
+      const ids: string[] = [];
       for (const run of [...inflight.values()]) {
+        if (!run.done_) {
+          ids.push(run.req_.id);
+        }
         cancel(run);
       }
 

@@ -341,7 +341,11 @@ export function createSystemCore<const M extends ModuleSchema>(
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
-  /** A part asked for a pass while one ran (a run ended, `enable()`). */
+  /**
+   * A part asked for a pass while one ran (a run ended, `enable()`), on a
+   * lane other than `micro`. On `micro` the ask is 1.35's scheduleReconcile:
+   * dropped if its microtask finds the pass still open.
+   */
   let again = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
@@ -593,8 +597,9 @@ export function createSystemCore<const M extends ModuleSchema>(
         if (warned.size > 1000) {
           warned.delete(warned.values().next().value!);
         }
-        const type = (context as { requirement?: { type?: unknown } } | undefined)
-          ?.requirement?.type;
+        const type = (
+          context as { requirement?: { type?: unknown } } | undefined
+        )?.requirement?.type;
         const consequence =
           source === "resolver" && typeof type === "string" && !satisfied
             ? ` Requirement "${type}" stays unmet.`
@@ -1084,7 +1089,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     tracker,
     reportError,
     schedule() {
-      again = true;
+      again = kernel.lane !== "micro";
       scheduleReconcile();
     },
     settled: notifySettle,
