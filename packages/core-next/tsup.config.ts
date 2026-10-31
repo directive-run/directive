@@ -33,7 +33,22 @@ const devTransform = (source: string, expression: string): string =>
       `const __directiveDev = /* @__PURE__ */ (() => (${expression}))();`,
     );
 
-function inlineIsDevelopment(expression: string): EsbuildPlugin {
+/**
+ * The development and production builds: the dev check is the literal `true`
+ * or `false` at each use and the import is dropped, as in 1.35. A literal
+ * folds in this build with no bundler setting, so the production build drops
+ * the dev code on its own and the development build runs the checks where
+ * `process` does not exist (a browser dev server).
+ */
+const literalTransform = (source: string, literal: "true" | "false"): string =>
+  source
+    .replace(IS_DEVELOPMENT_IMPORT, "")
+    .replace(IS_DEVELOPMENT_USE, `(${literal})`);
+
+function inlineIsDevelopment(
+  transform: (source: string) => string,
+  devModule: string,
+): EsbuildPlugin {
   return {
     name: "inline-is-development",
     setup(build) {
@@ -43,13 +58,11 @@ function inlineIsDevelopment(expression: string): EsbuildPlugin {
           return undefined;
         }
 
-        return {
-          contents: devTransform(source, expression),
-          loader: "ts",
-        };
+        return { contents: transform(source), loader: "ts" };
       });
+      // Anything importing the module some other way gets the matching file.
       build.onResolve({ filter: /^#is-development$/ }, () => ({
-        path: fileURLToPath(new URL("./src/dev-true.ts", import.meta.url)),
+        path: fileURLToPath(new URL(devModule, import.meta.url)),
       }));
     },
   };
@@ -58,25 +71,79 @@ function inlineIsDevelopment(expression: string): EsbuildPlugin {
 export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
-export default defineConfig({
+const shared: Options = {
   entry: {
     index: "src/index.ts",
     internals: "src/internals.ts",
     testing: "src/utils/testing.ts",
   },
+  // ESM only, as core-next is today. CJS is a packaging follow-up for alpha.0.
   format: ["esm"],
-  dts: true,
   minify: false,
   sourcemap: false,
-  // `pnpm build` empties dist first.
+  // `pnpm build` empties dist first. Cleaning here would race the three
+  // builds below, which run at the same time and share the directory.
   clean: false,
   splitting: true,
   treeshake: true,
   target: "es2022",
-  esbuildPlugins: [inlineIsDevelopment(DEV_CHECK)],
   // Internal (private) members are named with a trailing `_` and shortened
   // here; public names are untouched. scripts/size.mjs measures the same.
   esbuildOptions(options) {
     options.mangleProps = /_$/;
   },
-});
+};
+
+// The same three builds 1.35 ships (packages/core/tsup.config.ts), selected by
+// the `exports` conditions in package.json.
+export default defineConfig([
+  // The default build, for consumers with neither condition. The check is
+  // read from the environment at run time and folded by a bundler that
+  // defines `process.env.NODE_ENV`. With no `process` (a browser) it is
+  // `false`: a bundler that only defines NODE_ENV cannot fold
+  // `typeof process`, so `true` there would keep every dev branch in its
+  // production bundles. Browser dev servers get the checks from the
+  // `development` build. The only build with type declarations.
+  {
+    ...shared,
+    outDir: "dist",
+    dts: true,
+    esbuildPlugins: [
+      inlineIsDevelopment(
+        (source) => devTransform(source, DEV_CHECK),
+        "./src/dev-true.ts",
+      ),
+    ],
+  },
+  // The development build, selected by the `development` export condition
+  // (Vite and webpack set it for dev servers and development builds).
+  // `isDevelopment` is the literal `true`. Unminified: it is the build people
+  // debug in a browser.
+  {
+    ...shared,
+    outDir: "dist/development",
+    dts: false,
+    esbuildPlugins: [
+      inlineIsDevelopment(
+        (source) => literalTransform(source, "true"),
+        "./src/dev-true.ts",
+      ),
+    ],
+  },
+  // The production build, selected by the `production` export condition
+  // (webpack and Vite set it for production builds; esbuild takes
+  // `--conditions=production`). `isDevelopment` is the literal `false`, so no
+  // bundler setting is needed for the dev code to disappear.
+  {
+    ...shared,
+    outDir: "dist/production",
+    dts: false,
+    minify: true,
+    esbuildPlugins: [
+      inlineIsDevelopment(
+        (source) => literalTransform(source, "false"),
+        "./src/dev-false.ts",
+      ),
+    ],
+  },
+]);
