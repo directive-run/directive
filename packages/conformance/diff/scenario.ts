@@ -42,9 +42,12 @@ import {
   type Difference,
   compareContract,
   compareFull,
+  comparePositions,
   drawProblems,
   drawnResolvers,
   interleaving,
+  isAfter,
+  latestPosition,
 } from "./compare.js";
 import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
@@ -115,6 +118,10 @@ export interface ScenarioDef {
  * An approved difference. It covers a difference in `scenario` on `stream`
  * with this `kind`; `engine`, `step`, `op` and `path` (a prefix inside the
  * entry) narrow it when given. Keyed by content, never by trace index.
+ *
+ * `ends: true` (fuzz only, signed; the census rejects it anywhere else)
+ * marks an approved quirk whose consequences cascade: the difference it
+ * covers ends the comparison of that fuzz case (`explain`).
  */
 export interface Divergence {
   id: string;
@@ -125,10 +132,14 @@ export interface Divergence {
   step?: number;
   op?: Difference["op"];
   path?: string;
+  ends?: boolean;
   reason: string;
   approvedBy: string;
   date: string;
 }
+
+/** The scenario name every fuzz case runs under (diff/fuzz/model.ts `toScenario`). */
+export const FUZZ_SCENARIO = "fuzz";
 
 export type { Difference };
 
@@ -145,6 +156,8 @@ export interface ScenarioResult {
   advisories: string[];
   /** Divergence ids that covered at least one difference. */
   used: string[];
+  /** Where an `ends` divergence stopped the comparison of a fuzz case. */
+  ended: Ended[];
   /** Engines compared against the reference. */
   compared: string[];
   traces: { reference: TraceEntry[]; candidate: TraceEntry[] };
@@ -677,6 +690,84 @@ export function covers(div: Divergence, name: string, d: Difference): boolean {
   );
 }
 
+/** A fuzz case whose comparison an `ends` divergence stopped, on one engine. */
+export interface Ended {
+  engine: string;
+  /** The `ends` divergence that stopped it. */
+  id: string;
+  /** The difference it covered, where the comparison stopped. */
+  at: Difference;
+  /** Later differences of that case on that engine, not compared. */
+  dropped: number;
+}
+
+/**
+ * Match one scenario's contract differences to divergences. Each difference
+ * is covered by the first entry that covers it, in file order: covered, it
+ * passes and the entry is used; uncovered, it is reported.
+ *
+ * A fuzz case on one engine also stops at its first difference whose
+ * covering entry has `ends: true` (the earliest by `latestPosition`): that
+ * difference passes, and a difference strictly after it in every trace it
+ * is in (`isAfter`, diff/compare.ts) is not compared. Within one trace that
+ * is the trace order; across the two traces only a matched record between
+ * them orders two records, so a difference in the same gap as the stop, in
+ * the other trace, is still matched as usual (and an uncovered one still
+ * fails), as is one before it. Each engine is walked on its own, and a hand
+ * scenario never stops: there `ends` is just an entry.
+ */
+export function explain(
+  name: string,
+  differences: Difference[],
+  divergences: Divergence[],
+): { unexplained: Difference[]; used: string[]; ended: Ended[] } {
+  const coverOf = (d: Difference) =>
+    divergences.find((x) => covers(x, name, d));
+  const cuts = new Map<string, { at: Difference; id: string }>();
+  if (name === FUZZ_SCENARIO) {
+    for (const d of differences) {
+      const div = coverOf(d);
+      const cut = cuts.get(d.engine);
+      if (
+        div?.ends === true &&
+        (!cut ||
+          comparePositions(latestPosition(d), latestPosition(cut.at)) < 0)
+      ) {
+        cuts.set(d.engine, { at: d, id: div.id });
+      }
+    }
+  }
+  const used = new Set<string>();
+  const dropped = new Map<string, number>();
+  const unexplained = differences.filter((d) => {
+    const cut = cuts.get(d.engine);
+    if (cut && isAfter(d, cut.at)) {
+      dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
+
+      return false;
+    }
+    const div = coverOf(d);
+    if (div) {
+      used.add(div.id);
+
+      return false;
+    }
+
+    return true;
+  });
+
+  return {
+    unexplained,
+    used: [...used],
+    ended: [...cuts].map(([engine, { at, id }]) => ({
+      engine,
+      id,
+      at,
+      dropped: dropped.get(engine) ?? 0,
+    })),
+  };
+}
+
 export async function runScenario(
   def: ScenarioDef,
   opts: RunOptions = {},
@@ -706,6 +797,7 @@ export async function runScenario(
       unexplained: [],
       advisories: [],
       used: [],
+      ended: [],
       compared: [],
       traces: { reference: first, candidate: [] },
       runaway: true,
@@ -769,17 +861,16 @@ export async function runScenario(
       }
     }
   }
-  const used = new Set<string>();
-  const unexplained = differences.filter((d) => {
-    const div = divergences.find((x) => covers(x, def.name, d));
-    if (div) {
-      used.add(div.id);
-
-      return false;
-    }
-
-    return true;
-  });
+  const { unexplained, used, ended } = explain(
+    def.name,
+    differences,
+    divergences,
+  );
+  for (const e of ended) {
+    advisories.push(
+      `ended on ${e.engine} by ${e.id} at ${describeDifference(e.at)}: ${e.dropped} later difference(s) not compared`,
+    );
+  }
 
   const report = [
     ...problems,
@@ -807,7 +898,8 @@ export async function runScenario(
     differences,
     unexplained,
     advisories,
-    used: [...used],
+    used,
+    ended,
     compared: Object.keys(theirs),
     traces: {
       reference: first,
@@ -846,18 +938,78 @@ export function logResult(result: ScenarioResult): void {
   ]);
 }
 
+/** What a fuzz run counts, case by case (diff/fuzz/fuzz.test.ts). */
+export interface FuzzTally {
+  ran: number;
+  runaway: number;
+  /** Compared cases that v2 took part in. */
+  onV2: number;
+  mostFired: number;
+  /** Compared cases an `ends` divergence stopped (on any engine). */
+  ended: number;
+  /** The sum of the step each ended case stopped at, for the mean. */
+  endedSteps: number;
+  /** Ended cases that stopped at step 0: nothing after setup was compared. */
+  endedAtStep0: number;
+}
+
+/** A tally before the first case. */
+export function newFuzzTally(): FuzzTally {
+  return {
+    ran: 0,
+    runaway: 0,
+    onV2: 0,
+    mostFired: 0,
+    ended: 0,
+    endedSteps: 0,
+    endedAtStep0: 0,
+  };
+}
+
+/**
+ * Count one fuzz case. A runaway is discarded; every other case is
+ * compared, whether it passed, failed or was ended by an `ends` divergence
+ * (`explain`), so an ended case counts toward the floors like any other.
+ */
+export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
+  tally.ran++;
+  if (result.runaway) {
+    tally.runaway++;
+
+    return;
+  }
+  if (result.compared.includes("v2")) {
+    tally.onV2++;
+  }
+  tally.mostFired = Math.max(tally.mostFired, result.fired);
+  if (result.ended.length > 0) {
+    const step = Math.min(...result.ended.map((e) => e.at.step));
+    tally.ended++;
+    tally.endedSteps += step;
+    if (step === 0) {
+      tally.endedAtStep0++;
+    }
+  }
+}
+
 /**
  * Record that the fuzzer compared `runs` cases from `seed` (`v2` of them on
- * v2 as well) and discarded `runaway` more (cases whose reference run passed
- * the budget).
+ * v2 as well), discarded `runaway` more (cases whose reference run passed
+ * the budget), and how many of the compared cases an `ends` divergence
+ * stopped and where (the census prints it, so a too-early stop shows).
  */
-export function logFuzz(
-  seed: number,
-  runs: number,
-  runaway: number,
-  v2: number,
-): void {
-  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs, runaway, v2 })]);
+export function logFuzz(seed: number, tally: FuzzTally): void {
+  logLines("fuzz.jsonl", [
+    JSON.stringify({
+      seed,
+      runs: tally.ran - tally.runaway,
+      runaway: tally.runaway,
+      v2: tally.onV2,
+      ended: tally.ended,
+      endedSteps: tally.endedSteps,
+      endedAtStep0: tally.endedAtStep0,
+    }),
+  ]);
 }
 
 /** `DIFF_DUMP=<dir>` writes each scenario's traces there, for reading. */

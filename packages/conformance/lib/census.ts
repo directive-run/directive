@@ -710,6 +710,12 @@ export function diffTestFiles(conformanceRoot: string): string[] {
 
 const LAYER = /^L(?:[0-9]|1[0-3])$/;
 
+/**
+ * The name every fuzz case runs under (diff/fuzz/model.ts `toScenario`):
+ * the one scenario an `ends` divergence may name, and no hand scenario's.
+ */
+const FUZZ_SCENARIO = "fuzz";
+
 /** Every `scenario(title, …)` title in diff/, with its file. */
 export function scenarioTitles(
   conformanceRoot: string,
@@ -763,6 +769,11 @@ export function checkScenarioLayers(conformanceRoot: string): string[] {
       failures.push(`${file}: scenario title "${title}" is used twice`);
     }
     seen.add(title);
+    if (title === FUZZ_SCENARIO) {
+      failures.push(
+        `${file}: scenario title "${FUZZ_SCENARIO}" is the fuzz cases' name (divergences for it, \`ends\` included, would apply to this scenario); rename it`,
+      );
+    }
     const layer = placed[title];
     if (typeof layer !== "string" || !LAYER.test(layer)) {
       failures.push(
@@ -790,6 +801,7 @@ export interface DivergenceEntry {
   step?: number;
   op?: string;
   path?: string;
+  ends?: boolean;
   reason: string;
   approvedBy: string;
   date: string;
@@ -804,7 +816,7 @@ const DIVERGENCE_REQUIRED = [
   "scenario",
   "stream",
 ];
-const DIVERGENCE_OPTIONAL = ["engine", "op", "path", "step"];
+const DIVERGENCE_OPTIONAL = ["ends", "engine", "op", "path", "step"];
 const STREAMS = [
   "hook",
   "observe",
@@ -824,6 +836,13 @@ const STREAMS = [
  * at least one difference, or null when not known: an entry that covers
  * nothing is stale and fails, so the file can only describe differences
  * that still exist.
+ *
+ * `ends: true` stops the comparison of a fuzz case at the difference the
+ * entry covers (diff/scenario.ts `explain`), so it is valid only on a signed
+ * entry for scenario "fuzz", and only a narrow one: for engine "v2" (1.35
+ * compared with 1.35, the workspace engine, is never stopped), with an `op`,
+ * and with a `path` when the op is "changed" (a field, not the whole entry).
+ * An `ends` entry that never stopped a case is stale like any other.
  */
 export function checkDivergences(
   conformanceRoot: string,
@@ -885,6 +904,35 @@ export function checkDivergences(
     }
     if (typeof e.approvedBy !== "string" || !e.approvedBy.trim()) {
       fail(`${label} needs approvedBy (the person who signed it off)`);
+    }
+    if (e.ends !== undefined) {
+      if (e.ends !== true) {
+        fail(`${label} ends must be true when given`);
+      }
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has ends, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}"); a hand scenario is compared to its end`,
+        );
+      }
+      if (typeof e.approvedBy !== "string" || !e.approvedBy.trim()) {
+        fail(
+          `${label} has ends, which stops comparing a fuzz case, so it must be signed (approvedBy)`,
+        );
+      }
+      if (e.engine !== "v2") {
+        fail(
+          `${label} has ends, so it must say engine "v2": 1.35 compared with 1.35 is never stopped`,
+        );
+      }
+      if (e.op === undefined) {
+        fail(
+          `${label} has ends, so it must say which op (missing, extra or changed) stops the case`,
+        );
+      } else if (e.op === "changed" && e.path === undefined) {
+        fail(
+          `${label} has ends with op "changed", so it must say the path of the field that changed`,
+        );
+      }
     }
     if (typeof e.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
       fail(`${label} needs a YYYY-MM-DD date`);
@@ -966,10 +1014,37 @@ export function checkHooksFired(
  * FUZZ_V2_FLOOR of them were compared on v2 as well. A fuzz run that v2 sits
  * out of proves nothing about 2.0, and a missing count counts as zero.
  */
-export function checkFuzzRuns(
-  runs: Array<{ seed: number; runs: number; runaway?: number; v2?: number }>,
-  v2Expected: boolean,
-): string[] {
+/** One fuzz run's line in fuzz.jsonl (diff/scenario.ts `logFuzz`). */
+export interface FuzzRun {
+  seed: number;
+  runs: number;
+  runaway?: number;
+  v2?: number;
+  /** Compared cases an `ends` divergence stopped. */
+  ended?: number;
+  /** The sum of the steps they stopped at. */
+  endedSteps?: number;
+  /** How many of them stopped at step 0. */
+  endedAtStep0?: number;
+}
+
+/**
+ * The census's line for one fuzz run: how many cases were compared, on v2,
+ * and how many an `ends` divergence stopped and where (the mean step, and
+ * how many at step 0), so a stop that comes too early is visible. It
+ * reports; the floors (`checkFuzzRuns`) are unchanged.
+ */
+export function describeFuzzRun(r: FuzzRun): string {
+  const ended = r.ended ?? 0;
+  const where =
+    ended === 0
+      ? ""
+      : ` (at step ${((r.endedSteps ?? 0) / ended).toFixed(1)} on average; ${r.endedAtStep0 ?? 0} at step 0)`;
+
+  return `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too, ${ended} ended early by an \`ends\` divergence${where}`;
+}
+
+export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {
   if (runs.length === 0) {
     return ["conformance:diff: the fuzzer reported no runs"];
   }
