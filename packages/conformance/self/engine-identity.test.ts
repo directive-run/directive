@@ -64,7 +64,7 @@ function expected(): Map<string, string> {
   } else {
     // core-next's source, or its dist on the `:dist` projects; entries it has
     // not built yet resolve to src/unbuilt.ts (lib/core-entries.ts).
-    for (const entry of dist ? v2DistEntries() : v2Entries()) {
+    for (const entry of dist ? v2DistEntries(undefined, build) : v2Entries()) {
       out.set(entry.specifier, entry.file);
     }
   }

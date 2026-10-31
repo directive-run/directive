@@ -170,10 +170,14 @@ export function nextPackageDir(repoRoot = defaultRepoRoot): string {
  * projects: the file core-next's own `exports` serve for the same subpath
  * (`dist/index.js`), or `src/unbuilt.ts` where core-next has not built the
  * entry (as v2Entries). This is what ships: internal members mangled
- * (`mangleProps`), the dev check written out at each use and read from
- * `NODE_ENV` at run time.
+ * (`mangleProps`). With a `condition`, the build that export condition
+ * selects, where the dev check is the literal `true` or `false`; without one,
+ * the default build, which reads it from `NODE_ENV` at run time.
  */
-export function v2DistEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
+export function v2DistEntries(
+  repoRoot = defaultRepoRoot,
+  condition?: "development" | "production",
+): CoreEntry[] {
   const nextRoot = nextPackageDir(repoRoot);
   const pkg = JSON.parse(readFileSync(join(nextRoot, "package.json"), "utf8"));
   const exportsMap = pkg.exports as Record<string, unknown>;
@@ -182,7 +186,17 @@ export function v2DistEntries(repoRoot = defaultRepoRoot): CoreEntry[] {
     if (entry.file.endsWith("/unbuilt.ts")) {
       return entry;
     }
-    const dist = runtimeTarget(exportsMap[entry.subpath]);
+    const target = exportsMap[entry.subpath];
+    let dist = runtimeTarget(target);
+    if (dist && condition) {
+      // The build that condition selects, as v1Entries picks 1.35's.
+      dist = runtimeTarget((target as Record<string, unknown>)[condition]);
+      if (!dist) {
+        throw new Error(
+          `core-next has no ${condition} build for ${entry.specifier}`,
+        );
+      }
+    }
     if (!dist) {
       return { ...entry, file: join(nextRoot, "src/unbuilt.ts") };
     }
