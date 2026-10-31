@@ -46,6 +46,7 @@
     "diff/scenarios/l2-resolver-rules.test.ts": "60154cc016cc566f91ffe20b64e30dfe704576da9fab9a436be63425634347df",
     "diff/scenarios/l3-lifecycle-error-boundary.test.ts": "0e98136c0c8bb13b4e4772df47711138ac7c26ada01be0f5fafddaea2c7d4754",
     "diff/scenarios/l3-lifecycle-plugins.test.ts": "7b64de8fdd48535e0600c7d8c42a642f6a65b5c104a4509e330673208dedd406",
+    "diff/scenarios/l3-lifecycle-quirks.test.ts": "c5509de5cb7646f5d0eb0edb3a894ffd4076da90839b74c5dcdd532ad49d0429",
     "diff/scenarios/l4-effects-gates.test.ts": "a824514a6e867351600bbee16937d10880596fc16ce4b3af185b88f4a75fb6fb",
     "diff/scenarios/l4-effects.test.ts": "96ac3a976687a61500fa9a58bffc1118716ed09de62692ffaa110bc40297de67",
     "diff/scenarios/l5-sources-gates.test.ts": "6edd2a62eb5a8c6715c98c7ef989d2bf772e4b140390b215f23f1852a4dacdae",
