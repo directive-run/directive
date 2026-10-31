@@ -246,8 +246,8 @@ const loadFlat: Load = (src, set, hydrated) => {
 };
 
 /** 1.35 refuses a zero or negative `tickMs` when the system is created. */
-export const checkTick = (ms: unknown): void => {
-  if (ms !== undefined && (ms as number) <= 0) {
+export const checkTick = (ms: number | undefined): void => {
+  if (ms !== undefined && ms <= 0) {
     throw new Error("[Directive] tickMs must be a positive number");
   }
 };
@@ -302,7 +302,11 @@ export function createSystemCore<const M extends ModuleSchema>(
     );
   }
   const tickMs = options.tickMs;
-  checkTick(tickMs);
+  if (!module.load_) {
+    // The namespaced form checks it in createSystem, before its module
+    // checks (1.35's order), so a flattened module is not checked twice.
+    checkTick(tickMs);
+  }
   const load = module.load_ ?? loadFlat;
   if (
     !module.load_ &&
@@ -945,6 +949,50 @@ export function createSystemCore<const M extends ModuleSchema>(
 
     return () => clock.clearTimeout(id);
   };
+  // A stop in 1.35's two halves. `halt` ends the run (tick timer, running
+  // flag, in-flight runs aborted); `stopped` runs the effect cleanups, onStop
+  // and the stop event. stop() runs both at once; stopAsync() awaits between
+  // them, so its cleanups run a microtask after the caller's next line.
+  /** Ends the run; false when it was not running. */
+  const halt = (): boolean => {
+    if (tickTimer) {
+      clock.clearTimeout(tickTimer);
+      tickTimer = 0;
+    }
+    if (!running) {
+      return false;
+    }
+    running = false;
+    resetChain();
+    features.reconcile?.stop_();
+
+    return true;
+  };
+  const stopped = () => {
+    features.effects?.cleanupAll();
+    for (const hooks of hooks_) {
+      hooks.onStop?.(system);
+    }
+    emit("system.stop", { system });
+    // A settle() waiting on the runs just ended hears that they did.
+    notifySettle();
+  };
+  /** 1.35's engine stopAsync: the sync half, one await, then the rest. */
+  const stopEngineAsync = async () => {
+    if (halt()) {
+      // L5: the source unsubscribes are awaited here (1.35's cleanupAllAsync).
+      await Promise.resolve();
+      stopped();
+    }
+  };
+  /** 1.35's engine destroyAsync: awaits its own stopAsync, then tears down. */
+  const destroyEngineAsync = async () => {
+    if (destroyed) {
+      return;
+    }
+    await stopEngineAsync();
+    system.destroy();
+  };
   const system = {
     _mode: "single",
     facts,
@@ -1071,7 +1119,7 @@ export function createSystemCore<const M extends ModuleSchema>(
               arm();
               system.dispatch({ type: tickKey });
             },
-            tickMs as number,
+            tickMs,
             { owner: kernel.owner, kind: "tick" },
           );
         };
@@ -1079,31 +1127,24 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     },
     stop() {
-      if (tickTimer) {
-        clock.clearTimeout(tickTimer);
-        tickTimer = 0;
-      }
-      if (running) {
-        running = false;
-        resetChain();
-        features.reconcile?.stop_();
-        features.effects?.cleanupAll();
-        for (const hooks of hooks_) {
-          hooks.onStop?.(system);
-        }
-        emit("system.stop", { system });
-        // A settle() waiting on the runs just ended hears that they did.
-        notifySettle();
+      if (halt()) {
+        stopped();
       }
     },
-    /** 1.35's async stop (RFC 0009): nothing to await before sources (L5). */
+    /**
+     * 1.35's async stop (RFC 0009): the system wrapper awaits the engine's,
+     * so it resolves two microtasks after the cleanups run.
+     */
     async stopAsync() {
-      system.stop();
+      await stopEngineAsync();
     },
-    /** 1.35's async destroy (RFC 0009): stopAsync, then the destroy. */
+    /**
+     * 1.35's async destroy (RFC 0009): stopAsync, then the engine's async
+     * destroy (which awaits its own no-op stopAsync before tearing down).
+     */
     async destroyAsync() {
       await system.stopAsync();
-      system.destroy();
+      await destroyEngineAsync();
     },
     destroy() {
       if (destroyed) {

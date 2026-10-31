@@ -108,6 +108,86 @@ describe("L3a module hooks (S2)", () => {
       "p.onDestroy",
     ]);
   });
+
+  // 1.35's sequence, microtask by microtask (probed on both engines): the
+  // run ends inside the call; the cleanups, onStop and the stop event follow
+  // one microtask later; stopAsync resolves at microtask 3, and destroyAsync
+  // announces onDestroy at microtask 3 and resolves at microtask 5.
+  for (const how of ["stopAsync", "destroyAsync"] as const) {
+    for (const form of ["single", "namespaced"] as const) {
+      it(`${how} (${form}) tears down in 1.35's microtask order`, async () => {
+        const log: string[] = [];
+        const mod = (id: string) =>
+          createModule(id, {
+            schema: { facts: { count: t.number() }, events: {} },
+            init: (facts: any) => {
+              facts.count = 0;
+            },
+            effects: {
+              e: {
+                run: (facts: any) => {
+                  void facts.count;
+
+                  return () => log.push(`${id}.cleanup`);
+                },
+              },
+            },
+            hooks: { onStop: () => log.push(`${id}.onStop`) },
+          } as never);
+        const plugins = [
+          {
+            name: "p",
+            onStop: () => log.push("p.onStop"),
+            onDestroy: () => log.push("p.onDestroy"),
+          },
+        ];
+        const sys: any = createSystem(
+          (form === "single"
+            ? { module: mod("a"), plugins }
+            : { modules: { a: mod("a"), b: mod("b") }, plugins }) as never,
+        );
+        sys.start();
+        await sys.settle();
+        let done = false;
+        sys[how]().then(() => {
+          done = true;
+        });
+        log.push(`call running=${sys.isRunning}`);
+        for (let i = 1; i <= 6; i++) {
+          await Promise.resolve();
+          log.push(`mt${i}${done ? " done" : ""}`);
+        }
+        const teardown =
+          form === "single"
+            ? ["a.cleanup", "a.onStop", "p.onStop"]
+            : ["a.cleanup", "b.cleanup", "a.onStop", "b.onStop", "p.onStop"];
+        expect(log).toEqual(
+          how === "stopAsync"
+            ? [
+                "call running=false",
+                ...teardown,
+                "mt1",
+                "mt2",
+                "mt3 done",
+                "mt4 done",
+                "mt5 done",
+                "mt6 done",
+              ]
+            : [
+                "call running=false",
+                ...teardown,
+                "mt1",
+                "mt2",
+                "mt3",
+                "p.onDestroy",
+                "mt4",
+                "mt5",
+                "mt6 done",
+              ],
+        );
+      });
+    }
+  }
 });
 
 describe("L3a timers on the kernel clock (S7, C1, C2)", () => {
