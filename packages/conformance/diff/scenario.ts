@@ -46,6 +46,8 @@ import {
   drawProblems,
   drawnResolvers,
   interleaving,
+  isAfter,
+  latestPosition,
 } from "./compare.js";
 import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
@@ -704,14 +706,15 @@ export interface Ended {
  * is covered by the first entry that covers it, in file order: covered, it
  * passes and the entry is used; uncovered, it is reported.
  *
- * A fuzz case on one engine is also walked in trace order (`Position`) and
- * stops at its first difference whose covering entry has `ends: true`: that
- * difference, and every one after it in both traces, is not compared. Where
- * it stops is the latest position that difference has in the two traces;
- * a difference is dropped only if even its earliest position is later, so
- * one at the same position, or before it in either trace, is still matched
- * as usual (and an uncovered one still fails). Each engine is walked on its
- * own, and a hand scenario never stops: there `ends` is just an entry.
+ * A fuzz case on one engine also stops at its first difference whose
+ * covering entry has `ends: true` (the earliest by `latestPosition`): that
+ * difference passes, and a difference strictly after it in every trace it
+ * is in (`isAfter`, diff/compare.ts) is not compared. Within one trace that
+ * is the trace order; across the two traces only a matched record between
+ * them orders two records, so a difference in the same gap as the stop, in
+ * the other trace, is still matched as usual (and an uncovered one still
+ * fails), as is one before it. Each engine is walked on its own, and a hand
+ * scenario never stops: there `ends` is just an entry.
  */
 export function explain(
   name: string,
@@ -727,7 +730,8 @@ export function explain(
       const cut = cuts.get(d.engine);
       if (
         div?.ends === true &&
-        (!cut || comparePositions(d.span.to, cut.at.span.to) < 0)
+        (!cut ||
+          comparePositions(latestPosition(d), latestPosition(cut.at)) < 0)
       ) {
         cuts.set(d.engine, { at: d, id: div.id });
       }
@@ -737,7 +741,7 @@ export function explain(
   const dropped = new Map<string, number>();
   const unexplained = differences.filter((d) => {
     const cut = cuts.get(d.engine);
-    if (cut && comparePositions(d.span.from, cut.at.span.to) > 0) {
+    if (cut && isAfter(d, cut.at)) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
       return false;
@@ -941,6 +945,25 @@ export interface FuzzTally {
   /** Compared cases that v2 took part in. */
   onV2: number;
   mostFired: number;
+  /** Compared cases an `ends` divergence stopped (on any engine). */
+  ended: number;
+  /** The sum of the step each ended case stopped at, for the mean. */
+  endedSteps: number;
+  /** Ended cases that stopped at step 0: nothing after setup was compared. */
+  endedAtStep0: number;
+}
+
+/** A tally before the first case. */
+export function newFuzzTally(): FuzzTally {
+  return {
+    ran: 0,
+    runaway: 0,
+    onV2: 0,
+    mostFired: 0,
+    ended: 0,
+    endedSteps: 0,
+    endedAtStep0: 0,
+  };
 }
 
 /**
@@ -959,20 +982,34 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
     tally.onV2++;
   }
   tally.mostFired = Math.max(tally.mostFired, result.fired);
+  if (result.ended.length > 0) {
+    const step = Math.min(...result.ended.map((e) => e.at.step));
+    tally.ended++;
+    tally.endedSteps += step;
+    if (step === 0) {
+      tally.endedAtStep0++;
+    }
+  }
 }
 
 /**
  * Record that the fuzzer compared `runs` cases from `seed` (`v2` of them on
- * v2 as well) and discarded `runaway` more (cases whose reference run passed
- * the budget).
+ * v2 as well), discarded `runaway` more (cases whose reference run passed
+ * the budget), and how many of the compared cases an `ends` divergence
+ * stopped and where (the census prints it, so a too-early stop shows).
  */
-export function logFuzz(
-  seed: number,
-  runs: number,
-  runaway: number,
-  v2: number,
-): void {
-  logLines("fuzz.jsonl", [JSON.stringify({ seed, runs, runaway, v2 })]);
+export function logFuzz(seed: number, tally: FuzzTally): void {
+  logLines("fuzz.jsonl", [
+    JSON.stringify({
+      seed,
+      runs: tally.ran - tally.runaway,
+      runaway: tally.runaway,
+      v2: tally.onV2,
+      ended: tally.ended,
+      endedSteps: tally.endedSteps,
+      endedAtStep0: tally.endedAtStep0,
+    }),
+  ]);
 }
 
 /** `DIFF_DUMP=<dir>` writes each scenario's traces there, for reading. */

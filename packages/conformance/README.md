@@ -208,20 +208,24 @@ cascade: when 2.0 re-dispatches a resolver that 1.35 does not (or the other
 way round), every later record of that case differs, differently for each
 seed, so entries written per record at the PR seed fail the nightly seeds,
 and entries wide enough for every seed would hide unrelated differences in
-every fuzz case. In each fuzz case, on each engine, the differences are
-walked in trace order (`Position` in `diff/compare.ts`: step, then phase,
-then how many matched records come before it, then how far past the last
-one it is; a changed record takes the earlier of its two positions, and the
-stop the later). An uncovered one is reported and a covered one passes, as
-before; the first one whose covering entry has `ends` stops the walk: it
-passes, and every difference after it in both traces is not compared. One
-before it, or at the same position in the other trace, is still checked,
-other engines are compared in full, and the case still counts toward the
-fuzz floors. The run prints where each case ended as an advisory. `ends` is
-valid only on a signed entry for scenario `fuzz` (the census rejects it
-anywhere else, and rejects a hand scenario titled `fuzz`): hand scenarios
-are always compared to their end. An `ends` entry that never stopped a case
-is stale like any other.
+every fuzz case. In each fuzz case, on each engine, the first difference
+whose covering entry has `ends` is the stop: it passes, and a difference
+strictly after it is not compared. "After" is `isAfter` in
+`diff/compare.ts`: within one trace, the trace order; across the two
+traces, only a matched record between them orders two records (a later
+step or phase, or more matched records before it), so a difference in the
+same gap as the stop, in the other trace, is never after it. A difference
+is dropped only when every record it has is after the stop. An uncovered
+one before the stop, or beside it, is still reported and a covered one
+passes, as before; other engines are compared in full, and the case still
+counts toward the fuzz floors. The run prints where each case ended as an
+advisory, and the census's fuzz line says how many cases ended early, at
+which step on average and how many at step 0, so a stop that comes too
+early shows. `ends` is valid only on a signed entry for scenario `fuzz`
+with engine `v2`, an `op`, and a `path` when the op is `changed` (the
+census rejects it anywhere else, and rejects a hand scenario titled
+`fuzz`): hand scenarios are always compared to their end. An `ends` entry
+that never stopped a case is stale like any other.
 
 ## Frozen 1.35 contracts (`contracts/`)
 

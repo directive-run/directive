@@ -56,6 +56,7 @@ import {
   currentLayer,
   logFuzz,
   logResult,
+  newFuzzTally,
   runScenario,
   tallyCase,
 } from "../scenario.js";
@@ -99,7 +100,7 @@ describe("differential fuzz", () => {
     console.info(
       `[diff fuzz] seed ${SEED}, ${RUNS + upToCurrent} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
     );
-    const tally: FuzzTally = { ran: 0, runaway: 0, onV2: 0, mostFired: 0 };
+    const tally: FuzzTally = newFuzzTally();
     const started = Date.now();
     try {
       for (const phase of phases) {
@@ -128,11 +129,11 @@ describe("differential fuzz", () => {
         }
       }
     } finally {
-      const { ran, runaway, onV2, mostFired } = tally;
+      const { ran, runaway, onV2, mostFired, ended } = tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (reference passed ${RUN_BUDGET} timer callbacks; discarded), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}); most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (reference passed ${RUN_BUDGET} timer callbacks; discarded), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
-      logFuzz(SEED, ran - runaway, runaway, onV2);
+      logFuzz(SEED, tally);
     }
     expect(
       tally.runaway,

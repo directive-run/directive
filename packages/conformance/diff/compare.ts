@@ -85,20 +85,20 @@ export interface Difference {
   /** Trace positions, for context. */
   at: { reference?: number; candidate?: number };
   /**
-   * When it happens (`Position`): the earliest and the latest of the
-   * positions its records have in the two traces. A missing or extra entry
-   * is in one trace, so both are its position there; a changed one is in
-   * both.
+   * When it happens: the `Position` of its record in each trace it is in.
+   * A missing entry is in the reference only, an extra one in the candidate
+   * only, a changed one in both (`isAfter` orders two differences).
    */
-  span: { from: Position; to: Position };
+  where: { reference?: Position; candidate?: Position };
 }
 
 // ---------------------------------------------------------------------------
 // Trace position
 
 /**
- * Where in a trace a record happens, comparable across the two traces of a
- * comparison: `[step, phase, matched, after]`, compared left to right.
+ * Where in a trace a record happens: `[step, phase, matched, after]`,
+ * compared left to right within its trace, and without `after` across the
+ * two traces of a comparison (below).
  *
  * - `step` and `phase` (setup 0, sync 1, async 2) are the record's segment:
  *   every step marker is in both traces, so a record in an earlier step
@@ -113,9 +113,17 @@ export interface Difference {
  *   (or the segment's start): the first record a trace has that the other
  *   lacks is 1, the next 2.
  *
- * So the first record each trace has in place of the other's is at the
- * same position in both, the record after it is later, and a matched
- * record is later than the unmatched ones just before it.
+ * Within one trace the whole position is the trace order. Across the two
+ * traces `after` means nothing: it counts records one trace has and the
+ * other lacks, so the third such record of one trace and the first of the
+ * other are in the same gap between two matched records, and neither
+ * happened before the other. Across traces only `[step, phase, matched]`
+ * orders two records, and only when strictly later: a record whose
+ * `matched` is higher than another's (same segment) has a matched record M
+ * at or before it that the other trace has after its record (its trace has
+ * more matched records up to it than the other trace has up to the other
+ * record), so M separates them. Equal `[step, phase, matched]` across
+ * traces is the same gap: unordered (`isAfter`).
  */
 export type Position = readonly [
   step: number,
@@ -130,9 +138,17 @@ const PHASE_RANK: Record<Keyed["phase"], number> = {
   async: 2,
 };
 
-/** Negative when `a` is earlier than `b`, zero at the same position. */
-export function comparePositions(a: Position, b: Position): number {
-  for (let i = 0; i < 4; i++) {
+/**
+ * Negative when `a` is earlier than `b`, zero at the same position, over
+ * the first `fields` of the position: all four within one trace, three
+ * (no `after`) across the two traces.
+ */
+export function comparePositions(
+  a: Position,
+  b: Position,
+  fields: 3 | 4 = 4,
+): number {
+  for (let i = 0; i < fields; i++) {
     const d = (a[i] as number) - (b[i] as number);
     if (d !== 0) {
       return d;
@@ -140,6 +156,44 @@ export function comparePositions(a: Position, b: Position): number {
   }
 
   return 0;
+}
+
+const TRACES = ["reference", "candidate"] as const;
+
+/**
+ * Whether difference `d` happens strictly after `stop`, in every trace `d`
+ * is in. Each record of `d` is set against `stop`'s record in the same
+ * trace when `stop` has one there (the whole position, `after` included:
+ * that is the trace's order; a changed `stop` has a record in both), and
+ * otherwise against `stop`'s record in the other trace, by `[step, phase,
+ * matched]` only, strictly (`Position`). So a record in the same gap as the
+ * stop, in the other trace, is never after it, and `d` is after `stop` only
+ * if every one of its records is.
+ */
+export function isAfter(d: Difference, stop: Difference): boolean {
+  return TRACES.every((trace) => {
+    const p = d.where[trace];
+    if (!p) {
+      return true;
+    }
+    const same = stop.where[trace];
+    if (same) {
+      return comparePositions(p, same) > 0;
+    }
+    const other = stop.where[trace === "reference" ? "candidate" : "reference"];
+
+    return other !== undefined && comparePositions(p, other, 3) > 0;
+  });
+}
+
+/** The latest position `d` has in the traces it is in (a total order, for picking a stop). */
+export function latestPosition(d: Difference): Position {
+  const [a, b] = [d.where.reference, d.where.candidate];
+  if (!a || !b) {
+    return (a ?? b) as Position;
+  }
+
+  return comparePositions(a, b) >= 0 ? a : b;
 }
 
 /** Each keyed record's position, given which of them the alignment matched. */
@@ -645,11 +699,6 @@ function compareWith(
     ...positions(left, matchedLeft),
     ...positions(right, matchedRight),
   ]);
-  const one = (k: Keyed) => {
-    const p = at.get(k) as Position;
-
-    return { from: p, to: p };
-  };
   const out: Difference[] = [];
   for (const { stream, a, b, pairs } of aligned) {
     const matchedA = new Set(pairs.map(([i]) => i));
@@ -670,18 +719,17 @@ function compareWith(
         candidate?: Json;
       }> = [];
       diffJson(project(ka.entry), project(kb.entry), "", fields);
-      const [pa, pb] = [at.get(ka) as Position, at.get(kb) as Position];
-      const span =
-        comparePositions(pa, pb) <= 0
-          ? { from: pa, to: pb }
-          : { from: pb, to: pa };
+      const where = {
+        reference: at.get(ka) as Position,
+        candidate: at.get(kb) as Position,
+      };
       for (const f of fields) {
         out.push({
           ...base(ka),
           op: "changed",
           ...f,
           at: { reference: ka.index, candidate: kb.index },
-          span,
+          where,
         });
       }
     }
@@ -692,7 +740,7 @@ function compareWith(
           op: "missing",
           reference: project(k.entry),
           at: { reference: k.index },
-          span: one(k),
+          where: { reference: at.get(k) as Position },
         });
       }
     });
@@ -703,7 +751,7 @@ function compareWith(
           op: "extra",
           candidate: project(k.entry),
           at: { candidate: k.index },
-          span: one(k),
+          where: { candidate: at.get(k) as Position },
         });
       }
     });

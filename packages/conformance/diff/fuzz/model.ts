@@ -24,7 +24,12 @@
  */
 
 import fc from "fast-check";
-import type { BuildContext, ScenarioDef, Step } from "../scenario.js";
+import {
+  type BuildContext,
+  FUZZ_SCENARIO,
+  type ScenarioDef,
+  type Step,
+} from "../scenario.js";
 
 export interface FuzzDerivation {
   facts: number[];
@@ -743,7 +748,7 @@ function steps(spec: FuzzSpec): Step[] {
   return out;
 }
 
-export function toScenario(spec: FuzzSpec, name = "fuzz"): ScenarioDef {
+export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {
   return {
     name,
     build: build(spec),

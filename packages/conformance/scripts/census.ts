@@ -16,6 +16,7 @@ import { pathToFileURL } from "node:url";
 import {
   ALL_PROJECTS,
   DIFF_PROJECT,
+  type FuzzRun,
   type JsonReport,
   census,
   checkAheadOfV1,
@@ -24,6 +25,7 @@ import {
   checkFuzzRuns,
   checkHooksFired,
   checkScenarioLayers,
+  describeFuzzRun,
 } from "../lib/census.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
 import { checkLock } from "../lib/harness.js";
@@ -46,12 +48,7 @@ const config = (
 failures.push(...checkConfig(config, repoRoot));
 
 const out = mkdtempSync(join(tmpdir(), "conformance-census-"));
-let fuzzRuns: Array<{
-  seed: number;
-  runs: number;
-  runaway?: number;
-  v2?: number;
-}> = [];
+let fuzzRuns: FuzzRun[] = [];
 const reports: Record<string, JsonReport> = {};
 // The differential project logs here what a test cannot assert on its own:
 // divergences used, hooks fired, fuzz cases run (diff/scenario.ts).
@@ -144,9 +141,7 @@ console.log(
     }
   }
 }
-console.log(
-  `[census] fuzz: ${fuzzRuns.map((r) => `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too`).join("; ")}`,
-);
+console.log(`[census] fuzz: ${fuzzRuns.map(describeFuzzRun).join("; ")}`);
 console.log(
   v2Layer === null
     ? "[census] v2: no layer built yet (layers.rules.json `current` is null); v2 runs nothing"
