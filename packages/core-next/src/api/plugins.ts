@@ -198,7 +198,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
     // with no plugin; a blocked report must name a registered plugin, and its
     // re-entry through the hooks stops at depth 4.
     let depth = 0;
-    (system as { notify?: unknown }).notify = {
+    system.notify = {
       guardrailBlocked(
         plugin: string,
         key: string,

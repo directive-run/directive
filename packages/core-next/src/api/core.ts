@@ -869,8 +869,11 @@ export function createSystemCore<const M extends ModuleSchema>(
     scheduleReconcile();
   };
   const writers: Writers = { record: null };
+  /** Where a write comes from: 1.35 files loaded facts as "hydrate". */
+  let origin = "authored";
   const store = createFactsStore({
     schema,
+    originOf: () => origin,
     graph,
     tracker,
     writers,
@@ -1209,13 +1212,19 @@ export function createSystemCore<const M extends ModuleSchema>(
         const set = (key: string, value: unknown) => {
           (facts as Record<string, unknown>)[key] = value;
         };
+        // Filed as "hydrate", per write: loaded, not decided by this run.
         store.batch(() => {
-          if (initial) {
-            load(initial, set);
-          }
-          if (hydrated) {
-            load(hydrated, set, true);
-            hydrated = null;
+          origin = "hydrate";
+          try {
+            if (initial) {
+              load(initial, set);
+            }
+            if (hydrated) {
+              load(hydrated, set, true);
+              hydrated = null;
+            }
+          } finally {
+            origin = "authored";
           }
         });
       }

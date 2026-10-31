@@ -141,6 +141,8 @@ export const withReconcile: SystemPart = (context) => {
   const requeued = new Set<string>();
   /** The requirement set the last commit acted on, by id. */
   let previous = new Map<string, RequirementWithId>();
+  /** Requirement ids stop() canceled: quirk j dispatches them again. */
+  const restart = new Set<string>();
   const resolvers = createResolvers({
     defs: resolverDefs,
     store: context.store,
@@ -456,6 +458,16 @@ export const withReconcile: SystemPart = (context) => {
     evaluate_: (passKeys) =>
       constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys),
     commit_(current, passKeys) {
+      if (restart.size > 0 && system.isRunning) {
+        // Quirk j: the first pass after start() sees each one still wanted
+        // as added, so it runs again; one no longer wanted is canceled.
+        for (const req of current) {
+          if (restart.has(req.id)) {
+            previous.delete(req.id);
+          }
+        }
+        restart.clear();
+      }
       const quiet = current.length === 0 && previous.size === 0;
       const next = quiet ? previous : new Map<string, RequirementWithId>();
       const added: RequirementWithId[] = [];
@@ -549,11 +561,12 @@ export const withReconcile: SystemPart = (context) => {
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
     stop_() {
-      // Quirk j: a requirement canceled here leaves the set, so the pass
-      // after start() sees it as added and dispatches it again if it is
-      // still wanted. 1.35 keeps it and never runs it again.
+      // A requirement canceled here stays in the set, as in 1.35: inspect()
+      // still lists it, and the pass after start() cancels it if it is no
+      // longer wanted. Quirk j: that pass runs it again if it still is;
+      // 1.35 never runs it again.
       for (const id of resolvers.abortAll()) {
-        previous.delete(id);
+        restart.add(id);
       }
       // A requeue asked by a run just canceled is not carried into start().
       requeued.clear();
