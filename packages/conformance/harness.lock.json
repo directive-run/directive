@@ -68,7 +68,7 @@
     "lib/census.ts": "aaea6901de7dfbd89cd457f7f789dee2b2cfe1759938ca4978a6215a012066cb",
     "lib/check.ts": "cf2f75893454deddbb473f621ffaf92d1b359741e4d21d689a102adb2a9c5001",
     "lib/classify.ts": "c6954bf97157f5c0c759960e4fe548ef724bea28464cb0596f9095a827d7bbdc",
-    "lib/core-entries.ts": "568b325f6aa70546b78a864707f967b8629ffba0921274cd6ebe937c433aeb4c",
+    "lib/core-entries.ts": "48ced00debac0727b3c88a3c5eeb1f4cba58947071b1df62e2a82c76d78e7113",
     "lib/fuzz.ts": "8e2984f2868abd72dcacdcca2a374648de77e93face53ef901b1b57c16f75438",
     "lib/guard.ts": "cdd82fd2c7013ee86005912ba7af63bc77b296511f3b5033a3573d70b9b31e33",
     "lib/harness.ts": "abb9e3d0b20db0f9a440d3a3b1083eeb2accc581478c5b1c02f06b9c2e9529a7",
@@ -98,7 +98,7 @@
     "scripts/pin-v1.ts": "5776aab3692e11272cf7ac166213798c4aec80a9fe43e16c9f019bb0005ee970",
     "scripts/port.ts": "4db287d40ac72b44fe0bcf17475ba56df7c1ffcb3ed870e5a7a7c4b32a2dbd8a",
     "scripts/v2-ratchet.ts": "56a4d8929ecb21b76b747f4a724fc9d38ed16f35ab9ce14e142f305b47e1e0ca",
-    "self/engine-identity.test.ts": "707fd9e0dea37a086fdbd2da579de19545ca608227ae34ffda2ec189995e3ab8",
+    "self/engine-identity.test.ts": "cf79d4a5fb3fe00554c1bd56d6d93b59312f55f841ab4ad6b9138cd8f65b1622",
     "tsconfig.json": "d5b4851238c86a90955cef94f62df985445f19a688116e63c61fd47d449c53b5",
     "v1-pin.json": "72d7116e4ce09d9540fb2aecdc2e4a3011ab8875c1ece7c273b81a3659c36204",
     "vitest.config.ts": "140f948c8f62207b52aade52680c760d5946243b511eefc6aaea78bf0afdcf26"

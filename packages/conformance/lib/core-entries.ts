@@ -187,15 +187,18 @@ export function v2DistEntries(
       return entry;
     }
     const target = exportsMap[entry.subpath];
-    let dist = runtimeTarget(target);
-    if (dist && condition) {
-      // The build that condition selects, as v1Entries picks 1.35's.
+    let dist: string | undefined;
+    if (target !== undefined && condition) {
+      // The build that condition selects, as v1Entries picks 1.35's. An
+      // exported entry without it is an error, never a silent fallback.
       dist = runtimeTarget((target as Record<string, unknown>)[condition]);
       if (!dist) {
         throw new Error(
           `core-next has no ${condition} build for ${entry.specifier}`,
         );
       }
+    } else {
+      dist = runtimeTarget(target);
     }
     if (!dist) {
       return { ...entry, file: join(nextRoot, "src/unbuilt.ts") };

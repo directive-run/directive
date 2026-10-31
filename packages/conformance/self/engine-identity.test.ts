@@ -79,7 +79,8 @@ describe(`engine identity (${which}${dist ? " dist" : ""}, ${build})`, () => {
     expect(["development", "production"]).toContain(build);
     expect(dist ? which : "v2").toBe("v2");
     if (dist) {
-      // The built dev check reads NODE_ENV at each use (core-next tsup.config.ts).
+      // Each :dist project runs the build its condition selects, whose dev
+      // check is a literal; NODE_ENV must still agree with it, as on v1.
       expect(process.env.NODE_ENV === "production").toBe(
         build === "production",
       );
