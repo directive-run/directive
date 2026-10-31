@@ -24,6 +24,7 @@
  */
 
 import fc from "fast-check";
+import { FUZZ_TRIGGERS, type FuzzTrigger } from "../../lib/fuzz.js";
 import {
   type BuildContext,
   FUZZ_SCENARIO,
@@ -492,10 +493,12 @@ function moduleDef(
       resolve: async (_req: unknown, context: any) => {
         attempt += 1;
         const n = attempt;
-        external([`${id}.r${i}`, "start", n]);
-        // Aborts are recorded under their own kind, "aborted", so a
-        // divergence entry can cover abort records alone (as the hand
-        // scenarios do) without covering every record of this resolver.
+        // Starts, writes and aborts are each recorded under their own kind
+        // ("start", "wrote", "aborted"; the resolver's tag is data[1]), the
+        // same on every engine, so the comparison pairs a start only with a
+        // start, and an entry's kind does not depend on which resolver
+        // (`<module>.r<index>`) a case happens to have.
+        external(["start", `${id}.r${i}`, n]);
         context.signal?.addEventListener?.("abort", () =>
           external(["aborted", `${id}.r${i}`, n]),
         );
@@ -506,7 +509,7 @@ function moduleDef(
           throw new Error(`${id}.r${i} attempt ${n}`);
         }
         context.facts[f(c.writes)] = c.value;
-        external([`${id}.r${i}`, "wrote", n]);
+        external(["wrote", `${id}.r${i}`, n]);
       },
     };
   });
@@ -567,6 +570,89 @@ function moduleDef(
     effects,
     sources,
   } as any);
+}
+
+/**
+ * A strategy the model passes in `errorBoundary`. Only a string can be read
+ * here: a function strategy (which the model never passes) would need its
+ * own trigger rule, so it is an error, never a guess.
+ */
+function strategy(value: unknown): string | undefined {
+  if (typeof value === "function") {
+    throw new Error(
+      "specTriggers: a function error strategy cannot be read from the spec; define its trigger first",
+    );
+  }
+
+  return value as string | undefined;
+}
+
+/**
+ * Each trigger a fuzz case can have (lib/fuzz.ts `FUZZ_TRIGGERS`), as a test
+ * of its spec. A fuzz divergence with `when` applies only to the cases that
+ * have every trigger it lists (diff/scenario.ts `covers`), so each one is the
+ * spec feature its quirk needs, read from the options the case really passes
+ * (`options()`), never wider. Every resolver belongs to one constraint.
+ */
+const TRIGGERS = {
+  /** `onResolverError` is "retry", and the case has a resolver. */
+  resolverRetry: (spec, boundary) =>
+    hasConstraint(spec) && strategy(boundary?.onResolverError) === "retry",
+  /** `onResolverError` is "retry-later", and the case has a resolver. */
+  resolverRetryLater: (spec, boundary) =>
+    hasConstraint(spec) &&
+    strategy(boundary?.onResolverError) === "retry-later",
+  /**
+   * `onConstraintError` is "retry-later", and the case has a constraint.
+   * Never set today: the model always passes "skip" (its constraints never
+   * throw), so an entry that lists it applies to no case.
+   */
+  constraintRetryLater: (spec, boundary) =>
+    hasConstraint(spec) &&
+    strategy(boundary?.onConstraintError) === "retry-later",
+  /** Some resolver has a retry policy (`retry` > 0: more than one attempt). */
+  retryPolicy: (spec) =>
+    spec.modules.some((m) => m.constraints.some((c) => c.retry > 0)),
+  /** Some resolver has a timeout. */
+  timeout: (spec) =>
+    spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)),
+  /** The steps have a `stop` step with a `start` step after it. */
+  restart: (spec) => {
+    const stop = spec.steps.findIndex((s) => s.op === "stop");
+
+    return (
+      stop >= 0 && spec.steps.slice(stop + 1).some((s) => s.op === "start")
+    );
+  },
+  /** Some error-boundary strategy is "disable" (resolvers and effects). */
+  disable: (_spec, boundary) =>
+    Object.values(boundary ?? {}).some((v) => strategy(v) === "disable"),
+  /** Some error-boundary strategy is "throw" (resolvers; effects skip). */
+  throw: (_spec, boundary) =>
+    Object.values(boundary ?? {}).some((v) => strategy(v) === "throw"),
+} satisfies Record<
+  FuzzTrigger,
+  (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
+>;
+
+function hasConstraint(spec: FuzzSpec): boolean {
+  return spec.modules.some((m) => m.constraints.length > 0);
+}
+
+/** The triggers a case has (`TRIGGERS` above), in `FUZZ_TRIGGERS` order. */
+export function specTriggers(spec: FuzzSpec): FuzzTrigger[] {
+  const boundary = (
+    options(spec) as { errorBoundary?: Record<string, unknown> }
+  ).errorBoundary;
+  // retryLater is the retry-later settings, not a strategy.
+  const strategies =
+    boundary === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(boundary).filter(([key]) => key !== "retryLater"),
+        );
+
+  return FUZZ_TRIGGERS.filter((name) => TRIGGERS[name](spec, strategies));
 }
 
 function options(spec: FuzzSpec) {
@@ -755,5 +841,6 @@ export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {
     steps: steps(spec),
     seed: 1,
     layer: specLayer(spec),
+    triggers: specTriggers(spec),
   };
 }

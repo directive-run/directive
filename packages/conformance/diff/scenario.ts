@@ -112,6 +112,11 @@ export interface ScenarioDef {
   observeDerivations?: boolean;
   /** Timer callbacks one run may make (default RUN_BUDGET). */
   budget?: number;
+  /**
+   * A fuzz case's triggers (diff/fuzz/model.ts `specTriggers`): a divergence
+   * with `when` covers a difference only in a case that has all of them.
+   */
+  triggers?: readonly string[];
 }
 
 /**
@@ -122,6 +127,11 @@ export interface ScenarioDef {
  * `ends: true` (fuzz only, signed; the census rejects it anywhere else)
  * marks an approved quirk whose consequences cascade: the difference it
  * covers ends the comparison of that fuzz case (`explain`).
+ *
+ * `when` (fuzz only) narrows an entry to the fuzz cases that have every
+ * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `group` (fuzz
+ * only) is read by the census alone: an entry of a group is stale only when
+ * no entry of its group covered a difference in the run.
  */
 export interface Divergence {
   id: string;
@@ -133,6 +143,8 @@ export interface Divergence {
   op?: Difference["op"];
   path?: string;
   ends?: boolean;
+  when?: string[];
+  group?: string;
   reason: string;
   approvedBy: string;
   date: string;
@@ -674,9 +686,23 @@ export function formatReport(
   return lines.join("\n");
 }
 
-export function covers(div: Divergence, name: string, d: Difference): boolean {
+/**
+ * Whether `div` covers difference `d` of scenario `name`. An entry with
+ * `when` covers only in a fuzz case whose `triggers` include every one it
+ * lists: never in a hand scenario, nor in a case without a trigger set.
+ */
+export function covers(
+  div: Divergence,
+  name: string,
+  d: Difference,
+  triggers?: readonly string[],
+): boolean {
   return (
     div.scenario === name &&
+    (div.when === undefined ||
+      (name === FUZZ_SCENARIO &&
+        triggers !== undefined &&
+        div.when.every((t) => triggers.includes(t)))) &&
     div.stream === d.stream &&
     div.kind === d.kind &&
     (div.engine === undefined || div.engine === d.engine) &&
@@ -703,8 +729,9 @@ export interface Ended {
 
 /**
  * Match one scenario's contract differences to divergences. Each difference
- * is covered by the first entry that covers it, in file order: covered, it
- * passes and the entry is used; uncovered, it is reported.
+ * is covered by the first entry that covers it (`covers`, with the fuzz
+ * case's `triggers`), in file order: covered, it passes and the entry is
+ * used; uncovered, it is reported.
  *
  * A fuzz case on one engine also stops at its first difference whose
  * covering entry has `ends: true` (the earliest by `latestPosition`): that
@@ -720,9 +747,10 @@ export function explain(
   name: string,
   differences: Difference[],
   divergences: Divergence[],
+  triggers?: readonly string[],
 ): { unexplained: Difference[]; used: string[]; ended: Ended[] } {
   const coverOf = (d: Difference) =>
-    divergences.find((x) => covers(x, name, d));
+    divergences.find((x) => covers(x, name, d, triggers));
   const cuts = new Map<string, { at: Difference; id: string }>();
   if (name === FUZZ_SCENARIO) {
     for (const d of differences) {
@@ -865,6 +893,7 @@ export async function runScenario(
     def.name,
     differences,
     divergences,
+    def.triggers,
   );
   for (const e of ended) {
     advisories.push(
