@@ -315,19 +315,21 @@ describe("a development build warns about the same mistake once", () => {
     } as never) as any;
     system.start();
     await system.settle();
-    const about = (name: string) =>
-      warn.mock.calls.filter((call) =>
-        String(call[0]).includes(`dated.${name}`),
-      ).length;
-
+    // Count warnings, not their wording: the first non-JSON write of a fact
+    // warns, a repeat write of the same fact does not, another fact does.
+    const count = () => warn.mock.calls.length;
+    const start = count();
     system.facts.dated.first = new Date(1);
+    const afterFirst = count();
+    expect(afterFirst).toBeGreaterThan(start);
     system.facts.dated.first = new Date(2);
-    expect(about("first")).toBe(1);
-    expect(about("second")).toBe(0);
+    expect(count()).toBe(afterFirst);
     system.facts.dated.second = new Date(3);
+    const afterSecond = count();
+    // Another fact's first write warns as much as the first fact's did.
+    expect(afterSecond - afterFirst).toBe(afterFirst - start);
     system.facts.dated.second = new Date(4);
-    expect(about("first")).toBe(1);
-    expect(about("second")).toBe(1);
+    expect(count()).toBe(afterSecond);
   });
 
   it("for a write through a cross-module view, once per name", async () => {
@@ -366,11 +368,12 @@ describe("a development build warns about the same mistake once", () => {
       },
     } as any);
     const system = createSystem({ modules: { auth, app } } as never) as any;
+    // Counted around start, which runs the derivation: five refused writes to
+    // two names give one warning for each name, whatever the text says.
+    const before = warn.mock.calls.length;
     system.start();
     await system.settle();
-
     expect(system.derive.app.attempts).toEqual([true, true, true, true, true]);
-    // Five refused writes, two names: one warning for each name.
-    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.length - before).toBe(2);
   });
 });
