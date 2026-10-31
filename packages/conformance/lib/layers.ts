@@ -251,6 +251,37 @@ function unwrap(node: Node): Node {
 }
 
 /**
+ * Whether a property's value is an object literal: written there
+ * (`batch: { … }`), or named by a shorthand or an identifier whose
+ * declaration is one (`const batch = { … }`).
+ */
+function isObjectValued(node: Node): boolean {
+  let value: Node | undefined;
+  let decls: Node[] = [];
+  if (Node.isPropertyAssignment(node)) {
+    value = node.getInitializer();
+    value = value ? unwrap(value) : undefined;
+    if (value && Node.isIdentifier(value)) {
+      decls = value.getSymbol()?.getDeclarations() ?? [];
+    }
+  } else if (Node.isShorthandPropertyAssignment(node)) {
+    // The name node's own symbol is the property; the value's is the variable.
+    decls = node.getValueSymbol()?.getDeclarations() ?? [];
+  }
+  for (const decl of decls) {
+    const init = Node.isVariableDeclaration(decl)
+      ? decl.getInitializer()
+      : undefined;
+    if (init) {
+      value = unwrap(init);
+      break;
+    }
+  }
+
+  return !!value && Node.isObjectLiteralExpression(value);
+}
+
+/**
  * The registry a member call is made on: `system.derive.register(…)`,
  * `(system.derive as Any).register(…)`, or `d.register(…)` after
  * `const d = system.derive as Any`.
@@ -484,6 +515,15 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
         }
       }
       const last = chain[chain.length - 1];
+      // A batch resolver's `batch` option, wherever its object is built. A
+      // helper that takes the resolver's options as an argument
+      // (`build({ batch: { enabled: true } })`) leaves no `resolvers.<id>` in
+      // the key path, so the OPTION_LAYERS entry never matches there. The
+      // value must be an object (a BatchConfig): a `batch` function or flag on
+      // some other API says nothing about resolvers.
+      if (last === "batch" && isObjectValued(node)) {
+        out.push({ name: "option batch resolver", layer: "L7" });
+      }
       if (last !== undefined && PREDICATE_OPERATORS.has(last)) {
         out.push({ name: "option predicate data form", layer: "L11" });
       }
