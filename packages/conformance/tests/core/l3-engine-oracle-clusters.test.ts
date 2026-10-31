@@ -9,7 +9,8 @@
  *   as they were when the pass dispatched them: the second may not silently
  *   overwrite what the first wrote.
  * - retry-later keeps a waiting constraint's retry and a waiting resolver's
- *   retry apart: each is retried as itself.
+ *   retry apart: each is retried as itself, even when the resolver is named
+ *   like the constraint and its own failure is skipped.
  * - `when()` stops asking its predicate once it has resolved.
  * - when() that times out stops asking its predicate.
  * - destroy() of a system with a resolver in flight: nothing is announced to a
@@ -142,6 +143,75 @@ describe("retry-later with a constraint and a resolver both waiting", () => {
     // Well past the delay, whatever the poll's cadence.
     await vi.advanceTimersByTimeAsync(1000);
     expect(flakyAsked).toBeGreaterThan(askedBefore);
+    sys.destroy();
+  });
+
+  it("a resolver that shares the constraint's name and is skipped does not stop the retry", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let asked = 0;
+    const mod = createModule("same-name", {
+      schema: {
+        facts: { done: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { BREAK: {}, FINISH: {} },
+      },
+      init: (facts: any) => {
+        facts.done = false;
+      },
+      constraints: {
+        // Throws the first time it is asked, then asks for FINISH.
+        x: {
+          when: () => {
+            asked++;
+            if (asked === 1) {
+              throw new Error("not yet");
+            }
+
+            return true;
+          },
+          require: { type: "FINISH" },
+        },
+        trigger: {
+          when: () => true,
+          require: { type: "BREAK" },
+        },
+      },
+      resolvers: {
+        // Named like the constraint above; its failure is skipped.
+        x: {
+          requirement: "BREAK",
+          resolve: async () => {
+            throw new Error("broken");
+          },
+        },
+        finish: {
+          requirement: "FINISH",
+          resolve: async (_req: unknown, context: any) => {
+            context.facts.done = true;
+          },
+        },
+      },
+    } as never);
+    const sys = createSystem({
+      module: mod,
+      errorBoundary: {
+        onConstraintError: "retry-later",
+        onResolverError: "skip",
+        retryLater: { delayMs: 300 },
+      },
+    } as never) as any;
+    sys.start();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(asked).toBe(1);
+    expect(sys.facts.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1500);
+    // The constraint's own retry still happens: it is asked again and its
+    // requirement is met.
+    expect(asked).toBe(2);
+    expect(sys.facts.done).toBe(true);
     sys.destroy();
   });
 });

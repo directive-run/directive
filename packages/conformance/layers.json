@@ -7342,6 +7342,10 @@
           "layer": "L3",
           "by": ["option error boundary"]
         },
+        "retry-later with a constraint and a resolver both waiting > a resolver that shares the constraint's name and is skipped does not stop the retry": {
+          "layer": "L3",
+          "by": ["option error boundary"]
+        },
         "when() > stops asking its predicate once it has resolved": {
           "layer": "L0",
           "by": [

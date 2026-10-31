@@ -182,6 +182,14 @@
     "endCol": 48
   },
   {
+    "line": 248,
+    "col": 19,
+    "mutator": "ObjectLiteral",
+    "replacement": "{}",
+    "reason": "not-observable",
+    "note": "harness limit, not a missing test: NO_REQUIREMENT_CHANGES is a module-load constant (a Stryker static mutant). The per-test run only re-runs the two tests that cover it and never re-evaluates the module, so it reports Survived at every ceiling (the other static mutant, 81:36, survives the same way though sources.test.ts kills it by hand). Applied by hand, the whole conformance:local suite fails 58 tests (a quiet pass destructures undefined and throws at added.length), including tests placed at L0 (l1-effects.test.ts > which effects run > a throw next to an async effect is reported by the time settle() returns), L1 (l1-views.test.ts > what is not reported > a value too large to check, even when changed), L2 (l2-constraints-oracle.test.ts > when and require > keeps an untouched constraint answering nothing when another constraint fires) and L3 (blackbox-effects.test.ts > a throwing effect > an async rejection is reported)."
+  },
+  {
     "line": 253,
     "col": 51,
     "mutator": "BlockStatement",
@@ -306,18 +314,18 @@
     "col": 51,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 317,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 317,
@@ -333,27 +341,27 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 327,
     "col": 75,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 328,
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 331,
@@ -396,27 +404,27 @@
     "col": 36,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 342,
     "col": 37,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 343,
     "col": 5,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L5",
-    "note": "sources: source collision check, plugin source hooks, publish acceptance and cross-module drop, gated evaluation, cleanup; needs a source() definition",
+    "note": "sources: source collision check, plugin source hooks, publish acceptance and cross-module drop, gated evaluation, cleanup; needs a source() definition. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 346,
     "endCol": 7
   },
@@ -425,9 +433,9 @@
     "col": 7,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L5",
-    "note": "sources: source collision check, plugin source hooks, publish acceptance and cross-module drop, gated evaluation, cleanup; needs a source() definition",
+    "note": "sources: source collision check, plugin source hooks, publish acceptance and cross-module drop, gated evaluation, cleanup; needs a source() definition. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 345,
     "endCol": 15
   },
@@ -436,27 +444,27 @@
     "col": 41,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 348,
     "col": 39,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 349,
     "col": 36,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
+    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 353,
@@ -514,9 +522,9 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 380,
     "endCol": 20
   },
@@ -525,9 +533,9 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 380,
     "endCol": 20
   },
@@ -697,9 +705,9 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 410,
     "endCol": 36
   },
@@ -1159,9 +1167,9 @@
     "col": 7,
     "mutator": "UpdateOperator",
     "replacement": "ordinaryWrites--",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 878,
     "endCol": 23
   },
@@ -1340,9 +1348,9 @@
     "col": 25,
     "mutator": "ArrowFunction",
     "replacement": "() => undefined",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 926,
     "endCol": 58
   },
@@ -1524,9 +1532,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 998,
     "endCol": 23
   },
@@ -1535,9 +1543,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 998,
     "endCol": 23
   },
@@ -1615,18 +1623,18 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: a batch whose every change is a restore (time travel, L8) returns before the snapshot and reconcile bookkeeping"
+    "note": "history: a batch whose every change is a restore (time travel, L8) returns before the snapshot and reconcile bookkeeping. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 1035,
     "col": 30,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 1035,
     "endCol": 35
   },
@@ -1635,27 +1643,27 @@
     "col": 39,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing"
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 1037,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing"
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 1037,
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing"
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 1042,
@@ -1702,9 +1710,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 1042,
     "endCol": 51
   },
@@ -1713,9 +1721,9 @@
     "col": 34,
     "mutator": "BooleanLiteral",
     "replacement": "duringNavigation",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 1042,
     "endCol": 51
   },
@@ -1735,9 +1743,9 @@
     "col": 30,
     "mutator": "BooleanLiteral",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 1043,
     "endCol": 34
   },
@@ -1925,9 +1933,9 @@
     "col": 5,
     "mutator": "ObjectLiteral",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L5",
-    "note": "sources: the sources manager's lifecycle callbacks (attach/publish/detach/error); needs a source() definition (L5)"
+    "note": "sources: the sources manager's lifecycle callbacks (attach/publish/detach/error); needs a source() definition (L5). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
     "line": 1194,
@@ -2297,25 +2305,9 @@
     "line": 1495,
     "col": 11,
     "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "equivalent",
-    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty). Every mutant here either sets that callback, skips it, or sets it on another entry of the same resolver: no pass, run or fact changes. Proved: whole L3 suite passes with the mutant. (Setting it on a constraint's entry is killed by l3-engine-oracle-clusters)"
-  },
-  {
-    "line": 1495,
-    "col": 11,
-    "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "equivalent",
-    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty). Every mutant here either sets that callback, skips it, or sets it on another entry of the same resolver: no pass, run or fact changes. Proved: whole L3 suite passes with the mutant. (Setting it on a constraint's entry is killed by l3-engine-oracle-clusters)"
-  },
-  {
-    "line": 1495,
-    "col": 11,
-    "mutator": "EqualityOperator",
-    "replacement": "strategy !== \"retry-later\"",
-    "reason": "equivalent",
-    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty). Every mutant here either sets that callback, skips it, or sets it on another entry of the same resolver: no pass, run or fact changes. Proved: whole L3 suite passes with the mutant. (Setting it on a constraint's entry is killed by l3-engine-oracle-clusters)"
+    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty), so never setting it changes nothing. Proved: whole L3 suite passes with the mutant. (Entering the block for a resolver whose strategy is not retry-later is observable and is killed by l3-engine-oracle-clusters: a resolver that shares the constraint's name and is skipped does not stop the retry.)"
   },
   {
     "line": 1495,
@@ -2323,7 +2315,7 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "equivalent",
-    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty). Every mutant here either sets that callback, skips it, or sets it on another entry of the same resolver: no pass, run or fact changes. Proved: whole L3 suite passes with the mutant. (Setting it on a constraint's entry is killed by l3-engine-oracle-clusters)"
+    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty), so never setting it changes nothing. Proved: whole L3 suite passes with the mutant. (Entering the block for a resolver whose strategy is not retry-later is observable and is killed by l3-engine-oracle-clusters: a resolver that shares the constraint's name and is skipped does not stop the retry.)"
   },
   {
     "line": 1495,
@@ -2331,7 +2323,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "equivalent",
-    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty). Every mutant here either sets that callback, skips it, or sets it on another entry of the same resolver: no pass, run or fact changes. Proved: whole L3 suite passes with the mutant. (Setting it on a constraint's entry is killed by l3-engine-oracle-clusters)"
+    "note": "retry-later for a resolver: the callback set here only calls scheduleReconcile(), and an entry without one does the same in the poll (source 'resolver' skips markDirty), so never setting it changes nothing. Proved: whole L3 suite passes with the mutant. (Entering the block for a resolver whose strategy is not retry-later is observable and is killed by l3-engine-oracle-clusters: a resolver that shares the constraint's name and is skipped does not stop the retry.)"
   },
   {
     "line": 1499,
@@ -3778,16 +3770,18 @@
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "equivalent",
-    "note": "an empty baseline object when no added requirement is bound: createBoundFacts only reads the baseline for a bound resolver's own fields, and an unbound run never reads it"
+    "reason": "feature-layer",
+    "layer": "L7",
+    "note": "batch resolvers (L7): an empty {} baseline when no added requirement is bound. createBoundFacts reads a baseline only for a bound resolver's own fields, but a batch takes the LAST non-undefined baseline of its window (resolvers.ts processBatch), so an empty {} added on a later tick shadows an earlier tick's bound baseline; observable only through batch."
   },
   {
     "line": 2113,
     "col": 13,
     "mutator": "EqualityOperator",
     "replacement": "ownedKeysThisTick.size >= 0",
-    "reason": "equivalent",
-    "note": "an empty baseline object when no added requirement is bound: createBoundFacts only reads the baseline for a bound resolver's own fields, and an unbound run never reads it"
+    "reason": "feature-layer",
+    "layer": "L7",
+    "note": "batch resolvers (L7): an empty {} baseline when no added requirement is bound. createBoundFacts reads a baseline only for a bound resolver's own fields, but a batch takes the LAST non-undefined baseline of its window (resolvers.ts processBatch), so an empty {} added on a later tick shadows an earlier tick's bound baseline; observable only through batch."
   },
   {
     "line": 2126,
@@ -4363,9 +4357,9 @@
     "col": 20,
     "mutator": "OptionalChaining",
     "replacement": "(schema[key] as {\n  _meta?: DefinitionMeta;\n})._meta",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 2479,
     "endCol": 70
   },
@@ -4383,9 +4377,9 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 2489,
     "endCol": 32
   },
@@ -5727,9 +5721,9 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 3338,
     "endCol": 31
   },
@@ -5738,9 +5732,9 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L6",
-    "note": "snapshots and restore: restore-origin write tracking, getSnapshot options and errors, restore() input validation",
+    "note": "snapshots and restore: restore-origin write tracking, getSnapshot options and errors, restore() input validation. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 3339,
     "endCol": 28
   },
@@ -5759,9 +5753,9 @@
     "col": 29,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
     "endLine": 3345,
     "endCol": 34
   },
