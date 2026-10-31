@@ -14,13 +14,6 @@ import { createSystem } from "../api/system.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Lets queued microtasks run; no real timers. */
-async function drain(turns = 2000) {
-  for (let i = 0; i < turns; i++) {
-    await Promise.resolve();
-  }
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
 });
