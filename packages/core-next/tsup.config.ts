@@ -59,7 +59,11 @@ export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
 export default defineConfig({
-  entry: { index: "src/index.ts", internals: "src/internals.ts" },
+  entry: {
+    index: "src/index.ts",
+    internals: "src/internals.ts",
+    testing: "src/utils/testing.ts",
+  },
   format: ["esm"],
   dts: true,
   minify: false,

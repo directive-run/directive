@@ -84,6 +84,9 @@ export interface ResolverDef {
   requirement: string | ((req: Requirement) => boolean);
   key?: (req: Requirement) => string;
   resolve?: Fn;
+  /** Batching is L7; only their presence is checked (1.35's validation). */
+  resolveBatch?: Fn;
+  resolveBatchWithResults?: Fn;
   retry?: RetryPolicy;
   timeout?: number;
   /** Batching is L7: until it is built, a batched resolver is not run. */
@@ -102,6 +105,8 @@ export interface Run extends Writer {
   dropped_: boolean;
   /** Out of flight but not aborted (RFC-0003): it still reports its outcome. */
   detached_: boolean;
+  /** The attempt running, 0 while pending (inspect()'s status). */
+  attempt_: number;
 }
 
 /** 1.35's per-attempt cap on clobber reports, then one summary. */
@@ -197,6 +202,26 @@ const toError = (error: unknown): Error =>
 
 export function createResolvers(options: ResolversOptions): Resolvers {
   const { defs, store, clock, owner, emit } = options;
+  if (isDevelopment) {
+    // 1.35's validateDefinitions, development only.
+    for (const [id, def] of Object.entries(defs)) {
+      if (!def.resolve && !def.resolveBatch && !def.resolveBatchWithResults) {
+        throw new Error(
+          `[Directive] Resolver "${id}" must define either resolve() or resolveBatch(). Add one of these methods to handle requirements.`,
+        );
+      }
+      if (def.batch?.enabled && !def.resolveBatch && !def.resolveBatchWithResults) {
+        if (!def.resolve) {
+          throw new Error(
+            `[Directive] Resolver "${id}" has batch.enabled=true but no resolve(), resolveBatch(), or resolveBatchWithResults() method.`,
+          );
+        }
+        console.warn(
+          `[Directive] Resolver "${id}" has batch.enabled but no resolveBatch(). Falling back to individual resolve() calls. Add resolveBatch() for true bulk operations.`,
+        );
+      }
+    }
+  }
   const inflight = new Map<string, Run>();
   const detached = new Set<Run>();
   /** The last stamp handed out: run ids start at 1 (0 is unattributed). */
@@ -204,7 +229,12 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
   const find = (req: Requirement): string | null => {
     for (const id in defs) {
-      const match = defs[id]!.requirement;
+      const def = defs[id];
+      // As 1.35: only an object definition handles requirements.
+      if (typeof def !== "object" || def === null) {
+        continue;
+      }
+      const match = def.requirement;
       if (typeof match === "function" ? match(req) : match === req.type) {
         return id;
       }
@@ -386,6 +416,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       if (attempt > 1 && run.satisfied_) {
         break;
       }
+      run.attempt_ = attempt;
       // Asked each attempt, as 1.35: a constraint found async since loses it.
       const keys = options.bindingOf(run.req_);
       const context = keys
@@ -420,9 +451,10 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         ) {
           break;
         }
-        if (attempt < attempts) {
+        // A second attempt exists only under a retry policy.
+        if (policy && attempt < attempts) {
           abort = false;
-          await wait(delayFor(policy!, attempt, options.random), signal);
+          await wait(delayFor(policy, attempt, options.random), signal);
           if (signal.aborted) {
             quiet = true;
             break;
@@ -479,6 +511,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         satisfied_: false,
         dropped_: false,
         detached_: false,
+        attempt_: 0,
       };
       inflight.set(req.id, run);
       emit("resolver.start", () => ({ resolver: resolverId, req }));

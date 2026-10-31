@@ -29,7 +29,7 @@
 import isDevelopment from "#is-development";
 import { type ConstraintDef, createConstraints } from "./constraints.js";
 import type { ReconcileFeature, SystemPart } from "./core.js";
-import { DERIVATION_DEP_PREFIX } from "./facts.js";
+import { DERIVATION_DEP_PREFIX, describeDep } from "./facts.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
 
@@ -179,7 +179,7 @@ export const withReconcile: SystemPart = (context) => {
     },
     onError(run, error) {
       // 1.35 passes the requirement as the error's context.
-      reportError("resolver", run.resolver_, error, run.req_);
+      reportError("resolver", run.resolver_, error, run.req_, run.satisfied_);
       emit("resolver.error", () => ({
         resolver: run.resolver_,
         req: run.req_,
@@ -533,7 +533,38 @@ export const withReconcile: SystemPart = (context) => {
       for (const id of resolvers.abortAll()) {
         previous.delete(id);
       }
+      // A requeue asked by a run just canceled is not carried into start().
+      requeued.clear();
     },
+    inspect_: () => ({
+      unmet: [...previous.values()],
+      inflight: [...resolvers.inflight.values()].map((run) => ({
+        id: run.req_.id,
+        resolverId: run.resolver_,
+        startedAt: run.startedAt_,
+      })),
+      constraints: constraints.states_().map((state) => {
+        const def = constraintDefs[state.id] as ConstraintDef & {
+          meta?: unknown;
+        };
+        // 1.35 lists `abortOn` only when it names a key.
+        const abortOn = def.abortOn?.length ? def.abortOn : undefined;
+
+        return {
+          id: state.id,
+          active: state.lastResult ?? false,
+          disabled: constraints.isDisabled(state.id),
+          priority: state.priority,
+          hitCount: state.hitCount,
+          lastActiveAt: state.lastActiveAt,
+          meta: def.meta,
+          ...(abortOn ? { abortOn } : {}),
+        };
+      }),
+      resolvers: Object.fromEntries(
+        [...resolvers.inflight.values()].map((run) => [run.req_.id, status(run)]),
+      ),
+    }),
     details_(core) {
       const runs = [...resolvers.inflight.values()];
       const all = [...previous.values()];
@@ -554,6 +585,74 @@ export const withReconcile: SystemPart = (context) => {
     },
   };
   kernel.define("reconcile", feature);
+  /** 1.35's ResolverStatus for a run in flight: pending, then running. */
+  const status = (run: Run): Record<string, unknown> =>
+    run.attempt_ === 0
+      ? {
+          state: "pending",
+          requirementId: run.req_.id,
+          startedAt: run.startedAt_,
+        }
+      : {
+          state: "running",
+          requirementId: run.req_.id,
+          startedAt: run.startedAt_,
+          attempt: run.attempt_,
+        };
+  /** 1.35's explain(): why a requirement in the current set is there. */
+  system.explain = (requirementId: string): string | null => {
+    const req = previous.get(requirementId);
+    if (!req) {
+      return null;
+    }
+    const from = req.fromConstraint;
+    const state = constraints.state_(from);
+    const run = resolvers.inflight.get(requirementId);
+    const relevant: Record<string, unknown> = {};
+    const read = constraints.depsOf(from);
+    if (read) {
+      for (const dep of read) {
+        relevant[describeDep(dep)] = dep.startsWith(DERIVATION_DEP_PREFIX)
+          ? context.derived[dep.slice(1)]
+          : context.store.get(dep);
+      }
+    } else {
+      Object.assign(relevant, context.store.toObject());
+    }
+    const meta = (constraintDefs[from] as { meta?: Record<string, any> })
+      ?.meta;
+    const lines = [
+      `Requirement "${req.requirement.type}" (id: ${req.id})`,
+      `├─ Produced by constraint: ${meta?.label ?? from}`,
+      `├─ Constraint priority: ${state?.priority ?? 0}`,
+      `├─ Constraint active: ${state?.lastResult ?? "unknown"}`,
+      // Outcomes are not kept (1.35 keeps an LRU of them): a requirement
+      // not in flight reads "idle".
+      `├─ Resolver status: ${run ? status(run).state : "idle"}`,
+    ];
+    if (meta?.description) {
+      lines.push(`├─ Description: ${meta.description}`);
+    }
+    const payload = Object.entries(req.requirement)
+      .filter(([k]) => k !== "type")
+      .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+      .join(", ");
+    if (payload) {
+      lines.push(`├─ Requirement payload: { ${payload} }`);
+    }
+    const entries = Object.entries(relevant).slice(0, 10);
+    if (entries.length > 0) {
+      lines.push("└─ Relevant facts:");
+      entries.forEach(([k, v], i) => {
+        const text = typeof v === "object" ? JSON.stringify(v) : String(v);
+        lines.push(
+          `${i === entries.length - 1 ? "   └─" : "   ├─"} ${k} = ${text.slice(0, 50)}${text.length > 50 ? "..." : ""}`,
+        );
+      });
+    }
+
+    return lines.join("\n");
+  };
   system.constraints = {
     disable(id: string) {
       // Quirk e: a dependent it held back is asked again.

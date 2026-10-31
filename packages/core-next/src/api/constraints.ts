@@ -81,6 +81,20 @@ export interface Constraints {
   disable(id: string): boolean;
   enable(id: string): void;
   isDisabled(id: string): boolean;
+  /** 1.35's constraint state, for inspect() and explain(). */
+  state_(id: string): ConstraintState | undefined;
+  /** Every constraint's state, in declaration order. */
+  states_(): ConstraintState[];
+}
+
+/** What inspect() reports of a constraint (1.35's ConstraintState subset). */
+export interface ConstraintState {
+  id: string;
+  priority: number;
+  /** The last answer of its `when`; null before it is asked (a throw is false). */
+  lastResult: boolean | null;
+  hitCount: number;
+  lastActiveAt: number | null;
 }
 
 /** A `require` that threw, with what it read before it threw. */
@@ -97,8 +111,46 @@ const ASYNC_WHEN_TIMEOUT_MS = 5000;
 const EMPTY: RequirementWithId[] = [];
 
 export function createConstraints(options: ConstraintsOptions): Constraints {
-  const { defs, facts, derived, tracker, keys, onEvaluate, onError } = options;
+  const { defs, facts, derived, tracker, keys } = options;
   const ids = Object.keys(defs);
+  for (const id of ids) {
+    const spec = defs[id]?.when;
+    // 1.35: `$changed` is effects-only, refused at registration in every
+    // build. (The rest of the data form is the L11 compiler.)
+    if (spec !== undefined && typeof spec !== "function" && hasChanged(spec)) {
+      throw new Error(
+        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
+      );
+    }
+  }
+  const states = new Map<string, ConstraintState>(
+    ids.map((id) => [
+      id,
+      {
+        id,
+        priority: defs[id]!.priority ?? 0,
+        lastResult: null,
+        hitCount: 0,
+        lastActiveAt: null,
+      },
+    ]),
+  );
+  /** 1.35's recordConstraintResult: the answer, and a hit when active. */
+  const onEvaluate = (id: string, active: boolean) => {
+    const state = states.get(id)!;
+    state.lastResult = active;
+    if (active) {
+      state.hitCount++;
+      state.lastActiveAt = options.clock.now();
+    }
+    options.onEvaluate(id, active);
+  };
+  /** 1.35's recordConstraintError: a `when` that threw is not active. */
+  const onWhenError = (id: string, error: unknown) => {
+    states.get(id)!.lastResult = false;
+    options.onError(id, error);
+  };
+  const onError = options.onError;
   const deps = new Map<string, Set<string>>();
   const byKey = new Map<string, Set<string>>();
   const last = new Map<string, RequirementWithId[]>();
@@ -217,7 +269,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       throw read.thrown;
     }
 
-    return read.value as boolean | Promise<boolean>;
+    return read.value;
   }
   function evaluateSync(id: string): boolean | Promise<boolean> {
     try {
@@ -238,7 +290,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
             return active;
           },
           (error) => {
-            onError(id, error);
+            onWhenError(id, error);
 
             return false;
           },
@@ -248,7 +300,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
 
       return result;
     } catch (error) {
-      onError(id, error);
+      onWhenError(id, error);
 
       return false;
     }
@@ -272,7 +324,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
 
       return active;
     } catch (error) {
-      onError(id, error);
+      onWhenError(id, error);
 
       return false;
     }
@@ -585,5 +637,82 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       }
     },
     isDisabled: (id) => disabled.has(id),
+    state_: (id) => states.get(id),
+    states_: () => [...states.values()],
   };
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/**
+ * 1.35's containsChangedOperator over its walkPredicate: `$changed` as an
+ * operator (object or array clause form) or a stray `$`-key at fact
+ * position; combinators and nested plain objects are followed, operands are
+ * not. Cycles stop the walk, and so does depth past 64.
+ */
+function hasChanged(
+  spec: unknown,
+  seen = new WeakSet<object>(),
+  depth = 0,
+): boolean {
+  if (depth > 64) {
+    return false;
+  }
+  if (Array.isArray(spec)) {
+    return spec.some(
+      (c) =>
+        isObject(c) &&
+        typeof c.fact === "string" &&
+        c.op === "$changed",
+    );
+  }
+  if (
+    !isObject(spec) ||
+    spec instanceof Date ||
+    spec instanceof RegExp ||
+    seen.has(spec)
+  ) {
+    return false;
+  }
+  seen.add(spec);
+  for (const kind of ["$all", "$any", "$not"]) {
+    if (kind in spec) {
+      const children =
+        kind === "$not" ? [spec.$not] : ((spec[kind] as unknown[]) ?? []);
+
+      return children.some((child) => hasChanged(child, seen, depth + 1));
+    }
+  }
+  for (const key of Object.keys(spec)) {
+    if (key.startsWith("$")) {
+      if (key === "$changed") {
+        return true;
+      }
+      continue;
+    }
+    const value = spec[key];
+    if (
+      isObject(value) &&
+      !(value instanceof Date) &&
+      !(value instanceof RegExp)
+    ) {
+      const ops = Object.keys(value);
+      if (ops.length > 0 && ops.every((op) => op.startsWith("$"))) {
+        if (ops.includes("$changed")) {
+          return true;
+        }
+        continue;
+      }
+      const proto = Object.getPrototypeOf(value);
+      if (
+        (proto === Object.prototype || proto === null) &&
+        hasChanged(value, seen, depth + 1)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

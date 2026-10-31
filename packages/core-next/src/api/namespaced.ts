@@ -18,6 +18,7 @@ import type { SystemPart } from "./core.js";
 import { createSystemCore } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
 import { BLOCKED_PROPS, detectNonJsonValueType, warnNonJson } from "./facts.js";
+import { createCheckedReadView } from "./readonly.js";
 import type { ModuleDefinition, System, SystemOptions } from "./types.js";
 
 export const SEPARATOR = "::";
@@ -25,6 +26,7 @@ const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 const no = () => false;
 
 type Rec = Record<string, any>;
+type Fn = (...args: any[]) => any;
 interface Spec {
   get(key: string): unknown;
   set?(key: string, value: unknown): boolean;
@@ -113,6 +115,7 @@ function order(modules: Rec): string[] {
 
 const ROLE: Record<string, [string, string]> = {
   derive: ["a derivation", "Derivations"],
+  constraint: ["a constraint", "Constraints"],
   effect: ["an effect", "Effects"],
 };
 
@@ -268,12 +271,158 @@ export function createNamespacedSystem(
     });
   };
 
+  // --- what a resolver sees (1.35's createResolver*Proxy) ------------------
+  /** Another module's facts, read-only: a write throws in development. */
+  const depView = (src: Rec, ns: string, dep: string): Rec =>
+    cached(src, `resolver|${ns}|${dep}`, () => {
+      const prefix = dep + SEPARATOR;
+      const refuse = (key: string) => {
+        if (isDevelopment) {
+          throw new Error(
+            `[Directive] Module "${ns}": a resolver wrote "${dep}.${key}". Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${dep}" owns instead.`,
+          );
+        }
+
+        return true;
+      };
+
+      return hardened({
+        get: (key) => src[prefix + key],
+        set: refuse,
+        delete: refuse,
+        has: (key) => prefix + key in src,
+        ownKeys: () => keysUnder(src, prefix),
+      });
+    });
+  /** `context.deps`: one read-only view per declared dependency. */
+  const depsOf = (src: Rec, ns: string, deps: string[]): Rec =>
+    cached(src, `deps|${ns}|${deps.join(",")}`, () =>
+      hardened({
+        get(key) {
+          if (deps.includes(key)) {
+            return depView(src, ns, key);
+          }
+          if (isDevelopment && !RUNTIME_PROBE_PROPS.has(key)) {
+            const id = `resolver-deps|${ns}|${key}`;
+            if (!warned.has(id)) {
+              warned.add(id);
+              console.warn(
+                `[Directive] Module "${ns}": a resolver read ctx.deps.${key}, but "${key}" is not in crossModuleDeps. Declared: ${deps.join(", ")}.`,
+              );
+            }
+          }
+
+          return undefined;
+        },
+        set(key) {
+          if (isDevelopment) {
+            throw new Error(
+              `[Directive] Module "${ns}": ctx.deps is read-only (tried to set "${key}").`,
+            );
+          }
+
+          return true;
+        },
+        has: (key) => deps.includes(key),
+        ownKeys: () => [...deps],
+      }),
+    );
+  /** `$store` scoped to the module: bare or own-prefixed keys only. */
+  const storeOf = (src: Rec, ns: string): Rec =>
+    cached(src, `store|${ns}`, () => {
+      const prefix = ns + SEPARATOR;
+      const store = src.$store as Rec;
+      const own = (key: unknown): string | null =>
+        typeof key !== "string"
+          ? null
+          : key.startsWith(prefix)
+            ? key
+            : key.includes(SEPARATOR)
+              ? null
+              : prefix + key;
+      const refuse = (key: unknown) => {
+        if (isDevelopment) {
+          const target = String(key);
+          const owner = target.includes(SEPARATOR)
+            ? target.slice(0, target.indexOf(SEPARATOR))
+            : "another module";
+          throw new Error(
+            `[Directive] Module "${ns}": a resolver wrote "${target}" through ctx.facts.$store. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${owner}" owns instead.`,
+          );
+        }
+      };
+      const write =
+        (op: "set" | "delete") =>
+        (key: string, ...rest: unknown[]) => {
+          const full = own(key);
+          if (full === null) {
+            refuse(key);
+
+            return;
+          }
+          store[op](full, ...rest);
+        };
+
+      return Object.freeze({
+        get: (key: string) => {
+          const full = own(key);
+
+          return full === null ? undefined : store.get(full);
+        },
+        has: (key: string) => {
+          const full = own(key);
+
+          return full === null ? false : store.has(full);
+        },
+        set: write("set"),
+        delete: write("delete"),
+        batch: (fn: () => void) => store.batch(fn),
+        subscribe: (keys: string[], listener: () => void) =>
+          store.subscribe(
+            keys.map(own).filter((k): k is string => k !== null),
+            listener,
+          ),
+        subscribeAll: (listener: () => void) => store.subscribeAll(listener),
+        toObject: () => {
+          const out: Rec = {};
+          for (const [key, value] of Object.entries(store.toObject() as Rec)) {
+            if (key.startsWith(prefix)) {
+              out[key.slice(prefix.length)] = value;
+            }
+          }
+
+          return out;
+        },
+      });
+    });
+  /** `context.facts`: own facts, bare keys, with `$store` scoped too. */
+  const resolverFactsOf = (src: Rec, ns: string): Rec =>
+    cached(src, `facts|${ns}`, () => {
+      const own = factsOf(src, ns);
+      const scoped = () => storeOf(src, ns);
+
+      return hardened({
+        get: (key) =>
+          key === "$store" ? scoped() : key === "$snapshot" ? scoped : own[key],
+        set(key, value) {
+          own[key] = value;
+
+          return true;
+        },
+        has: (key) => key in own,
+        delete: (key) => Reflect.deleteProperty(own, key),
+        ownKeys: () => Object.keys(own),
+      });
+    });
+
   // --- one flat module -----------------------------------------------------
   const facts: Rec = {};
   const derivations: Rec = {};
   const derive: Rec = {};
   const events: Rec = {};
   const effects: Rec = {};
+  const constraints: Rec = {};
+  const resolvers: Rec = {};
   const inits: Array<(src: Rec) => void> = [];
   const namespaceKeys = new Map<string, string[]>();
   for (const ns of ordered) {
@@ -339,6 +488,104 @@ export function createNamespacedSystem(
       );
       effects[p(key)] = { ...def, run, deps: def.deps?.map(p) };
     }
+    // Constraints (1.35's prefixConstraints): ids, deps, `after` and
+    // `abortOn` keys move into the namespace; a function `when` or
+    // `require` reads `facts.self` (or the module's facts) and its own
+    // derivations.
+    const scoped =
+      (fn: Fn) =>
+      (src: Rec, d: Rec): unknown =>
+        fn(scopedFacts(src, ns, deps, "constraint"), deriveOf(d, ns));
+    const inNs = (key: string) => (key.includes(SEPARATOR) ? key : p(key));
+    for (const [key, def] of Object.entries(mod.constraints ?? {}) as [
+      string,
+      Rec,
+    ][]) {
+      constraints[p(key)] = {
+        ...def,
+        deps: def.deps?.map(p),
+        after: def.after?.map(inNs),
+        abortOn: def.abortOn?.map(inNs),
+        when: typeof def.when === "function" ? scoped(def.when) : def.when,
+        require:
+          typeof def.require === "function" ? scoped(def.require) : def.require,
+      };
+    }
+    // Resolvers (1.35's prefixResolvers): `context.facts` is the module's
+    // own facts, other modules only through `context.deps`. The wrappers
+    // keep 1.35's async shape, so a run ends on the same microtask.
+    const wrap = (context: Rec): Rec =>
+      deps.length > 0
+        ? {
+            ...context,
+            facts: resolverFactsOf(context.facts, ns),
+            deps: depsOf(context.facts, ns, deps),
+          }
+        : { ...context, facts: resolverFactsOf(context.facts, ns) };
+    const run = async (context: Rec, call: (wrapped: Rec) => Promise<unknown>) => {
+      const wrapped = wrap(context);
+      if (isDevelopment && deps.length > 0) {
+        // A value handed out through context.deps changed in place is
+        // reported once the run settles, naming the path (1.35).
+        const checks = deps.map((dep) =>
+          createCheckedReadView(
+            wrapped.deps[dep] as Rec,
+            (key) => {
+              // The dependency view refuses the write, with its message.
+              (wrapped.deps[dep] as Rec)[key] = undefined;
+
+              return true;
+            },
+            { prefix: dep },
+          ),
+        );
+        const views = new Proxy(wrapped.deps as Rec, {
+          get: (target, key) => {
+            const i = typeof key === "string" ? deps.indexOf(key) : -1;
+
+            return i >= 0 ? checks[i]!.view : Reflect.get(target, key);
+          },
+        });
+        const result = await call({ ...wrapped, deps: views });
+        for (const check of checks) {
+          const mutated = check.takeMutation();
+          if (mutated !== null) {
+            throw new Error(
+              `[Directive] Module "${ns}": a resolver changed "${mutated}" in place. Another module's facts are read-only from a resolver – emit a requirement or dispatch an event that module "${mutated.slice(0, mutated.indexOf("."))}" owns instead.`,
+            );
+          }
+        }
+
+        return result;
+      }
+
+      return call(wrapped);
+    };
+    for (const [key, def] of Object.entries(mod.resolvers ?? {}) as [
+      string,
+      Rec,
+    ][]) {
+      resolvers[p(key)] = {
+        ...def,
+        ...(def.resolve && {
+          resolve: async (req: unknown, context: Rec) => {
+            await run(context, (wrapped) => def.resolve(req, wrapped));
+          },
+        }),
+        ...(def.resolveBatch && {
+          resolveBatch: async (reqs: unknown[], context: Rec) => {
+            await run(context, (wrapped) => def.resolveBatch(reqs, wrapped));
+          },
+        }),
+        ...(def.resolveBatchWithResults && {
+          resolveBatchWithResults: async (reqs: unknown[], context: Rec) => {
+            return run(context, (wrapped) =>
+              def.resolveBatchWithResults(reqs, wrapped),
+            );
+          },
+        }),
+      };
+    }
     if (mod.init) {
       inits.push((src) => mod.init!(factsOf(src, ns)));
     }
@@ -351,6 +598,8 @@ export function createNamespacedSystem(
     derive,
     events,
     effects,
+    constraints,
+    resolvers,
   } as unknown as ModuleDefinition;
 
   const system = createSystemCore(
