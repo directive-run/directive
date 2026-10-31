@@ -45,6 +45,30 @@ export interface Tracker {
   deps: Set<string> | null;
 }
 
+/**
+ * Who made a write: a small integer passed with it (`store.set(key, value,
+ * stamp)`). 0 is unattributed (an event, init, a listener, the user); a
+ * resolver run passes its run id. Never held in an ambient variable, so a
+ * listener's nested write is never credited to the write that woke it.
+ */
+export type Stamp = number;
+
+/**
+ * Where the store reports each write that changed something, with its
+ * stamp. A holder, like {@link Tracker}: the reconcile part fills it in
+ * after the store exists; while it is null a write costs one check.
+ */
+export interface Writers {
+  record: ((key: string, stamp: Stamp) => void) | null;
+}
+
+/** A facts view whose writes carry one stamp (a resolver run). */
+export interface Writer {
+  readonly stamp_: Stamp;
+  /** Superseded: a newer run owns the requirement, its writes are dropped. */
+  readonly dropped_: boolean;
+}
+
 export const DERIVATION_DEP_PREFIX = "\u001F";
 export const describeDep = (dep: string): string =>
   dep.startsWith(DERIVATION_DEP_PREFIX) ? `derive.${dep.slice(1)}` : dep;
@@ -158,6 +182,8 @@ export interface CreateFactsStoreOptions<S extends Schema> {
   /** The graph to hold values in (a system passes its own). */
   graph?: Graph;
   tracker?: Tracker;
+  /** Told of each write that changed something, with its stamp. */
+  writers?: Writers;
   /** Filled with each key's graph node (a system walks their subscribers). */
   nodes?: Map<string, ReactiveNode>;
 }
@@ -192,6 +218,7 @@ export function createFactsStore<S extends Schema>(
   const originOf = options.originOf ?? (() => "authored" as FactOrigin);
   const graph = options.graph ?? new Graph();
   const tracker = options.tracker ?? { deps: null };
+  const writers: Writers = options.writers ?? { record: null };
 
   /** One graph node per key; `present` says whether the key holds a value. */
   const nodes = options.nodes ?? new Map<string, ReactiveNode>();
@@ -308,7 +335,7 @@ export function createFactsStore<S extends Schema>(
 
       return present.has(key);
     },
-    set(key: string, value: unknown) {
+    set(key: string, value: unknown, stamp: Stamp = 0) {
       if (isDevelopment) {
         validator?.(key, value);
       }
@@ -317,13 +344,16 @@ export function createFactsStore<S extends Schema>(
       if (!Object.is(prev, value)) {
         present.add(key);
         graph.write(n, value);
+        writers.record?.(key, stamp);
         record(key, value, prev, "set");
       }
     },
-    delete(key: string) {
+    delete(key: string, stamp: Stamp = 0) {
       const n = node(key);
       const prev = n.value;
-      present.delete(key);
+      const had = present.delete(key);
+      // Deleting an absent key changes nothing its writer can claim.
+      writers.record?.(key, had ? stamp : 0);
       graph.write(n, undefined);
       record(key, undefined, prev, "delete");
     },
@@ -481,7 +511,9 @@ export function createFactsProxy<S extends Schema>(
   schema: S,
   tracker: Tracker = { deps: null },
   warned: Set<string> = new Set(),
+  writer?: Writer,
 ): Facts<S> {
+  const stamp = writer ? writer.stamp_ : 0;
   const nested = new WeakMap<object, object>();
   const s = store as unknown as FactsStore;
   const untracked =
@@ -521,6 +553,9 @@ export function createFactsProxy<S extends Schema>(
       return value;
     },
     set(_, prop, value) {
+      if (writer?.dropped_) {
+        return true;
+      }
       if (reserved(prop)) {
         return false;
       }
@@ -530,15 +565,18 @@ export function createFactsProxy<S extends Schema>(
           warnNonJson(warned, prop, nonJson);
         }
       }
-      s.set(prop, value);
+      s.set(prop, value, stamp);
 
       return true;
     },
     deleteProperty(_, prop) {
+      if (writer?.dropped_) {
+        return true;
+      }
       if (reserved(prop)) {
         return false;
       }
-      s.delete(prop);
+      s.delete(prop, stamp);
 
       return true;
     },

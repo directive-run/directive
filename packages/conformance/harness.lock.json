@@ -5,7 +5,7 @@
     "contracts/GATE-0.md": "3cd4a4b08258f22d5abf416db9641c179b56ce1d4aafb0bedf02f46cc8f4299a",
     "contracts/GATE-1.md": "8a5e8b995fbb91986d62cd17841fa5aa0db945046702f3fb27512795f7ae94ab",
     "contracts/PACKAGES-2.0.md": "29d3f2db4bbf2233df392c7e1769fdb109913f49732fd268a25a930014245a6d",
-    "contracts/STABILITY.md": "269fae4d3d625ea346c7b6cc3c7c8ec9ac3f04aa0a44638ee4fb1d90c353f504",
+    "contracts/STABILITY.md": "861c54f02af61e89268984c864a7ec3c6ac40c85dcac1ac8c1acfc1b50d1961e",
     "contracts/api-changes.json": "760aa80c7222939e50e152f9c29276555fc40af9f1b15413671236e6da5b01b8",
     "contracts/api-surface.json": "b5018b9d0733186d94ed2b7756896723737005224c59e616562eeb72cbbd9b33",
     "contracts/api-surface.test.ts": "d94e13fc9ba4ba6467deda05aa772b8d6514d5a69fb82ba7956d7ed944abbebc",

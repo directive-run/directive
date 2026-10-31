@@ -19,8 +19,18 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
     case "system.destroy":
     case "reconcile.start":
       return [{ type }];
-    case "reconcile.end":
-      return [{ type, resolversCompleted: 0, resolversCanceled: 0 }];
+    case "reconcile.end": {
+      const r = event.result as { completed?: unknown; canceled?: unknown };
+      const count = (list: unknown) => (Array.isArray(list) ? list.length : 0);
+
+      return [
+        {
+          type,
+          resolversCompleted: count(r?.completed),
+          resolversCanceled: count(r?.canceled),
+        },
+      ];
+    }
     case "fact.set":
       return [
         {
@@ -59,6 +69,52 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       return [{ type, id: event.id, value: event.value }];
     case "effect.run":
       return [{ type, id: event.id }];
+    // L2 (reconcile.ts), shaped as 1.35's observer shapes them.
+    case "constraint.evaluate":
+      return [{ type, id: event.id, active: event.active }];
+    case "constraint.error":
+      return [{ type, id: event.id, error: event.error }];
+    case "requirement.created": {
+      const req = event.req as { id: string; requirement: { type: string } };
+
+      return [{ type, id: req.id, requirementType: req.requirement.type }];
+    }
+    case "requirement.met":
+      return [
+        {
+          type,
+          id: (event.req as { id: string }).id,
+          byResolver: event.resolver,
+        },
+      ];
+    case "requirement.canceled":
+      return [{ type, id: (event.req as { id: string }).id }];
+    case "resolver.start":
+      return [
+        {
+          type,
+          resolver: event.resolver,
+          requirementId: (event.req as { id: string }).id,
+        },
+      ];
+    case "resolver.complete":
+      return [
+        {
+          type,
+          resolver: event.resolver,
+          requirementId: (event.req as { id: string }).id,
+          duration: event.duration,
+        },
+      ];
+    case "resolver.error":
+      return [
+        {
+          type,
+          resolver: event.resolver,
+          requirementId: (event.req as { id: string }).id,
+          error: event.error,
+        },
+      ];
     case "effect.error":
       return [{ type, id: event.id, error: event.error }];
     case "effect.write-blocked":

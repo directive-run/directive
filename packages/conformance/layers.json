@@ -7347,19 +7347,6 @@
             "option init"
           ]
         },
-        "the cut drops only what the chain carried > a write made while an async effect awaits does not restart the chain's count": {
-          "layer": "L0",
-          "by": [
-            "import createModule",
-            "import createSystem",
-            "import t",
-            "member .events",
-            "member .facts",
-            "option effects",
-            "option events",
-            "option init"
-          ]
-        },
         "the cut drops only what the chain carried > drops the derivation changes the chain carried: a later unrelated write does not replay them": {
           "layer": "L0",
           "by": [
@@ -7393,10 +7380,6 @@
         "after the cut > onSettledChange hears that the system settled": {
           "layer": "L3",
           "by": ["member .onSettledChange"]
-        },
-        "the retry strategy for an effect > retries a failing effect three times in a row, then leaves it until its next change": {
-          "layer": "L3",
-          "by": ["option error boundary"]
         },
         "the retry strategy for an effect > an ordinary write gives a failing effect its retries back": {
           "layer": "L3",
@@ -7858,10 +7841,6 @@
         "the error boundary in production > retry-later gives up silently once its attempts are used": {
           "layer": "L3",
           "by": ["option error boundary", "option plugins"]
-        },
-        "the error boundary in production > a failing effect under retry gives up silently once its retries are used": {
-          "layer": "L3",
-          "by": ["option error boundary"]
         }
       }
     },
@@ -8135,6 +8114,10 @@
         "a composed system in a production build > still refuses a module with a prototype-walking key": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
+        },
+        "a view in a production build hides the names it must never serve > answers `in` and reads as absent for the prototype-walking names a store holds": {
+          "layer": "L1",
+          "by": ["option modules"]
         }
       }
     },
@@ -8214,6 +8197,48 @@
         "a bare module in a composed system > joins with no init, derivations, events, effects, constraints or resolvers": {
           "layer": "L1",
           "by": ["option modules"]
+        }
+      }
+    },
+    "tests/core/l3-proxies-oracle-views.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "tests": {
+        "every listing of a view's names agrees > for a composed system's own views": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "every listing of a view's names agrees > for the views a module's own code receives": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "every listing of a view's names agrees > for the views a resolver receives": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "an event view answers `in` and reflection quietly > answers `in` false for a name an event view was never asked for": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "an event view answers `in` and reflection quietly > lets a library ask an event view whether it owns a name": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a resolver in each module of one system > each sees its own facts and its own dependencies": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a resolver in each module of one system > each sees only the dependencies it declared": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "a development build warns about the same mistake once > for a non-JSON fact written through a module, once per fact": {
+          "layer": "L1",
+          "by": ["option modules"]
+        },
+        "a development build warns about the same mistake once > for a write through a cross-module view, once per name": {
+          "layer": "L1",
+          "by": ["option crossModuleDeps", "option modules"]
         }
       }
     },

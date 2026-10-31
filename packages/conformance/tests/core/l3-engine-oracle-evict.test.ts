@@ -9,8 +9,6 @@
 import { createModule, createSystem, t } from "@directive-run/core";
 import { describe, expect, it } from "vitest";
 
-const flushMacrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
-
 function hanging(slowDestroyMs = 0) {
   const starts: string[] = [];
   const plugin = {

@@ -209,3 +209,40 @@ describe("a composed system in a production build", () => {
     expect(() => createSystem({ modules: { bad } } as never)).toThrow(Error);
   });
 });
+
+describe("a view in a production build hides the names it must never serve", () => {
+  it("answers `in` and reads as absent for the prototype-walking names a store holds", async () => {
+    let store: any;
+    const m = createModule("m", {
+      schema: { facts: { n: t.number() }, events: { poke: {} } },
+      init: (f: any) => {
+        f.n = 1;
+      },
+      events: {
+        poke: (f: any) => {
+          store = f.$store;
+        },
+      },
+    } as any);
+    const other = createModule("other", {
+      schema: { facts: { v: t.number() } },
+      init: (f: any) => {
+        f.v = 1;
+      },
+    } as any);
+    const system = createSystem({ modules: { m, other } } as never) as any;
+    system.start();
+    system.events.m.poke();
+    await settle(system);
+
+    for (const name of ["__proto__", "constructor", "prototype"]) {
+      store.set(`m::${name}`, "smuggled");
+    }
+
+    for (const name of ["__proto__", "constructor", "prototype"]) {
+      expect(name in system.facts.m).toBe(false);
+      expect(system.facts.m[name]).not.toBe("smuggled");
+    }
+    expect(system.facts.m.n).toBe(1);
+  });
+});

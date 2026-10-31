@@ -44,7 +44,7 @@ const NEEDLE_MIN = 20;
 // leaves the derived set has either started shipping (a gate was removed) or
 // been deleted. If you deleted dev text on purpose, lower this number in the
 // same commit; if you added dev text, raise it to the count the guard prints.
-const DEV_STRINGS_MIN = 64;
+const DEV_STRINGS_MIN = 76;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

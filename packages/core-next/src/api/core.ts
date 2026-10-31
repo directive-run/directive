@@ -34,6 +34,8 @@ import {
   LOCKED,
   type Listeners,
   type Tracker,
+  type Writer,
+  type Writers,
   createFactsProxy,
   createFactsStore,
   describeDep,
@@ -41,6 +43,7 @@ import {
   view,
   withTracking,
 } from "./facts.js";
+import type { RequirementWithId } from "./requirements.js";
 import type {
   FactChange,
   Facts,
@@ -94,6 +97,8 @@ interface Derivation {
   stale_: boolean;
   /** Has computed at least once (1.35 creates its state on first read). */
   live_: boolean;
+  /** What it read when it last computed (the tracker's set, kept). */
+  deps_?: Set<string>;
   /**
    * What a membership test (`"id" in derived`) reads: made on the first test,
    * never written. It is the edge a read would leave, without the read that
@@ -115,7 +120,31 @@ export interface SystemContext {
   readonly derived: Record<string, unknown>;
   readonly tracker: Tracker;
   /** Report an error from `source` (the default strategy: skip). */
-  reportError(source: ErrorSource, sourceId: string, error: unknown): void;
+  reportError(
+    source: ErrorSource,
+    sourceId: string,
+    error: unknown,
+    context?: unknown,
+  ): void;
+  /** Ask for a reconcile pass, through the kernel's scheduler. */
+  schedule(): void;
+  /**
+   * Watch a derivation named in declared deps: every invalidation upstream
+   * of it wakes the reader, even while it stays stale (nothing computes it
+   * for the reader). 1.35's observed set, for declared deps.
+   */
+  watch(id: string): void;
+  /** Tell settle listeners that `isSettled` may have changed. */
+  settled(): void;
+  /** The store reports each changing write and its stamp here (reconcile). */
+  readonly writers: Writers;
+  /** A facts view whose writes carry `writer`'s stamp (a resolver run). */
+  factsFor(writer: Writer): Facts<Schema>;
+  /**
+   * What a derivation read when it last computed: fact keys and prefixed
+   * derivation ids (own-write satisfaction follows them to the facts).
+   */
+  derivationDeps(id: string): ReadonlySet<string> | undefined;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -125,6 +154,27 @@ export type SystemPart = (ctx: SystemContext) => void;
 export interface EffectsFeature {
   runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
   cleanupAll(): void;
+}
+
+/** The L2 reconcile feature (reconcile.ts) as the pass drives it. */
+export interface ReconcileFeature {
+  /** Pass start, before effects. */
+  begin_(): void;
+  /** After effects: the requirements now (a promise only when it must wait). */
+  evaluate_(
+    passKeys: Set<string>,
+  ): RequirementWithId[] | Promise<RequirementWithId[]>;
+  /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
+  commit_(
+    current: RequirementWithId[],
+    passKeys: Set<string>,
+  ): Record<string, unknown>;
+  /** A run is in flight: not settled. */
+  busy_(): boolean;
+  start_(): void;
+  stop_(): void;
+  /** The settle-timeout details, around the core's own. */
+  details_(core: string[]): string[];
 }
 
 declare module "../kernel.js" {
@@ -222,6 +272,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const { graph, hooks, clock } = kernel;
   const features = kernel.features as {
     effects?: EffectsFeature;
+    reconcile?: ReconcileFeature;
     validate?: (key: string, value: unknown) => void;
     plugins?: { deliver_(event: KernelEvent): void };
   };
@@ -263,6 +314,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   /** In this system's settle: a follow-up pass waits for the next microtask. */
   let inSettle = false;
   let followUpQueued = false;
+  /** A part asked for a pass while one ran (a run ended, `enable()`). */
+  let again = false;
   let changedKeys = new Set<string>();
   const settleListeners = new Set<() => void>();
   const notifySettle = () => settleListeners.forEach((fn) => fn());
@@ -272,6 +325,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   const byNode = new Map<ReactiveNode, Derivation>();
   const listeners: Listeners = new Map();
   const pending = new Set<string>();
+  /** Derivations named in declared deps (SystemContext.watch). */
+  const watched = new Set<string>();
   let holdDepth = 0;
 
   /** Tell the subscribers of every derivation that went stale. */
@@ -346,6 +401,11 @@ export function createSystemCore<const M extends ModuleSchema>(
             }
             seen.add(node);
             if (!d.live_ || d.stale_) {
+              if (d.stale_ && watched.has(d.id_)) {
+                // Still stale, so nothing below it moves, but a body that
+                // named it in its deps hears every change upstream (1.35).
+                changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
+              }
               continue;
             }
             d.stale_ = true;
@@ -380,6 +440,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      d.deps_ = deps;
       if (live()) {
         emit("derivation.compute", {
           id: d.id_,
@@ -475,6 +536,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     source: ErrorSource,
     sourceId: string,
     error: unknown,
+    context?: unknown,
   ): void {
     const wrapped =
       error instanceof DirectiveError
@@ -483,7 +545,7 @@ export function createSystemCore<const M extends ModuleSchema>(
             messageOf(error),
             source,
             sourceId,
-            undefined,
+            context,
             source !== "system",
           );
     emit("error", { error: wrapped });
@@ -535,10 +597,12 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
     scheduleReconcile();
   };
+  const writers: Writers = { record: null };
   const store = createFactsStore({
     schema,
     graph,
     tracker,
+    writers,
     nodes: factNodes,
     validator: isDevelopment
       ? (key, value) => features.validate?.(key, value)
@@ -576,7 +640,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
     onBatchEnd: endBatch,
   });
-  const facts = createFactsProxy(store, schema, tracker, new Set());
+  /** Non-JSON warnings already given, shared by every facts view. */
+  const nonJson = new Set<string>();
+  const facts = createFactsProxy(store, schema, tracker, nonJson);
 
   // --- reconcile -------------------------------------------------------------
   function scheduleReconcile(): void {
@@ -676,10 +742,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       return;
     }
     reconciling = true;
+    again = false;
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
     chainKeys = chain > 0 ? passKeys : null;
+    const l2 = features.reconcile;
+    l2?.begin_();
     try {
       if (live()) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
@@ -693,14 +762,29 @@ export function createSystemCore<const M extends ModuleSchema>(
       } finally {
         effectsOpen = false;
       }
+      let result: Record<string, unknown> | undefined;
+      if (l2) {
+        // 1.35 awaits constraint evaluation only when it must; the diff,
+        // the dispatch and the pass end then share one continuation.
+        const asked = l2.evaluate_(passKeys);
+        result = l2.commit_(
+          asked instanceof Promise ? await asked : asked,
+          passKeys,
+        );
+      }
       if (live()) {
         emit("reconcile.end", {
-          result: { unmet: [], inflight: [], completed: [], canceled: [] },
+          result: result ?? {
+            unmet: [],
+            inflight: [],
+            completed: [],
+            canceled: [],
+          },
         });
       }
     } finally {
       reconciling = false;
-      if (changedKeys.size > 0) {
+      if (changedKeys.size > 0 || again) {
         scheduleReconcile();
       }
       notifySettle();
@@ -708,7 +792,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
 
   // --- the system ----------------------------------------------------------
-  const isSettled = () => !scheduled && !reconciling;
+  const isSettled = () =>
+    !scheduled && !reconciling && !features.reconcile?.busy_();
   const warnUnknown = (method: string, id: string) =>
     console.warn(`[Directive] ${method}: unknown key "${id}"`);
   /** A clock timer owned by this system; returns its canceller. */
@@ -777,14 +862,18 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       system.initialize();
       running = true;
+      features.reconcile?.start_();
       emit("system.start", { system });
       scheduleReconcile();
     },
     stop() {
       if (running) {
         running = false;
+        features.reconcile?.stop_();
         features.effects?.cleanupAll();
         emit("system.stop", { system });
+        // A settle() waiting on the runs just ended hears that they did.
+        notifySettle();
       }
     },
     destroy() {
@@ -906,14 +995,17 @@ export function createSystemCore<const M extends ModuleSchema>(
         };
         const cancel = after(maxWait, () => {
           // Read before finish(): its state is what timed out.
-          const details = [
-            reconciling && "reconciliation in progress",
-            scheduled && "reconcile scheduled",
-          ].filter(Boolean);
+          const details: string[] = [];
+          if (reconciling) {
+            details.push("reconciliation in progress");
+          }
+          if (scheduled) {
+            details.push("reconcile scheduled");
+          }
           finish();
           reject(
             new Error(
-              `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+              `[Directive] settle() timed out after ${maxWait}ms. ${(features.reconcile?.details_(details) ?? details).join("; ")}`,
             ),
           );
         });
@@ -947,6 +1039,22 @@ export function createSystemCore<const M extends ModuleSchema>(
     derived: derive,
     tracker,
     reportError,
+    schedule() {
+      again = true;
+      scheduleReconcile();
+    },
+    settled: notifySettle,
+    watch: (id) => watched.add(id),
+    writers,
+    factsFor: (writer) =>
+      createFactsProxy(
+        store,
+        schema,
+        tracker,
+        nonJson,
+        writer,
+      ) as Facts<Schema>,
+    derivationDeps: (id) => derivations.get(id)?.deps_,
   };
   for (const part of parts) {
     part(ctx);
