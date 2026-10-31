@@ -12,6 +12,7 @@ import { withInspect } from "./inspect.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
 import { withPlugins } from "./plugins.js";
+import { withReconcile } from "./reconcile.js";
 import type { ModuleSchema, System, SystemOptions } from "./types.js";
 import { withValidation } from "./validate.js";
 
@@ -24,6 +25,8 @@ export function createSystem<const M extends ModuleSchema>(
 ): System<M> {
   const parts: SystemPart[] = [
     withEffects,
+    // L2: constraints -> requirements -> resolvers.
+    withReconcile,
     withInspect,
     withObserve,
     // Last: its onInit pass starts once the system is complete.
