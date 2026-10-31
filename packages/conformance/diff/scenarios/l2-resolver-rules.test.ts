@@ -65,6 +65,61 @@ function loader(
   } as any);
 }
 
+/** The backoff delay before jitter, clamped to the default maxDelay. */
+const MAX_DELAY = 30000;
+const exponential = (initial: number, failed: number) =>
+  Math.min(initial * 2 ** (failed - 1), MAX_DELAY);
+const linear = (initial: number, failed: number) =>
+  Math.min(initial * failed, MAX_DELAY);
+
+/** [min, max] of the wait after `failed` failures, per jitter form. */
+type Bounds = (failed: number) => [number, number];
+/** jitter: "full": 0 to base. */
+const fullJitter =
+  (initial: number): Bounds =>
+  (failed) => [0, exponential(initial, failed)];
+/** jitter: "equal": base / 2 to base (an even base keeps both ends whole). */
+const equalJitter =
+  (initial: number): Bounds =>
+  (failed) => {
+    const base = exponential(initial, failed);
+
+    return [base / 2, base];
+  };
+/** jitter: { maxMs }: base to base + maxMs. */
+const additiveJitter =
+  (initial: number, maxMs: number): Bounds =>
+  (failed) => {
+    const base = linear(initial, failed);
+
+    return [base, base + maxMs];
+  };
+
+/**
+ * Report each attempt of a retrying resolver and return its number. The
+ * first is `[name, 1, time]`; each later one is `[name, n, { $draw, min, max
+ * }]`, the wait since the attempt before and the bounds `bounds` gives for it
+ * (the only shape compare.ts masks and checks).
+ */
+function retryReporter(external: (data: unknown) => void) {
+  const attempts: Record<string, number> = {};
+  const lastAt: Record<string, number> = {};
+
+  return (name: string, bounds: Bounds): number => {
+    const n = (attempts[name] = (attempts[name] ?? 0) + 1);
+    const now = Date.now();
+    if (n === 1) {
+      external([name, 1, now]);
+    } else {
+      const [min, max] = bounds(n - 1);
+      external([name, n, { $draw: now - (lastAt[name] as number), min, max }]);
+    }
+    lastAt[name] = now;
+
+    return n;
+  };
+}
+
 suite("L2 resolver rules at their edges", () => {
   scenario(
     "a retry fires exactly when its backoff ends",
@@ -139,26 +194,50 @@ suite("L2 resolver rules at their edges", () => {
     ],
   );
 
+  // A retry's jitter draw is incidental (two valid engines draw differently
+  // from the same seed: README "What the trace freezes"), its bounds are not.
+  // The first attempt of a chain is reported with its absolute time (nothing
+  // is drawn before it); each later attempt is reported as the wait since the
+  // one before, `{ $draw, min, max }`, which must lie in [min, max] on every
+  // engine. So that no order of events and no start time depends on a draw,
+  // the three jitter forms run one after another, each started by a step at
+  // a fixed time after the one before has finished at any draw.
   scenario(
     "full and equal jitter draw from the seeded random",
     ({ core: { createModule, t }, external }) => {
-      const attempts: Record<string, number> = { full: 0, equal: 0 };
+      const attempt = retryReporter(external);
 
       return {
         module: createModule("m", {
           schema: {
-            facts: { full: t.boolean(), equal: t.boolean() },
+            facts: {
+              full: t.boolean(),
+              additive: t.boolean(),
+              equal: t.boolean(),
+              goAdditive: t.boolean(),
+              goEqual: t.boolean(),
+            },
             derivations: {},
             events: {},
-            requirements: { FULL: {}, EQUAL: {} },
+            requirements: { FULL: {}, ADDITIVE: {}, EQUAL: {} },
           },
           init: (facts: any) => {
             facts.full = false;
+            facts.additive = false;
             facts.equal = false;
+            facts.goAdditive = false;
+            facts.goEqual = false;
           },
           constraints: {
             full: { when: (f: any) => !f.full, require: { type: "FULL" } },
-            equal: { when: (f: any) => !f.equal, require: { type: "EQUAL" } },
+            additive: {
+              when: (f: any) => f.goAdditive && !f.additive,
+              require: { type: "ADDITIVE" },
+            },
+            equal: {
+              when: (f: any) => f.goEqual && !f.equal,
+              require: { type: "EQUAL" },
+            },
           },
           resolvers: {
             full: {
@@ -170,16 +249,15 @@ suite("L2 resolver rules at their edges", () => {
                 jitter: "full",
               },
               resolve: async (_req: unknown, context: any) => {
-                attempts.full = (attempts.full ?? 0) + 1;
-                external(["full", attempts.full, Date.now()]);
-                if (attempts.full < 4) {
+                if (attempt("full", fullJitter(40)) < 4) {
                   throw new Error("again");
                 }
                 context.facts.full = true;
               },
             },
-            equal: {
-              requirement: "EQUAL",
+            // jitter { maxMs }: the draw is added on top of the delay.
+            additive: {
+              requirement: "ADDITIVE",
               retry: {
                 attempts: 3,
                 backoff: "linear",
@@ -187,12 +265,106 @@ suite("L2 resolver rules at their edges", () => {
                 jitter: { maxMs: 25 },
               },
               resolve: async (_req: unknown, context: any) => {
-                attempts.equal = (attempts.equal ?? 0) + 1;
-                external(["equal", attempts.equal, Date.now()]);
-                if (attempts.equal < 3) {
+                if (attempt("additive", additiveJitter(30, 25)) < 3) {
+                  throw new Error("again");
+                }
+                context.facts.additive = true;
+              },
+            },
+            equal: {
+              requirement: "EQUAL",
+              retry: {
+                attempts: 4,
+                backoff: "exponential",
+                initialDelay: 20,
+                jitter: "equal",
+              },
+              resolve: async (_req: unknown, context: any) => {
+                if (attempt("equal", equalJitter(20)) < 4) {
                   throw new Error("again");
                 }
                 context.facts.equal = true;
+              },
+            },
+          },
+        } as any),
+      };
+    },
+    [
+      { op: "start" },
+      // full finishes by 280 ms, additive by 140 ms, at any draw.
+      { op: "advance", ms: 300 },
+      { op: "set", key: "goAdditive", value: true },
+      { op: "advance", ms: 300 },
+      { op: "set", key: "goEqual", value: true },
+      { op: "settle" },
+    ],
+  );
+
+  // Two chains retrying at once, both started by `start`. The draws would
+  // normally decide which chain's attempt comes first, and the diff harness
+  // compares the order of the external stream exactly, so the bounds are
+  // chosen so that they cannot: every attempt of one chain lies in a time
+  // window that is disjoint from its neighbours' in the other. Attempts, by
+  // the earliest and latest time each can fall at (ms after start):
+  //   equal    (exponential 40): #2 in [20, 40]   #3 in [60, 120]
+  //   additive (linear 45, +10): #2 in [45, 55]   #3 in [135, 155]
+  // so the order is always equal 1, additive 1 (both at 0), equal 2,
+  // additive 2, equal 3, additive 3, whatever the draws. Each chain's own
+  // order and every draw's bounds are asserted, the interleaving too.
+  scenario(
+    "two jittered retry chains at once keep their own order",
+    ({ core: { createModule, t }, external }) => {
+      const attempt = retryReporter(external);
+
+      return {
+        module: createModule("m", {
+          schema: {
+            facts: { equal: t.boolean(), additive: t.boolean() },
+            derivations: {},
+            events: {},
+            requirements: { EQUAL: {}, ADDITIVE: {} },
+          },
+          init: (facts: any) => {
+            facts.equal = false;
+            facts.additive = false;
+          },
+          constraints: {
+            equal: { when: (f: any) => !f.equal, require: { type: "EQUAL" } },
+            additive: {
+              when: (f: any) => !f.additive,
+              require: { type: "ADDITIVE" },
+            },
+          },
+          resolvers: {
+            equal: {
+              requirement: "EQUAL",
+              retry: {
+                attempts: 3,
+                backoff: "exponential",
+                initialDelay: 40,
+                jitter: "equal",
+              },
+              resolve: async (_req: unknown, context: any) => {
+                if (attempt("equal", equalJitter(40)) < 3) {
+                  throw new Error("again");
+                }
+                context.facts.equal = true;
+              },
+            },
+            additive: {
+              requirement: "ADDITIVE",
+              retry: {
+                attempts: 3,
+                backoff: "linear",
+                initialDelay: 45,
+                jitter: { maxMs: 10 },
+              },
+              resolve: async (_req: unknown, context: any) => {
+                if (attempt("additive", additiveJitter(45, 10)) < 3) {
+                  throw new Error("again");
+                }
+                context.facts.additive = true;
               },
             },
           },

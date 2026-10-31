@@ -52,6 +52,7 @@
     "a timeout fires exactly at its deadline": "L2",
     "a loading flag set and cleared around a satisfied, timed-out run": "L2",
     "full and equal jitter draw from the seeded random": "L2",
+    "two jittered retry chains at once keep their own order": "L2",
     "requeue runs a resolver again for the same requirement": "L2",
     "shouldRetry sees why each attempt aborted": "L2",
     "a write to an abortOn fact changed meanwhile is rejected (clobber)": "L2",
