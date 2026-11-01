@@ -7498,7 +7498,7 @@
       "rule": "L3",
       "tests": {
         "start() while evict() is running > is ignored: the system does not start": {
-          "layer": "L10",
+          "layer": "L5",
           "by": ["member .evict"]
         }
       }
@@ -9000,6 +9000,184 @@
         }
       }
     },
+    "tests/core/l5-sources-oracle-gates.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "an active gate > attaches nothing before it first opens, attaches on its rising edge, and unsubscribes when it closes": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an active gate > that returns a truthy non-boolean fails closed; exactly true attaches": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an active gate > is the same as the key form that returns a fixed key when open and null when closed": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an active gate > drops a publish made through the handle after the gate closed, as gate-closed": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an ungated source > attaches once at start with no gate context, and fact writes never attach it again": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a key gate > passes the key to attach, and a re-key tears the old subscription down before attaching the new one": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a key gate > gives a re-keyed source an empty coalesce buffer: the new key's first publish is not coalesced against the old key's": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a key gate > that throws fails closed: the source detaches and the error is reported with phase gate": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a key gate > that returns neither a string nor null fails closed with phase gate, and attaches nothing": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "gateLingerMs > cancels the teardown when the gate opens again inside the window": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "gateLingerMs > tears down at the end of the window when the gate stays closed": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "gateLingerMs > defers a re-key's teardown and attach to the end of the window": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "gateLingerMs > tears the committed key down at once when the key moves to a third value inside the window": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "gateLingerMs > is cleared by stop(): the source unsubscribes once at stop, and nothing fires when the window would have ended": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "coalesce > lastWriteWins dispatches only the last of a burst, after the current task, and each superseded publish is a coalesced drop": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "coalesce > lastWriteWins coalesces per event name, and flushes in first-publish order": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "coalesce > \"all\", and no coalesce option, dispatch every publish at once": {
+          "layer": "L5",
+          "by": ["option sources"]
+        }
+      }
+    },
+    "tests/core/l5-sources-oracle-lifecycle.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "sources follow attach order > at stop, with a gated source declared first: attach is ungated first, and each detach is heard before its unsubscribe, in reverse": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "sources follow attach order > at evict, with a gated source declared first: onEvict runs in attach order, then the unsubscribes in reverse": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "an attach that does not return an unsubscribe function > is an attach error naming its module, and the source is never attached or detached (undefined, null, a number, a string)": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an attach that does not return an unsubscribe function > is an attach error that names the Promise when attach returns one": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an attach that does not return an unsubscribe function > leaves the publish handle live: a publish through it still dispatches and is heard, with no attach (U8)": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source's unsubscribe at stop > that throws is a cleanup error, and the other sources still unsubscribe, in reverse": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source's unsubscribe at stop > runs once: a second stop(), and destroy() after stop(), unsubscribe nothing more": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source's unsubscribe at stop > never runs on a system that was never started, and nothing attaches": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "stop then start > attaches the source again, and each cycle unsubscribes once and publishes into the running system": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish > is attributed to the source that made it, when two sources publish the same event": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish > made inside attach at start is applied before start() returns, for an ungated and a gated source (U5)": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "reportError > reports a runtime error to plugins while attached, and does nothing after detach": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source error's message > reaches plugins cut to its first 256 characters": {
+          "layer": "L5",
+          "by": ["option sources"]
+        }
+      }
+    },
+    "tests/core/l5-sources-oracle-ported.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "source primitive — public lifecycle and guards > post-destroy publish is a silent no-op (does not crash, does not dispatch)": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — public lifecycle and guards > rejects source ids that match BLOCKED_PROPS (prototype pollution defense)": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > source publish dispatches into the system's event handlers": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > source unsubscribe runs at system.stop()": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > source unsubscribe runs at system.destroy() via stop()": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > multiple modules can each declare sources; ordering is per-module flat": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > dispatcher drops publishes whose event names walk the prototype chain": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "source primitive — end-to-end with createSystem > publishes between stop() and the next start() silently drop": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "RFC 0012 — gated/keyed sources > declaring BOTH key and active throws at registration": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "RFC 0012 — gated/keyed sources > a failing attach backs off instead of retrying on every reconcile": {
+          "layer": "L5",
+          "by": ["option sources"]
+        }
+      }
+    },
     "tests/core/l5-sources-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L5",
@@ -9007,6 +9185,48 @@
         "a namespaced source in production > drops another module's event as cross-module without a warning": {
           "layer": "L5",
           "by": ["option sources"]
+        }
+      }
+    },
+    "tests/core/l5-sources-oracle-teardown.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "an async unsubscribe > is not awaited by stop(), and is awaited by stopAsync()": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an async unsubscribe > that hangs is given up on by stopAsync() as a cleanup error, and the next source still unsubscribes": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "an async unsubscribe > is waited on for its own evictTimeoutMs, when that is longer than the default": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "evict() > runs each source's onEvict in order, and a throwing one is a runtime error that stops none of the others": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict() > gives up on an onEvict that hangs as a runtime error, and still evicts the next source": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict() > waits on an onEvict for its own evictTimeoutMs, when that is longer than the default": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict() > with evictTimeoutMs Infinity reports no error for an onEvict that finishes": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict() > with no onEvict on the source resolves, and unsubscribes it once": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict() > skips a gated source whose gate never opened, or opened and closed again": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
         }
       }
     },
@@ -13713,23 +13933,23 @@
           "by": ["member .destroyAsync"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.evict(undefined) awaits full teardown": {
-          "layer": "L10",
+          "layer": "L5",
           "by": ["member .evict"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.evict(deadline<=now) returns synchronously without throwing": {
-          "layer": "L10",
+          "layer": "L5",
           "by": ["member .evict"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.evict() is reentry-safe — onEvict fires once across concurrent calls": {
-          "layer": "L10",
-          "by": ["member .evict"]
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.evict() clears isEvicting on inner-work rejection": {
-          "layer": "L10",
-          "by": ["member .evict"]
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.start() is a no-op when isEvicting or isDestroyed": {
-          "layer": "L10",
+          "layer": "L5",
           "by": ["member .evict"]
         },
         "RFC 0009 async lifecycle — single-module createSystem > system.stopAsync() awaits an async source unsubscribe": {
@@ -13737,7 +13957,7 @@
           "by": ["option sources"]
         },
         "RFC 0009 async lifecycle — namespaced createSystem > namespaced system.stopAsync() / destroyAsync() / evict() exist": {
-          "layer": "L10",
+          "layer": "L5",
           "by": ["member .evict"]
         }
       }
