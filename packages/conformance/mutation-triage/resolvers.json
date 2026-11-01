@@ -1859,8 +1859,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "Batch resolvers (L7): hasPendingBatches(): settle() uses it to wait for and run a queued batch now; killed in the full run by l7-batch-resolvers-oracle.test.ts > the batch window settle() runs a queued batch now instead of waiting out the window.",
-    "layer": "L3"
+    "note": "Batch resolvers: hasPendingBatches(): settle() uses it to wait for and run a queued batch now. `batches` is filled only by a resolver's `batch` option, which lib/layers.ts places at L7 ('option batch resolver'), so no test at or below L4 can queue a batch. Killed in the full run by l7-batch-resolvers-oracle.test.ts > the batch window > settle() runs a queued batch now instead of waiting out the window (placed L7). Proved 2026-11-01: with the mutant applied that test fails on conformance:local, and the whole suite at MUTATION_LAYER=L4 passes.",
+    "layer": "L7"
   },
   {
     "line": 2355,
