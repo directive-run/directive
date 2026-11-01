@@ -75,9 +75,25 @@ derivations (each the sum of two facts), 5 auto-tracked effects (2 read `prev`, 
 derivations), then a settle. Every fact changes every frame, so all 5 effects re-run.
 The timing table reports time per frame; the heap section reports bytes per frame.
 
+## The frame-loop-source workload
+
+`frame-loop-source` is the same frame arriving the way an Aperture frame does (RFC 2.0
+L5, decision B2), and it is the workload the L5 speed gate ("0.8x or better") is judged
+by. Per frame a gated, coalesced source publishes one `frame` event; the module's handler
+makes the 20 writes (an event handler runs in one batch); 10 derivations and 5 effects
+follow, and the source's gate is evaluated after the pass. The gate stays open, so the
+source attaches once and never re-attaches. One extra fact, `open`, is the gate's input.
+It reports time per frame and bytes per frame, like `frame-loop`.
+
+1.35 declares the source through a module `sources:` key. core-next has no sources until
+L5, so on v2 the workload is **skipped and shown as n/a** ("sources not built (L5)"), never
+a made-up number. The runner finds this out by trying: a workload that lists
+`requires: ["sources"]` runs on an engine only if a probe module's source attaches at
+start, so the v2 side begins to run by itself the day L5 lands.
+
 ## Other files
 
-- `workloads.mjs`: the ten workloads, shared by both engines, each checked against
+- `workloads.mjs`: the eleven workloads, shared by both engines, each checked against
   hand-worked expectations before it is timed.
 - `runner.mjs`: runs one engine in one process; `entry-v1.mjs`, `entry-v2.mjs` load it.
 - `run.mjs`: the driver (rounds, alternating order, tables, JSON, `--show`, `--compare`).
