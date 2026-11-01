@@ -90,6 +90,7 @@ jobs:
           # the guard reads that file, so replace the dispatch payload with the
           # rebuilt one. Data only; nothing from the PR is executed.
           cp "$RUNNER_TEMP/pr-event.json" "$GITHUB_EVENT_PATH"
+          echo "DEBUG $GITHUB_EVENT_PATH"; ls -l "$GITHUB_EVENT_PATH" "$RUNNER_TEMP"; jq -c keys "$GITHUB_EVENT_PATH"
 
       # The base branch, never the PR head.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
