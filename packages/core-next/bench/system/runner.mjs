@@ -202,6 +202,28 @@ async function heapProbe(engine, api) {
   }
   const calibratedBytes = calibration.length ? median(calibration) : null;
 
+  // One frame of the frame-loop workload (20 batched writes, 10 derivations, 5
+  // effects, settle) in bytes, by the same trial method. Its step settles, so
+  // each trial is only the frames. 2,000 frames stay well under the semi-space.
+  const frames = await workloads["frame-loop"].build(api);
+  for (let s = 0; s < 300; s++) {
+    await frames.step();
+  }
+  const FRAMES = 2000;
+  const frameRows = [];
+  for (let k = 0; k < 9; k++) {
+    frameRows.push(
+      await trial(async () => {
+        for (let s = 0; s < FRAMES; s++) {
+          await frames.step();
+        }
+      }),
+    );
+  }
+  frames.done();
+  const cleanFrames = frameRows.filter((r) => r.clean).map((r) => r.bytes);
+  const frameBytesPerOp = cleanFrames.length >= 3 ? median(cleanFrames) / FRAMES : null;
+
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
     const full = [];
@@ -223,6 +245,7 @@ async function heapProbe(engine, api) {
           writesPerTrial: writes,
           writeOnlyBytesPerOp: median(keepClean(only)) / writes,
           fullStepBytesPerOp: median(keepClean(full)) / writes,
+          frameBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },

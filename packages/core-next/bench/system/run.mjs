@@ -121,6 +121,9 @@ function printHeap(r) {
     );
   }
   console.log(
+    `  frame loop (frame-loop workload, bytes per frame): v1 ${bytes(h.v1FrameBytesPerOp)}, v2 ${bytes(h.v2FrameBytesPerOp)}`,
+  );
+  console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
   );
   if (sizes("v1") !== sizes("v2")) {
@@ -475,6 +478,8 @@ const result = {
     v2WriteOnlyBytesPerOp: heapOf("v2", "writeOnlyBytesPerOp"),
     v1FullStepBytesPerOp: heapOf("v1", "fullStepBytesPerOp"),
     v2FullStepBytesPerOp: heapOf("v2", "fullStepBytesPerOp"),
+    v1FrameBytesPerOp: heapOf("v1", "frameBytesPerOp"),
+    v2FrameBytesPerOp: heapOf("v2", "frameBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),
