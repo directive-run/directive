@@ -386,7 +386,12 @@ export const workloads = {
         },
         check(steps) {
           for (let k = 0; k < 5; k++) {
-            expect("frame-loop", `effect ${k} reruns`, runs[k] - base[k], steps);
+            expect(
+              "frame-loop",
+              `effect ${k} reruns`,
+              runs[k] - base[k],
+              steps,
+            );
           }
           // After `steps` frames f<k> = steps + k, so d<j> = 2 * steps + 4j + 1.
           expect("frame-loop", "sum of f0 and f1", last[0], 2 * steps + 1);

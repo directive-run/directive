@@ -222,7 +222,8 @@ async function heapProbe(engine, api) {
   }
   frames.done();
   const cleanFrames = frameRows.filter((r) => r.clean).map((r) => r.bytes);
-  const frameBytesPerOp = cleanFrames.length >= 3 ? median(cleanFrames) / FRAMES : null;
+  const frameBytesPerOp =
+    cleanFrames.length >= 3 ? median(cleanFrames) / FRAMES : null;
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
