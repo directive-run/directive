@@ -147,13 +147,26 @@ describe("cost", () => {
     });
     system.start();
     await system.settle();
+    // The cost per write is measured over several rounds of writes and the
+    // figure compared is the *fastest* round. A single round lets one burst of
+    // contention from other work on the machine land in the one figure and push
+    // it past the threshold — under parallel load the one-round version failed
+    // now and then although nothing in the check had changed. Contention only
+    // ever adds time, so the fastest round is the one least disturbed. A check
+    // that walks the 10k rows makes every write slower, so it still moves the
+    // minimum.
+    const rounds = 7;
     const writes = 50;
-    const started = performance.now();
-    for (let i = 1; i <= writes; i++) {
-      system.facts.n = i;
-      await system.settle();
+    let perWrite = Number.POSITIVE_INFINITY;
+    let value = 0;
+    for (let round = 0; round < rounds; round++) {
+      const started = performance.now();
+      for (let i = 1; i <= writes; i++) {
+        system.facts.n = ++value;
+        await system.settle();
+      }
+      perWrite = Math.min(perWrite, (performance.now() - started) / writes);
     }
-    const perWrite = (performance.now() - started) / writes;
 
     expect(attached).toEqual(["feed"]);
     // Not a walk of 10k rows per write: the check gives up past its budget.
