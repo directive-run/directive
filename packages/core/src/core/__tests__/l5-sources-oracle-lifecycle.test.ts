@@ -5,7 +5,8 @@ import { createModule, createSystem, t } from "../../index.js";
 // `sources.test.ts` (WHITE-BOX.md maps each one), plus the L5-pre pins U5,
 // U7 and U8 (packages/core-next/docs/rfc-l5-sources.md). A source is declared
 // on a module's `sources:` key and observed through its own callbacks and the
-// plugin source hooks. Public API only; logged text is never asserted.
+// plugin source hooks. Public API only. Logged text is asserted only where
+// the original case asserted it: the attach-error messages (rows 5, 15, 32).
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -21,16 +22,16 @@ function recorder() {
     onSourceAttach: (id: string, moduleId: string) => {
       log.push(["attach", id, moduleId]);
     },
-    onSourcePublish: (id: string, _moduleId: string, eventName: string) => {
-      log.push(["publish", id, eventName]);
+    onSourcePublish: (id: string, moduleId: string, eventName: string) => {
+      log.push(["publish", id, moduleId, eventName]);
     },
     onSourceDrop: (
       id: string,
-      _moduleId: string,
+      moduleId: string,
       eventName: string,
       reason: string,
     ) => {
-      log.push(["drop", id, eventName, reason]);
+      log.push(["drop", id, moduleId, eventName, reason]);
     },
     onSourceDetach: (id: string, moduleId: string) => {
       log.push(["detach", id, moduleId]);
@@ -51,9 +52,15 @@ function recorder() {
 const kinds = (log: unknown[][], kind: string) =>
   log.filter((entry) => entry[0] === kind);
 
+/** The text of each `console.error` call's first argument (a string or an Error). */
+const errorTexts = (spy: { mock: { calls: unknown[][] } }) =>
+  spy.mock.calls.map(([arg]) =>
+    typeof arg === "string" ? arg : arg instanceof Error ? arg.message : "",
+  );
+
 /** Module `m`: `poke` counts into `hits`, `seed` writes `seeded`. */
-function sourceModule(sources: Record<string, unknown>) {
-  return createModule("m", {
+function sourceModule(sources: Record<string, unknown>, id = "m") {
+  return createModule(id, {
     schema: {
       facts: { hits: t.number(), seeded: t.number(), open: t.boolean() },
       derivations: {},
@@ -154,8 +161,9 @@ describe("sources follow attach order", () => {
 
 describe("an attach that does not return an unsubscribe function", () => {
   it("is an attach error naming its module, and the source is never attached or detached (undefined, null, a number, a string)", () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     for (const value of [undefined, null, 0, "no"]) {
+      errorSpy.mockClear();
       const { log, plugin } = recorder();
       const system = createSystem({
         module: sourceModule({ forgot: { attach: () => value } }),
@@ -166,6 +174,16 @@ describe("an attach that does not return an unsubscribe function", () => {
       expect(kinds(log, "error").map((entry) => entry.slice(0, 4))).toEqual([
         ["error", "forgot", "m", "attach"],
       ]);
+      expect(String(kinds(log, "error")[0]?.[4])).toContain(
+        'Source "forgot" did not return an unsubscribe function',
+      );
+      expect(
+        errorTexts(errorSpy).some((text) =>
+          text.includes(
+            'Source "forgot" did not return an unsubscribe function',
+          ),
+        ),
+      ).toBe(true);
 
       system.stop();
       expect(kinds(log, "detach")).toEqual([]);
@@ -173,8 +191,25 @@ describe("an attach that does not return an unsubscribe function", () => {
     }
   });
 
+  it("names its module and its source in the message", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { log, plugin } = recorder();
+    const system = createSystem({
+      module: sourceModule({ forgot: { attach: () => undefined } }, "the-mod"),
+      plugins: [plugin],
+    } as any);
+    system.start();
+    const matches = (text: string) =>
+      text.includes('Module "the-mod"') &&
+      text.includes('Source "forgot"') &&
+      text.includes("did not return an unsubscribe function");
+    expect(errorTexts(errorSpy).some(matches)).toBe(true);
+    expect(matches(String(kinds(log, "error")[0]?.[4]))).toBe(true);
+    system.destroy();
+  });
+
   it("is an attach error that names the Promise when attach returns one", () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { log, plugin } = recorder();
     const system = createSystem({
       module: sourceModule({
@@ -188,6 +223,10 @@ describe("an attach that does not return an unsubscribe function", () => {
       ["error", "eager", "m", "attach"],
     ]);
     expect(String(errors[0]?.[4])).toMatch(/Promise/);
+    expect(String(errors[0]?.[4])).toMatch(/attach\(\) must be synchronous/);
+    const logged = errorTexts(errorSpy)[0] ?? "";
+    expect(logged).toMatch(/Promise/);
+    expect(logged).toMatch(/attach\(\) must be synchronous/);
     expect(kinds(log, "attach")).toEqual([]);
     system.destroy();
   });
@@ -213,7 +252,7 @@ describe("an attach that does not return an unsubscribe function", () => {
     handles.s!("poke");
     await system.settle();
     expect((system.facts as any).hits).toBe(1);
-    expect(kinds(log, "publish")).toEqual([["publish", "s", "poke"]]);
+    expect(kinds(log, "publish")).toEqual([["publish", "s", "m", "poke"]]);
     expect(kinds(log, "attach")).toEqual([]);
     system.destroy();
   });
@@ -347,10 +386,36 @@ describe("a publish", () => {
     } as any);
     system.start();
     expect(kinds(log, "publish")).toEqual([
-      ["publish", "sourceA", "poke"],
-      ["publish", "sourceB", "poke"],
+      ["publish", "sourceA", "m", "poke"],
+      ["publish", "sourceB", "m", "poke"],
     ]);
     expect((system.facts as any).hits).toBe(2);
+    system.destroy();
+  });
+
+  it("is attributed to the module that declared its source, when two modules' sources publish the same event", () => {
+    const { log, plugin } = recorder();
+    const publishPoke = {
+      attach: (publish: Publish) => {
+        publish("poke");
+
+        return () => undefined;
+      },
+    };
+    const system = createSystem({
+      modules: {
+        a: sourceModule({ sourceA: publishPoke }, "a"),
+        b: sourceModule({ sourceB: publishPoke }, "b"),
+      },
+      plugins: [plugin],
+    } as any) as any;
+    system.start();
+    expect(kinds(log, "publish")).toEqual([
+      ["publish", "a::sourceA", "a", "a::poke"],
+      ["publish", "b::sourceB", "b", "b::poke"],
+    ]);
+    expect(system.facts.a.hits).toBe(1);
+    expect(system.facts.b.hits).toBe(1);
     system.destroy();
   });
 
@@ -423,8 +488,10 @@ describe("a source error's message", () => {
       plugins: [plugin],
     } as any);
     system.start();
+    expect(kinds(log, "error")).toHaveLength(1);
     const message = String(kinds(log, "error")[0]?.[4]);
     expect(message.length).toBeLessThan(huge.length);
+    expect(message).toMatch(/chars truncated/);
     expect(message.startsWith("Z".repeat(256))).toBe(true);
     expect(message.startsWith("Z".repeat(257))).toBe(false);
     system.destroy();

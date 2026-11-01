@@ -21,16 +21,16 @@ function recorder() {
     onSourceAttach: (id: string) => {
       log.push(["attach", id]);
     },
-    onSourcePublish: (id: string, _moduleId: string, eventName: string) => {
-      log.push(["publish", id, eventName]);
+    onSourcePublish: (id: string, moduleId: string, eventName: string) => {
+      log.push(["publish", id, moduleId, eventName]);
     },
     onSourceDrop: (
       id: string,
-      _moduleId: string,
+      moduleId: string,
       eventName: string,
       reason: string,
     ) => {
-      log.push(["drop", id, eventName, reason]);
+      log.push(["drop", id, moduleId, eventName, reason]);
     },
     onSourceDetach: (id: string) => {
       log.push(["detach", id]);
@@ -195,7 +195,9 @@ describe("an active gate", () => {
     handles.s!("tick", { v: 1 });
     await system.settle();
     expect(seen).toEqual([]);
-    expect(kinds(log, "drop")).toEqual([["drop", "s", "tick", "gate-closed"]]);
+    expect(kinds(log, "drop")).toEqual([
+      ["drop", "s", "m", "tick", "gate-closed"],
+    ]);
     expect(kinds(log, "publish")).toEqual([]);
     system.destroy();
   });
@@ -286,7 +288,7 @@ describe("a key gate", () => {
     await system.settle();
     expect(seen).toEqual([["tick", 2]]);
     expect(
-      kinds(log, "drop").filter((entry) => entry[3] === "coalesced"),
+      kinds(log, "drop").filter((entry) => entry[4] === "coalesced"),
     ).toEqual([]);
     system.destroy();
   });
@@ -459,9 +461,9 @@ describe("coalesce", () => {
     expect(seen).toEqual([]);
     await system.settle();
     expect(seen).toEqual([["tick", 5]]);
-    expect(kinds(log, "publish")).toEqual([["publish", "s", "tick"]]);
+    expect(kinds(log, "publish")).toEqual([["publish", "s", "m", "tick"]]);
     expect(kinds(log, "drop")).toEqual(
-      Array.from({ length: 4 }, () => ["drop", "s", "tick", "coalesced"]),
+      Array.from({ length: 4 }, () => ["drop", "s", "m", "tick", "coalesced"]),
     );
     system.destroy();
   });

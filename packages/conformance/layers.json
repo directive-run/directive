@@ -9090,6 +9090,10 @@
           "layer": "L5",
           "by": ["option sources"]
         },
+        "an attach that does not return an unsubscribe function > names its module and its source in the message": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
         "an attach that does not return an unsubscribe function > is an attach error that names the Promise when attach returns one": {
           "layer": "L5",
           "by": ["option sources"]
@@ -9115,6 +9119,10 @@
           "by": ["option sources"]
         },
         "a publish > is attributed to the source that made it, when two sources publish the same event": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish > is attributed to the module that declared its source, when two modules' sources publish the same event": {
           "layer": "L5",
           "by": ["option sources"]
         },
@@ -9239,6 +9247,10 @@
           "by": ["option sources"]
         },
         "a source whose attach throws > is reported to plugins as an attach error, and the next source still attaches": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source whose attach throws, in a named module > is logged with its module and source, so collisions across modules are debuggable": {
           "layer": "L5",
           "by": ["option sources"]
         },

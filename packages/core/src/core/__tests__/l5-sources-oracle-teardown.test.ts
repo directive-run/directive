@@ -4,25 +4,33 @@ import { createModule, createSystem, t } from "../../index.js";
 // Black-box rewrites of the async-teardown and `evictAll` cases in
 // `sources.test.ts` (WHITE-BOX.md maps each one): `stopAsync()` and
 // `evict()` await a source's async work, each capped by its timeout, and a
-// failure in one source never stops the others. Public API only; the
-// message text of a timeout is never asserted.
+// failure in one source never stops the others. Public API only; a timeout
+// error's message is asserted where the original did (it says "timeout", or
+// the source's own `12000ms`).
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
-/** A plugin that records each source error as [id, phase]. */
+/** A plugin that records each source error as [id, phase], and its message. */
 function errorLog() {
   const errors: string[][] = [];
+  const messages: string[] = [];
   const plugin = {
     name: "source-errors",
-    onSourceError: (id: string, _moduleId: string, phase: string) => {
+    onSourceError: (
+      id: string,
+      _moduleId: string,
+      phase: string,
+      error: unknown,
+    ) => {
       errors.push([id, phase]);
+      messages.push((error as Error)?.message ?? "");
     },
   };
 
-  return { errors, plugin };
+  return { errors, messages, plugin };
 }
 
 function sourceModule(sources: Record<string, unknown>) {
@@ -73,7 +81,7 @@ describe("an async unsubscribe", () => {
   it("that hangs is given up on by stopAsync() as a cleanup error, and the next source still unsubscribes", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.useFakeTimers();
-    const { errors, plugin } = errorLog();
+    const { errors, messages, plugin } = errorLog();
     let cleaned = false;
     const system = createSystem({
       module: sourceModule({
@@ -91,6 +99,7 @@ describe("an async unsubscribe", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     await stopping;
     expect(errors).toEqual([["hung", "cleanup"]]);
+    expect(messages[0]).toContain("timeout");
     expect(cleaned).toBe(true);
     system.destroy();
   });
@@ -98,7 +107,7 @@ describe("an async unsubscribe", () => {
   it("is waited on for its own evictTimeoutMs, when that is longer than the default", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.useFakeTimers();
-    const { errors, plugin } = errorLog();
+    const { errors, messages, plugin } = errorLog();
     const system = createSystem({
       module: sourceModule({
         slow: { evictTimeoutMs: 12_000, attach: () => never },
@@ -112,6 +121,7 @@ describe("an async unsubscribe", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     await stopping;
     expect(errors).toEqual([["slow", "cleanup"]]);
+    expect(messages[0]).toContain("12000ms");
     system.destroy();
   });
 });
@@ -158,7 +168,7 @@ describe("evict()", () => {
   it("gives up on an onEvict that hangs as a runtime error, and still evicts the next source", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.useFakeTimers();
-    const { errors, plugin } = errorLog();
+    const { errors, messages, plugin } = errorLog();
     let evicted = false;
     const system = createSystem({
       module: sourceModule({
@@ -177,13 +187,14 @@ describe("evict()", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     await evicting;
     expect(errors).toEqual([["hung", "runtime"]]);
+    expect(messages[0]).toContain("timeout");
     expect(evicted).toBe(true);
   });
 
   it("waits on an onEvict for its own evictTimeoutMs, when that is longer than the default", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.useFakeTimers();
-    const { errors, plugin } = errorLog();
+    const { errors, messages, plugin } = errorLog();
     const system = createSystem({
       module: sourceModule({
         slow: {
@@ -201,6 +212,7 @@ describe("evict()", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     await evicting;
     expect(errors).toEqual([["slow", "runtime"]]);
+    expect(messages[0]).toContain("12000ms");
   });
 
   it("with evictTimeoutMs Infinity reports no error for an onEvict that finishes", async () => {

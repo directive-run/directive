@@ -4,9 +4,10 @@ import { createModule, createSystem, t } from "../../index.js";
 // Black-box pins for the engine's side of sources (L5): the plugin hooks a
 // source's lifecycle reaches, the publish guards and the reason each drop
 // reports, a namespaced source's own-module scoping, the gate evaluated at
-// start, and detach on stop. Public API only. The logged text is never
-// asserted, except that the cross-module warning names the bare event to
-// publish instead (the fix it carries) and speaks once per source.
+// start, and detach on stop. Public API only. Logged text is asserted only
+// where the original case asserted it (the attach-throw line names its module
+// and source, row 14), and for the cross-module warning, which names the bare
+// event to publish instead (the fix it carries) and speaks once per source.
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -23,16 +24,16 @@ function recorder() {
     onSourceAttach: (id: string, moduleId: string) => {
       log.push(["attach", id, moduleId]);
     },
-    onSourcePublish: (id: string, _moduleId: string, eventName: string) => {
-      log.push(["publish", id, eventName]);
+    onSourcePublish: (id: string, moduleId: string, eventName: string) => {
+      log.push(["publish", id, moduleId, eventName]);
     },
     onSourceDrop: (
       id: string,
-      _moduleId: string,
+      moduleId: string,
       eventName: string,
       reason: string,
     ) => {
-      log.push(["drop", id, eventName, reason]);
+      log.push(["drop", id, moduleId, eventName, reason]);
     },
     onSourceDetach: (id: string, moduleId: string) => {
       log.push(["detach", id, moduleId]);
@@ -110,14 +111,14 @@ describe("plugins and a source's lifecycle", () => {
     expect((system.facts as any).hits).toBe(1);
     expect(log).toEqual([
       ["attach", "feed", "m"],
-      ["publish", "feed", "poke"],
+      ["publish", "feed", "m", "poke"],
     ]);
 
     system.stop();
     expect(unsubscribed).toBe(1);
     expect(log).toEqual([
       ["attach", "feed", "m"],
-      ["publish", "feed", "poke"],
+      ["publish", "feed", "m", "poke"],
       ["detach", "feed", "m"],
     ]);
     system.destroy();
@@ -156,6 +157,37 @@ describe("a source whose attach throws", () => {
   });
 });
 
+describe("a source whose attach throws, in a named module", () => {
+  it("is logged with its module and source, so collisions across modules are debuggable", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { plugin } = recorder();
+    const system = createSystem({
+      module: pokeModule(
+        "game-engine",
+        {},
+        {
+          boom: {
+            attach: () => {
+              throw new Error("oops");
+            },
+          },
+        },
+      ),
+      plugins: [plugin],
+    } as any);
+    system.start();
+    const matched = errorSpy.mock.calls.some(([head]) => {
+      return (
+        typeof head === "string" &&
+        head.includes('Module "game-engine"') &&
+        head.includes('Source "boom"')
+      );
+    });
+    expect(matched).toBe(true);
+    system.destroy();
+  });
+});
+
 describe("a publish the engine refuses", () => {
   it("is a drop with its reason: an empty name, a blocked name, a name with no handler", async () => {
     const handles: Handles = {};
@@ -173,9 +205,9 @@ describe("a publish the engine refuses", () => {
     await system.settle();
 
     expect(log).toEqual([
-      ["drop", "feed", "", "invalid-event-name"],
-      ["drop", "feed", "__proto__", "blocked-event-name"],
-      ["drop", "feed", "nope", "unknown-event"],
+      ["drop", "feed", "m", "", "invalid-event-name"],
+      ["drop", "feed", "m", "__proto__", "blocked-event-name"],
+      ["drop", "feed", "m", "nope", "unknown-event"],
     ]);
     expect((system.facts as any).hits).toBe(0);
     system.destroy();
@@ -210,7 +242,7 @@ describe("a publish the engine refuses", () => {
 
     expect(log).toEqual([
       ["detach", "late", "m"],
-      ["drop", "early", "poke", "post-stop"],
+      ["drop", "early", "m", "poke", "post-stop"],
       ["detach", "early", "m"],
     ]);
     expect((system.facts as any).hits).toBe(0);
@@ -243,7 +275,7 @@ describe("a publish the engine refuses", () => {
 
     handles.feed!("poke");
 
-    expect(log).toEqual([["drop", "feed", "poke", "post-destroy"]]);
+    expect(log).toEqual([["drop", "feed", "m", "poke", "post-destroy"]]);
   });
 });
 
@@ -270,7 +302,7 @@ describe("a namespaced source", () => {
 
     expect(system.facts.loop.hits).toBe(1);
     expect(system.facts.other.hits).toBe(0);
-    expect(log).toEqual([["publish", "loop::feed", "loop::poke"]]);
+    expect(log).toEqual([["publish", "loop::feed", "loop", "loop::poke"]]);
     system.destroy();
   });
 
@@ -289,8 +321,8 @@ describe("a namespaced source", () => {
     expect(system.facts.loop.hits).toBe(0);
     expect(system.facts.other.hits).toBe(0);
     expect(log).toEqual([
-      ["drop", "loop::feed", "other::poke", "cross-module-event"],
-      ["drop", "loop::feed", "other::poke", "cross-module-event"],
+      ["drop", "loop::feed", "loop", "other::poke", "cross-module-event"],
+      ["drop", "loop::feed", "loop", "other::poke", "cross-module-event"],
     ]);
     const aboutFeed = warn.mock.calls.filter((call) =>
       String(call[0]).includes("loop::feed"),
@@ -312,7 +344,7 @@ describe("a namespaced source", () => {
 
     expect(system.facts.loop.hits).toBe(0);
     expect(log).toEqual([
-      ["drop", "loop::feed", "loop::poke", "cross-module-event"],
+      ["drop", "loop::feed", "loop", "loop::poke", "cross-module-event"],
     ]);
     const aboutFeed = warn.mock.calls
       .map((call) => String(call[0]))

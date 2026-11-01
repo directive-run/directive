@@ -871,7 +871,7 @@
   {
     "file": "src/core/__tests__/l5-sources-oracle-lifecycle.test.ts",
     "category": "black-box",
-    "cases": 13,
+    "cases": 15,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -907,7 +907,7 @@
   {
     "file": "src/core/__tests__/l5-sources-oracle.test.ts",
     "category": "black-box",
-    "cases": 9,
+    "cases": 11,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

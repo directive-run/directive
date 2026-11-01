@@ -120,7 +120,7 @@ The file has 81 cases. The other 13 are placed above L5 and stay with their
 layers: 11 at L9 (`inspect().sources` and its counters, `meta`, the three
 `source.*` `observe` events), 1 at L10 (`registerModule`) and 1 at L8 (the
 replay guard). Of the 68: **10 ported**, **52 rewritten**,
-**1 deferred to L9**, **5 internal**. Every
+**1 deferred to L9**, **4 deferred to L10**, **1 internal**. Every
 replacement lives in `packages/core/src/core/__tests__/` and runs at L5:
 `l5-sources-oracle`, `l5-sources-oracle-lifecycle`, `l5-sources-oracle-teardown`, `l5-sources-oracle-gates` and `l5-sources-oracle-ported` (`.test.ts` omitted). A ported case keeps its
 title and assertions; a rewritten one tests the same behaviour through
@@ -132,7 +132,7 @@ title and assertions; a rewritten one tests the same behaviour through
 | 2 | attaches multiple sources in registration order, detaches in reverse | rewritten | `l5-sources-oracle-lifecycle` › sources follow attach order › at stop, with a gated source declared first (U7) |
 | 3 | publish callback dispatches events into the supplied dispatcher with per-source attribution | rewritten | `l5-sources-oracle-lifecycle` › a publish › is attributed to the source that made it; › made inside attach at start is applied before start() returns (U5) |
 | 4 | isolates attach failures — one bad source does not block others | rewritten | `l5-sources-oracle` › a source whose attach throws › is reported to plugins as an attach error, and the next source still attaches |
-| 5 | rejects sources whose attach returns something other than a function | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › is an attach error naming its module, and the source is never attached or detached |
+| 5 | rejects sources whose attach returns something other than a function | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › is an attach error naming its module, and the source is never attached or detached (the message text is asserted as the original did) |
 | 6 | isolates unsubscribe failures — one bad cleanup does not block others | rewritten | `l5-sources-oracle-lifecycle` › a source's unsubscribe at stop › that throws is a cleanup error, and the other sources still unsubscribe, in reverse |
 | 7 | cleanupAll is idempotent — second call is a no-op | rewritten | `l5-sources-oracle-lifecycle` › a source's unsubscribe at stop › runs once: a second stop(), and destroy() after stop(), unsubscribe nothing more |
 | 8 | forwards attach + cleanup failures to the optional onError sink | rewritten | `onSourceError` phases `attach` and `cleanup`: `l5-sources-oracle` › a source whose attach throws; `l5-sources-oracle-lifecycle` › … › that throws is a cleanup error |
@@ -140,16 +140,16 @@ title and assertions; a rewritten one tests the same behaviour through
 | 10 | cleanupAll on an idle manager (never started) is a safe no-op | rewritten | `l5-sources-oracle-lifecycle` › a source's unsubscribe at stop › never runs on a system that was never started |
 | 11 | clears the attached array after cleanup so memory does not grow across cycles | rewritten | `l5-sources-oracle-lifecycle` › stop then start (one attach and one unsubscribe per cycle; the array itself is internal) |
 | 12 | registerDefinitions adds new sources before start; they attach at start | internal | `registerDefinitions` is a manager method. Its public form is a module's `sources:` at `createSystem`, which every test above uses; registering at runtime is `registerModule` (L10) |
-| 13 | registerDefinitions attaches immediately if the system is already running | internal | reachable only through `registerModule` (L10), where "emits source.attach immediately when a module is registered after start" pins it |
-| 14 | error messages name the module so multi-module collisions are debuggable | rewritten | the module reaches plugins as `onSourceError`'s `moduleId`: `l5-sources-oracle` › a source whose attach throws; `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function (console text is not asserted) |
-| 15 | error message on missing unsubscribe function names the module | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › is an attach error naming its module … |
+| 13 | registerDefinitions attaches immediately if the system is already running | deferred to L10 | public behaviour, reachable only through `registerModule` (L10); see the L10 gap below |
+| 14 | error messages name the module so multi-module collisions are debuggable | rewritten | the module reaches plugins as `onSourceError`'s `moduleId`: `l5-sources-oracle` › a source whose attach throws; and the logged line names the module and the source, as the original asserted: `l5-sources-oracle` › a source whose attach throws, in a named module |
+| 15 | error message on missing unsubscribe function names the module | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › names its module and its source in the message (the logged line and the plugin's error, both with `Module "the-mod"`, `Source "forgot"` and the "did not return an unsubscribe function" text) |
 | 16 | attach that returns null / number / string is treated as missing cleanup | rewritten | `l5-sources-oracle-lifecycle` › the same test, over `undefined`, `null`, `0` and `"no"` |
 | 17 | onAttach fires ONLY for sources whose attach succeeded (not for those that threw) | rewritten | `l5-sources-oracle` › a source whose attach throws (no attach is heard for it) |
 | 18 | onAttach does NOT fire for sources that return a non-function (forgotten cleanup) | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function |
-| 19 | onPublish fires with per-source attribution (not by event-name lookup) | rewritten | `l5-sources-oracle-lifecycle` › a publish › is attributed to the source that made it, when two sources publish the same event |
+| 19 | onPublish fires with per-source attribution (not by event-name lookup) | rewritten | `l5-sources-oracle-lifecycle` › a publish › is attributed to the source that made it, when two sources publish the same event; and, with the `moduleId` asserted, › … to the module that declared its source, when two modules' sources publish the same event |
 | 20 | onDetach fires in reverse-registration order before each unsubscribe | rewritten | `l5-sources-oracle-lifecycle` › sources follow attach order › at stop … each detach is heard before its unsubscribe, in reverse |
-| 21 | registerDefinitions during attached phase fires onAttach immediately for new sources | internal | runtime registration is `registerModule` (L10) |
-| 22 | re-registering an attached source unsubscribes the old one before attaching the new one | internal | re-registration happens only through `registerModule` (L10) |
+| 21 | registerDefinitions during attached phase fires onAttach immediately for new sources | deferred to L10 | public behaviour, reachable only through `registerModule` (L10); see the L10 gap below |
+| 22 | re-registering an attached source unsubscribes the old one before attaching the new one | deferred to L10 | public behaviour, reachable only through `registerModule` (L10); see the L10 gap below |
 | 23 | post-destroy publish is a silent no-op (does not crash, does not dispatch) | ported | `l5-sources-oracle-ported` |
 | 24 | rejects source ids that match BLOCKED_PROPS (prototype pollution defense) | ported | `l5-sources-oracle-ported` |
 | 25 | source publish dispatches into the system's event handlers | ported | `l5-sources-oracle-ported` |
@@ -158,10 +158,10 @@ title and assertions; a rewritten one tests the same behaviour through
 | 28 | multiple modules can each declare sources; ordering is per-module flat | ported | `l5-sources-oracle-ported` |
 | 29 | dispatcher drops publishes whose event names walk the prototype chain | ported | `l5-sources-oracle-ported` |
 | 30 | publishes between stop() and the next start() silently drop | ported | `l5-sources-oracle-ported` |
-| 31 | manager: OLD source's captured publish ref no-ops after re-registration replaces the source | internal | re-registration happens only through `registerModule` (L10) |
-| 32 | returning a Promise from attach() gets a Promise-specific error | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › is an attach error that names the Promise when attach returns one |
+| 31 | manager: OLD source's captured publish ref no-ops after re-registration replaces the source | deferred to L10 | public behaviour, reachable only through `registerModule` (L10); see the L10 gap below |
+| 32 | returning a Promise from attach() gets a Promise-specific error | rewritten | `l5-sources-oracle-lifecycle` › an attach that does not return an unsubscribe function › is an attach error that names the Promise when attach returns one ("attach() must be synchronous" asserted on the logged line and the plugin's error) |
 | 33 | onPublish only fires for accepted publishes (not for engine-rejected drops) | rewritten | `l5-sources-oracle` › a publish the engine refuses › is a drop with its reason …; the accepted half: `l5-sources-oracle` › plugins and a source's lifecycle |
-| 34 | onDrop fires with the engine's drop reason on rejected publishes | rewritten | `l5-sources-oracle` › a publish the engine refuses › is a drop with its reason: an empty name, a blocked name, a name with no handler |
+| 34 | onDrop fires with the engine's drop reason on rejected publishes | rewritten | `l5-sources-oracle` › a publish the engine refuses › is a drop with its reason: an empty name, a blocked name, a name with no handler (each hook's `moduleId` is asserted, here the module `m`; the recorders in the lifecycle, gates and main files all log it) |
 | 35 | onDrop fires with reason "coalesced" on the lastWriteWins manager drop | rewritten | `l5-sources-oracle-gates` › coalesce › lastWriteWins dispatches only the last of a burst … |
 | 36 | lastError.message is truncated at SOURCE_ERROR_MESSAGE_MAX (256) chars | deferred to L9 | `inspect().sources[].lastError`; the cut itself is pinned through plugins by `l5-sources-oracle-lifecycle` › a source error's message › reaches plugins cut to its first 256 characters |
 | 37 | onError callback receives an Error whose message is truncated to SOURCE_ERROR_MESSAGE_MAX | rewritten | `l5-sources-oracle-lifecycle` › a source error's message › reaches plugins cut to its first 256 characters |
@@ -196,6 +196,15 @@ title and assertions; a rewritten one tests the same behaviour through
 | 66 | ungated sources behave exactly as before (backward-compat) | rewritten | `l5-sources-oracle-gates` › an ungated source › attaches once at start with no gate context … |
 | 67 | passes the resolved key to attach via ctx.key | rewritten | `l5-sources-oracle-gates` › a key gate › passes the key to attach … |
 | 68 | a failing attach backs off instead of retrying on every reconcile | ported | `l5-sources-oracle-ported` |
+- **L10 sources (register after start, re-registration).** Rows 13, 21, 22
+  and 31 above are public behaviour that only `registerModule` reaches: a
+  module registered after start attaches its sources at once and fires
+  `onAttach`; re-registering an attached source unsubscribes the old one
+  before attaching the new one; and the old source's captured `publish` is a
+  no-op afterwards. `unregister-module.test.ts` covers none of these. The only
+  pin, `sources.test.ts:759` ("emits source.attach immediately when a module
+  is registered after start"), sits in the internals file v2 skips. Needed:
+  black-box tests through `registerModule` for all four, before the L10 gate.
 - **L2 coalescing.** The four coalescing tests in
   `reconcile-timing-rules.test.ts` count history snapshots per pass, so they
   sit at L8 (`allowAbove` in layers.rules.json). Needed: the same four rules
