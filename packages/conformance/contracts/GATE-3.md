@@ -77,9 +77,51 @@ The y scenario with an `on` gate needs data-form predicates, so it sits at L11
   `isEnabled()` (`blackbox-effects`, `engine`, `l1-effects`), which pass on
   core-next's source and dist.
 
+## Fixes that landed on main while the gate was raised
+
+- **#314, the L4 mutation-gate debt.** The L4 mutation-gate run (41280732049)
+  could not see three deferred mutants killed, because their triage entries
+  named a layer the feature does not have. The corrections: `effects.ts`
+  730:7 (`onGates.size > 0` forced false) and `effects.ts` 966:11 (`if (gate)`
+  forced false) both need a data-form `on` gate, so they moved to L11; and
+  `resolvers.ts` 2336:34 (`hasPendingBatches` emptied) needs a batch
+  resolver, so it moved to L7. Each is killed in the full run by a named test
+  placed at the new layer, and the whole suite at `MUTATION_LAYER=L4` passes
+  with each mutant applied.
+- **#315, the straddle rule.** The deep fuzz at seed 2 (5,000 runs) failed
+  once at L4 on a case under quirk (a): 2.0's re-dispatched `r0` wrote 0 after
+  the `ends` stop, 1.35's `r1` wrote 1 before it, and the alignment paired the
+  two `fact.change` records as one changed difference. The owner approved the
+  rule (quoted in GATE-2.md): a changed difference after the stop's shared
+  match point is dropped when either record is past the stop in its own
+  trace; a pair with both records before the stop is still checked. Seed 2
+  now passes. This gate signs no new fuzz entry for it.
+
 ## Results
 
-FUZZ
+The fuzz ran at the L4 ceiling (`current` = `"L4"`, committed), on top of main
+at 513064e2 (#314 and #315 included). A passing seed means every compared
+case showed only differences an existing signed entry covers, and the fuzz
+floors held.
+
+**Pull-request count** (287 cases a seed, the default; seeds 1 to 20 and
+24301): all 21 seeds pass. Per seed, 90 to 109 cases also ran on 2.0, and 7
+to 17 ended early at an `ends` stop (seed 24301: 287 compared, 102 on 2.0, 9
+ended early). Seeds 4 and 5 each discarded one runaway case (the reference
+passed 20,000 timer callbacks); every other seed discarded none.
+
+**Deep runs** (`DIFF_FUZZ_RUNS=5000`: 5,000 cases across every layer, plus
+2,000 up to L4 where 2.0 takes part):
+
+| Seed | Cases compared | Also on 2.0 | Ended early at an `ends` stop | Runaways | Time | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 7,000 | 2,411 | 207 | 0 | 281 s | pass |
+| 24301 | 7,000 | 2,396 | 211 | 0 | 390 s | pass |
+| 1 | 7,000 | 2,408 | 207 | 0 | 265 s | pass |
+
+The census (seed 24301, PR count) reads: "287 cases compared, 102 of them on
+v2 too, 9 ended early by an `ends` divergence (at step 3.2 on average; 0 at
+step 0)". The ratchet holds 1,509 tests; 11 are new and none was removed.
 
 ## Sizes
 
