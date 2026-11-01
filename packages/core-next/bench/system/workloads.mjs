@@ -17,6 +17,10 @@
  *   done()        destroy everything
  *   cleanBlock()  optional, untimed cleanup that runs after each timed block
  * One step is `ops` ops (default 1); the runner reports ns/op.
+ *
+ * A workload may list `requires: ["sources"]`. The runner probes each engine
+ * for the feature and, where it is missing, skips the workload and reports it
+ * as not built (n/a), never as a number. Nothing is faked.
  */
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -104,6 +108,80 @@ function chainModules({ createModule, t }, count, onEffect) {
   }
 
   return modules;
+}
+
+// The frame both frame workloads run (RFC 2.0 L4, decision B2): 20 facts, 10
+// derivations (each the sum of two facts), 5 auto-tracked effects (two read
+// `prev`, two read derivations). Frame i writes f<k> = i + k, so every fact
+// differs from the last frame's and every effect re-runs. `runs` counts each
+// effect's runs; `last` holds what each effect last saw (two fact sums, two
+// prev deltas, one derived pair).
+const FRAME_FACTS = 20;
+function frameShape(t, runs, last) {
+  const names = Array.from({ length: FRAME_FACTS }, (_, k) => `f${k}`);
+  const facts = {};
+  const derive = {};
+  const derivations = {};
+  for (const name of names) {
+    facts[name] = t.number();
+  }
+  for (let k = 0; k < FRAME_FACTS / 2; k++) {
+    derivations[`d${k}`] = t.number();
+    derive[`d${k}`] = (f) => f[`f${2 * k}`] + f[`f${2 * k + 1}`];
+  }
+
+  return {
+    names,
+    facts,
+    derivations,
+    derive,
+    effects: {
+      sumFacts: {
+        run: (f) => {
+          runs[0]++;
+          last[0] = f.f0 + f.f1;
+        },
+      },
+      readDerived: {
+        run: (_f, _p, d) => {
+          runs[1]++;
+          last[1] = d.d0;
+        },
+      },
+      deltaPrev2: {
+        run: (f, prev) => {
+          runs[2]++;
+          last[2] = f.f2 - prev.f2;
+        },
+      },
+      deltaPrev3: {
+        run: (f, prev) => {
+          runs[3]++;
+          last[3] = f.f3 - prev.f3;
+        },
+      },
+      readDerivedPair: {
+        run: (_f, _p, d) => {
+          runs[4]++;
+          last[4] = d.d5 + d.d9;
+        },
+      },
+    },
+  };
+}
+
+// What `steps` frames must have produced, worked out by hand.
+function checkFrame(workload, steps, runs, base, last, sys) {
+  for (let k = 0; k < 5; k++) {
+    expect(workload, `effect ${k} reruns`, runs[k] - base[k], steps);
+  }
+  // After `steps` frames f<k> = steps + k, so d<j> = 2 * steps + 4j + 1.
+  expect(workload, "sum of f0 and f1", last[0], 2 * steps + 1);
+  expect(workload, "d0", last[1], 2 * steps + 1);
+  expect(workload, "f2 minus prev", last[2], 1);
+  expect(workload, "f3 minus prev", last[3], 1);
+  expect(workload, "d5 + d9", last[4], 4 * steps + 20 + 36 + 2);
+  expect(workload, "d9 read", sys.derive.d9, 2 * steps + 37);
 }
 
 export const workloads = {
@@ -309,62 +387,23 @@ export const workloads = {
     op: "1 frame: 20 batched writes, 10 derivations, 5 effects (2 use prev), settle",
     async: true,
     async build({ createModule, createSystem, t }) {
-      const FACTS = 20;
-      const names = Array.from({ length: FACTS }, (_, k) => `f${k}`);
-      const facts = {};
-      const derive = {};
-      const derivations = {};
-      for (const name of names) {
-        facts[name] = t.number();
-      }
-      for (let k = 0; k < FACTS / 2; k++) {
-        derivations[`d${k}`] = t.number();
-        derive[`d${k}`] = (f) => f[`f${2 * k}`] + f[`f${2 * k + 1}`];
-      }
       const runs = new Array(5).fill(0);
-      // What each effect last saw: two fact sums, two prev deltas, one derived pair.
       const last = new Array(5).fill(-1);
+      const { names, facts, derivations, derive, effects } = frameShape(
+        t,
+        runs,
+        last,
+      );
       const sys = createSystem({
         module: createModule("frame", {
           schema: { facts, derivations },
           init: (f) => {
-            for (let k = 0; k < FACTS; k++) {
+            for (let k = 0; k < FRAME_FACTS; k++) {
               f[names[k]] = k;
             }
           },
           derive,
-          effects: {
-            sumFacts: {
-              run: (f) => {
-                runs[0]++;
-                last[0] = f.f0 + f.f1;
-              },
-            },
-            readDerived: {
-              run: (_f, _p, d) => {
-                runs[1]++;
-                last[1] = d.d0;
-              },
-            },
-            deltaPrev2: {
-              run: (f, prev) => {
-                runs[2]++;
-                last[2] = f.f2 - prev.f2;
-              },
-            },
-            deltaPrev3: {
-              run: (f, prev) => {
-                runs[3]++;
-                last[3] = f.f3 - prev.f3;
-              },
-            },
-            readDerivedPair: {
-              run: (_f, _p, d) => {
-                runs[4]++;
-                last[4] = d.d5 + d.d9;
-              },
-            },
-          },
+          effects,
         }),
       });
       sys.start();
@@ -377,7 +416,7 @@ export const workloads = {
           const frame = ++i;
           sys.batch(() => {
             const f = sys.facts;
-            for (let k = 0; k < FACTS; k++) {
+            for (let k = 0; k < FRAME_FACTS; k++) {
               f[names[k]] = frame + k;
             }
           });
@@ -385,23 +424,100 @@ export const workloads = {
           return sys.settle();
         },
         check(steps) {
-          for (let k = 0; k < 5; k++) {
-            expect(
-              "frame-loop",
-              `effect ${k} reruns`,
-              runs[k] - base[k],
-              steps,
-            );
-          }
-          // After `steps` frames f<k> = steps + k, so d<j> = 2 * steps + 4j + 1.
-          expect("frame-loop", "sum of f0 and f1", last[0], 2 * steps + 1);
-          expect("frame-loop", "d0", last[1], 2 * steps + 1);
-          expect("frame-loop", "f2 minus prev", last[2], 1);
-          expect("frame-loop", "f3 minus prev", last[3], 1);
-          expect("frame-loop", "d5 + d9", last[4], 4 * steps + 20 + 36 + 2);
-          expect("frame-loop", "d9 read", sys.derive.d9, 2 * steps + 37);
+          checkFrame("frame-loop", steps, runs, base, last, sys);
 
           return null;
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
+  // The workload the L5 speed gate is judged by (RFC 2.0 L5, decision B2): the
+  // frame-loop frame, but arriving the way an Aperture frame does. Per frame a
+  // gated, coalesced source publishes one `frame` event; the module's handler
+  // makes the frame's 20 writes (an event handler runs in one batch), and the
+  // source's gate is evaluated after the pass. The gate stays open, so the
+  // source attaches once and never re-attaches. One extra fact, `open`, is the
+  // gate's input. 1.35 declares the source through a module `sources:` key.
+  // core-next has no sources until L5, so the runner skips this workload there
+  // and reports n/a.
+  "frame-loop-source": {
+    op: "1 frame through a gated, coalesced source: publish, 20 batched writes in the handler, 10 derivations, 5 effects (2 use prev), settle",
+    async: true,
+    requires: ["sources"],
+    async build({ createModule, createSystem, t }) {
+      const runs = new Array(5).fill(0);
+      const last = new Array(5).fill(-1);
+      const counts = { attaches: 0, detaches: 0, gateReads: 0, handled: 0 };
+      let publish = null;
+      const { names, facts, derivations, derive, effects } = frameShape(
+        t,
+        runs,
+        last,
+      );
+      const sys = createSystem({
+        module: createModule("frame", {
+          schema: {
+            facts: { ...facts, open: t.boolean() },
+            derivations,
+            events: { frame: { n: t.number() } },
+          },
+          init: (f) => {
+            for (let k = 0; k < FRAME_FACTS; k++) {
+              f[names[k]] = k;
+            }
+            f.open = true;
+          },
+          derive,
+          effects,
+          events: {
+            frame: (f, payload) => {
+              counts.handled++;
+              for (let k = 0; k < FRAME_FACTS; k++) {
+                f[names[k]] = payload.n + k;
+              }
+            },
+          },
+          sources: {
+            feed: {
+              coalesce: "lastWriteWins",
+              active: (f) => {
+                counts.gateReads++;
+
+                return f.open === true;
+              },
+              attach: (pub) => {
+                counts.attaches++;
+                publish = pub;
+
+                return () => {
+                  counts.detaches++;
+                };
+              },
+            },
+          },
+        }),
+      });
+      sys.start();
+      await sys.settle();
+      const base = runs.slice();
+      let i = 0;
+
+      return {
+        step() {
+          publish("frame", { n: ++i });
+
+          return sys.settle();
+        },
+        check(steps) {
+          checkFrame("frame-loop-source", steps, runs, base, last, sys);
+          expect("frame-loop-source", "frames handled", counts.handled, steps);
+          expect("frame-loop-source", "attaches", counts.attaches, 1);
+          expect("frame-loop-source", "detaches", counts.detaches, 0);
+
+          // Gate reads are the engine's own business (1.35 evaluates the gate
+          // after each pass), so they are a note, not an expectation.
+          return { gateReadsPerFrame: counts.gateReads / steps };
         },
         done: () => sys.destroy(),
       };

@@ -66,7 +66,9 @@ const opt = (k, d) => {
 };
 const flag = (k) => args.includes(`--${k}`);
 
-const f = (x, d = 2) => x.toFixed(d);
+// A workload an engine cannot run (see `requires` in workloads.mjs) has no
+// figure for it: null, printed as n/a, never a made-up number.
+const f = (x, d = 2) => (x === null || x === undefined ? "n/a" : x.toFixed(d));
 const pad = (s, n) => String(s).padEnd(n);
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -124,6 +126,9 @@ function printHeap(r) {
     `  frame loop (frame-loop workload, bytes per frame): v1 ${bytes(h.v1FrameBytesPerOp)}, v2 ${bytes(h.v2FrameBytesPerOp)}`,
   );
   console.log(
+    `  frame loop through a source (frame-loop-source workload, bytes per frame): v1 ${bytes(h.v1FrameSourceBytesPerOp)}, v2 ${bytes(h.v2FrameSourceBytesPerOp)}`,
+  );
+  console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
   );
   if (sizes("v1") !== sizes("v2")) {
@@ -143,9 +148,17 @@ function printTables(r, stat) {
     `${pad("workload", 22)}${pad("v1 ns/op", 12)}${pad("v2 ns/op", 12)}${pad("v2/v1", 8)}min-max`,
   );
   for (const row of rows) {
+    const ratio = row.ratioMedian === null ? "n/a" : `${f(row.ratioMedian)}x`;
+    const range =
+      row.ratioMedian === null ? "" : `${f(row.ratioMin)}-${f(row.ratioMax)}`;
     console.log(
-      `${pad(row.workload, 22)}${pad(f(row.v1NsPerOp, 0), 12)}${pad(f(row.v2NsPerOp, 0), 12)}${pad(`${f(row.ratioMedian)}x`, 8)}${f(row.ratioMin)}-${f(row.ratioMax)}`,
+      `${pad(row.workload, 22)}${pad(f(row.v1NsPerOp, 0), 12)}${pad(f(row.v2NsPerOp, 0), 12)}${pad(ratio, 8)}${range}`,
     );
+  }
+  for (const engine of ["v1", "v2"]) {
+    for (const [name, why] of Object.entries(r.skipped?.[engine] ?? {})) {
+      console.log(`  ${engine}: ${name} not run: ${why}`);
+    }
   }
   console.log("ops:");
   for (const row of rows) {
@@ -164,6 +177,9 @@ function printTables(r, stat) {
     `development checks on: v1 ${r.devChecks.v1}, v2 ${r.devChecks.v2} (NODE_ENV ${r.env})`,
   );
   for (const name of Object.keys(r.notes.v1)) {
+    if (r.skipped?.v2?.[name] || r.skipped?.v1?.[name]) {
+      continue;
+    }
     const a = JSON.stringify(r.notes.v1[name]);
     const b = JSON.stringify(r.notes.v2[name]);
     if (a !== b) {
@@ -375,6 +391,7 @@ function runOne(engine, extra = {}, heap = false) {
 const other = { v1: "v2", v2: "v1" };
 const samples = { v1: {}, v2: {} };
 const notes = { v1: {}, v2: {} };
+const skipped = { v1: {}, v2: {} };
 const heapSamples = { v1: [], v2: [] };
 const devChecks = {};
 for (const engine of ["v1", "v2"]) {
@@ -387,6 +404,7 @@ const record = (engine, report) => {
     samples[engine][name].push(value);
     notes[engine][name] = report.notes[name];
   }
+  Object.assign(skipped[engine], report.skipped);
   devChecks[engine] = report.devChecks;
 };
 
@@ -418,6 +436,29 @@ for (let round = 0; round < rounds; round++) {
 function summarize(name, s) {
   const v1 = samples.v1[name].map((r) => r[s]);
   const v2 = samples.v2[name].map((r) => r[s]);
+  // An engine that skipped the workload has no samples: its figures are null.
+  if (v1.length === 0 || v2.length === 0) {
+    const stats = (xs) =>
+      xs.length === 0
+        ? { median: null, min: null, max: null }
+        : { median: median(xs), min: Math.min(...xs), max: Math.max(...xs) };
+    const a = stats(v1);
+    const b = stats(v2);
+
+    return {
+      workload: name,
+      op: workloads[name].op,
+      ratioMedian: null,
+      ratioMin: null,
+      ratioMax: null,
+      v1NsPerOp: a.median,
+      v1Min: a.min,
+      v1Max: a.max,
+      v2NsPerOp: b.median,
+      v2Min: b.min,
+      v2Max: b.max,
+    };
+  }
   // Round i's ratio pairs the two processes measured in the same round.
   const ratios = v2.map((v, i) => v / v1[i]);
 
@@ -439,10 +480,13 @@ const byStat = Object.fromEntries(
   STATS.map((s) => [s, names.map((name) => summarize(name, s))]),
 );
 
-const heapOf = (engine, key) =>
-  heapSamples[engine].length
-    ? median(heapSamples[engine].map((h) => h[key]))
-    : null;
+// Median of the rounds that measured it; null when none did (an engine without
+// the workload, or too few clean trials), never a median of nothing.
+const heapOf = (engine, key) => {
+  const xs = heapSamples[engine].map((h) => h[key]).filter((x) => x !== null);
+
+  return xs.length ? median(xs) : null;
+};
 const calibrated = (engine) => {
   const xs = heapSamples[engine]
     .map((h) => h.calibration.measured)
@@ -480,6 +524,8 @@ const result = {
     v2FullStepBytesPerOp: heapOf("v2", "fullStepBytesPerOp"),
     v1FrameBytesPerOp: heapOf("v1", "frameBytesPerOp"),
     v2FrameBytesPerOp: heapOf("v2", "frameBytesPerOp"),
+    v1FrameSourceBytesPerOp: heapOf("v1", "frameSourceBytesPerOp"),
+    v2FrameSourceBytesPerOp: heapOf("v2", "frameSourceBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),
@@ -487,6 +533,7 @@ const result = {
     },
   },
   notes,
+  skipped,
 };
 
 printTables(result, stat);
