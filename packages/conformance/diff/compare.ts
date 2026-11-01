@@ -87,7 +87,7 @@ export interface Difference {
   /**
    * When it happens: the `Position` of its record in each trace it is in.
    * A missing entry is in the reference only, an extra one in the candidate
-   * only, a changed one in both (`isAfter` orders two differences).
+   * only, a changed one in both (`isPastStop` sets one against a stop).
    */
   where: { reference?: Position; candidate?: Position };
 }
@@ -123,7 +123,8 @@ export interface Difference {
  * at or before it that the other trace has after its record (its trace has
  * more matched records up to it than the other trace has up to the other
  * record), so M separates them. Equal `[step, phase, matched]` across
- * traces is the same gap: unordered (`isAfter`).
+ * traces is the same gap: unordered (`isPastStop` counts a record in an
+ * unmatched stop's gap as past the stop).
  */
 export type Position = readonly [
   step: number,
@@ -161,16 +162,40 @@ export function comparePositions(
 const TRACES = ["reference", "candidate"] as const;
 
 /**
- * Whether difference `d` happens strictly after `stop`, in every trace `d`
- * is in. Each record of `d` is set against `stop`'s record in the same
- * trace when `stop` has one there (the whole position, `after` included:
- * that is the trace's order; a changed `stop` has a record in both), and
- * otherwise against `stop`'s record in the other trace, by `[step, phase,
- * matched]` only, strictly (`Position`). So a record in the same gap as the
- * stop, in the other trace, is never after it, and `d` is after `stop` only
- * if every one of its records is.
+ * Whether record position `p` is past the stop's record `s`: strictly after
+ * it (`same`: the two are in one trace, so the whole position orders them;
+ * otherwise only `[step, phase, matched]`, strictly), or in the same gap as
+ * an unmatched stop, in either trace: an unmatched record between the same
+ * two matched records (equal `[step, phase, matched]`, `after` above 0 in
+ * both). A matched record is never in a gap: at the stop's `[step, phase,
+ * matched]` it is the matched record that opens the gap, before it.
  */
-export function isAfter(d: Difference, stop: Difference): boolean {
+function pastStop(p: Position, s: Position, same: boolean): boolean {
+  const order = comparePositions(p, s, same ? 4 : 3);
+  if (order > 0) {
+    return true;
+  }
+  // The stop's own record (one trace, the whole position) is not past it.
+  if (same && order === 0) {
+    return false;
+  }
+
+  return p[3] > 0 && s[3] > 0 && comparePositions(p, s, 3) === 0;
+}
+
+/**
+ * Whether difference `d` is past `stop` (an `ends` divergence's difference)
+ * in every trace `d` is in: each record of `d` is set against `stop`'s record
+ * in the same trace when `stop` has one there (a changed `stop` has a record
+ * in both), and otherwise against `stop`'s record in the other trace
+ * (`pastStop`). So a record after the stop, or in the stop's gap (records
+ * one trace has and the other lacks, between the same two matched records,
+ * which no record orders against the stop: where an approved quirk adds or
+ * removes a run, the records around it fall into that gap in an order of
+ * their own), is past it; a record before the gap is not, and `d` is past
+ * `stop` only if every one of its records is.
+ */
+export function isPastStop(d: Difference, stop: Difference): boolean {
   return TRACES.every((trace) => {
     const p = d.where[trace];
     if (!p) {
@@ -178,11 +203,11 @@ export function isAfter(d: Difference, stop: Difference): boolean {
     }
     const same = stop.where[trace];
     if (same) {
-      return comparePositions(p, same) > 0;
+      return pastStop(p, same, true);
     }
     const other = stop.where[trace === "reference" ? "candidate" : "reference"];
 
-    return other !== undefined && comparePositions(p, other, 3) > 0;
+    return other !== undefined && pastStop(p, other, false);
   });
 }
 

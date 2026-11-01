@@ -416,6 +416,18 @@ export function specLayer(spec: FuzzSpec): string {
 }
 
 const f = (i: number) => `f${i}`;
+
+/**
+ * Whether an abort's reason is the error a resolver's `timeout` rejects
+ * with: `Resolver "<id>" timed out after <ms>ms`, the same message on every
+ * engine.
+ */
+const TIMED_OUT = /^Resolver ".*" timed out after \d+ms$/;
+const isTimeoutError = (reason: unknown): boolean => {
+  const message = (reason as { message?: unknown } | null)?.message;
+
+  return typeof message === "string" && TIMED_OUT.test(message);
+};
 const NAMES = ["a", "b"];
 
 function moduleDef(
@@ -497,10 +509,19 @@ function moduleDef(
         // ("start", "wrote", "aborted"; the resolver's tag is data[1]), the
         // same on every engine, so the comparison pairs a start only with a
         // start, and an entry's kind does not depend on which resolver
-        // (`<module>.r<index>`) a case happens to have.
+        // (`<module>.r<index>`) a case happens to have. An abort whose
+        // reason is the resolver's timeout error is a "timeout" instead:
+        // 1.35 never aborts a signal on a timeout, 2.0 does (row n), and
+        // under one kind the comparison paired 2.0's early timeout abort
+        // with 1.35's later cancel-time abort of the same attempt, moving
+        // every other run's record between the two.
         external(["start", `${id}.r${i}`, n]);
         context.signal?.addEventListener?.("abort", () =>
-          external(["aborted", `${id}.r${i}`, n]),
+          external([
+            isTimeoutError(context.signal.reason) ? "timeout" : "aborted",
+            `${id}.r${i}`,
+            n,
+          ]),
         );
         if (c.delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, c.delay));

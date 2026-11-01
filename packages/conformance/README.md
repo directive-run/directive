@@ -103,9 +103,13 @@ the traces to agree.
   stop/start/destroy mid-run, snapshot/restore, back/forward, a second
   system in the same engine instance). A resolver's start, write and abort
   are external records under their own kinds, `["start" | "wrote" |
-  "aborted", "<module>.r<index>", attempt]`, so the comparison pairs a start
-  only with a start, and an entry's kind does not depend on the resolver's
-  id. PR CI runs the fixed seed for 205
+  "aborted" | "timeout", "<module>.r<index>", attempt]`, so the comparison
+  pairs a start only with a start, and an entry's kind does not depend on
+  the resolver's id. An abort whose `signal.reason` is the resolver's
+  timeout error (`Resolver "<id>" timed out after <ms>ms`) is a `timeout`,
+  any other an `aborted`: 1.35 never aborts a signal on a timeout, so a
+  `timeout` record is 2.0's alone (row n), and it never pairs with a later
+  cancel-time `aborted`. PR CI runs the fixed seed for 205
   cases across every layer (`FUZZ_DEFAULT_RUNS`); the census fails fewer than
   200 compared (`lib/fuzz.ts` `FUZZ_FLOOR`) or more than max(1% of cases, 2)
   runaways — and `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a
@@ -214,15 +218,19 @@ seed, so entries written per record at the PR seed fail the nightly seeds,
 and entries wide enough for every seed would hide unrelated differences in
 every fuzz case. In each fuzz case, on each engine, the first difference
 whose covering entry has `ends` is the stop: it passes, and a difference
-strictly after it is not compared. "After" is `isAfter` in
-`diff/compare.ts`: within one trace, the trace order; across the two
-traces, only a matched record between them orders two records (a later
-step or phase, or more matched records before it), so a difference in the
-same gap as the stop, in the other trace, is never after it. A difference
-is dropped only when every record it has is after the stop. An uncovered
-one before the stop, or beside it, is still reported and a covered one
-passes, as before; other engines are compared in full, and the case still
-counts toward the fuzz floors. The run prints where each case ended as an
+past it is not compared. "Past" is `isPastStop` in `diff/compare.ts`:
+strictly after the stop, or beside it, in the same gap (records one trace
+has and the other lacks, between the same two matched records, in either
+trace; the records around a run one engine adds or removes fall there in
+an order of their own). "After" within one trace is the trace order;
+across the two traces only a matched record between them orders two
+records (a later step or phase, or more matched records before it). A
+matched record is never in a gap. A difference is dropped only when every
+record it has is past the stop. An uncovered one before the stop's gap is
+still reported and a covered one passes, as before; only an `ends` entry
+stops (an ordinary entry covers its difference and the case goes on), and
+only in a case with its `when` triggers; other engines are compared in
+full, and the case still counts toward the fuzz floors. The run prints where each case ended as an
 advisory, and the census's fuzz line says how many cases ended early, at
 which step on average and how many at step 0, so a stop that comes too
 early shows. `ends` is valid only on a signed entry for scenario `fuzz`

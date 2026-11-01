@@ -1945,15 +1945,15 @@
     "date": "2026-11-01"
   },
   {
-    "id": "l2-quirk-n-fuzz-aborted-extra",
+    "id": "l2-quirk-n-fuzz-timeout-extra",
     "scenario": "fuzz",
     "stream": "external",
-    "kind": "aborted",
+    "kind": "timeout",
     "engine": "v2",
     "op": "extra",
     "when": ["timeout"],
     "group": "quirk-n",
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record (the fuzz model records one when a resolver attempt's signal aborts) that 2.0 has and 1.35 does not: the record of an attempt that timed out, made when its timeout fires. Every such record in the fixed-seed run was checked: the resolver has a timeout no longer than its delay, and a retry or the timeout error follows it. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: scoped to its quirk's trigger.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"timeout\" record that 2.0 has and 1.35 does not: the fuzz model records an abort whose signal.reason is the resolver's timeout error as kind \"timeout\" (any other abort is \"aborted\"), so this is the timed-out attempt's abort, made when its timeout fires. 1.35 never aborts a signal on a timeout, so no engine but 2.0 makes one (the survey of seeds 1 to 20 and 24301 found none in any 1.35 or workspace trace). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: re-scoped from kind \"aborted\" to the model's new \"timeout\" kind (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the early abort no longer pairs with 1.35's later cancel-time abort.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -1966,7 +1966,7 @@
     "op": "missing",
     "when": ["timeout"],
     "group": "quirk-n",
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record that 1.35 has and 2.0 does not, at that position. It is the same abort moved earlier: a run is canceled after an attempt timed out. 1.35 never aborted the timed-out attempt, so its cancel aborts that attempt then; 2.0 aborted it at its timeout (the extra record), and a signal aborts once, so the cancel does not repeat it. Every such record in the fixed-seed run has its twin on 2.0 at the timeout. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: scoped to its quirk's trigger.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record that 1.35 has and 2.0 does not: a run is canceled after one of its attempts timed out. 1.35 never aborted the timed-out attempt, so its cancel aborts that attempt then; 2.0 aborted it at its timeout (its \"timeout\" record, l2-quirk-n-fuzz-timeout-extra), and a signal aborts once, so the cancel does not repeat it. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: its twin on 2.0 is now a \"timeout\" record (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the two never pair and this is the cancel-time abort alone.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },

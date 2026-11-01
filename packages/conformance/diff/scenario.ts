@@ -46,7 +46,7 @@ import {
   drawProblems,
   drawnResolvers,
   interleaving,
-  isAfter,
+  isPastStop,
   latestPosition,
 } from "./compare.js";
 import "./coverage.js";
@@ -735,12 +735,14 @@ export interface Ended {
  *
  * A fuzz case on one engine also stops at its first difference whose
  * covering entry has `ends: true` (the earliest by `latestPosition`): that
- * difference passes, and a difference strictly after it in every trace it
- * is in (`isAfter`, diff/compare.ts) is not compared. Within one trace that
- * is the trace order; across the two traces only a matched record between
- * them orders two records, so a difference in the same gap as the stop, in
- * the other trace, is still matched as usual (and an uncovered one still
- * fails), as is one before it. Each engine is walked on its own, and a hand
+ * difference passes, and a difference past it in every trace it is in
+ * (`isPastStop`, diff/compare.ts) is not compared: strictly after it, or in
+ * the same gap as the stop (between the same two matched records, in either
+ * trace). Within one trace "after" is the trace order; across the two
+ * traces only a matched record between them orders two records. A
+ * difference before the stop's gap is still matched as usual (and an
+ * uncovered one still fails). Only an `ends` entry stops, and only in a case
+ * with its `when` triggers; each engine is walked on its own, and a hand
  * scenario never stops: there `ends` is just an entry.
  */
 export function explain(
@@ -769,7 +771,7 @@ export function explain(
   const dropped = new Map<string, number>();
   const unexplained = differences.filter((d) => {
     const cut = cuts.get(d.engine);
-    if (cut && isAfter(d, cut.at)) {
+    if (cut && isPastStop(d, cut.at)) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
       return false;
