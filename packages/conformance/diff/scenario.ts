@@ -46,6 +46,7 @@ import {
   drawProblems,
   drawnResolvers,
   interleaving,
+  isPastSharedPoint,
   isPastStop,
   latestPosition,
 } from "./compare.js";
@@ -735,13 +736,23 @@ export interface Ended {
  *
  * A fuzz case on one engine also stops at its first difference whose
  * covering entry has `ends: true` (the earliest by `latestPosition`): that
- * difference passes, and a difference past it in every trace it is in
- * (`isPastStop`, diff/compare.ts) is not compared: strictly after it, or in
- * the same gap as the stop (between the same two matched records, in either
- * trace). Within one trace "after" is the trace order; across the two
- * traces only a matched record between them orders two records. A
- * difference before the stop's gap is still matched as usual (and an
- * uncovered one still fails). Only an `ends` entry stops, and only in a case
+ * difference passes, and the stop covers every stream of the case (Jason,
+ * 2026-11-01: "when an approved quirk ends a case, drop every stream's
+ * unmatched records after the last record both engines matched before the
+ * stop"). A difference is not compared when
+ *
+ * - it is an unmatched record (missing or extra), in any stream, after the
+ *   stop's shared match point: the last record both traces matched before
+ *   the stop, across streams (`SharedPoint`, `isPastSharedPoint`,
+ *   diff/compare.ts); or
+ * - it is past the stop in every trace it is in (`isPastStop`): strictly
+ *   after it, or in the same gap as the stop (between the same two matched
+ *   records, in either trace). This is how a changed difference (a matched
+ *   pair) after the stop is dropped.
+ *
+ * A difference before the shared match point is still matched as usual (and
+ * an uncovered one still fails), whatever its stream, as is a changed one
+ * that is not past the stop. Only an `ends` entry stops, and only in a case
  * with its `when` triggers; each engine is walked on its own, and a hand
  * scenario never stops: there `ends` is just an entry.
  */
@@ -771,7 +782,7 @@ export function explain(
   const dropped = new Map<string, number>();
   const unexplained = differences.filter((d) => {
     const cut = cuts.get(d.engine);
-    if (cut && isPastStop(d, cut.at)) {
+    if (cut && (isPastSharedPoint(d, cut.at) || isPastStop(d, cut.at))) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
       return false;

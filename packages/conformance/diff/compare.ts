@@ -41,8 +41,9 @@
  * marker can never hide a value that is not bounds-checked.
  *
  * Every difference also carries when it happens (`Position`, from the
- * alignment), so a fuzz case can be compared exactly up to a difference a
- * signed `ends` divergence covers and no further (scenario.ts `explain`).
+ * alignment) and the shared match point before it (`SharedPoint`), so a
+ * fuzz case can be compared exactly up to a difference a signed `ends`
+ * divergence covers and no further (scenario.ts `explain`).
  */
 
 import type { Json } from "./normalize.js";
@@ -90,6 +91,12 @@ export interface Difference {
    * only, a changed one in both (`isPastStop` sets one against a stop).
    */
   where: { reference?: Position; candidate?: Position };
+  /**
+   * The shared match point before it (`SharedPoint`): if an `ends`
+   * divergence stops the case here, every stream's unmatched records after
+   * this point are not compared (`isPastSharedPoint`).
+   */
+  shared: SharedPoint;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +216,108 @@ export function isPastStop(d: Difference, stop: Difference): boolean {
 
     return other !== undefined && pastStop(p, other, false);
   });
+}
+
+// ---------------------------------------------------------------------------
+// The shared match point
+
+/**
+ * The last record both engines matched before a difference, as a pair of
+ * trace indexes (the index of a record in its whole trace, `Keyed.index`;
+ * -1 for the start of the trace): every record of a trace up to and
+ * including its index is before the point, every later one past it.
+ *
+ * The global record order is each trace's own order: every stream's
+ * records, the step and async markers among them, sit in one array, so
+ * within a trace any two records are ordered whatever their streams. Across
+ * the two traces the only links are the records both have: each pair the
+ * alignment matched (any stream, `lcs`), and each step and async marker,
+ * paired with the same marker in the other trace (every step is in both
+ * traces). A pair of indexes `(r, c)` is a shared match point when it is
+ * such a link and the two prefixes it closes agree on what they hold: every
+ * link with its reference record at or before `r` has its candidate record
+ * at or before `c`, and the other way round. Each stream is aligned on its
+ * own, so its matches can cross another stream's (1.35's error paired with
+ * a later 2.0 error, while 2.0's records between them pair with 1.35's
+ * after it); no point is set inside a crossing, so a record before the
+ * point in one trace is never paired with one past it in the other.
+ *
+ * The shared points form one chain, later in both traces at once (a link
+ * that closes two agreeing prefixes is the latest record of each). A
+ * difference's point is the latest one before it in every trace it is in:
+ * strictly before its record in that trace (a changed difference has one
+ * in each, a missing one in the reference only, an extra one in the
+ * candidate only). The start of both traces, (-1, -1), is always one.
+ */
+export interface SharedPoint {
+  reference: number;
+  candidate: number;
+}
+
+/**
+ * The shared match points of a comparison, in order (see `SharedPoint`),
+ * from its links: pairs of trace indexes, one record in each trace.
+ */
+function sharedChain(links: [number, number][]): SharedPoint[] {
+  const byRef = [...links].sort((x, y) => x[0] - y[0]);
+  const rankInCandidate = new Map(
+    [...links]
+      .sort((x, y) => x[1] - y[1])
+      .map(([, c], rank) => [c, rank] as const),
+  );
+  const chain: SharedPoint[] = [{ reference: -1, candidate: -1 }];
+  let latest = -1;
+  byRef.forEach(([r, c], rank) => {
+    latest = Math.max(latest, c);
+    // The first rank+1 links in reference order are the first rank+1 in
+    // candidate order: this link is the latest of each prefix.
+    if (latest === c && rankInCandidate.get(c) === rank) {
+      chain.push({ reference: r, candidate: c });
+    }
+  });
+
+  return chain;
+}
+
+/** The latest shared match point strictly before the records `at` names. */
+function sharedBefore(chain: SharedPoint[], at: Difference["at"]): SharedPoint {
+  let found = chain[0] as SharedPoint;
+  for (const point of chain) {
+    if (
+      (at.reference === undefined || point.reference < at.reference) &&
+      (at.candidate === undefined || point.candidate < at.candidate)
+    ) {
+      found = point;
+    } else {
+      break;
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Whether difference `d` is an unmatched record past `stop`'s shared match
+ * point (an `ends` divergence's difference): a missing record after the
+ * point's reference index, or an extra one after its candidate index. This
+ * is the owner's rule (2026-11-01): when an approved quirk ends a case,
+ * every stream's unmatched records after the last record both engines
+ * matched before the stop are dropped. A changed difference (a matched
+ * pair) is never dropped by this rule; `isPastStop` decides it.
+ */
+export function isPastSharedPoint(d: Difference, stop: Difference): boolean {
+  // The stop itself is not past it: it passes, covered.
+  if (d === stop) {
+    return false;
+  }
+  if (d.op === "missing") {
+    return (d.at.reference as number) > stop.shared.reference;
+  }
+  if (d.op === "extra") {
+    return (d.at.candidate as number) > stop.shared.candidate;
+  }
+
+  return false;
 }
 
 /** The latest position `d` has in the traces it is in (a total order, for picking a stop). */
@@ -724,7 +833,8 @@ function compareWith(
     ...positions(left, matchedLeft),
     ...positions(right, matchedRight),
   ]);
-  const out: Difference[] = [];
+  const chain = sharedChain(links(reference, candidate, aligned));
+  const out: Omit<Difference, "shared">[] = [];
   for (const { stream, a, b, pairs } of aligned) {
     const matchedA = new Set(pairs.map(([i]) => i));
     const matchedB = new Set(pairs.map(([, j]) => j));
@@ -782,11 +892,50 @@ function compareWith(
     });
   }
 
-  return out.sort(
-    (x, y) =>
-      Math.min(x.at.reference ?? 1e9, x.at.candidate ?? 1e9) -
-      Math.min(y.at.reference ?? 1e9, y.at.candidate ?? 1e9),
-  );
+  return out
+    .map((d) => ({ ...d, shared: sharedBefore(chain, d.at) }))
+    .sort(
+      (x, y) =>
+        Math.min(x.at.reference ?? 1e9, x.at.candidate ?? 1e9) -
+        Math.min(y.at.reference ?? 1e9, y.at.candidate ?? 1e9),
+    );
+}
+
+/**
+ * The records both traces have, as pairs of trace indexes: each pair the
+ * alignment matched, and each step and async marker with the same marker
+ * in the other trace (`SharedPoint`).
+ */
+function links(
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+  aligned: { a: Keyed[]; b: Keyed[]; pairs: [number, number][] }[],
+): [number, number][] {
+  const out: [number, number][] = [];
+  for (const { a, b, pairs } of aligned) {
+    for (const [i, j] of pairs) {
+      out.push([(a[i] as Keyed).index, (b[j] as Keyed).index]);
+    }
+  }
+  const markers = (trace: TraceEntry[]) => {
+    const found = new Map<string, number>();
+    for (const [index, entry] of trace.entries()) {
+      if (entry.k === "step" || entry.k === "async") {
+        found.set(`${entry.k} ${entry.i}`, index);
+      }
+    }
+
+    return found;
+  };
+  const inCandidate = markers(candidate);
+  for (const [marker, index] of markers(reference)) {
+    const other = inCandidate.get(marker);
+    if (other !== undefined) {
+      out.push([index, other]);
+    }
+  }
+
+  return out;
 }
 
 /** Contract differences: these fail unless a divergence covers them. */
