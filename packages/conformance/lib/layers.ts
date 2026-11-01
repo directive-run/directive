@@ -113,6 +113,11 @@ const OPTION_LAYERS: [string[], Layer, string][] = [
   [["sources"], "L5", "sources"],
   [["history"], "L8", "history"],
   [["meta"], "L9", "meta"],
+  // `createSystem({ trace: true })` or `{ trace: { maxRuns } }`: the plan's L9
+  // (the trace option, like `meta`; the `.trace` member is already L9). Without
+  // this a test that only turns tracing on and reads a plugin hook was placed
+  // by its module's `deps` alone, at L4.
+  [["trace"], "L9", "trace"],
   [["modules"], "L1", "modules"],
   // Module lifecycle hooks, SSR initial facts and the tick interval: the
   // plan's L3 (lifecycle, ssr, clock/timer).

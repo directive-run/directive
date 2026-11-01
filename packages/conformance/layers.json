@@ -751,11 +751,11 @@
         },
         "what a run tells the trace > lists declared deps, with derivations as derive.<id>": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "what a run tells the trace > an auto-tracked effect starts with none and then lists what it read": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "what a run tells the trace > call reports its deps too, and none when none are known": {
           "layer": "L10",
@@ -763,7 +763,7 @@
         },
         "what a run tells the trace > records an effect error in the trace": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "what a run tells the trace > works with no plugins and no trace": {
           "layer": "L10",
@@ -2483,7 +2483,7 @@
         },
         "inspect() includes disabled field on constraints > inspect().traceEnabled reflects trace config": {
           "layer": "L9",
-          "by": ["member .inspect"]
+          "by": ["member .inspect", "option trace"]
         }
       }
     },
@@ -5166,13 +5166,14 @@
           ],
           "pulledDown": ["option effect prev (L4)"]
         },
-        "an effect reading a derivation > re-runs when it only tested the derivation's membership": {
+        "an effect reading a derivation > sees the derivation as present when it only tests its membership": {
           "layer": "L0",
           "by": [
             "import createModule",
             "import createSystem",
             "import t",
             "member .facts",
+            "member .read",
             "option derivations",
             "option effects",
             "option init"
@@ -8957,6 +8958,45 @@
         "zeroConfig > an errorBoundary given alongside wins over the zeroConfig defaults": {
           "layer": "L3",
           "by": ["option error boundary", "option plugins"]
+        }
+      }
+    },
+    "tests/core/l4-effects-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L4",
+      "tests": {
+        "an auto-tracked effect's dependencies > stay those of the last good run when a run throws": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
+        },
+        "an async auto-tracked effect > depends only on what it read before its first await": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
+        },
+        "a synchronous pass > is settled after exactly one microtask, the effect having run": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ]
         }
       }
     },
@@ -13989,7 +14029,7 @@
         },
         "Config Forwarding > trace config forwarded": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Config Forwarding > errorBoundary config forwarded": {
           "layer": "L3",
@@ -14296,99 +14336,99 @@
         },
         "Trace > creates a trace entry on fact change": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > tracks derivation recomputation with dependency edges": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > tracks constraints and requirements when triggered": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > attributes async resolver completion to the correct trace": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > attributes resolver errors to the correct trace": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > keeps trace pending while multiple resolvers are inflight": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > evicts old runs when maxRuns is exceeded": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > cleans up maps when pending runs are evicted": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > skips traces with no activity": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > transitions from pending to settled when resolver completes": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > calls onTraceComplete plugin hook with finalized trace entry": {
-          "layer": "L4",
-          "by": ["option effect deps"]
+          "layer": "L9",
+          "by": ["option trace"]
         },
         "Trace > includes trace in inspect() when enabled": {
           "layer": "L9",
-          "by": ["member .inspect", "member .trace"]
+          "by": ["member .inspect", "member .trace", "option trace"]
         },
         "Trace > cleans up trace state on destroy": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > includes fromConstraint on removed requirements": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > derivation entries use object format with id and deps": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > generates causal chain on settled traces": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > tracks effects with triggeredBy dependency arrays": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > includes dependency arrays on constraint hit entries": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > returns cached array on repeat access without changes (E1)": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace > returns deep-copied trace from inspect()": {
           "layer": "L9",
-          "by": ["member .inspect", "member .trace"]
+          "by": ["member .inspect", "member .trace", "option trace"]
         },
         "Trace fields > records which derivations recomputed, with their dependencies": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace fields > records a requirement going away, and which constraint it came from": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace fields > records an effect that threw": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         },
         "Trace fields > flags a run where a resolver errored": {
           "layer": "L9",
-          "by": ["member .trace"]
+          "by": ["member .trace", "option trace"]
         }
       }
     },
@@ -14410,7 +14450,7 @@
         },
         "a derivation's private reads stay in its own frame > keeps the dependency shape stable across the fast-path threshold": {
           "layer": "L9",
-          "by": ["member .inspect", "member .trace"]
+          "by": ["member .inspect", "member .trace", "option trace"]
         }
       }
     },
