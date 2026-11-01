@@ -514,6 +514,12 @@
     "tests/core/sources.test.ts": {
       "rule": "L5"
     },
+    "tests/core/l5-sources-oracle.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/l5-sources-oracle-production.test.ts": {
+      "rule": "L5"
+    },
     "tests/core/restore-flush-reconcile.test.ts": {
       "rule": "L6"
     },
