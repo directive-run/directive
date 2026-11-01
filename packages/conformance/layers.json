@@ -6902,6 +6902,22 @@
         "disable and enable > reports a name that is no constraint as not disabled, and keeps working after enable() of one": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
+        },
+        "a derivation read only through a membership test > is asked again on every change of the derivation, not only the first": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "a derivation read only through a membership test > wakes a derivation that only asks, and the constraint that reads it, on every change": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "a derivation read only through a membership test > wakes the constraint through two askers of one derivation on every change": {
+          "layer": "L2",
+          "by": ["option constraints"]
+        },
+        "a derivation read only through a membership test > wakes the constraint when the asker is read by value further down": {
+          "layer": "L2",
+          "by": ["option constraints"]
         }
       }
     },
