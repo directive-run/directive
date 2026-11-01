@@ -9000,6 +9000,58 @@
         }
       }
     },
+    "tests/core/l5-sources-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "a namespaced source in production > drops another module's event as cross-module without a warning": {
+          "layer": "L5",
+          "by": ["option sources"]
+        }
+      }
+    },
+    "tests/core/l5-sources-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L5",
+      "tests": {
+        "plugins and a source's lifecycle > hear its attach at start, its publish, and its detach at stop, which unsubscribes it": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a source whose attach throws > is reported to plugins as an attach error, and the next source still attaches": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish the engine refuses > is a drop with its reason: an empty name, a blocked name, a name with no handler": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish the engine refuses > is dropped as post-stop when a source still attached publishes while the system stops": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a publish the engine refuses > is dropped as post-destroy when a source attached again during destroy publishes after it": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a namespaced source > publishes its own module's event by its bare name": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a namespaced source > drops another module's event as cross-module, and development warns once per source": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a namespaced source > drops its own event named with its prefix, and the warning names the bare event to publish": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "a gated source > whose gate is open at start is attached when start() returns": {
+          "layer": "L5",
+          "by": ["option sources"]
+        }
+      }
+    },
     "tests/core/l7-batch-resolvers-oracle.test.ts": {
       "category": "black-box",
       "rule": "L7",
