@@ -164,7 +164,9 @@ const MEMBER_LAYERS: Record<string, Layer> = {
   watchDistributableSnapshot: "L12",
   registerModule: "L10",
   unregisterModule: "L10",
-  evict: "L10",
+  // B1 (owner, 2026-11-01): evict comes with the sources' onEvict at L5,
+  // not with dynamic() at L10; neither does anything without the other.
+  evict: "L5",
   whenReady: "L3",
   stopAsync: "L3",
   destroyAsync: "L3",

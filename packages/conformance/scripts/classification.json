@@ -860,6 +860,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l5-sources-oracle-gates.test.ts",
+    "category": "black-box",
+    "cases": 17,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l5-sources-oracle-lifecycle.test.ts",
+    "category": "black-box",
+    "cases": 15,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l5-sources-oracle-ported.test.ts",
+    "category": "black-box",
+    "cases": 10,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l5-sources-oracle-production.test.ts",
     "category": "black-box",
     "cases": 1,
@@ -869,9 +896,18 @@
     "notes": []
   },
   {
-    "file": "src/core/__tests__/l5-sources-oracle.test.ts",
+    "file": "src/core/__tests__/l5-sources-oracle-teardown.test.ts",
     "category": "black-box",
     "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l5-sources-oracle.test.ts",
+    "category": "black-box",
+    "cases": 11,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

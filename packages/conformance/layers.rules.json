@@ -74,7 +74,7 @@
     "notify: guardrail channels reach plugins": "L3",
     "notify: clobber-loop channels reach plugins": "L12",
     "async stop and destroy wait for in-flight runs": "L3",
-    "async stop, evict and destroy": "L10",
+    "async stop, evict and destroy": "L5",
     "settle(maxWait) gives up on a resolver that never finishes": "L3",
     "settle() pending across stop() and destroy()": "L3",
     "a timer completed while paused: elapsed time after the clock moves": "L3",
@@ -103,6 +103,14 @@
     "onEvict runs on evict; a throwing attach reports a source error": "L5",
     "sources: attach, publish, active gate and detach": "L5",
     "sources: a publish naming another module's event is dropped": "L5",
+    "a failed gated attach on a quiet system waits for an unrelated write to retry": "L5",
+    "a failed re-key with gateLingerMs retries only after another linger window": "L5",
+    "coalesced publishes queued after the closing write are dropped uncounted": "L5",
+    "coalesced publishes queued before the closing write are dispatched": "L5",
+    "evict with a deadline already past returns at once": "L5",
+    "evict with a future deadline waits only until the deadline": "L5",
+    "evict with no deadline waits for every onEvict": "L5",
+    "a return to the old key inside a retry's linger window leaves the source dark": "L5",
     "t.* refine, transform, brand and wrong types in development": "L6",
     "the persistence plugin restores, saves debounced, and excludes keys": "L6",
     "distributable snapshots": "L6",
@@ -518,6 +526,18 @@
       "rule": "L5"
     },
     "tests/core/l5-sources-oracle-production.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/l5-sources-oracle-ported.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/l5-sources-oracle-lifecycle.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/l5-sources-oracle-teardown.test.ts": {
+      "rule": "L5"
+    },
+    "tests/core/l5-sources-oracle-gates.test.ts": {
       "rule": "L5"
     },
     "tests/core/restore-flush-reconcile.test.ts": {

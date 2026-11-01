@@ -1246,6 +1246,12 @@
         "an async auto-tracked effect > depends only on what it read before its first await",
         "an auto-tracked effect's dependencies > stay those of the last good run when a run throws"
       ],
+      "tests/core/l5-sources-oracle-lifecycle.test.ts": [
+        "a source's unsubscribe at stop > never runs on a system that was never started, and nothing attaches"
+      ],
+      "tests/core/l5-sources-oracle-ported.test.ts": [
+        "source primitive — public lifecycle and guards > rejects source ids that match BLOCKED_PROPS (prototype pollution defense)"
+      ],
       "tests/core/l8-system-oracle.test.ts": [
         "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
         "hydrate() data in a single-module system > is applied over initialFacts when it is clean"
