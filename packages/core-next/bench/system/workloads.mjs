@@ -300,6 +300,113 @@ export const workloads = {
       };
     },
   },
+  // The frame loop the L5 gate is judged by (RFC 2.0 L4, decision B2). One
+  // frame of an Aperture-shaped app: 20 facts written in one batch, 10
+  // derivations (each the sum of two facts), 5 auto-tracked effects (two read
+  // `prev`, two read derivations), then a settle. Frame i writes f<k> = i + k,
+  // so every fact differs from the last frame's and every effect re-runs.
+  "frame-loop": {
+    op: "1 frame: 20 batched writes, 10 derivations, 5 effects (2 use prev), settle",
+    async: true,
+    async build({ createModule, createSystem, t }) {
+      const FACTS = 20;
+      const names = Array.from({ length: FACTS }, (_, k) => `f${k}`);
+      const facts = {};
+      const derive = {};
+      const derivations = {};
+      for (const name of names) {
+        facts[name] = t.number();
+      }
+      for (let k = 0; k < FACTS / 2; k++) {
+        derivations[`d${k}`] = t.number();
+        derive[`d${k}`] = (f) => f[`f${2 * k}`] + f[`f${2 * k + 1}`];
+      }
+      const runs = new Array(5).fill(0);
+      // What each effect last saw: two fact sums, two prev deltas, one derived pair.
+      const last = new Array(5).fill(-1);
+      const sys = createSystem({
+        module: createModule("frame", {
+          schema: { facts, derivations },
+          init: (f) => {
+            for (let k = 0; k < FACTS; k++) {
+              f[names[k]] = k;
+            }
+          },
+          derive,
+          effects: {
+            sumFacts: {
+              run: (f) => {
+                runs[0]++;
+                last[0] = f.f0 + f.f1;
+              },
+            },
+            readDerived: {
+              run: (_f, _p, d) => {
+                runs[1]++;
+                last[1] = d.d0;
+              },
+            },
+            deltaPrev2: {
+              run: (f, prev) => {
+                runs[2]++;
+                last[2] = f.f2 - prev.f2;
+              },
+            },
+            deltaPrev3: {
+              run: (f, prev) => {
+                runs[3]++;
+                last[3] = f.f3 - prev.f3;
+              },
+            },
+            readDerivedPair: {
+              run: (_f, _p, d) => {
+                runs[4]++;
+                last[4] = d.d5 + d.d9;
+              },
+            },
+          },
+        }),
+      });
+      sys.start();
+      await sys.settle();
+      const base = runs.slice();
+      let i = 0;
+
+      return {
+        step() {
+          const frame = ++i;
+          sys.batch(() => {
+            const f = sys.facts;
+            for (let k = 0; k < FACTS; k++) {
+              f[names[k]] = frame + k;
+            }
+          });
+
+          return sys.settle();
+        },
+        check(steps) {
+          for (let k = 0; k < 5; k++) {
+            expect(
+              "frame-loop",
+              `effect ${k} reruns`,
+              runs[k] - base[k],
+              steps,
+            );
+          }
+          // After `steps` frames f<k> = steps + k, so d<j> = 2 * steps + 4j + 1.
+          expect("frame-loop", "sum of f0 and f1", last[0], 2 * steps + 1);
+          expect("frame-loop", "d0", last[1], 2 * steps + 1);
+          expect("frame-loop", "f2 minus prev", last[2], 1);
+          expect("frame-loop", "f3 minus prev", last[3], 1);
+          expect("frame-loop", "d5 + d9", last[4], 4 * steps + 20 + 36 + 2);
+          expect("frame-loop", "d9 read", sys.derive.d9, 2 * steps + 37);
+
+          return null;
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // 1,000 subscribers on one fact; one write notifies them all.
   "subscribe-1000": {
     op: "1 write notifying 1,000 subscribers",
