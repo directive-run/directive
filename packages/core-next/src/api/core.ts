@@ -131,6 +131,11 @@ interface Derivation {
    * runs the derivation. See `invalidate`.
    */
   asked_: ReactiveNode | null;
+  /**
+   * An effect's membership key for it, quirk (c): MEMBER_DEP_PREFIX (facts.ts)
+   * + the id, made once rather than on every test.
+   */
+  member_: string;
 }
 
 /**
@@ -738,6 +743,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       stale_: true,
       live_: false,
       asked_: null,
+      // MEMBER_DEP_PREFIX written out: importing it costs the floor bytes (a
+      // test pins that the two agree).
+      member_: `\u001E${id}`,
     } as Derivation;
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
@@ -786,9 +794,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         // frame `deps` is null, never `effect_`), so it keeps 1.35's rule
         // below, as constraints do.
         if (typeof id === "string" && tracker.deps === tracker.effect_) {
-          // MEMBER_DEP_PREFIX (facts.ts) written out: importing it costs the
-          // floor bytes (a test pins that the two agree).
-          tracker.deps.add(`\u001E${id}`);
+          // A derivation's key is made once; an unknown name's (w) per test.
+          tracker.deps.add(d ? d.member_ : `\u001E${id}`);
 
           return !!d;
         }

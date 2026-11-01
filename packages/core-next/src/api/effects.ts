@@ -69,9 +69,9 @@ interface EffectState {
    */
   deps: Set<string> | null;
   /** T1: the cleared set the next auto-tracked run tracks into. */
-  spare_?: Set<string>;
+  spare_: Set<string> | undefined;
   /** The pass whose changed keys reached it (T2). */
-  hit_?: number;
+  hit_: number;
   cleanup: (() => void) | null;
   /** Its cleanup is running: the boundary's "disable" does not start it again. */
   cleaning_?: boolean;
@@ -204,6 +204,9 @@ export function createEffectsManager<S extends Schema>(
       enabled: true,
       explicit: Array.isArray(deps),
       deps: Array.isArray(deps) ? new Set(deps.map(depKey)) : null,
+      // From the start, as selection reads them: one shape for every state.
+      spare_: undefined,
+      hit_: 0,
       cleanup: null,
     };
     for (const key of state.deps ?? []) {
@@ -435,12 +438,19 @@ export function createEffectsManager<S extends Schema>(
         store.batch(body);
       } else {
         // withTracking's frame, without its result object, into the spare
-        // set (T1), marked as an effect's for the membership rule (c). Taken
-        // off the state while it runs, so a nested run makes its own.
+        // set (T1), marked as an effect's for the membership rule (c).
+        //
+        // `effect_` is not restored: no effect body runs inside another's.
+        // The system's pass is the only caller of `run` and does not start
+        // while one is going (core.ts `reconciling`): a write, an `enable`,
+        // a plugin hook or a derivation computed in the body cannot re-enter
+        // it, and another system has its own tracker. Once this frame ends,
+        // `deps` is the outer frame and never this set, so the stale mark
+        // matches nothing. l4b-quirk-c-index.test.ts pins both effects'
+        // tracking in such a body.
         const deps = state.spare_ ?? new Set<string>();
         state.spare_ = undefined;
         const outer = tracker.deps;
-        const outerEffect = tracker.effect_;
         tracker.deps = tracker.effect_ = deps;
         try {
           store.batch(body);
@@ -451,7 +461,6 @@ export function createEffectsManager<S extends Schema>(
           throw error;
         } finally {
           tracker.deps = outer;
-          tracker.effect_ = outerEffect;
         }
         commit(state, deps);
         if (isDevelopment && state.out_ instanceof Promise) {
@@ -490,14 +499,26 @@ export function createEffectsManager<S extends Schema>(
   let pass = 0;
   /** Stamp the effects that `keys` reach with this pass (T2). */
   function reach(keys: Set<string>, now: number): void {
-    // From whichever side is smaller: the changed keys, or the index.
-    for (const key of keys.size > index.size ? index.keys() : keys) {
-      const at = keys.has(key) && index.get(key);
-      if (at) {
-        for (const state of at) {
-          state.hit_ = now;
+    // From whichever side is smaller: the changed keys, or the index. Two
+    // loops, each over one kind of collection, so neither is polymorphic.
+    if (keys.size > index.size) {
+      for (const [key, at] of index) {
+        if (keys.has(key)) {
+          stamp(at, now);
         }
       }
+    } else {
+      for (const key of keys) {
+        const at = index.get(key);
+        if (at) {
+          stamp(at, now);
+        }
+      }
+    }
+  }
+  function stamp(at: EffectState[], now: number): void {
+    for (const state of at) {
+      state.hit_ = now;
     }
   }
   /**

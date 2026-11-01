@@ -410,3 +410,98 @@ describe("T2: the effect index", () => {
     "L10: a declared name that comes to exist is linked into the index when it resolves (refreshDeps does not exist in core-next yet)",
   );
 });
+
+/**
+ * `run` does not restore `tracker.effect_` (effects.ts): it relies on no
+ * effect body running inside another's. If one ever did, the outer body's
+ * later membership tests would take the inner frame's mark: `effect_` would
+ * still be the inner set, so they would fall back to 1.35's value rule and
+ * an unknown name (w) would track nothing.
+ */
+describe("no effect body runs inside another's (effect_ is not restored)", () => {
+  it.each(["micro", "sync"] as const)(
+    "on the %s lane, an effect that writes, enables another and computes a derivation keeps both effects' tracking",
+    async (lane) => {
+      const log: unknown[] = [];
+      let tracker!: Tracker;
+      const grab: SystemPart = (ctx) => {
+        tracker = ctx.tracker;
+      };
+      const tracked = () =>
+        [...tracker.deps!].map((key) =>
+          key
+            .replace(MEMBER_DEP_PREFIX, "member:")
+            .replace(DERIVATION_DEP_PREFIX, "value:"),
+        );
+      const system: any = createSystemCore(
+        {
+          module: createModule("m", {
+            schema: {
+              facts: { a: t.number(), b: t.number() },
+              derivations: { d: t.number() },
+              events: {},
+              requirements: {},
+            },
+            init: (f: any) => {
+              f.a = 0;
+              f.b = 0;
+            },
+            derive: { d: (f: any) => f.a + 1 },
+            effects: {
+              outer: {
+                run: (f: any, _p: any, dd: any) => {
+                  const a = f.a;
+                  log.push(["outer", a]);
+                  if (a === 1) {
+                    // Each asks for (or could start) a pass from inside the body.
+                    system.facts.b = 1;
+                    system.effects.enable("inner");
+                  }
+                  // Stale after the write to `a`: computed in this frame.
+                  log.push(["d", dd.d]);
+                  log.push(["outer has", "d" in dd, "nope" in dd]);
+                  log.push(["outer tracked", tracked()]);
+                },
+              },
+              inner: {
+                run: (f: any, _p: any, dd: any) => {
+                  log.push(["inner", f.b, "d" in dd]);
+                  log.push(["inner tracked", tracked()]);
+                },
+              },
+            },
+          } as any),
+        } as any,
+        [withEffects, withReconcile, grab],
+        { lane },
+      );
+      system.effects.disable("inner");
+      system.start();
+      await flush();
+      system.facts.a = 1;
+      await flush();
+      await flush();
+      system.destroy();
+
+      const outerTracked = [
+        "outer tracked",
+        ["a", "value:d", "member:d", "member:nope"],
+      ];
+      expect(log).toEqual([
+        ["outer", 0],
+        ["d", 1],
+        ["outer has", true, false],
+        outerTracked,
+        ["outer", 1],
+        ["d", 2],
+        // After the write, the enable and the compute: still the effect's
+        // membership rule, so the unknown name is tracked too (w).
+        ["outer has", true, false],
+        outerTracked,
+        // In the next pass, never inside `outer`'s body.
+        ["inner", 1, true],
+        ["inner tracked", ["b", "member:d"]],
+      ]);
+    },
+  );
+});
