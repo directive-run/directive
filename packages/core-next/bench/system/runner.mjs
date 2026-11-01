@@ -1,7 +1,7 @@
 /**
  * Runs the whole-system workloads for ONE engine inside the current process
  * and prints a single JSON line:
- *   time mode (default):     { engine, devChecks, envSwap, cpuSource, results: { workload: nsPerOp }, notes }
+ *   time mode (default):     { engine, devChecks, envSwap, cpuSource, results: { workload: nsPerOp }, notes, skipped }
  *   heap mode (BENCH_MODE=heap): { engine, devChecks, envSwap, cpuSource, heap: { ... } }
  *
  * Fairness rules (as in ../runner.mjs): the process holds exactly one engine;
@@ -99,11 +99,60 @@ async function verify(name, def, api) {
   return notes;
 }
 
+// What this engine can do, found by trying it, never by name. A module's
+// `sources:` key must attach its source when the system starts; an engine that
+// ignores the key (core-next before L5) or throws on it has no sources. The
+// probe lets a workload that needs sources run the day an engine gains them,
+// with no edit here.
+const MISSING = { sources: "sources not built (L5)" };
+function featuresOf({ createModule, createSystem, t }) {
+  let attached = false;
+  try {
+    const sys = createSystem({
+      module: createModule("probe-sources", {
+        schema: { facts: { n: t.number() } },
+        init: (f) => {
+          f.n = 0;
+        },
+        sources: {
+          probe: {
+            attach: () => {
+              attached = true;
+
+              return () => {};
+            },
+          },
+        },
+      }),
+    });
+    sys.start();
+    sys.destroy();
+  } catch {
+    attached = false;
+  }
+
+  return { sources: attached };
+}
+
+// The reason a workload cannot run on this engine, or null.
+function missingFeature(def, features) {
+  const lacking = (def.requires ?? []).find((feature) => !features[feature]);
+
+  return lacking ? MISSING[lacking] : null;
+}
+
 async function runAll(engine, api, only) {
   const results = {};
   const notes = {};
+  const skipped = {};
+  const features = featuresOf(api);
   for (const [name, def] of Object.entries(workloads)) {
     if (only && !only.includes(name)) {
+      continue;
+    }
+    const why = missingFeature(def, features);
+    if (why) {
+      skipped[name] = why;
       continue;
     }
     notes[name] = await verify(name, def, api);
@@ -142,7 +191,7 @@ async function runAll(engine, api, only) {
     };
   }
 
-  return { engine, results, notes };
+  return { engine, results, notes, skipped };
 }
 
 // Steady-state allocation of the scalar-write path, in bytes per write. A big
@@ -202,28 +251,37 @@ async function heapProbe(engine, api) {
   }
   const calibratedBytes = calibration.length ? median(calibration) : null;
 
-  // One frame of the frame-loop workload (20 batched writes, 10 derivations, 5
-  // effects, settle) in bytes, by the same trial method. Its step settles, so
-  // each trial is only the frames. 2,000 frames stay well under the semi-space.
-  const frames = await workloads["frame-loop"].build(api);
-  for (let s = 0; s < 300; s++) {
-    await frames.step();
+  // One frame of a frame workload (20 batched writes, 10 derivations, 5 effects,
+  // settle) in bytes, by the same trial method. Its step settles, so each trial
+  // is only the frames. The trial is sized to stay well under the semi-space.
+  // Null when the engine lacks what the workload needs, or too few trials were
+  // clean.
+  const features = featuresOf(api);
+  async function frameBytes(name, FRAMES) {
+    if (missingFeature(workloads[name], features)) {
+      return null;
+    }
+    const frames = await workloads[name].build(api);
+    for (let s = 0; s < 300; s++) {
+      await frames.step();
+    }
+    const rows = [];
+    for (let k = 0; k < 9; k++) {
+      rows.push(
+        await trial(async () => {
+          for (let s = 0; s < FRAMES; s++) {
+            await frames.step();
+          }
+        }),
+      );
+    }
+    frames.done();
+    const clean = rows.filter((r) => r.clean).map((r) => r.bytes);
+
+    return clean.length >= 3 ? median(clean) / FRAMES : null;
   }
-  const FRAMES = 2000;
-  const frameRows = [];
-  for (let k = 0; k < 9; k++) {
-    frameRows.push(
-      await trial(async () => {
-        for (let s = 0; s < FRAMES; s++) {
-          await frames.step();
-        }
-      }),
-    );
-  }
-  frames.done();
-  const cleanFrames = frameRows.filter((r) => r.clean).map((r) => r.bytes);
-  const frameBytesPerOp =
-    cleanFrames.length >= 3 ? median(cleanFrames) / FRAMES : null;
+  const frameBytesPerOp = await frameBytes("frame-loop", 2000);
+  const frameSourceBytesPerOp = await frameBytes("frame-loop-source", 1000);
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
@@ -247,6 +305,7 @@ async function heapProbe(engine, api) {
           writeOnlyBytesPerOp: median(keepClean(only)) / writes,
           fullStepBytesPerOp: median(keepClean(full)) / writes,
           frameBytesPerOp,
+          frameSourceBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },
