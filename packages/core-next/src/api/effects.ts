@@ -47,6 +47,8 @@ export interface EffectsManager {
   /** Run `id` in the next pass whatever changed (1.35's requestRerun). */
   rerun_(id: string): void;
   reruns_(): boolean;
+  /** Every prefixed derivation id an enabled effect reads (1.35). */
+  observed_(into: Set<string>): void;
 }
 
 interface EffectState {
@@ -477,6 +479,18 @@ export function createEffectsManager<S extends Schema>(
       }
     },
     reruns_: () => reruns.size > 0,
+    observed_(into) {
+      // 1.35 drops a disabled effect's dependencies (effects.ts:1457).
+      for (const state of states.values()) {
+        if (state.enabled && state.deps) {
+          for (const key of state.deps) {
+            if (key.startsWith(DERIVATION_DEP_PREFIX)) {
+              into.add(key);
+            }
+          }
+        }
+      }
+    },
   };
 }
 
