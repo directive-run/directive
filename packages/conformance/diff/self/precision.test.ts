@@ -145,17 +145,19 @@ describe("the fuzz records starts and writes under their own kinds", () => {
 // ---------------------------------------------------------------------------
 
 describe("a fuzz case's triggers come from its spec, exactly", () => {
-  it("a plain case with a resolver has none", () => {
-    expect(specTriggers(spec())).toEqual([]);
-    expect(specTriggers(spec({ boundary: "skip" }))).toEqual([]);
+  it("a plain case with a resolver has only settleStop", () => {
+    expect(specTriggers(spec())).toEqual(["settleStop"]);
+    expect(specTriggers(spec({ boundary: "skip" }))).toEqual(["settleStop"]);
   });
 
   it("resolverRetry and resolverRetryLater need the strategy and a resolver", () => {
     expect(specTriggers(spec({ boundary: "retry" }))).toEqual([
       "resolverRetry",
+      "settleStop",
     ]);
     expect(specTriggers(spec({ boundary: "retry-later" }))).toEqual([
       "resolverRetryLater",
+      "settleStop",
     ]);
     expect(specTriggers(spec({ boundary: "retry" }, []))).toEqual([]);
     expect(specTriggers(spec({ boundary: "retry-later" }, []))).toEqual([]);
@@ -178,26 +180,43 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
   it("retryPolicy and timeout need a resolver with one", () => {
     expect(specTriggers(spec({}, [constraint({ retry: 1 })]))).toEqual([
       "retryPolicy",
+      "settleStop",
     ]);
     expect(specTriggers(spec({}, [constraint({ timeout: 10 })]))).toEqual([
       "timeout",
+      "settleStop",
     ]);
   });
 
+  it("resolverRejects needs a resolver that fails or can time out first; settleStop needs a resolver", () => {
+    expect(specTriggers(spec({}, [constraint({ fails: 1 })]))).toEqual([
+      "resolverRejects",
+      "settleStop",
+    ]);
+    // A timeout no longer than the wait can fire before the write.
+    expect(
+      specTriggers(spec({}, [constraint({ delay: 5, timeout: 5 })])),
+    ).toEqual(["timeout", "resolverRejects", "settleStop"]);
+    expect(
+      specTriggers(spec({}, [constraint({ delay: 5, timeout: 6 })])),
+    ).toEqual(["timeout", "settleStop"]);
+    // No resolver: neither.
+    expect(specTriggers(spec({}, []))).toEqual([]);
+  });
   it("restart needs a stop with a start after it and no destroy", () => {
     const steps = (...ops: Array<"stop" | "start" | "settle" | "destroy">) =>
       specTriggers(spec({ steps: ops.map((op) => ({ op })) }));
 
-    expect(steps("stop", "start")).toEqual(["restart"]);
-    expect(steps("stop", "settle", "start")).toEqual(["restart"]);
-    expect(steps("start", "stop", "start")).toEqual(["restart"]);
-    expect(steps("start", "stop")).toEqual([]);
-    expect(steps("start", "start")).toEqual([]);
-    expect(steps("destroy", "start")).toEqual([]);
+    expect(steps("stop", "start")).toEqual(["settleStop", "restart"]);
+    expect(steps("stop", "settle", "start")).toEqual(["settleStop", "restart"]);
+    expect(steps("start", "stop", "start")).toEqual(["settleStop", "restart"]);
+    expect(steps("start", "stop")).toEqual(["settleStop"]);
+    expect(steps("start", "start")).toEqual(["settleStop"]);
+    expect(steps("destroy", "start")).toEqual(["settleStop"]);
     // A destroy between the stop and the start: the start is ignored.
-    expect(steps("stop", "destroy", "start")).toEqual([]);
+    expect(steps("stop", "destroy", "start")).toEqual(["settleStop"]);
     // A destroyed system is never restarted, whatever follows.
-    expect(steps("destroy", "stop", "start")).toEqual([]);
+    expect(steps("destroy", "stop", "start")).toEqual(["settleStop"]);
   });
 
   const effect = {
@@ -216,8 +235,14 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
   };
 
   it("disable and throw are their strategies, on a resolver that exists", () => {
-    expect(specTriggers(spec({ boundary: "disable" }))).toEqual(["disable"]);
-    expect(specTriggers(spec({ boundary: "throw" }))).toEqual(["throw"]);
+    expect(specTriggers(spec({ boundary: "disable" }))).toEqual([
+      "settleStop",
+      "disable",
+    ]);
+    expect(specTriggers(spec({ boundary: "throw" }))).toEqual([
+      "settleStop",
+      "throw",
+    ]);
     // No resolver and no effect: the strategy applies to nothing.
     expect(specTriggers(spec({ boundary: "disable" }, []))).toEqual([]);
     expect(specTriggers(spec({ boundary: "throw" }, []))).toEqual([]);
@@ -226,13 +251,17 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
   it("disable also counts an effect; throw does not (effects skip then)", () => {
     expect(specTriggers(withEffect("disable", []))).toEqual(["disable"]);
     expect(specTriggers(withEffect("throw", []))).toEqual([]);
-    expect(specTriggers(withEffect("throw"))).toEqual(["throw"]);
+    expect(specTriggers(withEffect("throw"))).toEqual(["settleStop", "throw"]);
   });
 
   it("toScenario gives the case its triggers", () => {
     const s = spec({ boundary: "retry" }, [constraint({ timeout: 3 })]);
 
-    expect(toScenario(s).triggers).toEqual(["resolverRetry", "timeout"]);
+    expect(toScenario(s).triggers).toEqual([
+      "resolverRetry",
+      "timeout",
+      "settleStop",
+    ]);
   });
 });
 
