@@ -238,6 +238,53 @@ describe("(x): disable runs the cleanup at once", () => {
   });
 });
 
+describe('a cleanup that throws under onEffectError: "throw"', () => {
+  const throwing = (calls: { n: number }) =>
+    createSystem({
+      module: mod({
+        e: {
+          deps: ["a"],
+          run: (f: any) => {
+            calls.n += f.a === 0 ? 0 : 100;
+            return () => {
+              calls.n++;
+              throw new Error("cleanup boom");
+            };
+          },
+        },
+      }),
+      errorBoundary: { onEffectError: "throw" },
+    } as any) as any;
+
+  it("disable throws it to the caller, and the effect is off all the same (probe C6)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const calls = { n: 0 };
+    const system = throwing(calls);
+    system.start();
+    await flush();
+    expect(() => system.effects.disable("e")).toThrow("cleanup boom");
+    // 1.35 is off too (it runs the cleanup later, (x)).
+    expect(system.effects.isEnabled("e")).toBe(false);
+    system.facts.a = 1;
+    await flush();
+    expect(calls.n).toBe(1);
+    expect(() => system.destroy()).toThrow("cleanup boom");
+  });
+
+  it("the cleanup is kept and called again at destroy, as 1.35 does (probe C6)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const calls = { n: 0 };
+    const system = throwing(calls);
+    system.start();
+    await flush();
+    expect(() => system.effects.disable("e")).toThrow("cleanup boom");
+    expect(calls.n).toBe(1);
+    // 1.35's destroy calls the cleanup that threw and throws again.
+    expect(() => system.destroy()).toThrow("cleanup boom");
+    expect(calls.n).toBe(2);
+  });
+});
+
 describe("(y): after disable and enable, the effect wakes only on its own record", () => {
   it("declared deps: not on unrelated writes, nor for the write made while disabled", async () => {
     const log: unknown[] = [];

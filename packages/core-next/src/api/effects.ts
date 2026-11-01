@@ -65,6 +65,8 @@ interface EffectState {
   explicit: boolean;
   deps: Set<string> | null;
   cleanup: (() => void) | null;
+  /** Its cleanup is running: the boundary's "disable" does not start it again. */
+  cleaning_?: boolean;
   /** What the current run's `run` returned. */
   out_?: unknown;
 }
@@ -237,19 +239,24 @@ export function createEffectsManager<S extends Schema>(
   }
 
   function runCleanup(state: EffectState): void {
-    const cleanup = state.cleanup;
-    if (cleanup) {
-      // Cleared first: a throw reaches the boundary, whose "disable" runs
-      // the cleanup (x), which would otherwise call it again.
-      state.cleanup = null;
+    // A throw reaches the boundary, whose "disable" runs the cleanup (x): the
+    // guard stops it starting again. Cleared only after it returns, so one
+    // whose throw "throw" rethrows is kept and called again (1.35).
+    if (state.cleanup && !state.cleaning_) {
+      state.cleaning_ = true;
       try {
-        cleanup();
-      } catch (error) {
-        onError?.(state.id, error);
-        console.error(
-          `[Directive] Effect "${state.id}" cleanup threw an error:`,
-          error,
-        );
+        try {
+          state.cleanup();
+        } catch (error) {
+          onError?.(state.id, error);
+          console.error(
+            `[Directive] Effect "${state.id}" cleanup threw an error:`,
+            error,
+          );
+        }
+        state.cleanup = null;
+      } finally {
+        state.cleaning_ = false;
       }
     }
   }
@@ -472,10 +479,11 @@ export function createEffectsManager<S extends Schema>(
     },
     disable(id) {
       const state = get(id);
-      runCleanup(state);
-      // (y): the dependencies stay. observed_ skips a disabled effect, so the
-      // pass-end trim releases the derivations only it watched.
+      // Off before the cleanup: one that throws under "throw" cannot leave it
+      // on. (y): the dependencies stay. observed_ skips a disabled effect, so
+      // the pass-end trim releases the derivations only it watched.
       state.enabled = false;
+      runCleanup(state);
     },
     enable(id) {
       const state = get(id);
