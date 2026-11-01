@@ -5,6 +5,11 @@
 // the building esbuild: no second copy can drift from it.
 // With a built dist/index.js present, it is also minified and measured, as a
 // check that the measured number is what ships.
+// Budgets: the graph module, the `minimal`, `two-module` and `floor` fixtures
+// and the full entry each have a gzip budget in size-budgets.next.json at the
+// repo root. A measured size over its budget fails the run (any mode), naming
+// the fixture, its size, the budget and the overage. scripts/size-budgets-tighten.mjs
+// keeps those budgets from rising without a written reason.
 // Run from the package: `pnpm --filter @directive-run/core-next size`.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -12,6 +17,55 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import ts from "typescript";
+
+// The budgets are data (not constants here) so a pull request that raises one
+// shows up as a one-line diff next to its reason, and so the tighten-only check
+// can compare the file with the base branch's copy.
+const budgets = JSON.parse(
+  readFileSync(
+    new URL("../../../size-budgets.next.json", import.meta.url),
+    "utf8",
+  ),
+).budgets;
+for (const [key, entry] of Object.entries(budgets)) {
+  if (
+    typeof entry?.reason !== "string" ||
+    entry.reason.trim() === "" ||
+    !(entry.gzBudget === null || Number.isInteger(entry.gzBudget))
+  ) {
+    console.error(
+      `size-budgets.next.json "${key}" must be { gzBudget: <integer bytes or null>, reason: <non-empty string> }`,
+    );
+    process.exit(1);
+  }
+}
+const budgeted = new Set();
+// Records a measured min+gzip size against its budget. A null budget means
+// "reported, not budgeted" and is only allowed with a changed reason (see the
+// tighten-only check). A fixture with no entry fails: a new fixture must come
+// with its budget.
+function checkBudget(key, label, gz) {
+  budgeted.add(key);
+  const entry = budgets[key];
+  if (!entry) {
+    console.error(
+      `no budget for ${label} (${gz} B min+gzip): add "${key}" to size-budgets.next.json`,
+    );
+    process.exitCode = 1;
+
+    return;
+  }
+  if (entry.gzBudget !== null && gz > entry.gzBudget) {
+    console.error(
+      `OVER BUDGET: ${label} is ${gz} B min+gzip, budget ${entry.gzBudget} B, over by ${gz - entry.gzBudget} B (size-budgets.next.json "${key}"; raising it needs a new reason)`,
+    );
+    process.exitCode = 1;
+  }
+}
+const budgetText = (key) =>
+  budgets[key]?.gzBudget == null
+    ? "no budget"
+    : `budget ${budgets[key].gzBudget} B`;
 
 const require = createRequire(import.meta.url);
 const esbuildPath = createRequire(require.resolve("tsup")).resolve("esbuild");
@@ -190,12 +244,11 @@ const result = await build({
 });
 const code = result.outputFiles[0].contents;
 const gz = gzipSync(code, { level: 9 }).length;
-// Budget approved for the graph module. `--check` exits non-zero above it.
-const BUDGET = 1800;
+checkBudget("graph", "graph.ts", gz);
 console.log(
-  `graph.ts: ${code.length} B min, ${gz} B min+gzip (budget ${BUDGET} B, esbuild ${version} via tsup)`,
+  `graph.ts: ${code.length} B min, ${gz} B min+gzip (${budgetText("graph")}, esbuild ${version} via tsup)`,
 );
-// The L0b runtime: reported, not budgeted yet. Each entry bundles what it
+// The L0b runtime: reported, not budgeted. Each entry bundles what it
 // imports, tree-shaken, so "kernel (default)" is what `createKernel` alone
 // costs and "kernel (all features)" adds every opt-in piece.
 const src = new URL("../src/", import.meta.url).pathname;
@@ -272,7 +325,8 @@ if (existsSync(dist)) {
     `dist entry incl. chunks (${imported.length} imported): ${builtGz} B min+gzip (dist/index.js bundled, @directive-run/* external)`,
   );
 }
-// Fixtures, reported (no budget yet): each bundled for production
+// Fixtures, budgeted in size-budgets.next.json (the 1.35 lines are only
+// reported): each bundled for production
 // (`#is-development` inlined as in tsup, NODE_ENV is "production"),
 // minified and gzipped the same way. `@directive-run/core` is pointed at
 // core-next and at packages/core (1.35.x), each with its own build's options.
@@ -452,31 +506,46 @@ async function measure(label, contents, resolveDir, engine) {
     assertNoDevStrings(label, bytes);
   }
 
-  return `${bytes.length} B min, ${gzipSync(bytes, { level: 9 }).length} B min+gzip`;
+  const gz = gzipSync(bytes, { level: 9 }).length;
+
+  return { gz, text: `${bytes.length} B min, ${gz} B min+gzip` };
 }
 const minimal = readFileSync(join(fixtures, "minimal.ts"), "utf8");
 for (const [name, engine] of Object.entries(engines)) {
-  console.log(
-    `fixture minimal on ${name}: ${await measure("minimal", minimal, fixtures, engine)}`,
-  );
+  const m = await measure("minimal", minimal, fixtures, engine);
+  console.log(`fixture minimal on ${name}: ${m.text}`);
+  if (engine.mangleProps) {
+    checkBudget("minimal", "fixture minimal on core-next", m.gz);
+  }
 }
 // Two namespaced modules with a cross-module read (fixtures/two-module.ts).
 const twoModule = readFileSync(join(fixtures, "two-module.ts"), "utf8");
 for (const [name, engine] of Object.entries(engines)) {
-  console.log(
-    `fixture two-module on ${name}: ${await measure("two-module", twoModule, fixtures, engine)}`,
-  );
+  const m = await measure("two-module", twoModule, fixtures, engine);
+  console.log(`fixture two-module on ${name}: ${m.text}`);
+  if (engine.mangleProps) {
+    checkBudget("two-module", "fixture two-module on core-next", m.gz);
+  }
 }
 // The floor: the same app on the system core with no optional part (see
 // fixtures/floor.ts). core-next only: 1.35 has no such entry point.
 const floor = readFileSync(join(fixtures, "floor.ts"), "utf8");
-console.log(
-  `fixture floor on core-next: ${await measure("floor", floor, fixtures, engines["core-next"])}`,
+const floorSize = await measure("floor", floor, fixtures, engines["core-next"]);
+console.log(`fixture floor on core-next: ${floorSize.text}`);
+checkBudget("floor", "fixture floor on core-next", floorSize.gz);
+const fullEntry = await measure(
+  "full entry",
+  'export * from "@directive-run/core";',
+  fixtures,
+  engines["core-next"],
 );
-console.log(
-  `core-next full entry (every export): ${await measure("full entry", 'export * from "@directive-run/core";', fixtures, engines["core-next"])}`,
-);
-if (process.argv.includes("--check") && gz > BUDGET) {
-  console.error(`graph.ts is ${gz - BUDGET} B over the ${BUDGET} B budget`);
-  process.exit(1);
+console.log(`core-next full entry (every export): ${fullEntry.text}`);
+checkBudget("full-entry", "core-next full entry (every export)", fullEntry.gz);
+// A budget for something this script no longer measures would never fire.
+const unmeasured = Object.keys(budgets).filter((key) => !budgeted.has(key));
+if (unmeasured.length > 0) {
+  console.error(
+    `size-budgets.next.json has budgets size.mjs does not measure: ${unmeasured.join(", ")}`,
+  );
+  process.exitCode = 1;
 }
