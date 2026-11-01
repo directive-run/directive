@@ -50,6 +50,8 @@ export const FUZZ_TRIGGERS = [
   "constraintRetryLater",
   "retryPolicy",
   "timeout",
+  "resolverRejects",
+  "settleStop",
   "restart",
   "disable",
   "throw",

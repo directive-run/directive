@@ -109,7 +109,10 @@ the traces to agree.
   timeout error (`Resolver "<id>" timed out after <ms>ms`) is a `timeout`,
   any other an `aborted`: 1.35 never aborts a signal on a timeout, so a
   `timeout` record is 2.0's alone (row n), and it never pairs with a later
-  cancel-time `aborted`. PR CI runs the fixed seed for 205
+  cancel-time `aborted`. An effect's run and its cleanup are kinded the
+  same way, `["effect" | "cleanup", "<module>.x<index>", values read]`, so
+  an entry for an extra effect run does not depend on the effect's id.
+  PR CI runs the fixed seed for 205
   cases across every layer (`FUZZ_DEFAULT_RUNS`); the census fails fewer than
   200 compared (`lib/fuzz.ts` `FUZZ_FLOOR`) or more than max(1% of cases, 2)
   runaways — and `.github/workflows/diff-fuzz-nightly.yml` runs 5,000 from a
@@ -254,6 +257,8 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `constraintRetryLater` | `errorBoundary.onConstraintError` is `"retry-later"` and the case has a constraint. Never set today: the model always passes `"skip"` |
 | `retryPolicy` | some resolver has a `retry` policy (more than one attempt) |
 | `timeout` | some resolver has a `timeout` |
+| `resolverRejects` | some resolver can reject: it fails at least once (`fails` > 0), or its `timeout` is no longer than its wait (`delay`), so the timeout can fire before it writes |
+| `settleStop` | the case has a resolver. A settle step leaves its `settle()` waiting only when its drive gives up (500 timer jumps) with a run in flight or re-dispatched, and a `stop`, `destroy` or the teardown's `destroy()` always follows a settle step (every case ends with one), so the spec cannot narrow it further |
 | `restart` | the steps have a `stop` with a `start` after it and no `destroy` anywhere before that `start` (1.35 ignores `start()` after `destroy()`) |
 | `disable` | some `errorBoundary` strategy is `"disable"` and the case has what it applies to: a resolver (`onResolverError`) or an effect (`onEffectError`) |
 | `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |

@@ -540,12 +540,16 @@ function moduleDef(
       ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
       run: (fs: any) => {
         const seen = e.reads.map((k) => own(fs)[f(k)]);
-        external([`${id}.x${i}`, seen]);
+        // An effect's run and its cleanup are recorded under their own kind
+        // ("effect", "cleanup"; the effect's tag is data[1]), the same on
+        // every engine, as resolver records are: under one kind per effect
+        // tag, a quirk that adds runs (row p) needed an entry per tag.
+        external(["effect", `${id}.x${i}`, seen]);
         if (e.throwsAt !== null && seen[0] === e.throwsAt) {
           throw new Error(`${id}.x${i} throws at ${seen[0]}`);
         }
         if (e.cleanup) {
-          return () => external([`${id}.x${i}`, "cleanup", seen]);
+          return () => external(["cleanup", `${id}.x${i}`, seen]);
         }
 
         return undefined;
@@ -637,6 +641,27 @@ const TRIGGERS = {
   /** Some resolver has a timeout. */
   timeout: (spec) =>
     spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)),
+  /**
+   * Some resolver can reject: it throws on its first `fails` attempts
+   * (`fails` > 0), or it has a timeout no longer than its wait (`delay`), so
+   * the timeout can fire before it writes. A resolver's outcome can be an
+   * error only then, which row b needs (an error and a cancel for one run).
+   */
+  resolverRejects: (spec) =>
+    spec.modules.some((m) =>
+      m.constraints.some(
+        (c) => c.fails > 0 || (c.timeout !== null && c.timeout <= c.delay),
+      ),
+    ),
+  /**
+   * A settle() can still be waiting when stop() or destroy() runs (row z):
+   * the case has a resolver. A settle step's settle() is left waiting only
+   * when its drive gives up (500 timer jumps, diff/scenario.ts `drive`)
+   * while a run is in flight or re-dispatched, and a stop or destroy always
+   * follows a settle step: every case ends with one, then the teardown's
+   * destroy(). So the spec cannot narrow this further than "has a resolver".
+   */
+  settleStop: (spec) => hasConstraint(spec),
   /**
    * The steps have a `stop` step and, later, a `start` step with no
    * `destroy` step between them. A destroyed system is never restarted

@@ -320,41 +320,14 @@
   },
   {
     "group": "quirk-t",
-    "why": "Seed 2's ceiling phase: a pass retracts a run after it reported complete, before it left flight; 1.35 also reports a cancel (row t, third path).",
+    "why": "Row t's third path, built from the hand scenario \"a run retracted after it reported complete: complete, then cancel\": r0's own write retracts c0 while r1 completes in the same tick. Since #301 no resolver can reject here, so no quirk-b stop (ends) comes first; the seed-2 case it replaces now ends at b's extra error.",
     "spec": {
       "modules": [
         {
-          "facts": 1,
-          "date": true,
-          "derivations": [
-            {
-              "facts": [0],
-              "derived": [],
-              "threshold": 0,
-              "throwsAt": 8
-            },
-            {
-              "facts": [0],
-              "derived": [],
-              "threshold": 6,
-              "throwsAt": null
-            },
-            {
-              "facts": [0],
-              "derived": [1],
-              "threshold": 6,
-              "throwsAt": 7
-            }
-          ],
+          "facts": 2,
+          "date": false,
+          "derivations": [],
           "events": [
-            {
-              "target": 0,
-              "add": true
-            },
-            {
-              "target": 0,
-              "add": false
-            },
             {
               "target": 0,
               "add": false
@@ -363,25 +336,83 @@
           "constraints": [
             {
               "fact": 0,
-              "atLeast": 2,
+              "atLeast": 1,
               "crossAtLeast": null,
               "priority": 0,
               "writes": 0,
-              "value": -1,
+              "value": 0,
               "delay": 1,
-              "fails": 1,
-              "retry": 1,
+              "fails": 0,
+              "retry": 0,
               "timeout": null
             },
             {
               "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 1,
+              "value": 5,
+              "delay": 1,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 0
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        }
+      ]
+    }
+  },
+  {
+    "group": "quirk-z",
+    "why": "Seed 3 at 5,000 cases (shrunk): the last settle step's settle() is still waiting at the teardown's destroy(); 1.35 keeps its maxWait timer, 2.0 resolved it (row z).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
               "atLeast": 4,
               "crossAtLeast": null,
-              "priority": 1,
+              "priority": 0,
               "writes": 0,
-              "value": 0,
+              "value": 4,
               "delay": 20,
-              "fails": 0,
+              "fails": 2,
               "retry": 0,
               "timeout": 10
             },
@@ -391,82 +422,125 @@
               "crossAtLeast": null,
               "priority": 1,
               "writes": 0,
-              "value": 6,
-              "delay": 1,
-              "fails": 2,
-              "retry": 0,
-              "timeout": 50
+              "value": 4,
+              "delay": 20,
+              "fails": 1,
+              "retry": 1,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 10
             }
           ],
           "effects": [
             {
               "reads": [0],
               "explicitDeps": false,
-              "cleanup": false,
-              "throwsAt": 4
+              "cleanup": true,
+              "throwsAt": null
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 4,
+              "delay": 5,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": 3,
+              "priority": 2,
+              "writes": 0,
+              "value": 4,
+              "delay": 0,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 6
+            },
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": null
             }
           ],
           "source": null
         }
       ],
-      "boundary": "throw",
+      "boundary": null,
       "history": false,
       "trace": false,
       "steps": [
         {
-          "op": "tick"
+          "op": "advance",
+          "ms": 200
         },
         {
           "op": "advance",
-          "ms": 1500
-        },
-        {
-          "op": "tick"
+          "ms": 25
         },
         {
           "op": "dispatch",
           "module": 0,
-          "event": 1397286281,
-          "value": -1
+          "event": 60616005,
+          "value": 3
         },
         {
           "op": "advance",
           "ms": 200
         },
         {
-          "op": "dispatch",
+          "op": "set",
           "module": 0,
-          "event": 1268345284,
+          "fact": 578270400,
           "value": 3
-        },
-        {
-          "op": "advance",
-          "ms": 1
         },
         {
           "op": "set",
           "module": 0,
-          "fact": 717863401,
-          "value": 0
-        },
-        {
-          "op": "batch",
-          "module": 0,
-          "writes": [[250824855, 4], [750604705, 1], [1798772623, 3]]
-        },
-        {
-          "op": "tick"
-        },
-        {
-          "op": "batch",
-          "module": 0,
-          "writes": [[729987248, -1]]
-        },
-        {
-          "op": "dispatch",
-          "module": 0,
-          "event": 1236644929,
-          "value": 3
+          "fact": 154124259,
+          "value": 4
         }
       ]
     }
