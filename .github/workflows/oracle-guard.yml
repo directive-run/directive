@@ -34,6 +34,13 @@ name: Oracle guard
 #   it posts the guard's result as a check run named `oracle-guard` on the
 #   head sha the guard actually evaluated. A check run made with GITHUB_TOKEN
 #   belongs to the GitHub Actions app, which is what the required check pins.
+# - ⚠ THE DISPATCHED PATH'S BOUNDARY IS WRITE ACCESS, NOT THIS FILE.
+#   `workflow_dispatch` runs this workflow as it exists on the ref it is
+#   dispatched from, so a same-repo branch carrying an edited copy could post
+#   its own `oracle-guard` result. That is no new capability: anyone with
+#   write access can already push a workflow that posts a check by name.
+#   Forks cannot dispatch. The pull_request_target path above still runs the
+#   base branch's copy and is the one a PR cannot rewrite.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
