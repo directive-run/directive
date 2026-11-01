@@ -21,7 +21,7 @@
     "namespaced modules keep their facts apart": "L1",
     "an effect's write is blocked (facts are read-only in effects)": "L1",
     "an effect sees the previous facts in prev": "L1",
-    "data-form when, on and comparison operators": "L4",
+    "data-form when, on and comparison operators": "L11",
     "namespaced events, wildcard subscriptions and cross-module reads": "L1",
     "single-module facts, derive and events proxies under reflection": "L1",
     "namespaced facts, derive and events proxies under reflection": "L1",
@@ -83,7 +83,7 @@
     "stop() from a module's onResolverError: error, then cancel": "L3",
     "a run retracted after it reported complete: complete, then cancel": "L2",
     "deps at startup: an effect runs once on start, then on its deps only": "L4",
-    "an `on` predicate gates an effect; derived values read inside run": "L4",
+    "an `on` predicate gates an effect; derived values read inside run": "L11",
     "effects disable, enable and run in declaration order": "L4",
     "effects: deps, prev, cleanup and auto-tracking": "L4",
     "effects: a throwing effect goes to the boundary and keeps running": "L4",
@@ -496,6 +496,9 @@
       "rule": "L4"
     },
     "tests/core/effect-reconcile-boundaries.test.ts": {
+      "rule": "L4"
+    },
+    "tests/core/l4-effects-oracle.test.ts": {
       "rule": "L4"
     },
     "tests/core/sources.test.ts": {

@@ -851,6 +851,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l4-effects-oracle.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
     "category": "black-box",
     "cases": 30,
