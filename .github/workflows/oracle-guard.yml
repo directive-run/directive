@@ -86,11 +86,6 @@ jobs:
             "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-event.json"
           echo "base_sha=$(jq -r .base.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
-          # The runner pins GITHUB_EVENT_PATH (a step cannot override it), and
-          # the guard reads that file, so replace the dispatch payload with the
-          # rebuilt one. Data only; nothing from the PR is executed.
-          cp "$RUNNER_TEMP/pr-event.json" "$GITHUB_EVENT_PATH"
-          echo "DEBUG $GITHUB_EVENT_PATH"; ls -l "$GITHUB_EVENT_PATH" "$RUNNER_TEMP"; jq -c keys "$GITHUB_EVENT_PATH"
 
       # The base branch, never the PR head.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,7 +102,17 @@ jobs:
       # The base's own lockfile; no lifecycle scripts.
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - run: pnpm --filter @directive-run/conformance oracle:guard --pr
+      - name: Run the guard
+        run: |
+          set -euo pipefail
+          # Dispatch only. The runner pins GITHUB_EVENT_PATH (a step cannot
+          # point it elsewhere) and rewrites that file before every step, so
+          # replace the dispatch payload with the rebuilt one inside this
+          # step. Data only; nothing from the PR is executed.
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            cp "$RUNNER_TEMP/pr-event.json" "$GITHUB_EVENT_PATH"
+          fi
+          pnpm --filter @directive-run/conformance oracle:guard --pr
         env:
           GH_TOKEN: ${{ github.token }}
 
