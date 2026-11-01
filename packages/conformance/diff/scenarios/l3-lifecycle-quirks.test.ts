@@ -239,4 +239,81 @@ suite("L3 lifecycle quirks of 1.35", () => {
     }),
     [...runThenLook],
   );
+
+  // Row t, third path (found by the fuzz at L3; diff/fuzz/pinned.json): a
+  // reconcile pass retracts a run after the run reported complete but before
+  // it left flight. r0's own write (f0 = 0) retracts c0, while r1 completes
+  // in the same tick. 1.35 then also reports a cancel for r0; 2.0 reports
+  // the completion only. No stop() is involved: constraints and resolvers.
+  scenario(
+    "a run retracted after it reported complete: complete, then cancel",
+    ({ core: { createModule, t }, external }) => ({
+      module: createModule("m", {
+        schema: {
+          facts: { f0: t.number(), f1: t.number() },
+          derivations: {},
+          events: { e0: { v: t.number() } },
+          requirements: { A0: {}, A1: {} },
+        },
+        init: (facts: any) => {
+          facts.f0 = 0;
+          facts.f1 = 0;
+        },
+        events: {
+          e0: (facts: any, payload: any) => {
+            facts.f0 = payload.v;
+          },
+        },
+        constraints: {
+          c0: { when: (facts: any) => facts.f0 >= 1, require: { type: "A0" } },
+          c1: { when: (facts: any) => facts.f0 >= 0, require: { type: "A1" } },
+        },
+        resolvers: {
+          r0: {
+            requirement: "A0",
+            resolve: async (_req: unknown, context: any) => {
+              external(["start", "r0"]);
+              await wait(1);
+              context.facts.f0 = 0;
+              external(["wrote", "r0"]);
+            },
+          },
+          r1: {
+            requirement: "A1",
+            resolve: async (_req: unknown, context: any) => {
+              external(["start", "r1"]);
+              await wait(1);
+              context.facts.f1 = 5;
+              external(["wrote", "r1"]);
+            },
+          },
+        },
+      }),
+    }),
+    [
+      { op: "start" },
+      {
+        op: "run",
+        label: "f0 = 1",
+        fn: (system) => {
+          system.facts.f0 = 1;
+        },
+      },
+      {
+        op: "run",
+        label: "f0 = 0",
+        fn: (system) => {
+          system.facts.f0 = 0;
+        },
+      },
+      {
+        op: "run",
+        label: "dispatch e0 { v: 1 }",
+        fn: (system) => system.dispatch({ type: "e0", v: 1 }),
+      },
+      { op: "settle" },
+      { op: "checkpoint", label: "settled" },
+      { op: "destroy" },
+    ],
+  );
 });

@@ -26,6 +26,8 @@
       "tests/core/blackbox-derivations.test.ts": [
         "a derivation is cached until something it read changes > composed derivations share one compute of their input",
         "a derivation is cached until something it read changes > reads twice with one compute",
+        "a derivation that reads itself > throws on read and recovers once the cycle is gone",
+        "a derivation that reads itself > two derivations reading each other throw rather than hang",
         "a throwing derivation > keeps working for the dependants of a recovered derivation",
         "a throwing derivation > rethrows to the reader, reports to plugins, and recovers",
         "reading a derivation that does not exist > throws a message that names the problem",
@@ -45,6 +47,7 @@
         "an effect that keeps waking itself > runs each follow-up pass on its own microtask"
       ],
       "tests/core/blackbox-effects-readonly.test.ts": [
+        "a reported write reaches the error boundary too > the boundary's callback sees the effect id",
         "an in-place change to a nested fact > a nested read leaves no complaint behind",
         "an in-place change to a nested fact > is reported for an async auto-tracked effect",
         "an in-place change to a nested fact > is reported for an auto-tracked effect",
@@ -69,7 +72,12 @@
         "a throwing effect > an async rejection is reported",
         "a throwing effect > an auto-tracked effect re-tracks what it reads after an error",
         "a throwing effect > does not need a plugin or a boundary",
+        "a throwing effect > does not stop the others, and is reported after every body has run",
+        "a throwing effect > is reported before an async neighbour settles",
         "a throwing effect > is reported to plugins and the console, naming the effect",
+        "a throwing effect > is routed to the error boundary's callback with the error and id",
+        "a throwing effect > the retry strategy recovers when the retry succeeds",
+        "a throwing effect > the retry strategy runs it again, a bounded number of times",
         "an effect that can read prevFacts is handed them > a namespaced effect gets prev when its own run takes it",
         "an effect that can read prevFacts is handed them > a namespaced effect that ignores prev still runs",
         "an effect that can read prevFacts is handed them > when it has a bound function",
@@ -123,6 +131,8 @@
         "cleanup > destroy() runs pending cleanups",
         "cleanup > runs before the next run, once, and not again",
         "cleanup > stop() runs every pending cleanup, once",
+        "data-form on > rejects a value that is not a predicate, by what it is",
+        "declared dependencies > a derivation name runs the effect when the derivation changes",
         "declared dependencies > a fact name among unresolved ones keeps working",
         "declared dependencies > an empty deps array means the effect never runs for a change",
         "effects after a history navigation > an onNavigate skip effect still runs for a real change",
@@ -389,6 +399,7 @@
         "a resolver that fails after satisfying its requirement > passes on the original error",
         "constraint re-evaluation > a when that threw is woken by the write that fixes it",
         "constraint re-evaluation > an async when without deps is evaluated on every pass",
+        "constraint re-evaluation > retry-later re-evaluates the constraint that threw",
         "constraint re-evaluation > start() re-evaluates every constraint"
       ],
       "tests/core/data-forms-namespaced.test.ts": [
@@ -407,22 +418,32 @@
         "the derivation dependency namespace > rejects a fact key carrying the separator",
         "the derivation dependency namespace > rejects it mid-name, not only in front"
       ],
+      "tests/core/derivation-dep-wake-rate.test.ts": [
+        "what actually wakes a derivation-dep effect > same-value writes to the derivation's input",
+        "what actually wakes a derivation-dep effect > unrelated fact writes vs the derivation's own input"
+      ],
       "tests/core/derivation-deps.test.ts": [
         "a fact and a derivation with the same name > does not re-evaluate a fact-gated constraint when the derivation goes stale",
         "a fact and a derivation with the same name > does not re-run a fact-gated effect when the derivation goes stale",
         "a fact and a derivation with the same name > keeps an explicit dep that names a fact working",
         "a fact and a derivation with the same name > keeps re-evaluating an async constraint that never reads the derivation",
+        "a fact and a derivation with the same name > keeps waking an effect whose body never reads the derivation it named",
         "a fact and a derivation with the same name > re-evaluates an async constraint whose explicit deps name a derivation",
+        "a fact and a derivation with the same name > re-runs an effect whose explicit deps name a derivation",
         "a fact and a derivation with the same name > still invalidates a derivation that reads the like-named fact",
         "derivation dependencies > leaves a system whose constraints read only facts unchanged",
         "derivation dependencies > re-evaluates a constraint gated only on a derivation",
         "derivation dependencies > re-runs an effect that reads a derivation and no facts",
         "invalidation cost > announces a derivation going stale once, not once per later write",
         "invalidation cost > does not pay for the size of a graph nothing is watching",
+        "invalidation cost > keeps waking a watcher while the derivation it named stays stale",
         "invalidation cost > says nothing about a derivation no dependency set names"
       ],
       "tests/core/derivation-hold-reentrancy.test.ts": [
-        "derivation hold re-entrancy > still announces once per batch when nothing nests"
+        "a nested batch cannot release its parent's hold > announces once per batch even when a plugin batches inside the broadcast",
+        "a nested batch cannot release its parent's hold > does not let a listener observe a value before every plugin has seen it",
+        "derivation hold re-entrancy > still announces once per batch when nothing nests",
+        "derivation hold re-entrancy > survives a plugin that opens a batch from inside onFactsBatch"
       ],
       "tests/core/derive-reach-back-warning.test.ts": [
         "reaching for a derivation where a module name belongs > does not fire in a single-module system, where the read is correct",
@@ -448,6 +469,7 @@
         "docs/derivations.md — the example on that page must keep compiling > compiles and composes"
       ],
       "tests/core/effect-deps-startup.test.ts": [
+        "startup + wake behaviour by dep kind > derivation dep",
         "startup + wake behaviour by dep kind > fact dep"
       ],
       "tests/core/effect-readonly-facts.test.ts": [
@@ -469,7 +491,9 @@
         "cutting a self-waking chain > keeps a write that is not the chain's own",
         "effect facts types > forbid assigning a fact in a single module",
         "effect facts types > forbid assigning a fact in every namespace",
-        "the retired legacy effect-writes key > grants nothing: an effect carrying it still cannot write"
+        "the retired legacy effect-writes key > grants nothing: an effect carrying it still cannot write",
+        "the retry strategy for an effect > re-runs the failed effect until it succeeds",
+        "the retry strategy for an effect > stops after three retries in a row"
       ],
       "tests/core/engine.test.ts": [
         "constraint-binding (RFC-0003) — engine integration > `abortOn` on an async constraint is ignored — the clobber lands",
@@ -484,6 +508,7 @@
         "constraint-binding (RFC-0003) — engine integration > the binding prevents tail-clobber end-to-end through createSystem",
         "effects and the reconcile boundary > delivers a synchronous effect-phase write, with no async effect and no resolver in sight",
         "effects and the reconcile boundary > delivers a write arriving from outside the system while the phase is open",
+        "effects and the reconcile boundary > delivers it to an effect gated on a derivation the write invalidates",
         "effects and the reconcile boundary > gives a fact written during the effects phase to the constraints and to the effects",
         "Engine — Batch > system.batch() coalesces fact mutations",
         "Engine — Constraints & Resolvers > constraint when returning false creates no requirement",
@@ -495,6 +520,7 @@
         "Engine — Derivations > derive functions auto-track dependencies",
         "Engine — Dev Warnings > warns when fact and derivation share the same name",
         "Engine — Effects > effects run when their tracked facts change",
+        "Engine — Error Boundary > error boundary onError callback is invoked",
         "Engine — Error Boundary > system catches resolver errors and does not crash",
         "Engine — Events > dispatch fires event handler which mutates facts",
         "Engine — Events > dispatch with payload passes data to handler",
@@ -505,6 +531,7 @@
         "Engine — Facts > facts proxy reads and writes values",
         "Engine — Facts > facts.$snapshot returns an untracked snapshot accessor",
         "Engine — Facts > facts.$store.batch() batches multiple changes to the same key",
+        "Engine — initialFacts > initialFacts overrides module init values",
         "Engine — Inspect > inspect returns constraints info",
         "Engine — Inspect > inspect returns resolverDefs info",
         "Engine — Inspect > inspect shows inflight resolvers when running",
@@ -512,9 +539,14 @@
         "Engine — Lifecycle > does not fire onResolverError when resolver succeeds",
         "Engine — Lifecycle > double start is a no-op",
         "Engine — Lifecycle > double stop is a no-op",
+        "Engine — Lifecycle > fires onInit hook during initialization",
+        "Engine — Lifecycle > fires onResolverError hook when a resolver throws after retries",
+        "Engine — Lifecycle > fires onStart hook on start()",
+        "Engine — Lifecycle > fires onStop hook on stop()",
         "Engine — Lifecycle > init function runs and sets initial facts",
         "Engine — Lifecycle > initialize() can be called before start() for SSR",
         "Engine — Lifecycle > isInitialized is true after start",
+        "Engine — Lifecycle > isolates errors thrown from inside onResolverError",
         "Engine — Lifecycle > system starts stopped (isRunning false)",
         "Engine — Lifecycle > system.destroy() cleans up the system",
         "Engine — Lifecycle > system.start() sets isRunning true",
@@ -525,6 +557,7 @@
         "Engine — onSettledChange > onSettledChange fires when settlement status changes",
         "Engine — Read > system.read(key) returns current derivation value",
         "Engine — Read > system.read(key) updates after fact change",
+        "Engine — Security > $ prefix keys in schema throw",
         "Engine — Security > BLOCKED_PROPS in dispatch event type is silently ignored",
         "Engine — Security > BLOCKED_PROPS in events definition throws",
         "Engine — Security > BLOCKED_PROPS keys in schema throw",
@@ -553,7 +586,8 @@
         "exotic objects in facts > still warns about a nested mutation of a plain object"
       ],
       "tests/core/fact-origin-at-write.test.ts": [
-        "fact origin is stamped at the write > delivers the rest of a batch when an observer throws"
+        "fact origin is stamped at the write > delivers the rest of a batch when an observer throws",
+        "fact origin is stamped at the write > labels hydrated state as hydration, not as something the program did"
       ],
       "tests/core/fact-set-listener-isolation.test.ts": [
         "a throwing subscriber is contained > keeps notifying the subscribers that did not throw",
@@ -869,16 +903,34 @@
         "a resolver that wrote the fact its constraint reads > alone in changing what the constraint reads: finishes, is not canceled",
         "a resolver that wrote the fact its constraint reads > two resolvers that between them end their constraint's requirements: neither is canceled",
         "a resolver's error strategy and its module hook > a module with other hooks but no onResolverError reports no hook failure",
+        "a resolver's error strategy and its module hook > a throwing onResolverError hook is reported with the module's id, and the system carries on",
+        "a resolver's error strategy and its module hook > the module's onResolverError hook is given an Error, the requirement and the facts",
         "a source with a dangerous key is refused, naming where it is > a dangerous key in sources",
+        "module hooks that are only partly filled in > a module with onStart but no onStop stops and destroys, sync and async",
+        "module hooks that are only partly filled in > destroy() and destroyAsync() of a running system call the module's onStop once",
         "settle() that gives up says what it was waiting for > a settle that is not stuck does not mention resolvers or requirements",
         "settle() that gives up says what it was waiting for > names the resolver still running and the requirement that is unmet",
         "stopping a system ends what is in flight > stop() and stopAsync() abort a resolver that is still running"
       ],
+      "tests/core/l3-engine-oracle-clusters.test.ts": [
+        "a constraint whose abortOn lists no facts > is not bound: its run is aborted when the requirement is retracted",
+        "destroy() with a resolver in flight > a settlement listener hears nothing after destroy()",
+        "retry-later with a constraint and a resolver both waiting > a resolver that shares the constraint's name and is skipped does not stop the retry",
+        "retry-later with a constraint and a resolver both waiting > each is retried as itself: the throwing constraint is asked again",
+        "stopAsync() and retry-later > a retry waiting at stopAsync() does not come back after a restart",
+        "two abort-bound resolvers started by one pass > the second may not overwrite the first's write to a fact they both bind",
+        "when() > stops asking its predicate once it has resolved",
+        "when() > with a timeout, resolving first means it never rejects later",
+        "when() that times out > rejects, and stops asking its predicate after that"
+      ],
       "tests/core/l3-engine-oracle-effect-chain.test.ts": [
         "after the cut > onSettledChange hears that the system settled",
+        "stop() and start() start the chain over > counts the chain from zero again, so a restart gets the same length as a fresh start",
         "the cut drops only what the chain carried > a write made while an async effect awaits does not restart the chain's count",
         "the cut drops only what the chain carried > drops the derivation changes the chain carried: a later unrelated write does not replay them",
         "the cut drops only what the chain carried > keeps a write that is not the chain's own",
+        "the retry strategy for an effect > an ordinary write gives a failing effect its retries back",
+        "the retry strategy for an effect > retries a failing effect three times in a row, then leaves it until its next change",
         "what counts as a chain > a chain whose every pass also carries a write made outside the effects is never cut",
         "what counts as a chain > a long run of ordinary writes, each answered by an effect's write, is never cut"
       ],
@@ -886,6 +938,13 @@
         "inspect() lists the definitions > lists each constraint, with abortOn only when it names facts",
         "inspect() lists the definitions > names every fact, event, derivation, effect and module",
         "inspect() lists the definitions > names the requirement a resolver answers, and marks a predicate"
+      ],
+      "tests/core/l3-engine-oracle-lifecycle-pins.test.ts": [
+        "namespaced module onStart > a module with no onStart does not stop the ones after it",
+        "namespaced module onStart > every module's onStart runs on start(), in registration order",
+        "readiness timing > isReady is false for the whole first pass and true only once it has ended",
+        "readiness timing > stays ready after stop(), and a restart is still ready from its first pass",
+        "readiness timing > whenReady() is one shared promise while it waits"
       ],
       "tests/core/l3-engine-oracle-own-write.test.ts": [
         "onReconcileEnd > lists a retracted requirement whose run is no longer in flight, with a resolver id",
@@ -895,8 +954,17 @@
       ],
       "tests/core/l3-engine-oracle.test.ts": [
         "a resolver's own write is told apart from the writes around it > a resolver that ends its requirement by writing the fact its constraint reads completes once, after earlier outside writes to that fact",
+        "error boundary strategies > a module's onResolverError hook hears the error and requirement; a throwing hook is isolated",
         "error boundary strategies > a resolver error in a module with no hooks does not break the system",
+        "error boundary strategies > a resolver that fails under disable turns its constraint off",
         "error boundary strategies > a resolver that fails under skip is run again for its next requirement",
+        "error boundary strategies > a throwing constraint is reported, and disable stops asking it",
+        "error boundary strategies > an effect that fails once under retry runs again and then stops",
+        "error boundary strategies > an effect that keeps throwing under retry is retried a bounded number of times, then waits for its next change",
+        "error boundary strategies > an effect that throws under disable stops running",
+        "error boundary strategies > retry-later asks a throwing constraint again after the delay",
+        "error boundary strategies > retry-later chosen by a function, with no retryLater config, still polls (default delay)",
+        "error boundary strategies > retry-later gives a failed resolver's requirement another pass after its delay, not before",
         "error boundary strategies > skip leaves a throwing constraint in place, so it is asked again",
         "error boundary strategies > skip starts no retry-later polling",
         "error boundary strategies > stop() drops a pending retry-later",
@@ -906,10 +974,20 @@
         "initialize, reserved names, effect chains and settle(maxWait) > settle(maxWait) rejects when a resolver never finishes; a settle that resolves leaves no timer",
         "lifecycle: each transition happens once and is announced once > a pass scheduled just before stop() does not run after it",
         "lifecycle: each transition happens once and is announced once > destroy() stops a running system first, then announces the destroy once",
+        "lifecycle: each transition happens once and is announced once > destroyAsync() stops, then announces the destroy once",
         "lifecycle: each transition happens once and is announced once > start() after destroy() is refused: no start hooks and no work",
+        "lifecycle: each transition happens once and is announced once > start() twice starts once: one onStart for plugins and for modules",
+        "lifecycle: each transition happens once and is announced once > stop() before start() does nothing; on a running system it announces once",
+        "lifecycle: each transition happens once and is announced once > stopAsync() announces to plugins and modules once and runs effect cleanups",
         "lifecycle: each transition happens once and is announced once > stopAsync() on a module with no hooks resolves",
         "ordinary dispatches are not mistaken for navigation re-runs > an ordinary dispatch after start does not warn",
+        "readiness > isReady is false before start, and whenReady() before start rejects",
+        "readiness > whenReady() right after start resolves for every caller once the first pass is done",
+        "readiness and polling after the first pass > stop() and stopAsync() end retry-later polling at once",
+        "readiness and polling after the first pass > whenReady() first called after the system is ready resolves at once",
         "resolver keys and system.notify > a resolver's key decides which requirements are the same run",
+        "resolver keys and system.notify > notify.guardrailBlocked reaches plugins only for a registered plugin name",
+        "resolver keys and system.notify > notify.guardrailCoverage reaches plugins until destroy; with no plugins notify is silent",
         "settling > a resolver whose own write retracts its requirement completes and is never canceled",
         "settling > isSettled is false while a pass is scheduled and while a resolver is in flight",
         "settling > onSettledChange hears the system become busy, and nothing after unsubscribing",
@@ -926,10 +1004,40 @@
         "watch, when and subscribe > when() with a timeout rejects once it passes; a zero timeout never rejects"
       ],
       "tests/core/l3-errors-oracle.test.ts": [
+        "retry-later > a resolver that succeeds clears its retry budget and its waiting retry",
+        "retry-later > honours delayMs, backoffMultiplier, maxRetries and maxDelayMs",
+        "retry-later > retries a failing constraint after a growing delay, then gives up with a skip",
+        "retry-later > starts the budget over once it has given up",
         "retry-later > stop() discards retries that were waiting",
+        "retry-later remembers attempts for a bounded number of sources > keeps the attempt counts of the first 1000 sources and forgets the oldest after that",
+        "the development warning for an error nothing handles > a handler function counts as handling it, even one that returns nothing",
+        "the development warning for an error nothing handles > errorBoundary.onError counts as handling it",
+        "the development warning for an error nothing handles > is silent when the constraint source has an option, and speaks when only the other sources do",
+        "the development warning for an error nothing handles > is silent when the derivation source has an option, and speaks when only the other sources do",
+        "the development warning for an error nothing handles > is silent when the resolver source has an option, and speaks when only the other sources do",
         "the development warning for an error nothing handles > remembers the first 1000 sources it spoke about and forgets the oldest after that",
         "the development warning for an error nothing handles > speaks once for each constraint, resolver and derivation that throws, never for an effect",
         "the development warning for an error nothing handles > stays quiet about a failure that came after the run had satisfied its requirement",
+        "what an observer is told > a DirectiveError names the source, the id, the cause and whether it is recoverable",
+        "what an observer is told > a DirectiveError the code threw itself reaches observers as that object, and the strategy follows the place it was thrown",
+        "what an observer is told > an observer that throws is contained: the failure is logged and recovery still happens",
+        "what an observer is told > plugins hear each source's own error hook, and a module hook hears resolver failures",
+        "what each strategy does > disable on a resolver disables the constraint that required it",
+        "what each strategy does > disable stops a constraint from being evaluated again; skip does not",
+        "what each strategy does > disable stops an effect from running again; skip does not",
+        "what each strategy does > retry is reported for a failed resolver, which runs again the next time its requirement is raised",
+        "what each strategy does > retry makes the next read of a failed derivation compute it again",
+        "what each strategy does > retry runs a failed effect again without waiting for a change",
+        "what each strategy does > throw raises the DirectiveError to whoever read the derivation",
+        "what each strategy does > throw stops the pass and reports the DirectiveError from a failing constraint",
+        "what each strategy does > throw stops the pass and reports the DirectiveError from a failing effect",
+        "which strategy a source gets > a handler function receives the thrown error and the id; a string it returns is the strategy",
+        "which strategy a source gets > a handler that throws is logged and the error is skipped",
+        "which strategy a source gets > a value that is not an Error is reported by its string form",
+        "which strategy a source gets > an option set for the constraint source changes that source and no other",
+        "which strategy a source gets > an option set for the derivation source changes that source and no other",
+        "which strategy a source gets > an option set for the effect source changes that source and no other",
+        "which strategy a source gets > an option set for the resolver source changes that source and no other",
         "which strategy a source gets > skips by default, for every source, and the system keeps running"
       ],
       "tests/core/l3-proxies-oracle-gates.test.ts": [
@@ -1035,6 +1143,11 @@
         "containers check every element against every constraint > a tuple checks length, position and constraints",
         "containers check every element against every constraint > an array of constrained elements",
         "containers check every element against every constraint > an object shape with a constrained member",
+        "each builder names its type > a wrapper around a type with no name calls it unknown",
+        "each builder names its type > a wrapper names what it wraps",
+        "each builder names its type > enum lists its values and literal shows its value",
+        "each builder names its type > the container builders",
+        "each builder names its type > the scalar and format builders",
         "enum > a valid enum and a valid tuple are built without a warning",
         "enum > accepts only its listed strings",
         "nullable and optional keep the inner constraints > nullable accepts null and a value the inner type accepts",
@@ -1052,21 +1165,35 @@
         "a system that is never started > namespaced: is not reported once initialized",
         "a system that is never started > namespaced: is not reported once started",
         "a system that is never started > namespaced: is not reported under NODE_ENV=test",
+        "a system that is never started > namespaced: is reported once, in development",
+        "a system that is never started > namespaced: is reported where there is no process",
         "a system that is never started > single: is not reported once initialized",
         "a system that is never started > single: is not reported once started",
         "a system that is never started > single: is not reported under NODE_ENV=test",
+        "a system that is never started > single: is reported once, in development",
+        "a system that is never started > single: is reported where there is no process",
+        "a system that is never started, where process has no env > namespaced: is still reported",
+        "a system that is never started, where process has no env > single: is still reported",
         "createSystem refuses options that cannot build a system > a lone module definition passed as modules is refused, not run",
         "createSystem refuses options that cannot build a system > a module may be registered under the namespace id",
         "createSystem refuses options that cannot build a system > a module may be registered under the namespace schema",
         "createSystem refuses options that cannot build a system > a module that is null is refused the same way",
         "createSystem refuses options that cannot build a system > a module that is undefined is refused the same way",
         "createSystem refuses options that cannot build a system > an empty object: an Error of the library's own, not a runtime TypeError",
+        "createSystem refuses options that cannot build a system > nothing at all: an Error of the library's own, not a runtime TypeError",
+        "createSystem refuses options that cannot build a system > null: an Error of the library's own, not a runtime TypeError",
         "createSystem refuses options that cannot build a system > options naming neither module nor modules: an Error of the library's own, not a runtime TypeError",
         "crossModuleDeps diagnostics in development > a dependency on a module that does not exist warns once; the system still runs",
         "crossModuleDeps diagnostics in development > a dependency on a module that exists, or none at all, does not warn",
         "crossModuleDeps diagnostics in development > a module depending on itself warns once",
+        "crossModuleDeps diagnostics in development > single module: declared crossModuleDeps are ignored, with a warning",
         "crossModuleDeps diagnostics in development > single module: none declared, or an empty set, is quiet",
         "initialFacts in a namespaced system > a known namespace with no facts changes nothing",
+        "initialFacts in a namespaced system > a module may be named constructor, but initialFacts under that name are still dropped, with a warning in development",
+        "initialFacts in a namespaced system > applies each known namespace's facts at start",
+        "initialFacts in a namespaced system > ignores a blocked namespace name such as __proto__, with a warning in development",
+        "initialFacts in a namespaced system > ignores a namespace the system does not have, with a warning in development",
+        "initialFacts in a namespaced system > refuses facts carrying a prototype-pollution key when the system starts",
         "module initialization order > \"declaration\" follows the order the modules were written in",
         "module initialization order > a cycle that does not start at the first module names only the cycle",
         "module initialization order > a dependency on a module that does not exist is ignored when ordering, whatever its name",
@@ -1079,11 +1206,29 @@
         "the events view of a single-module system > cannot be written, deleted, redefined or re-parented",
         "the events view of a single-module system > knows no symbol and no prototype-chain name",
         "the events view of a single-module system > names the module's events and nothing else",
+        "the status properties > namespaced: enumerable, configurable accessors",
+        "the status properties > namespaced: follow the lifecycle",
+        "the status properties > namespaced: meta is an enumerable, configurable value",
+        "the status properties > single: enumerable, configurable accessors",
+        "the status properties > single: follow the lifecycle",
+        "the status properties > single: meta is an enumerable, configurable value",
         "tickMs > destroy() ends the tick as stop() does",
         "tickMs > is quiet when any one module has a tick handler, or no tickMs is set: namespaced",
         "tickMs > is quiet when the module has a tick handler, or no tickMs is set: single",
+        "tickMs > namespaced: tick goes to the first module that has one, not to the others",
+        "tickMs > namespaced: zero and negative values are refused, positive and absent ones are not",
+        "tickMs > single: dispatches tick every tickMs once started, and stops with the system",
+        "tickMs > single: zero and negative values are refused, positive and absent ones are not",
+        "tickMs > warns, in development, that no tick handler exists: namespaced",
+        "tickMs > warns, in development, that no tick handler exists: single",
         "tickMs > without a tick event there is no interval to run",
+        "zeroConfig > an errorBoundary given alongside wins over the zeroConfig defaults",
+        "zeroConfig > skips an error from each kind of source, without the unhandled-error warning",
         "zeroConfig > without zeroConfig the same errors skip too, but development says so once per source"
+      ],
+      "tests/core/l8-system-oracle.test.ts": [
+        "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
+        "hydrate() data in a single-module system > is applied over initialFacts when it is clean"
       ],
       "tests/core/module.test.ts": [
         "createModule — pivot-name conflict > does NOT throw when fact keys do not collide",
@@ -1143,6 +1288,12 @@
         "a resolver mutating a dependency module's value in place > is reported for a Map changed in place",
         "an effect mutating a collection or date in place > is reported for a Map, a Set and a Date"
       ],
+      "tests/core/notify-guardrail-blocked.test.ts": [
+        "system.notify.guardrailBlocked —  > caps reentry depth to prevent infinite recursion through the broadcast fabric",
+        "system.notify.guardrailBlocked —  > drops + warns when called with an unknown plugin name (forgery defense)",
+        "system.notify.guardrailBlocked —  > emits the typed event when plugin name matches a registered plugin",
+        "system.notify.guardrailBlocked —  > is a no-op after destroy"
+      ],
       "tests/core/nullable-equality.test.ts": [
         "nullable() equality — item 10 reproduction > derivation reading two nullable facts via &&/|| compose correctly",
         "nullable() equality — item 10 reproduction > derivation that reads nullable fact narrows correctly after null assignment",
@@ -1201,7 +1352,8 @@
         "a loading flag survives a failure after satisfying > a loading guard in when: timeout plus retry does not deadlock (L3)",
         "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)",
         "a loading flag survives a failure after satisfying > satisfied, then timed out: the finally lands (L4)",
-        "constraint errors > a require() that throws keeps what it read (H1)"
+        "constraint errors > a require() that throws keeps what it read (H1)",
+        "constraint errors > retry-later retries with no retryLater config (H4)"
       ],
       "tests/core/resolver-outcomes.test.ts": [
         "resolver outcomes > a canceled run that returns normally reports only the cancel",
@@ -1330,6 +1482,14 @@
         "history.snapshotEvents > dev warning for invalid history.snapshotEvents entries"
       ],
       "tests/core/ssr.test.ts": [
+        "SSR > hydrate() after start() throws > throws when called after start",
+        "SSR > hydrate() before start() round-trip > applies hydrated facts on start",
+        "SSR > hydrate() before start() round-trip > hydrated facts take precedence over initialFacts",
+        "SSR > hydrate() before start() round-trip > works with sync loader",
+        "SSR > isPrototypeSafe validation in single-module hydrate() > allows clean hydrated facts",
+        "SSR > isPrototypeSafe validation in single-module hydrate() > skips hydrated facts with __proto__ key",
+        "SSR > isPrototypeSafe validation in single-module hydrate() > skips hydrated facts with constructor key",
+        "SSR > isPrototypeSafe validation in single-module hydrate() > top-level isPrototypeSafe throws for initialFacts with dangerous keys",
         "SSR > settle() timeout behavior > resolves when system has no async work",
         "SSR > settle() timeout behavior > settle() with timeout rejects on slow resolvers"
       ],
@@ -1339,9 +1499,11 @@
         "late writes from runs no longer in flight still land > a timed-out run's late write lands after its replacement (K2, resolver's job to guard)",
         "late writes from runs no longer in flight still land > canceled, re-dispatched, new run guarded on loading: the old finally lands (M2)",
         "late writes from runs no longer in flight still land > timed out, re-dispatched, new run guarded on loading: the old finally lands (M3)",
-        "the retry-later poller > does not keep the process alive"
+        "the retry-later poller > does not keep the process alive",
+        "the retry-later poller > stops polling once nothing is left to retry (K5)"
       ],
       "tests/core/system-async-lifecycle.test.ts": [
+        "RFC 0009 async lifecycle — single-module createSystem > system.destroyAsync() exists and tears down without error",
         "RFC 0009 async lifecycle — single-module createSystem > system.stopAsync() exists, returns a Promise, and tears down without error"
       ],
       "tests/core/system-facts-derived.test.ts": [
@@ -1354,6 +1516,7 @@
         "Config Forwarding > errorBoundary config forwarded",
         "Config Forwarding > plugins array forwarded to engine",
         "Config Forwarding > plugins forwarded in single module mode",
+        "Config Forwarding > trace config forwarded",
         "Config Forwarding > zeroConfig applies defaults",
         "Cross-Module Dependencies > derivation can read facts from another module via crossModuleDeps",
         "dispatch() > dispatch forwards to engine in namespaced mode",
@@ -1362,10 +1525,15 @@
         "Engine Passthrough Methods > inspect returns system state",
         "Engine Passthrough Methods > isSettled reflects engine state",
         "Engine Passthrough Methods > onSettledChange fires on settlement changes",
+        "InitialFacts & Hydration > hydrate applies facts before start in namespaced mode",
+        "InitialFacts & Hydration > hydrate throws if called after start",
+        "InitialFacts & Hydration > initialFacts applied on start in namespaced mode",
+        "InitialFacts & Hydration > initialFacts applied on start in single module mode",
         "Namespace Validation > throws when a single module is passed to modules: instead of module:",
         "Namespace Validation > throws when module name contains '::'",
         "Namespace Validation > throws when modules is an array",
         "Namespace Validation > throws when schema key contains '::'",
+        "Namespace Validation > throws when tickMs is zero or negative",
         "Namespaced Module Mode > _mode is 'namespaced'",
         "Namespaced Module Mode > dispatches namespaced events",
         "Namespaced Module Mode > events.auth.logout works",
@@ -1441,7 +1609,8 @@
         "timerOps integration with virtualClock > repeat fires every interval"
       ],
       "tests/core/trace.test.ts": [
-        "Trace > returns cached array on repeat access without changes (E1)"
+        "Trace > returns cached array on repeat access without changes (E1)",
+        "Trace > returns null when trace is not enabled"
       ],
       "tests/core/tracking-frame-kind.test.ts": [
         "the watched set counts external readers only > does not count a derivation composing through system.derive"
@@ -1470,6 +1639,7 @@
     },
     "conformance:v2:prod": {
       "tests/core/blackbox-effects-production.test.ts": [
+        "effects in production > a retried failing effect does not warn when the retries run out",
         "effects in production > does not warn about an async effect that read nothing",
         "effects in production > drops a write quietly when nobody is listening",
         "effects in production > drops a write to facts, reports it to plugins, and does not throw",
@@ -1509,6 +1679,8 @@
         "constraints in production > still rejects an `after` cycle when the system is created"
       ],
       "tests/core/l3-errors-oracle-production.test.ts": [
+        "the error boundary in production > a failing effect under retry gives up silently once its retries are used",
+        "the error boundary in production > retry-later gives up silently once its attempts are used",
         "the error boundary in production > skips an unhandled error from a constraint, a resolver and a derivation without a word"
       ],
       "tests/core/l3-proxies-oracle-production.test.ts": [
@@ -1522,7 +1694,11 @@
         "createSystem diagnostics in production > a dependency on a module that does not exist, or on itself, is not reported",
         "createSystem diagnostics in production > a system that is never started is not reported",
         "createSystem diagnostics in production > crossModuleDeps ignored by a single module are not reported",
+        "createSystem diagnostics in production > initialFacts for an unknown or blocked namespace are dropped without a report",
         "createSystem diagnostics in production > tickMs with no tick handler is not reported, single or namespaced"
+      ],
+      "tests/core/l8-system-oracle-production.test.ts": [
+        "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly"
       ],
       "tests/core/multi-module-correctness.prod.test.ts": [
         "production build > ignores a resolver's $store write to a dependency key without throwing",

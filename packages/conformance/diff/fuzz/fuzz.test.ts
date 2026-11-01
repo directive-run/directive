@@ -41,6 +41,7 @@
  * census) whenever v2 has built a layer.
  */
 
+import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -60,7 +61,20 @@ import {
   runScenario,
   tallyCase,
 } from "../scenario.js";
-import { specArbitrary, toScenario } from "./model.js";
+import { type FuzzSpec, specArbitrary, toScenario } from "./model.js";
+
+/**
+ * Cases the ceiling phase runs before its random ones (fast-check
+ * `examples`), on every seed: each shows one approved quirk whose fuzz
+ * group (diff/divergences.json `group`) the fixed seed's random cases never
+ * reach, so the census's stale check sees that group used on every PR run,
+ * and finds it stale the day 2.0 stops showing the quirk.
+ */
+const PINNED = (
+  JSON.parse(
+    readFileSync(new URL("./pinned.json", import.meta.url), "utf8"),
+  ) as { group: string; spec: FuzzSpec }[]
+).map((p) => [p.spec] as [FuzzSpec]);
 
 const SEED = Number(process.env.DIFF_FUZZ_SEED ?? 0x5eed);
 const RUNS = Number(process.env.DIFF_FUZZ_RUNS ?? FUZZ_DEFAULT_RUNS);
@@ -85,6 +99,7 @@ describe("differential fuzz", () => {
         runs: RUNS,
         seed: SEED,
         arbitrary: specArbitrary(),
+        examples: [] as [FuzzSpec][],
       },
       ...(current === null
         ? []
@@ -94,6 +109,7 @@ describe("differential fuzz", () => {
               runs: upToCurrent,
               seed: CEILING_SEED,
               arbitrary: specArbitrary({ ceiling: current }),
+              examples: PINNED,
             },
           ]),
     ];
@@ -119,7 +135,12 @@ describe("differential fuzz", () => {
                 );
               }
             }),
-            { seed: phase.seed, numRuns: phase.runs, endOnFailure: false },
+            {
+              seed: phase.seed,
+              numRuns: phase.runs,
+              endOnFailure: false,
+              examples: phase.examples,
+            },
           );
         } catch (error) {
           if (error instanceof Error) {

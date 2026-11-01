@@ -616,20 +616,38 @@ const TRIGGERS = {
   /** Some resolver has a timeout. */
   timeout: (spec) =>
     spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)),
-  /** The steps have a `stop` step with a `start` step after it. */
+  /**
+   * The steps have a `stop` step and, later, a `start` step with no
+   * `destroy` step between them. A destroyed system is never restarted
+   * (1.35 ignores start() after destroy), so a `destroy` before the stop
+   * rules it out too.
+   */
   restart: (spec) => {
-    const stop = spec.steps.findIndex((s) => s.op === "stop");
+    let stopped = false;
+    for (const s of spec.steps) {
+      if (s.op === "destroy") {
+        return false;
+      }
+      if (s.op === "stop") {
+        stopped = true;
+      } else if (s.op === "start" && stopped) {
+        return true;
+      }
+    }
 
-    return (
-      stop >= 0 && spec.steps.slice(stop + 1).some((s) => s.op === "start")
-    );
+    return false;
   },
-  /** Some error-boundary strategy is "disable" (resolvers and effects). */
-  disable: (_spec, boundary) =>
-    Object.values(boundary ?? {}).some((v) => strategy(v) === "disable"),
-  /** Some error-boundary strategy is "throw" (resolvers; effects skip). */
-  throw: (_spec, boundary) =>
-    Object.values(boundary ?? {}).some((v) => strategy(v) === "throw"),
+  /**
+   * Some error-boundary strategy is "disable" and the case has what it
+   * applies to (`hasTarget`): a resolver or an effect, as the model passes
+   * it to both.
+   */
+  disable: (spec, boundary) => usesStrategy(spec, boundary, "disable"),
+  /**
+   * Some error-boundary strategy is "throw" and the case has what it applies
+   * to (resolvers; the model passes "skip" to effects then).
+   */
+  throw: (spec, boundary) => usesStrategy(spec, boundary, "throw"),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -637,6 +655,38 @@ const TRIGGERS = {
 
 function hasConstraint(spec: FuzzSpec): boolean {
   return spec.modules.some((m) => m.constraints.length > 0);
+}
+
+/**
+ * Whether the case has anything an error-boundary key applies to. Every
+ * resolver belongs to one constraint, so a resolver exists when a
+ * constraint does. A key this table does not know throws rather than guess.
+ */
+function hasTarget(spec: FuzzSpec, key: string): boolean {
+  switch (key) {
+    case "onResolverError":
+    case "onConstraintError":
+      return hasConstraint(spec);
+    case "onEffectError":
+      return spec.modules.some((m) => m.effects.length > 0);
+    case "onDerivationError":
+      return spec.modules.some((m) => m.derivations.length > 0);
+    default:
+      throw new Error(
+        `specTriggers: no target is known for the error-boundary key ${key}; add it to hasTarget first`,
+      );
+  }
+}
+
+/** Some strategy is `name` and the case has what that strategy applies to. */
+function usesStrategy(
+  spec: FuzzSpec,
+  boundary: Record<string, unknown> | undefined,
+  name: "disable" | "throw",
+): boolean {
+  return Object.entries(boundary ?? {}).some(
+    ([key, value]) => strategy(value) === name && hasTarget(spec, key),
+  );
 }
 
 /** The triggers a case has (`TRIGGERS` above), in `FUZZ_TRIGGERS` order. */

@@ -1,7 +1,9 @@
 /**
  * L3: retry-later really re-running, readiness, SSR hydrate, the plugin
- * API (order, an async onInit, a throwing hook), notify.* channels
- * (guardrail, clobber loop), async stop/destroy, evict, settle(maxWait).
+ * API (order, an async onInit, a throwing hook), the guardrail notify.*
+ * channels, async stop/destroy, settle(maxWait). Two scenarios use a feature
+ * a later layer builds and are placed there in layers.rules.json: the
+ * clobber-loop notify.* channels (L12) and evict (L10).
  */
 
 import { type BuildContext, scenario, suite } from "../scenario.js";
@@ -175,7 +177,7 @@ suite("L3 lifecycle and the plugin API", () => {
   );
 
   scenario(
-    "notify: guardrail and clobber-loop channels reach plugins",
+    "notify: guardrail channels reach plugins",
     (ctx) => ({ module: worker(ctx, 0) }),
     [
       { op: "start" },
@@ -199,6 +201,15 @@ suite("L3 lifecycle and the plugin API", () => {
           );
         },
       },
+      { op: "settle" },
+    ],
+  );
+
+  scenario(
+    "notify: clobber-loop channels reach plugins",
+    (ctx) => ({ module: worker(ctx, 0) }),
+    [
+      { op: "start" },
       {
         op: "run",
         label: "clobber loop notifications",
@@ -218,7 +229,34 @@ suite("L3 lifecycle and the plugin API", () => {
   );
 
   scenario(
-    "async stop and destroy wait for in-flight runs; evict",
+    "async stop and destroy wait for in-flight runs",
+    (ctx) => ({ module: worker(ctx, 0, 30) }),
+    [
+      { op: "start" },
+      { op: "set", key: "go", value: true },
+      { op: "advance", ms: 5 },
+      {
+        op: "run",
+        label: "stopAsync",
+        fn: async (system, { external }) => {
+          await system.stopAsync();
+          external(["stopped", system.isRunning ?? null]);
+        },
+      },
+      { op: "start" },
+      {
+        op: "run",
+        label: "destroyAsync",
+        fn: async (system, { external }) => {
+          await system.destroyAsync();
+          external("destroyed");
+        },
+      },
+    ],
+  );
+
+  scenario(
+    "async stop, evict and destroy",
     (ctx) => ({ module: worker(ctx, 0, 30) }),
     [
       { op: "start" },
