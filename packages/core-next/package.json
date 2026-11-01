@@ -64,6 +64,7 @@
     "bench:system": "pnpm --filter @directive-run/core build && pnpm --filter @directive-run/core-next build && node bench/system/run.mjs",
     "size": "node scripts/size.mjs",
     "size:check": "node scripts/size.mjs --check",
+    "size:tighten": "node scripts/size-budgets-tighten.mjs",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

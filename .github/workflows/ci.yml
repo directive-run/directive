@@ -77,9 +77,21 @@ jobs:
       # the budget intentionally when shipping a deliberate new feature.
       - run: pnpm size
 
-      # The 2.0 graph module's gzip budget (scripts/size.mjs). Runs after the
-      # build so it also reports the built dist/index.js beside the source.
+      # The 2.0 gzip budgets in size-budgets.next.json (scripts/size.mjs): the
+      # graph module, the fixtures and the full entry. Runs after the build so it
+      # also reports the built dist/index.js beside the source.
       - run: pnpm --filter @directive-run/core-next size:check
+
+      # Tighten-only: a pull request may not raise a 2.0 size budget unless the
+      # entry's `reason` changes in the same pull request. Compares with the base
+      # branch; pushes to main have no base and compare nothing.
+      - name: Size budgets only tighten
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          pnpm --filter @directive-run/core-next size:tighten "origin/${BASE_REF}"
 
       # Ratchet: no new `as any` casts on system objects in packages/ai/src.
       - run: pnpm check:ai-casts

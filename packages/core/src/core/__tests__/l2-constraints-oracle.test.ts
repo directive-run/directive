@@ -1408,3 +1408,111 @@ describe("disable and enable", () => {
     system.destroy();
   });
 });
+
+describe("a derivation read only through a membership test", () => {
+  const ask = (name: string) => (_facts: any, derived: any) =>
+    name in derived ? 1 : 0;
+
+  /**
+   * One module: facts a and b, the given derivations, and a constraint whose
+   * `when` reads only `read(derived)` and never fires. Returns what each
+   * `when` call saw, grouped by the step that caused it: the first start, then
+   * a = 1, a = 2, a = 3, b = 1, a = 4.
+   */
+  async function evaluations(
+    derive: Record<string, (facts: any, derived: any) => unknown>,
+    read: (derived: any) => unknown,
+  ) {
+    const seen: unknown[] = [];
+    const mod = createModule("members", {
+      schema: {
+        facts: { a: t.number(), b: t.number() },
+        derivations: Object.fromEntries(
+          Object.keys(derive).map((name) => [name, t.any()]),
+        ),
+        events: {},
+        requirements: { R: {} },
+      },
+      init: (facts: any) => {
+        facts.a = 0;
+        facts.b = 0;
+      },
+      derive,
+      constraints: {
+        c: {
+          when: (_facts: any, derived: any) => {
+            seen.push(read(derived));
+
+            return false;
+          },
+          require: { type: "R" },
+        },
+      },
+    } as never);
+    const system = createSystem({ module: mod } as never) as any;
+    const steps: unknown[][] = [];
+    const take = () => steps.push(seen.splice(0));
+    system.start();
+    await system.settle();
+    take();
+    for (const [fact, value] of [
+      ["a", 1],
+      ["a", 2],
+      ["a", 3],
+      ["b", 1],
+      ["a", 4],
+    ] as const) {
+      system.facts[fact] = value;
+      await system.settle();
+      take();
+    }
+    system.destroy();
+
+    return steps;
+  }
+
+  it("is asked again on every change of the derivation, not only the first", async () => {
+    expect(
+      await evaluations(
+        { d: (facts: any) => facts.a + 1 },
+        (derived) => "d" in derived,
+      ),
+    ).toEqual([[true], [true], [true], [true], [], [true]]);
+  });
+
+  it("wakes a derivation that only asks, and the constraint that reads it, on every change", async () => {
+    expect(
+      await evaluations(
+        { d: (facts: any) => facts.a + 1, asks: ask("d") },
+        (derived) => derived.asks,
+      ),
+    ).toEqual([[1], [1], [1], [1], [], [1]]);
+  });
+
+  it("wakes the constraint through two askers of one derivation on every change", async () => {
+    expect(
+      await evaluations(
+        {
+          d: (facts: any) => facts.a + 1,
+          asks1: ask("d"),
+          asks2: (_facts: any, derived: any) => ("d" in derived ? 2 : 0),
+          top: (_facts: any, derived: any) => derived.asks1 + derived.asks2,
+        },
+        (derived) => derived.top,
+      ),
+    ).toEqual([[3], [3], [3], [3], [], [3]]);
+  });
+
+  it("wakes the constraint when the asker is read by value further down", async () => {
+    expect(
+      await evaluations(
+        {
+          d: (facts: any) => facts.a + 1,
+          asks: ask("d"),
+          down: (_facts: any, derived: any) => derived.asks * 10,
+        },
+        (derived) => derived.down,
+      ),
+    ).toEqual([[10], [10], [10], [10], [], [10]]);
+  });
+});

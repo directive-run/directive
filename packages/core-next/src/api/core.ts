@@ -570,6 +570,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   function invalidate(keys: readonly string[]): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
+    let told: Set<ReactiveNode> | undefined;
     try {
       for (const key of keys) {
         for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
@@ -587,6 +588,9 @@ export function createSystemCore<const M extends ModuleSchema>(
                 // Still stale, so nothing below it moves, but a body that
                 // named it in its deps hears every change upstream (1.35).
                 changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
+              }
+              if (d.asked_) {
+                tell(d.asked_, (told ??= new Set()));
               }
               continue;
             }
@@ -626,6 +630,30 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     } finally {
       release();
+    }
+  }
+
+  /**
+   * Whoever asked whether a stale derivation exists was computed without
+   * computing it, so it sits live behind the frontier the walk stops at.
+   * 1.35's drain walks past that frontier to it and everything it feeds
+   * (derivations.ts collectInvalidated), without staling any of them: wake
+   * their readers, mark nothing.
+   */
+  function tell(asked: ReactiveNode, told: Set<ReactiveNode>): void {
+    const stack = [asked];
+    while (stack.length > 0) {
+      for (let s = stack.pop()!.subs; s; s = s.nextSub) {
+        const d = byNode.get(s.target);
+        if (d && !told.has(s.target)) {
+          told.add(s.target);
+          changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
+          stack.push(s.target);
+          if (d.asked_) {
+            stack.push(d.asked_);
+          }
+        }
+      }
     }
   }
 
@@ -748,6 +776,14 @@ export function createSystemCore<const M extends ModuleSchema>(
         }
         tracker.deps?.add(DERIVATION_DEP_PREFIX + d.id_);
         graph.read((d.asked_ ??= graph.signal(0)));
+        // A constraint or effect asking (a tracked frame outside the graph:
+        // a derivation computes as a graph node, so `graph.active` is it)
+        // watches the target, as 1.35's observer reader does (derivations.ts
+        // :817–819): left stale, it still wakes the asker on every change
+        // upstream. A derivation asking is an edge, not a watcher.
+        if (tracker.deps && !graph.active) {
+          watched.add(d.id_);
+        }
 
         return true;
       },

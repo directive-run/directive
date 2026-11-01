@@ -755,6 +755,10 @@
         "inspect() reports each constraint > shows whether a constraint is active, how many times it was, and when it last was"
       ],
       "tests/core/l2-constraints-oracle.test.ts": [
+        "a derivation read only through a membership test > is asked again on every change of the derivation, not only the first",
+        "a derivation read only through a membership test > wakes a derivation that only asks, and the constraint that reads it, on every change",
+        "a derivation read only through a membership test > wakes the constraint through two askers of one derivation on every change",
+        "a derivation read only through a membership test > wakes the constraint when the asker is read by value further down",
         "after > after a restart asks constraints of equal priority dependencies first",
         "after > does not wait for a named constraint that is disabled",
         "after > does not wait for a named constraint whose require threw",
