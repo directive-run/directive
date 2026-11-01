@@ -76,6 +76,7 @@
     "async stop and destroy wait for in-flight runs": "L3",
     "async stop, evict and destroy": "L10",
     "settle(maxWait) gives up on a resolver that never finishes": "L3",
+    "settle() pending across stop() and destroy()": "L3",
     "a timer completed while paused: elapsed time after the clock moves": "L3",
     "a second start() arms a second tick interval, and stop() leaves one running": "L3",
     "start() after destroy() arms a tick interval on its own": "L3",

@@ -309,4 +309,36 @@ suite("L3 lifecycle and the plugin API", () => {
       { op: "stop" },
     ],
   );
+
+  // Row z (owner-approved 2026-11-01): a settle() still waiting when stop()
+  // and then destroy() run. 1.35 leaves it waiting, keeps its maxWait timer
+  // through destroy(), and rejects it once the wait runs out; 2.0 resolves it
+  // at stop(), with no timer left and no late rejection. The resolver waits
+  // a minute, so only the lifecycle can end the settle() here.
+  scenario(
+    "settle() pending across stop() and destroy()",
+    (ctx) => ({ module: worker(ctx, 0, 60_000) }),
+    [
+      { op: "start" },
+      { op: "set", key: "go", value: true },
+      {
+        op: "run",
+        label: "settle() left waiting",
+        fn: (system, { external }) => {
+          // Not awaited: the outcome is recorded at the step it lands in.
+          system.settle().then(
+            () => external(["settle", "resolved"]),
+            () => external(["settle", "rejected"]),
+          );
+        },
+      },
+      { op: "advance", ms: 100 },
+      { op: "stop" },
+      { op: "checkpoint", label: "stopped" },
+      { op: "advance", ms: 100 },
+      { op: "destroy" },
+      { op: "advance", ms: 6_000 },
+      { op: "checkpoint", label: "after the wait would have run out" },
+    ],
+  );
 });
