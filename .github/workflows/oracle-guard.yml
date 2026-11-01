@@ -86,6 +86,10 @@ jobs:
             "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-event.json"
           echo "base_sha=$(jq -r .base.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          # The runner pins GITHUB_EVENT_PATH (a step cannot override it), and
+          # the guard reads that file, so replace the dispatch payload with the
+          # rebuilt one. Data only; nothing from the PR is executed.
+          cp "$RUNNER_TEMP/pr-event.json" "$GITHUB_EVENT_PATH"
 
       # The base branch, never the PR head.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,8 +109,6 @@ jobs:
       - run: pnpm --filter @directive-run/conformance oracle:guard --pr
         env:
           GH_TOKEN: ${{ github.token }}
-          # On dispatch, read the rebuilt payload; otherwise the real event.
-          GITHUB_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && format('{0}/pr-event.json', runner.temp) || github.event_path }}
 
   # Dispatch only. Posts the guard's result on the PR head as the required
   # `oracle-guard` check. Checks out and runs nothing from the PR.
