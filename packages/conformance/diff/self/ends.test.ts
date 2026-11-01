@@ -6,8 +6,11 @@
  * hand scenarios still check after it."). Each test proves one edge of how
  * wide that is: what is still reported before and at the stop, what is not
  * after it, that an ordinary entry, another engine and a hand scenario never
- * stop, that a difference in the same gap as the stop, in the other trace,
- * is still compared, that the census accepts `ends` only on a signed, narrow
+ * stop, that a difference in the same gap as the stop (between the same two
+ * matched records, in either trace) is past it too (Jason, 2026-11-01:
+ * "ends entries also dropping differences beside the stop"), but only when
+ * an `ends` entry made the stop in a case with its trigger, and that one
+ * before the gap is still compared, that the census accepts `ends` only on a signed, narrow
  * fuzz entry (engine "v2", an op, a path for "changed"; `when`, proved in
  * precision.test.ts) and finds it stale
  * when it never stopped a case, and that an ended case still counts toward
@@ -215,22 +218,47 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
       [entry("q-ends", "q", { ends: true, op: "missing" })],
     );
 
-    // r and r2 are the candidate's records in place of q: the same gap
-    // (no matched record between them and q), so neither is after it and
-    // both are still compared, and fail. q2 is after q in the reference;
-    // step 1's d and e come after the quirk in both traces.
-    expect(shown(result.unexplained)).toEqual([
-      "v2 r extra step 0",
-      "v2 r2 extra step 0",
+    // r and r2 are the candidate's records in place of q: the same gap (no
+    // matched record between them and q), so both are beside the stop and
+    // past it. q2 is after q in the reference; step 1's d and e come after
+    // the quirk in both traces.
+    expect(result.unexplained).toEqual([]);
+    expect(result.ended[0]).toMatchObject({ id: "q-ends", dropped: 5 });
+  });
+
+  it("an uncovered difference before the stop's gap is still reported, in either trace", () => {
+    // y (candidate) and z (reference) are before a, the matched record that
+    // opens q's gap; w is in the gap, beside q.
+    const reference = trace([
+      ["z", 0],
+      ["a", 0],
+      ["q", 0],
+      ["c", 0],
     ]);
-    expect(result.ended[0]).toMatchObject({ id: "q-ends", dropped: 3 });
+    const candidate = trace([
+      ["y", 0],
+      ["a", 0],
+      ["w", 0],
+      ["c", 0],
+    ]);
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(reference, candidate, "v2"),
+      [entry("q-ends", "q", { ends: true, op: "missing" })],
+    );
+
+    expect(shown(result.unexplained).sort()).toEqual([
+      "v2 y extra step 0",
+      "v2 z missing step 0",
+    ]);
+    expect(result.ended[0]).toMatchObject({ id: "q-ends", dropped: 1 });
   });
 
   // The reviewer's case (PR #296): the stop is a missing hook in the
   // reference; the candidate has, in the same gap, a covered extra x and
-  // then an uncovered notify y. Counted past the last matched record, y
-  // (2) looks later than the stop (1), but those counts are of two
-  // different traces: nothing orders y after the quirk, so it is reported.
+  // then an uncovered notify y. Nothing orders y after the quirk, but it is
+  // beside it, in the same gap, so an `ends` stop drops it (and x); an
+  // ordinary entry, or a case without the `ends` entry's trigger, does not.
   const onError: TraceEntry = { k: "hook", hook: "onError", args: [] };
   const notifyY: TraceEntry = { k: "notify", id: "y", value: 1 };
   const ext = (tag: string): TraceEntry => ({ k: "external", data: [tag, 0] });
@@ -240,7 +268,7 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
     { k: "async", i: 0 },
   ];
 
-  it("a difference in the same gap as the stop, in the other trace, is still reported (candidate side)", () => {
+  it("a difference in the same gap as the stop, in the other trace, is past it (candidate side)", () => {
     const reference = flat(ext("a"), onError, ext("b"));
     const candidate = flat(ext("a"), ext("x"), notifyY, ext("b"));
     const result = explain(
@@ -249,12 +277,58 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
       [entry("x", "x"), ends("onError-ends", "onError", { stream: "hook" })],
     );
 
-    expect(shown(result.unexplained)).toEqual(["v2 y extra step 0"]);
-    expect(result.used.sort()).toEqual(["onError-ends", "x"]);
-    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 0 });
+    expect(result.unexplained).toEqual([]);
+    expect(result.used).toEqual(["onError-ends"]);
+    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 2 });
   });
 
-  it("a difference in the same gap as the stop, in the other trace, is still reported (reference side)", () => {
+  it("control: with an ordinary entry for the same difference, the same-gap difference is reported", () => {
+    const reference = flat(ext("a"), onError, ext("b"));
+    const candidate = flat(ext("a"), ext("x"), notifyY, ext("b"));
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(reference, candidate, "v2"),
+      [
+        entry("x", "x"),
+        entry("onError", "onError", {
+          stream: "hook",
+          engine: "v2",
+          op: "missing",
+        }),
+      ],
+    );
+
+    expect(shown(result.unexplained)).toEqual(["v2 y extra step 0"]);
+    expect(result.used.sort()).toEqual(["onError", "x"]);
+    expect(result.ended).toEqual([]);
+  });
+
+  it("in a case without the `ends` entry's trigger nothing stops, and the same-gap difference is reported", () => {
+    const reference = flat(ext("a"), onError, ext("b"));
+    const candidate = flat(ext("a"), ext("x"), notifyY, ext("b"));
+    const divergences = [
+      entry("x", "x"),
+      ends("onError-ends", "onError", { stream: "hook", when: ["timeout"] }),
+    ];
+    const differences = compareContract(reference, candidate, "v2");
+    const without = explain(FUZZ_SCENARIO, differences, divergences, [
+      "retryPolicy",
+    ]);
+
+    expect(shown(without.unexplained)).toEqual([
+      "v2 onError missing step 0",
+      "v2 y extra step 0",
+    ]);
+    expect(without.ended).toEqual([]);
+    // Control: the same case with the trigger stops at the quirk.
+    const withIt = explain(FUZZ_SCENARIO, differences, divergences, [
+      "timeout",
+    ]);
+    expect(withIt.unexplained).toEqual([]);
+    expect(withIt.ended[0]).toMatchObject({ id: "onError-ends", dropped: 2 });
+  });
+
+  it("a difference in the same gap as the stop, in the other trace, is past it (reference side)", () => {
     const reference = flat(ext("a"), ext("x"), notifyY, ext("b"));
     const candidate = flat(ext("a"), onError, ext("b"));
     const result = explain(
@@ -266,8 +340,8 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
       ],
     );
 
-    expect(shown(result.unexplained)).toEqual(["v2 y missing step 0"]);
-    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 0 });
+    expect(result.unexplained).toEqual([]);
+    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 2 });
   });
 
   it("a difference in the other trace after a matched record that follows the stop is not reported", () => {
@@ -281,9 +355,10 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
       [entry("x", "x"), ends("onError-ends", "onError", { stream: "hook" })],
     );
 
+    // x is beside the stop, in its gap: past it as well.
     expect(result.unexplained).toEqual([]);
-    expect(result.used.sort()).toEqual(["onError-ends", "x"]);
-    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 1 });
+    expect(result.used).toEqual(["onError-ends"]);
+    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 2 });
   });
 
   it("only the engine whose difference it covers stops; another engine is compared in full", () => {
