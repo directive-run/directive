@@ -1036,11 +1036,13 @@
   {
     "line": 730,
     "col": 7,
+    "endLine": 730,
+    "endCol": 23,
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "Decides whether prevFacts is built (observable through prev or a data-form on gate, L4) \u2014 killed in the full run by the facts view itself previous facts and derivations cannot be written, and name themselves",
-    "layer": "L4"
+    "note": "`onGates.size > 0` forced false: whether a data-form `on` gate forces the prevFacts snapshot when no effect body reads prev. onGates is filled only by an effect's data-form `on` (a predicate spec; any other value throws), and data-form predicates are L11 (lib/layers.ts 'option predicate data form'; layers.rules.json 'an `on` predicate gates an effect' is L11), so no test at or below L4 can build a gate. Reading prev (L4) still sets the flag through the other operand. Killed in the full run by blackbox-effects.test.ts > more behaviour of the run loop > a data gate with $changed ignores a write that left that fact alone (placed L11). Proved 2026-11-01: with the mutant applied that test fails on conformance:local, and the whole suite at MUTATION_LAYER=L4 passes. Covers only the inner `onGates.size > 0` mutant; the outer whole-expression `false` mutant is killed at L4 and needs no entry.",
+    "layer": "L11"
   },
   {
     "line": 731,
@@ -1469,8 +1471,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "Dep-stability reset, declared-deps refresh or data-form gate in shouldRun (L4 deps/on). Stability only skips re-tracking and is reset by shouldRun on any overlapping change, so it is reachable only through a pending rerun (navigation, L8) \u2014 killed in the full run by data-form on fires only when the gate holds, and only for changes to its facts",
-    "layer": "L3"
+    "note": "`if (gate)` in shouldRun forced false: the data-form `on` gate is never evaluated, so the effect runs on any change to its facts. onGates is filled only by an effect's data-form `on` (a predicate spec), and data-form predicates are L11 (lib/layers.ts 'option predicate data form'; layers.rules.json 'an `on` predicate gates an effect' is L11), so no test at or below L4 can build a gate. Killed in the full run by blackbox-effects.test.ts > data-form on > fires only when the gate holds, and only for changes to its facts (placed L11). Proved 2026-11-01: with the mutant applied that test (and 'swapping a function-form effect for a gated one installs the gate') fails on conformance:local, and the whole suite at MUTATION_LAYER=L4 passes.",
+    "layer": "L11"
   },
   {
     "line": 986,
