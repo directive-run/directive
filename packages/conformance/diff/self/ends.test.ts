@@ -18,8 +18,10 @@
  * "Stop all streams" decision (2026-11-01, quoted below) the stop covers
  * every stream: an unmatched record in any stream after the last record both
  * engines matched before the stop is dropped, one before that point is still
- * reported, and a changed record between the point and the stop is still
- * compared.
+ * reported, and a changed record (a matched pair) after the point is
+ * dropped when either of its records is past the stop (Jason, 2026-11-01:
+ * "Yes, drop straddling pairs"), but still compared when both are before
+ * it.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -33,7 +35,12 @@ import {
   describeFuzzRun,
 } from "../../lib/census.js";
 import { FUZZ_FLOOR } from "../../lib/fuzz.js";
-import { type Difference, compareContract } from "../compare.js";
+import {
+  type Difference,
+  compareContract,
+  isPastStop,
+  straddlesStop,
+} from "../compare.js";
 import { type EngineHandle, engines } from "../engines.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
@@ -537,28 +544,149 @@ describe("an `ends` stop covers every stream, from the last shared match point",
     expect(result.ended[0]?.at.shared).toEqual({ reference: 3, candidate: 4 });
   });
 
-  it("a changed difference between the shared match point and the stop is still compared", () => {
-    // w is a matched pair, before the stop in the candidate: the owner's
-    // rule drops unmatched records only, so its change is still reported.
-    const reference = flat(ext("a"), hook("onError"), {
-      k: "external",
-      data: ["w", 0],
+  // A changed w whose two records straddle the stop: 1.35's w comes after
+  // its onError, 2.0's w before its onError and the stop (the onError pair
+  // crosses w, so the shared match point is a). 1.35's w has more matched
+  // records before it than the stop has: past the stop, while 2.0's w is
+  // before it in its own trace.
+  const straddleReference = flat(ext("a"), hook("onError"), {
+    k: "external",
+    data: ["w", 0],
+  });
+  const straddleCandidate = flat(
+    ext("a"),
+    { k: "external", data: ["w", 1] },
+    hook("onReconcileStart"),
+    hook("onError"),
+  );
+  const straddling = () => {
+    const differences = compareContract(
+      straddleReference,
+      straddleCandidate,
+      "v2",
+    );
+    const find = (kind: string) =>
+      differences.find((d) => d.kind === kind) as Difference;
+
+    return { differences, stop: find("onReconcileStart"), w: find("w") };
+  };
+
+  it("a changed pair after the shared match point with its 1.35 record past the stop is dropped", () => {
+    // Jason, 2026-11-01: "a changed record whose 2.0 half or 1.35 half is
+    // past the stop, and that sits after the shared match point, is
+    // dropped, as its two halves would be if left unpaired."
+    const { differences, stop, w } = straddling();
+    expect(stop.shared).toEqual({ reference: 1, candidate: 1 });
+    // Only one record is past the stop, so the older rule kept it.
+    expect(isPastStop(w, stop)).toBe(false);
+    expect(straddlesStop(w, stop)).toBe(true);
+
+    const result = explain(
+      FUZZ_SCENARIO,
+      differences,
+      [reconcileEnds],
+      ["resolverRetry"],
+    );
+
+    expect(result.unexplained).toEqual([]);
+    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends", dropped: 1 });
+  });
+
+  it("a changed pair after the shared match point with its 2.0 record past the stop is dropped (the shape of depth seed 2)", () => {
+    // 1.35's y comes before its b, 2.0's y after its b and after the stop
+    // (2.0's extra q), as 1.35's r1 wrote before the stop and 2.0's
+    // re-dispatched r0 wrote after it. 1.35's y is not past the stop: no
+    // matched record is between them.
+    const reference = flat(ext("a"), notifyY, ext("b"));
+    const candidate = flat(ext("a"), ext("b"), ext("q"), {
+      ...notifyY,
+      value: 0,
     });
+    const differences = compareContract(reference, candidate, "v2");
+    const stop = differences.find((d) => d.kind === "q") as Difference;
+    const y = differences.find((d) => d.kind === "y") as Difference;
+    expect(y.op).toBe("changed");
+    expect(isPastStop(y, stop)).toBe(false);
+
+    const result = explain(FUZZ_SCENARIO, differences, [
+      ends("q-ends", "q", { op: "extra" }),
+    ]);
+
+    expect(result.unexplained).toEqual([]);
+    expect(result.ended[0]).toMatchObject({ id: "q-ends", dropped: 1 });
+  });
+
+  it("a changed pair after the shared match point with both records before the stop is still reported", () => {
+    // As above, but x follows w in both traces and comes before the stop
+    // in 2.0's: 1.35's w has no more matched records before it than the
+    // stop has, so neither record of w is past the stop. "A pair with both
+    // halves before the stop is still checked."
+    const reference = flat(
+      ext("a"),
+      hook("onError"),
+      { k: "external", data: ["w", 0] },
+      ext("x"),
+    );
     const candidate = flat(
       ext("a"),
       { k: "external", data: ["w", 1] },
+      ext("x"),
       hook("onReconcileStart"),
       hook("onError"),
     );
+    const differences = compareContract(reference, candidate, "v2");
+    const stop = differences.find(
+      (d) => d.kind === "onReconcileStart",
+    ) as Difference;
+    const w = differences.find((d) => d.kind === "w") as Difference;
+    expect(stop.shared).toEqual({ reference: 1, candidate: 1 });
+    expect(straddlesStop(w, stop)).toBe(false);
+
     const result = explain(
       FUZZ_SCENARIO,
-      compareContract(reference, candidate, "v2"),
+      differences,
       [reconcileEnds],
       ["resolverRetry"],
     );
 
     expect(shown(result.unexplained)).toEqual(["v2 w changed step 0"]);
-    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends" });
+    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends", dropped: 0 });
+  });
+
+  it("a changed pair at the shared match point is still reported, even with a record past the stop", () => {
+    // A real comparison cannot produce this: the point is before the stop
+    // in every trace the stop is in, and both traces have the same matched
+    // records up to it, so no matched record at or before it is past the
+    // stop (`straddlesStop`). Moving the stop's point onto w by hand pins
+    // the rule's other half: only a pair after the point is dropped.
+    const { differences, stop, w } = straddling();
+    const moved = { ...stop, shared: { reference: 3, candidate: 2 } };
+    expect(w.at).toEqual({ reference: 3, candidate: 2 });
+
+    const result = explain(
+      FUZZ_SCENARIO,
+      differences.map((d) => (d === stop ? moved : d)),
+      [reconcileEnds],
+      ["resolverRetry"],
+    );
+
+    expect(shown(result.unexplained)).toEqual(["v2 w changed step 0"]);
+    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends", dropped: 0 });
+  });
+
+  it("in a case without the entry's trigger nothing stops: the straddling pair is reported", () => {
+    const result = explain(
+      FUZZ_SCENARIO,
+      straddling().differences,
+      [reconcileEnds],
+      ["timeout"],
+    );
+
+    expect(shown(result.unexplained).sort()).toEqual([
+      "v2 onReconcileStart extra step 0",
+      "v2 w changed step 0",
+    ]);
+    expect(result.ended).toEqual([]);
   });
 
   it("in a case without the entry's trigger nothing stops: every stream is compared", () => {

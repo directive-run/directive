@@ -226,7 +226,7 @@ all streams: when an approved quirk ends a case, drop every stream's
 unmatched records after the last record both engines matched before the
 stop. That reads 'stops comparing that case' as the whole case. It applies
 only to cases with the quirk's trigger, and everything before the shared
-match point is still checked." Two rules drop a difference, in
+match point is still checked." Three rules drop a difference, in
 `diff/compare.ts`:
 
 - **After the shared match point** (`SharedPoint`, `isPastSharedPoint`): a
@@ -248,8 +248,16 @@ match point is still checked." Two rules drop a difference, in
   the trace order; across the two traces only a matched record between
   them orders two records (a later step or phase, or more matched records
   before it). This is how a changed record (a matched pair) after the stop
-  is dropped; a changed record between the shared point and the stop is
-  still compared, since the decision drops unmatched records only.
+  is dropped.
+- **A changed pair that straddles the stop** (`straddlesStop`): a changed
+  record after the shared match point with either of its two records past
+  the stop in its own trace. The owner's decision (Jason, 2026-11-01): "Yes,
+  drop straddling pairs: a changed record whose 2.0 half or 1.35 half is
+  past the stop, and that sits after the shared match point, is dropped, as
+  its two halves would be if left unpaired. A pair with both halves before
+  the stop is still checked, so no difference from before the quirk is
+  hidden." A changed record at or before the shared point is never dropped
+  (from a real comparison it is never past the stop either).
 
 A difference before the shared match point is still reported, in every
 stream, and a covered one passes, as before; only an `ends` entry

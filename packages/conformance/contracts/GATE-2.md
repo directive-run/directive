@@ -249,10 +249,27 @@ traces have (a pair the alignment matched in any stream, or a step or async
 marker) whose two trace prefixes hold the same pairs, before the stop in every
 trace the stop is in. Every missing or extra record after that point, in any
 stream, is dropped; a difference before it is still reported, and a changed
-record (a matched pair) is dropped only when it is past the stop, as before.
+record (a matched pair) is dropped only when it is past the stop, as before
+(until the straddling rule below).
 Only an `ends` entry stops, and only in a case with its `when` triggers
 (`diff/compare.ts` `SharedPoint`, `isPastSharedPoint`;
 `diff/self/ends.test.ts`).
+
+**An `ends` stop drops a changed pair that straddles it (2026-11-01).** The L4
+gate's deep fuzz (seed 2, 5000 runs) failed on a row a case: 2.0's
+re-dispatched r0 wrote 0 after the stop, 1.35's r1 wrote 1 before it, and the
+alignment paired the two `fact.change` records as one changed difference, with
+only 2.0's record past the stop. The owner decided: "Yes, drop straddling
+pairs: a changed record whose 2.0 half or 1.35 half is past the stop, and that
+sits after the shared match point, is dropped, as its two halves would be if
+left unpaired. A pair with both halves before the stop is still checked, so no
+difference from before the quirk is hidden." The rule: a changed difference
+after the stop's shared match point is dropped when either of its records is
+past the stop in its own trace (set against the stop as `isPastStop` sets
+each record); one with both records before the stop is still reported, and
+one at or before the shared point is never dropped. Only an `ends` entry
+stops, and only in a case with its `when` triggers (`diff/compare.ts`
+`straddlesStop`; `diff/self/ends.test.ts`).
 
 **Row z (approved 2026-11-01).** The owner approved 2.0's behaviour: "a pending
 settle() resolves at stop or destroy, with no lingering timer and no late
