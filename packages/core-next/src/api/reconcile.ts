@@ -20,7 +20,7 @@
  *    before any of them starts, then requeues are applied; answers the
  *    `onReconcileEnd` result.
  *
- * Follow-up passes (a run ended, a requeue, `enable()`) go through the core's
+ * Follow-up passes (a run ended, a requeue, `disable()`) go through the core's
  * `schedule`, which asks the kernel's scheduler, so systems sharing one
  * flush in registration order. On the `micro` lane an ask whose microtask
  * finds a pass still open is dropped, as 1.35's scheduleReconcile is: a run
@@ -568,6 +568,7 @@ export const withReconcile: SystemPart = (context) => {
     busy_: () => resolvers.inflight.size > 0,
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
+    observed_: (into) => constraints.observed_(into),
     requeue_(id, max) {
       // A retracted requirement is not requeued; one in flight has a run.
       if (previous.has(id) && !resolvers.inflight.has(id)) {
@@ -717,10 +718,9 @@ export const withReconcile: SystemPart = (context) => {
         schedule();
       }
     },
-    enable(id: string) {
-      constraints.enable(id);
-      schedule();
-    },
+    // As 1.35 (constraints.ts:1600-1614, engine.ts:2610): enabling marks
+    // it dirty and asks for no pass; the next pass evaluates it.
+    enable: (id: string) => constraints.enable(id),
     isDisabled: (id: string) => constraints.isDisabled(id),
   };
 };
