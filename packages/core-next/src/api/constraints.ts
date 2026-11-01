@@ -78,6 +78,8 @@ export interface Constraints {
   /** Ask `id` again in the next pass (a due retry-later, 1.35's markDirty). */
   markDirty(id: string): void;
   hasDirty(): boolean;
+  /** Every prefixed derivation id a constraint read last time (1.35). */
+  observed_(into: Set<string>): void;
   /** True when a dependent it held back is now free (ask for a pass). */
   disable(id: string): boolean;
   enable(id: string): void;
@@ -619,6 +621,16 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     markDirty: (id) => dirty.add(id),
     hasDirty: () => [...dirty].some((id) => !disabled.has(id)),
+    observed_(into) {
+      // A disabled constraint reads nothing (disable), as in 1.35.
+      for (const read of deps.values()) {
+        for (const key of read) {
+          if (key.startsWith(DERIVATION_DEP_PREFIX)) {
+            into.add(key);
+          }
+        }
+      }
+    },
     disable(id) {
       if (!defs[id]) {
         if (isDevelopment) {

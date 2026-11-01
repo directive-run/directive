@@ -115,8 +115,14 @@ describe("an effect reading a derivation", () => {
     await system.stop();
   });
 
-  it("re-runs when it only tested the derivation's membership", async () => {
+  it("sees the derivation as present when it only tests its membership", async () => {
+    // How often such an effect re-runs is quirk (c) in contracts/GATE-1.md:
+    // 1.35 re-runs it at every change of the derivation, 2.0 re-runs it only
+    // when membership changes. Not pinned here; core-next pins the 2.0
+    // behaviour and the L4 gate records the divergence. What both keep:
+    // the effect runs, the test answers true, and the derivation is intact.
     let runs = 0;
+    const found: boolean[] = [];
     const system = build({
       schema: {
         facts: { a: t.number() },
@@ -130,17 +136,20 @@ describe("an effect reading a derivation", () => {
         watch: {
           run: (_f: any, _p: any, d: any) => {
             runs++;
-            void ("d1" in d);
+            found.push("d1" in d);
           },
         },
       },
     });
     await settled(system);
-    const before = runs;
+    expect(runs).toBeGreaterThan(0);
+    expect(system.read("d1")).toBe(2);
 
     system.facts.a = 2;
     await settled(system);
-    expect(runs).toBeGreaterThan(before);
+    expect(system.read("d1")).toBe(3);
+    expect(found.length).toBe(runs);
+    expect(found.every((answer) => answer === true)).toBe(true);
     await system.stop();
   });
 

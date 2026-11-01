@@ -122,7 +122,7 @@
       "an effect reading a derivation > re-runs when the derivation changes": "L0",
       "an effect reading a derivation > re-runs when the end of a derivation chain changes": "L0",
       "an effect reading a derivation > is not re-run by a write the derivation does not depend on": "L0",
-      "an effect reading a derivation > re-runs when it only tested the derivation's membership": "L0",
+      "an effect reading a derivation > sees the derivation as present when it only tests its membership": "L0",
       "an effect reading a derivation > then a fact depends on that fact too": "L0",
       "two effects reading derivations > of one fact are both re-run when it changes": "L0",
       "two effects reading derivations > of different facts: a write to one re-runs only its effect": "L0",

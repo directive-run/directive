@@ -32,6 +32,8 @@ export interface CreateEffectsOptions<S extends Schema> {
    * key (1.35's resolveDeps), else the name itself, a fact key.
    */
   depKey?: (name: string) => string;
+  /** Watch derivation `id` again: `enable` restores what `disable` released. */
+  watch?: (id: string) => void;
 }
 
 export interface EffectsManager {
@@ -41,12 +43,20 @@ export interface EffectsManager {
   runAll(): Promise<void>;
   callOne(id: string): Promise<void>;
   cleanupAll(): void;
+  /**
+   * Stops the effect and runs its cleanup at once (x). Its dependencies are
+   * kept (y); only the watching of their derivations goes, at the pass end.
+   * An unknown id throws, in production too (1.35).
+   */
   disable(id: string): void;
+  /** Watches its derivations again; does not run it or replay changes (y). */
   enable(id: string): void;
   isEnabled(id: string): boolean;
   /** Run `id` in the next pass whatever changed (1.35's requestRerun). */
   rerun_(id: string): void;
   reruns_(): boolean;
+  /** Every prefixed derivation id an enabled effect reads (1.35). */
+  observed_(into: Set<string>): void;
 }
 
 interface EffectState {
@@ -55,6 +65,8 @@ interface EffectState {
   explicit: boolean;
   deps: Set<string> | null;
   cleanup: (() => void) | null;
+  /** Its cleanup is running: the boundary's "disable" does not start it again. */
+  cleaning_?: boolean;
   /** What the current run's `run` returned. */
   out_?: unknown;
 }
@@ -227,39 +239,47 @@ export function createEffectsManager<S extends Schema>(
   }
 
   function runCleanup(state: EffectState): void {
-    if (state.cleanup) {
+    // A throw reaches the boundary, whose "disable" runs the cleanup (x): the
+    // guard stops it starting again. Cleared only after it returns, so one
+    // whose throw "throw" rethrows is kept and called again (1.35).
+    if (state.cleanup && !state.cleaning_) {
+      state.cleaning_ = true;
       try {
-        state.cleanup();
-      } catch (error) {
-        onError?.(state.id, error);
-        console.error(
-          `[Directive] Effect "${state.id}" cleanup threw an error:`,
-          error,
-        );
+        try {
+          state.cleanup();
+        } catch (error) {
+          onError?.(state.id, error);
+          console.error(
+            `[Directive] Effect "${state.id}" cleanup threw an error:`,
+            error,
+          );
+        }
+        state.cleanup = null;
+      } finally {
+        state.cleaning_ = false;
       }
-      state.cleanup = null;
     }
   }
 
   function keep(state: EffectState, result: unknown): void {
-    if (typeof result !== "function") {
-      return;
-    }
-    if (!stopped) {
+    if (typeof result === "function") {
       state.cleanup = result as () => void;
-
-      return;
-    }
-    try {
-      (result as () => void)();
-    } catch (error) {
-      onError?.(state.id, error);
-      console.error(
-        `[Directive] Effect "${state.id}" cleanup threw an error:`,
-        error,
-      );
+      // Stopped, or disabled while this run was going (x): an effect that
+      // will not run holds no cleanup.
+      if (stopped || !state.enabled) {
+        runCleanup(state);
+      }
     }
   }
+
+  const get = (id: string): EffectState => {
+    const state = states.get(id);
+    if (!state) {
+      throw new Error(`[Directive] Unknown effect: ${id}`);
+    }
+
+    return state;
+  };
 
   function report(state: EffectState, error: unknown): void {
     onError?.(state.id, error);
@@ -458,25 +478,45 @@ export function createEffectsManager<S extends Schema>(
       }
     },
     disable(id) {
-      const state = states.get(id);
-      if (state) {
-        runCleanup(state);
-        state.enabled = false;
-      }
+      const state = get(id);
+      // Off before the cleanup: one that throws under "throw" cannot leave it
+      // on. (y): the dependencies stay. observed_ skips a disabled effect, so
+      // the pass-end trim releases the derivations only it watched.
+      state.enabled = false;
+      runCleanup(state);
     },
     enable(id) {
-      const state = states.get(id);
-      if (state) {
+      const state = get(id);
+      if (!state.enabled) {
         state.enabled = true;
+        // Released while disabled, so a stale one would never wake it.
+        for (const key of state.deps ?? []) {
+          if (key.startsWith(DERIVATION_DEP_PREFIX)) {
+            options.watch?.(key.slice(DERIVATION_DEP_PREFIX.length));
+          }
+        }
       }
     },
-    isEnabled: (id) => states.get(id)?.enabled ?? false,
+    isEnabled: (id) => get(id).enabled,
     rerun_(id) {
       if (states.has(id)) {
         reruns.add(id);
       }
     },
     reruns_: () => reruns.size > 0,
+    observed_(into) {
+      // A disabled effect pins nothing (1.35 drops its dependencies,
+      // effects.ts:1457; (y) keeps them and skips it here).
+      for (const state of states.values()) {
+        if (state.enabled && state.deps) {
+          for (const key of state.deps) {
+            if (key.startsWith(DERIVATION_DEP_PREFIX)) {
+              into.add(key);
+            }
+          }
+        }
+      }
+    },
   };
 }
 
@@ -502,6 +542,7 @@ export const withEffects: SystemPart = (ctx) => {
 
       return DERIVATION_DEP_PREFIX + name;
     },
+    watch: ctx.watch,
     definitions: (ctx.module.effects ?? {}) as Record<string, any>,
     facts: ctx.facts,
     store: ctx.store,
@@ -549,4 +590,10 @@ export const withEffects: SystemPart = (ctx) => {
     "effects",
     Object.assign(manager, { fresh_: () => retries.clear() }),
   );
+  // 1.35's controls (engine.ts:2633–2636); none asks for a pass.
+  ctx.system.effects = {
+    disable: manager.disable,
+    enable: manager.enable,
+    isEnabled: manager.isEnabled,
+  };
 };

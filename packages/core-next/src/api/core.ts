@@ -195,6 +195,8 @@ export interface EffectsFeature {
   reruns_(): boolean;
   /** A pass from an ordinary write: failing effects get their retries back. */
   fresh_(): void;
+  /** Every prefixed derivation id an enabled effect reads. */
+  observed_(into: Set<string>): void;
 }
 
 /** The error boundary (errors.ts) as the lifecycle drives it. */
@@ -225,6 +227,8 @@ export interface ReconcileFeature {
   stop_(): void;
   /** A due retry-later constraint is asked again in the next pass. */
   dirty_(id: string): void;
+  /** Every prefixed derivation id a constraint read last time. */
+  observed_(into: Set<string>): void;
   /**
    * A due retry-later resolver's requirement (candidate p): dispatched
    * again, through the requeue set, if it is still raised and not in flight,
@@ -493,7 +497,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   let inSettle = false;
   let followUpQueued = false;
   /**
-   * A part asked for a pass while one ran (a run ended, `enable()`), on a
+   * A part asked for a pass while one ran (a run ended, `disable()`), on a
    * lane other than `micro`. On `micro` the ask is 1.35's scheduleReconcile:
    * dropped if its microtask finds the pass still open.
    */
@@ -507,7 +511,11 @@ export function createSystemCore<const M extends ModuleSchema>(
   const byNode = new Map<ReactiveNode, Derivation>();
   const listeners: Listeners = new Map();
   const pending = new Set<string>();
-  /** Derivations named in declared deps (SystemContext.watch). */
+  /**
+   * Derivations a constraint or effect named in declared deps
+   * (SystemContext.watch) or asked about (the `has` trap); trimmed at each
+   * pass end to what one still reads, as 1.35's observed set is.
+   */
   const watched = new Set<string>();
   let holdDepth = 0;
 
@@ -1117,6 +1125,20 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     } finally {
       reconciling = false;
+      // As 1.35 (engine.ts:2244-2250): every constraint and effect of this
+      // pass has finished, so the watched set keeps only what one still
+      // reads. A derivation asked about once stops costing every later
+      // write a scan. Removal only; nothing to do when nothing is watched.
+      if (watched.size > 0) {
+        const live = new Set<string>();
+        features.reconcile?.observed_(live);
+        features.effects?.observed_(live);
+        for (const id of watched) {
+          if (!live.has(DERIVATION_DEP_PREFIX + id)) {
+            watched.delete(id);
+          }
+        }
+      }
       if (changedKeys.size > 0 || again || features.effects?.reruns_()) {
         scheduleReconcile();
       }
