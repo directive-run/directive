@@ -66,9 +66,18 @@ and the probe falls back to 50,000. A `NOTE` is printed when the sizes differ: b
 write is then only comparable if the path is at steady state at both sizes. The
 semi-space is pinned at 64 MB so no scavenge lands inside a trial.
 
+## The frame-loop workload
+
+`frame-loop` is the yardstick the L5 speed gate ("0.8x or better on the frame loop")
+is judged by, fixed before L4 so L4's gains are measured on the gate's own workload.
+One step is one frame of an Aperture-shaped app: 20 facts written in one batch, 10
+derivations (each the sum of two facts), 5 auto-tracked effects (2 read `prev`, 2 read
+derivations), then a settle. Every fact changes every frame, so all 5 effects re-run.
+The timing table reports time per frame; the heap section reports bytes per frame.
+
 ## Other files
 
-- `workloads.mjs`: the nine workloads, shared by both engines, each checked against
+- `workloads.mjs`: the ten workloads, shared by both engines, each checked against
   hand-worked expectations before it is timed.
 - `runner.mjs`: runs one engine in one process; `entry-v1.mjs`, `entry-v2.mjs` load it.
 - `run.mjs`: the driver (rounds, alternating order, tables, JSON, `--show`, `--compare`).
