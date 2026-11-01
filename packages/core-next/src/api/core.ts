@@ -448,7 +448,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     plugins?: Tail;
     errors?: ErrorsFeature;
   };
-  const tracker: Tracker = { deps: null };
+  // `effect_` from the start: the effects part sets it on its first run, and
+  // a field added then would give every hot tracker read a second shape.
+  const tracker: Tracker = { deps: null, effect_: undefined };
   /**
    * After destroy the kernel's stream is gone, but as in 1.35 plugins and
    * observers still hear writes: records go straight to the plugins.
