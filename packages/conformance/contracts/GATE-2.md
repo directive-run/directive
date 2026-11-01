@@ -102,8 +102,10 @@ A signed fuzz entry with `ends: true` stops the comparison of a fuzz case at
 the first difference it covers, on that engine. The owner's decision behind it:
 "The fuzz compares a case exactly up to its first approved-quirk difference,
 then stops comparing that case." The case is compared exactly up to that
-difference: an uncovered difference before it, or beside it, still fails; a
-difference after it is not compared; the case still counts toward the fuzz
+difference: an uncovered difference before it still fails; a difference
+after it is not compared, and since 2026-11-01 the stop covers every stream
+from the last shared match point (below, "An `ends` stop covers every
+stream"); the case still counts toward the fuzz
 floors; and other engines are compared in full. `ends` is valid only on a
 signed entry for scenario `fuzz`, engine `v2`, with an `op` (and a `path` when
 the op is `changed`). An `ends` entry that never stopped a case is stale like
@@ -231,6 +233,26 @@ gap as an unmatched stop (between the same two matched records, in either
 trace). Only an `ends` entry makes a stop, and only in a case with its `when`
 triggers; a difference before the gap is still reported (`diff/compare.ts`
 `isPastStop`, `diff/self/ends.test.ts`).
+
+**An `ends` stop covers every stream (2026-11-01).** At depth, seeds 2 and
+24301 still failed after #301 on approved shapes of rows a and b: 2.0's
+records for the re-dispatched run, or for the paired error, came in other
+streams just before the hook-stream stop. Each stream is aligned on its own,
+so 1.35's error paired with a later 2.0 error, and the records in between were
+neither after the stop nor in its gap. The owner decided: "Stop all streams:
+when an approved quirk ends a case, drop every stream's unmatched records
+after the last record both engines matched before the stop. That reads 'stops
+comparing that case' as the whole case. It applies only to cases with the
+quirk's trigger, and everything before the shared match point is still
+checked." The rule: the stop's shared match point is the latest record both
+traces have (a pair the alignment matched in any stream, or a step or async
+marker) whose two trace prefixes hold the same pairs, before the stop in every
+trace the stop is in. Every missing or extra record after that point, in any
+stream, is dropped; a difference before it is still reported, and a changed
+record (a matched pair) is dropped only when it is past the stop, as before.
+Only an `ends` entry stops, and only in a case with its `when` triggers
+(`diff/compare.ts` `SharedPoint`, `isPastSharedPoint`;
+`diff/self/ends.test.ts`).
 
 **Row z (approved 2026-11-01).** The owner approved 2.0's behaviour: "a pending
 settle() resolves at stop or destroy, with no lingering timer and no late

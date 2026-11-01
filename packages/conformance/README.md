@@ -220,17 +220,39 @@ way round), every later record of that case differs, differently for each
 seed, so entries written per record at the PR seed fail the nightly seeds,
 and entries wide enough for every seed would hide unrelated differences in
 every fuzz case. In each fuzz case, on each engine, the first difference
-whose covering entry has `ends` is the stop: it passes, and a difference
-past it is not compared. "Past" is `isPastStop` in `diff/compare.ts`:
-strictly after the stop, or beside it, in the same gap (records one trace
-has and the other lacks, between the same two matched records, in either
-trace; the records around a run one engine adds or removes fall there in
-an order of their own). "After" within one trace is the trace order;
-across the two traces only a matched record between them orders two
-records (a later step or phase, or more matched records before it). A
-matched record is never in a gap. A difference is dropped only when every
-record it has is past the stop. An uncovered one before the stop's gap is
-still reported and a covered one passes, as before; only an `ends` entry
+whose covering entry has `ends` is the stop: it passes, and the stop covers
+every stream of the case. The owner's decision (Jason, 2026-11-01): "Stop
+all streams: when an approved quirk ends a case, drop every stream's
+unmatched records after the last record both engines matched before the
+stop. That reads 'stops comparing that case' as the whole case. It applies
+only to cases with the quirk's trigger, and everything before the shared
+match point is still checked." Two rules drop a difference, in
+`diff/compare.ts`:
+
+- **After the shared match point** (`SharedPoint`, `isPastSharedPoint`): a
+  missing or extra record, in any stream, after the last record both
+  engines matched before the stop. Each trace has one global record order
+  (every stream's records, and the step and async markers, in one array).
+  The two traces are linked only by the records both have: each pair the
+  alignment matched, in any stream, and each step and async marker. A
+  shared match point is such a link where the two prefixes it closes hold
+  the same links (no matched pair has one record before it and the other
+  after). Each stream is aligned on its own, so one stream's pairs can cross
+  another's (1.35's error paired with a later 2.0 error, while 2.0's
+  records between them pair with 1.35's after it); no shared point falls
+  inside a crossing. The stop's point is the latest one before the stop's
+  record in every trace the stop is in.
+- **Past the stop** (`isPastStop`): strictly after the stop, or beside it,
+  in the same gap (records one trace has and the other lacks, between the
+  same two matched records, in either trace). "After" within one trace is
+  the trace order; across the two traces only a matched record between
+  them orders two records (a later step or phase, or more matched records
+  before it). This is how a changed record (a matched pair) after the stop
+  is dropped; a changed record between the shared point and the stop is
+  still compared, since the decision drops unmatched records only.
+
+A difference before the shared match point is still reported, in every
+stream, and a covered one passes, as before; only an `ends` entry
 stops (an ordinary entry covers its difference and the case goes on), and
 only in a case with its `when` triggers; other engines are compared in
 full, and the case still counts toward the fuzz floors. The run prints where each case ended as an

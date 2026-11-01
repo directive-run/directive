@@ -14,7 +14,12 @@
  * fuzz entry (engine "v2", an op, a path for "changed"; `when`, proved in
  * precision.test.ts) and finds it stale
  * when it never stopped a case, and that an ended case still counts toward
- * the fuzz floors and is shown on the census's fuzz line.
+ * the fuzz floors and is shown on the census's fuzz line. Since the owner's
+ * "Stop all streams" decision (2026-11-01, quoted below) the stop covers
+ * every stream: an unmatched record in any stream after the last record both
+ * engines matched before the stop is dropped, one before that point is still
+ * reported, and a changed record between the point and the stop is still
+ * compared.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -93,6 +98,16 @@ const REFERENCE = trace([
   ["q", 0],
   ["c", 0],
 ]);
+
+/** Records for the tests below: `flat` is one step's records between its step and async markers. */
+const onError: TraceEntry = { k: "hook", hook: "onError", args: [] };
+const notifyY: TraceEntry = { k: "notify", id: "y", value: 1 };
+const ext = (tag: string): TraceEntry => ({ k: "external", data: [tag, 0] });
+const flat = (...records: TraceEntry[]): TraceEntry[] => [
+  { k: "step", i: 0, step: "step 0" },
+  ...records,
+  { k: "async", i: 0 },
+];
 
 describe("an `ends` entry stops a fuzz case at its difference", () => {
   it("control: an ordinary entry covers its difference and the case goes on", () => {
@@ -259,14 +274,6 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
   // then an uncovered notify y. Nothing orders y after the quirk, but it is
   // beside it, in the same gap, so an `ends` stop drops it (and x); an
   // ordinary entry, or a case without the `ends` entry's trigger, does not.
-  const onError: TraceEntry = { k: "hook", hook: "onError", args: [] };
-  const notifyY: TraceEntry = { k: "notify", id: "y", value: 1 };
-  const ext = (tag: string): TraceEntry => ({ k: "external", data: [tag, 0] });
-  const flat = (...records: TraceEntry[]): TraceEntry[] => [
-    { k: "step", i: 0, step: "step 0" },
-    ...records,
-    { k: "async", i: 0 },
-  ];
 
   it("a difference in the same gap as the stop, in the other trace, is past it (candidate side)", () => {
     const reference = flat(ext("a"), onError, ext("b"));
@@ -418,6 +425,177 @@ describe("an `ends` entry stops a fuzz case at its difference", () => {
     expect(shown(result.unexplained)).toEqual(["v2 c changed step 0"]);
     expect(result.used).toEqual([]);
     expect(result.ended).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The stop covers every stream (Jason, 2026-11-01: "Stop all streams: when an
+// approved quirk ends a case, drop every stream's unmatched records after the
+// last record both engines matched before the stop. That reads 'stops
+// comparing that case' as the whole case. It applies only to cases with the
+// quirk's trigger, and everything before the shared match point is still
+// checked.")
+
+describe("an `ends` stop covers every stream, from the last shared match point", () => {
+  const hook = (name: "onError" | "onReconcileStart"): TraceEntry => ({
+    k: "hook",
+    hook: name,
+    args: [],
+  });
+  const step = (i: number): TraceEntry[] => [
+    { k: "step", i, step: `step ${i}` },
+  ];
+  const done = (i: number): TraceEntry => ({ k: "async", i });
+
+  // The shape of depth seed 2: the hook stream pairs 1.35's onError with a
+  // later 2.0 onError, so the external stream's matched w crosses it. The
+  // last point both traces agree on is a; the candidate's notify y comes
+  // after a and before w, ahead of the stop (2.0's extra onReconcileStart).
+  const crossedReference = flat(ext("a"), hook("onError"), ext("w"));
+  const crossedCandidate = flat(
+    ext("a"),
+    notifyY,
+    ext("w"),
+    hook("onReconcileStart"),
+    hook("onError"),
+  );
+  const reconcileEnds = ends("reconcile-ends", "onReconcileStart", {
+    stream: "hook",
+    op: "extra",
+    when: ["resolverRetry"],
+  });
+
+  it("an unmatched record in another stream after the shared match point is dropped, where one stream's matches cross another's", () => {
+    const differences = compareContract(
+      crossedReference,
+      crossedCandidate,
+      "v2",
+    );
+    const stop = differences.find(
+      (d) => d.kind === "onReconcileStart",
+    ) as Difference;
+    // The shared match point is a (trace index 1 in both), not w: w is
+    // matched, but the onError pair crosses it.
+    expect(stop.shared).toEqual({ reference: 1, candidate: 1 });
+
+    const result = explain(
+      FUZZ_SCENARIO,
+      differences,
+      [reconcileEnds],
+      ["resolverRetry"],
+    );
+
+    expect(result.unexplained).toEqual([]);
+    expect(result.used).toEqual(["reconcile-ends"]);
+    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends", dropped: 1 });
+  });
+
+  it("an unmatched record in another stream before the shared match point is still reported, in either trace", () => {
+    // b is matched before the stop in both traces: y (candidate) and z
+    // (reference) come before it, so they are checked.
+    const reference = flat(ext("a"), ext("z"), ext("b"), hook("onError"));
+    const candidate = flat(ext("a"), notifyY, ext("b"));
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(reference, candidate, "v2"),
+      [ends("onError-ends", "onError", { stream: "hook" })],
+    );
+
+    expect(shown(result.unexplained).sort()).toEqual([
+      "v2 y extra step 0",
+      "v2 z missing step 0",
+    ]);
+    expect(result.ended[0]).toMatchObject({ id: "onError-ends", dropped: 0 });
+  });
+
+  it("a step marker is a shared match point: an unmatched record at the end of an earlier step is still reported", () => {
+    // No record of step 1 is matched before the stop, so its shared match
+    // point is step 1's marker, which both traces have, not a.
+    const reference = [
+      ...step(0),
+      ext("a"),
+      done(0),
+      ...step(1),
+      hook("onError"),
+      done(1),
+    ];
+    const candidate = [
+      ...step(0),
+      ext("a"),
+      notifyY,
+      done(0),
+      ...step(1),
+      done(1),
+    ];
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(reference, candidate, "v2"),
+      [ends("onError-ends", "onError", { stream: "hook" })],
+    );
+
+    expect(shown(result.unexplained)).toEqual(["v2 y extra step 0"]);
+    expect(result.ended[0]?.at.shared).toEqual({ reference: 3, candidate: 4 });
+  });
+
+  it("a changed difference between the shared match point and the stop is still compared", () => {
+    // w is a matched pair, before the stop in the candidate: the owner's
+    // rule drops unmatched records only, so its change is still reported.
+    const reference = flat(ext("a"), hook("onError"), {
+      k: "external",
+      data: ["w", 0],
+    });
+    const candidate = flat(
+      ext("a"),
+      { k: "external", data: ["w", 1] },
+      hook("onReconcileStart"),
+      hook("onError"),
+    );
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(reference, candidate, "v2"),
+      [reconcileEnds],
+      ["resolverRetry"],
+    );
+
+    expect(shown(result.unexplained)).toEqual(["v2 w changed step 0"]);
+    expect(result.ended[0]).toMatchObject({ id: "reconcile-ends" });
+  });
+
+  it("in a case without the entry's trigger nothing stops: every stream is compared", () => {
+    const result = explain(
+      FUZZ_SCENARIO,
+      compareContract(crossedReference, crossedCandidate, "v2"),
+      [reconcileEnds],
+      ["timeout"],
+    );
+
+    expect(shown(result.unexplained).sort()).toEqual([
+      "v2 onReconcileStart extra step 0",
+      "v2 y extra step 0",
+    ]);
+    expect(result.ended).toEqual([]);
+  });
+
+  it("an ordinary entry for the same difference covers it and stops nothing, in a fuzz case or a hand scenario", () => {
+    const differences = compareContract(
+      crossedReference,
+      crossedCandidate,
+      "v2",
+    );
+    const ordinary = entry("reconcile", "onReconcileStart", {
+      stream: "hook",
+      engine: "v2",
+      op: "extra",
+    });
+    const fuzz = explain(FUZZ_SCENARIO, differences, [ordinary]);
+    expect(shown(fuzz.unexplained)).toEqual(["v2 y extra step 0"]);
+    expect(fuzz.ended).toEqual([]);
+
+    const hand = explain("a hand scenario", differences, [
+      { ...reconcileEnds, scenario: "a hand scenario", when: undefined },
+    ]);
+    expect(shown(hand.unexplained)).toEqual(["v2 y extra step 0"]);
+    expect(hand.ended).toEqual([]);
   });
 });
 
