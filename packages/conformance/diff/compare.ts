@@ -94,7 +94,8 @@ export interface Difference {
   /**
    * The shared match point before it (`SharedPoint`): if an `ends`
    * divergence stops the case here, every stream's unmatched records after
-   * this point are not compared (`isPastSharedPoint`).
+   * this point are not compared (`isPastSharedPoint`), nor a changed record
+   * after it with either record past the stop (`straddlesStop`).
    */
   shared: SharedPoint;
 }
@@ -203,19 +204,31 @@ function pastStop(p: Position, s: Position, same: boolean): boolean {
  * `stop` only if every one of its records is.
  */
 export function isPastStop(d: Difference, stop: Difference): boolean {
-  return TRACES.every((trace) => {
-    const p = d.where[trace];
-    if (!p) {
-      return true;
-    }
-    const same = stop.where[trace];
-    if (same) {
-      return pastStop(p, same, true);
-    }
-    const other = stop.where[trace === "reference" ? "candidate" : "reference"];
+  return TRACES.every((trace) => recordPastStop(d, stop, trace) !== false);
+}
 
-    return other !== undefined && pastStop(p, other, false);
-  });
+/**
+ * Whether `d`'s record in `trace` is past `stop`: set against `stop`'s record
+ * in the same trace when `stop` has one there, and otherwise against its
+ * record in the other trace (`pastStop`). Undefined when `d` has no record
+ * in `trace`.
+ */
+function recordPastStop(
+  d: Difference,
+  stop: Difference,
+  trace: (typeof TRACES)[number],
+): boolean | undefined {
+  const p = d.where[trace];
+  if (!p) {
+    return undefined;
+  }
+  const same = stop.where[trace];
+  if (same) {
+    return pastStop(p, same, true);
+  }
+  const other = stop.where[trace === "reference" ? "candidate" : "reference"];
+
+  return other !== undefined && pastStop(p, other, false);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +316,8 @@ function sharedBefore(chain: SharedPoint[], at: Difference["at"]): SharedPoint {
  * is the owner's rule (2026-11-01): when an approved quirk ends a case,
  * every stream's unmatched records after the last record both engines
  * matched before the stop are dropped. A changed difference (a matched
- * pair) is never dropped by this rule; `isPastStop` decides it.
+ * pair) is never dropped by this rule; `isPastStop` and `straddlesStop`
+ * decide it.
  */
 export function isPastSharedPoint(d: Difference, stop: Difference): boolean {
   // The stop itself is not past it: it passes, covered.
@@ -318,6 +332,39 @@ export function isPastSharedPoint(d: Difference, stop: Difference): boolean {
   }
 
   return false;
+}
+
+/**
+ * Whether difference `d` is a changed record (a matched pair) that straddles
+ * `stop` (an `ends` divergence's difference): after `stop`'s shared match
+ * point, with either of its two records past the stop in its own trace
+ * (`recordPastStop`, as `isPastStop` sets each record). This is the owner's
+ * rule (Jason, 2026-11-01): "a changed record whose 2.0 half or 1.35 half is
+ * past the stop, and that sits after the shared match point, is dropped, as
+ * its two halves would be if left unpaired. A pair with both halves before
+ * the stop is still checked, so no difference from before the quirk is
+ * hidden."
+ *
+ * "After the point" is after it in both traces: the point closes two trace
+ * prefixes that hold the same pairs, so a matched pair has both records
+ * before it or both after it. A pair at or before the point is never
+ * dropped by this rule; from a real comparison it is never past the stop
+ * either (the point is before the stop in every trace the stop is in, and
+ * the matched records up to the point are the same in both traces, so no
+ * matched record before it is ordered after the stop).
+ */
+export function straddlesStop(d: Difference, stop: Difference): boolean {
+  if (d === stop || d.op !== "changed") {
+    return false;
+  }
+  const afterPoint =
+    (d.at.reference as number) > stop.shared.reference &&
+    (d.at.candidate as number) > stop.shared.candidate;
+
+  return (
+    afterPoint &&
+    TRACES.some((trace) => recordPastStop(d, stop, trace) === true)
+  );
 }
 
 /** The latest position `d` has in the traces it is in (a total order, for picking a stop). */

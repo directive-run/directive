@@ -49,6 +49,7 @@ import {
   isPastSharedPoint,
   isPastStop,
   latestPosition,
+  straddlesStop,
 } from "./compare.js";
 import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
@@ -748,11 +749,18 @@ export interface Ended {
  * - it is past the stop in every trace it is in (`isPastStop`): strictly
  *   after it, or in the same gap as the stop (between the same two matched
  *   records, in either trace). This is how a changed difference (a matched
- *   pair) after the stop is dropped.
+ *   pair) after the stop is dropped; or
+ * - it is a changed difference after the shared match point with either of
+ *   its records past the stop in its own trace (`straddlesStop`; Jason,
+ *   2026-11-01: "a changed record whose 2.0 half or 1.35 half is past the
+ *   stop, and that sits after the shared match point, is dropped, as its two
+ *   halves would be if left unpaired").
  *
  * A difference before the shared match point is still matched as usual (and
  * an uncovered one still fails), whatever its stream, as is a changed one
- * that is not past the stop. Only an `ends` entry stops, and only in a case
+ * with both records before the stop ("A pair with both halves before the
+ * stop is still checked, so no difference from before the quirk is
+ * hidden"). Only an `ends` entry stops, and only in a case
  * with its `when` triggers; each engine is walked on its own, and a hand
  * scenario never stops: there `ends` is just an entry.
  */
@@ -782,7 +790,12 @@ export function explain(
   const dropped = new Map<string, number>();
   const unexplained = differences.filter((d) => {
     const cut = cuts.get(d.engine);
-    if (cut && (isPastSharedPoint(d, cut.at) || isPastStop(d, cut.at))) {
+    if (
+      cut &&
+      (isPastSharedPoint(d, cut.at) ||
+        isPastStop(d, cut.at) ||
+        straddlesStop(d, cut.at))
+    ) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
       return false;
