@@ -253,8 +253,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      pull-requests: read
     steps:
-      - run: gh workflow run oracle-guard.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f pr="$PR_NUMBER"
+      # The head sha is read here and sent with the dispatch, so the guard
+      # evaluates and reports on exactly this commit. `--ref` is the branch
+      # this run is on, so a release on `next` dispatches the copy of the
+      # guard that lives on `next`.
+      - run: |
+          set -euo pipefail
+          sha=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)
+          gh workflow run oracle-guard.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f pr="$PR_NUMBER" -f sha="$sha"
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.release.outputs.pullRequestNumber }}

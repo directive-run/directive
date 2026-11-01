@@ -26,7 +26,8 @@ name: Oracle guard
 #   that token causes. The required `oracle-guard` check therefore never
 #   appeared on a new release head until a person toggled a label. The
 #   release workflow dispatches this workflow instead (dispatch is the one
-#   event GITHUB_TOKEN is allowed to start), passing only the PR number.
+#   event GITHUB_TOKEN is allowed to start), passing the PR number and the
+#   head sha it saw.
 # - A dispatched run has the same safety shape: the PR is read from the API,
 #   the checkout is its base sha, the head is read only as data, and the
 #   guard step has the same read-only token. The only extra permission is
@@ -34,6 +35,15 @@ name: Oracle guard
 #   it posts the guard's result as a check run named `oracle-guard` on the
 #   head sha the guard actually evaluated. A check run made with GITHUB_TOKEN
 #   belongs to the GitHub Actions app, which is what the required check pins.
+# - The result is bound to one sha. The dispatch carries the head sha it
+#   saw; the first step refuses to run if the PR head is already something
+#   else, and the report job re-reads the head right before posting and posts
+#   nothing if it moved while the guard ran (the guard reads the changed-file
+#   list and labels live, so a moved head could mix two heads). The check is
+#   always created on the evaluated sha, never on the current head, so it
+#   cannot be read as approving a commit it did not see. A moved head gets
+#   its own dispatch from the release workflow. The head is never checked
+#   out: the checkout stays the base sha, as above.
 # - ⚠ THE DISPATCHED PATH'S BOUNDARY IS WRITE ACCESS, NOT THIS FILE.
 #   `workflow_dispatch` runs this workflow as it exists on the ref it is
 #   dispatched from, so a same-repo branch carrying an edited copy could post
@@ -48,6 +58,10 @@ on:
     inputs:
       pr:
         description: Pull request number to guard (used by the release workflow)
+        required: true
+        type: string
+      sha:
+        description: Head sha the caller saw; the guard evaluates and reports on exactly this
         required: true
         type: string
 
@@ -68,10 +82,13 @@ jobs:
     env:
       # Set only on a dispatched run; empty on pull_request_target.
       DISPATCH_PR: ${{ inputs.pr }}
+      DISPATCH_SHA: ${{ inputs.sha }}
     steps:
       # Dispatch only: rebuild the pull_request payload the guard reads, from
       # the API, so the guard itself is unchanged. The PR number is checked
-      # to be digits before use, and a closed PR is not guarded.
+      # to be digits before use, a closed PR is not guarded, and a head that
+      # is no longer the dispatched sha is refused: nothing is posted for it,
+      # and the new head is covered by its own dispatch.
       - name: Load the PR (dispatch only)
         id: pr
         if: github.event_name == 'workflow_dispatch'
@@ -88,11 +105,22 @@ jobs:
             echo "::error::PR #${DISPATCH_PR} is ${state}, not open"
             exit 1
           fi
+          case "$DISPATCH_SHA" in
+            *[!0-9a-f]*|'') echo "::error::sha must be 40 lowercase hex characters"; exit 1;;
+          esac
+          if [ "${#DISPATCH_SHA}" -ne 40 ]; then
+            echo "::error::sha must be 40 lowercase hex characters"; exit 1
+          fi
+          head_now=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")
+          if [ "$head_now" != "$DISPATCH_SHA" ]; then
+            echo "::error::PR #${DISPATCH_PR} head is ${head_now}, not the dispatched ${DISPATCH_SHA}; not evaluating, posting nothing. The new head gets its own dispatch."
+            exit 1
+          fi
           jq -c --arg repo "$GITHUB_REPOSITORY" \
             '{repository: {full_name: $repo}, pull_request: .}' \
             "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-event.json"
           echo "base_sha=$(jq -r .base.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${DISPATCH_SHA}" >> "$GITHUB_OUTPUT"
 
       # The base branch, never the PR head.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -133,14 +161,30 @@ jobs:
     timeout-minutes: 5
     permissions:
       checks: write
+      pull-requests: read
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ needs.oracle-guard.outputs.head_sha }}
           RESULT: ${{ needs.oracle-guard.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          # Re-read the head right before posting. If it moved while the guard
+          # ran, what the guard read may not describe HEAD_SHA, and HEAD_SHA is
+          # no longer the head: post nothing. The new head has its own dispatch.
+          case "$PR_NUMBER" in
+            ''|*[!0-9]*) echo "::error::pr must be a number"; exit 1;;
+          esac
+          case "$HEAD_SHA" in
+            *[!0-9a-f]*|'') echo "::error::head sha is not hex"; exit 1;;
+          esac
+          head_now=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)
+          if [ "$head_now" != "$HEAD_SHA" ]; then
+            echo "::warning title=oracle-guard not posted::PR #${PR_NUMBER} head moved from ${HEAD_SHA} to ${head_now} while the guard ran; posting nothing for ${HEAD_SHA}. The new head gets its own dispatch."
+            exit 0
+          fi
           if [ "$RESULT" = "success" ]; then conclusion=success; else conclusion=failure; fi
           gh api -X POST "repos/${GITHUB_REPOSITORY}/check-runs" \
             -f name=oracle-guard \
