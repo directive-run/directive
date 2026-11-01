@@ -16,6 +16,7 @@ jobs:
   release:
     outputs:
       published: ${{ steps.changesets.outputs.published }}
+      pullRequestNumber: ${{ steps.changesets.outputs.pullRequestNumber }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -239,6 +240,24 @@ jobs:
           done
           echo "::error title=latest dist-tag mismatch::Published @directive-run/core@${want} but latest is ${latest} after five minutes."
           exit 1
+
+  # The Version Packages PR is pushed with GITHUB_TOKEN, and GitHub starts no
+  # pull_request_target run for that, so the required `oracle-guard` check
+  # never appeared on a new release head. workflow_dispatch is the one event
+  # GITHUB_TOKEN may start; the guard reads the PR itself and reports on its
+  # head. Its own job so `actions: write` stays out of the publishing job.
+  guard-release-pr:
+    name: Run oracle-guard on the release PR
+    needs: release
+    if: ${{ !cancelled() && needs.release.outputs.pullRequestNumber != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run oracle-guard.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f pr="$PR_NUMBER"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.release.outputs.pullRequestNumber }}
 
   docs-artifacts:
     name: Publish docs artifacts
