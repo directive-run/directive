@@ -416,6 +416,18 @@ export function specLayer(spec: FuzzSpec): string {
 }
 
 const f = (i: number) => `f${i}`;
+
+/**
+ * Whether an abort's reason is the error a resolver's `timeout` rejects
+ * with: `Resolver "<id>" timed out after <ms>ms`, the same message on every
+ * engine.
+ */
+const TIMED_OUT = /^Resolver ".*" timed out after \d+ms$/;
+const isTimeoutError = (reason: unknown): boolean => {
+  const message = (reason as { message?: unknown } | null)?.message;
+
+  return typeof message === "string" && TIMED_OUT.test(message);
+};
 const NAMES = ["a", "b"];
 
 function moduleDef(
@@ -497,10 +509,19 @@ function moduleDef(
         // ("start", "wrote", "aborted"; the resolver's tag is data[1]), the
         // same on every engine, so the comparison pairs a start only with a
         // start, and an entry's kind does not depend on which resolver
-        // (`<module>.r<index>`) a case happens to have.
+        // (`<module>.r<index>`) a case happens to have. An abort whose
+        // reason is the resolver's timeout error is a "timeout" instead:
+        // 1.35 never aborts a signal on a timeout, 2.0 does (row n), and
+        // under one kind the comparison paired 2.0's early timeout abort
+        // with 1.35's later cancel-time abort of the same attempt, moving
+        // every other run's record between the two.
         external(["start", `${id}.r${i}`, n]);
         context.signal?.addEventListener?.("abort", () =>
-          external(["aborted", `${id}.r${i}`, n]),
+          external([
+            isTimeoutError(context.signal.reason) ? "timeout" : "aborted",
+            `${id}.r${i}`,
+            n,
+          ]),
         );
         if (c.delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, c.delay));
@@ -519,12 +540,16 @@ function moduleDef(
       ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
       run: (fs: any) => {
         const seen = e.reads.map((k) => own(fs)[f(k)]);
-        external([`${id}.x${i}`, seen]);
+        // An effect's run and its cleanup are recorded under their own kind
+        // ("effect", "cleanup"; the effect's tag is data[1]), the same on
+        // every engine, as resolver records are: under one kind per effect
+        // tag, a quirk that adds runs (row p) needed an entry per tag.
+        external(["effect", `${id}.x${i}`, seen]);
         if (e.throwsAt !== null && seen[0] === e.throwsAt) {
           throw new Error(`${id}.x${i} throws at ${seen[0]}`);
         }
         if (e.cleanup) {
-          return () => external([`${id}.x${i}`, "cleanup", seen]);
+          return () => external(["cleanup", `${id}.x${i}`, seen]);
         }
 
         return undefined;
@@ -616,6 +641,27 @@ const TRIGGERS = {
   /** Some resolver has a timeout. */
   timeout: (spec) =>
     spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)),
+  /**
+   * Some resolver can reject: it throws on its first `fails` attempts
+   * (`fails` > 0), or it has a timeout no longer than its wait (`delay`), so
+   * the timeout can fire before it writes. A resolver's outcome can be an
+   * error only then, which row b needs (an error and a cancel for one run).
+   */
+  resolverRejects: (spec) =>
+    spec.modules.some((m) =>
+      m.constraints.some(
+        (c) => c.fails > 0 || (c.timeout !== null && c.timeout <= c.delay),
+      ),
+    ),
+  /**
+   * A settle() can still be waiting when stop() or destroy() runs (row z):
+   * the case has a resolver. A settle step's settle() is left waiting only
+   * when its drive gives up (500 timer jumps, diff/scenario.ts `drive`)
+   * while a run is in flight or re-dispatched, and a stop or destroy always
+   * follows a settle step: every case ends with one, then the teardown's
+   * destroy(). So the spec cannot narrow this further than "has a resolver".
+   */
+  settleStop: (spec) => hasConstraint(spec),
   /**
    * The steps have a `stop` step and, later, a `start` step with no
    * `destroy` step between them. A destroyed system is never restarted

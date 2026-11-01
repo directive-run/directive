@@ -7,6 +7,7 @@
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { engines } from "../engines.js";
 import {
   FEATURE_LAYERS,
   type FuzzEffect,
@@ -16,7 +17,8 @@ import {
   specLayer,
   toScenario,
 } from "../fuzz/model.js";
-import { currentLayer, v2Runs } from "../scenario.js";
+import type { TraceEntry } from "../record.js";
+import { currentLayer, runScenario, v2Runs } from "../scenario.js";
 
 const sample = (ceiling?: string, numRuns = 400): FuzzSpec[] =>
   fc.sample(specArbitrary(ceiling === undefined ? {} : { ceiling }), {
@@ -163,5 +165,65 @@ describe("fuzz generator ceiling", () => {
   it("refuses a ceiling that is not a layer", () => {
     expect(() => specArbitrary({ ceiling: "1" })).toThrow(/not a layer/);
     expect(() => specArbitrary({ ceiling: "L" })).toThrow(/not a layer/);
+  });
+});
+
+describe("fuzz model abort records", () => {
+  // One resolver that takes 5 ms under a 3 ms timeout: its attempt times out.
+  const timedOut: FuzzSpec = {
+    modules: [
+      {
+        facts: 1,
+        date: false,
+        derivations: [],
+        events: [{ target: 0, add: false }],
+        constraints: [
+          {
+            fact: 0,
+            atLeast: 0,
+            crossAtLeast: null,
+            priority: 0,
+            writes: 0,
+            value: 1,
+            delay: 5,
+            fails: 0,
+            retry: 0,
+            timeout: 3,
+          },
+        ],
+        effects: [],
+        source: null,
+      },
+    ],
+    boundary: "skip",
+    history: false,
+    trace: false,
+    steps: [{ op: "settle" }],
+  };
+  const records = (trace: TraceEntry[], tag: string) =>
+    trace.flatMap((e) =>
+      e.k === "external" && Array.isArray(e.data) && e.data[0] === tag
+        ? [e.data]
+        : [],
+    );
+
+  it("records an abort whose reason is the timeout error as a timeout, on the engine that aborts on one", async () => {
+    for (const engine of engines().slice(1)) {
+      const result = await runScenario(toScenario(timedOut), {
+        candidates: [engine],
+      });
+      // 1.35 (the reference, and the workspace engine) never aborts on a
+      // timeout: no record of either kind.
+      expect(records(result.traces.reference, "timeout")).toEqual([]);
+      expect(records(result.traces.reference, "aborted")).toEqual([]);
+      const own = result.traces.candidate;
+      if (engine.name === "v2") {
+        // Row n: 2.0 aborts the timed-out attempt with the timeout error.
+        expect(records(own, "timeout")).toEqual([["timeout", "a.r0", 1]]);
+        expect(records(own, "aborted")).toEqual([]);
+      } else {
+        expect(records(own, "timeout")).toEqual([]);
+      }
+    }
   });
 });

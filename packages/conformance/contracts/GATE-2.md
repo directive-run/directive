@@ -112,17 +112,16 @@ shows. The census prints how many cases ended early, at which step on average
 and how many at step 0.
 
 Every `ends` entry is for engine `v2`, signed, and carries `when` (see "How a
-fuzz entry is narrowed" below). The four groups that have one:
+fuzz entry is narrowed" below). The four groups that have one (as of #301):
 
-| Group | Entries | `when` | Ends a fuzz case at |
+| Group | Entries that end a case | `when` | Ends a fuzz case at |
 | --- | --- | --- | --- |
-| `quirk-a` (row A1) | `l3-quirk-a-fuzz-hook-onReconcileStart-extra`, `l3-quirk-a-fuzz-hook-onResolverStart-extra`, `l3-quirk-a-fuzz-external-start-extra`, `l3-quirk-a-fuzz-external-start-changed-attempt`, `l3-quirk-a-fuzz-external-wrote-changed-attempt` | `resolverRetry` | the first record only the re-dispatch makes: its `onReconcileStart` or `onResolverStart` call, the resolver's own `start` record (extra, or with another attempt number), or a `wrote` record with another attempt number. `l3-quirk-a-fuzz-hook-onResolverRetry-missing` is in the group but does not end a case |
-| `quirk-p` (row p) | `l3-quirk-p-fuzz-hook-onReconcileStart-extra`, `l3-quirk-p-fuzz-hook-onResolverStart-extra` | `resolverRetryLater` | the `onReconcileStart` or `onResolverStart` call of the `retry-later` re-dispatch |
-| `quirk-j` | `l3-quirk-j-fuzz-hook-onResolverStart-extra`, `l3-quirk-j-fuzz-hook-onReconcileStart-extra`, `l3-quirk-j-fuzz-hook-onReconcileEnd-changed-inflight`, `l3-quirk-j-fuzz-hook-onReconcileEnd-changed-unmet` | `restart` | the first record of the run that `stop()` then `start()` re-dispatches on 2.0 (an extra start, or an `onReconcileEnd` whose in-flight or unmet list holds it) |
-| `quirk-b` | `l2-quirk-b-observe-resolver-error-missing` | `retryPolicy` | the `resolver.error` observe event 1.35 adds after the cancel, the last of its four extra records (the other three are ordinary entries) |
+| `quirk-a` (row A1) | 12 of its 13: `onReconcileStart` or `onResolverStart` extra; `onResolverStart` and the `resolver.start` event changed (`args`, `event`); the external `start` record extra or changed (`data[1]` the resolver, `data[2]` the attempt); `wrote` changed (`data[2]`); `onResolverRetry` extra or changed (`args[2]`); `onReconcileEnd` changed (`args[0].inflight`, `args[0].unmet`) | `resolverRetry` | the first record only the re-dispatch makes, or the first that the comparison pairs with another run's because of it. `l3-quirk-a-fuzz-hook-onResolverRetry-missing` is in the group but does not end a case |
+| `quirk-p` (row p) | all 5: `onReconcileStart` or `onResolverStart` extra; `start` changed (`data[2]`); an `effect` run or `cleanup` extra | `resolverRetryLater` | the first record of a `retry-later` re-dispatch 1.35 does not make, or of the effect runs its writes cause |
+| `quirk-j` | all 5: `onResolverStart` or `onReconcileStart` extra; `onResolverStart` changed (`args`); `onReconcileEnd` changed (in flight, unmet) | `restart` | the first record of the run that `stop()` then `start()` re-dispatches on 2.0 |
+| `quirk-b` | all 10: each error record 1.35 adds after the cancel (`onError`, `onErrorRecovery`, `onResolverError`, `resolver.error`, the unhandled error under `"throw"`), missing or changed | `resolverRejects` | the first of 1.35's extra error records: from it on the strategy (disable, throw, retry) runs on 1.35 only |
 
-Twelve entries end a case in all (5, 2, 4 and 1). At the PR seed 6 cases end
-early, at step 4.2 on average, none at step 0.
+32 entries end a case in all (12, 5, 5 and 10). At the PR seed (24301, 287 cases, 90 on v2) 7 cases end early, at step 3.9 on average, none at step 0.
 
 ## How a fuzz entry is narrowed (#297)
 
@@ -147,6 +146,8 @@ Three pieces, each described in `README.md` under "Divergences":
   | `constraintRetryLater` | `onConstraintError` is `"retry-later"` and the case has a constraint (never set today: the model passes `"skip"`) |
   | `retryPolicy` | some resolver has a `retry` policy (more than one attempt) |
   | `timeout` | some resolver has a `timeout` |
+  | `resolverRejects` | some resolver can reject: it fails at least once (`fails` > 0), or its `timeout` is no longer than its wait, so the timeout can fire before it writes (#301) |
+  | `settleStop` | the case has a resolver: a settle step can leave its `settle()` waiting, and a stop, destroy or the teardown always follows a settle step (#301) |
   | `restart` | the steps have a `stop` with a `start` after it and no `destroy` before that `start` (1.35 ignores `start()` after `destroy()`) |
   | `disable` | some strategy is `"disable"` and the case has what it applies to: a resolver (`onResolverError`) or an effect (`onEffectError`) |
   | `throw` | some strategy is `"throw"` and the case has a resolver (effects then skip) |
@@ -162,11 +163,12 @@ Three pieces, each described in `README.md` under "Divergences":
   that covered nothing is stale as a whole. `group` changes only the stale
   check, never what an entry covers.
 
-Fuzz entries by group (38): `quirk-a` 6, `quirk-p` 2, `quirk-j` 4, `quirk-n` 10
-(`aborted`, `wrote` and `start` records; `when: timeout`), `quirk-b` 10
-(`when: retryPolicy`), `quirk-t` 5 (no `when`: the shape needs only a resolver
-whose write retracts its own constraint) and the L2 console-warning entry
-`l2-quirk-b-console-warn` (no group, no `when`).
+Fuzz entries by group (52, as of #301): `quirk-a` 13, `quirk-p` 5, `quirk-j` 5,
+`quirk-n` 10 (`timeout`, `aborted`, `wrote` and `start` records; `when:
+timeout`), `quirk-b` 10 (`when: resolverRejects`), `quirk-t` 5 (no `when`: the
+shape needs only a resolver whose write retracts its own constraint), `quirk-z`
+3 (`when: settleStop`) and the L2 console-warning entry `l2-quirk-b-console-warn`
+(no group, no `when`).
 
 ## Row t has a third path
 
@@ -185,10 +187,14 @@ entries are group `quirk-t`.
 
 ## Pinned fuzz cases
 
-`diff/fuzz/pinned.json` holds three fixed cases that the ceiling phase runs
+`diff/fuzz/pinned.json` holds four fixed cases that the ceiling phase runs
 before its random ones, on every seed (fast-check `examples`): quirk p
 (`retry-later` re-dispatch, seed 5's ceiling phase), quirk j (`stop()` then
-`start()` re-dispatches, seed 5) and quirk t (the third path above, seed 2).
+`start()` re-dispatches, seed 5), quirk t (the third path above; since #301
+the case is built from its hand scenario, because the seed-2 case it replaced
+now ends at a quirk-b stop before t's records) and,
+since #301, quirk z (a `settle()` still waiting at the teardown, seed 3 at
+5,000 cases).
 Each shows one approved quirk whose fuzz group the random cases of the fixed
 seed (24301) never reach. Without them the census would find those groups
 unused at the PR seed and fail them as stale, so whichever seed the PR or the
@@ -199,28 +205,82 @@ still covers only what it names. The owner kept them on 2026-11-01: "keep
 diff/fuzz/pinned.json (three fixed fuzz cases for quirks p, j and t on every
 seed)".
 
-## Known open: the nightly fuzz at 5,000 cases
+## The nightly fuzz at 5,000 cases (#301)
 
-The PR fuzz passes: the fixed seed (24301), 287 cases compared, 90 of them on
-v2, 6 ended early; and seeds 1 to 20 plus 24301 at the PR run count (205) all
-exit 0, 21 of 21.
+At the L3 gate the PR fuzz passed and the nightly depth (5,000 cases) failed on
+shapes of approved quirks a and n. The owner decided on 2026-11-01 to merge the
+gate and fix the depth in its own slice: "timeout aborts recorded under their
+own kind, and ends entries also dropping differences beside the stop". #301
+built both, and found two more approved shapes on the way.
 
-The nightly fuzz runs 5,000 cases and still fails. The three seeds run at that
-depth (2, 24301 and 1) all fail on shapes of approved quirks a and n that the
-entries do not cover:
+**Timeout aborts get their own kind.** In `diff/fuzz/model.ts` an abort whose
+`signal.reason` is the resolver's timeout error is recorded as `["timeout",
+"<m>.r<i>", attempt]`; any other abort stays `aborted`. 1.35 never aborts a
+signal on a timeout, so a `timeout` record is 2.0's alone (row n): a survey of
+seeds 1 to 20 and 24301 at the PR count, and 1, 2, 3, 4 and 24301 at depth,
+found none in any 1.35 trace. Before, the comparison paired 2.0's early timeout
+abort with 1.35's later cancel-time abort of the same attempt, and every other
+run's record between the two moved. The n group's abort entry is re-scoped to
+`timeout`. Effect runs and cleanups are kinded the same way since #301
+(`["effect" | "cleanup", "<m>.x<i>", values]`), so row p's extra effect runs
+need one entry, not one per effect.
 
-- seed 2: quirk a, where a record beside the stop differs (`onFactSet` missing
-  on v2, then extra `reconcile.start` and `requirement.created`) and `ends`
-  does not drop it, because "beside" is not "after";
-- seed 24301: quirk n, a timed-out attempt's error records (`onError`,
-  `onErrorRecovery`, `onResolverError`, `resolver.error`, extra on v2) at a
-  step where the pairing differs;
-- seed 1: an `external` `start` record whose resolver differs (`data[1]`), a
-  pairing artifact of quirks a and n.
+**`ends` also drops differences beside the stop.** A difference is dropped if
+it comes strictly after the stop, or if it is an unmatched record in the same
+gap as an unmatched stop (between the same two matched records, in either
+trace). Only an `ends` entry makes a stop, and only in a case with its `when`
+triggers; a difference before the gap is still reported (`diff/compare.ts`
+`isPastStop`, `diff/self/ends.test.ts`).
 
-These are classified from the first difference of each seed, not by proving
-every record. None looks like an unapproved row. The owner decided on
-2026-11-01 to merge the gate now and fix this in its own slice: "timeout
-aborts recorded under their own kind, and ends entries also dropping
-differences beside the stop". Until that lands, the nightly fuzz is red at
-5,000 cases and the PR fuzz stays green.
+**Row z (approved 2026-11-01).** The owner approved 2.0's behaviour: "a pending
+settle() resolves at stop or destroy, with no lingering timer and no late
+rejection". 1.35 leaves a `settle()` that is still waiting when `stop()` or
+`destroy()` runs pending, keeps its 5-second `maxWait` timer through
+`destroy()`, and rejects it once the wait runs out (`settle() timed out`). 2.0
+resolves it at `stop()` (`packages/core-next/src/api/core.ts`, `stopped()`).
+The hand scenario "settle() pending across stop() and destroy()" (L3, in
+`l3-lifecycle-plugins`) shows all three differences, each with a signed
+`l3-quirk-z-settle-*` entry: the outcome 2.0 records at `stop()`, the timer
+count after `destroy()`, and the late rejection only 1.35 records. In the fuzz
+a settle step leaves its `settle()` waiting when its drive gives up (500 timer
+jumps) with a run in flight; the group `quirk-z` covers the timer count after
+a destroy step or the teardown and the late rejection, with `when:
+settleStop`. The spec cannot narrow it below "the case has a resolver",
+because every case ends with a settle step and then the teardown.
+
+**Row b's window is wider than a retry backoff.** 1.35 reports a cancel and
+then an error for one run also when the run rejects and is canceled in the
+same timer tick, with no backoff at all (a probe with no retry policy and no
+timeout shows it). The b group's `when` was `retryPolicy`, which missed that
+window (seed 4 at depth, a timeout and `"throw"`), so it is now
+`resolverRejects`: some resolver can reject, which every case of either window
+has. Every b entry now ends the case: 1.35's extra error changes what the case
+does next (the strategy disables, throws or re-runs), and the comparison pairs
+the records after it differently for each seed. All ten were re-signed.
+
+**Row t's error shape.** The same probe, with the cancel one microtask after
+the rejection, shows row t's order for an error: 1.35 reports the error and
+then a cancel for the same run, 2.0 the error only. That is row t's shape
+("reports the outcome only, with no cancel after it") with an error as the
+outcome. The `quirk-t` entries have no `when` and cover the missing cancel
+records whatever the outcome, so this shape needs no new entry.
+
+**Results at #301.** At the PR count (205 cases) seeds 1 to 20 and 24301 all
+pass, 21 of 21. At 5,000 cases seeds 1, 3 and 4 pass; seeds 2 and 24301 still
+fail, on approved shapes (a with n, and b) that per-shape entries cannot reach:
+
+- the comparison aligns each stream on its own, so under quirk a the observe
+  events of 2.0's re-dispatched pass (`fact.change`, `reconcile.start`, …) can
+  be unmatched earlier than the hook-stream stop (seed 24301);
+- where 1.35's extra error (b) pairs as `changed` with a later error of 2.0's,
+  a stop at that record does not drop the records between its two halves, so a
+  bystander write (`onFactSet`, `fact.change`, `onDerivation*`) that 2.0 makes
+  earlier stays reported (seed 2; two replays of the round-1 residuals).
+
+Covering these with entries would need wide bystander entries (an extra fact
+write anywhere in a case with the trigger), which the owner has not approved.
+They need a decision on the stop rule instead (for example, a stop drops the
+unmatched records of every stream after the last record both traces matched
+before it). Until then the nightly fuzz stays red on seeds like these and the
+PR fuzz stays green.
+
