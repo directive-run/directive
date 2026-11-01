@@ -1,0 +1,25 @@
+{
+  "_README": "Gzip budgets for the 2.0 engine (packages/core-next), read by packages/core-next/scripts/size.mjs. Each entry is a fixture or module and its `gzBudget` in bytes: minified with esbuild, gzip level 9, the exact number `pnpm --filter @directive-run/core-next size` prints for it. size.mjs fails when a measured size is over its budget. Tighten-only: scripts/size-budgets-tighten.mjs fails a pull request that raises a budget, or sets one to null (no budget), unless that entry's `reason` also changed in the same pull request. A later layer that adds code raises its budget in its own pull request and writes why in `reason`. Lowering a budget needs no new reason. Keys: `graph` is src/graph.ts bundled alone; `minimal`, `two-module` and `floor` are scripts/fixtures/*.ts built against core-next; `full-entry` is `export * from '@directive-run/core'` (every export).",
+  "budgets": {
+    "graph": {
+      "gzBudget": 1850,
+      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+    },
+    "minimal": {
+      "gzBudget": 25500,
+      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+    },
+    "two-module": {
+      "gzBudget": 25600,
+      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+    },
+    "floor": {
+      "gzBudget": 10400,
+      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+    },
+    "full-entry": {
+      "gzBudget": 27700,
+      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+    }
+  }
+}
