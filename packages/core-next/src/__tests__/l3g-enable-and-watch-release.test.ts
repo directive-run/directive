@@ -265,7 +265,7 @@ describe("the watched set keeps only what a reader still reads (1.35)", () => {
     ]);
   });
 
-  it("an effect that keeps asking keeps the watch", async () => {
+  it("an effect that keeps asking watches nothing and does not re-run (quirk c)", async () => {
     const log = await run(
       (log: unknown[]) => ({
         effects: {
@@ -283,16 +283,16 @@ describe("the watched set keeps only what a reader still reads (1.35)", () => {
         ["b", 1],
       ],
     );
+    // 1.35 watches `d` and re-runs `e` at every `a` write. 2.0 records the
+    // membership of `d`, which nothing changes before L10.
     expect(log).toEqual([
       "a=1",
+      // `d`, computed at start, goes stale once; nothing watches it after.
       "d in pass",
-      "e asks",
       "a=2",
-      "d in pass",
-      "e asks",
+      "-",
       "a=3",
-      "d in pass",
-      "e asks",
+      "-",
       "b=1",
       "-",
     ]);

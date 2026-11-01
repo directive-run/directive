@@ -38,12 +38,16 @@ const init = (f: any) => {
   f.b = 0;
   f.c = 0;
 };
-const mod = (effects: Record<string, unknown>) =>
+const mod = (
+  effects: Record<string, unknown>,
+  constraints?: Record<string, unknown>,
+) =>
   createModule("m", {
-    schema,
+    schema: { ...schema, requirements: { R: {} } },
     init,
     derive: { d: (f: any) => f.a + 1 },
     effects,
+    constraints,
   } as any);
 
 /** A write `[key, value]`, a control on effect `e`, or a look. */
@@ -417,7 +421,10 @@ describe("watching: a disabled effect pins nothing, and enable watches again", (
   const D = DERIVATION_DEP_PREFIX + "d";
 
   /** Each pass's changed keys (whether `d` was among them), and the runs. */
-  async function trace(effects: (log: unknown[]) => Record<string, unknown>) {
+  async function trace(
+    effects: (log: unknown[]) => Record<string, unknown>,
+    constraints?: (log: unknown[]) => Record<string, unknown>,
+  ) {
     const log: unknown[] = [];
     const spy: SystemPart = (ctx) => {
       const feature = (ctx.kernel.features as any).effects;
@@ -427,11 +434,10 @@ describe("watching: a disabled effect pins nothing, and enable watches again", (
         return original.call(feature, keys);
       };
     };
-    const system: any = createSystemCore({ module: mod(effects(log)) } as any, [
-      withEffects,
-      withReconcile,
-      spy,
-    ]);
+    const system: any = createSystemCore(
+      { module: mod(effects(log), constraints?.(log)) } as any,
+      [withEffects, withReconcile, spy],
+    );
     system.start();
     await flush();
     log.length = 0;
@@ -485,15 +491,21 @@ describe("watching: a disabled effect pins nothing, and enable watches again", (
     ]);
   });
 
+  // A constraint: under quirk (c) an effect that asks watches nothing.
   it("another reader that asks about it keeps it watched", async () => {
     expect(
-      await trace((log) => ({
-        e: e(log),
-        f: {
-          run: (_f: any, _p: any, dd: any) =>
-            void log.push("d" in dd ? "f asks" : "f"),
-        },
-      })),
+      await trace(
+        (log) => ({ e: e(log) }),
+        (log) => ({
+          f: {
+            when: (_f: any, dd: any) => {
+              log.push("d" in dd ? "f asks" : "f");
+              return false;
+            },
+            require: { type: "R" },
+          },
+        }),
+      ),
     ).toEqual([
       "a=1",
       "d in pass",

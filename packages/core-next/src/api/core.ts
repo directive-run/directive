@@ -778,7 +778,20 @@ export function createSystemCore<const M extends ModuleSchema>(
       // for whoever reads its value (a read would run it, and report its
       // throw, for a question about whether it exists).
       has: (_, id) => {
-        const d = typeof id === "string" ? derivations.get(id) : undefined;
+        // A symbol is in no Map of names: undefined, as for an unknown name.
+        const d = derivations.get(id as string);
+        // Quirk (c) and (w), effects only: an effect body's membership test
+        // depends on membership, true or false, and watches nothing. A
+        // derivation computed inside it has its own frame (and outside any
+        // frame `deps` is null, never `effect_`), so it keeps 1.35's rule
+        // below, as constraints do.
+        if (typeof id === "string" && tracker.deps === tracker.effect_) {
+          // MEMBER_DEP_PREFIX (facts.ts) written out: importing it costs the
+          // floor bytes (a test pins that the two agree).
+          tracker.deps.add(`\u001E${id}`);
+
+          return !!d;
+        }
         if (!d) {
           return false;
         }
@@ -797,8 +810,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       },
       // As in 1.35, a derivation reads like a getter under reflection.
       getOwnPropertyDescriptor: (_, id) =>
-        typeof id === "string" && derivations.has(id)
-          ? { configurable: true, enumerable: true, get: () => read(id) }
+        derivations.has(id as string)
+          ? {
+              configurable: true,
+              enumerable: true,
+              get: () => read(id as string),
+            }
           : undefined,
     },
   );

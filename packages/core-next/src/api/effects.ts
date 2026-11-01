@@ -63,7 +63,15 @@ interface EffectState {
   id: string;
   enabled: boolean;
   explicit: boolean;
+  /**
+   * What it depends on: declared, or what its last good run read (null: an
+   * auto-tracked effect that has not run yet). Indexed by key in `index`.
+   */
   deps: Set<string> | null;
+  /** T1: the cleared set the next auto-tracked run tracks into. */
+  spare_?: Set<string>;
+  /** The pass whose changed keys reached it (T2). */
+  hit_?: number;
   cleanup: (() => void) | null;
   /** Its cleanup is running: the boundary's "disable" does not start it again. */
   cleaning_?: boolean;
@@ -155,6 +163,32 @@ export function createEffectsManager<S extends Schema>(
   );
 
   const depKey = options.depKey ?? ((name: string) => name);
+  /**
+   * T2: dependency key to the effects that depend on it, so a pass looks up
+   * its changed keys instead of walking every effect's set. It changes only
+   * when a set does (T1's swap), never per pass. A disabled effect keeps its
+   * entries (y) and selection skips it, so `enable` re-indexes nothing.
+   *
+   * TODO(L8): a history navigation wakes every effect but those declaring
+   * `onNavigate: "skip"`, which see only the real keys: `reach` marks per
+   * key set, so a pass can call it once for each. TODO(L10): `refreshDeps`
+   * links a declared name when it comes to exist (`link`). Neither feature
+   * exists in core-next yet, so their tests land with them.
+   */
+  const index = new Map<string, EffectState[]>();
+  const link = (state: EffectState, key: string) => {
+    const at = index.get(key);
+    at ? at.push(state) : index.set(key, [state]);
+  };
+  const unlink = (state: EffectState, key: string) => {
+    const at = index.get(key)!;
+    at.splice(at.indexOf(state), 1);
+    if (at.length === 0) {
+      index.delete(key);
+    }
+  };
+  /** Declaration order, for selection. */
+  const order: EffectState[] = [];
   for (const id of Object.keys(definitions)) {
     const def = definitions[id];
     const deps = def?.deps as string[] | undefined;
@@ -165,13 +199,49 @@ export function createEffectsManager<S extends Schema>(
         `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
       );
     }
-    states.set(id, {
+    const state: EffectState = {
       id,
       enabled: true,
       explicit: Array.isArray(deps),
       deps: Array.isArray(deps) ? new Set(deps.map(depKey)) : null,
       cleanup: null,
-    });
+    };
+    for (const key of state.deps ?? []) {
+      link(state, key);
+    }
+    states.set(id, state);
+    order.push(state);
+  }
+
+  /**
+   * T1: a good auto-tracked run's reads become its dependencies. It tracked
+   * into the spare set: the same keys keep the old set and clear the spare
+   * for the next run, so a frame whose reads did not change allocates
+   * nothing; different keys swap the two and re-index what moved.
+   */
+  function commit(state: EffectState, next: Set<string>): void {
+    const old = state.deps;
+    let same = old?.size === next.size;
+    for (const key of next) {
+      same &&= old!.has(key);
+    }
+    if (same) {
+      next.clear();
+      state.spare_ = next;
+
+      return;
+    }
+    for (const key of old ?? []) {
+      unlink(state, key);
+    }
+    for (const key of next) {
+      link(state, key);
+    }
+    if (old) {
+      old.clear();
+      state.spare_ = old;
+    }
+    state.deps = next;
   }
 
   const refuse = (id: string, key: string): true => {
@@ -364,18 +434,29 @@ export function createEffectsManager<S extends Schema>(
       if (state.explicit) {
         store.batch(body);
       } else {
-        // withTracking's frame, without its result object.
-        const deps = new Set<string>();
+        // withTracking's frame, without its result object, into the spare
+        // set (T1), marked as an effect's for the membership rule (c). Taken
+        // off the state while it runs, so a nested run makes its own.
+        const deps = state.spare_ ?? new Set<string>();
+        state.spare_ = undefined;
         const outer = tracker.deps;
-        tracker.deps = deps;
+        const outerEffect = tracker.effect_;
+        tracker.deps = tracker.effect_ = deps;
         try {
           store.batch(body);
+        } catch (error) {
+          // A throwing run keeps the last good run's dependencies (U3).
+          deps.clear();
+          state.spare_ = deps;
+          throw error;
         } finally {
           tracker.deps = outer;
+          tracker.effect_ = outerEffect;
         }
-        state.deps = deps.size > 0 ? deps : null;
+        commit(state, deps);
         if (isDevelopment && state.out_ instanceof Promise) {
-          warnAsyncAutoTracked(id, deps);
+          // Not `deps`: when the reads matched, commit cleared it as the spare.
+          warnAsyncAutoTracked(id, state.deps!);
         }
       }
       const result = state.out_;
@@ -406,28 +487,41 @@ export function createEffectsManager<S extends Schema>(
 
   /** Effects asked to run again, taken by the next pass's selection. */
   const reruns = new Set<string>();
+  let pass = 0;
+  /** Stamp the effects that `keys` reach with this pass (T2). */
+  function reach(keys: Set<string>, now: number): void {
+    // From whichever side is smaller: the changed keys, or the index.
+    for (const key of keys.size > index.size ? index.keys() : keys) {
+      const at = keys.has(key) && index.get(key);
+      if (at) {
+        for (const state of at) {
+          state.hit_ = now;
+        }
+      }
+    }
+  }
+  /**
+   * The pass's effects in declaration order: those its keys reached, those
+   * asked to run again, and auto-tracked ones that depend on nothing (never
+   * run, or read nothing), which run on every change (1.35).
+   */
   function select(changed: Set<string>): EffectState[] {
     const out: EffectState[] = [];
-    const again = reruns.size > 0 ? new Set(reruns) : null;
-    reruns.clear();
-    for (const state of states.values()) {
-      if (!state.enabled) {
-        continue;
-      }
-      if (state.deps && !again?.has(state.id)) {
-        let hit = false;
-        for (const key of state.deps) {
-          if (changed.has(key)) {
-            hit = true;
-            break;
-          }
-        }
-        if (!hit) {
-          continue;
-        }
-      }
-      out.push(state);
+    const now = ++pass;
+    if (index.size > 0) {
+      reach(changed, now);
     }
+    for (const state of order) {
+      if (
+        state.enabled &&
+        (state.hit_ === now ||
+          reruns.has(state.id) ||
+          (!state.explicit && !state.deps?.size))
+      ) {
+        out.push(state);
+      }
+    }
+    reruns.clear();
 
     return out;
   }

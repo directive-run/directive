@@ -6,7 +6,7 @@
  * that derivation hears every change past it (collectInvalidated). Each
  * trace below is 1.35's, across three changes to what `d` reads.
  *
- * Effects pin 1.35 as it is today; GATE-1 quirk (c) (L4) changes their rule.
+ * Effects follow GATE-1 quirk (c) instead (l4b-quirk-c.test.ts).
  */
 import { describe, expect, it } from "vitest";
 import { createModule } from "../api/core.js";
@@ -111,7 +111,7 @@ describe("a membership test watches the derivation (1.35)", () => {
     ]);
   });
 
-  it("an effect that only asks re-runs on every change (1.35 today; quirk c is L4)", async () => {
+  it("an effect that only asks runs once: quirk (c), not 1.35", async () => {
     const log = await trace((log) => ({
       effects: {
         e: {
@@ -121,15 +121,13 @@ describe("a membership test watches the derivation (1.35)", () => {
         },
       },
     }));
+    // 1.35 re-runs it at all three `a` writes (it tracks `d`'s value).
     expect(log).toEqual([
       "compute asks",
       ["run", true],
       "a=1",
-      ["run", true],
       "a=2",
-      ["run", true],
       "a=3",
-      ["run", true],
       "b=1",
     ]);
   });
