@@ -73,6 +73,13 @@ export const isPrototypeSafe = (
 export interface Tracker {
   /** Fact keys and `\u001F`-prefixed derivation ids read in this frame. */
   deps: Set<string> | null;
+  /**
+   * The frame of the effect body running now (quirk c): while `deps` is this
+   * set, a membership test on the derived view records {@link MEMBER_DEP_PREFIX}
+   * + the name instead of the derivation's value key. Set only by the effects
+   * part, so a system without effects never reads anything but `undefined`.
+   */
+  effect_?: Set<string>;
 }
 
 /**
@@ -106,6 +113,12 @@ export interface Writer {
 }
 
 export const DERIVATION_DEP_PREFIX = "\u001F";
+/**
+ * Quirk (c) and (w): what an effect's `"name" in derived` depends on, whether
+ * the answer was true or false. Nothing changes membership before L10, whose
+ * register/unregister of a derivation adds this key to the changed set.
+ */
+export const MEMBER_DEP_PREFIX = "\u001E";
 export const describeDep = (dep: string): string =>
   dep.startsWith(DERIVATION_DEP_PREFIX) ? `derive.${dep.slice(1)}` : dep;
 

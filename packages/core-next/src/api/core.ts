@@ -131,6 +131,11 @@ interface Derivation {
    * runs the derivation. See `invalidate`.
    */
   asked_: ReactiveNode | null;
+  /**
+   * An effect's membership key for it, quirk (c): MEMBER_DEP_PREFIX (facts.ts)
+   * + the id, made once rather than on every test.
+   */
+  member_: string;
 }
 
 /**
@@ -443,7 +448,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     plugins?: Tail;
     errors?: ErrorsFeature;
   };
-  const tracker: Tracker = { deps: null };
+  // `effect_` from the start: the effects part sets it on its first run, and
+  // a field added then would give every hot tracker read a second shape.
+  const tracker: Tracker = { deps: null, effect_: undefined };
   /**
    * After destroy the kernel's stream is gone, but as in 1.35 plugins and
    * observers still hear writes: records go straight to the plugins.
@@ -738,6 +745,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       stale_: true,
       live_: false,
       asked_: null,
+      // MEMBER_DEP_PREFIX written out: importing it costs the floor bytes (a
+      // test pins that the two agree).
+      member_: `\u001E${id}`,
     } as Derivation;
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
@@ -778,7 +788,19 @@ export function createSystemCore<const M extends ModuleSchema>(
       // for whoever reads its value (a read would run it, and report its
       // throw, for a question about whether it exists).
       has: (_, id) => {
-        const d = typeof id === "string" ? derivations.get(id) : undefined;
+        // A symbol is in no Map of names: undefined, as for an unknown name.
+        const d = derivations.get(id as string);
+        // Quirk (c) and (w), effects only: an effect body's membership test
+        // depends on membership, true or false, and watches nothing. A
+        // derivation computed inside it has its own frame (and outside any
+        // frame `deps` is null, never `effect_`), so it keeps 1.35's rule
+        // below, as constraints do.
+        if (typeof id === "string" && tracker.deps === tracker.effect_) {
+          // A derivation's key is made once; an unknown name's (w) per test.
+          tracker.deps.add(d ? d.member_ : `\u001E${id}`);
+
+          return !!d;
+        }
         if (!d) {
           return false;
         }
@@ -797,8 +819,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       },
       // As in 1.35, a derivation reads like a getter under reflection.
       getOwnPropertyDescriptor: (_, id) =>
-        typeof id === "string" && derivations.has(id)
-          ? { configurable: true, enumerable: true, get: () => read(id) }
+        derivations.has(id as string)
+          ? {
+              configurable: true,
+              enumerable: true,
+              get: () => read(id as string),
+            }
           : undefined,
     },
   );
