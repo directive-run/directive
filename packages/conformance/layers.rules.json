@@ -1,6 +1,6 @@
 {
   "$comment": "Hand-maintained input for the generated layers.json. `rule` is the layer whose behaviour a file tests (the plan table, L0–L13). Each test is then placed by the highest feature it uses (see lib/layers.ts); `pin: true` marks a correctness file whose tests may not sit above `rule` except through `allowAbove` (a feature that legitimately belongs higher, with the reason). `instruments` are features a pinned file uses only to observe; they do not raise its tests, and the generated file lists them as `pulledDown` so the layer that owns the rule knows it must provide them. `current` is the highest layer core-next has built; null until Phase 1.",
-  "current": "L4",
+  "current": "L5",
   "$scenarios": "Each differential scenario (diff/scenarios/), by title, and the layer it needs: the highest feature it uses on the plan's ladder. On v2 the diff project runs only scenarios at or below `current`; fuzz cases are placed by the features they use (diff/fuzz/model.ts specLayer); diff/self/ always runs. Checked by the census (lib/census.ts checkScenarioLayers).",
   "scenarios": {
     "derivation chain recomputes once per change": "L0",
@@ -115,7 +115,7 @@
     "a linger pending at stopAsync attaches nothing during the stop": "L5",
     "t.* refine, transform, brand and wrong types in development": "L6",
     "the persistence plugin restores, saves debounced, and excludes keys": "L6",
-    "distributable snapshots": "L6",
+    "distributable snapshots": "L12",
     "every t.* builder accepts good writes and refuses bad ones": "L6",
     "schema introspection: kinds, operators and predicate validation": "L6",
     "snapshot and restore round-trip, with reconcile after restore": "L6",
@@ -569,6 +569,18 @@
       "rule": "L6"
     },
     "tests/plugins/hydration-scope.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-snapshots-oracle.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-snapshots-oracle-production.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-schema-oracle.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-persistence-oracle.test.ts": {
       "rule": "L6"
     },
     "tests/core/batch-resolve-fallback.test.ts": {

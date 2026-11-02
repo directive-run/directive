@@ -113,6 +113,19 @@ must be filled before that layer's gate.
   Filled at L5-pre by the mapping below and the diff scenarios in
   `diff/scenarios/l5-sources-pins.test.ts`. `localId` is a field of the
   `inspect().sources` row, so it belongs at L9, with the row's counters.
+- **L6 snapshots, restore and persistence.** `persistence.test.ts` (35
+  cases) drives the plugin against a mock system, so it says nothing about a
+  real system's init order, namespaced keys or development checks, and no
+  test reached `restore()`'s input checks or the base builders' `.refine()`.
+  Filled at L6-pre-a by `l6-snapshots-oracle`,
+  `l6-snapshots-oracle-production`, `l6-schema-oracle` and
+  `l6-persistence-oracle` (`.test.ts` omitted): the L6 RFC's U1, U3 to U6,
+  U8, U11, U12, U14 and U15, and the parts of U2 and U7 that the approved
+  (ag) and (ai) keep. Still open, for L6-pre-b: the parts those two change
+  (a development restore left half-applied, an init that sets a persisted
+  fact) and U9's stale saved key (ak) as diff scenarios, and U10's envelope
+  and next save as a golden test. U13 (the 41 validation cases v2 skips) is
+  L0 triage, a separate slice.
 
 ### `sources.test.ts`: the 68 L5 cases (L5-pre)
 
