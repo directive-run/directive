@@ -157,7 +157,13 @@ export interface ModuleDefinition<M extends ModuleSchema = ModuleSchema> {
   readonly effects?: Record<string, unknown>;
   readonly crossModuleDeps?: Record<string, unknown>;
   readonly meta?: DefinitionMeta;
-  readonly [key: string]: unknown;
+  // Named rather than an index signature, so 1.35's public ModuleDef (an
+  // interface, which has no implicit index signature) is assignable here.
+  readonly sources?: unknown;
+  readonly constraints?: unknown;
+  readonly resolvers?: unknown;
+  readonly hooks?: unknown;
+  readonly history?: unknown;
 }
 
 export interface SystemEvent {

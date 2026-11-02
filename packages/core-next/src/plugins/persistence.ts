@@ -42,6 +42,10 @@ import { isPrototypeSafe } from "../api/facts.js";
 import { scopes } from "../api/plugins.js";
 import type { ModuleSchema, Plugin, System } from "../api/types.js";
 import type { KernelEvent } from "../kernel.js";
+import type {
+  ModuleSchema as ModuleSchema135,
+  Plugin as Plugin135,
+} from "../types/index.js";
 
 /**
  * Configuration for the {@link persistencePlugin}, as 1.35's.
@@ -90,6 +94,10 @@ type Rec = Record<string, unknown>;
  * });
  * ```
  */
+export function persistencePlugin<M extends ModuleSchema135 = ModuleSchema135>(
+  options: PersistencePluginOptions,
+): Plugin135<M>;
+/** @internal The implementation, on core-next's own Plugin type. */
 export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   options: PersistencePluginOptions,
 ): Plugin {

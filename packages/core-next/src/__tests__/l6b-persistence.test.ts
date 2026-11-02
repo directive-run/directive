@@ -9,8 +9,9 @@ import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { createModule } from "../api/core.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
-import type { Plugin } from "../api/types.js";
 import { persistencePlugin } from "../plugins/index.js";
+// 1.35's Plugin: persistencePlugin<M> returns exactly 1.35's Plugin<M>.
+import type { Plugin } from "../types/index.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -356,7 +357,7 @@ describe("the persistence plugin's types", () => {
       storage: memoryStorage() as unknown as Storage,
       key: "prefs",
     });
-    expectTypeOf(made).toMatchTypeOf<Plugin>();
+    expectTypeOf(made).toEqualTypeOf<Plugin<typeof schema>>();
     // @ts-expect-error: M must be a module schema, as 1.35's.
     persistencePlugin<string>({ storage: memoryStorage(), key: "prefs" });
   });
