@@ -184,9 +184,19 @@ export interface ScenarioResult {
   /**
    * Runs that passed the budget where the reference's first run settled:
    * an engine under test that hangs, or a second reference run that did
-   * (nondeterminism). Always a failure.
+   * (nondeterminism). Always a failure, except a run in `discarded`.
    */
   hung: string[];
+  /**
+   * Engines under test that passed the budget after an `ends` divergence
+   * on that same engine had already stopped their comparison (the stop's
+   * record came before the runaway, `stopsBefore`). Not a hang: the case is
+   * discarded like a reference runaway and counted toward the same limit
+   * (`tallyCase`). Its differences before the stop are still checked, so
+   * the case can still fail on them (Jason, 2026-11-02: "Discard after the
+   * stop").
+   */
+  discarded: string[];
   /** Timer callbacks the reference's first run made. */
   fired: number;
   report: string;
@@ -306,10 +316,13 @@ const COUNTED = ["setTimeout", "setInterval", "setImmediate"] as const;
  * `limit` the run is a runaway: every pending timer is cleared and further
  * callbacks are dropped, so the run winds down; its trace is not compared.
  */
-function installBudget(limit: number) {
+function installBudget(limit: number, mark: () => number) {
   const g = globalThis as unknown as Record<string, TimerFn>;
   const fakes = COUNTED.map((name) => [name, g[name] as TimerFn] as const);
-  const state = { fired: 0, exceeded: false };
+  const state: { fired: number; exceeded: boolean; at?: number } = {
+    fired: 0,
+    exceeded: false,
+  };
   for (const [name, fake] of fakes) {
     g[name] = function (this: unknown, cb: unknown, ...rest: unknown[]) {
       if (typeof cb !== "function") {
@@ -324,6 +337,7 @@ function installBudget(limit: number) {
           }
           if (++state.fired > limit) {
             state.exceeded = true;
+            state.at = mark();
             vi.clearAllTimers();
 
             return;
@@ -498,6 +512,11 @@ export interface BudgetedRun {
   fired: number;
   /** The run passed the budget: its trace is cut short and not compared. */
   runaway: boolean;
+  /**
+   * For a runaway, the trace's length when the budget ran out: every record
+   * at a lower index happened before the runaway.
+   */
+  runawayAt?: number;
 }
 
 /** Run one scenario on one engine under a timer-callback budget. */
@@ -510,7 +529,7 @@ export async function runBudgeted(
   // Everything that makes a run deterministic, and everything that captures
   // what the engine prints, goes in before the engine loads.
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
-  const budget = installBudget(limit);
+  const budget = installBudget(limit, () => rec.trace.length);
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -556,6 +575,7 @@ export async function runBudgeted(
         trace: rec.trace,
         fired: budget.state.fired,
         runaway: budget.state.exceeded,
+        runawayAt: budget.state.at,
       };
     }
     const snapshots = new Map<string, unknown>();
@@ -609,6 +629,7 @@ export async function runBudgeted(
     trace: rec.trace,
     fired: budget.state.fired,
     runaway: budget.state.exceeded,
+    runawayAt: budget.state.at,
   };
 }
 
@@ -822,6 +843,47 @@ export function explain(
   };
 }
 
+/**
+ * Whether an `ends` stop on one engine came before that engine's runaway
+ * (`runawayAt`, from `runBudgeted`), so the comparison had already ended
+ * when the run stopped settling (Jason, 2026-11-02: "Discard after the
+ * stop"). A stop with a record in the engine's trace (extra or changed)
+ * came first when that record's index is below `runawayAt`. A stop that is
+ * the reference's alone (missing) came first only when its segment (step,
+ * then setup, sync or async phase) ends before the one the runaway happened
+ * in: in the same segment the engine may simply not have reached it yet, so
+ * that runaway is still a hang.
+ */
+export function stopsBefore(
+  stop: Difference,
+  trace: TraceEntry[],
+  runawayAt: number | undefined,
+): boolean {
+  if (runawayAt === undefined) {
+    return false;
+  }
+  if (stop.at.candidate !== undefined) {
+    return stop.at.candidate < runawayAt;
+  }
+  const where = stop.where.reference;
+  if (!where) {
+    return false;
+  }
+  // The runaway's segment, as keyTrace (diff/compare.ts) files records.
+  let step = -1;
+  let phase = 0;
+  for (const entry of trace.slice(0, runawayAt)) {
+    if (entry.k === "step") {
+      step = entry.i;
+      phase = 1;
+    } else if (entry.k === "async") {
+      phase = 2;
+    }
+  }
+
+  return where[0] < step || (where[0] === step && where[1] < phase);
+}
+
 export async function runScenario(
   def: ScenarioDef,
   opts: RunOptions = {},
@@ -856,6 +918,7 @@ export async function runScenario(
       traces: { reference: first, candidate: [] },
       runaway: true,
       hung: [],
+      discarded: [],
       fired: firstRun.fired,
       report: `runaway in scenario "${def.name}": the reference (${reference.name}) made more than ${limit} timer callbacks, so the case never settles and is not compared`,
     };
@@ -871,30 +934,16 @@ export async function runScenario(
       `reference engine is not deterministic in scenario "${def.name}": its second run made more than ${limit} timer callbacks, the first ${firstRun.fired}`,
     );
   }
+  const runaways = new Map<string, number | undefined>();
   for (const engine of candidates) {
     const run = await runBudgeted(engine, def, limit);
     theirs[engine.name] = run.trace;
     if (run.runaway) {
-      hung.push(engine.name);
-      problems.push(
-        `hang in scenario "${def.name}": ${engine.name} made more than ${limit} timer callbacks where the reference settled after ${firstRun.fired}`,
-      );
+      runaways.set(engine.name, run.runawayAt);
     }
   }
 
   const nondeterministic = compareFull(first, again, "v1 (second run)");
-  // A drawn delay is incidental to the comparison but must stay in bounds,
-  // on the reference and on every engine under test: the same values the
-  // comparison masks (the reference's drawn resolvers) are checked.
-  const drawn = drawnResolvers(first);
-  for (const [engine, trace] of [
-    [reference.name, first],
-    ...Object.entries(theirs),
-  ] as [string, TraceEntry[]][]) {
-    for (const problem of drawProblems(trace, drawn)) {
-      problems.push(`${engine} in scenario "${def.name}": ${problem}`);
-    }
-  }
   const differences: Difference[] = [];
   const advisories: string[] = [];
   for (const [engine, trace] of Object.entries(theirs)) {
@@ -932,6 +981,37 @@ export async function runScenario(
       `ended on ${e.engine} by ${e.id} at ${describeDifference(e.at)}: ${e.dropped} later difference(s) not compared`,
     );
   }
+  // An engine under test that passes the budget is a hang, unless an `ends`
+  // stop on that same engine came before the runaway: then the comparison
+  // had already ended and the case is discarded (Jason, 2026-11-02:
+  // "Discard after the stop"), counted toward the runaway limit.
+  const discarded: string[] = [];
+  for (const [engine, at] of runaways) {
+    const stop = ended.find((e) => e.engine === engine);
+    if (stop && stopsBefore(stop.at, theirs[engine] ?? [], at)) {
+      discarded.push(engine);
+      advisories.push(
+        `runaway on ${engine} after the stop by ${stop.id}: more than ${limit} timer callbacks once the comparison had ended; discarded, not a hang`,
+      );
+      continue;
+    }
+    hung.push(engine);
+    problems.push(
+      `hang in scenario "${def.name}": ${engine} made more than ${limit} timer callbacks where the reference settled after ${firstRun.fired}`,
+    );
+  }
+  // A drawn delay is incidental to the comparison but must stay in bounds,
+  // on the reference and on every engine under test: the same values the
+  // comparison masks (the reference's drawn resolvers) are checked.
+  const drawn = drawnResolvers(first);
+  for (const [engine, trace] of [
+    [reference.name, first],
+    ...Object.entries(theirs),
+  ] as [string, TraceEntry[]][]) {
+    for (const problem of drawProblems(trace, drawn)) {
+      problems.push(`${engine} in scenario "${def.name}": ${problem}`);
+    }
+  }
 
   const report = [
     ...problems,
@@ -968,6 +1048,7 @@ export async function runScenario(
     },
     runaway: false,
     hung,
+    discarded,
     fired: firstRun.fired,
     report,
   };
@@ -1002,7 +1083,13 @@ export function logResult(result: ScenarioResult): void {
 /** What a fuzz run counts, case by case (diff/fuzz/fuzz.test.ts). */
 export interface FuzzTally {
   ran: number;
+  /** Discarded cases: the reference's runaways and those in `afterStop`. */
   runaway: number;
+  /**
+   * Of `runaway`, cases discarded because an engine under test ran away
+   * after an `ends` stop (`ScenarioResult.discarded`), not the reference.
+   */
+  afterStop: number;
   /** Compared cases that v2 took part in. */
   onV2: number;
   mostFired: number;
@@ -1019,6 +1106,7 @@ export function newFuzzTally(): FuzzTally {
   return {
     ran: 0,
     runaway: 0,
+    afterStop: 0,
     onV2: 0,
     mostFired: 0,
     ended: 0,
@@ -1028,14 +1116,23 @@ export function newFuzzTally(): FuzzTally {
 }
 
 /**
- * Count one fuzz case. A runaway is discarded; every other case is
- * compared, whether it passed, failed or was ended by an `ends` divergence
- * (`explain`), so an ended case counts toward the floors like any other.
+ * Count one fuzz case. A runaway is discarded: the reference's, or an
+ * engine under test's after an `ends` stop (`discarded`; Jason, 2026-11-02:
+ * "Discard after the stop"), both counted toward the one runaway limit.
+ * Every other case is compared, whether it passed, failed or was ended by
+ * an `ends` divergence (`explain`), so an ended case counts toward the
+ * floors like any other.
  */
 export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   tally.ran++;
   if (result.runaway) {
     tally.runaway++;
+
+    return;
+  }
+  if (result.discarded.length > 0) {
+    tally.runaway++;
+    tally.afterStop++;
 
     return;
   }
@@ -1056,7 +1153,8 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
 /**
  * Record that the fuzzer compared `runs` cases from `seed` (`v2` of them on
  * v2 as well), discarded `runaway` more (cases whose reference run passed
- * the budget), and how many of the compared cases an `ends` divergence
+ * the budget, and `runawayAfterStop` of them where an engine under test
+ * passed it after an `ends` stop), and how many of the compared cases an `ends` divergence
  * stopped and where (the census prints it, so a too-early stop shows).
  */
 export function logFuzz(seed: number, tally: FuzzTally): void {
@@ -1065,6 +1163,7 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
       seed,
       runs: tally.ran - tally.runaway,
       runaway: tally.runaway,
+      runawayAfterStop: tally.afterStop,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,

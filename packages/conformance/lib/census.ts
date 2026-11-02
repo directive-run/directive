@@ -1118,7 +1118,13 @@ export function checkHooksFired(
 export interface FuzzRun {
   seed: number;
   runs: number;
+  /** Discarded cases, `runawayAfterStop` included. */
   runaway?: number;
+  /**
+   * Of `runaway`, cases where an engine under test ran away after an `ends`
+   * stop (diff/scenario.ts `tallyCase`; Jason, 2026-11-02).
+   */
+  runawayAfterStop?: number;
   v2?: number;
   /** Compared cases an `ends` divergence stopped. */
   ended?: number;
@@ -1131,8 +1137,10 @@ export interface FuzzRun {
 /**
  * The census's line for one fuzz run: how many cases were compared, on v2,
  * and how many an `ends` divergence stopped and where (the mean step, and
- * how many at step 0), so a stop that comes too early is visible. It
- * reports; the floors (`checkFuzzRuns`) are unchanged.
+ * how many at step 0), so a stop that comes too early is visible, and how
+ * many cases were discarded after a stop (an engine under test ran away
+ * once an `ends` divergence had ended the comparison). It reports; the
+ * floors and the runaway limit (`checkFuzzRuns`) are unchanged.
  */
 export function describeFuzzRun(r: FuzzRun): string {
   const ended = r.ended ?? 0;
@@ -1141,7 +1149,13 @@ export function describeFuzzRun(r: FuzzRun): string {
       ? ""
       : ` (at step ${((r.endedSteps ?? 0) / ended).toFixed(1)} on average; ${r.endedAtStep0 ?? 0} at step 0)`;
 
-  return `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too, ${ended} ended early by an \`ends\` divergence${where}`;
+  const afterStop = r.runawayAfterStop ?? 0;
+  const discarded =
+    afterStop === 0
+      ? ""
+      : `; ${afterStop} discarded after a stop (an engine under test ran away once an \`ends\` divergence had ended the comparison; counted toward the runaway limit)`;
+
+  return `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too, ${ended} ended early by an \`ends\` divergence${where}${discarded}`;
 }
 
 export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {

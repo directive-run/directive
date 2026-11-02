@@ -30,7 +30,11 @@
  * it is discarded as a runaway and counted, not failed; the census floor
  * counts only compared cases. More than max(1% of cases, 2) runaways fail the
  * run (a generator drifting into runaways would compare nothing). A case the reference settles but an engine
- * under test does not is a hang, and fails.
+ * under test does not is a hang, and fails, unless an `ends` divergence on
+ * that engine had already ended the comparison before it ran away: then it
+ * is discarded like a reference runaway and counted toward the same limit
+ * (Jason, 2026-11-02: "Discard after the stop"; diff/scenario.ts
+ * `stopsBefore`).
  *
  * A case an `ends` divergence stops (diff/scenario.ts `explain`: an approved
  * quirk whose consequences cascade) is compared up to that difference, and
@@ -150,9 +154,9 @@ describe("differential fuzz", () => {
         }
       }
     } finally {
-      const { ran, runaway, onV2, mostFired, ended } = tally;
+      const { ran, runaway, afterStop, onV2, mostFired, ended } = tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (reference passed ${RUN_BUDGET} timer callbacks; discarded), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       logFuzz(SEED, tally);
     }

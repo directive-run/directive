@@ -273,6 +273,20 @@ census rejects it anywhere else, and rejects a hand scenario titled
 that never stopped a case is stale like any other, and it must carry
 `when` (below), so it stops only the cases that can show its quirk.
 
+An engine under test that passes the timer-callback budget after an `ends`
+stop on that same engine is not a hang: the case is discarded like a 1.35
+runaway, counted toward the same max(1% of cases, 2) limit, and the census's
+fuzz line says how many were "discarded after a stop" (Jason, 2026-11-02:
+"Once an approved stop rule (an `ends` divergence) has ended the
+comparison, a 2.0 runaway past it is discarded like a 1.35 runaway, inside
+the existing 1% runaway limit, and reported in the census line. A 2.0
+runaway with no stop rule before it still fails."). The stop must come
+first (diff/scenario.ts `stopsBefore`): its record in that engine's trace
+is before the point the budget ran out, or, for a missing stop, its step
+and phase end before the one the runaway happened in. A runaway with no
+stop, before the stop, or on an engine the stop is not on is still a hang,
+and differences before the stop are still checked.
+
 A fuzz entry may say `when: [<trigger>, …]`: it then covers a difference
 only in a fuzz case that has every trigger it lists (diff/scenario.ts
 `covers`). Without `when`, a fuzz entry applies to every fuzz case,
