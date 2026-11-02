@@ -112,7 +112,7 @@ describe("the persistence plugin (ai): applied inside initialize()", () => {
 });
 
 describe("the persistence plugin (ak): saved keys the schema dropped", () => {
-  it("are skipped with one development warning, and the other keys restore", () => {
+  it("are skipped with one development warning, the other keys restore, and they stay in storage", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const storage = memoryStorage({
@@ -128,10 +128,55 @@ describe("the persistence plugin (ak): saved keys the schema dropped", () => {
     expect(system.facts.fps).toBe(2);
     expect(system.facts.other).toBe("saved");
     system.destroy();
-    expect(storage.raw("prefs")).toBe('{"fps":2,"other":"saved"}');
+    expect(storage.raw("prefs")).toBe(
+      '{"fps":2,"removedLater":true,"other":"saved"}',
+    );
     const hits = warn.mock.calls.filter((c) => /removedLater/.test(String(c)));
     expect(hits).toHaveLength(1);
     expect(error).not.toHaveBeenCalled();
+  });
+
+  // Owner, 2026-11-02, "Keep them in storage": every save writes a dropped
+  // key back unchanged, so an app rolled back to an older version keeps it.
+  it("survive two saves unchanged, in their place", () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const storage = memoryStorage({ prefs: { fps: 2, removedLater: true } });
+      const system: any = createSystem({
+        module: scene(() => {}),
+        plugins: [plugin(storage, { debounce: 10 })],
+      });
+      system.start();
+      system.facts.fps = 3;
+      vi.advanceTimersByTime(20);
+      expect(storage.raw("prefs")).toBe('{"fps":3,"removedLater":true}');
+      system.facts.fps = 4;
+      vi.advanceTimersByTime(20);
+      expect(storage.raw("prefs")).toBe('{"fps":4,"removedLater":true}');
+      system.destroy();
+      expect(storage.raw("prefs")).toBe('{"fps":4,"removedLater":true}');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("an older envelope at the plugin's key is written back as 1.35 production writes it (U10)", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const storage = memoryStorage({
+      prefs: { v: 1, schema: { m: 1 }, facts: { fps: 6 } },
+    });
+    const system: any = createSystem({
+      module: scene((facts) => {
+        facts.fps = 1;
+      }),
+      plugins: [plugin(storage)],
+    });
+    system.start();
+    system.destroy();
+    expect(storage.raw("prefs")).toBe(
+      '{"v":1,"schema":{"m":1},"facts":{"fps":6},"fps":1}',
+    );
   });
 });
 

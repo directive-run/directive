@@ -15,10 +15,12 @@
  *   until `initialize()`. Until then a save writes the saved values it holds,
  *   so nothing saved is lost, and a key the program writes itself before
  *   `initialize()` is the program's, as in 1.35.
- * - (ak) a saved key the schema no longer has is skipped, with one
+ * - (ak) a saved key the schema no longer has is not restored, with one
  *   development warning, so an app update that removes a fact does not stop
- *   the restore (1.35 development) or keep saving the stale key (1.35
- *   production).
+ *   the restore (1.35 development). Every save writes it back unchanged, in
+ *   its place, so an app rolled back to an older version keeps the value and
+ *   storage holds 1.35 production's bytes (owner, 2026-11-02: "Keep them in
+ *   storage"). `include` and `exclude` apply to it as to any key.
  *
  * The plugin reaches its system's context (the flat facts view, the
  * "hydrate" batch, the schema) through the module-private {@link scopes},
@@ -103,6 +105,8 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   let system: System<M> | null = null;
   /** Each system's saved values read at onInit and not yet applied ((ai)), in storage order. */
   const held = new WeakMap<object, Map<string, unknown>>();
+  /** Each system's saved values the schema no longer has (ak), written back by every save. */
+  const kept = new WeakMap<object, Map<string, unknown>>();
   const trackedKeys = new Set<string>();
 
   /** Check if a key should be persisted */
@@ -151,34 +155,36 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
     }
   };
 
-  /** The persisted entries of `data`, without the keys the schema dropped (ak). */
+  /**
+   * The persisted entries of `data`, in storage order. The keys the schema
+   * dropped stay among them, so they are tracked in their place, and go to
+   * `kept` for `sys`: not restored, written back by every save (ak).
+   */
   const entriesOf = (
+    sys: System<M>,
     data: Rec,
     context: SystemContext | undefined,
   ): [string, unknown][] => {
     const schema = context?.module.schema?.facts as Rec | undefined;
+    const stale = new Map<string, unknown>();
+    const entries = Object.entries(data).filter(([factKey]) =>
+      shouldPersist(factKey),
+    );
     // An empty schema declares nothing, so nothing in it is stale (as restore()).
-    const known =
-      schema && Object.keys(schema).length > 0
-        ? (factKey: string) => Object.hasOwn(schema, factKey)
-        : () => true;
-    const stale: string[] = [];
-    const entries = Object.entries(data).filter(([factKey]) => {
-      if (!shouldPersist(factKey)) {
-        return false;
+    if (schema && Object.keys(schema).length > 0) {
+      for (const [factKey, value] of entries) {
+        if (!Object.hasOwn(schema, factKey)) {
+          stale.set(factKey, value);
+        }
       }
-      if (!known(factKey)) {
-        stale.push(factKey);
-
-        return false;
+    }
+    if (stale.size > 0) {
+      kept.set(sys, stale);
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] persistence: skipped saved keys the schema no longer has: ${[...stale.keys()].join(", ")}. They stay in storage.`,
+        );
       }
-
-      return true;
-    });
-    if (isDevelopment && stale.length > 0) {
-      console.warn(
-        `[Directive] persistence: skipped saved keys the schema no longer has: ${stale.join(", ")}. The next save leaves them out.`,
-      );
     }
 
     return entries;
@@ -191,9 +197,12 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
     entries: Iterable<[string, unknown]>,
   ) => {
     const context = scopes.get(sys);
+    const stale = kept.get(sys);
     const write = () => {
       for (const [factKey, value] of entries) {
-        facts(sys)[factKey] = value;
+        if (!stale?.has(factKey)) {
+          facts(sys)[factKey] = value;
+        }
         trackedKeys.add(factKey);
       }
     };
@@ -211,6 +220,10 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
         write();
       });
     }
+    // 1.35 production restores a stale key, and that write schedules a save.
+    if (stale) {
+      scheduleSave();
+    }
     onRestore?.(data);
   };
 
@@ -227,9 +240,12 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
         error,
       });
       // Keys the throw left unwritten, and nothing else wrote, are not
-      // tracked, as 1.35 never tracked them.
+      // tracked, as 1.35 never tracked them; a kept key (ak) stays.
       for (const factKey of saved.keys()) {
-        if (!scopes.get(sys)!.store.has(factKey)) {
+        if (
+          !scopes.get(sys)!.store.has(factKey) &&
+          !kept.get(sys)?.has(factKey)
+        ) {
           trackedKeys.delete(factKey);
         }
       }
@@ -246,13 +262,18 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       const data: Rec = {};
       const view = facts(system);
       const saved = held.get(system);
+      const stale = kept.get(system);
 
       for (const factKey of trackedKeys) {
         if (shouldPersist(factKey)) {
-          // Saved but not applied yet (ai): the saved value stands.
+          // Saved but not applied yet (ai): the saved value stands. A kept
+          // key (ak) is written back unchanged, unless the program has since
+          // set it itself (production allows an unknown key).
           data[factKey] = saved?.has(factKey)
             ? saved.get(factKey)
-            : view[factKey];
+            : stale?.has(factKey) && !scopes.get(system)!.store.has(factKey)
+              ? stale.get(factKey)
+              : view[factKey];
         }
       }
 
@@ -283,10 +304,11 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       if (!data) {
         return;
       }
-      const entries = entriesOf(data, context);
+      const entries = entriesOf(sys, data, context);
       if (context && !sys.isInitialized) {
         // (ai): held for the turn. Tracked now, as 1.35 tracks a restored
-        // key here, so each save writes the keys in 1.35's order.
+        // key here, so each save writes the keys in 1.35's order, a kept
+        // key (ak) in its place.
         for (const [factKey] of entries) {
           trackedKeys.add(factKey);
         }
