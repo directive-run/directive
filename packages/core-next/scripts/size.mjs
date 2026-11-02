@@ -99,7 +99,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 117;
+const DEV_STRINGS_MIN = 116;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

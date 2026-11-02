@@ -117,7 +117,16 @@ const ROLE: Record<string, [string, string]> = {
   derive: ["a derivation", "Derivations"],
   constraint: ["a constraint", "Constraints"],
   effect: ["an effect", "Effects"],
-  gate: ["a source gate", "Source gates"],
+};
+
+/**
+ * 1.35's rejectGateWrite, in both modes: a source gate is a pure read of
+ * facts, so a write throws with the module's name and the local key.
+ */
+const gateWrote = (ns: string, key: string): never => {
+  throw new Error(
+    `[Directive] Module "${ns}": a source's key/active gate wrote "${key}". Gates are pure reads of facts; change facts from an event handler or resolver.`,
+  );
 };
 
 export function createNamespacedSystem(
@@ -232,6 +241,9 @@ export function createNamespacedSystem(
           return undefined;
         },
         set(key) {
+          if (role === "gate") {
+            gateWrote(ns, key);
+          }
           // The role names are development text: production drops them.
           if (isDevelopment) {
             const id = `cross-module-set|${ns}|${role}|${key}`;
@@ -646,9 +658,21 @@ export function createNamespacedSystem(
     modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
     owners_: owners,
     // A source gate of module `ns` reads `src` as the module's constraints
-    // do: its own facts by bare name, or `self` and its dependencies.
+    // do: its own facts by bare name, or `self` and its dependencies. The
+    // views write through to `src` as `dep::key`, so a write is refused
+    // there, in both modes, with the local key (1.35's gate proxy).
     gate_: (src: Rec, ns: string) =>
-      scopedFacts(src, ns, gateDeps.get(ns)!, "gate"),
+      scopedFacts(
+        cached(src, `gate|${ns}`, () => {
+          const refuse = (_: Rec, key: string) =>
+            gateWrote(ns, key.split(SEPARATOR)[1]!);
+
+          return new Proxy(src, { set: refuse, deleteProperty: refuse });
+        }),
+        ns,
+        gateDeps.get(ns)!,
+        "gate",
+      ),
     derive,
     events,
     effects,
