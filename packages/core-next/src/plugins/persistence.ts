@@ -17,10 +17,13 @@
  *   `initialize()` is the program's, as in 1.35.
  * - (ak) a saved key the schema no longer has is not restored, with one
  *   development warning, so an app update that removes a fact does not stop
- *   the restore (1.35 development). Every save writes it back unchanged, in
- *   its place, so an app rolled back to an older version keeps the value and
- *   storage holds 1.35 production's bytes (owner, 2026-11-02: "Keep them in
- *   storage"). `include` and `exclude` apply to it as to any key.
+ *   the restore (1.35 development). In production every save writes it back
+ *   unchanged, in its place, so an app rolled back to an older version keeps
+ *   the value and storage holds 1.35 production's bytes (owner, 2026-11-02:
+ *   "Keep them in storage"). In development a save leaves it out, as 1.35's
+ *   development save does, since 1.35 development stops its restore at such a
+ *   key and a rollback would lose the keys after it (owner, 2026-11-02: "Drop
+ *   stale keys in dev"). `include` and `exclude` apply to it as to any key.
  *
  * The plugin reaches its system's context (the flat facts view, the
  * "hydrate" batch, the schema) through the module-private {@link scopes},
@@ -105,7 +108,7 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   let system: System<M> | null = null;
   /** Each system's saved values read at onInit and not yet applied ((ai)), in storage order. */
   const held = new WeakMap<object, Map<string, unknown>>();
-  /** Each system's saved values the schema no longer has (ak), written back by every save. */
+  /** Each system's saved values the schema no longer has (ak): not restored; production saves write them back. */
   const kept = new WeakMap<object, Map<string, unknown>>();
   const trackedKeys = new Set<string>();
 
@@ -158,7 +161,8 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   /**
    * The persisted entries of `data`, in storage order. The keys the schema
    * dropped stay among them, so they are tracked in their place, and go to
-   * `kept` for `sys`: not restored, written back by every save (ak).
+   * `kept` for `sys`: not restored (ak); production writes them back on every
+   * save, development leaves them out, as each 1.35 build does.
    */
   const entriesOf = (
     sys: System<M>,
@@ -182,7 +186,7 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       kept.set(sys, stale);
       if (isDevelopment) {
         console.warn(
-          `[Directive] persistence: skipped saved keys the schema no longer has: ${[...stale.keys()].join(", ")}. They stay in storage.`,
+          `[Directive] persistence: skipped saved keys the schema no longer has: ${[...stale.keys()].join(", ")}. The next save drops them.`,
         );
       }
     }
@@ -220,9 +224,14 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
         write();
       });
     }
-    // 1.35 production restores a stale key, and that write schedules a save.
     if (stale) {
-      scheduleSave();
+      if (isDevelopment) {
+        // 1.35 development writes no stale key, so only the keys written
+        // schedule a save there, through the hooks, as here.
+      } else {
+        // 1.35 production restores a stale key, and that write schedules a save.
+        scheduleSave();
+      }
     }
     onRestore?.(data);
   };
@@ -266,9 +275,20 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
 
       for (const factKey of trackedKeys) {
         if (shouldPersist(factKey)) {
+          // Development leaves out a kept key (ak) the program has not set
+          // itself, as 1.35's development save does (owner, 2026-11-02:
+          // "Drop stale keys in dev"), so a rollback to 1.35 in development
+          // restores every key. Production writes it back, below.
+          if (
+            isDevelopment &&
+            stale?.has(factKey) &&
+            !scopes.get(system)!.store.has(factKey)
+          ) {
+            continue;
+          }
           // Saved but not applied yet (ai): the saved value stands. A kept
-          // key (ak) is written back unchanged, unless the program has since
-          // set it itself (production allows an unknown key).
+          // key (ak) is written back unchanged in production, unless the
+          // program has since set it itself (production allows an unknown key).
           data[factKey] = saved?.has(factKey)
             ? saved.get(factKey)
             : stale?.has(factKey) && !scopes.get(system)!.store.has(factKey)
@@ -307,8 +327,8 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       const entries = entriesOf(sys, data, context);
       if (context && !sys.isInitialized) {
         // (ai): held for the turn. Tracked now, as 1.35 tracks a restored
-        // key here, so each save writes the keys in 1.35's order, a kept
-        // key (ak) in its place.
+        // key here, so each save writes the keys in 1.35's order, and in
+        // production a kept key (ak) in its place.
         for (const [factKey] of entries) {
           trackedKeys.add(factKey);
         }
