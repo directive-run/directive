@@ -133,4 +133,61 @@ suite("L11 predicates", () => {
       },
     ],
   );
+
+  scenario(
+    "predicate validation against a schema's field kinds",
+    ({ core: { createModule, t } }) => ({
+      module: createModule("m", {
+        schema: {
+          facts: { s: t.string(), n: t.number() },
+          derivations: {},
+          events: {},
+        },
+        init: (facts: any) => {
+          facts.s = "abc";
+          facts.n = 5;
+        },
+      } as any),
+    }),
+    [
+      {
+        op: "run",
+        label: "validate",
+        fn: (_s, ctx) => {
+          const c = ctx.core as any;
+          const { t } = ctx.core as any;
+          const facts = { s: t.string().minLength(2), n: t.number().min(0) };
+          const attempt = (name: string, fn: () => unknown) => {
+            try {
+              ctx.external([name, fn()]);
+            } catch (error) {
+              ctx.external([name, "threw", error]);
+            }
+          };
+          // As first written in the L6 schema-kinds scenario: a schema where
+          // the kind map belongs (1.35 throws "kindMap.get is not a function").
+          attempt("validate good, schema", () =>
+            c.validatePredicateAgainstSchema({ n: { $gte: 1 } }, { facts }),
+          );
+          attempt("validate bad, schema", () =>
+            c.validatePredicateAgainstSchema(
+              { s: { $gte: 1 }, zz: 1 },
+              { facts },
+            ),
+          );
+          // With the kind map getSchemaFieldKinds builds.
+          const kinds = () => c.getSchemaFieldKinds({ facts });
+          attempt("validate good", () =>
+            c.validatePredicateAgainstSchema({ n: { $gte: 1 } }, kinds()),
+          );
+          attempt("validate bad", () =>
+            c.validatePredicateAgainstSchema(
+              { s: { $gte: 1 }, zz: 1 },
+              kinds(),
+            ),
+          );
+        },
+      },
+    ],
+  );
 });
