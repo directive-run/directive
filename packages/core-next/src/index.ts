@@ -70,6 +70,18 @@ export type {
   RequirementWithId,
 } from "./api/requirements.js";
 export { t } from "./api/schema-builders.js";
+// Schema introspection (L6, B5): root exports only, so a system that does
+// not call them bundles none of it.
+export {
+  getKind,
+  getOperatorsForKind,
+  getSchemaFieldKinds,
+  listAllPredicateOperators,
+} from "./api/schema-introspection.js";
+export type {
+  SchemaKind,
+  SchemaKindNode,
+} from "./api/schema-introspection.js";
 export type * from "./api/schema-builders.js";
 export type * from "./api/types.js";
 export {
