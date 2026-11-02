@@ -41,7 +41,8 @@ export type {
 export { PHASES, withPhases } from "./phases.js";
 export type { Ctx, Phase, Phases } from "./phases.js";
 export { withSnapshot } from "./snapshot.js";
-export type { Snapshot, SnapshotPart } from "./snapshot.js";
+// The kernel snapshot, renamed: `Snapshot` is 1.35's plugin snapshot below.
+export type { Snapshot as KernelSnapshot, SnapshotPart } from "./snapshot.js";
 
 // The 1.35 public API (alphas keep it unchanged), built on the graph above.
 export {
@@ -50,24 +51,13 @@ export {
   createModuleFactory,
   createSystem,
 } from "./api/system.js";
-export type { ErrorSource } from "./api/system.js";
-export type { Strategy as RecoveryStrategy } from "./api/core.js";
-export type {
-  ErrorBoundaryConfig,
-  ErrorHandler,
-  RetryLaterConfig,
-} from "./api/errors.js";
+export type { ErrorHandler } from "./api/errors.js";
 export {
   RequirementSet,
   forType,
   generateRequirementId,
   isRequirementType,
   req,
-} from "./api/requirements.js";
-export type {
-  Requirement,
-  RequirementKeyFn,
-  RequirementWithId,
 } from "./api/requirements.js";
 export { t } from "./api/schema-builders.js";
 // Schema introspection (L6, B5): root exports only, so a system that does
@@ -83,7 +73,171 @@ export type {
   SchemaKindNode,
 } from "./api/schema-introspection.js";
 export type * from "./api/schema-builders.js";
-export type * from "./api/types.js";
+// core-next's own option and module types (not in 1.35).
+export type {
+  EventPayload,
+  ModuleDefinition,
+  ModuleFacts,
+  SystemOptions,
+} from "./api/types.js";
+// 1.35's public types, exactly: copied from 1.35 into src/types/ (types only).
+// Some describe features core-next has not built yet; see createSystem.
+export type {
+  AuditEntry,
+  AuditEntryKind,
+  AuditLedger,
+  AuditLedgerOptions,
+  AuditLedgerSink,
+  QueryFilter,
+  VerifyResult,
+} from "./types/audit-ledger.js";
+export type {
+  CheckAbortOnFinding,
+  CheckAbortOnResult,
+  CheckAgainstResult,
+  Contradiction,
+  ContradictionType,
+  ExistingConstraint,
+} from "./types/doctor.js";
+export type {
+  AnySystem,
+  BatchConfig,
+  ClauseResult,
+  CreateSystemOptionsNamed,
+  CreateSystemOptionsSingle,
+  CrossModuleDeps,
+  CrossModuleResolverContext,
+  CrossModuleResolversDef,
+  DefinitionKind,
+  DefinitionMeta,
+  DerivationDefWithMeta,
+  DistributableSnapshot,
+  DistributableSnapshotOptions,
+  DynamicConstraintDef,
+  DynamicDefinitionKind,
+  DynamicEffectDef,
+  DynamicResolverDef,
+  EffectDef,
+  ErrorBoundaryConfig,
+  ErrorSource,
+  FactChange,
+  FactOrigin,
+  FactPredicate,
+  FactTemplate,
+  Facts,
+  FactsSnapshot,
+  FactsStore,
+  HistoryAPI,
+  HistoryOption,
+  HistoryState,
+  InferDerivations,
+  InferEvents,
+  InferFacts,
+  InferRequirementTypes,
+  InferRequirements,
+  InferSchema,
+  InferSchemaType,
+  InferSelectorState,
+  KeySelector,
+  MetaAccessor,
+  MetaMatch,
+  ModuleDef,
+  ModuleHooks,
+  ModuleSchema,
+  ModulesMap,
+  NamespacedSystem,
+  ObservationEvent,
+  OperatorObject,
+  PatchSpec,
+  PatchValue,
+  PayloadRef,
+  Plugin,
+  PredicateClause,
+  PredicateCombinator,
+  PredicateCombinatorKey,
+  PredicateObject,
+  PredicateOp,
+  PredicateOverlapProof,
+  RecoveryStrategy,
+  Requirement,
+  RequirementKeyFn,
+  RequirementWithId,
+  ResolverAbortReason,
+  ResolverDeps,
+  RetryLaterConfig,
+  RetryPolicy,
+  Schema,
+  SchemaType,
+  ShouldRetryContext,
+  SingleModuleSystem,
+  Snapshot,
+  SourceDef,
+  SourceDropReason,
+  SourceGateFacts,
+  SourcePublish,
+  SourceReportError,
+  SourceUnsubscribe,
+  SourcesDef,
+  System,
+  SystemConfig,
+  SystemDerived,
+  SystemEvent,
+  SystemFacts,
+  SystemInspection,
+  SystemMode,
+  SystemSnapshot,
+  TraceEntry,
+  TraceOption,
+} from "./types/index.js";
+export type {
+  ModuleConfig,
+  ModuleConfigWithDeps,
+} from "./types/module-config.js";
+export type { DescribeOptions } from "./types/predicate-describe.js";
+export type { PredicateToMongoOptions } from "./types/predicate-to-mongo.js";
+export type { PredicateToPostgrestOptions } from "./types/predicate-to-pgrest.js";
+export type {
+  PredicateToSqlOptions,
+  PredicateToSqlResult,
+} from "./types/predicate-to-sql.js";
+export type {
+  SchemaValidationError,
+  SchemaValidationOptions,
+  SchemaValidationResult,
+} from "./types/predicate-validation.js";
+export type {
+  PredictMissingChange,
+  PredictResult,
+} from "./types/predict.js";
+export type {
+  PredicateBacktestReport,
+  ReplayDiffSample,
+  ReplayFrame,
+  ReplayUnderOptions,
+} from "./types/replay-under.js";
+export type { RequirementTypeStatus } from "./types/requirement-status.js";
+export type {
+  Change,
+  ChangeKind,
+  ConstraintDiff,
+  ConstraintStatus,
+  DiffRulesOptions,
+  LeafClause,
+  RulesDiffReport,
+  RulesMapInput,
+} from "./types/rules-diff.js";
+export type {
+  DistributableSnapshotLike,
+  SignedSnapshot,
+  SnapshotDiff,
+  SnapshotDiffEntry,
+} from "./types/snapshot-utils.js";
+export type {
+  SweepHole,
+  SweepPoint,
+  SweepReport,
+  SweepUnderOptions,
+} from "./types/sweep-under.js";
 export {
   completeTimer,
   elapsedMs,

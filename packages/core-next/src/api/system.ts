@@ -6,6 +6,14 @@
  */
 
 import isDevelopment from "#is-development";
+import type {
+  CreateSystemOptionsNamed,
+  CreateSystemOptionsSingle,
+  ModuleSchema as ModuleSchema135,
+  ModulesMap,
+  NamespacedSystem,
+  SingleModuleSystem,
+} from "../types/index.js";
 import {
   type ErrorSource,
   type SystemPart,
@@ -29,9 +37,32 @@ export { DirectiveError } from "./core.js";
 export { createModule, createModuleFactory } from "./module.js";
 export type { ErrorSource };
 
-export function createSystem<const M extends ModuleSchema>(
-  options: SystemOptions<M>,
-): System<M> {
+/**
+ * The public signatures are 1.35's two overloads, on 1.35's types (src/types/,
+ * copied from 1.35): `{ module }` gives a SingleModuleSystem, `{ modules }` a
+ * NamespacedSystem (`system.facts.auth.token`).
+ *
+ * Declared with 1.35's types but not built yet (runtime: slice P3-F3): the
+ * system's `history`, `onHistoryChange`, `trace`, `meta`, `explain`,
+ * `getDistributableSnapshot`/`watchDistributableSnapshot`, the dynamic
+ * `constraints`/`resolvers`/`effects`/`derive` controls, and the
+ * `history`/`trace` options.
+ */
+export function createSystem<S extends ModuleSchema135>(
+  options: CreateSystemOptionsSingle<S>,
+): SingleModuleSystem<S>;
+export function createSystem<const Modules extends ModulesMap>(
+  options: CreateSystemOptionsNamed<Modules>,
+): NamespacedSystem<Modules>;
+/**
+ * @internal The implementation, on core-next's own types (api/types.ts).
+ * `O` erases to `any` and `object` is a supertype of both overloads' returns,
+ * which is what lets 1.35's overloads sit on it unchanged.
+ */
+export function createSystem<
+  const M extends ModuleSchema,
+  O extends SystemOptions<M> = SystemOptions<M>,
+>(options: O): object {
   if (!options || (!("module" in options) && !("modules" in options))) {
     throw new Error(
       "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",

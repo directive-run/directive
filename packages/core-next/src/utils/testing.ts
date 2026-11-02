@@ -10,3 +10,19 @@ export async function flushMicrotasks(): Promise<void> {
     await Promise.resolve();
   }
 }
+
+// 1.35's public types for this entry, exactly: copied from 1.35 into
+// src/types/ (types only, no runtime code).
+export type {
+  CoverageReport,
+  CreateTestSystemOptions,
+  CreateTestSystemOptionsSingle,
+  FactChangeRecord,
+  FakeTimers,
+  MockResolver,
+  MockResolverContext,
+  MockResolverOptions,
+  TestSystem,
+  TestSystemBase,
+  TestSystemSingle,
+} from "../types/testing.js";

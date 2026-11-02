@@ -8,6 +8,15 @@
  */
 
 import isDevelopment from "#is-development";
+import type {
+  CrossModuleDeps,
+  ModuleDef as ModuleDef135,
+  ModuleSchema as ModuleSchema135,
+} from "../types/index.js";
+import type {
+  ModuleConfig,
+  ModuleConfigWithDeps,
+} from "../types/module-config.js";
 import { BLOCKED_PROPS, DERIVATION_DEP_PREFIX } from "./facts.js";
 import type { ModuleDef, ModuleDefinition, ModuleSchema } from "./types.js";
 
@@ -139,10 +148,33 @@ function advise(id: string, config: Config): void {
   }
 }
 
-export function createModule<const M extends ModuleSchema>(
+// The public signatures are 1.35's three overloads, on 1.35's types
+// (src/types/, copied from 1.35): a module that declares `crossModuleDeps`
+// gets `facts.self` and its dependencies' facts typed in every handler.
+// Overload 1: with crossModuleDeps.
+export function createModule<
+  const M extends ModuleSchema135,
+  const Deps extends CrossModuleDeps,
+>(id: string, config: ModuleConfigWithDeps<M, Deps>): ModuleDef135<M>;
+// Overload 2: without crossModuleDeps.
+export function createModule<const M extends ModuleSchema135>(
   id: string,
-  definition: ModuleDef<M>,
-): ModuleDefinition<M> {
+  config: ModuleConfig<M>,
+): ModuleDef135<M>;
+// Overload 3: either (used by createModuleFactory).
+export function createModule<const M extends ModuleSchema135>(
+  id: string,
+  config: ModuleConfigWithDeps<M, CrossModuleDeps> | ModuleConfig<M>,
+): ModuleDef135<M>;
+/**
+ * @internal The implementation, on core-next's own types (api/types.ts).
+ * `D` erases to `any` and `object` is a supertype of every overload's
+ * return, which is what lets 1.35's overloads sit on it unchanged.
+ */
+export function createModule<
+  const M extends ModuleSchema,
+  D extends ModuleDef<M> = ModuleDef<M>,
+>(id: string, definition: D): object {
   const config = definition as Config;
   check(id, config);
   if (isDevelopment) {
@@ -167,8 +199,17 @@ export function createModule<const M extends ModuleSchema>(
   } as unknown as ModuleDefinition<M>;
 }
 
-export function createModuleFactory<const M extends ModuleSchema>(
-  definition: ModuleDef<M>,
-): (name: string) => ModuleDefinition<M> {
+// 1.35's two overloads.
+export function createModuleFactory<const M extends ModuleSchema135>(
+  config: ModuleConfig<M>,
+): (name: string) => ModuleDef135<M>;
+export function createModuleFactory<
+  const M extends ModuleSchema135,
+  const Deps extends CrossModuleDeps,
+>(config: ModuleConfigWithDeps<M, Deps>): (name: string) => ModuleDef135<M>;
+/** @internal The implementation: 1.35's (overload 3 of createModule). */
+export function createModuleFactory<const M extends ModuleSchema135>(
+  definition: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): (name: string) => ModuleDef135<M> {
   return (name) => createModule(name, definition);
 }
