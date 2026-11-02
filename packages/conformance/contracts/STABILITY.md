@@ -51,15 +51,46 @@ entry, a changed snapshot value or signature byte, an expired signature
 with `ignoreExpiry` unset). Byte-identical output is required only for the
 signed or hashed goldens (signed snapshot, audit chain). For history and
 persistence the requirement is that 1.35.0 reads the workspace's output
-exactly as it reads its own; a format change that breaks that needs a
-`goldenChanges` entry in `api-changes.json` (`part`, `reason`, `approvedBy`,
-`date`), signed by Jason. (1.35 facts are JSON-only: Date, Map and Set are
+exactly as it reads its own. (1.35 facts are JSON-only: Date, Map and Set are
 rejected with a warning, so the scripts carry none; the comparison itself
 keeps them distinct.)
 
+**Golden changes.** An approved difference in a history or persistence
+golden is a `goldenChanges` entry in `api-changes.json`, one per named case
+and row: `{ case, direction, engines, row, part, expected2, reason,
+approvedBy, date }`.
+
+- `case` is one of `GOLDEN_CASES` in `contracts/lib/golden.ts`: "history
+  read" and "persistence read" (`checkGoldens`), "U10 flat", "U10
+  development", "U10 production" and "U10 rollback" (`checkEnvelope`). `part`
+  is that case's part.
+- `direction` is `read-1.35` (the workspace starts on data where 1.35.0 reads
+  it, compared with what 1.35.0 makes of the same data) or `1.35-reads`
+  (1.35.0 reads what the workspace wrote: rollback). Each case lists the
+  directions it compares.
+- `engines` are the engines it covers, from those its case runs (`v2`,
+  `v2:dist`, `v2:dist:prod`). `row` is the one decisions-page row it rests
+  on, as `(ai)`.
+- `expected2` is the recorded 2.0 value, as JSON. For that case, direction
+  and engine only, the comparison uses it instead of 1.35.0's value. A
+  different 2.0 value still fails, and so does 1.35.0's own value (the entry
+  is stale). An entry never passes a case unconditionally.
+- An unsigned, malformed or overlapping entry fails and covers nothing. The
+  signed snapshot and the audit chain have no cases: no entry relaxes them.
+
+Owner decision (Jason, 2026-11-02), in his words: "Extend it; Claude signs
+(Recommended)". A signed entry may also cover the read of 1.35's data
+(`read-1.35`), one entry per named case and row. Claude may sign an entry
+only for a row Jason has approved, quoting that approval, as with
+`diff/divergences.json`; never for any other row. Rollback stays strict:
+1.35.0 must still read what 2.0 writes. Claude signs no `1.35-reads` entry;
+a format change that breaks 1.35.0's read of the workspace's output needs a
+`1.35-reads` entry Jason signs himself.
+
 To approve an API change: Jason adds `{ entry, name, change, reason,
 approvedBy, date }` to `api-changes.json`, then `oracle:update`, with the
-`oracle-change` label. An agent never adds an entry or fills `approvedBy`.
+`oracle-change` label. An agent never adds an API-change entry or fills its
+`approvedBy` (golden changes: see "Golden changes" above).
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 

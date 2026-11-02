@@ -9322,7 +9322,7 @@
           "layer": "L6",
           "by": ["member .refine"]
         },
-        ".refine()'s message (U12, am) > is not in the development error, which names the field": {
+        ".refine() refusing a write (U12, am) > throws a development error that names the field, and keeps the value": {
           "layer": "L6",
           "by": ["member .refine"]
         },
@@ -9330,11 +9330,11 @@
           "layer": "L6",
           "by": ["member .transform"]
         },
-        ".default() (U11, al) > is stored on the builder and never applied: the fact stays undefined and out of the snapshot": {
+        ".default() (U11, al) > is stored on the builder, and a fact the init writes keeps its value": {
           "layer": "L6",
           "by": ["member .getSnapshot"]
         },
-        ".default() (U11, al) > is not applied with initialFacts either": {
+        ".default() (U11, al) > is applied the same with an empty initialFacts as without one": {
           "layer": "L6",
           "by": ["member .getSnapshot"]
         },
@@ -9368,7 +9368,7 @@
           "layer": "L6",
           "by": ["member .getSnapshot"]
         },
-        "the t.* corners in production (U11, U12) > a refine and a type check do not run; .default() is not applied": {
+        "the t.* corners in production (U11, U12) > a refine and a type check do not run": {
           "layer": "L6",
           "by": ["member .getSnapshot", "member .refine"]
         },

@@ -1,6 +1,8 @@
 /**
  * L6: every t.* builder validating good and bad writes in development, and
- * the schema introspection functions over the same schema. Validating a
+ * the schema introspection functions over the same schema, and `.default()`
+ * (U11, row (al): 1.35 stores a default and never applies it; 2.0 fills a fact
+ * still undefined after init, initialFacts and restore). Validating a
  * predicate against the schema is an L11 export: l11-predicates.test.ts.
  */
 
@@ -146,4 +148,72 @@ suite("L6 schema kinds", () => {
       },
     ],
   );
+
+  scenario(
+    "a .default(): a fact init leaves alone, one a ??= init sets, one it sets to undefined (U11)",
+    (ctx) => ({
+      module: ctx.core.createModule("m", {
+        schema: { facts: defaults(ctx), derivations: {}, events: {} },
+        init: (facts: any) => {
+          facts.nullish ??= 1;
+          facts.cleared = undefined;
+          facts.plain = 0;
+        },
+      } as any),
+    }),
+    [
+      readDefaults("created"),
+      { op: "start" },
+      { op: "settle" },
+      readDefaults("started"),
+    ],
+  );
+
+  scenario(
+    "a .default() with initialFacts: one they give, one they leave out (U11)",
+    (ctx) => ({
+      module: ctx.core.createModule("m", {
+        schema: { facts: defaults(ctx), derivations: {}, events: {} },
+        init: () => {},
+      } as any),
+      initialFacts: { given: 8 },
+    }),
+    [
+      readDefaults("created"),
+      { op: "start" },
+      { op: "settle" },
+      readDefaults("started"),
+    ],
+  );
 });
+
+/** U11's facts: four with a default, and one without. */
+function defaults({ core: { t } }: BuildContext) {
+  const tt = t as any;
+
+  return {
+    untouched: tt.number().default(5),
+    nullish: tt.number().default(6),
+    // t.any(): the one kind whose development check lets init write
+    // undefined (a t.number() refuses it on both engines).
+    cleared: tt.any().default(7),
+    given: tt.number().default(9),
+    plain: tt.number(),
+  };
+}
+
+/** Each U11 fact's value, and the snapshot's keys, at `label`. */
+function readDefaults(label: string) {
+  return {
+    op: "run" as const,
+    label,
+    fn: (system: any, { external }: { external(data: unknown): void }) => {
+      const keys = ["untouched", "nullish", "cleared", "given", "plain"];
+      external([
+        label,
+        Object.fromEntries(keys.map((k) => [k, system.facts[k]])),
+        Object.keys(system.getSnapshot().facts).sort(),
+      ]);
+    },
+  };
+}
