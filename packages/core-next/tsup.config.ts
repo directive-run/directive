@@ -71,7 +71,7 @@ function inlineIsDevelopment(
 export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
-// The four entries package.json `exports` serves.
+// The four built entries package.json `exports` serves.
 const entry = {
   index: "src/index.ts",
   internals: "src/internals.ts",
@@ -79,13 +79,23 @@ const entry = {
   testing: "src/utils/testing.ts",
 };
 
+// 1.35's other three entries, which 2.0 has not built: 1.35's export names,
+// each function throwing `featureMissing` (src/api/missing.ts). Built on their
+// own so the four entries above split into the same chunks as before and
+// their ESM output does not change (slice P3-F5).
+const stubEntry = {
+  worker: "src/worker.ts",
+  migration: "src/migration.ts",
+  "adapter-utils": "src/adapter-utils.ts",
+};
+
 const shared: Options = {
-  entry,
-  // ESM only, as core-next is today. CJS is a packaging follow-up for alpha.0.
-  format: ["esm"],
+  // ESM and CommonJS, as 1.35 ships. tsup runs one esbuild build per format,
+  // so the CJS files leave the ESM ones as they were.
+  format: ["esm", "cjs"],
   minify: false,
   sourcemap: false,
-  // `pnpm build` empties dist first. Cleaning here would race the three
+  // `pnpm build` empties dist first. Cleaning here would race the six
   // builds below, which run at the same time and share the directory.
   clean: false,
   splitting: true,
@@ -99,8 +109,12 @@ const shared: Options = {
 };
 
 // The same three builds 1.35 ships (packages/core/tsup.config.ts), selected by
-// the `exports` conditions in package.json.
-export default defineConfig([
+// the `exports` conditions in package.json, for one set of entries. `extra`
+// goes in the default build only.
+const builds = (
+  entries: Record<string, string>,
+  extra: Record<string, string> = {},
+): Options[] => [
   // The default build, for consumers with neither condition. The check is
   // read from the environment at run time and folded by a bundler that
   // defines `process.env.NODE_ENV`. With no `process` (a browser) it is
@@ -110,9 +124,7 @@ export default defineConfig([
   // `development` build. The only build with type declarations.
   {
     ...shared,
-    // `graph` is private: not in package.json `exports`, so no consumer can
-    // import it. bench/entry-ours.mjs reads it to measure the built graph.
-    entry: { ...entry, graph: "src/graph.ts" },
+    entry: { ...entries, ...extra },
     outDir: "dist",
     dts: true,
     esbuildPlugins: [
@@ -128,6 +140,7 @@ export default defineConfig([
   // debug in a browser.
   {
     ...shared,
+    entry: entries,
     outDir: "dist/development",
     dts: false,
     esbuildPlugins: [
@@ -143,6 +156,7 @@ export default defineConfig([
   // bundler setting is needed for the dev code to disappear.
   {
     ...shared,
+    entry: entries,
     outDir: "dist/production",
     dts: false,
     minify: true,
@@ -153,4 +167,11 @@ export default defineConfig([
       ),
     ],
   },
+];
+
+export default defineConfig([
+  // `graph` is private: not in package.json `exports`, so no consumer can
+  // import it. bench/entry-ours.mjs reads it to measure the built graph.
+  ...builds(entry, { graph: "src/graph.ts" }),
+  ...builds(stubEntry),
 ]);
