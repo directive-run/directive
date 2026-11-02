@@ -1,17 +1,23 @@
 /**
  * An engine under test that runs away after an `ends` divergence on that
  * same engine has already stopped its comparison is discarded, not failed
- * (Jason, 2026-11-02: "Once an approved stop rule (an `ends` divergence)
- * has ended the comparison, a 2.0 runaway past it is discarded like a 1.35
+ * (Jason, 2026-11-02, answering in chat: "Discard after the stop", the
+ * option that reads: once an approved stop rule, an `ends` divergence, has
+ * ended the comparison, a 2.0 runaway past it is discarded like a 1.35
  * runaway, inside the existing 1% runaway limit, and reported in the census
- * line. A 2.0 runaway with no stop rule before it still fails."). Each test
+ * line; a 2.0 runaway with no stop rule before it still fails). Each test
  * proves one edge of how wide that is: the runaway after a stop is
  * discarded and counted; one with no stop, an ordinary entry or a hand
  * scenario is still a hang; one before the stop (in a later step, or in the
  * same step before the stop's record, or in the same segment as a missing
  * stop) is still a hang; one on an engine the stop is not on is still a
  * hang; and discarded cases count toward the one runaway limit, which still
- * fails the run.
+ * fails the run. The runaway starts where the engine's timer callbacks pass
+ * the reference's own total, not where the budget ran out (diff/scenario.ts
+ * `stopsBefore`), so (e) a loop whose own records match the `ends` entry,
+ * and a loop that started before the stop, are still hangs; the stop must
+ * be strictly before that point; and a discarded case still fails on a
+ * difference before its stop.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -43,6 +49,12 @@ interface Marks {
   omit?: boolean;
   /** Starts an endless timer chain in the spin steps. */
   spin?: boolean;
+  /** Reports z as 1 (the reference 0): a difference no entry explains. */
+  z?: boolean;
+  /** The endless chain reports q (an extra record) in every callback. */
+  loopQ?: boolean;
+  /** In the TICKS step: reports q (extra) in this tick, then spins. */
+  qAt?: number;
 }
 
 const MARK = "__runawayAfterStopSelfTest";
@@ -356,5 +368,147 @@ describe("a runaway after an `ends` stop is discarded, and counted", () => {
     expect(checkFuzzRuns([over.run], true)).toEqual([
       "conformance:diff: 3 runaway fuzz cases (seed 1); at most 2 allowed (max(1% of cases, 2))",
     ]);
+  });
+});
+
+/** Like spawn, but every callback first reports q: the loop's own record. */
+function spawnQ(ctx: BuildContext): void {
+  const fire = () => {
+    ctx.external(["q", 1]);
+    setTimeout(fire, 1);
+    setTimeout(fire, 1);
+  };
+  setTimeout(fire, 1);
+  setTimeout(fire, 1);
+}
+
+/** The timer callbacks every engine makes in the TICKS step. */
+const TICKS = 3;
+
+/**
+ * Every engine runs a chain of TICKS timer callbacks, so the reference
+ * makes exactly TICKS. A spinning engine with `qAt` ticks on to `qAt`,
+ * reports q there, then spins: q's record is the first one past the
+ * reference's total when `qAt` is TICKS + 1, the last one before it when
+ * `qAt` is TICKS.
+ */
+const TICK: Step = {
+  op: "run",
+  label: "ticks",
+  fn: (_s, ctx) => {
+    const { qAt = 0, spin } = marksOf(ctx);
+    let k = 0;
+    const tick = () => {
+      k++;
+      if (k === qAt) {
+        ctx.external(["q", 1]);
+      }
+      if (k < TICKS || (spin && k < qAt)) {
+        setTimeout(tick, 1);
+      } else if (spin) {
+        spawn();
+      }
+    };
+    setTimeout(tick, 1);
+    vi.advanceTimersByTime(100);
+  },
+};
+
+describe("(e) the runaway starts where the engine outworks the reference, not where the budget runs out", () => {
+  it("P1: a loop whose own records match the `ends` entry is still a hang", async () => {
+    // The loop starts in step 1 and reports q in every callback; the first
+    // q is an `ends` stop far below the point the budget ran out.
+    const result = await runScenario(
+      fuzzCase([
+        {
+          op: "run",
+          label: "loop",
+          fn: (_s, ctx) => {
+            if (marksOf(ctx).loopQ) {
+              spawnQ(ctx);
+            }
+          },
+        },
+        ADVANCE,
+      ]),
+      {
+        candidates: [marked("v2", { loopQ: true })],
+        divergences: [ends("extra")],
+      },
+    );
+    expect(result.fired).toBe(0);
+    expect(result.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expectHang(result, "v2");
+  });
+
+  it("P3: a loop that started before the stop and ran out of budget after it is still a hang", async () => {
+    const result = await runScenario(
+      fuzzCase([
+        {
+          op: "run",
+          label: "loop a little",
+          fn: (_s, ctx) => {
+            if (marksOf(ctx).spin) {
+              // 2 + 4 + 8 callbacks: far below the budget.
+              spawn();
+              vi.advanceTimersByTime(3);
+            }
+          },
+        },
+        REPORT,
+        ADVANCE,
+      ]),
+      {
+        candidates: [marked("v2", { diff: true, spin: true })],
+        divergences: [ends()],
+      },
+    );
+    expect(result.fired).toBe(0);
+    expect(result.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expectHang(result, "v2");
+  });
+
+  it("the stop must be strictly before the point: the last record within the reference's callbacks is discarded, the first past them is a hang", async () => {
+    const run = (qAt: number) =>
+      runScenario(fuzzCase([TICK]), {
+        candidates: [marked("v2", { qAt, spin: true })],
+        divergences: [ends("extra")],
+      });
+
+    const within = await run(TICKS);
+    expect(within.fired).toBe(TICKS);
+    expect(within.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expect([within.ok, within.discarded, within.hung]).toEqual([
+      true,
+      ["v2"],
+      [],
+    ]);
+
+    // q is the first record of callback TICKS + 1: at the point, not before.
+    const at = await run(TICKS + 1);
+    expect(at.fired).toBe(TICKS);
+    expect(at.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expectHang(at, "v2");
+  });
+
+  it("P2: a discarded case still fails on a difference before its stop", async () => {
+    // z differs in step 1, the stop is in step 2, the runaway in step 4.
+    const Z: Step = {
+      op: "run",
+      label: "report z",
+      fn: (_s, ctx) => ctx.external(["z", marksOf(ctx).z ? 1 : 0]),
+    };
+    const result = await runScenario(fuzzCase([Z, REPORT, SPIN, ADVANCE]), {
+      candidates: [marked("v2", { z: true, diff: true, spin: true })],
+      divergences: [ends()],
+    });
+    expect(result.discarded).toEqual(["v2"]);
+    expect(result.hung).toEqual([]);
+    expect(result.ok).toBe(false);
+    expect(result.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expect(result.unexplained).toMatchObject([
+      { engine: "v2", op: "changed", stream: "external", step: 1 },
+    ]);
+    expect(result.report).toMatch(/engines differ/);
   });
 });

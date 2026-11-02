@@ -31,7 +31,8 @@
  * counts only compared cases. More than max(1% of cases, 2) runaways fail the
  * run (a generator drifting into runaways would compare nothing). A case the reference settles but an engine
  * under test does not is a hang, and fails, unless an `ends` divergence on
- * that engine had already ended the comparison before it ran away: then it
+ * that engine had already ended the comparison before it ran away (before
+ * its timer callbacks passed the reference's total): then it
  * is discarded like a reference runaway and counted toward the same limit
  * (Jason, 2026-11-02: "Discard after the stop"; diff/scenario.ts
  * `stopsBefore`).

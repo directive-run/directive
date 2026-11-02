@@ -190,7 +190,8 @@ export interface ScenarioResult {
   /**
    * Engines under test that passed the budget after an `ends` divergence
    * on that same engine had already stopped their comparison (the stop's
-   * record came before the runaway, `stopsBefore`). Not a hang: the case is
+   * record came before the engine made more timer callbacks than the
+   * reference's whole run, `stopsBefore`). Not a hang: the case is
    * discarded like a reference runaway and counted toward the same limit
    * (`tallyCase`). Its differences before the stop are still checked, so
    * the case can still fail on them (Jason, 2026-11-02: "Discard after the
@@ -315,11 +316,18 @@ const COUNTED = ["setTimeout", "setInterval", "setImmediate"] as const;
  * Count timer callbacks on the (already installed) fake timers. Past
  * `limit` the run is a runaway: every pending timer is cleared and further
  * callbacks are dropped, so the run winds down; its trace is not compared.
+ * `past` is the reference's own total: `pastAt` marks the trace's length
+ * just before the callback that takes the count past it runs.
  */
-function installBudget(limit: number, mark: () => number) {
+function installBudget(limit: number, past: number, mark: () => number) {
   const g = globalThis as unknown as Record<string, TimerFn>;
   const fakes = COUNTED.map((name) => [name, g[name] as TimerFn] as const);
-  const state: { fired: number; exceeded: boolean; at?: number } = {
+  const state: {
+    fired: number;
+    exceeded: boolean;
+    at?: number;
+    pastAt?: number;
+  } = {
     fired: 0,
     exceeded: false,
   };
@@ -335,7 +343,10 @@ function installBudget(limit: number, mark: () => number) {
           if (state.exceeded) {
             return;
           }
-          if (++state.fired > limit) {
+          if (++state.fired === past + 1) {
+            state.pastAt = mark();
+          }
+          if (state.fired > limit) {
             state.exceeded = true;
             state.at = mark();
             vi.clearAllTimers();
@@ -512,24 +523,34 @@ export interface BudgetedRun {
   fired: number;
   /** The run passed the budget: its trace is cut short and not compared. */
   runaway: boolean;
-  /**
-   * For a runaway, the trace's length when the budget ran out: every record
-   * at a lower index happened before the runaway.
-   */
+  /** For a runaway, the trace's length when the budget ran out. */
   runawayAt?: number;
+  /**
+   * The trace's length just before the run's timer callback number
+   * `referenceFired + 1` ran: every record at a lower index was emitted
+   * while the run had made no more timer callbacks than the reference made
+   * in its whole settled run. Every record a loop emits once it has
+   * outworked the reference is at this index or later. Set for every
+   * runaway (its count passes the limit, which the reference's does not).
+   */
+  pastReferenceAt?: number;
 }
 
-/** Run one scenario on one engine under a timer-callback budget. */
+/**
+ * Run one scenario on one engine under a timer-callback budget.
+ * `referenceFired`, the reference's total, sets `pastReferenceAt`.
+ */
 export async function runBudgeted(
   engine: EngineHandle,
   def: ScenarioDef,
   limit = def.budget ?? RUN_BUDGET,
+  referenceFired = limit,
 ): Promise<BudgetedRun> {
   const rec = createRecorder();
   // Everything that makes a run deterministic, and everything that captures
   // what the engine prints, goes in before the engine loads.
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
-  const budget = installBudget(limit, () => rec.trace.length);
+  const budget = installBudget(limit, referenceFired, () => rec.trace.length);
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -576,6 +597,7 @@ export async function runBudgeted(
         fired: budget.state.fired,
         runaway: budget.state.exceeded,
         runawayAt: budget.state.at,
+        pastReferenceAt: budget.state.pastAt,
       };
     }
     const snapshots = new Map<string, unknown>();
@@ -630,6 +652,7 @@ export async function runBudgeted(
     fired: budget.state.fired,
     runaway: budget.state.exceeded,
     runawayAt: budget.state.at,
+    pastReferenceAt: budget.state.pastAt,
   };
 }
 
@@ -844,26 +867,33 @@ export function explain(
 }
 
 /**
- * Whether an `ends` stop on one engine came before that engine's runaway
- * (`runawayAt`, from `runBudgeted`), so the comparison had already ended
- * when the run stopped settling (Jason, 2026-11-02: "Discard after the
- * stop"). A stop with a record in the engine's trace (extra or changed)
- * came first when that record's index is below `runawayAt`. A stop that is
- * the reference's alone (missing) came first only when its segment (step,
- * then setup, sync or async phase) ends before the one the runaway happened
- * in: in the same segment the engine may simply not have reached it yet, so
- * that runaway is still a hang.
+ * Whether an `ends` stop on one engine came before that engine's runaway,
+ * so the comparison had already ended when the run stopped settling (Jason,
+ * 2026-11-02: "Discard after the stop"). The runaway starts at
+ * `pastReferenceAt` (from `runBudgeted`): the point the engine had made more
+ * timer callbacks than the reference made in its whole settled run, not
+ * the later point the budget ran out. Up to there the engine has done no
+ * more timer work than a settling run needs; from there on it is doing work
+ * the reference never did, so a record there may be the loop's own (an
+ * extra hook record a loop repeats can match an `ends` entry) and cannot be
+ * the stop that ended the comparison first. A stop with a record in the
+ * engine's trace (extra or changed) came first when that record's index is
+ * strictly below `pastReferenceAt`. A stop that is the reference's alone
+ * (missing) came first only when its segment (step, then setup, sync or
+ * async phase) ends before the one the runaway started in: in the same
+ * segment the engine may simply not have reached it yet, so that runaway is
+ * still a hang.
  */
 export function stopsBefore(
   stop: Difference,
   trace: TraceEntry[],
-  runawayAt: number | undefined,
+  pastReferenceAt: number | undefined,
 ): boolean {
-  if (runawayAt === undefined) {
+  if (pastReferenceAt === undefined) {
     return false;
   }
   if (stop.at.candidate !== undefined) {
-    return stop.at.candidate < runawayAt;
+    return stop.at.candidate < pastReferenceAt;
   }
   const where = stop.where.reference;
   if (!where) {
@@ -872,7 +902,7 @@ export function stopsBefore(
   // The runaway's segment, as keyTrace (diff/compare.ts) files records.
   let step = -1;
   let phase = 0;
-  for (const entry of trace.slice(0, runawayAt)) {
+  for (const entry of trace.slice(0, pastReferenceAt)) {
     if (entry.k === "step") {
       step = entry.i;
       phase = 1;
@@ -936,10 +966,10 @@ export async function runScenario(
   }
   const runaways = new Map<string, number | undefined>();
   for (const engine of candidates) {
-    const run = await runBudgeted(engine, def, limit);
+    const run = await runBudgeted(engine, def, limit, firstRun.fired);
     theirs[engine.name] = run.trace;
     if (run.runaway) {
-      runaways.set(engine.name, run.runawayAt);
+      runaways.set(engine.name, run.pastReferenceAt);
     }
   }
 
@@ -982,9 +1012,10 @@ export async function runScenario(
     );
   }
   // An engine under test that passes the budget is a hang, unless an `ends`
-  // stop on that same engine came before the runaway: then the comparison
-  // had already ended and the case is discarded (Jason, 2026-11-02:
-  // "Discard after the stop"), counted toward the runaway limit.
+  // stop on that same engine came before the runaway started (before it
+  // outworked the reference, `stopsBefore`): then the comparison had
+  // already ended and the case is discarded (Jason, 2026-11-02: "Discard
+  // after the stop"), counted toward the runaway limit.
   const discarded: string[] = [];
   for (const [engine, at] of runaways) {
     const stop = ended.find((e) => e.engine === engine);
