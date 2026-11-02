@@ -27,8 +27,8 @@ below); every other entry is for a hand scenario.
 | ac | "A failed gated attach": "The attach retries on the clock. The timer is cleared at stop and destroy, and skipped after a history navigation." | Approved 2026-11-01: "Approve all". Built in L5b (#323) |
 | ad | "stop() called inside a source's attach": "a stop() during start's attach loop ends the loop, and stop's own detach covers every source attached so far." | Approved in chat 2026-11-01: "Approve both". Found reviewing L5a; built in L5c (#324) |
 | ae | "A linger timer that fires during stopAsync()": "stop clears pending linger timers before it awaits, so nothing attaches during the stop." | Approved in chat 2026-11-01: "Approve both". Found reviewing L5b; built with (ad) in L5c (#324) |
-| A2 | "The aperture fixture": "Keep the plan: a copy of the real Aperture lab at layer six. Nothing synthetic at layer five, since the minimal app already measures layer five's size." | Approved 2026-11-01: "Keep the plan." Nothing built at L5 |
-| B1 | "evict, and the source frame-loop bench": "B1: move evict to layer five with onEvict." | Approved 2026-11-01: "Approve all three." Placed by L5-pre (#320): 7 evict-only tests and the scenario "async stop, evict and destroy" moved from L10 to L5 |
+| A2 | "The aperture fixture": "Keep the plan: a copy of the real Aperture lab at layer six. Nothing synthetic at layer five, since the minimal app already measures layer five's size." | Approved 2026-11-01 with the L5 rows ("Approve all"). Nothing built at L5 |
+| B1 | "evict, and the source frame-loop bench": "B1: move evict to layer five with onEvict." | Approved 2026-11-01 with the L5 rows ("Approve all"). Placed by L5-pre (#320): 7 evict-only tests and the scenario "async stop, evict and destroy" moved from L10 to L5 |
 | B2 | "B2: add a frame-loop-source benchmark." | Approved 2026-11-01. Built in #319; the L5 gate judges it against 0.8 times 1.35's time |
 | B3 | "B3: keep evict on the system for now, and decide its beta home before beta." | Approved 2026-11-01. Nothing to do at L5 |
 | crossing | "Where the fuzz stop starts when records cross": "When the engines reorder records just before an approved quirk, the stop starts before that crossing. On seed 2 it drops 12 records that a literal reading would keep." | Confirmed 2026-11-01: "Confirm crossing reading". A test-harness rule (#315); no entry |
@@ -201,14 +201,10 @@ adds a divergence entry.
   stop are still checked. The self-tests are `diff/self/runaway-after-stop.test.ts`
   (real engines).
 
-**Known limit (from #328's review).** The runaway is taken to start where the
-engine's timer callbacks pass the reference's own total, not where the budget
-ran out, and the stop must lie strictly before that point. A loop record that
-lands within the reference's own callback count is therefore still discarded:
-the harness cannot tell it from the stop, so a loop whose first matching record
-falls inside that count is read as the stop that ended the comparison. It is a
-known limit of the rule, logged from #328's review; the discard stays inside
-the runaway limit.
+**Known limit (from #328's review).** The runaway is taken to start at the first timer callback past the number the
+reference needed to settle, and the stop must come before that point. So a 2.0 loop that starts within those
+first callbacks, and whose own record matches an `ends` entry there, is still discarded. The discard counts
+toward the runaway limit and shows in the census line.
 
 ## Results
 
