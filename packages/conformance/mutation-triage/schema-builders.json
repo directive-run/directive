@@ -14,7 +14,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 206,
@@ -23,7 +23,7 @@
     "replacement": "[]",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 206,
@@ -32,7 +32,7 @@
     "replacement": "refinements && []",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 206,
@@ -41,7 +41,7 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 206,
@@ -50,7 +50,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 208,
@@ -59,7 +59,7 @@
     "replacement": "[]",
     "reason": "feature-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.number(), t.boolean(), ...). Every test that calls `.refine` is placed at L6 by lib/layers.ts (MEMBER_LAYERS refine), so no test at or below L3 can reach it; NoCoverage in the full run too, so no existing test kills it yet. The L6 refine scenarios will."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). Stays feature-layer L6 so the next gate=L6 run must record the kill."
   },
   {
     "line": 245,

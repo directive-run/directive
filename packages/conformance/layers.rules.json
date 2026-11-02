@@ -115,7 +115,7 @@
     "a linger pending at stopAsync attaches nothing during the stop": "L5",
     "t.* refine, transform, brand and wrong types in development": "L6",
     "the persistence plugin restores, saves debounced, and excludes keys": "L6",
-    "distributable snapshots": "L6",
+    "distributable snapshots": "L12",
     "every t.* builder accepts good writes and refuses bad ones": "L6",
     "schema introspection: kinds, operators and predicate validation": "L6",
     "snapshot and restore round-trip, with reconcile after restore": "L6",
@@ -564,6 +564,18 @@
       "rule": "L6"
     },
     "tests/plugins/hydration-scope.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-snapshots-oracle.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-snapshots-oracle-production.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-schema-oracle.test.ts": {
+      "rule": "L6"
+    },
+    "tests/core/l6-persistence-oracle.test.ts": {
       "rule": "L6"
     },
     "tests/core/batch-resolve-fallback.test.ts": {

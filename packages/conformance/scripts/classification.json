@@ -914,6 +914,42 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l6-persistence-oracle.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l6-schema-oracle.test.ts",
+    "category": "black-box",
+    "cases": 7,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l6-snapshots-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l6-snapshots-oracle.test.ts",
+    "category": "black-box",
+    "cases": 16,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
     "category": "black-box",
     "cases": 30,

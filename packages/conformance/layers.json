@@ -9284,6 +9284,170 @@
         }
       }
     },
+    "tests/core/l6-persistence-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L6",
+      "tests": {
+        "saved data against the module init and initialFacts (U7) > an init that leaves the persisted fact alone keeps the saved value": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        },
+        "saved data against the module init and initialFacts (U7) > an init that uses ??= keeps the saved value": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        },
+        "saved data against the module init and initialFacts (U7) > initialFacts beat the saved value": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        },
+        "a namespaced system persists flat ns::key keys (U15) > saves an included key under its flat name, and restores it from there": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        },
+        "a Date fact in a development save (U8, aj declined) > saves nothing, and only onError hears": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        }
+      }
+    },
+    "tests/core/l6-schema-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L6",
+      "tests": {
+        ".refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message }": {
+          "layer": "L6",
+          "by": ["member .refine"]
+        },
+        ".refine() on a base builder (U12) > chained twice records both refinements in order, and both predicates run": {
+          "layer": "L6",
+          "by": ["member .refine"]
+        },
+        ".refine()'s message (U12, am) > is not in the development error, which names the field": {
+          "layer": "L6",
+          "by": ["member .refine"]
+        },
+        ".transform() (U12, an declined) > drops every check before it, the type check included, and is never applied to a write": {
+          "layer": "L6",
+          "by": ["member .transform"]
+        },
+        ".default() (U11, al) > is stored on the builder and never applied: the fact stays undefined and out of the snapshot": {
+          "layer": "L6",
+          "by": ["member .getSnapshot"]
+        },
+        ".default() (U11, al) > is not applied with initialFacts either": {
+          "layer": "L6",
+          "by": ["member .getSnapshot"]
+        },
+        "a Date fact read through system.facts (U8, aj declined) > cannot be read as a Date in development: getTime() and JSON.stringify throw": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
+        }
+      }
+    },
+    "tests/core/l6-snapshots-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L6",
+      "tests": {
+        "restore() in production > writes an unknown key and an ill-typed value unchecked (U2)": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .restore"]
+        },
+        "restore() in production > still throws its three errors, and writes nothing (U14)": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .restore"]
+        },
+        "a snapshot in production (U1) > shares its nested values with the live facts": {
+          "layer": "L6",
+          "by": ["member .getSnapshot"]
+        },
+        "the t.* corners in production (U11, U12) > a refine and a type check do not run; .default() is not applied": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .refine"]
+        },
+        "a Date fact in production (U8) > reads as a Date, and the persistence plugin saves it as an ISO string": {
+          "layer": "L6",
+          "by": ["import persistencePlugin"]
+        }
+      }
+    },
+    "tests/core/l6-snapshots-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L6",
+      "tests": {
+        "a snapshot copies one level (U1) > is the facts and version 1, and a scalar changed on it stays on it": {
+          "layer": "L6",
+          "by": ["member .getSnapshot"]
+        },
+        "a snapshot copies one level (U1) > shares its nested values with the live facts, and nothing hears a change made through it": {
+          "layer": "L6",
+          "by": ["member .getSnapshot"]
+        },
+        "restore() reads only snapshot.facts (U3) > restores the facts of an envelope and ignores every other field": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .restore"]
+        },
+        "restore() and the module init (U4) > made before the system is initialized is overwritten by the init at start()": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() and the module init (U4) > made after initialize() and before start() is kept": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() and the module init (U4) > made after destroy() still writes, and does not throw": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() checks each key in development (U2) > throws naming an unknown key": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() checks each key in development (U2) > throws naming a key whose value fails its type": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() refuses a bad snapshot and writes nothing (U14) > that is not an object, even one carrying a facts object": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() refuses a bad snapshot and writes nothing (U14) > whose facts is missing or not an object": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .restore"]
+        },
+        "restore() refuses a bad snapshot and writes nothing (U14) > that holds a prototype-polluting key, at any depth": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "restore() writes one batch, filed as loaded data (U14) > plugins hear one onFactsBatch of hydrate writes, no onFactSet and no onSnapshot; derivations and effects follow": {
+          "layer": "L6",
+          "by": ["member .restore"]
+        },
+        "hydrate() (U5, U6) > an awaited loader is applied at start": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        },
+        "hydrate() (U5, U6) > a loader still pending at start() is never applied, not even after a stop and start (U5)": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        },
+        "hydrate() (U5, U6) > a loader still pending at initialize() is never applied (U5)": {
+          "layer": "L6",
+          "by": ["member .hydrate"]
+        },
+        "hydrate() (U5, U6) > a namespaced snapshot has flat keys: restore() takes them, hydrate() loads none (U6)": {
+          "layer": "L6",
+          "by": ["member .getSnapshot", "member .hydrate", "member .restore"]
+        }
+      }
+    },
     "tests/core/l7-batch-resolvers-oracle.test.ts": {
       "category": "black-box",
       "rule": "L7",
