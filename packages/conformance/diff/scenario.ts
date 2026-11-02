@@ -55,6 +55,13 @@ import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
 import { type Json, normalize } from "./normalize.js";
 import {
+  type Bound,
+  type Excuse,
+  admits,
+  excuseFor,
+  names,
+} from "./fingerprint.js";
+import {
   type Recorder,
   type TraceEntry,
   createRecorder,
@@ -134,6 +141,13 @@ export interface ScenarioDef {
  * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `group` (fuzz
  * only) is read by the census alone: an entry of a group is stale only when
  * no entry of its group covered a difference in the run.
+ *
+ * What it excuses is named, not just its class (P3-F1). A hand scenario's
+ * entry lists its records in `excuses`, each with a `count` (`Excuse`); a
+ * fuzz entry, whose records differ from seed to seed, gives a `bound` on
+ * their payloads instead (`Bound`). `covers` reads both; `explain` also
+ * stops an excuse at its count. Absent, the entry is the old wildcard over
+ * its class: the census requires one of them on every entry.
  */
 export interface Divergence {
   id: string;
@@ -147,6 +161,8 @@ export interface Divergence {
   ends?: boolean;
   when?: string[];
   group?: string;
+  excuses?: Excuse[];
+  bound?: Bound;
   reason: string;
   approvedBy: string;
   date: string;
@@ -155,7 +171,7 @@ export interface Divergence {
 /** The scenario name every fuzz case runs under (diff/fuzz/model.ts `toScenario`). */
 export const FUZZ_SCENARIO = "fuzz";
 
-export type { Difference };
+export type { Bound, Difference, Excuse };
 
 export interface ScenarioResult {
   name: string;
@@ -170,6 +186,8 @@ export interface ScenarioResult {
   advisories: string[];
   /** Divergence ids that covered at least one difference. */
   used: string[];
+  /** Each covered difference, with the entry and excuse that covered it. */
+  covered?: Covered[];
   /** Where an `ends` divergence stopped the comparison of a fuzz case. */
   ended: Ended[];
   /** Engines compared against the reference. */
@@ -758,8 +776,18 @@ export function covers(
       (d.path !== undefined &&
         (d.path === div.path ||
           d.path.startsWith(`${div.path}.`) ||
-          d.path.startsWith(`${div.path}[`))))
+          d.path.startsWith(`${div.path}[`)))) &&
+    (div.excuses === undefined || div.excuses.some((x) => names(x, d))) &&
+    (div.bound === undefined || admits(div.bound, d))
   );
+}
+
+/** A difference an entry covered: by which entry, and which of its excuses. */
+export interface Covered {
+  id: string;
+  /** The index in the entry's `excuses`; absent for an entry without. */
+  excuse?: number;
+  difference: Difference;
 }
 
 /** A fuzz case whose comparison an `ends` divergence stopped, on one engine. */
@@ -813,9 +841,41 @@ export function explain(
   differences: Difference[],
   divergences: Divergence[],
   triggers?: readonly string[],
-): { unexplained: Difference[]; used: string[]; ended: Ended[] } {
+): {
+  unexplained: Difference[];
+  used: string[];
+  ended: Ended[];
+  covered: Covered[];
+} {
   const coverOf = (d: Difference) =>
     divergences.find((x) => covers(x, name, d, triggers));
+  // How many of its records each excuse has excused so far in this run.
+  const spent = new Map<Divergence, number[]>();
+  // The first entry that covers `d` and, if it lists excuses, still has
+  // one naming `d` below its count (an over-count copy falls through to the
+  // next entry, and is unexplained if none takes it).
+  const take = (d: Difference): Covered | undefined => {
+    for (const div of divergences) {
+      if (!covers(div, name, d, triggers)) {
+        continue;
+      }
+      if (div.excuses === undefined) {
+        return { id: div.id, difference: d };
+      }
+      const counts = spent.get(div) ?? div.excuses.map(() => 0);
+      spent.set(div, counts);
+      const i = div.excuses.findIndex(
+        (x, k) => names(x, d) && (counts[k] as number) < x.count,
+      );
+      if (i >= 0) {
+        counts[i] = (counts[i] as number) + 1;
+
+        return { id: div.id, excuse: i, difference: d };
+      }
+    }
+
+    return undefined;
+  };
   const cuts = new Map<string, { at: Difference; id: string }>();
   if (name === FUZZ_SCENARIO) {
     for (const d of differences) {
@@ -831,6 +891,7 @@ export function explain(
     }
   }
   const used = new Set<string>();
+  const covered: Covered[] = [];
   const dropped = new Map<string, number>();
   const unexplained = differences.filter((d) => {
     const cut = cuts.get(d.engine);
@@ -844,9 +905,10 @@ export function explain(
 
       return false;
     }
-    const div = coverOf(d);
-    if (div) {
-      used.add(div.id);
+    const c = take(d);
+    if (c) {
+      used.add(c.id);
+      covered.push(c);
 
       return false;
     }
@@ -857,6 +919,7 @@ export function explain(
   return {
     unexplained,
     used: [...used],
+    covered,
     ended: [...cuts].map(([engine, { at, id }]) => ({
       engine,
       id,
@@ -1000,7 +1063,7 @@ export async function runScenario(
       }
     }
   }
-  const { unexplained, used, ended } = explain(
+  const { unexplained, used, ended, covered } = explain(
     def.name,
     differences,
     divergences,
@@ -1071,6 +1134,7 @@ export async function runScenario(
     unexplained,
     advisories,
     used,
+    covered,
     ended,
     compared: Object.keys(theirs),
     traces: {
@@ -1104,6 +1168,42 @@ function logLines(file: string, lines: string[]): void {
 /** Record a run's used divergences and fired hooks for the census. */
 export function logResult(result: ScenarioResult): void {
   logLines("divergences-used.txt", result.used);
+  logLines(
+    "excuses-used.txt",
+    (result.covered ?? []).flatMap((c) =>
+      c.excuse === undefined ? [] : [`${c.id}\t${c.excuse}`],
+    ),
+  );
+  // The fingerprint migration (scripts/fingerprint-divergences.ts) reads
+  // every covered difference's payload.
+  if (process.env.DIFF_COVERAGE_LOG) {
+    if (result.name === FUZZ_SCENARIO) {
+      logLines(
+        "fuzz-differences.jsonl",
+        result.differences.map((d) =>
+          JSON.stringify({
+            stream: d.stream,
+            kind: d.kind,
+            engine: d.engine,
+            op: d.op,
+            path: d.path,
+            reference: d.reference,
+            candidate: d.candidate,
+          }),
+        ),
+      );
+    }
+    logLines(
+      "covered.jsonl",
+      (result.covered ?? []).map((c) =>
+        JSON.stringify({
+          scenario: result.name,
+          id: c.id,
+          excuse: excuseFor(c.difference),
+        }),
+      ),
+    );
+  }
   logLines("hooks-fired.txt", [
     ...new Set(
       result.traces.reference.flatMap((e) => (e.k === "hook" ? [e.hook] : [])),
