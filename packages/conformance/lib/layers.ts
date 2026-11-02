@@ -62,6 +62,9 @@ export const layerIndex = (layer: Layer): number => LAYERS.indexOf(layer);
 const MODULE_LAYERS: [RegExp, Layer][] = [
   [/^plugins\/persistence\b/, "L6"],
   [/^plugins\//, "L12"],
+  // A Plugin (createRequirementStatusPlugin, createStatusHook) and
+  // createSystem with it installed: plugins' L12.
+  [/^utils\/(requirement-status|system-with-status)\b/, "L12"],
   [/^(utils\/testing|utils\/migration|adapters\/|adapter-utils)/, "L13"],
   [/^(utils\/history|core\/history)/, "L8"],
   [
@@ -99,6 +102,28 @@ const NAME_LAYERS: Record<string, Layer> = {
   // utils/utils.ts holds unrelated helpers; place what tests use by name.
   signSnapshot: "L12",
   verifySnapshotSignature: "L12",
+  // The other distributable-snapshot helpers: each takes what
+  // `getDistributableSnapshot` (L12) returns, like signSnapshot.
+  diffSnapshots: "L12",
+  isSignedSnapshot: "L12",
+  isSnapshotExpired: "L12",
+  validateSnapshot: "L12",
+  // The documented `equalityFn` for `system.watch` (L0); adapter-utils
+  // re-exports it for selectors.
+  shallowEqual: "L0",
+  // /internals helpers, at their lowest-layer caller in packages/core/src:
+  // stableStringify keys requirements (core/requirements.ts, L2);
+  // isPrototypeSafe guards initialFacts (core/system.ts, L3); hashObject
+  // hashes predicates (core/predicate-hash.ts, L11) and distributable
+  // snapshots (L12). safeStringify has no core caller: @directive-run/ai, a
+  // package built on core, imports it (L13).
+  stableStringify: "L2",
+  isPrototypeSafe: "L3",
+  hashObject: "L11",
+  safeStringify: "L13",
+  // Declared in index.ts itself: the constants of a resolver's `retry`
+  // policy (`retry: { backoff: Backoff.Exponential }`), resolvers' L2.
+  Backoff: "L2",
 };
 
 /** `chain` is the option-key path, innermost last; `*` matches any one key. */
@@ -208,6 +233,28 @@ export function layerOfFeature(feature: NamedFeature): Layer {
   }
 
   return found;
+}
+
+/**
+ * The layer of one core export, as per-test placement gives it (coreBindings):
+ * the vehicle at L0, else by name (NAME_LAYERS), else by the module that
+ * declares it (`modulePath`, relative to packages/core/src). undefined when
+ * the tables do not place it. The core-next surface gate
+ * (contracts/lib/next-surface.ts) accepts a 1.35 export core-next lacks only
+ * while this layer is above `current`.
+ */
+export function layerOfExport(
+  name: string,
+  modulePath: string,
+): Layer | undefined {
+  if (VEHICLES.has(name)) {
+    return "L0";
+  }
+  if (Object.hasOwn(NAME_LAYERS, name)) {
+    return NAME_LAYERS[name];
+  }
+
+  return MODULE_LAYERS.find(([re]) => re.test(modulePath))?.[1];
 }
 
 /** Members that are dynamic-definition calls only on a definition registry. */

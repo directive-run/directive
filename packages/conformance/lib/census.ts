@@ -27,6 +27,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
+import { describeDrift, gateBuiltNext } from "../contracts/lib/next-surface.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
@@ -1249,4 +1250,37 @@ export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {
   }
 
   return out;
+}
+
+/**
+ * The core-next surface gate's report (contracts/lib/next-surface.ts) for the
+ * census output: the entries core-next does not ship yet, the 1.35 names
+ * waiting on an unbuilt layer, and signature drift, which is reported, not
+ * failed. The gate itself is contracts/api-surface-next.test.ts.
+ */
+export function nextSurfaceReport(repoRoot: string): string[] {
+  const result = gateBuiltNext(repoRoot);
+  if (!result) {
+    return ["core-next surface: packages/core-next/dist is missing (build it)"];
+  }
+  const perLayer = new Map<string, number>();
+  for (const u of result.unbuilt) {
+    perLayer.set(u.layer, (perLayer.get(u.layer) ?? 0) + 1);
+  }
+  const counts = [...perLayer]
+    .sort(([a], [b]) => layerIndex(a as Layer) - layerIndex(b as Layer))
+    .map(([layer, n]) => `${layer} ${n}`)
+    .join(", ");
+
+  return [
+    `core-next surface: entries not shipped yet: ${result.unshipped.join(", ") || "none"}`,
+    `core-next surface: 1.35 names missing at unbuilt layers: ${result.unbuilt.length}${counts ? ` (${counts})` : ""}`,
+    ...(result.failures.length > 0
+      ? [
+          `core-next surface: ${result.failures.length} gate failure(s), see contracts/api-surface-next.test.ts`,
+        ]
+      : []),
+    `core-next signature drift (reported, not failed): ${result.drift.length}`,
+    ...result.drift.map((d) => `  - ${describeDrift(d)}`),
+  ];
 }

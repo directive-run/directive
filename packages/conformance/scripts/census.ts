@@ -26,6 +26,7 @@ import {
   checkHooksFired,
   checkScenarioLayers,
   describeFuzzRun,
+  nextSurfaceReport,
 } from "../lib/census.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
 import { checkLock } from "../lib/harness.js";
@@ -106,6 +107,10 @@ try {
   rmSync(out, { recursive: true, force: true });
 }
 
+// Reported whether or not the run passed: drift is never a failure here.
+for (const line of nextSurfaceReport(repoRoot)) {
+  console.log(`[census] ${line}`);
+}
 for (const failure of failures) {
   console.error(`✗ ${failure}`);
 }
