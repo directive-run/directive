@@ -31,6 +31,21 @@ function expect(workload, what, got, want) {
   }
 }
 
+/** An in-memory Storage (frame-loop-persist). */
+function memoryStorage() {
+  const map = new Map();
+
+  return {
+    getItem: (key) => map.get(key) ?? null,
+    setItem: (key, value) => {
+      map.set(key, String(value));
+    },
+    removeItem: (key) => {
+      map.delete(key);
+    },
+  };
+}
+
 // The schema a dependent module declares for the module it reads.
 function numbers(t, names) {
   const out = {};
@@ -520,6 +535,110 @@ export const workloads = {
           return { gateReadsPerFrame: counts.gateReads / steps };
         },
         done: () => sys.destroy(),
+      };
+    },
+  },
+  // The L6 gate's persistence workload (RFC 2.0 L6, decision B7): the
+  // frame-loop-source frame with the persistence plugin installed as the
+  // Aperture lab installs it, `include` naming one fact. Each frame's batch
+  // reaches the plugin once; one of its 20 writes is persisted, so the
+  // debounced save re-arms every frame and fires only at destroy.
+  "frame-loop-persist": {
+    op: "the frame-loop-source frame with persistencePlugin({ include: [one fact] }): one of its 20 writes is persisted (debounced save re-armed each frame)",
+    async: true,
+    requires: ["sources"],
+    async build({ createModule, createSystem, t, persistencePlugin }) {
+      const storage = memoryStorage();
+      const runs = new Array(5).fill(0);
+      const last = new Array(5).fill(-1);
+      const counts = { attaches: 0, detaches: 0, gateReads: 0, handled: 0 };
+      let publish = null;
+      const { names, facts, derivations, derive, effects } = frameShape(
+        t,
+        runs,
+        last,
+      );
+      const sys = createSystem({
+        // As the Aperture lab installs it: one key persisted, the rest not.
+        plugins: [
+          persistencePlugin({ storage, key: "frame", include: [names[0]] }),
+        ],
+        module: createModule("frame", {
+          schema: {
+            facts: { ...facts, open: t.boolean() },
+            derivations,
+            events: { frame: { n: t.number() } },
+          },
+          init: (f) => {
+            for (let k = 0; k < FRAME_FACTS; k++) {
+              f[names[k]] = k;
+            }
+            f.open = true;
+          },
+          derive,
+          effects,
+          events: {
+            frame: (f, payload) => {
+              counts.handled++;
+              for (let k = 0; k < FRAME_FACTS; k++) {
+                f[names[k]] = payload.n + k;
+              }
+            },
+          },
+          sources: {
+            feed: {
+              coalesce: "lastWriteWins",
+              active: (f) => {
+                counts.gateReads++;
+
+                return f.open === true;
+              },
+              attach: (pub) => {
+                counts.attaches++;
+                publish = pub;
+
+                return () => {
+                  counts.detaches++;
+                };
+              },
+            },
+          },
+        }),
+      });
+      sys.start();
+      await sys.settle();
+      const base = runs.slice();
+      let i = 0;
+
+      return {
+        step() {
+          publish("frame", { n: ++i });
+
+          return sys.settle();
+        },
+        check(steps) {
+          checkFrame("frame-loop-persist", steps, runs, base, last, sys);
+          expect("frame-loop-persist", "frames handled", counts.handled, steps);
+          expect("frame-loop-persist", "attaches", counts.attaches, 1);
+          expect("frame-loop-persist", "detaches", counts.detaches, 0);
+
+          // Gate reads are the engine's own business (1.35 evaluates the gate
+          // after each pass), so they are a note, not an expectation.
+          return { gateReadsPerFrame: counts.gateReads / steps };
+        },
+        done: () => {
+          sys.destroy();
+          // destroy() saves at once: the persisted fact, as the last frame left it.
+          const saved = JSON.parse(storage.getItem("frame"));
+          if (
+            Object.keys(saved).length !== 1 ||
+            typeof saved[names[0]] !== "number"
+          ) {
+            throw new Error(
+              `frame-loop-persist: saved ${JSON.stringify(saved)}`,
+            );
+          }
+        },
       };
     },
   },

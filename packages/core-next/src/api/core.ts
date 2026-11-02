@@ -173,6 +173,14 @@ export interface SystemContext {
    * decided by this run (restore, L6; initialize uses it too).
    */
   load_(fn: () => void): void;
+  /** True while `initialize()` runs: the inits, a plugin's turn, initialFacts and hydrate. */
+  readonly init_: boolean;
+  /**
+   * A first-party plugin's turn inside `initialize()`, after the module inits
+   * and before `initialFacts` and hydrate: where the persistence plugin
+   * applies saved data ((ai), L6b). Set by the plugin (plugins.ts `scopes`).
+   */
+  turn_?: () => void;
   /**
    * Runs event `type`'s handler with `event` (a source's publish, L5): false
    * when there is none, after the development warning `dispatch` gives.
@@ -1364,6 +1372,7 @@ export function createSystemCore<const M extends ModuleSchema>(
         (module.init ? [module.init] : [])) {
         store.batch(() => init(facts));
       }
+      context.turn_?.();
       // 1.35 applies initialFacts, then hydrate's facts, after the inits
       // and before the first pass, in one batch.
       const initial = options.initialFacts as
@@ -1600,6 +1609,9 @@ export function createSystemCore<const M extends ModuleSchema>(
   };
   const context: SystemContext = {
     load_: loadAs,
+    get init_() {
+      return initializing;
+    },
     kernel,
     module,
     system,

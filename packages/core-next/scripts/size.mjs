@@ -99,7 +99,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 118;
+const DEV_STRINGS_MIN = 120;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -387,7 +387,7 @@ const inlineIsDevelopment = {
 // needle that matches nothing; and the list must hold exactly DEV_STRINGS_MIN
 // strings, so an under-derived list fails loudly.
 const entryContents =
-  'export * as a from "./index.ts"; export * as b from "./internals.ts";';
+  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts";';
 const bundleEntry = async (nodeEnv) =>
   Buffer.from(
     (
@@ -542,25 +542,28 @@ console.log(`fixture floor on core-next: ${floorSize.text}`);
 checkBudget("floor", "fixture floor on core-next", floorSize.gz);
 // The real Aperture lab app (fixtures/aperture.ts, A5): its three Directive
 // files verbatim, on both engines. Its page code (`/scene/` imports) stays
-// external; `@directive-run/core/plugins` is 1.35's persistence plugin on
-// both engines until core-next ships its own (L6b).
-const apertureLab = {
+// external; `@directive-run/core/plugins` is each engine's own persistence
+// plugin (core-next's since L6b).
+const apertureLab = (plugins) => ({
   name: "aperture-lab",
   setup(b) {
     b.onResolve({ filter: /^@directive-run\/core\/plugins$/ }, () => ({
-      path: new URL("../../core/src/plugins/persistence.ts", import.meta.url)
-        .pathname,
+      path: new URL(plugins, import.meta.url).pathname,
     }));
     b.onResolve({ filter: /\/scene\// }, (args) => ({
       path: args.path,
       external: true,
     }));
   },
-};
+});
 const aperture = readFileSync(join(fixtures, "aperture.ts"), "utf8");
 for (const [name, engine] of Object.entries(engines)) {
   const m = await measure("aperture", aperture, fixtures, engine, [
-    apertureLab,
+    apertureLab(
+      engine.mangleProps
+        ? "../src/plugins/persistence.ts"
+        : "../../core/src/plugins/persistence.ts",
+    ),
   ]);
   console.log(`fixture aperture on ${name}: ${m.text}`);
   if (engine.mangleProps) {

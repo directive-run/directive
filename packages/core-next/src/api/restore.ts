@@ -15,7 +15,7 @@
  *   that throws writes nothing (1.35 throws after the keys before the bad
  *   one are committed);
  * - (ah) a restore made before `initialize()` warns once, since the module
- *   inits will overwrite it. Keyed on `initialize()`, not `start()`: the
+ *   inits will overwrite it; one made inside it (a module init) does not. Keyed on `initialize()`, not `start()`: the
  *   Aperture lab calls `initialize()`, then restores, then `start()`.
  */
 
@@ -23,13 +23,8 @@ import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { BLOCKED_PROPS, isPrototypeSafe } from "./facts.js";
 
-export const withRestore: SystemPart = ({
-  kernel,
-  module,
-  system,
-  store,
-  load_,
-}) => {
+export const withRestore: SystemPart = (context) => {
+  const { kernel, module, system, store, load_ } = context;
   let warned = false;
   system.restore = (snapshot: { facts?: Record<string, unknown> } | null) => {
     if (!snapshot || typeof snapshot !== "object") {
@@ -51,7 +46,9 @@ export const withRestore: SystemPart = ({
       ([key]) => !BLOCKED_PROPS.has(key),
     );
     if (isDevelopment) {
-      if (!warned && !system.isInitialized) {
+      // Not inside initialize() either: a module init or the persistence
+      // plugin's turn restores after the inits it would lose to.
+      if (!warned && !system.isInitialized && !context.init_) {
         warned = true;
         console.warn(
           "[Directive] restore() was called before initialize(), so the module inits will overwrite what it restored. Call restore() after initialize(), or load the facts with hydrate().",

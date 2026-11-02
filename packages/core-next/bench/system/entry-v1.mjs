@@ -3,8 +3,14 @@
 // (dev code compiled out) instead of the default one.
 import { main } from "./runner.mjs";
 
-await main("v1", () =>
-  process.env.BENCH_V1_BUILD === "production"
-    ? import("../../../core/dist/production/index.js")
-    : import("../../../core/dist/index.js"),
+await main(
+  "v1",
+  () =>
+    process.env.BENCH_V1_BUILD === "production"
+      ? import("../../../core/dist/production/index.js")
+      : import("../../../core/dist/index.js"),
+  () =>
+    process.env.BENCH_V1_BUILD === "production"
+      ? import("../../../core/dist/production/plugins/index.js")
+      : import("../../../core/dist/plugins/index.js"),
 );

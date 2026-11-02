@@ -41,6 +41,18 @@
         "default": "./dist/testing.js"
       }
     },
+    "./plugins": {
+      "development": {
+        "import": "./dist/development/plugins.js"
+      },
+      "production": {
+        "import": "./dist/production/plugins.js"
+      },
+      "import": {
+        "types": "./dist/plugins.d.ts",
+        "default": "./dist/plugins.js"
+      }
+    },
     "./internals": {
       "development": {
         "import": "./dist/development/internals.js"
