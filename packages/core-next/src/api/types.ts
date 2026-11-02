@@ -232,6 +232,11 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   observe(observer: (event: ObservationEvent) => void): () => void;
   inspect(): Record<string, unknown>;
   getSnapshot(): { facts: Record<string, unknown>; version: number };
+  /**
+   * Writes `snapshot.facts` back in one batch, filed as "hydrate" (L6, a part
+   * `createSystem` wires; not on `createSystemCore`).
+   */
+  restore?(snapshot: { facts: Record<string, unknown> }): void;
   [key: string]: unknown;
 }
 

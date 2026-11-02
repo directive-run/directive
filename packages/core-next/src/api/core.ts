@@ -169,6 +169,11 @@ export interface SystemContext {
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
+   * Runs `fn`'s writes as one store batch filed as "hydrate": loaded, not
+   * decided by this run (restore, L6; initialize uses it too).
+   */
+  load_(fn: () => void): void;
+  /**
    * Runs event `type`'s handler with `event` (a source's publish, L5): false
    * when there is none, after the development warning `dispatch` gives.
    */
@@ -491,6 +496,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   let readyResolve: (() => void) | null = null;
   /** What `hydrate()` loaded, applied by the next initialize. */
   let hydrated: Record<string, unknown> | null = null;
+  /** Development: `hydrate()` loaders not yet settled ((ah)'s warning). */
+  let loading = 0;
   /** The pending `tickMs` timer on the kernel clock; 0 when none. */
   let tickTimer = 0;
   let scheduled = false;
@@ -1012,6 +1019,16 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     },
   });
+  /** `fn`'s writes in one batch, filed as "hydrate" (SystemContext.load_). */
+  const loadAs = (fn: () => void) =>
+    store.batch(() => {
+      origin = "hydrate";
+      try {
+        fn();
+      } finally {
+        origin = "authored";
+      }
+    });
   /** Non-JSON warnings already given, shared by every facts view. */
   const nonJson = new Set<string>();
   const facts = createFactsProxy(store, schema, tracker, nonJson);
@@ -1316,7 +1333,17 @@ export function createSystemCore<const M extends ModuleSchema>(
           "[Directive] hydrate() must be called before start(). The system is already running.",
         );
       }
-      const result = await loader();
+      const value = loader();
+      if (isDevelopment) {
+        // Counted down when the loader settles, before this function
+        // resumes (its reaction is first), so initialize() sees it exactly.
+        loading++;
+        const done = () => {
+          loading--;
+        };
+        Promise.resolve(value).then(done, done);
+      }
+      const result = await value;
       if (result && typeof result === "object") {
         hydrated = result as Record<string, unknown>;
       }
@@ -1324,6 +1351,12 @@ export function createSystemCore<const M extends ModuleSchema>(
     initialize() {
       if (initialized) {
         return;
+      }
+      if (isDevelopment && loading > 0) {
+        // (ah): 1.35 drops a loader still pending here, silently (H3).
+        console.warn(
+          "[Directive] initialize() ran while a hydrate() loader was still pending, so its facts will never be applied. Await hydrate() before initialize() or start().",
+        );
       }
       initializing = true;
       // A namespaced system runs each module's init in its own batch (1.35).
@@ -1340,19 +1373,13 @@ export function createSystemCore<const M extends ModuleSchema>(
         const set = (key: string, value: unknown) => {
           (facts as Record<string, unknown>)[key] = value;
         };
-        // Filed as "hydrate", per write: loaded, not decided by this run.
-        store.batch(() => {
-          origin = "hydrate";
-          try {
-            if (initial) {
-              load(initial, set);
-            }
-            if (hydrated) {
-              load(hydrated, set, true);
-              hydrated = null;
-            }
-          } finally {
-            origin = "authored";
+        loadAs(() => {
+          if (initial) {
+            load(initial, set);
+          }
+          if (hydrated) {
+            load(hydrated, set, true);
+            hydrated = null;
           }
         });
       }
@@ -1572,6 +1599,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
   };
   const context: SystemContext = {
+    load_: loadAs,
     kernel,
     module,
     system,
