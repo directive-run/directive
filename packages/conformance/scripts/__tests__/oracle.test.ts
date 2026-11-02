@@ -209,8 +209,10 @@ describe("the census", () => {
   });
 
   describe("layer-tagged golden checks", () => {
-    // current is L4 in this repo: the ledger part (L12) is gated, L0 is not.
+    // current is L6 in this repo: the history (L8) and ledger (L12) parts are
+    // gated, persistence (L6) and L0 are not.
     const LEDGER = "[L12] v2: the ledger golden round-trips with 1.35.0";
+    const HISTORY = "[L8] v2: the history golden round-trips with 1.35.0";
     const PERSISTENCE =
       "[L6] the persistence golden: core-next saves 1.35.0's flat format";
     const checks = (reports: Record<string, JsonReport>) =>
@@ -240,7 +242,7 @@ describe("the census", () => {
       expect(
         inGolden([
           [LEDGER, "skipped"],
-          [PERSISTENCE, "skipped"],
+          [HISTORY, "skipped"],
           ["[L0] the script's writes land", "passed"],
         ]),
       ).toBe("");
