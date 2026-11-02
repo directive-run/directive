@@ -38,4 +38,31 @@ describe("L6c in production", () => {
     expect(system.facts.c).toBe(3);
     system.destroy();
   });
+
+  it("(al) copies an array default per system; fills a default that fails its validators", () => {
+    const cart = createModule("cart", {
+      schema: {
+        facts: {
+          items: t.array<string>().default([]),
+          a: t.number().min(5).default(1),
+        },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: () => {},
+      derive: {},
+      events: {},
+    } as any);
+    const carts: unknown[] = [];
+    for (const user of ["alice", "bob"]) {
+      const system: any = createSystem({ module: cart });
+      system.start();
+      system.facts.items.push(`${user}-item`);
+      carts.push([...system.facts.items]);
+      expect(system.facts.a).toBe(1);
+      system.destroy();
+    }
+    expect(carts).toEqual([["alice-item"], ["bob-item"]]);
+  });
 });

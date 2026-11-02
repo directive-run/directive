@@ -7,7 +7,7 @@
 //      1.35's text.
 // 1.35 applies no default and never shows the refine message (U11, U12).
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createModule } from "../api/core.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
@@ -181,6 +181,101 @@ describe("(al) .default() fills facts still undefined after initialize()", () =>
     system.start();
     expect(system.facts.a.n).toBe(5);
     expect(system.facts.a.m).toBe(1);
+    system.destroy();
+  });
+});
+
+describe("(al) each fill gets its own copy of an object or array default", () => {
+  // A raw nested mutation warns in development; the copy is what is pinned.
+  const quiet = () => vi.spyOn(console, "warn").mockImplementation(() => {});
+  afterEach(() => vi.restoreAllMocks());
+
+  it("a new system per request never sees an earlier system's array", () => {
+    quiet();
+    const cart = moduleOf({ items: t.array<string>().default([]) });
+    const carts: unknown[] = [];
+    for (const user of ["alice", "bob"]) {
+      const system: any = createSystem({ module: cart });
+      system.start();
+      system.facts.items.push(`${user}-item`);
+      carts.push([...system.facts.items]);
+      system.destroy();
+    }
+    expect(carts).toEqual([["alice-item"], ["bob-item"]]);
+    expect((cart as any).schema.facts.items._default).toEqual([]);
+  });
+
+  it("two instances of one module in a namespaced system do not share it", () => {
+    quiet();
+    const m = moduleOf({ arr: t.array<string>().default([]) });
+    const system: any = createSystem({ modules: { a: m, b: m } } as any);
+    system.start();
+    system.facts.a.arr.push("x");
+    expect([...system.facts.b.arr]).toEqual([]);
+    system.destroy();
+  });
+
+  it("mutating a snapshot never changes a later system's default", () => {
+    const m = moduleOf({ o: t.object<{ n: number }>().default({ n: 1 }) });
+    const first: any = createSystem({ module: m });
+    first.start();
+    first.getSnapshot().facts.o.n = 2;
+    const second: any = createSystem({ module: m });
+    second.start();
+    expect({ ...second.facts.o }).toEqual({ n: 1 });
+    first.destroy();
+    second.destroy();
+  });
+});
+
+describe("(al) a default that fails its own validators", () => {
+  it("throws in development, naming .default() and the fact", () => {
+    const system: any = createSystem({
+      module: moduleOf({ a: t.number().min(5).default(1) }),
+    });
+    expect(() => system.start()).toThrow(
+      '[Directive] The .default() of fact "a" fails its own schema. [Directive] Validation failed for "a"',
+    );
+  });
+});
+
+describe("(al) never writes a default to a fact loaded after the inits", () => {
+  it("restored, initialFacts and hydrate facts never see the default written", async () => {
+    const writes: [string, unknown][] = [];
+    const rec: Plugin = {
+      name: "rec",
+      onFactSet: (key: string, value: unknown) =>
+        void writes.push([key, value]),
+      onFactsBatch: (changes: { key: string; value: unknown }[]) =>
+        void writes.push(
+          ...changes.map((c) => [c.key, c.value] as [string, unknown]),
+        ),
+    } as any;
+    const system: any = createSystem({
+      module: moduleOf({
+        p: t.number().default(5),
+        i: t.number().default(5),
+        h: t.number().default(5),
+        d: t.number().default(5),
+      }),
+      plugins: [
+        rec,
+        persistencePlugin({
+          storage: memoryStorage({ k: JSON.stringify({ p: 7 }) }),
+          key: "k",
+          include: ["p"],
+        }),
+      ],
+      initialFacts: { i: 3 },
+    });
+    await system.hydrate(() => ({ h: 4 }));
+    system.start();
+    expect([system.facts.p, system.facts.i, system.facts.h]).toEqual([7, 3, 4]);
+    // The recorder sees fills: the untouched fact gets the default once.
+    expect(writes.filter(([k]) => k === "d")).toEqual([["d", 5]]);
+    for (const key of ["p", "i", "h"]) {
+      expect(writes.filter(([k, v]) => k === key && v === 5)).toEqual([]);
+    }
     system.destroy();
   });
 });
