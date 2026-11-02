@@ -24,6 +24,7 @@ export type {
 export type {
   ClobberAlertEvent,
   ClobberAlertPluginOptions,
+  ClobberSummaryEvent,
 } from "../types/plugin-clobber-alert.js";
 export type {
   ClobberLoopDetectedEvent,
