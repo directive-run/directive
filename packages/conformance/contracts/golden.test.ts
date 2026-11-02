@@ -31,6 +31,7 @@ import {
   producePart,
   readGoldens,
   readPart,
+  restoreRun,
   same,
   scriptFacts,
 } from "./lib/golden.js";
@@ -151,6 +152,23 @@ describe("golden files", () => {
     expect(failures.join("\n")).toMatch(
       /the workspace reads 1\.35\.0's ledger differently/,
     );
+  });
+
+  it("1.35.0's persistence rollback read restores its own golden as the golden holds it, where the script's init would end at the init's values", async () => {
+    const golden = readGoldens(goldenDir);
+    const saved = golden["persistence-saved.golden"];
+    expect(await restoreRun(v1, saved)).toEqual({
+      restored: { count: 2, label: "middle", tags: ["a", { nested: [1, 2] }] },
+      logged: false,
+      saved,
+    });
+    // Through the script's init, 1.35.0 restores and then overwrites: the
+    // read a rollback check cannot use.
+    expect(await readPart(v1, golden, "persistence")).toEqual({
+      count: 0,
+      label: "start",
+      tags: [],
+    });
   });
 
   it("same() tells Date, Map and Set apart where JSON cannot", () => {
@@ -550,6 +568,62 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
     );
     expect(wrapped).toMatch(DEV_ROLLBACK_FAILS);
     expect(wrapped).not.toMatch(/handles U10/);
+  });
+
+  /** Edits every save's JSON before it reaches storage. */
+  const rewritesSave = (
+    edit: (saved: Record<string, unknown>) => Record<string, unknown>,
+    base: Engine = local,
+  ): Engine => ({
+    ...base,
+    name: "v2",
+    plugins: {
+      ...base.plugins,
+      persistencePlugin: (options: { storage: Storage }) =>
+        base.plugins.persistencePlugin({
+          ...options,
+          storage: {
+            getItem: (k: string) => options.storage.getItem(k),
+            removeItem: (k: string) => options.storage.removeItem(k),
+            setItem: (k: string, v: string) =>
+              options.storage.setItem(k, JSON.stringify(edit(JSON.parse(v)))),
+          },
+        }),
+    },
+  });
+
+  it("checkGoldens: 1.35.0 restores the workspace's persistence as it restores its own, whatever read-1.35 entry covers the read", async () => {
+    const ROLLBACK_FAILS =
+      /1\.35\.0 reads the workspace's persistence differently/;
+    const RESAVE_FAILS =
+      /1\.35\.0 reads what the workspace writes over 1\.35\.0's persistence differently from its own/;
+    const edits: [
+      string,
+      (s: Record<string, unknown>) => Record<string, unknown>,
+    ][] = [
+      ["one value changed", (s) => ({ ...s, count: Number(s.count) + 1 })],
+      [
+        "one key dropped",
+        (s) =>
+          Object.fromEntries(Object.entries(s).filter(([k]) => k !== "label")),
+      ],
+      ["one stale key added", (s) => ({ ...s, stale: 1 })],
+    ];
+    for (const [what, changed] of edits) {
+      // The workspace reads 1.35.0's data as 1.35.0 does; only its writes differ.
+      const without = (await persistence(rewritesSave(changed), [])).join("\n");
+      expect(without, what).not.toMatch(READ_FAILS);
+      expect(without, what).toMatch(ROLLBACK_FAILS);
+      expect(without, what).toMatch(RESAVE_FAILS);
+      // Its read also differs, under a signed read-1.35 entry: the read
+      // passes, both rollbacks still fail.
+      const covered = (
+        await persistence(rewritesSave(changed, keepsRestored()), [entry()])
+      ).join("\n");
+      expect(covered, what).not.toMatch(READ_FAILS);
+      expect(covered, what).toMatch(ROLLBACK_FAILS);
+      expect(covered, what).toMatch(RESAVE_FAILS);
+    }
   });
 
   it("checkGoldens: 1.35.0 imports what the workspace exports over 1.35.0's history, whatever read-1.35 entry covers the read", async () => {

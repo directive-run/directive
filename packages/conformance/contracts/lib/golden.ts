@@ -213,7 +213,13 @@ function memoryStorage(initial: Record<string, string> = {}) {
   };
 }
 
-function counterModule(engine: Engine) {
+/**
+ * The script's module. `withInit: false` is the persistence rollback's
+ * reader (`restoreRun`): on 1.35.0 the plugin restores before the init runs
+ * (the bug (ai) fixed), so through this init 1.35.0 ends at the init's values
+ * whatever the saved bytes say.
+ */
+function counterModule(engine: Engine, withInit = true) {
   const { createModule, t } = engine.core;
 
   return createModule("counter", {
@@ -223,11 +229,15 @@ function counterModule(engine: Engine) {
       events: {},
       requirements: {},
     },
-    init: (facts: Record<string, unknown>) => {
-      facts.count = 0;
-      facts.label = "start";
-      facts.tags = [];
-    },
+    ...(withInit
+      ? {
+          init: (facts: Record<string, unknown>) => {
+            facts.count = 0;
+            facts.label = "start";
+            facts.tags = [];
+          },
+        }
+      : {}),
     derive: {
       doubled: (facts: { count: number }) => facts.count * 2,
     },
@@ -380,11 +390,89 @@ export async function scriptFacts(
   });
 }
 
+/** What a system started on saved persistence bytes restored, and saved next. */
+export interface RestoreRun {
+  /** The facts the load put in the store, before anything else wrote. */
+  restored: Record<string, unknown>;
+  /** Whether the engine logged (console.error or console.warn) as it ran. */
+  logged: boolean;
+  /** What storage holds once the system is destroyed (its final save). */
+  saved: string;
+}
+
 /**
- * What `reader` makes of one part some engine wrote. For history and
- * persistence, `wrote` receives what the reader itself writes over that data
- * (its export after the import; what storage holds after it restored and was
- * destroyed), for a rollback check.
+ * The persistence rollback's read: `engine` starts on `saved` with the
+ * script's module minus its init (`counterModule`), so its facts are exactly
+ * what the load restored. A development build rejects an unknown key part
+ * way through a restore, keeping the keys before it, so whether it logged is
+ * part of the read. `saved` is what it writes over that data on destroy.
+ */
+export async function restoreRun(
+  engine: Engine,
+  saved: string,
+): Promise<RestoreRun> {
+  return withFixedClock(async () => {
+    const storage = memoryStorage({ golden: saved });
+    const logged: string[] = [];
+    const real = { error: console.error, warn: console.warn };
+    const capture = (...args: unknown[]) => {
+      logged.push(args.map((a) => String(a)).join(" "));
+    };
+    console.error = capture;
+    console.warn = capture;
+    try {
+      const system = engine.core.createSystem({
+        module: counterModule(engine, false),
+        plugins: [
+          engine.plugins.persistencePlugin({
+            storage,
+            key: "golden",
+            debounce: 0,
+          }),
+        ],
+      });
+      system.start();
+      await system.settle();
+      const restored = JSON.parse(JSON.stringify(system.getSnapshot().facts));
+      system.destroy();
+
+      return {
+        restored,
+        logged: logged.length > 0,
+        saved: storage.getItem("golden") ?? "",
+      };
+    } finally {
+      console.error = real.error;
+      console.warn = real.warn;
+    }
+  });
+}
+
+/**
+ * What 1.35.0 makes of one part some engine wrote, for a `1.35-reads`
+ * comparison: persistence through `restoreRun` (the load, and whether it
+ * logged), every other part as `readPart` reads it.
+ */
+export async function readBack(
+  v1: Engine,
+  goldens: Partial<Goldens>,
+  part: GoldenPart,
+): Promise<unknown> {
+  if (part !== "persistence") {
+    return readPart(v1, goldens, part);
+  }
+  const { restored, logged } = await restoreRun(
+    v1,
+    goldens["persistence-saved.golden"] ?? "",
+  );
+
+  return { restored, logged };
+}
+
+/**
+ * What `reader` makes of one part some engine wrote. For history, `wrote`
+ * receives what the reader itself writes over that data (its export after
+ * the import), for a rollback check; persistence's is `restoreRun`'s save.
  */
 export async function readPart(
   reader: Engine,
@@ -417,7 +505,8 @@ export async function readPart(
     }
 
     if (part === "persistence") {
-      // Persistence: a system started on the saved data restores it.
+      // Persistence: a system started on the saved data restores it, through
+      // the script's init (the `read-1.35` read, where (ai) shows).
       const storage = memoryStorage({
         golden: goldens["persistence-saved.golden"] as string,
       });
@@ -439,7 +528,6 @@ export async function readPart(
         tags: restored.facts.tags,
       };
       restored.destroy();
-      wrote?.(storage.getItem("golden") ?? "");
 
       return out;
     }
@@ -622,7 +710,7 @@ export const GOLDEN_CASES = {
     directions: ["1.35-reads"],
     engines: ["v2", "v2:dist"],
   },
-  /** checkGoldens: 1.35.0 restores what the workspace saves after restoring 1.35.0's save. */
+  /** checkGoldens: 1.35.0 restores what the workspace saves after restoring 1.35.0's save (both through `restoreRun`). */
   "persistence re-save": {
     part: "persistence",
     directions: ["1.35-reads"],
@@ -878,7 +966,13 @@ function readCase(part: GoldenPart): GoldenCase | undefined {
  *   export after the import, its save after the restore), 1.35.0 reads as it
  *   reads its own from the same data (cases "history re-export" and
  *   "persistence re-save", direction `1.35-reads`), so no `read-1.35` entry
- *   can carry a write 1.35.0 does not read.
+ *   can carry a write 1.35.0 does not read;
+ * - every `1.35-reads` read of persistence is `restoreRun`'s (`readBack`),
+ *   whose result is what 1.35.0 loaded from the bytes, and 1.35.0 must
+ *   restore its own golden exactly as the golden holds it.
+ * The persistence re-save is what each engine saves after `restoreRun` on
+ * 1.35.0's golden: the restore and the save, with no init in between (the
+ * init's order is (ai), judged by the `read-1.35` read).
  * A signed `goldenChanges` entry for a case, direction and `local.name`
  * replaces 1.35.0's value there with the entry's `expected2` (`judge`);
  * every entry is validated on every call (`checkGoldenChanges`).
@@ -908,7 +1002,23 @@ export async function checkGoldens(
   const localWrote: Partial<Record<GoldenPart, string>> = {};
   const expected = await read(v1, golden, PART_NAMES, v1Wrote);
   const localReadsV1 = await read(local, golden, parts, localWrote);
-  const v1ReadsLocal = await read(v1, fromLocal, parts);
+  const saved = golden["persistence-saved.golden"];
+  const own = await restoreRun(v1, saved);
+  v1Wrote.persistence = own.saved;
+  if (parts.includes("persistence")) {
+    localWrote.persistence = (await restoreRun(local, saved)).saved;
+  }
+  let holds: unknown;
+  try {
+    holds = JSON.parse(saved);
+  } catch {
+    holds = undefined;
+  }
+  if (own.logged || !same(own.restored, holds)) {
+    failures.push(
+      `1.35.0 does not restore its own persistence golden as the golden holds it: ${JSON.stringify({ restored: own.restored, logged: own.logged })}`,
+    );
+  }
   for (const part of parts) {
     const over = REWRITE_CASE[part];
     if (over) {
@@ -917,8 +1027,8 @@ export async function checkGoldens(
         ...judge(
           usable,
           { case: over, direction: "1.35-reads", engine: local.name },
-          await readPart(v1, { [file]: localWrote[part] }, part),
-          await readPart(v1, { [file]: v1Wrote[part] }, part),
+          await readBack(v1, { [file]: localWrote[part] }, part),
+          await readBack(v1, { [file]: v1Wrote[part] }, part),
           `1.35.0 reads what the workspace writes over 1.35.0's ${part} differently from its own`,
         ),
       );
@@ -935,8 +1045,10 @@ export async function checkGoldens(
       ...judge(
         usable,
         { ...at, direction: "1.35-reads" },
-        v1ReadsLocal[part],
-        expected[part],
+        await readBack(v1, fromLocal, part),
+        part === "persistence"
+          ? { restored: own.restored, logged: own.logged }
+          : expected[part],
         `1.35.0 reads the workspace's ${part} differently`,
       ),
     );
