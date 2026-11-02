@@ -177,8 +177,8 @@ a stop" clause: that seed discards none at the PR count.
 **Bench (B7).** `frame-loop-persist` (the frame-loop-source frame with the
 persistence plugin saving one of its 20 writes, debounced) measured at the
 gate commit, production build, 8 rounds: 1.35 takes 13,186 ns a frame and 2.0
-9,951 ns, so 2.0 takes 74% of 1.35's time (range 72% to 79%). That is inside
-B7's bar of 80%, and matches L6b's 74% (#335). The bench flagged the machine as
+9,951 ns, so 2.0 takes about 75% of 1.35's time (the rounds ranged from 72% to
+79%). That is inside B7's bar of 80%, in line with L6b's 74% (#335). The bench flagged the machine as
 busy (load about 8 on 14 cores); it measures thread CPU time, which ignores most
 of that noise. 2.0 also allocates less a frame: 23,435 bytes against 30,233.
 
