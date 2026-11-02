@@ -24,13 +24,19 @@
  * "hydrate" batch, the schema) through the module-private {@link scopes},
  * as 1.35's plugin reaches its hydration scope. On a system without one (a
  * test double) it restores at `onInit`, exactly as 1.35 does there.
+ *
+ * One instance on several systems: what 1.35 keeps per instance stays per
+ * instance (the debounce timer, the tracked keys, and the system a save
+ * reads, the one `onInit` saw last); the held saved data and the turn are
+ * each system's own.
  */
 
 import isDevelopment from "#is-development";
 import type { SystemContext } from "../api/core.js";
 import { isPrototypeSafe } from "../api/facts.js";
 import { scopes } from "../api/plugins.js";
-import type { Plugin, System } from "../api/types.js";
+import type { ModuleSchema, Plugin, System } from "../api/types.js";
+import type { KernelEvent } from "../kernel.js";
 
 /**
  * Configuration for the {@link persistencePlugin}, as 1.35's.
@@ -79,7 +85,9 @@ type Rec = Record<string, unknown>;
  * });
  * ```
  */
-export function persistencePlugin(options: PersistencePluginOptions): Plugin {
+export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
+  options: PersistencePluginOptions,
+): Plugin {
   const {
     storage,
     key,
@@ -92,11 +100,9 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
   } = options;
 
   let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-  let system: System | null = null;
-  /** The system's context; null on a system this package did not build. */
-  let context: SystemContext | null = null;
-  /** Saved values read at onInit and not yet applied ((ai)), in storage order. */
-  let pending: Map<string, unknown> | null = null;
+  let system: System<M> | null = null;
+  /** Each system's saved values read at onInit and not yet applied ((ai)), in storage order. */
+  const held = new WeakMap<object, Map<string, unknown>>();
   const trackedKeys = new Set<string>();
 
   /** Check if a key should be persisted */
@@ -112,7 +118,8 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
   };
 
   /** The facts view: flat `ns::key` keys on a namespaced system, as 1.35's engine. */
-  const facts = (): Rec => (context ? context.facts : system!.facts) as Rec;
+  const facts = (sys: System<M>): Rec =>
+    (scopes.get(sys)?.facts ?? sys.facts) as Rec;
 
   /** Load state from storage */
   const load = (): Rec | null => {
@@ -145,7 +152,10 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
   };
 
   /** The persisted entries of `data`, without the keys the schema dropped (ak). */
-  const entriesOf = (data: Rec): [string, unknown][] => {
+  const entriesOf = (
+    data: Rec,
+    context: SystemContext | undefined,
+  ): [string, unknown][] => {
     const schema = context?.module.schema?.facts as Rec | undefined;
     // An empty schema declares nothing, so nothing in it is stale (as restore()).
     const known =
@@ -175,10 +185,15 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
   };
 
   /** Write `entries` in one batch filed as hydration, then onRestore (1.35's onInit). */
-  const restore = (data: Rec, entries: Iterable<[string, unknown]>) => {
+  const restore = (
+    sys: System<M>,
+    data: Rec,
+    entries: Iterable<[string, unknown]>,
+  ) => {
+    const context = scopes.get(sys);
     const write = () => {
       for (const [factKey, value] of entries) {
-        facts()[factKey] = value;
+        facts(sys)[factKey] = value;
         trackedKeys.add(factKey);
       }
     };
@@ -188,7 +203,7 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
       // A system this package did not build — a test double, in practice.
       // Restore anyway rather than lose the user's state, but say so, as 1.35.
       (
-        system!.facts as { $store: { batch(fn: () => void): void } }
+        sys.facts as unknown as { $store: { batch(fn: () => void): void } }
       ).$store.batch(() => {
         console.error(
           "[Directive] persistence: no hydration scope on this system, so restored values are recorded as first-party writes rather than as hydration.",
@@ -199,15 +214,11 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
     onRestore?.(data);
   };
 
-  /** (ai): the plugin's turn inside initialize(), after the module inits. */
-  const turn = (data: Rec) => {
-    const held = pending;
-    pending = null;
-    if (!held) {
-      return;
-    }
+  /** (ai): `sys`'s turn inside initialize(), after the module inits. */
+  const turn = (sys: System<M>, data: Rec, saved: Map<string, unknown>) => {
+    held.delete(sys);
     try {
-      restore(data, held);
+      restore(sys, data, saved);
     } catch (error) {
       // What 1.35's plugin manager logs when this restore throws in onInit.
       console.error("[Directive] Plugin error:", {
@@ -217,18 +228,11 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
       });
       // Keys the throw left unwritten, and nothing else wrote, are not
       // tracked, as 1.35 never tracked them.
-      for (const factKey of held.keys()) {
-        if (!context!.store.has(factKey)) {
+      for (const factKey of saved.keys()) {
+        if (!scopes.get(sys)!.store.has(factKey)) {
           trackedKeys.delete(factKey);
         }
       }
-    }
-  };
-
-  /** A key the program writes before initialize() is its own, as in 1.35. */
-  const written = (factKey: string) => {
-    if (pending && !context!.init_) {
-      pending.delete(factKey);
     }
   };
 
@@ -240,13 +244,14 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
 
     try {
       const data: Rec = {};
-      const view = facts();
+      const view = facts(system);
+      const saved = held.get(system);
 
       for (const factKey of trackedKeys) {
         if (shouldPersist(factKey)) {
           // Saved but not applied yet (ai): the saved value stands.
-          data[factKey] = pending?.has(factKey)
-            ? pending.get(factKey)
+          data[factKey] = saved?.has(factKey)
+            ? saved.get(factKey)
             : view[factKey];
         }
       }
@@ -269,35 +274,58 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
   return {
     name: "persistence",
 
-    onInit: (sys: System) => {
+    onInit: (sys: System<M>) => {
       system = sys;
-      context = scopes.get(sys) ?? null;
+      const context = scopes.get(sys);
 
       // Restore state from storage
       const data = load();
       if (!data) {
         return;
       }
-      const entries = entriesOf(data);
+      const entries = entriesOf(data, context);
       if (context && !sys.isInitialized) {
         // (ai): held for the turn. Tracked now, as 1.35 tracks a restored
         // key here, so each save writes the keys in 1.35's order.
         for (const [factKey] of entries) {
           trackedKeys.add(factKey);
         }
-        pending = new Map(entries);
-        const ctx = context;
-        const before = ctx.turn_;
-        ctx.turn_ = () => {
+        const saved = new Map(entries);
+        held.set(sys, saved);
+        // A key the program writes on this system before initialize() is
+        // its own, as in 1.35. This system's records only: the hooks below
+        // do not say which system wrote. Reads no kind of its own (wants_),
+        // so it builds no record that was not built anyway.
+        const off = context.kernel.hooks.on(
+          Object.assign(
+            (event: KernelEvent) => {
+              if (
+                !context.init_ &&
+                event.sys === context.kernel.id &&
+                event.at.startsWith("fact.")
+              ) {
+                for (const change of (event.changes ?? [event]) as {
+                  key: string;
+                }[]) {
+                  saved.delete(change.key);
+                }
+              }
+            },
+            { wants_: () => false },
+          ),
+        );
+        const before = context.turn_;
+        context.turn_ = () => {
           before?.();
-          turn(data);
+          off();
+          turn(sys, data, saved);
         };
 
         return;
       }
       // Initialized already (a plugin whose onInit came after initialize()),
       // or no context: now, as 1.35.
-      restore(data, entries);
+      restore(sys, data, entries);
     },
 
     onDestroy: () => {
@@ -310,7 +338,6 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
 
     onFactSet: (factKey: string) => {
       trackedKeys.add(factKey);
-      written(factKey);
       if (shouldPersist(factKey)) {
         scheduleSave();
       }
@@ -318,7 +345,6 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
 
     onFactDelete: (factKey: string) => {
       trackedKeys.delete(factKey);
-      written(factKey);
       if (shouldPersist(factKey)) {
         scheduleSave();
       }
@@ -332,7 +358,6 @@ export function persistencePlugin(options: PersistencePluginOptions): Plugin {
         } else {
           trackedKeys.delete(change.key);
         }
-        written(change.key);
         if (shouldPersist(change.key)) {
           shouldSave = true;
         }

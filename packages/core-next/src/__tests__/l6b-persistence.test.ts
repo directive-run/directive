@@ -4,10 +4,11 @@
  * packages/conformance (persistence.test, l6-persistence-oracle,
  * hydration-scope, the L6 diff scenarios and the golden files).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { createModule } from "../api/core.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
+import type { Plugin } from "../api/types.js";
 import { persistencePlugin } from "../plugins/index.js";
 
 afterEach(() => {
@@ -159,5 +160,99 @@ describe("the persistence plugin and (ah)", () => {
     expect(storage.raw("prefs")).toBe('{"scene::palette":"neon"}');
     expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe("the persistence plugin: one instance on two systems", () => {
+  const abc = (init: (facts: any) => void) =>
+    createModule("m", {
+      schema: {
+        facts: { a: t.number(), b: t.string(), c: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init,
+    });
+  const read = (system: any, keys: string[]) =>
+    Object.fromEntries(keys.map((key) => [key, system.facts[key]]));
+
+  it("both created before either initializes: each applies its own saved data, into itself", () => {
+    const storage = memoryStorage({ prefs: { a: 5 } });
+    const shared = plugin(storage);
+    const s1: any = createSystem({
+      module: abc((facts) => {
+        facts.c = 1;
+      }),
+      plugins: [shared],
+    });
+    const s2: any = createSystem({
+      module: abc((facts) => {
+        facts.c = 2;
+      }),
+      plugins: [shared],
+    });
+    s1.initialize();
+    expect(read(s1, ["a", "c"])).toEqual({ a: 5, c: 1 });
+    // s2's saved data waits for s2's initialize() (ai), and s1's turn left it alone.
+    expect(read(s2, ["a", "c"])).toEqual({ a: undefined, c: undefined });
+    s2.initialize();
+    expect(read(s1, ["a", "c"])).toEqual({ a: 5, c: 1 });
+    expect(read(s2, ["a", "c"])).toEqual({ a: 5, c: 2 });
+    s1.destroy();
+    s2.destroy();
+    // 1.35's save reads the system the shared instance saw last.
+    expect(storage.raw("prefs")).toBe('{"a":5,"c":2}');
+  });
+
+  it("initialized in the other order: the first system keeps its saved data", () => {
+    const storage = memoryStorage({ prefs: { a: 5, b: "s" } });
+    const shared = plugin(storage, { include: ["a", "b"] });
+    const s1: any = createSystem({
+      module: abc((facts) => {
+        facts.a = 1;
+      }),
+      plugins: [shared],
+    });
+    const s2: any = createSystem({ module: abc(() => {}), plugins: [shared] });
+    s2.initialize();
+    s1.initialize();
+    // (ai): the saved value beats s1's init, as on one system.
+    expect(read(s1, ["a", "b"])).toEqual({ a: 5, b: "s" });
+    expect(read(s2, ["a", "b"])).toEqual({ a: 5, b: "s" });
+    s1.destroy();
+    s2.destroy();
+  });
+
+  it("a write before initialize() makes the key that system's own, not the other's", () => {
+    const storage = memoryStorage({ prefs: { a: 5 } });
+    const shared = plugin(storage);
+    const s1: any = createSystem({ module: abc(() => {}), plugins: [shared] });
+    const s2: any = createSystem({ module: abc(() => {}), plugins: [shared] });
+    s2.facts.a = 9;
+    s1.initialize();
+    s2.initialize();
+    expect(s1.facts.a).toBe(5);
+    expect(s2.facts.a).toBe(9);
+    s1.destroy();
+    s2.destroy();
+  });
+});
+
+describe("the persistence plugin's types", () => {
+  it("keeps 1.35's <M> type parameter", () => {
+    const schema = {
+      facts: { palette: t.string() },
+      derivations: {},
+      events: {},
+      requirements: {},
+    };
+    const made = persistencePlugin<typeof schema>({
+      storage: memoryStorage() as unknown as Storage,
+      key: "prefs",
+    });
+    expectTypeOf(made).toMatchTypeOf<Plugin>();
+    // @ts-expect-error: M must be a module schema, as 1.35's.
+    persistencePlugin<string>({ storage: memoryStorage(), key: "prefs" });
   });
 });
