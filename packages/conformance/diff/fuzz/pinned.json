@@ -544,5 +544,77 @@
         }
       ]
     }
+  },
+  {
+    "group": "quirk-a",
+    "why": "PR seed 12 at L5 (shrunk): under the \"retry\" boundary 2.0 re-runs r0 (row a), its write retracts c1 and r1's unaborted write re-raises both, so 2.0 ping-pongs through the 1,500 ms advance (1.35 does the same when r0 never fails). Over 126,000 differences: spreading them into push() threw RangeError before quirk a's ends entry could stop the comparison (diff/scenario.ts).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 1,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 1,
+              "delay": 1,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": "retry",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[0, 1]]
+        },
+        {
+          "op": "advance",
+          "ms": 1500
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[0, 0]]
+        }
+      ]
+    }
   }
 ]

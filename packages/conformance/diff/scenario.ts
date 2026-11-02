@@ -899,7 +899,13 @@ export async function runScenario(
   const advisories: string[] = [];
   for (const [engine, trace] of Object.entries(theirs)) {
     const contractDiffs = compareContract(first, trace, engine);
-    differences.push(...contractDiffs);
+    // A loop, not push(...contractDiffs): a case one engine drives far from
+    // the reference (an approved quirk that cascades) can yield more
+    // differences than a call may take as arguments, and spreading them
+    // threw RangeError before `explain` could stop the comparison.
+    for (const d of contractDiffs) {
+      differences.push(d);
+    }
     const contractKeys = new Set(
       contractDiffs.map((d) => `${d.at.reference}|${d.at.candidate}|${d.path}`),
     );
