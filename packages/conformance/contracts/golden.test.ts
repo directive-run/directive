@@ -292,7 +292,7 @@ describe("a saved-state envelope (U10)", () => {
   });
 
   it(
-    "[L6] core-next saves 1.35.0's flat format, and 1.35.0 restores it as its own (skipped by layer while core-next is built below L6)",
+    `[${partLayer("persistence")}] the persistence golden: core-next saves 1.35.0's flat format, and 1.35.0 restores it as its own (skipped by layer while core-next is built below ${partLayer("persistence")})`,
     skip("persistence"),
     async () => {
       const pairs: [Engine, Engine][] = [

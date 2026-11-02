@@ -37,6 +37,7 @@ import {
   checkHooksFired,
   checkScenarioLayers,
   diffTestFiles,
+  goldenTagProblem,
   pluginHooks,
   prodPorts,
   unbuiltReached,
@@ -207,19 +208,101 @@ describe("the census", () => {
     );
   });
 
-  it("fails when a layer-tagged check is skipped at or below current, or runs above it", () => {
-    const reports = cleanReports();
-    const results = reports[CHECKS_PROJECT]?.testResults[0]
-      ?.assertionResults as { title: string; status: string }[];
-    results.push(
-      { ...results[0], title: "[L0] a built part", status: "skipped" },
-      { ...results[0], title: "[L13] an unbuilt part", status: "passed" },
-    );
-    const out = census(repoRoot, reports).join("\n");
-    expect(out).toMatch(
-      /"\[L0\] a built part" is skipped but at or below the v2 layer/,
-    );
-    expect(out).toMatch(/"\[L13\] an unbuilt part" is above the v2 layer/);
+  describe("layer-tagged golden checks", () => {
+    // current is L4 in this repo: the ledger part (L12) is gated, L0 is not.
+    const LEDGER = "[L12] v2: the ledger golden round-trips with 1.35.0";
+    const PERSISTENCE =
+      "[L6] the persistence golden: core-next saves 1.35.0's flat format";
+    const checks = (reports: Record<string, JsonReport>) =>
+      reports[CHECKS_PROJECT]?.testResults as {
+        name: string;
+        assertionResults: { title: string; status: string }[];
+      }[];
+    const inGolden = (
+      add: [title: string, status: string][],
+      file = "contracts/golden.test.ts",
+    ) => {
+      const reports = cleanReports();
+      const target = checks(reports).find((f) => f.name.endsWith(file));
+      if (!target) {
+        throw new Error(`no ${file} in the checks report`);
+      }
+      // Retitle the file's first cases, so its count of tests stays right.
+      add.forEach(([title, status], i) => {
+        const base = target.assertionResults[i] as { title: string };
+        target.assertionResults[i] = { ...base, title, status };
+      });
+
+      return census(repoRoot, reports).join("\n");
+    };
+
+    it("passes a part skipped above current and a script check that ran", () => {
+      expect(
+        inGolden([
+          [LEDGER, "skipped"],
+          [PERSISTENCE, "skipped"],
+          ["[L0] the script's writes land", "passed"],
+        ]),
+      ).toBe("");
+    });
+
+    it("fails when a tagged check is skipped at or below current, or runs above it", () => {
+      const out = inGolden([
+        ["[L0] the script's writes land", "skipped"],
+        [LEDGER, "passed"],
+      ]);
+      expect(out).toMatch(
+        /"\[L0\] the script's writes land" is skipped but at or below the v2 layer/,
+      );
+      expect(out).toMatch(
+        /"\[L12\] v2: the ledger golden .*" is above the v2 layer but passed/,
+      );
+    });
+
+    it("fails a skipped title tagged with a layer that does not exist", () => {
+      for (const tag of ["L14", "L99"]) {
+        expect(
+          inGolden([[`[${tag}] v2: the ledger golden round-trips`, "skipped"]]),
+        ).toMatch(new RegExp(`is tagged \\[${tag}\\], which is not a layer`));
+      }
+    });
+
+    it("fails a title whose tag is not the layer its part needs", () => {
+      expect(
+        inGolden([["[L5] v2: the signed golden round-trips", "skipped"]]),
+      ).toMatch(/is tagged \[L5\] but the signed golden needs L12/);
+      // A later layer than its part's features skips forever.
+      expect(
+        inGolden([["[L13] the persistence golden round-trips", "skipped"]]),
+      ).toMatch(/is tagged \[L13\] but the persistence golden needs L6/);
+      expect(inGolden([["[L13] an unbuilt part", "skipped"]])).toMatch(
+        /is tagged \[L13\] but a title naming no golden part needs L0/,
+      );
+    });
+
+    it("fails a skipped [Ln] title in any checks file but golden.test.ts", () => {
+      for (const title of [LEDGER, PERSISTENCE, "[L13] an unbuilt part"]) {
+        expect(
+          inGolden([[title, "skipped"]], "scripts/__tests__/oracle.test.ts"),
+        ).toMatch(/oracle\.test\.ts > ".*" was skipped/);
+      }
+    });
+
+    it("skips exactly while the tag is above current: Ln equal to current passes", () => {
+      expect(goldenTagProblem(PERSISTENCE, "passed", "L6")).toBeNull();
+      expect(goldenTagProblem(PERSISTENCE, "skipped", "L6")).toMatch(
+        /skipped but at or below the v2 layer/,
+      );
+      expect(goldenTagProblem(PERSISTENCE, "skipped", "L5")).toBeNull();
+      expect(goldenTagProblem(PERSISTENCE, "passed", "L5")).toMatch(
+        /above the v2 layer but passed/,
+      );
+      // Nothing built yet: every tag is above current.
+      expect(goldenTagProblem(PERSISTENCE, "skipped", null)).toBeNull();
+      expect(goldenTagProblem(PERSISTENCE, "passed", null)).toMatch(
+        /above the v2 layer but passed/,
+      );
+    });
   });
 
   it("fails when a test was skipped outside aheadOfV1", () => {

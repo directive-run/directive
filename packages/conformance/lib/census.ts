@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
+import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
@@ -33,7 +34,7 @@ import {
   FUZZ_V2_FLOOR as V2_FLOOR,
   maxRunaways,
 } from "./fuzz.js";
-import { reachesAny } from "./layers.js";
+import { LAYERS, type Layer, layerIndex, reachesAny } from "./layers.js";
 import { staticTests } from "./tests.js";
 
 /** The fewest fuzz cases a differential run may execute (lib/fuzz.ts). */
@@ -108,6 +109,55 @@ export function v2Skips(
   const layer = Math.max(...pool.map(([, t]) => Number(t.layer?.slice(1))));
 
   return layer > Number(current.slice(1));
+}
+
+/** The one checks file whose tests may be gated by layer, with a `[Ln]` title. */
+export const GOLDEN_FILE = "contracts/golden.test.ts";
+
+/** The `[Ln]` a test title leads with (the title, or one of its ancestors). */
+export function layerTag(test: string): string | undefined {
+  return /(?:^| > )\[(L\d+)\] /.exec(test)?.[1];
+}
+
+/**
+ * What is wrong with a layer-tagged test in contracts/golden.test.ts, or null.
+ * The tag must be a real layer and the one the test's golden part needs
+ * (`partLayer`, named in the title as "the <part> golden"; a title naming no
+ * part needs L0), so a title cannot claim a later layer than its features.
+ * Then the test is skipped exactly while the tag is above `current`, and
+ * passes from then on.
+ */
+export function goldenTagProblem(
+  test: string,
+  status: string,
+  current: string | null,
+): string | null {
+  const tag = layerTag(test);
+  if (tag === undefined) {
+    return null;
+  }
+  if (!(LAYERS as readonly string[]).includes(tag)) {
+    return `is tagged [${tag}], which is not a layer`;
+  }
+  const named = PART_NAMES.filter((p) => test.includes(`the ${p} golden`));
+  const needs = named
+    .map((p) => partLayer(p))
+    .reduce<Layer>((a, b) => (layerIndex(b) > layerIndex(a) ? b : a), "L0");
+  if (tag !== needs) {
+    return `is tagged [${tag}] but ${named.length > 0 ? `the ${named.join(" and ")} golden needs` : "a title naming no golden part needs"} ${needs}`;
+  }
+  const gated =
+    current === null || layerIndex(tag as Layer) > layerIndex(current as Layer);
+  if (gated && status !== "skipped") {
+    return `is above the v2 layer but ${status}`;
+  }
+  if (!gated && status !== "passed") {
+    return status === "skipped"
+      ? "is skipped but at or below the v2 layer"
+      : `is ${status}`;
+  }
+
+  return null;
 }
 
 /**
@@ -597,22 +647,17 @@ export function census(
           }
           continue;
         }
-        // A check gated by layer (contracts/golden.test.ts, the core-next
-        // parts) names its layer in its title, `[Ln]`: it is skipped exactly
-        // while Ln is above `current`, and passes once it is not.
-        const tag =
-          name === CHECKS_PROJECT ? /\[(L\d+)\]/.exec(test)?.[1] : undefined;
-        if (tag) {
-          const gated =
-            current === null || Number(tag.slice(1)) > Number(current.slice(1));
-          if (gated && status !== "skipped") {
-            fail(
-              `${name}: ${file} > "${test}" is above the v2 layer but ${status}`,
-            );
-          } else if (!gated && status !== "passed") {
-            fail(
-              `${name}: ${file} > "${test}" is ${status === "skipped" ? "skipped but at or below the v2 layer" : status}`,
-            );
+        // A golden part core-next has not built yet (contracts/golden.test.ts)
+        // names its layer in its title, `[Ln]`, and is held to it
+        // (goldenTagProblem). Any other skip, in any file, fails below.
+        if (
+          name === CHECKS_PROJECT &&
+          file === GOLDEN_FILE &&
+          layerTag(test) !== undefined
+        ) {
+          const problem = goldenTagProblem(test, status, current);
+          if (problem) {
+            fail(`${name}: ${file} > "${test}" ${problem}`);
           }
           continue;
         }
