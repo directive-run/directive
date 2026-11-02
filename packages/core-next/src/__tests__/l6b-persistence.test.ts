@@ -282,6 +282,33 @@ describe("the persistence plugin: one instance on two systems", () => {
     s1.destroy();
     s2.destroy();
   });
+
+  it("a save between the two turns writes the waiting system's own saved data", () => {
+    vi.useFakeTimers();
+    const storage = memoryStorage({ prefs: { a: 5, b: "s" } });
+    const shared = plugin(storage, { debounce: 10 });
+    const s1: any = createSystem({
+      module: abc((facts) => {
+        facts.c = 1;
+      }),
+      plugins: [shared],
+    });
+    const s2: any = createSystem({
+      module: abc((facts) => {
+        facts.c = 2;
+      }),
+      plugins: [shared],
+    });
+    s1.initialize();
+    s1.facts.c = 3;
+    vi.advanceTimersByTime(20);
+    // 1.35's save reads the system the shared instance saw last (s2), whose
+    // saved data still waits for its initialize() (ai).
+    expect(storage.raw("prefs")).toBe('{"a":5,"b":"s"}');
+    s1.destroy();
+    s2.destroy();
+    vi.useRealTimers();
+  });
 });
 
 describe("the persistence plugin's types", () => {
