@@ -6,20 +6,20 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 27700,
-      "reason": "L5a sources part (A1, owner-approved 2026-11-01: sources live in createSystem in the alpha, raise up to 2.5 KB): measured 27,597 B, +2,108 B over 25,489. By piece: the core seams (start_, gate_, stop_, stopAsync_, fire_, gone_, untick_, down_) +50 B; the part's lifecycle, publish guards and drop reasons, module-scoped publish, attach and teardown errors, async teardown with timeouts, onEvict and system.evict(), and five plugin hook names +1,589 B; inspect().sources rows with their counters and the source.* observations, which the L5 diff scenarios compare, +469 B. Budget = measured + 103 B."
+      "gzBudget": 28400,
+      "reason": "L5b gates, linger, retry, coalesce, (aa) (ab) (ac) and the namespaced gate-write refusal, owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage): measured 28,282 B, +685 B over L5a's 27,597 B. By piece: the gate registry +165 B (99 B of it the 1.35 'both key and active' message, thrown in production as 1.35 does); gate timers, commit and evaluate (linger, backoff, (aa), (ac)) +366 B (41 B of it the 1.35 gate-returned message); coalesce +94 B; the gate-closed guard ((ab)) +26 B; folds with L5a's code -105 B; the namespaced gate-write refusal with 1.35's text in both modes +122 B (64 B of it the message). Budget = measured + 118 B, also covering rows ad and ae (approved the same day)."
     },
     "two-module": {
-      "gzBudget": 27800,
-      "reason": "L5a sources part, as minimal (A1, owner-approved 2026-11-01): measured 27,687 B, +2,115 B over 25,572, the same pieces."
+      "gzBudget": 28500,
+      "reason": "L5b, as minimal (owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage)): measured 28,374 B, +687 B over L5a's 27,687 B, the same pieces."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
     },
     "full-entry": {
-      "gzBudget": 29850,
-      "reason": "L5a sources part, as minimal (A1, owner-approved 2026-11-01): measured 29,733 B, +2,137 B over 27,596, the same pieces."
+      "gzBudget": 30550,
+      "reason": "L5b, as minimal (owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage)): measured 30,419 B, +686 B over L5a's 29,733 B, the same pieces."
     }
   }
 }
