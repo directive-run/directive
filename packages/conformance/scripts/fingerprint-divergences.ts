@@ -38,8 +38,30 @@ import { join } from "node:path";
 import type { Difference } from "../diff/compare.js";
 import { type Excuse, canonicalJson, generalize } from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
-import { type Divergence, FUZZ_SCENARIO, covers } from "../diff/scenario.js";
+import type { Divergence } from "../diff/scenario.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
+
+/** The scenario name of the fuzz cases (diff/scenario.ts `FUZZ_SCENARIO`; that module needs vitest). */
+const FUZZ_SCENARIO = "fuzz";
+
+/**
+ * Whether fuzz difference `d` is of entry `e`'s class: what diff/scenario.ts
+ * `covers` matched before fingerprints (stream, kind, engine, op, path
+ * prefix), with `when` read as satisfied.
+ */
+function inClass(e: Divergence, d: Difference): boolean {
+  return (
+    e.stream === d.stream &&
+    e.kind === d.kind &&
+    (e.engine === undefined || e.engine === d.engine) &&
+    (e.op === undefined || e.op === d.op) &&
+    (e.path === undefined ||
+      (d.path !== undefined &&
+        (d.path === e.path ||
+          d.path.startsWith(`${e.path}.`) ||
+          d.path.startsWith(`${e.path}[`))))
+  );
+}
 
 const conformanceRoot = join(defaultRepoRoot, "packages/conformance");
 const file = join(conformanceRoot, "diff/divergences.json");
@@ -57,7 +79,16 @@ let fuzzDiffs: Difference[] = [];
 try {
   const run = spawnSync(
     join(conformanceRoot, "node_modules/.bin/vitest"),
-    ["run", "--config", "vitest.config.ts", "--project", "conformance:diff"],
+    [
+      "run",
+      "--config",
+      "vitest.config.ts",
+      "--project",
+      "conformance:diff",
+      // The scenarios and the fuzz: the harness self-tests log nothing.
+      "diff/scenarios",
+      "diff/fuzz",
+    ],
     {
       cwd: conformanceRoot,
       stdio: "inherit",
@@ -123,15 +154,48 @@ try {
       );
     // The class of an entry that covered nothing itself: its own records'
     // kind and shape, as the run showed them (`when` read as satisfied).
-    const unbounded = { ...e, bound: undefined } as Divergence;
     const samples =
-      own.length > 0
-        ? own
-        : fuzzDiffs.filter((d) => covers(unbounded, FUZZ_SCENARIO, d, e.when));
+      own.length > 0 ? own : fuzzDiffs.filter((d) => inClass(e, d));
     const patterns = new Map<string, Json>();
     for (const d of samples) {
       const p = generalize(d, e.path);
       patterns.set(canonicalJson(p), p);
+    }
+    // A changed entry whose class never showed: its field as the records of
+    // its kind hold it (any op), each leaf under its path changed from one
+    // value of the leaf's class to another.
+    let fromRecords = 0;
+    if (patterns.size === 0 && e.op === "changed" && e.path !== undefined) {
+      for (const d of fuzzDiffs) {
+        if (d.stream !== e.stream || d.kind !== e.kind || d.op === "changed") {
+          continue;
+        }
+        const value = at(
+          d.op === "missing" ? d.reference : d.candidate,
+          e.path,
+        );
+        if (value === undefined) {
+          continue;
+        }
+        fromRecords++;
+        for (const [path, leaf] of leaves(value, e.path)) {
+          const like = generalize({
+            op: "missing",
+            reference: leaf,
+          } as Difference);
+          const p = generalize(
+            {
+              op: "changed",
+              path,
+              reference: leaf,
+              candidate: leaf,
+            } as Difference,
+            e.path,
+          ) as Record<string, Json>;
+          const q = { ...p, from: like, to: like };
+          patterns.set(canonicalJson(q), q);
+        }
+      }
     }
     if (patterns.size === 0) {
       report.push(
@@ -140,7 +204,7 @@ try {
       return e;
     }
     report.push(
-      `fuzz ${e.id}: ${own.length > 0 ? `${own.length} covered` : `0 covered, ${samples.length} of its class`} -> ${patterns.size} pattern(s)`,
+      `fuzz ${e.id}: ${own.length > 0 ? `${own.length} covered` : fromRecords > 0 ? `0 covered, 0 of its class, its field in ${fromRecords} record(s) of its kind` : `0 covered, ${samples.length} of its class`} -> ${patterns.size} pattern(s)`,
     );
     return withField(e, "bound", { match: [...patterns.values()] });
   });
@@ -161,4 +225,32 @@ function withField(e: Divergence, key: string, value: unknown): Divergence {
     next[k] = v;
   }
   return next as unknown as Divergence;
+}
+
+/** The value at `path` (`a.b[0].c`) inside `value`, or undefined. */
+function at(value: Json | undefined, path: string): Json | undefined {
+  let v: Json | undefined = value;
+  for (const [, key, index] of path.matchAll(/([^.[\]]+)|\[(\d+)\]/g)) {
+    if (v === null || typeof v !== "object") {
+      return undefined;
+    }
+    v =
+      index !== undefined
+        ? (v as Json[])[Number(index)]
+        : (v as Record<string, Json>)[key as string];
+  }
+  return v;
+}
+
+/** Every leaf under `value` with its full path (`value` is at `path`). */
+function leaves(value: Json, path: string): [string, Json][] {
+  if (Array.isArray(value)) {
+    return value.flatMap((v, i) => leaves(v, `${path}[${i}]`));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value).flatMap(([k, v]) =>
+      v === undefined ? [] : leaves(v, `${path}.${k}`),
+    );
+  }
+  return [[path, value]];
 }

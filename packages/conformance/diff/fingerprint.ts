@@ -70,6 +70,13 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   resolverTag: (v) => typeof v === "string" && /^[a-z]\.r\d+$/.test(v),
   /** An effect's record tag: `a.x0`. */
   effectTag: (v) => typeof v === "string" && /^[a-z]\.x\d+$/.test(v),
+  /**
+   * 1.35's settle() rejection when its maxWait runs out (its details list
+   * what was still in flight): `[Directive] settle() timed out after 5000ms. …`.
+   */
+  settleTimeout: (v) =>
+    typeof v === "string" &&
+    /^\[Directive\] settle\(\) timed out after \d+ms\./.test(v),
   /** A fuzz resolver's thrown message: `a.r0 attempt 1`. */
   failure: (v) => typeof v === "string" && /^[a-z]\.r\d+ attempt \d+$/.test(v),
 };
@@ -85,7 +92,7 @@ export function fits(pattern: Json, value: Json | undefined): boolean {
     if (keys.length === 1 && keys[0] === "$like") {
       const test = LIKE[pattern.$like as string];
 
-      return test !== undefined && test(value);
+      return test?.(value) === true;
     }
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
       return false;

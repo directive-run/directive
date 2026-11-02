@@ -27,6 +27,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
+import { LIKE, canonicalJson } from "../diff/fingerprint.js";
+import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
@@ -34,8 +36,6 @@ import {
   FUZZ_V2_FLOOR as V2_FLOOR,
   maxRunaways,
 } from "./fuzz.js";
-import { LIKE, canonicalJson } from "../diff/fingerprint.js";
-import type { Json } from "../diff/normalize.js";
 import { LAYERS, type Layer, layerIndex, reachesAny } from "./layers.js";
 import { staticTests } from "./tests.js";
 

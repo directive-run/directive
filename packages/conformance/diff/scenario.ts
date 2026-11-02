@@ -53,7 +53,6 @@ import {
 } from "./compare.js";
 import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
-import { type Json, normalize } from "./normalize.js";
 import {
   type Bound,
   type Excuse,
@@ -61,6 +60,7 @@ import {
   excuseFor,
   names,
 } from "./fingerprint.js";
+import { type Json, normalize } from "./normalize.js";
 import {
   type Recorder,
   type TraceEntry,
