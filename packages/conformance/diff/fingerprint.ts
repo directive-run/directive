@@ -77,8 +77,18 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   settleTimeout: (v) =>
     typeof v === "string" &&
     /^\[Directive\] settle\(\) timed out after \d+ms\./.test(v),
-  /** A fuzz resolver's thrown message: `a.r0 attempt 1`. */
-  failure: (v) => typeof v === "string" && /^[a-z]\.r\d+ attempt \d+$/.test(v),
+  /**
+   * The error a fuzz resolver's attempt ended with: its own thrown message
+   * (`a.r0 attempt 1`) or the engine's timeout of it
+   * (`Resolver "a::r0" timed out after 3ms`). One class, not two: the
+   * entries that hold an attempt's error (quirk b's) excuse whichever way the
+   * attempt failed (their `when`, `resolverRejects`, names both), so a bound
+   * that kept the two apart would describe which one a seed happened to show.
+   */
+  attemptError: (v) =>
+    typeof v === "string" &&
+    (/^[a-z]\.r\d+ attempt \d+$/.test(v) ||
+      /^Resolver "([a-z]::)?r\d+" timed out after \d+ms$/.test(v)),
 };
 
 /** Whether `value` fits `pattern` (`Bound`). */
@@ -155,54 +165,65 @@ export function admits(b: Bound, d: Difference): boolean {
   });
 }
 
+/** The `LIKE` classes `generalize` reads a value as, first match wins. */
+const ORDER = [
+  "integer",
+  "requirementId",
+  "requirementType",
+  "resolver",
+  "constraint",
+  "resolverTag",
+  "effectTag",
+  "attemptError",
+];
+
+/**
+ * `v` with every string of a `LIKE` identifier class and every integer
+ * replaced by that class, and an absent value by `absent`. A class already
+ * in place (`{ "$like": name }`, a pattern being re-generalized with the
+ * current classes) stays as it is.
+ */
+export function generalizeValue(v: Json | undefined): Json {
+  if (v === undefined) {
+    return { $like: "absent" };
+  }
+  const like = ORDER.find((name) => LIKE[name]?.(v));
+  if (like) {
+    return { $like: like };
+  }
+  if (Array.isArray(v)) {
+    return v.map(generalizeValue);
+  }
+  if (v !== null && typeof v === "object") {
+    const keys = Object.keys(v).filter((k) => v[k] !== undefined);
+    if (keys.length === 1 && keys[0] === "$like") {
+      return v;
+    }
+
+    return Object.fromEntries(keys.map((k) => [k, generalizeValue(v[k])]));
+  }
+
+  return v;
+}
+
 /**
  * The pattern a fuzz difference generalizes to: every string of a `LIKE`
  * identifier class and every integer becomes that class, every absent side
- * `absent`; and in a changed difference's path, the indices after `prefix`
- * (the entry's own `path`) become `[*]`. Everything else stays literal.
+ * `absent` (`generalizeValue`); and in a changed difference's path, the
+ * indices after `prefix` (the entry's own `path`) become `[*]`. Everything
+ * else stays literal.
  */
 export function generalize(d: Difference, prefix?: string): Json {
-  const ORDER = [
-    "integer",
-    "requirementId",
-    "requirementType",
-    "resolver",
-    "constraint",
-    "resolverTag",
-    "effectTag",
-    "failure",
-  ];
-  const walk = (v: Json | undefined): Json => {
-    if (v === undefined) {
-      return { $like: "absent" };
-    }
-    const like = ORDER.find((name) => LIKE[name]?.(v));
-    if (like) {
-      return { $like: like };
-    }
-    if (Array.isArray(v)) {
-      return v.map(walk);
-    }
-    if (v !== null && typeof v === "object") {
-      return Object.fromEntries(
-        Object.keys(v)
-          .filter((k) => v[k] !== undefined)
-          .map((k) => [k, walk(v[k])]),
-      );
-    }
-
-    return v;
-  };
   if (d.op !== "changed") {
-    return walk(payloadOf(d));
+    return generalizeValue(payloadOf(d));
   }
   const path = d.path ?? "";
   const head = prefix && path.startsWith(prefix) ? prefix : "";
 
   return {
     path: head + path.slice(head.length).replace(/\[\d+\]/g, "[*]"),
-    from: walk(d.reference),
-    to: walk(d.candidate),
+    from: generalizeValue(d.reference),
+    to: generalizeValue(d.candidate),
   };
 }
 

@@ -20,9 +20,22 @@
  * and have no class sample are listed and left unfingerprinted (the census
  * then fails them).
  *
- * Usage: tsx scripts/fingerprint-divergences.ts [--logs <dir> ...]
- *   --logs  also read a DIFF_LOG_DIR of another run made with
- *           DIFF_COVERAGE_LOG=1 (a deep fuzz seed), for more fuzz samples.
+ * A fuzz entry's bound must describe its record class, not one seed's
+ * literals, so its samples come from many seeds: `--seeds` runs the fuzz once
+ * more per seed (at the PR run count) and adds what each run showed, and
+ * `--rebound` regenerates every fuzz bound that way. It runs every fuzz
+ * entry as the old wildcard over its class (the file is written without
+ * fuzz bounds for the runs, then restored), so what an entry covered is
+ * still what it covered before fingerprints, never more. Each entry keeps
+ * every pattern it had, re-generalized with the current classes
+ * (`generalizeValue`), and gains the patterns its records showed.
+ *
+ * Usage: tsx scripts/fingerprint-divergences.ts [--rebound] [--seeds 1-20]
+ *          [--logs <dir> ...]
+ *   --rebound  regenerate every fuzz bound (above); hand excuses are kept
+ *   --seeds    extra fuzz seeds to run at the PR run count: `1-20` or `1,7`
+ *   --logs     also read a DIFF_LOG_DIR of another run made with
+ *              DIFF_COVERAGE_LOG=1 (a deep fuzz seed), for more fuzz samples.
  */
 
 import { spawnSync } from "node:child_process";
@@ -36,7 +49,12 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Difference } from "../diff/compare.js";
-import { type Excuse, canonicalJson, generalize } from "../diff/fingerprint.js";
+import {
+  type Excuse,
+  canonicalJson,
+  generalize,
+  generalizeValue,
+} from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
 import type { Divergence } from "../diff/scenario.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
@@ -68,16 +86,17 @@ const file = join(conformanceRoot, "diff/divergences.json");
 const extra = process.argv.flatMap((a, i, all) =>
   all[i - 1] === "--logs" ? [a] : [],
 );
-
-const out = mkdtempSync(join(tmpdir(), "conformance-fingerprint-"));
-const lines = (dir: string, name: string) =>
-  existsSync(join(dir, name))
-    ? readFileSync(join(dir, name), "utf8").split("\n").filter(Boolean)
-    : [];
-let covered: { scenario: string; id: string; excuse: Excuse }[] = [];
-let fuzzDiffs: Difference[] = [];
-try {
-  const run = spawnSync(
+const rebound = process.argv.includes("--rebound");
+const seeds = process.argv
+  .flatMap((a, i, all) => (all[i - 1] === "--seeds" ? a.split(",") : []))
+  .flatMap((r) => {
+    const [lo, hi = lo] = r.split("-").map(Number) as [number, number?];
+    return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  });
+const original = readFileSync(file, "utf8");
+const before = JSON.parse(original) as Divergence[];
+const vitest = (args: string[], env: NodeJS.ProcessEnv) =>
+  spawnSync(
     join(conformanceRoot, "node_modules/.bin/vitest"),
     [
       "run",
@@ -85,34 +104,81 @@ try {
       "vitest.config.ts",
       "--project",
       "conformance:diff",
-      // The scenarios and the fuzz: the harness self-tests log nothing.
-      "diff/scenarios",
-      "diff/fuzz",
+      ...args,
     ],
-    {
-      cwd: conformanceRoot,
-      stdio: "inherit",
-      env: { ...process.env, DIFF_LOG_DIR: out, DIFF_COVERAGE_LOG: "1" },
-    },
-  );
-  if (run.status !== 0) {
-    console.error(`[fingerprint] the differential run exited ${run.status}`);
-    process.exit(1);
+    { cwd: conformanceRoot, stdio: "inherit", env: { ...process.env, ...env } },
+  ).status;
+
+const out = mkdtempSync(join(tmpdir(), "conformance-fingerprint-"));
+const lines = (dir: string, name: string) =>
+  existsSync(join(dir, name))
+    ? readFileSync(join(dir, name), "utf8").split("\n").filter(Boolean)
+    : [];
+let covered: { scenario: string; id: string; excuse: Excuse }[] = [];
+const fuzzDiffs: Difference[] = [];
+let written = false;
+try {
+  if (rebound) {
+    const wild = before.map((e) => {
+      if (e.scenario !== FUZZ_SCENARIO) {
+        return e;
+      }
+      const { bound: _b, ...rest } = e;
+      return rest;
+    });
+    writeFileSync(file, `${JSON.stringify(wild, null, 2)}\n`);
   }
-  for (const dir of [out, ...extra]) {
+  // The scenarios and the fuzz: the harness self-tests log nothing.
+  const status = vitest(["diff/scenarios", "diff/fuzz"], {
+    DIFF_LOG_DIR: out,
+    DIFF_COVERAGE_LOG: "1",
+  });
+  if (status !== 0) {
+    throw new Error(`the differential run exited ${status}`);
+  }
+  const dirs = [out, ...extra];
+  for (const seed of seeds) {
+    const dir = join(out, `seed-${seed}`);
+    const code = vitest(["diff/fuzz"], {
+      DIFF_LOG_DIR: dir,
+      DIFF_COVERAGE_LOG: "1",
+      DIFF_FUZZ_SEED: String(seed),
+    });
+    if (code !== 0) {
+      throw new Error(`the fuzz at seed ${seed} exited ${code}`);
+    }
+    dirs.push(dir);
+  }
+  for (const dir of dirs) {
     covered = covered.concat(
       lines(dir, "covered.jsonl").map((l) => JSON.parse(l)),
     );
-    fuzzDiffs = fuzzDiffs.concat(
-      lines(dir, "fuzz-differences.jsonl").map((l) => JSON.parse(l)),
-    );
+  }
+  // Class samples are read only for the entries that covered nothing
+  // themselves (a deep run's file is large).
+  const sampled = before.filter(
+    (e) =>
+      e.scenario === FUZZ_SCENARIO &&
+      (rebound || e.bound === undefined) &&
+      !covered.some((c) => c.id === e.id),
+  );
+  const heads = sampled.map(
+    (e) =>
+      `{"stream":${JSON.stringify(e.stream)},"kind":${JSON.stringify(e.kind)},`,
+  );
+  for (const dir of dirs) {
+    for (const l of lines(dir, "fuzz-differences.jsonl")) {
+      if (heads.some((h) => l.startsWith(h))) {
+        fuzzDiffs.push(JSON.parse(l));
+      }
+    }
   }
   // Hand counts come from the PR run alone: a hand scenario runs once there.
   const handCovered = lines(out, "covered.jsonl")
     .map((l) => JSON.parse(l) as (typeof covered)[number])
     .filter((c) => c.scenario !== FUZZ_SCENARIO);
 
-  const entries = JSON.parse(readFileSync(file, "utf8")) as Divergence[];
+  const entries = before;
   const report: string[] = [];
   const asDifference = (x: Excuse, op: Difference["op"]) =>
     ({
@@ -143,7 +209,7 @@ try {
       }
       return withField(e, "excuses", [...counts.values()]);
     }
-    if (e.bound !== undefined) {
+    if (e.bound !== undefined && !rebound) {
       return e;
     }
     const op = e.op;
@@ -157,15 +223,42 @@ try {
     const samples =
       own.length > 0 ? own : fuzzDiffs.filter((d) => inClass(e, d));
     const patterns = new Map<string, Json>();
+    // A regenerated bound keeps what it had, in the current classes.
+    for (const p of e.bound?.match ?? []) {
+      const q =
+        e.op === "changed"
+          ? (() => {
+              const { path, from, to } = p as Record<string, Json>;
+              return {
+                path,
+                from: generalizeValue(from),
+                to: generalizeValue(to),
+              } as Json;
+            })()
+          : generalizeValue(p);
+      const r = JSON.parse(
+        canonicalJson(q).replaceAll(
+          '{"$like":"failure"}',
+          '{"$like":"attemptError"}',
+        ),
+      ) as Json;
+      patterns.set(canonicalJson(r), r);
+    }
+    const had = patterns.size;
     for (const d of samples) {
       const p = generalize(d, e.path);
-      patterns.set(canonicalJson(p), p);
+      const key = canonicalJson(p);
+      if (rebound && !patterns.has(key) && !attemptSide(p, e.op)) {
+        report.push(`fuzz ${e.id}: left out (not an attempt's error) ${key}`);
+        continue;
+      }
+      patterns.set(key, p);
     }
     // A changed entry whose class never showed: its field as the records of
     // its kind hold it (any op), each leaf under its path changed from one
     // value of the leaf's class to another.
     let fromRecords = 0;
-    if (patterns.size === 0 && e.op === "changed" && e.path !== undefined) {
+    if (samples.length === 0 && e.op === "changed" && e.path !== undefined) {
       for (const d of fuzzDiffs) {
         if (d.stream !== e.stream || d.kind !== e.kind || d.op === "changed") {
           continue;
@@ -204,15 +297,45 @@ try {
       return e;
     }
     report.push(
-      `fuzz ${e.id}: ${own.length > 0 ? `${own.length} covered` : fromRecords > 0 ? `0 covered, 0 of its class, its field in ${fromRecords} record(s) of its kind` : `0 covered, ${samples.length} of its class`} -> ${patterns.size} pattern(s)`,
+      `fuzz ${e.id}: had ${had}; ${own.length > 0 ? `${own.length} covered` : fromRecords > 0 ? `0 covered, 0 of its class, its field in ${fromRecords} record(s) of its kind` : `0 covered, ${samples.length} of its class`} -> ${patterns.size} pattern(s)`,
     );
     return withField(e, "bound", { match: [...patterns.values()] });
   });
   writeFileSync(file, `${JSON.stringify(migrated, null, 2)}\n`);
+  written = true;
   console.log(report.join("\n"));
   console.log(`[fingerprint] wrote ${file}; run biome format on it`);
+} catch (error) {
+  console.error(`[fingerprint] ${(error as Error).message}`);
+  process.exitCode = 1;
 } finally {
+  if (!written) {
+    writeFileSync(file, original);
+  }
   rmSync(out, { recursive: true, force: true });
+}
+
+/**
+ * Whether a sampled pattern's 1.35 side is a resolver attempt's error, where
+ * it holds an error at all. Every fuzz entry whose records carry an error is
+ * quirk b's, and quirk b is the error a retracted resolver attempt ended
+ * with; a changed record may pair it with any other error on 2.0 (the
+ * entries' reason), but a derivation's or an effect's error on 1.35 is not
+ * quirk b. A regenerated bound leaves such a sample out and lists it, so
+ * sampling more seeds never widens an entry past its reason. (`failure` is
+ * the class `attemptError` replaced.)
+ */
+function attemptSide(p: Json, op: Divergence["op"]): boolean {
+  const text = canonicalJson(p);
+  if (op === "changed") {
+    const { path, from } = p as Record<string, Json>;
+    return !(
+      String(path).includes("$error") &&
+      typeof from === "string" &&
+      from !== "resolver"
+    );
+  }
+  return !/"source":"(?!resolver")|throws at/.test(text);
 }
 
 /** `e` with `key` set, inserted before `reason` (key order kept). */

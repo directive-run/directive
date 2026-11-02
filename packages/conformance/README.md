@@ -230,15 +230,19 @@ under a changed entry's path. So every entry also carries one of:
   [patterns] }`. A pattern is the record (or, for changed, `{ path, from,
   to }`) with only the parts a seed varies left open: `{ "$like": name }`
   for a resolver, constraint, requirement or effect identifier of the fuzz
-  model's naming grammar, an integer (an attempt or a count), or an absent
-  side, and `[*]` for an array index under the entry's path. Field names,
+  model's naming grammar, an integer (an attempt or a count), the error a
+  fuzz resolver's attempt ended with (its thrown message or its timeout,
+  one class: quirk b excuses either), or an absent side, and `[*]` for an array index under the entry's path. Field names,
   tags, structure, array lengths and every other value stay literal, so a
   fuzz entry no longer excuses an unrelated record kind or key.
 
 The census requires one of them on every entry. They were added by
 `scripts/fingerprint-divergences.ts`, which records what each entry covered
-on the current engines (the PR run, plus a deep fuzz seed for fuzz
-samples) and writes exactly that: an excuse per distinct record with its
+on the current engines (the PR run; for fuzz samples, the fuzz at seeds
+1–20 and 24301 at the PR run count plus seed 24301 at 5000, so a bound
+describes its record class rather than one seed's literals: `--rebound
+--seeds 1-20` regenerates every bound that way, each entry run as the old
+wildcard over its class) and writes exactly that: an excuse per distinct record with its
 count, or the patterns the covered records generalize to (for a fuzz entry
 that covered nothing itself, the records of its class). That only narrows
 an entry, so it keeps its `approvedBy`, `date` and `reason`: narrowing an

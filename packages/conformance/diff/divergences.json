@@ -5979,218 +5979,8 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r2\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r1\" timed out after 10ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onError",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"b::r2\" timed out after 3ms",
                 "context": {
                   "fromConstraint": {
                     "$like": "constraint"
@@ -6255,288 +6045,8 @@
               "$error": {
                 "name": "Error",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 }
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r2\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r1\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r0\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r0\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r2\" timed out after 10ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r0\" timed out after 10ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r1\" timed out after 10ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"b::r1\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r1\" timed out after 3ms"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverError",
-          "args": [
-            {
-              "$like": "resolver"
-            },
-            {
-              "fromConstraint": {
-                "$like": "constraint"
-              },
-              "id": {
-                "$like": "requirementId"
-              },
-              "requirement": {
-                "type": {
-                  "$like": "requirementType"
-                }
-              }
-            },
-            {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"b::r2\" timed out after 3ms"
               }
             }
           ]
@@ -6567,7 +6077,7 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
                 "context": {
                   "fromConstraint": {
@@ -6600,7 +6110,7 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
                 "context": {
                   "fromConstraint": {
@@ -6633,7 +6143,7 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
                 "context": {
                   "fromConstraint": {
@@ -6656,223 +6166,6 @@
               }
             },
             "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r2\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry-later"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry-later"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r2\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry-later"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "throw"
           ]
         },
         {
@@ -6883,7 +6176,7 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
                 "context": {
                   "fromConstraint": {
@@ -6916,7 +6209,7 @@
               "$error": {
                 "name": "DirectiveError",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 },
                 "context": {
                   "fromConstraint": {
@@ -6986,223 +6279,6 @@
             {
               "$error": {
                 "name": "DirectiveError",
-                "message": "Resolver \"a::r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "disable"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r2\" timed out after 10ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r0\" timed out after 10ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r1\" timed out after 10ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "disable"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"b::r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "disable"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
                 "message": "a.d0 throws at 5",
                 "context": {
                   "$undefined": true
@@ -7232,37 +6308,6 @@
               }
             },
             "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry"
           ]
         },
         {
@@ -7310,37 +6355,6 @@
             {
               "$error": {
                 "name": "DirectiveError",
-                "message": "Resolver \"b::r2\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "retry-later"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
                 "message": "b.x0 throws at 4",
                 "context": {
                   "$undefined": true
@@ -7370,37 +6384,6 @@
               }
             },
             "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r1\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "disable"
           ]
         },
         {
@@ -7440,68 +6423,6 @@
             },
             "skip"
           ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"a::r0\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "skip"
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onErrorRecovery",
-          "args": [
-            {
-              "$error": {
-                "name": "DirectiveError",
-                "message": "Resolver \"b::r2\" timed out after 3ms",
-                "context": {
-                  "fromConstraint": {
-                    "$like": "constraint"
-                  },
-                  "id": {
-                    "$like": "requirementId"
-                  },
-                  "requirement": {
-                    "type": {
-                      "$like": "requirementType"
-                    }
-                  }
-                },
-                "recoverable": true,
-                "source": "resolver",
-                "sourceId": {
-                  "$like": "resolver"
-                }
-              }
-            },
-            "throw"
-          ]
         }
       ]
     },
@@ -7528,188 +6449,8 @@
               "$error": {
                 "name": "Error",
                 "message": {
-                  "$like": "failure"
+                  "$like": "attemptError"
                 }
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r2\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r1\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r0\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r0\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"a::r2\" timed out after 10ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r0\" timed out after 10ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r1\" timed out after 10ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"b::r1\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"r1\" timed out after 3ms"
-              }
-            },
-            "requirementId": {
-              "$like": "requirementId"
-            },
-            "resolver": {
-              "$like": "resolver"
-            },
-            "type": "resolver.error"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "error": {
-              "$error": {
-                "name": "Error",
-                "message": "Resolver \"b::r2\" timed out after 3ms"
               }
             },
             "requirementId": {
@@ -7745,116 +6486,8 @@
             "$error": {
               "name": "DirectiveError",
               "message": {
-                "$like": "failure"
+                "$like": "attemptError"
               },
-              "context": {
-                "fromConstraint": {
-                  "$like": "constraint"
-                },
-                "id": {
-                  "$like": "requirementId"
-                },
-                "requirement": {
-                  "type": {
-                    "$like": "requirementType"
-                  }
-                }
-              },
-              "recoverable": true,
-              "source": "resolver",
-              "sourceId": {
-                "$like": "resolver"
-              }
-            }
-          }
-        },
-        {
-          "k": "unhandled",
-          "error": {
-            "$error": {
-              "name": "DirectiveError",
-              "message": "Resolver \"r0\" timed out after 3ms",
-              "context": {
-                "fromConstraint": {
-                  "$like": "constraint"
-                },
-                "id": {
-                  "$like": "requirementId"
-                },
-                "requirement": {
-                  "type": {
-                    "$like": "requirementType"
-                  }
-                }
-              },
-              "recoverable": true,
-              "source": "resolver",
-              "sourceId": {
-                "$like": "resolver"
-              }
-            }
-          }
-        },
-        {
-          "k": "unhandled",
-          "error": {
-            "$error": {
-              "name": "DirectiveError",
-              "message": "Resolver \"r1\" timed out after 3ms",
-              "context": {
-                "fromConstraint": {
-                  "$like": "constraint"
-                },
-                "id": {
-                  "$like": "requirementId"
-                },
-                "requirement": {
-                  "type": {
-                    "$like": "requirementType"
-                  }
-                }
-              },
-              "recoverable": true,
-              "source": "resolver",
-              "sourceId": {
-                "$like": "resolver"
-              }
-            }
-          }
-        },
-        {
-          "k": "unhandled",
-          "error": {
-            "$error": {
-              "name": "DirectiveError",
-              "message": "Resolver \"r2\" timed out after 3ms",
-              "context": {
-                "fromConstraint": {
-                  "$like": "constraint"
-                },
-                "id": {
-                  "$like": "requirementId"
-                },
-                "requirement": {
-                  "type": {
-                    "$like": "requirementType"
-                  }
-                }
-              },
-              "recoverable": true,
-              "source": "resolver",
-              "sourceId": {
-                "$like": "resolver"
-              }
-            }
-          }
-        },
-        {
-          "k": "unhandled",
-          "error": {
-            "$error": {
-              "name": "DirectiveError",
-              "message": "Resolver \"b::r2\" timed out after 3ms",
               "context": {
                 "fromConstraint": {
                   "$like": "constraint"
@@ -7925,9 +6558,11 @@
         {
           "path": "error.$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
-          "to": "Resolver \"r1\" timed out after 3ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "error.$error.sourceId",
@@ -7936,22 +6571,6 @@
           },
           "to": {
             "$like": "resolver"
-          }
-        },
-        {
-          "path": "error.$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"r2\" timed out after 3ms"
-        },
-        {
-          "path": "error.$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": {
-            "$like": "failure"
           }
         }
       ]
@@ -8003,10 +6622,10 @@
         {
           "path": "args[0].$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
           "to": {
-            "$like": "failure"
+            "$like": "attemptError"
           }
         },
         {
@@ -8017,13 +6636,6 @@
           "to": {
             "$like": "resolver"
           }
-        },
-        {
-          "path": "args[0].$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"a::r2\" timed out after 10ms"
         },
         {
           "path": "args[0].$error.context.$undefined",
@@ -8064,7 +6676,7 @@
         {
           "path": "args[0].$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
           "to": "b.d2 throws at 3"
         },
@@ -8129,9 +6741,11 @@
         {
           "path": "args[0].$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
-          "to": "Resolver \"b::r1\" timed out after 3ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "args[0].$error.sourceId",
@@ -8140,15 +6754,6 @@
           },
           "to": {
             "$like": "resolver"
-          }
-        },
-        {
-          "path": "args[0].$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": {
-            "$like": "failure"
           }
         },
         {
@@ -8190,7 +6795,9 @@
         {
           "path": "args[0].$error.message",
           "from": "b.d2 throws at 5",
-          "to": "Resolver \"a::r0\" timed out after 10ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "args[0].$error.source",
@@ -8206,15 +6813,10 @@
         },
         {
           "path": "args[0].$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"a::r2\" timed out after 10ms"
-        },
-        {
-          "path": "args[0].$error.message",
           "from": "a.d0 throws at 6",
-          "to": "Resolver \"a::r0\" timed out after 3ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "args[0].$error.sourceId",
@@ -8240,13 +6842,10 @@
         },
         {
           "path": "args[0].$error.message",
-          "from": "Resolver \"b::r0\" timed out after 10ms",
-          "to": "Resolver \"b::r1\" timed out after 3ms"
-        },
-        {
-          "path": "args[0].$error.message",
           "from": "b.d0 throws at 6",
-          "to": "Resolver \"b::r1\" timed out after 3ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "args[0].$error.sourceId",
@@ -8294,7 +6893,7 @@
         {
           "path": "args[0].$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
           "to": "b.d2 throws at 3"
         },
@@ -8313,9 +6912,21 @@
         {
           "path": "args[0].$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
-          "to": "Resolver \"b::r0\" timed out after 3ms"
+          "to": "a.x1 throws at 6"
+        },
+        {
+          "path": "args[0].$error.source",
+          "from": "resolver",
+          "to": "effect"
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": "a::x1"
         }
       ]
     },
@@ -8375,37 +6986,11 @@
         {
           "path": "args[*].$error.message",
           "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"b::r1\" timed out after 3ms"
-        },
-        {
-          "path": "args[*].$error.message",
-          "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
           "to": {
-            "$like": "failure"
+            "$like": "attemptError"
           }
-        },
-        {
-          "path": "args[*].$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"a::r2\" timed out after 10ms"
-        },
-        {
-          "path": "args[*].$error.message",
-          "from": "Resolver \"b::r0\" timed out after 10ms",
-          "to": "Resolver \"b::r1\" timed out after 3ms"
-        },
-        {
-          "path": "args[*].$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"b::r0\" timed out after 3ms"
         }
       ]
     },
@@ -8429,9 +7014,11 @@
         {
           "path": "event.error.$error.message",
           "from": {
-            "$like": "failure"
+            "$like": "attemptError"
           },
-          "to": "Resolver \"b::r1\" timed out after 3ms"
+          "to": {
+            "$like": "attemptError"
+          }
         },
         {
           "path": "event.requirementId",
@@ -8450,27 +7037,6 @@
           "to": {
             "$like": "resolver"
           }
-        },
-        {
-          "path": "event.error.$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": {
-            "$like": "failure"
-          }
-        },
-        {
-          "path": "event.error.$error.message",
-          "from": {
-            "$like": "failure"
-          },
-          "to": "Resolver \"a::r2\" timed out after 10ms"
-        },
-        {
-          "path": "event.error.$error.message",
-          "from": "Resolver \"b::r0\" timed out after 10ms",
-          "to": "Resolver \"b::r1\" timed out after 3ms"
         }
       ]
     },
@@ -8765,16 +7331,16 @@
     "bound": {
       "match": [
         {
-          "k": "threw",
-          "where": "settle",
           "error": {
             "$error": {
-              "name": "Error",
               "message": {
                 "$like": "settleTimeout"
-              }
+              },
+              "name": "Error"
             }
-          }
+          },
+          "k": "threw",
+          "where": "settle"
         }
       ]
     },

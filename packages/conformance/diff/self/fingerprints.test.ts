@@ -262,6 +262,51 @@ describe("a fuzz entry excuses only payloads its bound admits", () => {
       false,
     );
   });
+
+  it("an attempt's error is one class, a rejection or a timeout; another error in the step is not", () => {
+    // Quirk b's records carry the error the retracted attempt ended with.
+    const quirkB = fuzz({
+      kind: "error",
+      op: "missing",
+      bound: {
+        match: [
+          record(
+            "error",
+            "resolver",
+            { $like: "resolver" },
+            { $like: "attemptError" },
+          ),
+        ],
+      },
+    });
+    const timedOut = [
+      "error",
+      "resolver",
+      "a::r1",
+      'Resolver "a::r1" timed out after 10ms',
+    ];
+    const rejected = ["error", "resolver", "r0", "a.r0 attempt 2"];
+    expect(
+      unexplained([timedOut, rejected], [], quirkB, FUZZ_SCENARIO),
+    ).toEqual([]);
+    for (const other of [
+      ["error", "resolver", "a::r1", "a.d0 throws at 4"], // a derivation's throw
+      ["error", "resolver", "a::r1", "a.x0 throws at 4"], // an effect's throw
+      [
+        "error",
+        "resolver",
+        "a::r1",
+        "[Directive] settle() timed out after 5000ms.",
+      ],
+      ["error", "resolver", "a::r1", 'Resolver "load" timed out after 10ms'], // not a fuzz resolver
+      ["error", "resolver", "a::r1", 'Resolver "a::r1" timed out after 10ms!'],
+      ["error", "effect", "a::r1", 'Resolver "a::r1" timed out after 10ms'], // another source
+    ] as Json[][]) {
+      expect(unexplained([timedOut, other], [], quirkB, FUZZ_SCENARIO)).toEqual(
+        [`missing ${JSON.stringify(record(...other))}`],
+      );
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
