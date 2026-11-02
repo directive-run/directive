@@ -1,6 +1,7 @@
 /**
  * L6b: the persistence plugin on core-next (RFC L6 rows P1–P9, decisions
- * (ai) and (ak)), development build. The black-box oracle is in
+ * (ai) and (ak)), development build; (ak) in production is in
+ * l6b-persistence-production.test.ts. The black-box oracle is in
  * packages/conformance (persistence.test, l6-persistence-oracle,
  * hydration-scope, the L6 diff scenarios and the golden files).
  */
@@ -112,7 +113,7 @@ describe("the persistence plugin (ai): applied inside initialize()", () => {
 });
 
 describe("the persistence plugin (ak): saved keys the schema dropped", () => {
-  it("are skipped with one development warning, the other keys restore, and they stay in storage", () => {
+  it("are skipped with one development warning, the other keys restore, and the save drops them", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const storage = memoryStorage({
@@ -128,17 +129,17 @@ describe("the persistence plugin (ak): saved keys the schema dropped", () => {
     expect(system.facts.fps).toBe(2);
     expect(system.facts.other).toBe("saved");
     system.destroy();
-    expect(storage.raw("prefs")).toBe(
-      '{"fps":2,"removedLater":true,"other":"saved"}',
-    );
+    expect(storage.raw("prefs")).toBe('{"fps":2,"other":"saved"}');
     const hits = warn.mock.calls.filter((c) => /removedLater/.test(String(c)));
     expect(hits).toHaveLength(1);
+    expect(String(hits[0])).toMatch(/The next save drops them\.$/);
     expect(error).not.toHaveBeenCalled();
   });
 
-  // Owner, 2026-11-02, "Keep them in storage": every save writes a dropped
-  // key back unchanged, so an app rolled back to an older version keeps it.
-  it("survive two saves unchanged, in their place", () => {
+  // Owner, 2026-11-02, "Drop stale keys in dev": a development save leaves a
+  // dropped key out, as 1.35's development save does, so a rollback to 1.35
+  // in development restores every key (production keeps it: the -production file).
+  it("are left out of every development save", () => {
     vi.useFakeTimers();
     try {
       vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -150,18 +151,29 @@ describe("the persistence plugin (ak): saved keys the schema dropped", () => {
       system.start();
       system.facts.fps = 3;
       vi.advanceTimersByTime(20);
-      expect(storage.raw("prefs")).toBe('{"fps":3,"removedLater":true}');
+      expect(storage.raw("prefs")).toBe('{"fps":3}');
       system.facts.fps = 4;
       vi.advanceTimersByTime(20);
-      expect(storage.raw("prefs")).toBe('{"fps":4,"removedLater":true}');
+      expect(storage.raw("prefs")).toBe('{"fps":4}');
       system.destroy();
-      expect(storage.raw("prefs")).toBe('{"fps":4,"removedLater":true}');
+      expect(storage.raw("prefs")).toBe('{"fps":4}');
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("an older envelope at the plugin's key is written back as 1.35 production writes it (U10)", () => {
+  it("are left out of a save before initialize(), while the saved values are held (ai)", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const storage = memoryStorage({ prefs: { fps: 2, removedLater: true } });
+    const system: any = createSystem({
+      module: scene(() => {}),
+      plugins: [plugin(storage)],
+    });
+    system.destroy();
+    expect(storage.raw("prefs")).toBe('{"fps":2}');
+  });
+
+  it("an older envelope at the plugin's key is written as 1.35 development writes it (U10)", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const storage = memoryStorage({
       prefs: { v: 1, schema: { m: 1 }, facts: { fps: 6 } },
@@ -174,9 +186,7 @@ describe("the persistence plugin (ak): saved keys the schema dropped", () => {
     });
     system.start();
     system.destroy();
-    expect(storage.raw("prefs")).toBe(
-      '{"v":1,"schema":{"m":1},"facts":{"fps":6},"fps":1}',
-    );
+    expect(storage.raw("prefs")).toBe('{"fps":1}');
   });
 });
 
