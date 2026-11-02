@@ -12,6 +12,7 @@ import {
   checkTick,
   createSystemCore,
 } from "./core.js";
+import { withDefaults } from "./defaults.js";
 import { withEffects } from "./effects.js";
 import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withInspect } from "./inspect.js";
@@ -46,6 +47,8 @@ export function createSystem<const M extends ModuleSchema>(
     withSources,
     // L6: restore() is on every 1.35 system, with no import (B6).
     withRestore,
+    // L6c: `.default()` fills facts still undefined after initialize ((al)).
+    withDefaults,
     // Last: its onInit pass starts once the system is complete.
     withPlugins(options.plugins),
   ];

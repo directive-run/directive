@@ -109,8 +109,13 @@ export function createValidator(
         indexHint = ` (element at index ${st._lastFailedIndex} failed)`;
         st._lastFailedIndex = -1;
       }
+      // (am), owner-approved for 2.0: a failed `.refine()` adds its message
+      // after 1.35's text (1.35 records the message and never shows it).
+      const refined = (
+        st._refinements as { predicate: unknown; message: string }[] | undefined
+      )?.find((r) => r.predicate === validator);
       throw new Error(
-        `[Directive] Validation failed for "${key}": expected ${st._typeName ?? "unknown"}, got ${typeLabel(value)} ${preview(value)}${i === 0 ? "" : ` (validator ${i + 1} failed)`}${indexHint}`,
+        `[Directive] Validation failed for "${key}": expected ${st._typeName ?? "unknown"}, got ${typeLabel(value)} ${preview(value)}${i === 0 ? "" : ` (validator ${i + 1} failed)`}${indexHint}${refined ? `. ${refined.message}` : ""}`,
       );
     }
   };

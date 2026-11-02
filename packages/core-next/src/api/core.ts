@@ -182,6 +182,12 @@ export interface SystemContext {
    */
   turn_?: () => void;
   /**
+   * The last step of `initialize()`, after the inits, the plugin's turn,
+   * `initialFacts` and hydrate: fills each fact still `undefined` that
+   * declares a `.default()` ((al), L6c). Set by the defaults part.
+   */
+  fill_?: () => void;
+  /**
    * Runs event `type`'s handler with `event` (a source's publish, L5): false
    * when there is none, after the development warning `dispatch` gives.
    */
@@ -1392,6 +1398,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         });
       }
+      context.fill_?.();
       initializing = false;
       initialized = true;
       for (const id of derivations.keys()) {
