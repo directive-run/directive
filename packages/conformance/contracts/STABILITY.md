@@ -71,6 +71,11 @@ approvedBy, date }`.
   These are `1.35-reads` cases, so a `read-1.35` entry never excuses a write
   1.35.0 reads differently. (The U10 `read-1.35` cases compare the load and
   whether it logged, not the save.)
+- 1.35.0 reads persistence for a rollback through a module with no init
+  (`restoreRun`): what it loaded, and whether it logged. The script's init
+  runs after 1.35.0's restore and overwrites it, so through that init any
+  bytes would read alike. 1.35.0 must restore its own golden exactly as the
+  golden holds it.
 - `direction` is `read-1.35` (the workspace starts on data where 1.35.0 reads
   it, compared with what 1.35.0 makes of the same data) or `1.35-reads`
   (1.35.0 reads what the workspace wrote: rollback). Each case lists the
