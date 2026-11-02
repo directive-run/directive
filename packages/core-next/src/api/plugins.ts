@@ -186,7 +186,20 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
     const manager: PluginManager = {
       list: plugins,
       register(plugin) {
-        const index = plugins.findIndex((p) => p.name === plugin.name);
+        // Not a plugin object (`plugins: [undefined]`): a clear error in
+        // development (P3-F3). Production reads `name` first, so undefined
+        // or null throws 1.35's TypeError ("reading 'name'") here, not a
+        // mangled one at the first hook.
+        if (isDevelopment && (!plugin || typeof plugin !== "object")) {
+          throw Object.assign(
+            new Error(
+              `[Directive] A plugin must be an object such as { name: "my-plugin", onStart() {} }; got ${String(plugin)}. Check the \`plugins\` array for an undefined entry (an import that does not exist, or a factory that was not called).`,
+            ),
+            { code: "E_INVALID_PLUGIN" },
+          );
+        }
+        const { name } = plugin;
+        const index = plugins.findIndex((p) => p.name === name);
         if (index !== -1) {
           console.warn(
             `[Directive] Plugin "${plugin.name}" is already registered, replacing...`,
