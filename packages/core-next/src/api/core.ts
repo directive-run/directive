@@ -47,6 +47,7 @@ import {
   withTracking,
 } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
+import type { SourcesFeature } from "./sources.js";
 import type {
   FactChange,
   Facts,
@@ -167,6 +168,17 @@ export interface SystemContext {
   decide_?: Decide;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
+  /**
+   * Runs event `type`'s handler with `event` (a source's publish, L5): false
+   * when there is none, after the development warning `dispatch` gives.
+   */
+  fire_(type: string, event: SystemEvent): boolean;
+  /** True once `destroy()` has marked the system destroyed. */
+  readonly gone_: boolean;
+  /** Ends the `tickMs` timer (1.35's evict clears it first). */
+  untick_(): void;
+  /** 1.35's engine destroyAsync, which its evict awaits. */
+  down_(): Promise<void>;
   /**
    * Watch a derivation named in declared deps: every invalidation upstream
    * of it wakes the reader, even while it stays stale (nothing computes it
@@ -447,6 +459,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     validate?: (key: string, value: unknown) => void;
     plugins?: Tail;
     errors?: ErrorsFeature;
+    sources?: SourcesFeature;
   };
   // `effect_` from the start: the effects part sets it on its first run, and
   // a field added then would give every hot tracker read a second shape.
@@ -1124,6 +1137,8 @@ export function createSystemCore<const M extends ModuleSchema>(
       } finally {
         effectsOpen = false;
       }
+      // L5: the sources' gates, after the effects phase (engine.ts:1932–1951).
+      features.sources?.gate_();
       let result: Record<string, unknown> | undefined;
       if (l2) {
         // 1.35 awaits constraint evaluation only when it must; the diff,
@@ -1188,11 +1203,14 @@ export function createSystemCore<const M extends ModuleSchema>(
   // and the stop event. stop() runs both at once; stopAsync() awaits between
   // them, so its cleanups run a microtask after the caller's next line.
   /** Ends the run; false when it was not running. */
-  const halt = (): boolean => {
+  const untick = () => {
     if (tickTimer) {
       clock.clearTimeout(tickTimer);
       tickTimer = 0;
     }
+  };
+  const halt = (): boolean => {
+    untick();
     if (!running) {
       return false;
     }
@@ -1204,6 +1222,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     return true;
   };
   const stopped = () => {
+    // Sources detach before the effect cleanups (engine.ts:3473).
+    features.sources?.stop_();
     features.effects?.cleanupAll();
     for (const hooks of hooks_) {
       hooks.onStop?.(system);
@@ -1212,11 +1232,29 @@ export function createSystemCore<const M extends ModuleSchema>(
     // A settle() waiting on the runs just ended hears that they did.
     notifySettle();
   };
+  /** 1.35's dispatchEventByName: false when no handler is registered. */
+  const fire = (type: string, event: SystemEvent): boolean => {
+    const handler = Object.hasOwn(eventDefs, type)
+      ? eventDefs[type]
+      : undefined;
+    if (handler) {
+      store.batch(() => handler(facts, event));
+
+      return true;
+    }
+    if (isDevelopment) {
+      console.warn(
+        `[Directive] Unknown event type "${type}". No handler is registered for this event. Available events: ${Object.keys(eventDefs).join(", ") || "(none)"}`,
+      );
+    }
+
+    return false;
+  };
   /** 1.35's engine stopAsync: the sync half, one await, then the rest. */
   const stopEngineAsync = async () => {
     if (halt()) {
-      // L5: the source unsubscribes are awaited here (1.35's cleanupAllAsync).
-      await Promise.resolve();
+      // The source unsubscribes are awaited here (1.35's cleanupAllAsync).
+      await features.sources?.stopAsync_();
       stopped();
     }
   };
@@ -1347,6 +1385,8 @@ export function createSystemCore<const M extends ModuleSchema>(
       for (const hooks of hooks_) {
         hooks.onStart?.(system);
       }
+      // Sources attach after onStart, before the start event (engine.ts:3361).
+      features.sources?.start_();
       features.reconcile?.start_();
       emit("system.start", { system });
       features.errors?.start_();
@@ -1404,19 +1444,8 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     },
     dispatch(event: SystemEvent) {
-      const type = event.type;
-      if (BLOCKED_PROPS.has(type)) {
-        return;
-      }
-      const handler = Object.hasOwn(eventDefs, type)
-        ? eventDefs[type]
-        : undefined;
-      if (handler) {
-        store.batch(() => handler(facts, event));
-      } else if (isDevelopment) {
-        console.warn(
-          `[Directive] Unknown event type "${type}". No handler is registered for this event. Available events: ${Object.keys(eventDefs).join(", ") || "(none)"}`,
-        );
+      if (!BLOCKED_PROPS.has(event.type)) {
+        fire(event.type, event);
       }
     },
     batch(fn: () => void) {
@@ -1556,6 +1585,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       scheduleReconcile();
     },
     settled: notifySettle,
+    fire_: fire,
+    get gone_() {
+      return destroyed;
+    },
+    untick_: untick,
+    down_: destroyEngineAsync,
     watch: (id) => watched.add(id),
     writers,
     factsFor: (writer, allow) =>

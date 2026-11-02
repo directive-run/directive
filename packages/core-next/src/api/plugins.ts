@@ -74,6 +74,12 @@ const HOOKS: Record<string, string[]> = {
   "resolver.retry": ["onResolverRetry", "resolver", "req", "attempt"],
   "resolver.cancel": ["onResolverCancel", "resolver", "req"],
   "resolver.write.rejected": ["onResolverWriteRejected", "event"],
+  // L5: sources.ts.
+  "source.attach": ["onSourceAttach", "id", "moduleId"],
+  "source.publish": ["onSourcePublish", "id", "moduleId", "eventName"],
+  "source.drop": ["onSourceDrop", "id", "moduleId", "eventName", "reason"],
+  "source.detach": ["onSourceDetach", "id", "moduleId"],
+  "source.error": ["onSourceError", "id", "moduleId", "phase", "error"],
   // L3: system.notify, defined below.
   "guardrail.blocked": [
     "onGuardrailBlocked",

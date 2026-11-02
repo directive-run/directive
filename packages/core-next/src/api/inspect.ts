@@ -5,6 +5,7 @@
  */
 
 import type { ReconcileFeature, SystemPart } from "./core.js";
+import type { SourcesFeature } from "./sources.js";
 
 type Defs = Record<string, { meta?: unknown; _meta?: unknown } | undefined>;
 
@@ -32,6 +33,7 @@ export const withInspect: SystemPart = ({ kernel, module, system }) => {
     const l2 = (
       kernel.features as { reconcile?: ReconcileFeature }
     ).reconcile?.inspect_();
+    const sources = (kernel.features as { sources?: SourcesFeature }).sources;
 
     return {
       unmet: l2?.unmet ?? [],
@@ -47,8 +49,8 @@ export const withInspect: SystemPart = ({ kernel, module, system }) => {
       resolvers: l2?.resolvers ?? {},
       resolverDefs,
       effects: metas(module.effects),
-      sources: [],
-      attachedSourceCount: 0,
+      sources: sources?.rows_() ?? [],
+      attachedSourceCount: sources?.count_() ?? 0,
       derivations: metas(module.derive),
       modules: (module as { modules_?: unknown[] }).modules_ ?? [
         { id: module.id, meta: module.meta },

@@ -19,6 +19,7 @@ import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
 import { withPlugins } from "./plugins.js";
 import { withReconcile } from "./reconcile.js";
+import { withSources } from "./sources.js";
 import type { ModuleSchema, System, SystemOptions } from "./types.js";
 import { withValidation } from "./validate.js";
 
@@ -40,6 +41,8 @@ export function createSystem<const M extends ModuleSchema>(
     withReconcile,
     withInspect,
     withObserve,
+    // L5: in the alpha a module's `sources:` key needs no import (A1).
+    withSources,
     // Last: its onInit pass starts once the system is complete.
     withPlugins(options.plugins),
   ];

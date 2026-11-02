@@ -8,6 +8,7 @@
 import type { KernelEvent } from "../kernel.js";
 import type { SystemPart } from "./core.js";
 import type { StreamPlugin } from "./plugins.js";
+import { localId } from "./sources.js";
 import type { FactChange, ObservationEvent } from "./types.js";
 
 /** The 1.35 observation events for one kernel record (often none). */
@@ -146,6 +147,19 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       const { plugin, screenedCount, screenedDigest, reason } = event;
 
       return [{ type, plugin, screenedCount, screenedDigest, reason }];
+    }
+    // L5: sources.ts, with 1.35's localId; the rest in the order emitted.
+    case "source.attach":
+    case "source.publish":
+    case "source.drop":
+    case "source.detach":
+    case "source.error": {
+      const { at, t, seq, sys, id, moduleId, ...rest } = event as Record<
+        string,
+        any
+      >;
+
+      return [{ type, id, moduleId, localId: localId(id, moduleId), ...rest }];
     }
     default:
       return [];

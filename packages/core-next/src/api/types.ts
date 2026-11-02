@@ -206,6 +206,11 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   /** Load facts before `start()`; they apply after `initialFacts`. */
   hydrate(loader: () => unknown): Promise<void>;
   destroyAsync(): Promise<void>;
+  /**
+   * Every attached source's `onEvict`, then `destroyAsync()`; `deadline` is
+   * epoch milliseconds (L5, with sources).
+   */
+  evict?(deadline?: number): Promise<void>;
   start(): void;
   stop(): void;
   destroy(): void;
