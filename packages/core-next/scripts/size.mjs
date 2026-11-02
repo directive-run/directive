@@ -329,7 +329,8 @@ if (existsSync(dist)) {
 // reported): each bundled for production
 // (`#is-development` inlined as in tsup, NODE_ENV is "production"),
 // minified and gzipped the same way. `@directive-run/core` is pointed at
-// core-next and at packages/core (1.35.x), each with its own build's options.
+// core-next and at packages/core (1.35.x), both with the inlining; only
+// core-next mangles private members, as its own build does.
 const fixtures = new URL("./fixtures/", import.meta.url).pathname;
 const engines = {
   "core-next": {
@@ -497,8 +498,12 @@ async function measure(label, contents, resolveDir, engine, extra = []) {
     conditions: ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
     alias: { "@directive-run/core": engine.entry },
+    // Both engines get the `#is-development` inlining, so each is measured
+    // as its own production build ships (packages/core/tsup.config.ts does
+    // the same transform, with the flag written as `false`). Without it,
+    // esbuild keeps the imported flag live and 1.35 would carry its dev text.
+    plugins: [...extra, inlineIsDevelopment],
     ...(engine.mangleProps ? { mangleProps: engine.mangleProps } : {}),
-    plugins: [...extra, ...(engine.mangleProps ? [inlineIsDevelopment] : [])],
   });
   const bytes = out.outputFiles[0].contents;
   if (engine.mangleProps) {
@@ -509,6 +514,9 @@ async function measure(label, contents, resolveDir, engine, extra = []) {
 
   return { gz, text: `${bytes.length} B min, ${gz} B min+gzip` };
 }
+console.log(
+  "fixtures: core-next and core 1.35 are built the same way (production, #is-development inlined so dev text is stripped, same esbuild options); only core-next's private-member mangling differs, as in each package's own build",
+);
 const minimal = readFileSync(join(fixtures, "minimal.ts"), "utf8");
 for (const [name, engine] of Object.entries(engines)) {
   const m = await measure("minimal", minimal, fixtures, engine);
