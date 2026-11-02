@@ -117,6 +117,7 @@ const ROLE: Record<string, [string, string]> = {
   derive: ["a derivation", "Derivations"],
   constraint: ["a constraint", "Constraints"],
   effect: ["an effect", "Effects"],
+  gate: ["a source gate", "Source gates"],
 };
 
 export function createNamespacedSystem(
@@ -213,10 +214,8 @@ export function createNamespacedSystem(
     });
   /** `self` plus the declared dependencies, for a module with crossModuleDeps. */
   const crossOf = (src: Rec, ns: string, deps: string[], role: string): Rec =>
-    cached(src, `${ns}|${deps.join(",")}|${role}`, () => {
-      const [singular, plural] = ROLE[role]!;
-
-      return hardened({
+    cached(src, `${ns}|${deps.join(",")}|${role}`, () =>
+      hardened({
         get(key) {
           if (key === "self") {
             return factsOf(src, ns);
@@ -233,20 +232,24 @@ export function createNamespacedSystem(
           return undefined;
         },
         set(key) {
-          const id = `cross-module-set|${ns}|${role}|${key}`;
-          if (isDevelopment && !warned.has(id)) {
-            warned.add(id);
-            console.warn(
-              `[Directive] Module "${ns}": ${singular} tried to write "${key}". ${plural} read facts and never write them – change "${key}" from an event handler or a resolver.`,
-            );
+          // The role names are development text: production drops them.
+          if (isDevelopment) {
+            const id = `cross-module-set|${ns}|${role}|${key}`;
+            if (!warned.has(id)) {
+              warned.add(id);
+              const [singular, plural] = ROLE[role]!;
+              console.warn(
+                `[Directive] Module "${ns}": ${singular} tried to write "${key}". ${plural} read facts and never write them – change "${key}" from an event handler or a resolver.`,
+              );
+            }
           }
 
           return false;
         },
         has: (key) => key === "self" || deps.includes(key),
         ownKeys: () => ["self", ...deps],
-      });
-    });
+      }),
+    );
   const scopedFacts = (src: Rec, ns: string, deps: string[], role: string) =>
     deps.length > 0 ? crossOf(src, ns, deps, role) : factsOf(src, ns);
   const deriveOf = (src: Rec, ns: string): Rec => {
@@ -424,6 +427,8 @@ export function createNamespacedSystem(
   const owners: Rec = {};
   const inits: Array<(src: Rec) => void> = [];
   const namespaceKeys = new Map<string, string[]>();
+  /** Each module's crossModuleDeps, for its source gates' facts view. */
+  const gateDeps = new Map<string, string[]>();
   for (const ns of ordered) {
     const mod = modules[ns]!;
     for (const [section, obj] of [
@@ -487,8 +492,10 @@ export function createNamespacedSystem(
       );
       effects[p(key)] = { ...def, run, deps: def.deps?.map(p) };
     }
-    // 1.35's prefixSources: ids become `ns::id` (the gates' scoped facts
-    // view comes with the gates, L5b).
+    // 1.35's prefixSources: ids become `ns::id`; a key or active gate reads
+    // the module's facts through `gate_` below (G6), so the definition is
+    // passed on as it is.
+    gateDeps.set(ns, deps);
     for (const [key, def] of Object.entries(mod.sources ?? {})) {
       sources[p(key)] = def;
     }
@@ -638,6 +645,10 @@ export function createNamespacedSystem(
     },
     modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
     owners_: owners,
+    // A source gate of module `ns` reads `src` as the module's constraints
+    // do: its own facts by bare name, or `self` and its dependencies.
+    gate_: (src: Rec, ns: string) =>
+      scopedFacts(src, ns, gateDeps.get(ns)!, "gate"),
     derive,
     events,
     effects,
