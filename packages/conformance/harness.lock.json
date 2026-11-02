@@ -55,6 +55,7 @@
     "diff/scenarios/l4-effects.test.ts": "96ac3a976687a61500fa9a58bffc1118716ed09de62692ffaa110bc40297de67",
     "diff/scenarios/l4-membership-tests.test.ts": "c3ec31fea7de8e639140a0354d0fa94ce116aebb626679175489d659693666a5",
     "diff/scenarios/l5-sources-gates.test.ts": "6edd2a62eb5a8c6715c98c7ef989d2bf772e4b140390b215f23f1852a4dacdae",
+    "diff/scenarios/l5-sources-leaks.test.ts": "66e84a5bc067cb33093a0f94f336731c1edbc69066af7cb418d8051f7e54d484",
     "diff/scenarios/l5-sources-pins.test.ts": "6581e18baa9c2baf849013a9a7cdfb02ff66d99801660b5ed40149f573c230ca",
     "diff/scenarios/l5-sources.test.ts": "754819bf1a41acec797fc876340c2c76c8b459fccf7c31243e9fd17ac36280d2",
     "diff/scenarios/l6-persistence-schema.test.ts": "7f8017ac55f8b4458ce6212be5751359c543073baaf845991fb80148f5626485",

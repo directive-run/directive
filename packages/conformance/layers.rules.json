@@ -111,6 +111,8 @@
     "evict with a future deadline waits only until the deadline": "L5",
     "evict with no deadline waits for every onEvict": "L5",
     "a return to the old key inside a retry's linger window leaves the source dark": "L5",
+    "a stop inside a source's attach at start ends the attach loop": "L5",
+    "a linger pending at stopAsync attaches nothing during the stop": "L5",
     "t.* refine, transform, brand and wrong types in development": "L6",
     "the persistence plugin restores, saves debounced, and excludes keys": "L6",
     "distributable snapshots": "L6",
