@@ -6,20 +6,20 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 25500,
-      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+      "gzBudget": 27700,
+      "reason": "L5a sources part (A1, owner-approved 2026-11-01: sources live in createSystem in the alpha, raise up to 2.5 KB): measured 27,597 B, +2,108 B over 25,489. By piece: the core seams (start_, gate_, stop_, stopAsync_, fire_, gone_, untick_, down_) +50 B; the part's lifecycle, publish guards and drop reasons, module-scoped publish, attach and teardown errors, async teardown with timeouts, onEvict and system.evict(), and five plugin hook names +1,589 B; inspect().sources rows with their counters and the source.* observations, which the L5 diff scenarios compare, +469 B. Budget = measured + 103 B."
     },
     "two-module": {
-      "gzBudget": 25600,
-      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+      "gzBudget": 27800,
+      "reason": "L5a sources part, as minimal (A1, owner-approved 2026-11-01): measured 27,687 B, +2,115 B over 25,572, the same pieces."
     },
     "floor": {
-      "gzBudget": 10400,
-      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+      "gzBudget": 10450,
+      "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
     },
     "full-entry": {
-      "gzBudget": 27700,
-      "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
+      "gzBudget": 29850,
+      "reason": "L5a sources part, as minimal (A1, owner-approved 2026-11-01): measured 29,733 B, +2,137 B over 27,596, the same pieces."
     }
   }
 }

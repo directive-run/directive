@@ -417,6 +417,7 @@ export function createNamespacedSystem(
   const derive: Rec = {};
   const events: Rec = {};
   const effects: Rec = {};
+  const sources: Rec = {};
   const constraints: Rec = {};
   const resolvers: Rec = {};
   /** Each resolver's module, for its onResolverError hook (1.35). */
@@ -485,6 +486,11 @@ export function createNamespacedSystem(
         def.run,
       );
       effects[p(key)] = { ...def, run, deps: def.deps?.map(p) };
+    }
+    // 1.35's prefixSources: ids become `ns::id` (the gates' scoped facts
+    // view comes with the gates, L5b).
+    for (const [key, def] of Object.entries(mod.sources ?? {})) {
+      sources[p(key)] = def;
     }
     // Constraints (1.35's prefixConstraints): ids, deps, `after` and
     // `abortOn` keys move into the namespace; a function `when` or
@@ -635,6 +641,7 @@ export function createNamespacedSystem(
     derive,
     events,
     effects,
+    sources,
     constraints,
     resolvers,
   } as unknown as ModuleDefinition;
