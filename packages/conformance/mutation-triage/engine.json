@@ -4,9 +4,8 @@
     "col": 36,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L5",
-    "note": "sources: the namespace separator a source's publish is scoped by (a bare name goes to its own module, a name with the separator is a cross-module drop); needs a source() definition (L5, lib/layers.ts 'option sources'). Killed by l5-sources-oracle.test.ts > plugins and a source's lifecycle > hear its attach at start, its publish, and its detach at stop, which unsubscribes it (placed L5). Proved 2026-11-01: with the mutant applied that test fails on conformance:local; the r5 and gate-L5 reports predate the test, so the next run is the first to record the kill."
+    "reason": "not-observable",
+    "note": "harness limit, not a missing test: SOURCE_NAMESPACE_SEPARATOR is a module-load constant (a Stryker static mutant). The per-test run never re-evaluates the module, so it reports Survived at every ceiling, as NO_REQUIREMENT_CHANGES does; the gate=L5 run on 9e1604eb (41362202220) still reported it Survived after l5-sources-oracle.test.ts landed. Applied by hand (\"::\" -> \"\"), every publish is dropped as cross-module and 18 tests at L5 fail on conformance:local, including l5-sources-oracle.test.ts > plugins and a source's lifecycle > hear its attach at start, its publish, and its detach at stop, which unsubscribes it (proved 2026-11-01)."
   },
   {
     "line": 119,
