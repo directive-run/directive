@@ -1,12 +1,15 @@
 /**
- * L5a: a module's `sources`, the lifecycle half of 1.35's sources manager
- * (core/sources.ts, engine.ts:3361–3418, 3473, 3533, 3559–3611): attach at
+ * A module's `sources`, 1.35's sources manager (core/sources.ts,
+ * engine.ts:1932–1951, 3361–3426, 3473, 3533, 3559–3611). L5a: attach at
  * start, publish and its drop reasons, module-scoped publish, attach and
  * teardown errors, async teardown with timeouts, `onEvict` and
- * `system.evict()` (RFC L5 rows A1–A6, P1–P5, V1–V4).
+ * `system.evict()` (RFC L5 rows A1–A6, P1–P5, V1–V4). L5b: the key and
+ * active gates, `gateLingerMs`, the retry after a failed gated attach and
+ * `coalesce` (G1–G6, L1–L3, T1–T3, K1–K3), with the owner-approved
+ * candidates (aa), (ab) and (ac).
  *
- * Not here: gates, linger, retry and coalesce (L5b, through `gate_`); the
- * counters and `inspect().sources` (L9); runtime registration (L10).
+ * Not here: the history-navigation gate skip (L8); runtime registration and
+ * its timer clearing (L10).
  *
  * In the alpha a 1.35 config declares sources with no import, so
  * `createSystem` carries this part (A1, owner-approved 2026-11-01); the
@@ -17,31 +20,59 @@
  *
  * Durations run on the kernel clock. The evict deadline is an epoch time and
  * is compared with Date.now(), never with the clock's now() (RFC L5, C list).
+ * The linger and backoff timers are kernel-clock timers owned by the system,
+ * one per gated source at most, cleared at start, stop and destroy.
  */
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { BLOCKED_PROPS } from "./facts.js";
+import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 
 type Fn = (...args: any[]) => any;
 type Phase = "attach" | "cleanup" | "runtime";
 
-/** A source definition, as far as L5a reads it. */
+/** A source definition, as far as the part reads it. */
 interface Def {
   attach: Fn;
   key?: unknown;
   active?: unknown;
   onEvict?: Fn;
   evictTimeoutMs?: number;
+  gateLingerMs?: number;
+  coalesce?: string;
 }
 
-/** One attach: a fresh record per start, as 1.35's AttachedSource. */
-interface Attached {
+/** Whom a record or a message names. */
+interface Who {
   id_: string;
   module_: string;
+}
+
+/** One attach: a fresh record per attach, as 1.35's AttachedSource. */
+interface Attached extends Who {
   def_: Def;
   off_: Fn;
   detached_: boolean;
+  /** Detached by its gate: a later publish is a `gate-closed` drop (P3). */
+  closed_?: true;
+}
+
+/**
+ * A gated source: 1.35's keyFns, lastKey, lingerTimers and attachRetries
+ * entries in one record. A linger needs a committed key and a retry needs
+ * none (with (aa) a failed attach commits null), so one timer slot serves
+ * both: `to_` is the linger's target or the retry's key.
+ */
+interface Gate extends Who {
+  def_: Def;
+  fn_: Fn;
+  /** The committed key: what is attached, never what was only intended. */
+  key_?: string | null;
+  timer_?: number;
+  to_?: string | null;
+  /** Failed attaches at `to_`; 0 when no retry is owed. */
+  tries_?: number;
 }
 
 /** 1.35's per-source counters, reset at every start. */
@@ -96,26 +127,32 @@ const empty = (): Counters => ({
 const toError = (raw: unknown): Error =>
   raw instanceof Error ? raw : new Error(String(raw));
 
+/** Development: a gate that wrote a fact or changed one in place. */
+const gateError = (id: string, what: string) =>
+  new Error(
+    `[Directive] Source "${id}": its key/active gate ${what}. Gates are pure reads of facts; change facts from an event handler or resolver.`,
+  );
+
 /** 1.35's resolveSourceTimeout: `evictTimeoutMs`, else 5 s. */
 const timeoutOf = (ms: number | undefined): number =>
-  ms === undefined
-    ? 5000
-    : ms === Number.POSITIVE_INFINITY
-      ? ms
-      : !Number.isFinite(ms) || ms <= 0
-        ? 5000
-        : Math.floor(ms);
+  ms === Number.POSITIVE_INFINITY
+    ? ms
+    : ms! > 0 && Number.isFinite(ms)
+      ? Math.floor(ms!)
+      : 5000;
 
 /** The prefix of every attach and teardown message (1.35's text). */
-const who = (rec: Attached) =>
+const who = (rec: Who) =>
   `[Directive] Module "${rec.module_}" → Source "${rec.id_}"`;
 
 export const withSources: SystemPart = (context) => {
-  const { kernel, module, system, fire_, untick_, down_ } = context;
+  const { kernel, module, system, facts, fire_, untick_, down_ } = context;
   const { clock, hooks } = kernel;
   // The namespaced form hands the core `ns::id` sources (namespaced.ts); the
   // owner is the namespace, as 1.35's prefixSources makes it.
   const namespaced = !!(module as { load_?: unknown }).load_;
+  /** The namespaced form's facts view for a module's gates (G6). */
+  const scope = (module as { gate_?: Fn }).gate_;
   const defs = Object.entries((module.sources ?? {}) as Record<string, Def>);
   const ownerOf = (id: string) =>
     namespaced ? id.slice(0, id.indexOf("::")) : module.id;
@@ -142,7 +179,7 @@ export const withSources: SystemPart = (context) => {
   type Tail = { deliver_(e: unknown): void; wants_(at: string): boolean };
   const tail = () => kernel.features.plugins as Tail | undefined;
   /** A source record for plugins, built only when one listens (P1). */
-  const hear = (at: string, rec: Attached, more?: Record<string, unknown>) => {
+  const hear = (at: string, rec: Who, more?: Record<string, unknown>) => {
     if (kernel.disposed ? tail()?.wants_(at) : hooks.wants(at)) {
       const data = { id: rec.id_, moduleId: rec.module_, ...more };
       if (kernel.disposed) {
@@ -159,7 +196,7 @@ export const withSources: SystemPart = (context) => {
     }
   };
   /** 1.35's reportError: plugins get a message cut at 256 characters. */
-  const report = (rec: Attached, phase: Phase, error: Error) => {
+  const report = (rec: Who, phase: Phase | "gate", error: Error) => {
     const m = error.message;
     const message =
       m.length <= 256
@@ -171,13 +208,32 @@ export const withSources: SystemPart = (context) => {
     hear("source.error", rec, {
       phase,
       error:
-        m.length <= 256
+        message === m
           ? error
           : Object.assign(new Error(message), {
               name: error.name,
               stack: error.stack,
             }),
     });
+    // A gate that throws fails closed: the source just never attaches. With
+    // no plugin listening that is invisible, so development says so, once
+    // per source.
+    if (isDevelopment && phase === "gate" && !warned.has(`${rec.id_}|gate`)) {
+      warned.add(`${rec.id_}|gate`);
+      console.warn(
+        `[Directive] Source "${rec.id_}": its key/active gate threw, so the source stays detached: ${message} The error is in inspect().sources and reaches plugins through onSourceError; this warning shows once per source and only in development.`,
+      );
+    }
+  };
+  /** A drop: counted when the source has counters, always heard (1.35). */
+  const drop = (rec: Who, name: string, reason: string) => {
+    const c = counters.get(rec.id_);
+    if (c) {
+      c.dropCount += 1;
+      c.lastDropReason = reason;
+      c.lastDropAt = Date.now();
+    }
+    hear("source.drop", rec, { eventName: name, reason });
   };
 
   /** The engine's guard and dispatch: a drop reason, or none when handled. */
@@ -220,30 +276,26 @@ export const withSources: SystemPart = (context) => {
     ) {
       reason = "unknown-event";
     }
-    // As 1.35: a record from an earlier start has no counters after a
-    // restart, and is not heard.
+    // As 1.35, a publish is counted and heard only while its id has
+    // counters. Every start makes them afresh for each ungated source, so a
+    // live handle from an earlier start (a failed attach's, which no stop
+    // detaches) is counted and heard again; a gated id has none until its
+    // gate opens or fails, and until then is not heard.
     const c = counters.get(rec.id_);
     if (!c) {
       return;
     }
-    const now = Date.now();
     if (reason) {
-      c.dropCount += 1;
-      c.lastDropReason = reason;
-      c.lastDropAt = now;
+      drop(rec, target, reason);
     } else {
       c.publishCount += 1;
-      c.lastPublishAt = now;
+      c.lastPublishAt = Date.now();
+      hear("source.publish", rec, { eventName: target });
     }
-    hear(
-      reason ? "source.drop" : "source.publish",
-      rec,
-      reason ? { eventName: target, reason } : { eventName: target },
-    );
   };
 
-  /** 1.35's attachOne for an ungated source. */
-  const attach = (id: string, def: Def) => {
+  /** 1.35's attachOne: true when attached. A keyed source gets `{ key }`. */
+  const attach = (id: string, def: Def, key?: string): boolean => {
     const rec: Attached = {
       id_: id,
       module_: ownerOf(id),
@@ -253,22 +305,57 @@ export const withSources: SystemPart = (context) => {
     };
     // Counters first, so a publish inside attach is counted.
     of(id);
+    // Through a detached record a publish is dropped: as `gate-closed` after
+    // its gate closed, silently after a stop (P3).
+    const inner = (name: string, payload?: unknown) => {
+      if (!rec.detached_) {
+        deliver(rec, name, payload);
+      } else if (rec.closed_) {
+        drop(rec, name, "gate-closed");
+      }
+    };
+    let publish = inner;
+    if (def.coalesce === "lastWriteWins") {
+      // K1: one pending payload per event name until a microtask; a second
+      // publish of the name replaces it, as a `coalesced` drop, and the
+      // flush keeps first-publish order. The buffer lives in this closure,
+      // so a re-key starts empty (K2).
+      let pending: Map<string, unknown> | undefined;
+      publish = (name, payload) => {
+        if (rec.detached_) {
+          inner(name);
+        } else if (pending) {
+          if (pending.has(name)) {
+            drop(rec, name, "coalesced");
+          }
+          pending.set(name, payload);
+        } else {
+          const queued = (pending = new Map([[name, payload]]));
+          queueMicrotask(() => {
+            pending = undefined;
+            // (ab): a payload still pending when its gate closed is a
+            // `gate-closed` drop, heard after the detach; after a stop it
+            // stays silent (1.35 drops them all uncounted, K3).
+            for (const [n, p] of queued) {
+              inner(n, p);
+            }
+          });
+        }
+      };
+    }
     try {
       // The record exists before attach runs, so a publish made inside it
       // is dispatched; a failed attach never detaches, so its handle stays
       // live (A2, A3).
-      const off = def.attach(
-        (name: string, payload?: unknown) => {
-          if (!rec.detached_) {
-            deliver(rec, name, payload);
-          }
-        },
-        (error: unknown) => {
-          if (!rec.detached_) {
-            report(rec, "runtime", toError(error));
-          }
-        },
-      );
+      const fail = (error: unknown) => {
+        if (!rec.detached_) {
+          report(rec, "runtime", toError(error));
+        }
+      };
+      const off =
+        key === undefined
+          ? def.attach(publish, fail)
+          : def.attach(publish, fail, { key });
       if (typeof off !== "function") {
         const err = new Error(
           off !== null &&
@@ -280,7 +367,7 @@ export const withSources: SystemPart = (context) => {
         console.error(err);
         report(rec, "attach", err);
 
-        return;
+        return false;
       }
       rec.off_ = off;
       attached.push(rec);
@@ -289,17 +376,24 @@ export const withSources: SystemPart = (context) => {
       c.attachedAt = Date.now();
       c.detachedAt = null;
       hear("source.attach", rec);
+
+      return true;
     } catch (raw) {
       const error = toError(raw);
       console.error(`${who(rec)} attach() threw:`, error);
       report(rec, "attach", error);
+
+      return false;
     }
   };
 
   /** A teardown step that threw (1.35's cleanupAll and cleanupAllAsync). */
   const failed = (rec: Attached, raw: unknown) => {
     const error = toError(raw);
-    console.error(`${who(rec)} unsubscribe threw:`, error);
+    console.error(
+      `${who(rec)} unsubscribe threw${rec.closed_ ? " during gate-closed" : ""}:`,
+      error,
+    );
     report(rec, "cleanup", error);
   };
   /** Flags the record, then plugins hear the detach before the unsubscribe. */
@@ -307,6 +401,196 @@ export const withSources: SystemPart = (context) => {
     rec.detached_ = true;
     hear("source.detach", rec);
     of(rec.id_).detachedAt = Date.now();
+  };
+  /** A synchronous detach: flag, hear, then unsubscribe (a promise not awaited). */
+  const unsubscribe = (rec: Attached) => {
+    detach(rec);
+    try {
+      rec.off_();
+    } catch (raw) {
+      failed(rec, raw);
+    }
+  };
+
+  // --- gates (G1–G6, L1–L3, T1–T3) ---------------------------------------
+  const gates: Gate[] = [];
+  /** The ungated sources, which start attaches in declaration order. */
+  const ungated: [string, Def][] = [];
+  for (const [id, def] of defs) {
+    const { key, active } = def;
+    const on = typeof active === "function";
+    if (on || typeof key === "function") {
+      if (typeof key === typeof active) {
+        throw new Error(
+          `[Directive] Source "${id}" declares both \`key\` and \`active\`. Use ONE: \`key\` for identity-based re-keying (returns a string | null), \`active\` for a simple on/off gate (returns a boolean).`,
+        );
+      }
+      // The rest of the state is set by `end()`, which every start runs.
+      gates.push({
+        id_: id,
+        module_: ownerOf(id),
+        def_: def,
+        // Strictly `=== true`: a truthy non-boolean must not open a channel.
+        fn_: on
+          ? (f: unknown) => ((active as Fn)(f) === true ? "__on__" : null)
+          : (key as Fn),
+      });
+    } else {
+      ungated.push([id, def]);
+    }
+  }
+  const disarm = (gate: Gate) => {
+    clock.clearTimeout(gate.timer_!);
+    gate.timer_ = 0;
+  };
+  /** The kernel-clock timer of `gate`, owned by the system: one at a time. */
+  const arm = (gate: Gate, ms: number, fn: () => void) => {
+    disarm(gate);
+    gate.timer_ = clock.setTimeout(
+      () => {
+        gate.timer_ = 0;
+        fn();
+      },
+      ms,
+      { owner: kernel.owner },
+    );
+  };
+  /**
+   * 1.35's runTeardownAndReattach: the committed key's subscription goes
+   * (detachOne, `gate-closed`; none on a rising edge, as nothing is
+   * attached under a null key), then commitAttach: attach under `k`, or
+   * commit null, and record the result. A failed attach owes a retry,
+   * 250 ms doubling to 30 s, held off while that backoff runs; a retry owed
+   * for another key never holds this one. (aa): the failure commits null,
+   * so the retry, and a return to an old key, is a rising edge. (ac): the
+   * backoff ends on a clock timer that evaluates this gate.
+   */
+  const commit = (gate: Gate, k: string | null | undefined) => {
+    const rec = attached.find((r) => !r.detached_ && r.id_ === gate.id_);
+    if (rec) {
+      rec.closed_ = true;
+      unsubscribe(rec);
+      attached.splice(attached.indexOf(rec), 1);
+      live.delete(rec.id_);
+    }
+    if (k != null) {
+      const again = gate.tries_ && gate.to_ === k;
+      if (again && gate.timer_) {
+        return;
+      }
+      if (!attach(gate.id_, gate.def_, k)) {
+        gate.tries_ = again ? gate.tries_! + 1 : 1;
+        gate.key_ = null;
+        gate.to_ = k;
+        // Not while a stopAsync awaits its teardown (phase "stopped").
+        arm(
+          gate,
+          Math.min(250 * 2 ** (gate.tries_ - 1), 30_000),
+          () => phase === "attached" && evaluate(gate),
+        );
+
+        return;
+      }
+    }
+    gate.key_ = k;
+    gate.tries_ = 0;
+    disarm(gate);
+  };
+  /**
+   * Development: the read-only view gates read through (G5), and the gate
+   * being evaluated, for the refused-write message.
+   */
+  let dev: { check_: CheckedReadView<object>; id_: string | null } | undefined;
+  /** 1.35's evaluateGated for one gate: fail closed, then follow the edge. */
+  const evaluate = (gate: Gate) => {
+    let k: string | null = null;
+    try {
+      const fn = gate.fn_;
+      let raw: unknown;
+      if (isDevelopment) {
+        if (!dev) {
+          const refuse = (key: string): never => {
+            throw gateError(dev!.id_ ?? "<unknown>", `wrote "${key}"`);
+          };
+          const readonlyStore = Object.freeze({
+            ...context.store,
+            set: refuse,
+            delete: refuse,
+          });
+          dev = {
+            id_: null,
+            check_: createCheckedReadView(facts as object, refuse, {
+              override: (prop) =>
+                prop === "$store" ? readonlyStore : undefined,
+            }),
+          };
+        }
+        const { check_ } = dev;
+        dev.id_ = gate.id_;
+        let changed: string | null;
+        try {
+          raw = fn(scope ? scope(check_.view, gate.module_) : check_.view);
+        } finally {
+          dev.id_ = null;
+          // Always taken, so a gate that throws leaves nothing recorded
+          // for the next one to be blamed for.
+          changed = check_.takeMutation();
+        }
+        if (changed !== null) {
+          throw gateError(gate.id_, `changed "${changed}" in place`);
+        }
+      } else {
+        raw = fn(scope ? scope(facts, gate.module_) : facts);
+      }
+      if (raw !== null && typeof raw !== "string") {
+        throw new Error(
+          `gate returned ${raw === undefined ? "undefined" : typeof raw} — must return string | null`,
+        );
+      }
+      k = raw;
+    } catch (raw) {
+      report(gate, "gate", toError(raw));
+    }
+    const committed = gate.key_;
+    const ms = gate.def_.gateLingerMs!;
+    if (gate.timer_ && committed !== null) {
+      // A linger in flight, committed → to_: a return cancels it, the same
+      // target leaves it running, and a third key tears the committed one
+      // down at once (L2; commit ends the timer).
+      if (k === committed) {
+        disarm(gate);
+      } else if (k !== gate.to_) {
+        commit(gate, k);
+      }
+    } else if (k !== committed) {
+      // (aa): a committed key is attached, so an unchanged key owes nothing.
+      if (committed !== null && ms > 0) {
+        // A fall or a re-key lingers: the committed key stays until the
+        // timer. A rising edge never lingers.
+        gate.to_ = k;
+        arm(gate, ms, () => commit(gate, gate.to_));
+      } else {
+        commit(gate, k);
+      }
+    }
+  };
+  /** Every gate, while attached (1.35's evaluateGated). */
+  const gate = () => {
+    if (phase === "attached") {
+      for (const g of gates) {
+        evaluate(g);
+      }
+    }
+  };
+  /** The end of an attach cycle: no list, and no gate state or timer. */
+  const end = () => {
+    attached = [];
+    live = new Set();
+    for (const g of gates) {
+      disarm(g);
+      g.key_ = null;
+      g.tries_ = 0;
+    }
   };
 
   /**
@@ -388,41 +672,31 @@ export const withSources: SystemPart = (context) => {
         const moduleId = ownerOf(id);
         const c = counters.get(id) ?? empty();
 
+        // The counters in their own order, which is 1.35's row order.
         return {
           id,
           moduleId,
           localId: localId(id, moduleId),
           meta: (def as { meta?: unknown }).meta,
           attached: live.has(id),
-          attachedAt: c.attachedAt,
-          detachedAt: c.detachedAt,
-          publishCount: c.publishCount,
-          lastPublishAt: c.lastPublishAt,
-          dropCount: c.dropCount,
-          lastDropReason: c.lastDropReason,
-          lastDropAt: c.lastDropAt,
-          errorCount: c.errorCount,
-          lastError: c.lastError,
+          ...c,
         };
       }),
     count_: () => attached.filter((rec) => !rec.detached_).length,
     start_() {
-      // 1.35's attachAll: a fresh list and fresh counters each start; gated
-      // sources are left to the gate evaluation (L5b), so the attach order
-      // is ungated first.
-      attached = [];
-      live = new Set();
+      // 1.35's attachAll: a fresh list, fresh counters and fresh gate state
+      // each start. The ungated sources attach first; then every gate is
+      // evaluated once (engine.ts:3426), so a source whose gate is open at
+      // start is attached when start() returns.
+      end();
       counters.clear();
       phase = "attached";
-      for (const [id, def] of defs) {
-        if (typeof def.key !== "function" && typeof def.active !== "function") {
-          attach(id, def);
-        }
+      for (const [id, def] of ungated) {
+        attach(id, def);
       }
+      gate();
     },
-    gate_() {
-      // L5b: the key and active gates.
-    },
+    gate_: gate,
     // Reverse attach order. A promise from unsubscribe is not awaited here.
     stop_() {
       if (phase !== "attached") {
@@ -431,18 +705,11 @@ export const withSources: SystemPart = (context) => {
       phase = "stopped";
       for (let i = attached.length - 1; i >= 0; i--) {
         const rec = attached[i];
-        if (!rec || rec.detached_) {
-          continue;
-        }
-        detach(rec);
-        try {
-          rec.off_();
-        } catch (raw) {
-          failed(rec, raw);
+        if (rec && !rec.detached_) {
+          unsubscribe(rec);
         }
       }
-      attached = [];
-      live = new Set();
+      end();
     },
     // Reverse attach order; each unsubscribe awaited, capped by its timeout.
     async stopAsync_() {
@@ -471,8 +738,7 @@ export const withSources: SystemPart = (context) => {
           failed(rec, raw);
         }
       }
-      attached = [];
-      live = new Set();
+      end();
     },
   });
 

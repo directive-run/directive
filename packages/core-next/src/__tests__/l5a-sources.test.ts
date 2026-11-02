@@ -5,8 +5,8 @@
  *
  * - attach, evict and stop follow attach order, not declaration order: a
  *   gated source declared first is left to the gates, so the ungated ones
- *   attach first, and stop detaches in reverse (each detach heard before its
- *   unsubscribe). L5b adds the gated source's own attach to the same list.
+ *   attach first and the gated one after them (L5b), and stop detaches in
+ *   reverse (each detach heard before its unsubscribe).
  * - an attach that returns a Promise is an attach error with no
  *   onSourceAttach, but its publish handle still dispatches, and since the
  *   source was never attached, stop never flips it to detached.
@@ -103,11 +103,13 @@ describe("attach order", () => {
     } as any);
     system.start();
     await system.settle();
-    // g1 is the gates' to attach (L5b): never before the ungated ones.
-    expect(order).toEqual(["attach u2", "attach u3"]);
+    // g1 is the gates' to attach: after the ungated ones (review probe R1).
+    expect(order).toEqual(["attach u2", "attach u3", "attach g1"]);
     order.length = 0;
     system.stop();
     expect(order).toEqual([
+      "detach g1",
+      "unsubscribe g1",
       "detach u3",
       "unsubscribe u3",
       "detach u2",
@@ -133,6 +135,8 @@ describe("attach order", () => {
     expect(order).toEqual([
       "evict u2",
       "evict u3",
+      "evict g1",
+      "unsubscribe g1",
       "unsubscribe u3",
       "unsubscribe u2",
     ]);
