@@ -119,6 +119,8 @@
     "distributable snapshots": "L12",
     "every t.* builder accepts good writes and refuses bad ones": "L6",
     "schema introspection: kinds and operators": "L6",
+    "a .default(): a fact init leaves alone, one a ??= init sets, one it sets to undefined (U11)": "L6",
+    "a .default() with initialFacts: one they give, one they leave out (U11)": "L6",
     "snapshot and restore round-trip, with reconcile after restore": "L6",
     "restore() with an unknown key or a bad value is half-applied in development": "L6",
     "a persisted fact loses to an init that sets it, and survives ??= and a read": "L6",

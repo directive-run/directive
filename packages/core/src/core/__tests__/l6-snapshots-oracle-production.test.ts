@@ -73,7 +73,7 @@ describe("a snapshot in production (U1)", () => {
 });
 
 describe("the t.* corners in production (U11, U12)", () => {
-  it("a refine and a type check do not run; .default() is not applied", () => {
+  it("a refine and a type check do not run", () => {
     const system: any = createSystem({
       module: createModule("m", {
         schema: {
@@ -101,11 +101,17 @@ describe("the t.* corners in production (U11, U12)", () => {
     system.facts.flag = false;
     expect(system.facts.c).toBe(3);
     expect(system.facts.flag).toBe(false);
-    expect(system.facts.v).toBeUndefined();
-    expect(Object.keys(system.getSnapshot().facts).sort()).toEqual([
-      "c",
-      "flag",
-    ]);
+    // Whether .default() fills v is row (al): 1.35 never applies a default,
+    // in either build (it has no code that would), and 2.0 does. Not pinned
+    // here; the diff scenarios "a .default(): a fact init leaves alone, one a
+    // ??= init sets, one it sets to undefined (U11)" and "a .default() with
+    // initialFacts: one they give, one they leave out (U11)" record the
+    // difference (the diff runs development builds), and the L6 gate signs it.
+    expect(
+      Object.keys(system.getSnapshot().facts)
+        .filter((k) => k !== "v")
+        .sort(),
+    ).toEqual(["c", "flag"]);
   });
 });
 
