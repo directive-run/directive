@@ -28,6 +28,7 @@ import {
   partLayer,
   partRuns,
   persistRun,
+  persistenceWrite,
   producePart,
   readGoldens,
   readPart,
@@ -624,6 +625,145 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
       expect(covered, what).toMatch(ROLLBACK_FAILS);
       expect(covered, what).toMatch(RESAVE_FAILS);
     }
+  });
+
+  /** Edits each save, seeing what the plugin loaded (null from empty storage). */
+  const editsSave = (
+    edit: (saved: string, loaded: string | null) => string,
+    base: Engine = local,
+  ): Engine => ({
+    ...base,
+    name: "v2",
+    plugins: {
+      ...base.plugins,
+      persistencePlugin: (options: { storage: Storage; key: string }) => {
+        const loaded = options.storage.getItem(options.key);
+
+        return base.plugins.persistencePlugin({
+          ...options,
+          storage: {
+            getItem: (k: string) => options.storage.getItem(k),
+            removeItem: (k: string) => options.storage.removeItem(k),
+            setItem: (k: string, v: string) =>
+              options.storage.setItem(k, edit(v, loaded)),
+          },
+        });
+      },
+    },
+  });
+  const dropLabel = (v: string) => {
+    const { label: _, ...rest } = JSON.parse(v);
+
+    return JSON.stringify(rest);
+  };
+  /** Drops label from a save made after a load and a change. */
+  const dropsLabelAfterLoadChange = (base: Engine = local) =>
+    editsSave(
+      (v, loaded) => (loaded === null || v === loaded ? v : dropLabel(v)),
+      base,
+    );
+  /** Drops label from a save made after a load, when the module has an init. */
+  const dropsLabelWithInit = (base: Engine = local): Engine => {
+    let init = false;
+    const edited = editsSave(
+      (v, loaded) => (loaded === null || !init ? v : dropLabel(v)),
+      base,
+    );
+
+    return {
+      ...edited,
+      core: {
+        ...edited.core,
+        createModule: (id: string, def: Record<string, unknown>) => {
+          init = typeof def.init === "function";
+
+          return edited.core.createModule(id, def);
+        },
+      },
+    };
+  };
+  const WRITE_FAILS =
+    /1\.35\.0 reads the workspace's save after a load and a write differently from its own/;
+
+  it("checkGoldens: 1.35.0 restores the workspace's save after a load and a write, whatever read-1.35 entry covers the read", async () => {
+    const saved = readGoldens(goldenDir)["persistence-saved.golden"];
+    // 1.35.0's own save after the write: the golden's values, count written.
+    expect((await persistenceWrite(v1, local, saved)).ours).toEqual({
+      restored: { count: 3, label: "middle", tags: ["a", { nested: [1, 2] }] },
+      logged: false,
+    });
+    // An honest workspace passes: 1.x's order, and (ai)'s.
+    expect(await persistence(local, [])).toEqual([]);
+    expect(await persistence(keepsRestored(), [entry()])).toEqual([]);
+    const standIns: [string, (base?: Engine) => Engine][] = [
+      ["drops label after a load and a change", dropsLabelAfterLoadChange],
+      ["drops label after a load, with an init", dropsLabelWithInit],
+    ];
+    for (const [what, standIn] of standIns) {
+      // Only this case sees it, with no entry or under a signed read-1.35
+      // entry covering the read.
+      for (const out of [
+        await persistence(standIn(), []),
+        await persistence(standIn(keepsRestored()), [entry()]),
+      ]) {
+        expect(out.join("\n"), what).toMatch(WRITE_FAILS);
+        expect(
+          out.filter((f) => !WRITE_FAILS.test(f)),
+          what,
+        ).toEqual([]);
+      }
+    }
+    // Each step is needed: with no write, the change-only drop saves what
+    // 1.35.0 saves; with no init, the init-only drop does.
+    const noWrite = await persistenceWrite(
+      v1,
+      dropsLabelAfterLoadChange(),
+      saved,
+      { init: true, write: false },
+    );
+    expect(noWrite.theirs).toEqual(noWrite.ours);
+    const noInit = await persistenceWrite(v1, dropsLabelWithInit(), saved, {
+      init: false,
+      write: true,
+    });
+    expect(noInit.theirs).toEqual(noInit.ours);
+  });
+
+  it("checkGoldens: a 1.35.0 that restores its own persistence golden other than as the golden holds it fails", async () => {
+    // Its load reads count as 9; with storage empty (the script) it writes
+    // exactly the goldens, and through the script's init it reads alike.
+    const misreads: Engine = {
+      ...v1,
+      plugins: {
+        ...v1.plugins,
+        persistencePlugin: (options: { storage: Storage }) =>
+          v1.plugins.persistencePlugin({
+            ...options,
+            storage: {
+              getItem: (k: string) => {
+                const v = options.storage.getItem(k);
+
+                return v === null
+                  ? v
+                  : JSON.stringify({ ...JSON.parse(v), count: 9 });
+              },
+              removeItem: (k: string) => options.storage.removeItem(k),
+              setItem: (k: string, v: string) => options.storage.setItem(k, v),
+            },
+          }),
+      },
+    };
+    const out = await checkGoldens(
+      goldenDir,
+      misreads,
+      local,
+      [],
+      ["persistence"],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(
+      /^1\.35\.0 does not restore its own persistence golden as the golden holds it: \{"restored":\{"count":9,/,
+    );
   });
 
   it("checkGoldens: 1.35.0 imports what the workspace exports over 1.35.0's history, whatever read-1.35 entry covers the read", async () => {

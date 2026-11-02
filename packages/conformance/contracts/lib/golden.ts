@@ -214,12 +214,19 @@ function memoryStorage(initial: Record<string, string> = {}) {
 }
 
 /**
- * The script's module. `withInit: false` is the persistence rollback's
- * reader (`restoreRun`): on 1.35.0 the plugin restores before the init runs
- * (the bug (ai) fixed), so through this init 1.35.0 ends at the init's values
- * whatever the saved bytes say.
+ * The script's module, with one of three inits:
+ * - `"script"`, the script's: on 1.35.0 the plugin restores before the init
+ *   runs (the bug (ai) fixed), so through this init 1.35.0 ends at the init's
+ *   values whatever the saved bytes say;
+ * - `"none"`, the persistence rollback's reader (`restoreRun`): the facts are
+ *   exactly what the load restored;
+ * - `"keeps"`, the same values with `??=`, which keep a restored value: the
+ *   workspace's module in the "persistence write" case (`persistenceWrite`).
  */
-function counterModule(engine: Engine, withInit = true) {
+function counterModule(
+  engine: Engine,
+  init: "script" | "none" | "keeps" = "script",
+) {
   const { createModule, t } = engine.core;
 
   return createModule("counter", {
@@ -229,7 +236,7 @@ function counterModule(engine: Engine, withInit = true) {
       events: {},
       requirements: {},
     },
-    ...(withInit
+    ...(init === "script"
       ? {
           init: (facts: Record<string, unknown>) => {
             facts.count = 0;
@@ -237,7 +244,15 @@ function counterModule(engine: Engine, withInit = true) {
             facts.tags = [];
           },
         }
-      : {}),
+      : init === "keeps"
+        ? {
+            init: (facts: Record<string, unknown>) => {
+              facts.count ??= 0;
+              facts.label ??= "start";
+              facts.tags ??= [];
+            },
+          }
+        : {}),
     derive: {
       doubled: (facts: { count: number }) => facts.count * 2,
     },
@@ -390,6 +405,9 @@ export async function scriptFacts(
   });
 }
 
+/** The "persistence write" case's one write after the load: `count`, so every other key the save holds is the load's. */
+const WRITE = 3;
+
 /** What a system started on saved persistence bytes restored, and saved next. */
 export interface RestoreRun {
   /** The facts the load put in the store, before anything else wrote. */
@@ -406,10 +424,13 @@ export interface RestoreRun {
  * what the load restored. A development build rejects an unknown key part
  * way through a restore, keeping the keys before it, so whether it logged is
  * part of the read. `saved` is what it writes over that data on destroy.
+ * `steps` adds the "persistence write" case's steps (`persistenceWrite`):
+ * the `??=` init, and `WRITE` after the load.
  */
 export async function restoreRun(
   engine: Engine,
   saved: string,
+  steps: { init?: boolean; write?: boolean } = {},
 ): Promise<RestoreRun> {
   return withFixedClock(async () => {
     const storage = memoryStorage({ golden: saved });
@@ -422,7 +443,7 @@ export async function restoreRun(
     console.warn = capture;
     try {
       const system = engine.core.createSystem({
-        module: counterModule(engine, false),
+        module: counterModule(engine, steps.init ? "keeps" : "none"),
         plugins: [
           engine.plugins.persistencePlugin({
             storage,
@@ -434,6 +455,10 @@ export async function restoreRun(
       system.start();
       await system.settle();
       const restored = JSON.parse(JSON.stringify(system.getSnapshot().facts));
+      if (steps.write) {
+        system.facts.count = WRITE;
+        await system.settle();
+      }
       system.destroy();
 
       return {
@@ -446,6 +471,42 @@ export async function restoreRun(
       console.warn = real.warn;
     }
   });
+}
+
+/**
+ * The "persistence write" case (direction `1.35-reads`): a save made after
+ * a load and a write, the path no other persistence case takes. The
+ * workspace (`local`) starts on 1.35.0's golden with the `??=` init, writes
+ * `WRITE` and saves; 1.35.0 starts on the same golden with no init, makes
+ * the same write and saves. `theirs` and `ours` are 1.35.0's reads of the
+ * two saves (`readBack`), and must match.
+ *
+ * Why the workspace's held state is 1.35.0's no-init restore: the golden
+ * holds every key the init sets, and `??=` keeps a restored value. Under
+ * (ai) the init runs and the load then overwrites it; on 1.35.0's order the
+ * load runs first and the init keeps it. Either way the store holds the
+ * golden's values before the write, as 1.35.0's no-init restore does, so an
+ * honest workspace saves what 1.35.0 saves and needs no entry. (The script's
+ * own init would overwrite the load on 1.35.0's order; that order is (ai),
+ * judged by the `read-1.35` read.) A workspace that saves differently only
+ * once it has loaded and changed something, or only when its module has an
+ * init, shows here and nowhere else. `steps` drops a step, for the
+ * self-tests that show each one is needed.
+ */
+export async function persistenceWrite(
+  v1: Engine,
+  local: Engine,
+  saved: string,
+  steps: { init: boolean; write: boolean } = { init: true, write: true },
+): Promise<{ theirs: unknown; ours: unknown }> {
+  const file = "persistence-saved.golden";
+  const mine = await restoreRun(local, saved, steps);
+  const own = await restoreRun(v1, saved, { write: steps.write });
+
+  return {
+    theirs: await readBack(v1, { [file]: mine.saved }, "persistence"),
+    ours: await readBack(v1, { [file]: own.saved }, "persistence"),
+  };
 }
 
 /**
@@ -716,6 +777,12 @@ export const GOLDEN_CASES = {
     directions: ["1.35-reads"],
     engines: ["v2", "v2:dist"],
   },
+  /** checkGoldens: 1.35.0 restores what the workspace saves after loading 1.35.0's save through an init and making one write (`persistenceWrite`). */
+  "persistence write": {
+    part: "persistence",
+    directions: ["1.35-reads"],
+    engines: ["v2", "v2:dist"],
+  },
   /** checkEnvelope: today's flat format stored, either build. */
   "U10 flat": {
     part: "persistence",
@@ -972,7 +1039,10 @@ function readCase(part: GoldenPart): GoldenCase | undefined {
  *   restore its own golden exactly as the golden holds it.
  * The persistence re-save is what each engine saves after `restoreRun` on
  * 1.35.0's golden: the restore and the save, with no init in between (the
- * init's order is (ai), judged by the `read-1.35` read).
+ * init's order is (ai), judged by the `read-1.35` read). The persistence
+ * write is what each saves after a load and one write, the workspace's
+ * through an init (case "persistence write", direction `1.35-reads`,
+ * `persistenceWrite`).
  * A signed `goldenChanges` entry for a case, direction and `local.name`
  * replaces 1.35.0's value there with the entry's `expected2` (`judge`);
  * every entry is validated on every call (`checkGoldenChanges`).
@@ -1030,6 +1100,22 @@ export async function checkGoldens(
           await readBack(v1, { [file]: localWrote[part] }, part),
           await readBack(v1, { [file]: v1Wrote[part] }, part),
           `1.35.0 reads what the workspace writes over 1.35.0's ${part} differently from its own`,
+        ),
+      );
+    }
+    if (part === "persistence") {
+      const { theirs, ours } = await persistenceWrite(v1, local, saved);
+      failures.push(
+        ...judge(
+          usable,
+          {
+            case: "persistence write",
+            direction: "1.35-reads",
+            engine: local.name,
+          },
+          theirs,
+          ours,
+          "1.35.0 reads the workspace's save after a load and a write differently from its own",
         ),
       );
     }
