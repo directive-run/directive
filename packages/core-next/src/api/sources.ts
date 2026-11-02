@@ -6,7 +6,9 @@
  * `system.evict()` (RFC L5 rows A1–A6, P1–P5, V1–V4). L5b: the key and
  * active gates, `gateLingerMs`, the retry after a failed gated attach and
  * `coalesce` (G1–G6, L1–L3, T1–T3, K1–K3), with the owner-approved
- * candidates (aa), (ab) and (ac).
+ * candidates (aa), (ab) and (ac). L5c: the two leak fixes, (ad) a stop
+ * inside an attach ends the attach loop and detaches that source too, and
+ * (ae) stopAsync clears the gate timers before its first await.
  *
  * Not here: the history-navigation gate skip (L8); runtime registration and
  * its timer clearing (L10).
@@ -376,6 +378,12 @@ export const withSources: SystemPart = (context) => {
       c.attachedAt = Date.now();
       c.detachedAt = null;
       hear("source.attach", rec);
+      if (phase !== "attached") {
+        // (ad): a stop ran inside this attach, before its unsubscribe
+        // existed, so the stop's detach could not reach it: it goes now.
+        unsubscribe(rec);
+        live.delete(id);
+      }
 
       return true;
     } catch (raw) {
@@ -574,10 +582,13 @@ export const withSources: SystemPart = (context) => {
       }
     }
   };
-  /** Every gate, while attached (1.35's evaluateGated). */
+  /**
+   * Every gate, while attached (1.35's evaluateGated). (ad): a stop inside a
+   * gated attach ends the pass.
+   */
   const gate = () => {
-    if (phase === "attached") {
-      for (const g of gates) {
+    for (const g of gates) {
+      if (phase === "attached") {
         evaluate(g);
       }
     }
@@ -692,6 +703,10 @@ export const withSources: SystemPart = (context) => {
       counters.clear();
       phase = "attached";
       for (const [id, def] of ungated) {
+        // (ad): a stop inside an attach ends the loop.
+        if (phase !== "attached") {
+          break;
+        }
         attach(id, def);
       }
       gate();
@@ -717,6 +732,9 @@ export const withSources: SystemPart = (context) => {
         return;
       }
       phase = "stopped";
+      // (ae): the linger and backoff timers go before the first await, so
+      // none fires into the teardown and attaches what nothing unsubscribes.
+      gates.forEach(disarm);
       for (let i = attached.length - 1; i >= 0; i--) {
         const rec = attached[i];
         if (!rec || rec.detached_) {
