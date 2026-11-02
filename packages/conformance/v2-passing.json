@@ -949,6 +949,9 @@
         "what counts as a chain > a chain whose every pass also carries a write made outside the effects is never cut",
         "what counts as a chain > a long run of ordinary writes, each answered by an effect's write, is never cut"
       ],
+      "tests/core/l3-engine-oracle-evict.test.ts": [
+        "start() while evict() is running > is ignored: the system does not start"
+      ],
       "tests/core/l3-engine-oracle-inspect.test.ts": [
         "inspect() lists the definitions > lists each constraint, with abortOn only when it names facts",
         "inspect() lists the definitions > names every fact, event, derivation, effect and module",
@@ -1059,6 +1062,8 @@
         "a resolver's ctx.deps > lists the declared dependencies, and each one's facts",
         "a resolver's ctx.deps > reports an in-place change made before the dependency is read again",
         "a resolver's ctx.deps > reports an in-place change to the second dependency read",
+        "a source gate in a composed system > reads the module's own facts by bare name, and reflects them",
+        "a source gate in a composed system > with crossModuleDeps reads under self and the dependency's name",
         "a view of a composed system refuses a symbol-keyed write > throws on assign and on delete"
       ],
       "tests/core/l3-proxies-oracle-transform.test.ts": [
@@ -1246,11 +1251,76 @@
         "an async auto-tracked effect > depends only on what it read before its first await",
         "an auto-tracked effect's dependencies > stay those of the last good run when a run throws"
       ],
+      "tests/core/l5-sources-oracle-gates.test.ts": [
+        "a key gate > gives a re-keyed source an empty coalesce buffer: the new key's first publish is not coalesced against the old key's",
+        "a key gate > passes the key to attach, and a re-key tears the old subscription down before attaching the new one",
+        "a key gate > that returns neither a string nor null fails closed with phase gate, and attaches nothing",
+        "a key gate > that throws fails closed: the source detaches and the error is reported with phase gate",
+        "an active gate > attaches nothing before it first opens, attaches on its rising edge, and unsubscribes when it closes",
+        "an active gate > drops a publish made through the handle after the gate closed, as gate-closed",
+        "an active gate > is the same as the key form that returns a fixed key when open and null when closed",
+        "an active gate > that returns a truthy non-boolean fails closed; exactly true attaches",
+        "an ungated source > attaches once at start with no gate context, and fact writes never attach it again",
+        "coalesce > \"all\", and no coalesce option, dispatch every publish at once",
+        "coalesce > lastWriteWins coalesces per event name, and flushes in first-publish order",
+        "coalesce > lastWriteWins dispatches only the last of a burst, after the current task, and each superseded publish is a coalesced drop",
+        "gateLingerMs > cancels the teardown when the gate opens again inside the window",
+        "gateLingerMs > defers a re-key's teardown and attach to the end of the window",
+        "gateLingerMs > is cleared by stop(): the source unsubscribes once at stop, and nothing fires when the window would have ended",
+        "gateLingerMs > tears down at the end of the window when the gate stays closed",
+        "gateLingerMs > tears the committed key down at once when the key moves to a third value inside the window"
+      ],
       "tests/core/l5-sources-oracle-lifecycle.test.ts": [
-        "a source's unsubscribe at stop > never runs on a system that was never started, and nothing attaches"
+        "a publish > is attributed to the module that declared its source, when two modules' sources publish the same event",
+        "a publish > is attributed to the source that made it, when two sources publish the same event",
+        "a publish > made inside attach at start is applied before start() returns, for an ungated and a gated source (U5)",
+        "a source error's message > reaches plugins cut to its first 256 characters",
+        "a source's unsubscribe at stop > never runs on a system that was never started, and nothing attaches",
+        "a source's unsubscribe at stop > runs once: a second stop(), and destroy() after stop(), unsubscribe nothing more",
+        "a source's unsubscribe at stop > that throws is a cleanup error, and the other sources still unsubscribe, in reverse",
+        "an attach that does not return an unsubscribe function > is an attach error naming its module, and the source is never attached or detached (undefined, null, a number, a string)",
+        "an attach that does not return an unsubscribe function > is an attach error that names the Promise when attach returns one",
+        "an attach that does not return an unsubscribe function > leaves the publish handle live: a publish through it still dispatches and is heard, with no attach (U8)",
+        "an attach that does not return an unsubscribe function > names its module and its source in the message",
+        "reportError > reports a runtime error to plugins while attached, and does nothing after detach",
+        "sources follow attach order > at evict, with a gated source declared first: onEvict runs in attach order, then the unsubscribes in reverse",
+        "sources follow attach order > at stop, with a gated source declared first: attach is ungated first, and each detach is heard before its unsubscribe, in reverse",
+        "stop then start > attaches the source again, and each cycle unsubscribes once and publishes into the running system"
       ],
       "tests/core/l5-sources-oracle-ported.test.ts": [
+        "RFC 0012 — gated/keyed sources > a failing attach backs off instead of retrying on every reconcile",
+        "RFC 0012 — gated/keyed sources > declaring BOTH key and active throws at registration",
+        "source primitive — end-to-end with createSystem > dispatcher drops publishes whose event names walk the prototype chain",
+        "source primitive — end-to-end with createSystem > multiple modules can each declare sources; ordering is per-module flat",
+        "source primitive — end-to-end with createSystem > publishes between stop() and the next start() silently drop",
+        "source primitive — end-to-end with createSystem > source publish dispatches into the system's event handlers",
+        "source primitive — end-to-end with createSystem > source unsubscribe runs at system.destroy() via stop()",
+        "source primitive — end-to-end with createSystem > source unsubscribe runs at system.stop()",
+        "source primitive — public lifecycle and guards > post-destroy publish is a silent no-op (does not crash, does not dispatch)",
         "source primitive — public lifecycle and guards > rejects source ids that match BLOCKED_PROPS (prototype pollution defense)"
+      ],
+      "tests/core/l5-sources-oracle-teardown.test.ts": [
+        "an async unsubscribe > is not awaited by stop(), and is awaited by stopAsync()",
+        "an async unsubscribe > is waited on for its own evictTimeoutMs, when that is longer than the default",
+        "an async unsubscribe > that hangs is given up on by stopAsync() as a cleanup error, and the next source still unsubscribes",
+        "evict() > gives up on an onEvict that hangs as a runtime error, and still evicts the next source",
+        "evict() > runs each source's onEvict in order, and a throwing one is a runtime error that stops none of the others",
+        "evict() > skips a gated source whose gate never opened, or opened and closed again",
+        "evict() > waits on an onEvict for its own evictTimeoutMs, when that is longer than the default",
+        "evict() > with evictTimeoutMs Infinity reports no error for an onEvict that finishes",
+        "evict() > with no onEvict on the source resolves, and unsubscribes it once"
+      ],
+      "tests/core/l5-sources-oracle.test.ts": [
+        "a gated source > whose gate is open at start is attached when start() returns",
+        "a namespaced source > drops another module's event as cross-module, and development warns once per source",
+        "a namespaced source > drops its own event named with its prefix, and the warning names the bare event to publish",
+        "a namespaced source > publishes its own module's event by its bare name",
+        "a publish the engine refuses > is a drop with its reason: an empty name, a blocked name, a name with no handler",
+        "a publish the engine refuses > is dropped as post-destroy when a source attached again during destroy publishes after it",
+        "a publish the engine refuses > is dropped as post-stop when a source still attached publishes while the system stops",
+        "a source whose attach throws > is reported to plugins as an attach error, and the next source still attaches",
+        "a source whose attach throws, in a named module > is logged with its module and source, so collisions across modules are debuggable",
+        "plugins and a source's lifecycle > hear its attach at start, its publish, and its detach at stop, which unsubscribes it"
       ],
       "tests/core/l8-system-oracle.test.ts": [
         "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
@@ -1312,7 +1382,19 @@
         "a resolver mutating a dependency module's value in place > is quiet for a resolver that only reads",
         "a resolver mutating a dependency module's value in place > is reported after the resolver settles, naming the path",
         "a resolver mutating a dependency module's value in place > is reported for a Map changed in place",
-        "an effect mutating a collection or date in place > is reported for a Map, a Set and a Date"
+        "a source gate mutating a value in place > a gate that only reads attaches",
+        "a source gate mutating a value in place > a single-module gate's top-level write is refused",
+        "a source gate mutating a value in place > is a gate error and the source stays detached, namespaced",
+        "a source gate mutating a value in place > is a gate error and the source stays detached, single-module",
+        "an effect mutating a collection or date in place > is reported for a Map, a Set and a Date",
+        "reading without mutating > is quiet for a null-prototype object, which a structured copy turns plain"
+      ],
+      "tests/core/nested-mutation-snapshot.test.ts": [
+        "a gate that fails closed > warns once in development when nothing else is listening",
+        "cost > a gate reading a large value stays cheap per write",
+        "reading class instances > a class instance's own field changed in place is still reported",
+        "reading class instances > a gate reading a fact that holds a class instance attaches",
+        "reading class instances > never runs a getter while recording"
       ],
       "tests/core/notify-guardrail-blocked.test.ts": [
         "system.notify.guardrailBlocked —  > caps reentry depth to prevent infinite recursion through the broadcast fabric",
@@ -1529,7 +1611,14 @@
         "the retry-later poller > stops polling once nothing is left to retry (K5)"
       ],
       "tests/core/system-async-lifecycle.test.ts": [
+        "RFC 0009 async lifecycle — namespaced createSystem > namespaced system.stopAsync() / destroyAsync() / evict() exist",
         "RFC 0009 async lifecycle — single-module createSystem > system.destroyAsync() exists and tears down without error",
+        "RFC 0009 async lifecycle — single-module createSystem > system.evict() clears isEvicting on inner-work rejection",
+        "RFC 0009 async lifecycle — single-module createSystem > system.evict() is reentry-safe — onEvict fires once across concurrent calls",
+        "RFC 0009 async lifecycle — single-module createSystem > system.evict(deadline<=now) returns synchronously without throwing",
+        "RFC 0009 async lifecycle — single-module createSystem > system.evict(undefined) awaits full teardown",
+        "RFC 0009 async lifecycle — single-module createSystem > system.start() is a no-op when isEvicting or isDestroyed",
+        "RFC 0009 async lifecycle — single-module createSystem > system.stopAsync() awaits an async source unsubscribe",
         "RFC 0009 async lifecycle — single-module createSystem > system.stopAsync() exists, returns a Promise, and tears down without error"
       ],
       "tests/core/system-facts-derived.test.ts": [
@@ -1723,12 +1812,16 @@
         "createSystem diagnostics in production > initialFacts for an unknown or blocked namespace are dropped without a report",
         "createSystem diagnostics in production > tickMs with no tick handler is not reported, single or namespaced"
       ],
+      "tests/core/l5-sources-oracle-production.test.ts": [
+        "a namespaced source in production > drops another module's event as cross-module without a warning"
+      ],
       "tests/core/l8-system-oracle-production.test.ts": [
         "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly"
       ],
       "tests/core/multi-module-correctness.prod.test.ts": [
         "production build > ignores a resolver's $store write to a dependency key without throwing",
-        "production build > ignores a resolver's write to a dependency module without throwing"
+        "production build > ignores a resolver's write to a dependency module without throwing",
+        "production build > still records a publish with no handler as an unknown-event drop"
       ],
       "tests/core/mutants-effects-production.test.ts": [
         "effects in production > does not check for an in-place mutation, sync, async or via callOne",
@@ -1743,6 +1836,7 @@
         "the facts store in production > neither warns about non-JSON values nor wraps nested objects"
       ],
       "tests/core/nested-mutation-checks.production.test.ts": [
+        "nested mutation checks, in production > a gate mutating a value in place still attaches",
         "nested mutation checks, in production > a resolver reading a dependency gets the stored value and no check"
       ]
     }
