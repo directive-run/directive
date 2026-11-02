@@ -71,13 +71,16 @@ function inlineIsDevelopment(
 export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
+// The four entries package.json `exports` serves.
+const entry = {
+  index: "src/index.ts",
+  internals: "src/internals.ts",
+  plugins: "src/plugins/index.ts",
+  testing: "src/utils/testing.ts",
+};
+
 const shared: Options = {
-  entry: {
-    index: "src/index.ts",
-    internals: "src/internals.ts",
-    plugins: "src/plugins/index.ts",
-    testing: "src/utils/testing.ts",
-  },
+  entry,
   // ESM only, as core-next is today. CJS is a packaging follow-up for alpha.0.
   format: ["esm"],
   minify: false,
@@ -107,6 +110,9 @@ export default defineConfig([
   // `development` build. The only build with type declarations.
   {
     ...shared,
+    // `graph` is private: not in package.json `exports`, so no consumer can
+    // import it. bench/entry-ours.mjs reads it to measure the built graph.
+    entry: { ...entry, graph: "src/graph.ts" },
     outDir: "dist",
     dts: true,
     esbuildPlugins: [

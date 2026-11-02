@@ -1,57 +1,24 @@
-export {
-  createGraph,
-  Flags,
-  Graph,
-  Link,
-  ReactiveNode,
-} from "./graph.js";
-export type {
-  Equals,
-  GraphOptions,
-  NodeOptions,
-  TrackOptions,
-} from "./graph.js";
-export { LANES, browserHosts, createScheduler } from "./scheduler.js";
-export type {
-  HostCallback,
-  Lane,
-  Scheduler,
-  SchedulerOptions,
-  SchedulerTarget,
-} from "./scheduler.js";
-export { createClock, createRng, createVirtualClock } from "./clock.js";
-export type {
-  Clock,
-  RealClockOptions,
-  Rng,
-  TimerOptions,
-  TimerRecord,
-  VirtualClock,
-} from "./clock.js";
-export { KERNEL_VERSION, createKernel, serializeEvent } from "./kernel.js";
-export type {
-  EventKind,
-  Hooks,
-  Kernel,
-  KernelEvent,
-  KernelFeatures,
-  KernelOptions,
-  Listener,
-} from "./kernel.js";
-export { PHASES, withPhases } from "./phases.js";
-export type { Ctx, Phase, Phases } from "./phases.js";
-export { withSnapshot } from "./snapshot.js";
-// The kernel snapshot, renamed: `Snapshot` is 1.35's plugin snapshot below.
-export type { Snapshot as KernelSnapshot, SnapshotPart } from "./snapshot.js";
-
-// The 1.35 public API (alphas keep it unchanged), built on the graph above.
+// Only 1.35's public names, entry by entry (contracts/api-surface.json; some
+// are not built yet): the alphas promise the 1.35 API, and an addition needs
+// a signed api-changes.json entry. The kernel layer (graph, scheduler, clock, kernel,
+// phases, snapshot) and core-next's own option types stay internal: import
+// them from their modules (bench/entry-ours.mjs reads dist/graph.js, a
+// private build output that is not in the package's exports).
+//
+// These modules are still evaluated first, as when the root exported them:
+// a bundle keeps its module order, so its bytes do not move.
+import "./graph.js";
+import "./scheduler.js";
+import "./clock.js";
+import "./kernel.js";
+import "./phases.js";
+import "./snapshot.js";
 export {
   DirectiveError,
   createModule,
   createModuleFactory,
   createSystem,
 } from "./api/system.js";
-export type { ErrorHandler } from "./api/errors.js";
 export {
   RequirementSet,
   forType,
@@ -72,14 +39,15 @@ export type {
   SchemaKind,
   SchemaKindNode,
 } from "./api/schema-introspection.js";
-export type * from "./api/schema-builders.js";
-// core-next's own option and module types (not in 1.35).
 export type {
-  EventPayload,
-  ModuleDefinition,
-  ModuleFacts,
-  SystemOptions,
-} from "./api/types.js";
+  Branded,
+  ChainableArrayType,
+  ChainableNumberType,
+  ChainableObjectType,
+  ChainableSchemaType,
+  ChainableStringType,
+  ExtendedSchemaType,
+} from "./api/schema-builders.js";
 // 1.35's public types, exactly: copied from 1.35 into src/types/ (types only).
 // Some describe features core-next has not built yet; see createSystem.
 export type {
@@ -117,16 +85,11 @@ export type {
   DynamicDefinitionKind,
   DynamicEffectDef,
   DynamicResolverDef,
-  EffectDef,
   ErrorBoundaryConfig,
-  ErrorSource,
-  FactChange,
-  FactOrigin,
   FactPredicate,
   FactTemplate,
   Facts,
   FactsSnapshot,
-  FactsStore,
   HistoryAPI,
   HistoryOption,
   HistoryState,
@@ -135,7 +98,6 @@ export type {
   InferFacts,
   InferRequirementTypes,
   InferRequirements,
-  InferSchema,
   InferSchemaType,
   InferSelectorState,
   KeySelector,
@@ -158,13 +120,10 @@ export type {
   PredicateObject,
   PredicateOp,
   PredicateOverlapProof,
-  RecoveryStrategy,
   Requirement,
-  RequirementKeyFn,
   RequirementWithId,
   ResolverAbortReason,
   ResolverDeps,
-  RetryLaterConfig,
   RetryPolicy,
   Schema,
   SchemaType,
@@ -181,7 +140,6 @@ export type {
   System,
   SystemConfig,
   SystemDerived,
-  SystemEvent,
   SystemFacts,
   SystemInspection,
   SystemMode,

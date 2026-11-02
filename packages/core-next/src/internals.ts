@@ -3,16 +3,10 @@
  * as core-next builds them. No semver promise, as in 1.35.
  */
 
-export {
-  BLOCKED_PROPS,
-  createFactsProxy,
-  isRunawayError,
-} from "./api/facts.js";
-export type { CreateFactsStoreOptions, Tracker } from "./api/facts.js";
+// Only names 1.35's /internals exports (contracts/api-surface.json).
+export { createFactsProxy } from "./api/facts.js";
 export { createFacts, createFactsStore } from "./api/validate.js";
-export type { StoreOptions, ValidatorOptions } from "./api/validate.js";
 export { createEffectsManager } from "./api/effects.js";
-export type { CreateEffectsOptions, EffectsManager } from "./api/effects.js";
 
 // 1.35's public types for this entry, exactly: copied from 1.35 into
 // src/types/ (types only, no runtime code).
