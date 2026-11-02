@@ -14,7 +14,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 206,
@@ -23,7 +23,7 @@
     "replacement": "[]",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 206,
@@ -32,7 +32,7 @@
     "replacement": "refinements && []",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 206,
@@ -41,7 +41,7 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 206,
@@ -50,7 +50,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 208,
@@ -59,7 +59,7 @@
     "replacement": "[]",
     "reason": "later-layer",
     "layer": "L6",
-    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the killing test runs on v2 at L6, so the next gate=L6 run records the kill."
+    "note": "Base chainable `.refine()` (t.boolean(), t.enum(), t.literal() and the other builders that do not override it; t.number() and t.string() have their own). Killed at L6 by l6-schema-oracle > .refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message } (and > chained twice records both refinements in order, and both predicates run); proved by hand on conformance:local at L6-pre-a (the gate=L6 run 41385391297 predates the test). At the L6 gate (2026-11-02, current = L6) it became later-layer: the gate=L6 rerun 41430058165 (3adf0c41, ceiling L6, so every test placed at or below L6, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 245,
