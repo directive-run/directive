@@ -7,7 +7,13 @@
  * `covers` or the count out of `explain`.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -309,6 +315,96 @@ describe("a fuzz entry excuses only payloads its bound admits", () => {
   });
 });
 
+describe("the committed fuzz entries excuse only their quirk's records", () => {
+  const committed = JSON.parse(
+    readFileSync(join(import.meta.dirname, "../divergences.json"), "utf8"),
+  ) as Divergence[];
+  const real = (id: string) => {
+    const e = committed.find((x) => x.id === id);
+    expect(e, id).toBeDefined();
+
+    return e as Divergence;
+  };
+  /** The differences one step of `reference` against `candidate` leaves unexplained. */
+  const left = (
+    reference: TraceEntry[],
+    candidate: TraceEntry[],
+    id: string,
+    triggers: string[],
+  ) => {
+    const step = (records: TraceEntry[]): TraceEntry[] => [
+      { k: "step", i: 0, step: "step 0" },
+      ...records,
+      { k: "async", i: 0 },
+    ];
+
+    return explain(
+      FUZZ_SCENARIO,
+      compareContract(step(reference), step(candidate), "v2"),
+      [real(id)],
+      triggers,
+    ).unexplained.map((d) => `${d.op} ${d.kind} ${d.path ?? ""}`);
+  };
+
+  it("quirk z's timer counts: 2.0 holding fewer timers is excused, more is not", () => {
+    const timers = (at: string, pending: number): TraceEntry => ({
+      k: "timers",
+      at,
+      pending,
+    });
+    for (const [id, at] of [
+      ["l3-quirk-z-fuzz-timers-teardown-changed", "teardown"],
+      ["l3-quirk-z-fuzz-timers-destroy-changed", "destroy"],
+    ] as const) {
+      // Control: 1.35 still holds the waiting settle()'s maxWait timer.
+      expect(
+        left([timers(at, 1)], [timers(at, 0)], id, ["settleStop"]),
+      ).toEqual([]);
+      expect(
+        left([timers(at, 3)], [timers(at, 1)], id, ["settleStop"]),
+      ).toEqual([]);
+      // A 2.0 timer leak is not quirk z.
+      for (const [from, to] of [
+        [1, 9],
+        [0, 3],
+        [2, 2 + 1],
+      ]) {
+        expect(
+          left([timers(at, from as number)], [timers(at, to as number)], id, [
+            "settleStop",
+          ]),
+        ).toEqual([`changed ${at} pending`]);
+      }
+    }
+  });
+
+  it("quirk b's onErrorRecovery entry does not excuse a derivation's or effect's error", () => {
+    const recovery = (error: Json, strategy: string): TraceEntry => ({
+      k: "hook",
+      hook: "onErrorRecovery",
+      args: [error, strategy],
+    });
+    const derivation = {
+      $error: {
+        name: "DirectiveError",
+        message: "a.d0 throws at 4",
+        context: { $undefined: true },
+        recoverable: true,
+        source: "derivation",
+        sourceId: "d0",
+      },
+    };
+    expect(
+      left(
+        [recovery(derivation, "skip")],
+        [],
+        "l2-quirk-b-hook-onErrorRecovery-missing",
+        ["resolverRejects"],
+      ),
+    ).toEqual(["missing onErrorRecovery "]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The census
 
@@ -397,6 +493,45 @@ describe("the census requires every entry to name what it excuses", () => {
         },
       ]),
     ).toMatch(/must be \{ path, from, to \}/);
+  });
+
+  it("reads $lt only as a changed pattern's to: { $lt: from }", () => {
+    const changed = {
+      ...bounded,
+      op: "changed",
+      path: "data",
+      bound: {
+        match: [
+          { path: "data[1]", from: { $like: "integer" }, to: { $lt: "from" } },
+        ],
+      },
+    };
+    expect(census([changed])).not.toMatch(/\$lt/);
+    for (const bad of [
+      {
+        ...changed,
+        op: "missing",
+        bound: { match: [record("q", { $lt: "from" })] },
+      },
+      {
+        ...changed,
+        bound: {
+          match: [
+            {
+              path: "data[1]",
+              from: { $lt: "from" },
+              to: { $like: "integer" },
+            },
+          ],
+        },
+      },
+      {
+        ...changed,
+        bound: { match: [{ path: "data[1]", from: 1, to: { $lt: "to" } }] },
+      },
+    ]) {
+      expect(census([bad])).toMatch(/uses \$lt other than/);
+    }
   });
 
   it("accepts the committed divergences", () => {

@@ -38,7 +38,10 @@ export interface Excuse {
  * - `{ "$like": name }` matches any value of the named class (`LIKE`): an
  *   identifier of the fuzz model's naming grammar (a resolver, constraint,
  *   requirement or effect of any module), an integer, or absent;
- * - in a changed pattern's `path`, `[*]` matches any array index.
+ * - in a changed pattern's `path`, `[*]` matches any array index;
+ * - a changed pattern's `to` may be `{ "$lt": "from" }` (`LOWER`): the
+ *   engine under test's value is a number below 1.35's, for a quirk whose
+ *   approval says which way a count moves (quirk z: 2.0 holds fewer timers).
  *
  * Why this bound is honest (P3-F1): a fuzz entry covers a quirk wherever a
  * seed puts it, so the resolver, requirement or attempt it shows up on
@@ -90,6 +93,20 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     (/^[a-z]\.r\d+ attempt \d+$/.test(v) ||
       /^Resolver "([a-z]::)?r\d+" timed out after \d+ms$/.test(v)),
 };
+
+/** A changed pattern's `to` that requires a number below the `from` value. */
+export const LOWER = { $lt: "from" } as const;
+
+/** Whether `p` is `LOWER`. */
+export function isLower(p: Json | undefined): boolean {
+  return (
+    p !== null &&
+    typeof p === "object" &&
+    !Array.isArray(p) &&
+    Object.keys(p).length === 1 &&
+    p.$lt === "from"
+  );
+}
 
 /** Whether `value` fits `pattern` (`Bound`). */
 export function fits(pattern: Json, value: Json | undefined): boolean {
@@ -160,7 +177,11 @@ export function admits(b: Bound, d: Difference): boolean {
       Object.keys(q).length === 3 &&
       pathFits(path, d.path ?? "") &&
       fits(q.from as Json, d.reference) &&
-      fits(q.to as Json, d.candidate)
+      (isLower(q.to)
+        ? typeof d.reference === "number" &&
+          typeof d.candidate === "number" &&
+          d.candidate < d.reference
+        : fits(q.to as Json, d.candidate))
     );
   });
 }

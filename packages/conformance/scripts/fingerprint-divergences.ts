@@ -51,6 +51,7 @@ import { join } from "node:path";
 import type { Difference } from "../diff/compare.js";
 import {
   type Excuse,
+  admits,
   canonicalJson,
   generalize,
   generalizeValue,
@@ -246,6 +247,11 @@ try {
     }
     const had = patterns.size;
     for (const d of samples) {
+      // A record the bound already admits adds nothing: a narrower pattern
+      // (a `$lt` one) is not widened back to the classes `generalize` reads.
+      if (e.bound !== undefined && admits(e.bound, d)) {
+        continue;
+      }
       const p = generalize(d, e.path);
       const key = canonicalJson(p);
       if (rebound && !patterns.has(key) && !attemptSide(p, e.op)) {

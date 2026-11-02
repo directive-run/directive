@@ -27,7 +27,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
-import { LIKE, canonicalJson } from "../diff/fingerprint.js";
+import { LIKE, canonicalJson, isLower } from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
@@ -1285,9 +1285,37 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
 
     return [];
   };
+  // `{ "$lt": "from" }` is read only as a changed pattern's `to`.
+  const lts = (v: unknown): number => {
+    if (Array.isArray(v)) {
+      return v.reduce((n: number, x) => n + lts(x), 0);
+    }
+    if (v !== null && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+
+      return (
+        ("$lt" in o ? 1 : 0) +
+        Object.values(o).reduce((n: number, x) => n + lts(x), 0)
+      );
+    }
+
+    return 0;
+  };
   const seen = new Set<string>();
   for (const [k, p] of b.match.entries()) {
     const at = `bound pattern ${k}`;
+    const to = (p as Record<string, unknown> | null)?.to as Json | undefined;
+    const lower =
+      e.op === "changed" &&
+      p !== null &&
+      typeof p === "object" &&
+      !Array.isArray(p) &&
+      isLower(to);
+    if (lts(p) !== (lower ? 1 : 0)) {
+      out.push(
+        `${at} uses $lt other than as a changed pattern's to: { "$lt": "from" }`,
+      );
+    }
     for (const name of likes(p).filter((n) => !BOUND_LIKES.includes(n))) {
       out.push(`${at} names an unknown $like "${name}"`);
     }
