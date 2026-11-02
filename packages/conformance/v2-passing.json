@@ -576,6 +576,7 @@
         "Engine — Settle > system.settle() throws on timeout",
         "Engine — Settle > system.settle() waits for resolvers to complete",
         "Engine — Snapshot > getSnapshot returns current facts",
+        "Engine — Snapshot > restore applies snapshot facts",
         "Engine — Subscribe / Watch > subscribe fires on any listed fact change",
         "Engine — Subscribe / Watch > subscribe fires on derivation change",
         "Engine — Subscribe / Watch > subscribe returns unsubscribe function",
@@ -1322,6 +1323,40 @@
         "a source whose attach throws, in a named module > is logged with its module and source, so collisions across modules are debuggable",
         "plugins and a source's lifecycle > hear its attach at start, its publish, and its detach at stop, which unsubscribes it"
       ],
+      "tests/core/l6-persistence-oracle.test.ts": [
+        "a Date fact in a development save (U8, aj declined) > saves nothing, and only onError hears",
+        "a namespaced system persists flat ns::key keys (U15) > saves an included key under its flat name, and restores it from there",
+        "saved data against the module init and initialFacts (U7) > an init that leaves the persisted fact alone keeps the saved value",
+        "saved data against the module init and initialFacts (U7) > an init that uses ??= keeps the saved value",
+        "saved data against the module init and initialFacts (U7) > initialFacts beat the saved value"
+      ],
+      "tests/core/l6-schema-oracle.test.ts": [
+        ".default() (U11, al) > an empty initialFacts leaves a defaulted fact as no initialFacts does",
+        ".default() (U11, al) > is stored on the builder, and a fact the init writes keeps its value",
+        ".refine() on a base builder (U12) > chained twice records both refinements in order, and both predicates run",
+        ".refine() on a base builder (U12) > keeps the type check, adds its predicate, and records { predicate, message }",
+        ".refine() refusing a write (U12, am) > throws a development error that names the field, and keeps the value",
+        ".transform() (U12, an declined) > drops every check before it, the type check included, and is never applied to a write",
+        "a Date fact read through system.facts (U8, aj declined) > cannot be read as a Date in development: getTime() and JSON.stringify throw"
+      ],
+      "tests/core/l6-snapshots-oracle.test.ts": [
+        "a snapshot copies one level (U1) > is the facts and version 1, and a scalar changed on it stays on it",
+        "a snapshot copies one level (U1) > shares its nested values with the live facts, and nothing hears a change made through it",
+        "hydrate() (U5, U6) > a loader still pending at initialize() is never applied (U5)",
+        "hydrate() (U5, U6) > a loader still pending at start() is never applied, not even after a stop and start (U5)",
+        "hydrate() (U5, U6) > a namespaced snapshot has flat keys: restore() takes them, hydrate() loads none (U6)",
+        "hydrate() (U5, U6) > an awaited loader is applied at start",
+        "restore() and the module init (U4) > made after destroy() still writes, and does not throw",
+        "restore() and the module init (U4) > made after initialize() and before start() is kept",
+        "restore() and the module init (U4) > made before the system is initialized is overwritten by the init at start()",
+        "restore() checks each key in development (U2) > throws naming a key whose value fails its type",
+        "restore() checks each key in development (U2) > throws naming an unknown key",
+        "restore() reads only snapshot.facts (U3) > restores the facts of an envelope and ignores every other field",
+        "restore() refuses a bad snapshot and writes nothing (U14) > that holds a prototype-polluting key, at any depth",
+        "restore() refuses a bad snapshot and writes nothing (U14) > that is not an object, even one carrying a facts object",
+        "restore() refuses a bad snapshot and writes nothing (U14) > whose facts is missing or not an object",
+        "restore() writes one batch, filed as loaded data (U14) > plugins hear one onFactsBatch of hydrate writes, no onFactSet and no onSnapshot; derivations and effects follow"
+      ],
       "tests/core/l8-system-oracle.test.ts": [
         "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
         "hydrate() data in a single-module system > is applied over initialFacts when it is clean"
@@ -1580,6 +1615,36 @@
       "tests/core/schema-freeze-scope.test.ts": [
         "the schema freeze covers our own types only > leaves a self-caching validator writable"
       ],
+      "tests/core/schema-introspection.test.ts": [
+        "getKind — chain wrappers > t.number().optional() adds nullable: true (undefined → null for predicate purposes)",
+        "getKind — chain wrappers > t.string().brand<'UserId'>() wraps as branded",
+        "getKind — chain wrappers > t.string().nullable() adds nullable: true to inner kind",
+        "getKind — dev-mode warning on function input > warns when a t.* factory is passed without ()",
+        "getKind — hostile-getter safety > returns { kind: 'unknown' } if _typeName getter throws",
+        "getKind — primitive builders > t.boolean() → { kind: 'boolean' }",
+        "getKind — primitive builders > t.number() → { kind: 'number' }",
+        "getKind — primitive builders > t.number().min(0).max(100) preserves kind",
+        "getKind — primitive builders > t.string() → { kind: 'string' }",
+        "getKind — primitive builders > t.string().validate(...) preserves kind",
+        "getOperatorsForKind > array → common + $contains (over element type)",
+        "getOperatorsForKind > bigint → common + orderable (no string ops)",
+        "getOperatorsForKind > boolean → common ops only (no $gt/$gte/$lt/$lte/$between/$matches)",
+        "getOperatorsForKind > branded → delegates to inner (UserId-as-string gets string ops)",
+        "getOperatorsForKind > date → common + orderable",
+        "getOperatorsForKind > enum — operators of the primitive",
+        "getOperatorsForKind > literal — operators of the primitive",
+        "getOperatorsForKind > nullable does not change operator availability",
+        "getOperatorsForKind > number → common + orderable",
+        "getOperatorsForKind > string → common + orderable + string-specific",
+        "getOperatorsForKind > union — empty members fall back to common ops",
+        "getOperatorsForKind > union — intersection of operators across members",
+        "getOperatorsForKind > unknown → common ops only",
+        "getSchemaFieldKinds — dev-mode warning on empty result > warns when schema yields zero introspectable keys",
+        "getSchemaFieldKinds — hostile-getter resilience > one hostile builder does not abort the whole walk",
+        "getSchemaFieldKinds > accepts a bare facts record (no facts: wrapper)",
+        "getSchemaFieldKinds > walks a flat facts schema",
+        "listAllPredicateOperators > returns the closed PREDICATE_OPERATORS set"
+      ],
       "tests/core/settle-strands-invalidations.test.ts": [
         "an effect's write reaches a derivation-gated constraint > fires the constraint in the same settle",
         "an effect's write reaches a derivation-gated constraint > settles without leaving an undelivered invalidation behind",
@@ -1590,6 +1655,7 @@
         "history.snapshotEvents > dev warning for invalid history.snapshotEvents entries"
       ],
       "tests/core/ssr.test.ts": [
+        "SSR > getSnapshot() → restore() round-trip > restores facts from a snapshot into a running system",
         "SSR > hydrate() after start() throws > throws when called after start",
         "SSR > hydrate() before start() round-trip > applies hydrated facts on start",
         "SSR > hydrate() before start() round-trip > hydrated facts take precedence over initialFacts",
@@ -1598,6 +1664,7 @@
         "SSR > isPrototypeSafe validation in single-module hydrate() > skips hydrated facts with __proto__ key",
         "SSR > isPrototypeSafe validation in single-module hydrate() > skips hydrated facts with constructor key",
         "SSR > isPrototypeSafe validation in single-module hydrate() > top-level isPrototypeSafe throws for initialFacts with dangerous keys",
+        "SSR > server-side lifecycle > full SSR lifecycle: create → start → settle → snapshot → destroy",
         "SSR > settle() timeout behavior > resolves when system has no async work",
         "SSR > settle() timeout behavior > settle() with timeout rejects on slow resolvers"
       ],
@@ -1745,7 +1812,46 @@
         "RetryPolicy.shouldRetry — reason-aware context > 18. three-arg shouldRetry receives ShouldRetryContext with reason='error' on a sync throw"
       ],
       "tests/plugins/hydration-scope.test.ts": [
-        "the hydration capability > is not reachable from a consumer plugin"
+        "the hydration capability > is not reachable from a consumer plugin",
+        "the hydration capability > marks restored values as hydration with persistence listed first",
+        "the hydration capability > marks them the same way whatever position the plugin is in"
+      ],
+      "tests/plugins/persistence.test.ts": [
+        "persistencePlugin > debounce > coalesces multiple rapid changes into a single save",
+        "persistencePlugin > debounce > resets debounce timer on each new change",
+        "persistencePlugin > debounce > respects custom debounce interval",
+        "persistencePlugin > exclude filter > does not restore excluded keys on init",
+        "persistencePlugin > exclude filter > does not save excluded keys",
+        "persistencePlugin > has name 'persistence'",
+        "persistencePlugin > include filter > only restores included keys on init",
+        "persistencePlugin > include filter > only saves included keys",
+        "persistencePlugin > onDestroy > clears pending debounce timeout on destroy",
+        "persistencePlugin > onDestroy > performs a synchronous final save",
+        "persistencePlugin > onDestroy > saves even when no pending timeout exists",
+        "persistencePlugin > onError — save errors > calls onError when storage.setItem throws",
+        "persistencePlugin > onError — save errors > does not throw when onError is not provided and save fails",
+        "persistencePlugin > onError — save errors > wraps non-Error throws in an Error",
+        "persistencePlugin > onFactDelete > does not schedule save for non-persisted key deletion",
+        "persistencePlugin > onFactDelete > schedules save when a persisted key is deleted",
+        "persistencePlugin > onFactsBatch > does not schedule save when all batched keys are excluded",
+        "persistencePlugin > onFactsBatch > schedules save for batched set+delete of persisted keys",
+        "persistencePlugin > onFactsBatch > schedules save if at least one batched key is persisted",
+        "persistencePlugin > onFactSet > does not schedule save for keys outside the include list",
+        "persistencePlugin > onFactSet > does not schedule save for non-persisted keys (excluded)",
+        "persistencePlugin > onFactSet > schedules a debounced save for a persisted key",
+        "persistencePlugin > onInit — error handling > calls onError when storage contains invalid JSON",
+        "persistencePlugin > onInit — error handling > calls onError when stored data contains __proto__ key (prototype pollution)",
+        "persistencePlugin > onInit — error handling > calls onError when stored data contains nested prototype pollution",
+        "persistencePlugin > onInit — error handling > does not throw when onError is not provided and JSON is invalid",
+        "persistencePlugin > onInit — onRestore callback > does not fire onRestore when storage is empty",
+        "persistencePlugin > onInit — onRestore callback > fires onRestore with the restored data",
+        "persistencePlugin > onInit — restore from storage > does nothing when storage is empty",
+        "persistencePlugin > onInit — restore from storage > does nothing when stored value is a non-object (string)",
+        "persistencePlugin > onInit — restore from storage > does nothing when stored value is null JSON",
+        "persistencePlugin > onInit — restore from storage > restores persisted facts via batch",
+        "persistencePlugin > onSave callback > fires after a debounced save with persisted data",
+        "persistencePlugin > onSave callback > fires on destroy save",
+        "persistencePlugin > save guards > does not save when system has not been initialized"
       ],
       "tests/utils/testing.test.ts": [
         "flushMicrotasks > does not advance setTimeout(0) macrotasks",
@@ -1814,6 +1920,13 @@
       ],
       "tests/core/l5-sources-oracle-production.test.ts": [
         "a namespaced source in production > drops another module's event as cross-module without a warning"
+      ],
+      "tests/core/l6-snapshots-oracle-production.test.ts": [
+        "a Date fact in production (U8) > reads as a Date, and the persistence plugin saves it as an ISO string",
+        "a snapshot in production (U1) > shares its nested values with the live facts",
+        "restore() in production > still throws its three errors, and writes nothing (U14)",
+        "restore() in production > writes an unknown key and an ill-typed value unchecked (U2)",
+        "the t.* corners in production (U11, U12) > a refine and a type check do not run"
       ],
       "tests/core/l8-system-oracle-production.test.ts": [
         "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly"
