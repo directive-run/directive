@@ -378,6 +378,57 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     }
   });
 
+  it("quirk b's onError entry excuses the pairing shift of the extra attempt, not a derivation's change", () => {
+    const onError = (error: Json): TraceEntry => ({
+      k: "hook",
+      hook: "onError",
+      args: [error],
+    });
+    const thrown = (message: string, sourceId: string) => ({
+      $error: {
+        name: "DirectiveError",
+        message,
+        context: { $undefined: true },
+        recoverable: true,
+        source: "derivation",
+        sourceId,
+      },
+    });
+    const attempt = {
+      $error: {
+        name: "DirectiveError",
+        message: "b.r0 attempt 1",
+        context: {
+          fromConstraint: "b::c0",
+          id: "B0:{}",
+          requirement: { type: "B0" },
+        },
+        recoverable: true,
+        source: "resolver",
+        sourceId: "b::r0",
+      },
+    };
+    const id = "l3-quirk-b-fuzz-hook-onError-changed";
+    const d0 = thrown("b.d0 throws at 3", "b::d0");
+    // Control (deep seed 24301): 1.35's extra attempt error pairs with
+    // 2.0's next error, a derivation's; the case ends there.
+    expect(
+      left([onError(attempt), onError(d0)], [onError(d0)], id, [
+        "resolverRejects",
+      ]),
+    ).toEqual([]);
+    // A derivation's error that changed is not quirk b, nor is 2.0's
+    // attempt error where 1.35 had a derivation's.
+    expect(
+      left([onError(d0)], [onError(thrown("b.d0 throws at 4", "b::d0"))], id, [
+        "resolverRejects",
+      ]),
+    ).toEqual(["changed onError args[0].$error.message"]);
+    expect(
+      left([onError(d0)], [onError(attempt)], id, ["resolverRejects"]),
+    ).not.toEqual([]);
+  });
+
   it("quirk b's onErrorRecovery entry does not excuse a derivation's or effect's error", () => {
     const recovery = (error: Json, strategy: string): TraceEntry => ({
       k: "hook",

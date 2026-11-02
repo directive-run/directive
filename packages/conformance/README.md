@@ -232,7 +232,9 @@ under a changed entry's path. So every entry also carries one of:
   for a resolver, constraint, requirement or effect identifier of the fuzz
   model's naming grammar, an integer (an attempt or a count), the error a
   fuzz resolver's attempt ended with (its thrown message or its timeout,
-  one class: quirk b excuses either), or an absent side, and `[*]` for an array index under the entry's path. A changed
+  one class: quirk b excuses either), a fuzz derivation's or effect's
+  thrown error and id (on 2.0's side of quirk b's pairing shift: 1.35's
+  extra attempt error pairs with 2.0's next error of the stream), or an absent side, and `[*]` for an array index under the entry's path. A changed
   pattern's `to` may instead be `{ "$lt": "from" }`: 2.0's number is below
   1.35's, for a quirk whose approval says which way a count moves (quirk
   z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused). Field names,

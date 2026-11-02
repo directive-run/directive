@@ -6446,6 +6446,70 @@
           "to": {
             "$like": "resolver"
           }
+        },
+        {
+          "path": "args[0].$error.context.$undefined",
+          "from": {
+            "$like": "absent"
+          },
+          "to": true
+        },
+        {
+          "path": "args[0].$error.context.fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.context.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement",
+          "from": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "thrownError"
+          }
+        },
+        {
+          "path": "args[0].$error.source",
+          "from": "resolver",
+          "to": "derivation"
+        },
+        {
+          "path": "args[0].$error.source",
+          "from": "resolver",
+          "to": "effect"
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "thrower"
+          }
         }
       ]
     },
@@ -6509,6 +6573,70 @@
           },
           "to": {
             "$like": "resolver"
+          }
+        },
+        {
+          "path": "args[0].$error.context.$undefined",
+          "from": {
+            "$like": "absent"
+          },
+          "to": true
+        },
+        {
+          "path": "args[0].$error.context.fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.context.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement",
+          "from": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "thrownError"
+          }
+        },
+        {
+          "path": "args[0].$error.source",
+          "from": "resolver",
+          "to": "derivation"
+        },
+        {
+          "path": "args[0].$error.source",
+          "from": "resolver",
+          "to": "effect"
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "thrower"
           }
         }
       ]

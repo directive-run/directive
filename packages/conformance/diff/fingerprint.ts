@@ -92,6 +92,16 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     typeof v === "string" &&
     (/^[a-z]\.r\d+ attempt \d+$/.test(v) ||
       /^Resolver "([a-z]::)?r\d+" timed out after \d+ms$/.test(v)),
+  /**
+   * The error a fuzz derivation or effect throws: `a.d0 throws at 4`,
+   * `b.x1 throws at 6`. Quirk b's changed entries read it on the 2.0 side
+   * only: 1.35's extra attempt error pairs with 2.0's next error of the
+   * stream, which may be a derivation's or an effect's (a pairing shift).
+   */
+  thrownError: (v) =>
+    typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
+  /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
+  thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
 };
 
 /** A changed pattern's `to` that requires a number below the `from` value. */
