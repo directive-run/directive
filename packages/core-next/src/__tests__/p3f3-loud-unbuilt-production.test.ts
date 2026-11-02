@@ -103,7 +103,7 @@ describe("production plugins: [undefined]", () => {
       createSystem({ module: mod(), plugins: [undefined] } as any),
     );
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toContain("name");
+    expect(error.message).toContain("reading 'name'");
     expect(error.code).toBeUndefined();
   });
 });

@@ -189,7 +189,8 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
         // Not a plugin object (`plugins: [undefined]`): a clear error in
         // development (P3-F3). Production reads `name` first, so undefined
         // or null throws 1.35's TypeError ("reading 'name'") here, not a
-        // mangled one at the first hook.
+        // mangled one at the first hook. 1.35 throws it here too when the
+        // array has two or more entries; for a lone entry it throws at start().
         if (isDevelopment && (!plugin || typeof plugin !== "object")) {
           throw Object.assign(
             new Error(
@@ -198,7 +199,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
             { code: "E_INVALID_PLUGIN" },
           );
         }
-        const { name } = plugin;
+        const name = plugin.name;
         const index = plugins.findIndex((p) => p.name === name);
         if (index !== -1) {
           console.warn(
