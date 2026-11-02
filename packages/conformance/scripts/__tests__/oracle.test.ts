@@ -379,15 +379,22 @@ describe("the census", () => {
 
   it("flags an unbuilt-entry read in the options-object form it(name, { timeout }, fn)", () => {
     // One line, so the census fixture's `^it(` count ignores this source.
+    // Synthetic entries, so the check does not depend on which entries
+    // core-next has built yet (`/plugins` was this test's example until L6b
+    // built it).
+    const entries = [
+      { specifier: "@directive-run/core/not-built-yet", file: "/x/unbuilt.ts" },
+      { specifier: "@directive-run/core", file: "/x/index.ts" },
+    ];
     const src =
-      'import { loggingPlugin } from "@directive-run/core/plugins"; import { it } from "vitest"; ' +
-      'it("plain", () => {}); it("with options", { timeout: 5000 }, () => { loggingPlugin(); });';
+      'import { helper } from "@directive-run/core/not-built-yet"; import { it } from "vitest"; ' +
+      'it("plain", () => {}); it("with options", { timeout: 5000 }, () => { helper(); });';
     const reached = unbuiltReached(
       new Project({ useInMemoryFileSystem: true }).createSourceFile(
         "/options-form.test.ts",
         src,
       ),
-      v2Entries(repoRoot),
+      entries,
     );
     expect([...reached.keys()]).toEqual(["with options"]);
   });
