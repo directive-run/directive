@@ -110,9 +110,11 @@ describe("the t.* corners in production (U11, U12)", () => {
     // ??= init sets, one it sets to undefined (U11)" and "a .default() with
     // initialFacts: one they give, one they leave out (U11)" record the
     // difference (the diff runs development builds), and the L6 gate signs it.
-    expect(Object.keys(system.getSnapshot().facts)).toEqual(
-      expect.arrayContaining(["c", "flag"]),
-    );
+    expect(
+      Object.keys(system.getSnapshot().facts)
+        .filter((k) => k !== "v")
+        .sort(),
+    ).toEqual(["c", "flag"]);
   });
 });
 

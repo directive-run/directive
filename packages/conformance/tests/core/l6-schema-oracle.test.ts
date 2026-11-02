@@ -149,7 +149,7 @@ describe(".default() (U11, al)", () => {
     expect(Object.keys(system.getSnapshot().facts)).toContain("k");
   });
 
-  it("is applied the same with an empty initialFacts as without one", () => {
+  it("an empty initialFacts leaves a defaulted fact as no initialFacts does", () => {
     const build = (initialFacts: boolean): any =>
       createSystem({
         module: createModule("m", {

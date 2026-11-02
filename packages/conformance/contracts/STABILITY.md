@@ -61,9 +61,16 @@ and row: `{ case, direction, engines, row, part, expected2, reason,
 approvedBy, date }`.
 
 - `case` is one of `GOLDEN_CASES` in `contracts/lib/golden.ts`: "history
-  read" and "persistence read" (`checkGoldens`), "U10 flat", "U10
-  development", "U10 production" and "U10 rollback" (`checkEnvelope`). `part`
-  is that case's part.
+  read", "persistence read", "history re-export" and "persistence re-save"
+  (`checkGoldens`); "U10 flat", "U10 development", "U10 production", and the
+  rollback of each, "U10 flat rollback", "U10 development rollback" and "U10
+  production rollback" (`checkEnvelope`). `part` is that case's part.
+- Every write the workspace makes over 1.35.0's data is judged by 1.35.0
+  reading it, against 1.35.0 reading its own write from the same data: the
+  re-export and re-save cases, and a rollback case for each U10 stored value.
+  These are `1.35-reads` cases, so a `read-1.35` entry never excuses a write
+  1.35.0 reads differently. (The U10 `read-1.35` cases compare the load and
+  whether it logged, not the save.)
 - `direction` is `read-1.35` (the workspace starts on data where 1.35.0 reads
   it, compared with what 1.35.0 makes of the same data) or `1.35-reads`
   (1.35.0 reads what the workspace wrote: rollback). Each case lists the

@@ -9334,7 +9334,7 @@
           "layer": "L6",
           "by": ["member .getSnapshot"]
         },
-        ".default() (U11, al) > is applied the same with an empty initialFacts as without one": {
+        ".default() (U11, al) > an empty initialFacts leaves a defaulted fact as no initialFacts does": {
           "layer": "L6",
           "by": ["member .getSnapshot"]
         },

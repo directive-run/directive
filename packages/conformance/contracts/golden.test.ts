@@ -30,6 +30,7 @@ import {
   persistRun,
   producePart,
   readGoldens,
+  readPart,
   same,
   scriptFacts,
 } from "./lib/golden.js";
@@ -337,13 +338,13 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
     },
   });
   /** Saves over the stored value, keeping its keys the save does not write ((ak)). */
-  const keepsStoredKeys = (): Engine => ({
-    ...local,
+  const keepsStoredKeys = (base: Engine = local): Engine => ({
+    ...base,
     name: "v2",
     plugins: {
-      ...local.plugins,
+      ...base.plugins,
       persistencePlugin: (options: { storage: Storage }) =>
-        local.plugins.persistencePlugin({
+        base.plugins.persistencePlugin({
           ...options,
           storage: {
             ...options.storage,
@@ -387,12 +388,12 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
 
   it("a signed entry passes exactly its case, and removing it brings the failure back", async () => {
     const drifted = keepsRestored();
-    expect((await persistence(drifted, [])).join("\n")).toMatch(READ_FAILS);
+    // The same engine reads the same recorded value both times: with the
+    // entry it passes; without it, that very value fails against 1.35.0's.
     expect(await persistence(drifted, [entry()])).toEqual([]);
-    const without = [entry()].filter((c) => c.case !== "persistence read");
-    expect((await persistence(drifted, without)).join("\n")).toMatch(
-      READ_FAILS,
-    );
+    expect(await persistence(drifted, [])).toEqual([
+      `the workspace reads 1.35.0's persistence differently: ${JSON.stringify(READ)} vs ${JSON.stringify({ count: 0, label: "start", tags: [] })}`,
+    ]);
   });
 
   it("an unsigned entry fails, and covers nothing", async () => {
@@ -448,7 +449,7 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
         /must list distinct engines its case runs/,
       ],
       [
-        [entry({ case: "U10 rollback", direction: "read-1.35" })],
+        [entry({ case: "U10 flat rollback", direction: "read-1.35" })],
         /has a direction its case does not compare/,
       ],
       [[entry({ engines: [] })], /must list distinct engines/],
@@ -475,31 +476,45 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
     }
   });
 
-  it("U10: a signed entry covers its own case, and rollback stays strict", async () => {
-    const drifted = keepsStoredKeys();
-    const dev = (over: Partial<GoldenChange> = {}) =>
-      entry({
-        case: "U10 development",
-        row: "(ak)",
-        expected2: {
-          restored: { n: 0 },
-          saved: '{"v":1,"schema":{"m":1},"facts":{"n":6},"n":1}',
-          logged: true,
-        },
-        ...over,
-      });
-    const DEV_FAILS = /v2 handles U10 development's stored data differently/;
-    expect((await checkEnvelope(drifted, v1, [])).join("\n")).toMatch(
-      DEV_FAILS,
-    );
+  /** Wraps every save in [ ], which 1.35.0 does not restore as its own. */
+  const writesWrapped = (base: Engine = local): Engine => ({
+    ...base,
+    name: "v2",
+    plugins: {
+      ...base.plugins,
+      persistencePlugin: (options: { storage: Storage }) =>
+        base.plugins.persistencePlugin({
+          ...options,
+          storage: {
+            getItem: (k: string) => options.storage.getItem(k),
+            removeItem: (k: string) => options.storage.removeItem(k),
+            setItem: (k: string, v: string) =>
+              options.storage.setItem(k, `[${v}]`),
+          },
+        }),
+    },
+  });
+  const DEV = { restored: {}, logged: true };
+  const dev = (over: Partial<GoldenChange> = {}) =>
+    entry({ case: "U10 development", row: "(ak)", expected2: DEV, ...over });
+  const DEV_FAILS = /v2 handles U10 development's stored data differently/;
+  const DEV_ROLLBACK_FAILS =
+    /1\.35\.0 restores v2's save from U10 development's stored data differently from its own/;
+
+  it("U10: a signed read-1.35 entry covers its own case, with its recorded value", async () => {
+    // The init keeps what loaded, so an envelope 1.35.0 rejects leaves n unset.
+    const drifted = keepsRestored();
     expect(await checkEnvelope(drifted, v1, [dev()])).toEqual([]);
+    expect(await checkEnvelope(drifted, v1, [])).toEqual([
+      `v2 handles U10 development's stored data differently from 1.35.0: ${JSON.stringify(DEV)} vs ${JSON.stringify({ restored: { n: 0 }, logged: true })}`,
+    ]);
     expect(
       (await checkEnvelope(drifted, v1, [dev({ approvedBy: "" })])).join("\n"),
     ).toMatch(DEV_FAILS);
     expect(
       (
         await checkEnvelope(drifted, v1, [
-          dev({ expected2: { restored: { n: 0 }, saved: "{}", logged: true } }),
+          dev({ expected2: { restored: { n: 6 }, logged: true } }),
         ])
       ).join("\n"),
     ).toMatch(/and not as the goldenChanges entry for U10 development/);
@@ -508,53 +523,107 @@ describe("goldenChanges: a signed entry covers one case, with its recorded value
         "\n",
       ),
     ).toMatch(DEV_FAILS);
+  });
 
-    // A save 1.35.0 cannot restore fails the rollback, whatever read-1.35
-    // entry covers the save itself.
-    const unreadable: Engine = {
+  it("U10: 1.35.0 reads the save made from every stored value, and no read-1.35 entry relaxes it", async () => {
+    // core-next's development save today ((ak)): the envelope's stale keys
+    // stay beside n, and 1.35.0 then restores n as 0, not 1.
+    const staleKeys = keepsStoredKeys();
+    expect((await persistRun(staleKeys, ENVELOPE)).saved).toBe(
+      '{"v":1,"schema":{"m":1},"facts":{"n":6},"n":1}',
+    );
+    expect((await checkEnvelope(staleKeys, v1, [])).join("\n")).toMatch(
+      DEV_ROLLBACK_FAILS,
+    );
+    // The same save from an engine whose development read differs, with a
+    // signed read-1.35 entry covering that read: the read passes, the
+    // rollback still fails.
+    const both = keepsStoredKeys(keepsRestored());
+    const out = (await checkEnvelope(both, v1, [dev()])).join("\n");
+    expect(out).not.toMatch(DEV_FAILS);
+    expect(out).toMatch(DEV_ROLLBACK_FAILS);
+    // Every stored value's save is read: a save 1.35.0 cannot restore fails
+    // the flat and the development rollback.
+    const wrapped = (await checkEnvelope(writesWrapped(), v1, [])).join("\n");
+    expect(wrapped).toMatch(
+      /1\.35\.0 restores v2's save from U10 flat's stored data differently/,
+    );
+    expect(wrapped).toMatch(DEV_ROLLBACK_FAILS);
+    expect(wrapped).not.toMatch(/handles U10/);
+  });
+
+  it("checkGoldens: 1.35.0 imports what the workspace exports over 1.35.0's history, whatever read-1.35 entry covers the read", async () => {
+    // After an import, the export keeps only the first snapshot: a write
+    // the read-1.35 "history read" value carries (exportedAgain).
+    const reExportsOne = (): Engine => ({
       ...local,
       name: "v2",
-      plugins: {
-        ...local.plugins,
-        persistencePlugin: (options: { storage: Storage }) =>
-          local.plugins.persistencePlugin({
-            ...options,
-            storage: {
-              getItem: (k: string) => options.storage.getItem(k),
-              removeItem: (k: string) => options.storage.removeItem(k),
-              setItem: (k: string, v: string) =>
-                options.storage.setItem(k, `[${v}]`),
+      core: {
+        ...local.core,
+        createSystem: (options: unknown) => {
+          const system = local.core.createSystem(options);
+          let imported = false;
+          const bind = (o: object, v: unknown) =>
+            typeof v === "function" ? v.bind(o) : v;
+
+          return new Proxy(system, {
+            get(target, prop) {
+              const value = Reflect.get(target, prop, target);
+              if (prop !== "history" || !value) {
+                return bind(target, value);
+              }
+
+              return new Proxy(value, {
+                get(h, p) {
+                  const v = Reflect.get(h, p, h);
+                  if (p === "import") {
+                    return (data: string) => {
+                      imported = true;
+
+                      return v.call(h, data);
+                    };
+                  }
+                  if (p === "export" && imported) {
+                    return () => {
+                      const e = JSON.parse(v.call(h));
+
+                      return JSON.stringify({
+                        ...e,
+                        snapshots: e.snapshots.slice(0, 1),
+                        ...("currentIndex" in e ? { currentIndex: 0 } : {}),
+                      });
+                    };
+                  }
+
+                  return bind(h, v);
+                },
+              });
             },
-          }),
+            set: (target, prop, value) =>
+              Reflect.set(target, prop, value, target),
+          });
+        },
       },
-    };
-    const flatSave = await persistRun(unreadable, FLAT);
-    const out = (
-      await checkEnvelope(unreadable, v1, [
+    });
+    const drifted = reExportsOne();
+    const history = (changes: unknown[]) =>
+      checkGoldens(goldenDir, v1, drifted, changes, ["history"]);
+    const READS = /the workspace reads 1\.35\.0's history differently/;
+    const REEXPORT_FAILS =
+      /1\.35\.0 reads what the workspace writes over 1\.35\.0's history differently from its own/;
+    const without = (await history([])).join("\n");
+    expect(without).toMatch(READS);
+    expect(without).toMatch(REEXPORT_FAILS);
+    const covered = (
+      await history([
         entry({
-          case: "U10 flat",
-          row: "(ak)",
-          expected2: {
-            restored: flatSave.restored,
-            saved: flatSave.saved,
-            logged: flatSave.logged.length > 0,
-          },
-        }),
-        dev({
-          expected2: {
-            ...(await (async () => {
-              const r = await persistRun(unreadable, ENVELOPE);
-              return {
-                restored: r.restored,
-                saved: r.saved,
-                logged: r.logged.length > 0,
-              };
-            })()),
-          },
+          case: "history read",
+          part: "history",
+          expected2: await readPart(drifted, readGoldens(goldenDir), "history"),
         }),
       ])
     ).join("\n");
-    expect(out).not.toMatch(/U10 flat|U10 development/);
-    expect(out).toMatch(/1\.35\.0 restores v2's flat save differently/);
+    expect(covered).not.toMatch(READS);
+    expect(covered).toMatch(REEXPORT_FAILS);
   });
 });

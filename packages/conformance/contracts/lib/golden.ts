@@ -380,11 +380,17 @@ export async function scriptFacts(
   });
 }
 
-/** What `reader` makes of one part some engine wrote. */
-async function readPart(
+/**
+ * What `reader` makes of one part some engine wrote. For history and
+ * persistence, `wrote` receives what the reader itself writes over that data
+ * (its export after the import; what storage holds after it restored and was
+ * destroyed), for a rollback check.
+ */
+export async function readPart(
   reader: Engine,
   goldens: Partial<Goldens>,
   part: GoldenPart,
+  wrote?: (bytes: string) => void,
 ): Promise<unknown> {
   return withFixedClock(async () => {
     if (part === "history") {
@@ -396,12 +402,14 @@ async function readPart(
       history.start();
       history.history.import(goldens["history-export.golden"]);
       await history.settle();
+      const exported = history.history.export();
+      wrote?.(exported);
       const out = {
         count: history.facts.count,
         label: history.facts.label,
         tags: history.facts.tags,
         currentIndex: history.history.currentIndex,
-        exportedAgain: JSON.parse(history.history.export()),
+        exportedAgain: JSON.parse(exported),
       };
       history.destroy();
 
@@ -431,6 +439,7 @@ async function readPart(
         tags: restored.facts.tags,
       };
       restored.destroy();
+      wrote?.(storage.getItem("golden") ?? "");
 
       return out;
     }
@@ -503,15 +512,21 @@ async function readPart(
   });
 }
 
-/** What `reader` makes of artifacts some engine wrote, part by part. */
+/**
+ * What `reader` makes of artifacts some engine wrote, part by part; `wrote`
+ * collects what it writes over them (`readPart`).
+ */
 async function read(
   reader: Engine,
   goldens: Partial<Goldens>,
   parts: readonly GoldenPart[] = PART_NAMES,
+  wrote: Partial<Record<GoldenPart, string>> = {},
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
   for (const part of parts) {
-    out[part] = await readPart(reader, goldens, part);
+    out[part] = await readPart(reader, goldens, part, (bytes) => {
+      wrote[part] = bytes;
+    });
   }
 
   return out;
@@ -601,6 +616,18 @@ export const GOLDEN_CASES = {
     directions: ["read-1.35", "1.35-reads"],
     engines: ["v2", "v2:dist"],
   },
+  /** checkGoldens: 1.35.0 imports what the workspace exports after importing 1.35.0's export. */
+  "history re-export": {
+    part: "history",
+    directions: ["1.35-reads"],
+    engines: ["v2", "v2:dist"],
+  },
+  /** checkGoldens: 1.35.0 restores what the workspace saves after restoring 1.35.0's save. */
+  "persistence re-save": {
+    part: "persistence",
+    directions: ["1.35-reads"],
+    engines: ["v2", "v2:dist"],
+  },
   /** checkEnvelope: today's flat format stored, either build. */
   "U10 flat": {
     part: "persistence",
@@ -619,11 +646,23 @@ export const GOLDEN_CASES = {
     directions: ["read-1.35"],
     engines: ["v2:dist:prod"],
   },
-  /** checkEnvelope: 1.35.0 restores the workspace's flat save. */
-  "U10 rollback": {
+  /** checkEnvelope: 1.35.0 restores the workspace's save made from the flat format. */
+  "U10 flat rollback": {
     part: "persistence",
     directions: ["1.35-reads"],
     engines: ["v2", "v2:dist", "v2:dist:prod"],
+  },
+  /** checkEnvelope: 1.35.0 restores the workspace's save made from an envelope, development build. */
+  "U10 development rollback": {
+    part: "persistence",
+    directions: ["1.35-reads"],
+    engines: ["v2", "v2:dist"],
+  },
+  /** checkEnvelope: 1.35.0 restores the workspace's save made from an envelope, production build. */
+  "U10 production rollback": {
+    part: "persistence",
+    directions: ["1.35-reads"],
+    engines: ["v2:dist:prod"],
   },
 } as const satisfies Record<
   string,
@@ -812,6 +851,12 @@ function judge(
   return [];
 }
 
+/** The case for what an engine writes over 1.35.0's data of a part, if any. */
+const REWRITE_CASE: Partial<Record<GoldenPart, GoldenCase>> = {
+  history: "history re-export",
+  persistence: "persistence re-save",
+};
+
 /** The case checkGoldens compares a part under, if the part has one. */
 function readCase(part: GoldenPart): GoldenCase | undefined {
   const name = `${part} read`;
@@ -828,7 +873,12 @@ function readCase(part: GoldenPart): GoldenCase | undefined {
  *   direction `1.35-reads`);
  * - the workspace reads what 1.35.0 wrote exactly as 1.35.0 does, including
  *   the reads that must fail (tampered, expired) (case "<part> read",
- *   direction `read-1.35`).
+ *   direction `read-1.35`);
+ * - what the workspace writes over 1.35.0's history and persistence data (its
+ *   export after the import, its save after the restore), 1.35.0 reads as it
+ *   reads its own from the same data (cases "history re-export" and
+ *   "persistence re-save", direction `1.35-reads`), so no `read-1.35` entry
+ *   can carry a write 1.35.0 does not read.
  * A signed `goldenChanges` entry for a case, direction and `local.name`
  * replaces 1.35.0's value there with the entry's `expected2` (`judge`);
  * every entry is validated on every call (`checkGoldenChanges`).
@@ -854,10 +904,25 @@ export async function checkGoldens(
       failures.push(`the workspace writes a different ${f} than 1.35.0`);
     }
   }
-  const expected = await read(v1, golden);
-  const localReadsV1 = await read(local, golden, parts);
+  const v1Wrote: Partial<Record<GoldenPart, string>> = {};
+  const localWrote: Partial<Record<GoldenPart, string>> = {};
+  const expected = await read(v1, golden, PART_NAMES, v1Wrote);
+  const localReadsV1 = await read(local, golden, parts, localWrote);
   const v1ReadsLocal = await read(v1, fromLocal, parts);
   for (const part of parts) {
+    const over = REWRITE_CASE[part];
+    if (over) {
+      const file = GOLDEN_PARTS[part].file;
+      failures.push(
+        ...judge(
+          usable,
+          { case: over, direction: "1.35-reads", engine: local.name },
+          await readPart(v1, { [file]: localWrote[part] }, part),
+          await readPart(v1, { [file]: v1Wrote[part] }, part),
+          `1.35.0 reads what the workspace writes over 1.35.0's ${part} differently from its own`,
+        ),
+      );
+    }
     const at = { case: readCase(part), engine: local.name };
     failures.push(
       ...judge(
@@ -986,22 +1051,32 @@ export const ENVELOPE = JSON.stringify({
 });
 export const FLAT = JSON.stringify({ n: 6 });
 
-/** What a U10 comparison compares: the load, the save, and whether it logged. */
-function envelopeOutcome(run: PersistRun) {
-  return {
-    restored: run.restored,
-    saved: run.saved,
-    logged: run.logged.length > 0,
-  };
+/**
+ * What a U10 run made of the stored value: the load and whether it logged.
+ * The save is not here: what the engine writes is judged only by how 1.35.0
+ * reads it (`checkEnvelope`'s rollback cases), so no `read-1.35` entry
+ * carries a write.
+ */
+function readOutcome(run: PersistRun) {
+  return { restored: run.restored, logged: run.logged.length > 0 };
+}
+
+/** What 1.35.0 made of a save: the load, its own next save, and whether it logged. */
+function rollbackOutcome(run: PersistRun) {
+  return { ...readOutcome(run), saved: run.saved };
 }
 
 /**
  * U10 on the engine under test (`next`) against 1.35.0 of the same build
- * (`ref`): for each stored value ("U10 flat", and "U10 development" or "U10
- * production" for the envelope) the load, the save and whether it logged are
- * 1.35.0's, and 1.35.0 restores `next`'s flat save as `{ n: 1 }` ("U10
- * rollback", direction `1.35-reads`). A signed `goldenChanges` entry for a
- * case and `next.name` replaces 1.35.0's value there with its `expected2`.
+ * (`ref`). For each stored value (today's flat format; an envelope):
+ * - `next` loads it as 1.35.0 does, and logs when 1.35.0 does ("U10 flat",
+ *   and "U10 development" or "U10 production"; direction `read-1.35`);
+ * - 1.35.0 makes of `next`'s save from it what it makes of its own save from
+ *   it: the load, its next save, and whether it logged ("U10 flat rollback",
+ *   and "U10 development rollback" or "U10 production rollback"; direction
+ *   `1.35-reads`).
+ * A signed `goldenChanges` entry for a case, direction and `next.name`
+ * replaces 1.35.0's value there with its `expected2`.
  */
 export async function checkEnvelope(
   next: Engine,
@@ -1015,34 +1090,32 @@ export async function checkEnvelope(
     );
   }
   const { failures, usable } = checkGoldenChanges(goldenChanges);
-  const cases: [string, GoldenCase][] = [
-    [FLAT, "U10 flat"],
-    [ENVELOPE, production ? "U10 production" : "U10 development"],
+  const cases: [string, GoldenCase, GoldenCase][] = [
+    [FLAT, "U10 flat", "U10 flat rollback"],
+    production
+      ? [ENVELOPE, "U10 production", "U10 production rollback"]
+      : [ENVELOPE, "U10 development", "U10 development rollback"],
   ];
-  for (const [stored, name] of cases) {
+  for (const [stored, name, back] of cases) {
+    const mine = await persistRun(next, stored);
+    const theirs = await persistRun(ref, stored);
     failures.push(
       ...judge(
         usable,
         { case: name, direction: "read-1.35", engine: next.name },
-        envelopeOutcome(await persistRun(next, stored)),
-        envelopeOutcome(await persistRun(ref, stored)),
+        readOutcome(mine),
+        readOutcome(theirs),
         `${next.name} handles ${name}'s stored data differently from 1.35.0`,
+      ),
+      ...judge(
+        usable,
+        { case: back, direction: "1.35-reads", engine: next.name },
+        rollbackOutcome(await persistRun(ref, mine.saved ?? "")),
+        rollbackOutcome(await persistRun(ref, theirs.saved ?? "")),
+        `1.35.0 restores ${next.name}'s save from ${name}'s stored data differently from its own`,
       ),
     );
   }
-  const back = await persistRun(
-    ref,
-    (await persistRun(next, FLAT)).saved ?? "",
-  );
-  failures.push(
-    ...judge(
-      usable,
-      { case: "U10 rollback", direction: "1.35-reads", engine: next.name },
-      back.restored,
-      { n: 1 },
-      `1.35.0 restores ${next.name}'s flat save differently`,
-    ),
-  );
 
   return failures;
 }
