@@ -5,7 +5,7 @@
 // the building esbuild: no second copy can drift from it.
 // With a built dist/index.js present, it is also minified and measured, as a
 // check that the measured number is what ships.
-// Budgets: the graph module, the `minimal`, `two-module` and `floor` fixtures
+// Budgets: the graph module, the `minimal`, `two-module`, `floor` and `aperture` fixtures
 // and the full entry each have a gzip budget in size-budgets.next.json at the
 // repo root. A measured size over its budget fails the run (any mode), naming
 // the fixture, its size, the budget and the overage. scripts/size-budgets-tighten.mjs
@@ -485,7 +485,7 @@ if (distBytes) {
     `dist/production: ${devNeedles.filter((n) => production.includes(n)).length} dev-only strings (expected 0, ${gzipSync(production, { level: 9 }).length} B gzip); dist/development: ${inDevelopment.length} of ${DEV_STRINGS_MIN}`,
   );
 }
-async function measure(label, contents, resolveDir, engine) {
+async function measure(label, contents, resolveDir, engine, extra = []) {
   const out = await build({
     stdin: { contents, resolveDir, loader: "ts" },
     bundle: true,
@@ -497,9 +497,8 @@ async function measure(label, contents, resolveDir, engine) {
     conditions: ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
     alias: { "@directive-run/core": engine.entry },
-    ...(engine.mangleProps
-      ? { mangleProps: engine.mangleProps, plugins: [inlineIsDevelopment] }
-      : {}),
+    ...(engine.mangleProps ? { mangleProps: engine.mangleProps } : {}),
+    plugins: [...extra, ...(engine.mangleProps ? [inlineIsDevelopment] : [])],
   });
   const bytes = out.outputFiles[0].contents;
   if (engine.mangleProps) {
@@ -533,6 +532,33 @@ const floor = readFileSync(join(fixtures, "floor.ts"), "utf8");
 const floorSize = await measure("floor", floor, fixtures, engines["core-next"]);
 console.log(`fixture floor on core-next: ${floorSize.text}`);
 checkBudget("floor", "fixture floor on core-next", floorSize.gz);
+// The real Aperture lab app (fixtures/aperture.ts, A5): its three Directive
+// files verbatim, on both engines. Its page code (`/scene/` imports) stays
+// external; `@directive-run/core/plugins` is 1.35's persistence plugin on
+// both engines until core-next ships its own (L6b).
+const apertureLab = {
+  name: "aperture-lab",
+  setup(b) {
+    b.onResolve({ filter: /^@directive-run\/core\/plugins$/ }, () => ({
+      path: new URL("../../core/src/plugins/persistence.ts", import.meta.url)
+        .pathname,
+    }));
+    b.onResolve({ filter: /\/scene\// }, (args) => ({
+      path: args.path,
+      external: true,
+    }));
+  },
+};
+const aperture = readFileSync(join(fixtures, "aperture.ts"), "utf8");
+for (const [name, engine] of Object.entries(engines)) {
+  const m = await measure("aperture", aperture, fixtures, engine, [
+    apertureLab,
+  ]);
+  console.log(`fixture aperture on ${name}: ${m.text}`);
+  if (engine.mangleProps) {
+    checkBudget("aperture", "fixture aperture on core-next", m.gz);
+  }
+}
 const fullEntry = await measure(
   "full entry",
   'export * from "@directive-run/core";',

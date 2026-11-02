@@ -1,5 +1,5 @@
 {
-  "_README": "Gzip budgets for the 2.0 engine (packages/core-next), read by packages/core-next/scripts/size.mjs. Each entry is a fixture or module and its `gzBudget` in bytes: minified with esbuild, gzip level 9, the exact number `pnpm --filter @directive-run/core-next size` prints for it. size.mjs fails when a measured size is over its budget. Tighten-only: scripts/size-budgets-tighten.mjs fails a pull request that raises a budget, or sets one to null (no budget), unless that entry's `reason` also changed in the same pull request. A later layer that adds code raises its budget in its own pull request and writes why in `reason`. Lowering a budget needs no new reason. Keys: `graph` is src/graph.ts bundled alone; `minimal`, `two-module` and `floor` are scripts/fixtures/*.ts built against core-next; `full-entry` is `export * from '@directive-run/core'` (every export).",
+  "_README": "Gzip budgets for the 2.0 engine (packages/core-next), read by packages/core-next/scripts/size.mjs. Each entry is a fixture or module and its `gzBudget` in bytes: minified with esbuild, gzip level 9, the exact number `pnpm --filter @directive-run/core-next size` prints for it. size.mjs fails when a measured size is over its budget. Tighten-only: scripts/size-budgets-tighten.mjs fails a pull request that raises a budget, or sets one to null (no budget), unless that entry's `reason` also changed in the same pull request. A later layer that adds code raises its budget in its own pull request and writes why in `reason`. Lowering a budget needs no new reason. Keys: `graph` is src/graph.ts bundled alone; `minimal`, `two-module`, `floor` and `aperture` are scripts/fixtures/*.ts built against core-next (`aperture` is the real Aperture lab app, A5); `full-entry` is `export * from '@directive-run/core'` (every export).",
   "budgets": {
     "graph": {
       "gzBudget": 1850,
@@ -16,6 +16,10 @@
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
+    },
+    "aperture": {
+      "gzBudget": 33125,
+      "reason": "L6a, A5 (owner-approved 2026-11-02, \"Approve all recommendations\"): the real Aperture lab's three Directive files verbatim, its system setup with history off, 1.35's persistence plugin standing in until L6b. Measured 33,025 B on main 3adf0c41, before L6a's restore() part lands (1.35 on the same copy: 59,798 B by this script). Budget = measured + 100 B; the plan's 6 KB and 8 KB for it are retired."
     },
     "full-entry": {
       "gzBudget": 30550,
