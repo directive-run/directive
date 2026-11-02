@@ -16,7 +16,7 @@
 
 import isDevelopment from "#is-development";
 import type { EventKind, KernelEvent } from "../kernel.js";
-import type { SystemPart } from "./core.js";
+import type { SystemContext, SystemPart } from "./core.js";
 import type { Plugin } from "./types.js";
 
 /** A plugin that takes the raw record instead of a 1.35 hook (observers). */
@@ -136,9 +136,19 @@ async function init(plugins: Plugin[], system: unknown): Promise<void> {
   }
 }
 
+/**
+ * Each system's context, for first-party plugins only (1.35's hydration
+ * capability, `core/internal-scopes.ts`): module-private, so no consumer
+ * plugin reaches it from the system it is given, and set before the first
+ * plugin's `onInit` runs (1.35 engine.ts:4884–4891).
+ */
+export const scopes = new WeakMap<object, SystemContext>();
+
 /** The plugins part, with the plugins a system starts with. */
 export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
-  return ({ kernel, system }) => {
+  return (context) => {
+    const { kernel, system } = context;
+    scopes.set(system, context);
     const plugins: StreamPlugin[] = [];
     let off: (() => void) | null = null;
     const wants = (at: EventKind): boolean => {

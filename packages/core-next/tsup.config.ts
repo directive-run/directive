@@ -75,6 +75,7 @@ const shared: Options = {
   entry: {
     index: "src/index.ts",
     internals: "src/internals.ts",
+    plugins: "src/plugins/index.ts",
     testing: "src/utils/testing.ts",
   },
   // ESM only, as core-next is today. CJS is a packaging follow-up for alpha.0.

@@ -129,6 +129,9 @@ function printHeap(r) {
     `  frame loop through a source (frame-loop-source workload, bytes per frame): v1 ${bytes(h.v1FrameSourceBytesPerOp)}, v2 ${bytes(h.v2FrameSourceBytesPerOp)}`,
   );
   console.log(
+    `  the same with the persistence plugin (frame-loop-persist workload, bytes per frame): v1 ${bytes(h.v1FramePersistBytesPerOp)}, v2 ${bytes(h.v2FramePersistBytesPerOp)}`,
+  );
+  console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
   );
   if (sizes("v1") !== sizes("v2")) {
@@ -526,6 +529,8 @@ const result = {
     v2FrameBytesPerOp: heapOf("v2", "frameBytesPerOp"),
     v1FrameSourceBytesPerOp: heapOf("v1", "frameSourceBytesPerOp"),
     v2FrameSourceBytesPerOp: heapOf("v2", "frameSourceBytesPerOp"),
+    v1FramePersistBytesPerOp: heapOf("v1", "framePersistBytesPerOp"),
+    v2FramePersistBytesPerOp: heapOf("v2", "framePersistBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),

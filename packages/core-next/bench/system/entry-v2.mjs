@@ -2,4 +2,8 @@
 // adapter.
 import { main } from "./runner.mjs";
 
-await main("v2", () => import("../../dist/index.js"));
+await main(
+  "v2",
+  () => import("../../dist/index.js"),
+  () => import("../../dist/plugins.js"),
+);

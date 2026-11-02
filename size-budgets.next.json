@@ -18,8 +18,8 @@
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
     },
     "aperture": {
-      "gzBudget": 33250,
-      "reason": "L6a, as minimal (owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\"): measured 33,192 B, +167 B over the 33,025 B measured on main 3adf0c41 before restore() landed (A5: the real Aperture lab's three Directive files verbatim, its system setup with history off, 1.35's persistence plugin standing in until L6b; 1.35 on the same copy is 59,798 B by this script). Budget = measured + 58 B; the plan's 6 KB and 8 KB for it are retired."
+      "gzBudget": 33340,
+      "reason": "L6b: the Aperture copy now runs core-next's own persistence plugin (A5), with (ai) and (ak), owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\": measured 33,283 B, +91 B over L6a's 33,192 B. By piece: the core seams every system pays (the plugin's turn inside initialize() and the init_ flag on the part context, +13 B in floor; the module-private scopes map the plugins part fills, the rest of minimal's +28 B); core-next's plugin in place of 1.35's, about +63 B ((ai)'s held saved data and its turn, (ak)'s schema check; its development warning 0 B). Budget = measured + 57 B."
     },
     "full-entry": {
       "gzBudget": 30650,

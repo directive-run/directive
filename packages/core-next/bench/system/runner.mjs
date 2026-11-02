@@ -282,6 +282,7 @@ async function heapProbe(engine, api) {
   }
   const frameBytesPerOp = await frameBytes("frame-loop", 2000);
   const frameSourceBytesPerOp = await frameBytes("frame-loop-source", 1000);
+  const framePersistBytesPerOp = await frameBytes("frame-loop-persist", 1000);
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
@@ -306,6 +307,7 @@ async function heapProbe(engine, api) {
           fullStepBytesPerOp: median(keepClean(full)) / writes,
           frameBytesPerOp,
           frameSourceBytesPerOp,
+          framePersistBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },
@@ -358,7 +360,7 @@ function devChecksOn({ createModule, createSystem, t }) {
  * often. BENCH_ENV_SWAP=0 (driver: --no-env-swap) leaves the real `process.env`
  * in place instead, which is the UNBUNDLED-Node case (report-only).
  */
-export async function main(engine, load) {
+export async function main(engine, load, loadPlugins) {
   const nodeEnv = process.env.BENCH_NODE_ENV || "production";
   const envSwap = process.env.BENCH_ENV_SWAP !== "0";
   if (envSwap) {
@@ -371,6 +373,8 @@ export async function main(engine, load) {
     createModule: mod.createModule,
     createSystem: mod.createSystem,
     t: mod.t,
+    // The engine's own `/plugins` entry (frame-loop-persist).
+    persistencePlugin: (await loadPlugins()).persistencePlugin,
   };
   const devChecks = devChecksOn(api);
   const report =

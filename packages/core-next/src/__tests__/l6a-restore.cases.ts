@@ -146,6 +146,47 @@ export function restoreCases(lib: any, mode: Mode): void {
       );
     });
 
+    it("resolvers run after a restore", async () => {
+      const resolved: number[] = [];
+      const system = createSystem({
+        module: createModule("r", {
+          schema: {
+            facts: { n: t.number(), seen: t.number() },
+            derivations: {},
+            events: {},
+            requirements: { MARK: {} },
+          },
+          init: (facts: any) => {
+            facts.n = 0;
+            facts.seen = 0;
+          },
+          constraints: {
+            big: {
+              when: (facts: any) => facts.n > 3 && facts.seen !== facts.n,
+              require: { type: "MARK" },
+            },
+          },
+          resolvers: {
+            mark: {
+              requirement: "MARK",
+              resolve: async (_req: unknown, context: any) => {
+                resolved.push(context.facts.n);
+                context.facts.seen = context.facts.n;
+              },
+            },
+          },
+        }),
+      });
+      system.start();
+      await system.settle();
+      expect(resolved).toEqual([]);
+      system.restore({ facts: { n: 5 } });
+      await system.settle();
+      expect(resolved).toEqual([5]);
+      expect(system.facts.seen).toBe(5);
+      system.destroy();
+    });
+
     it("is not on the system core", () => {
       expect(createSystemCore({ module: counter() }).restore).toBeUndefined();
     });
@@ -171,6 +212,29 @@ export function restoreCases(lib: any, mode: Mode): void {
       const system = createSystem({ module: counter() });
       system.initialize();
       system.restore({ facts: { n: 9 } });
+      system.start();
+      await tick();
+      expect(system.facts.n).toBe(9);
+      expect(warned()).toEqual([]);
+    });
+
+    it("a restore inside initialize() (a module init) keeps its value and does not warn", async () => {
+      warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const system: any = createSystem({
+        module: createModule("c", {
+          schema: {
+            facts: { n: t.number(), tags: t.array() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          },
+          init: (facts: any) => {
+            facts.n = 0;
+            facts.tags = [];
+            system.restore({ facts: { n: 9 } });
+          },
+        }),
+      });
       system.start();
       await tick();
       expect(system.facts.n).toBe(9);
