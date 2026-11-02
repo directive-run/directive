@@ -9,5 +9,42 @@
       "date": "2026-10-18"
     }
   ],
-  "goldenChanges": []
+  "goldenChanges": [
+    {
+      "case": "persistence read",
+      "direction": "read-1.35",
+      "engines": ["v2", "v2:dist"],
+      "row": "(ai)",
+      "part": "persistence",
+      "expected2": {
+        "count": 2,
+        "label": "middle",
+        "tags": [
+          "a",
+          {
+            "nested": [1, 2]
+          }
+        ]
+      },
+      "reason": "Row (ai) (L6; owner-approved 2026-11-01, \"Approve (ai)\"): the persistence plugin restores inside initialize(), after the module inits and before initialFacts and hydrate. Case \"persistence read\" (read-1.35): the workspace loads 1.35.0's persistence golden through the golden script's module, whose init sets count, label and tags. 1.35.0 restores before the init, and the init overwrites the saved values ({\"count\":0,\"label\":\"start\",\"tags\":[]}); 2.0 restores after it, so the saved values win ({\"count\":2,\"label\":\"middle\",\"tags\":[\"a\",{\"nested\":[1,2]}]}). Only the load differs: what 2.0 writes over this data is judged by the 1.35-reads cases (\"persistence read\" rollback, \"persistence re-save\", \"persistence write\"), which pass with no entry. Signed 2026-11-02 on the owner's instruction: he approved this row (\"Approve (ai)\", 2026-11-01) and asked Claude to sign for him. (goldenChanges signing per 'Extend it; Claude signs (Recommended)', 2026-11-02)",
+      "approvedBy": "Jason Comes",
+      "date": "2026-11-02"
+    },
+    {
+      "case": "U10 production",
+      "direction": "read-1.35",
+      "engines": ["v2:dist:prod"],
+      "row": "(ak)",
+      "part": "persistence",
+      "expected2": {
+        "restored": {
+          "n": 0
+        },
+        "logged": false
+      },
+      "reason": "Row (ak) (L6; owner-approved 2026-11-01, \"Approve all recommendations\"): the plugin skips saved keys the schema no longer has. Case \"U10 production\" (read-1.35, production build): the store holds an envelope-shaped value {\"v\":1,\"schema\":{\"m\":1},\"facts\":{\"n\":6},\"n\":0} and the schema has only n. 1.35.0 production loads v, schema and facts as facts ({\"v\":1,\"schema\":{\"m\":1},\"facts\":{\"n\":6},\"n\":0}); 2.0 skips those three keys and loads {\"n\":0}. Neither logs, so only `restored` differs. Under the refinement \"Keep them in storage (Recommended)\" (2026-11-02) the production save writes the skipped keys back unchanged, so \"U10 production rollback\" passes with no entry. Signed 2026-11-02 on the owner's instruction: he approved this row (\"Approve all recommendations\", 2026-11-01) and asked Claude to sign for him. (goldenChanges signing per 'Extend it; Claude signs (Recommended)', 2026-11-02)",
+      "approvedBy": "Jason Comes",
+      "date": "2026-11-02"
+    }
+  ]
 }
