@@ -597,6 +597,25 @@ export function census(
           }
           continue;
         }
+        // A check gated by layer (contracts/golden.test.ts, the core-next
+        // parts) names its layer in its title, `[Ln]`: it is skipped exactly
+        // while Ln is above `current`, and passes once it is not.
+        const tag =
+          name === CHECKS_PROJECT ? /\[(L\d+)\]/.exec(test)?.[1] : undefined;
+        if (tag) {
+          const gated =
+            current === null || Number(tag.slice(1)) > Number(current.slice(1));
+          if (gated && status !== "skipped") {
+            fail(
+              `${name}: ${file} > "${test}" is above the v2 layer but ${status}`,
+            );
+          } else if (!gated && status !== "passed") {
+            fail(
+              `${name}: ${file} > "${test}" is ${status === "skipped" ? "skipped but at or below the v2 layer" : status}`,
+            );
+          }
+          continue;
+        }
         const allowedSkip = test in skipAllowed;
         if (status === "passed" && allowedSkip) {
           fail(

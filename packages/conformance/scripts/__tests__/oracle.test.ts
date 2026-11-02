@@ -207,6 +207,21 @@ describe("the census", () => {
     );
   });
 
+  it("fails when a layer-tagged check is skipped at or below current, or runs above it", () => {
+    const reports = cleanReports();
+    const results = reports[CHECKS_PROJECT]?.testResults[0]
+      ?.assertionResults as { title: string; status: string }[];
+    results.push(
+      { ...results[0], title: "[L0] a built part", status: "skipped" },
+      { ...results[0], title: "[L13] an unbuilt part", status: "passed" },
+    );
+    const out = census(repoRoot, reports).join("\n");
+    expect(out).toMatch(
+      /"\[L0\] a built part" is skipped but at or below the v2 layer/,
+    );
+    expect(out).toMatch(/"\[L13\] an unbuilt part" is above the v2 layer/);
+  });
+
   it("fails when a test was skipped outside aheadOfV1", () => {
     const reports = cleanReports();
     const first = reports["conformance:local"]?.testResults[0]

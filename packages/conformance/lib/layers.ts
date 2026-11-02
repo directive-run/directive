@@ -173,6 +173,43 @@ const MEMBER_LAYERS: Record<string, Layer> = {
   onSettledChange: "L3",
 };
 
+/** One feature, named the way the tables above name it. */
+export type NamedFeature =
+  | { member: string }
+  | { option: string }
+  | { module: string }
+  | { name: string };
+
+/**
+ * The layer these tables give one named feature, for a harness that runs
+ * outside per-test placement but must skip by the same ladder (the golden
+ * files, contracts/lib/golden.ts). Throws on a feature the tables do not
+ * place, so a caller never falls back to a guess.
+ */
+export function layerOfFeature(feature: NamedFeature): Layer {
+  let found: Layer | undefined;
+  if ("member" in feature) {
+    found = Object.hasOwn(MEMBER_LAYERS, feature.member)
+      ? MEMBER_LAYERS[feature.member]
+      : undefined;
+  } else if ("option" in feature) {
+    found = OPTION_LAYERS.find(
+      ([chain]) => chain.length === 1 && chain[0] === feature.option,
+    )?.[1];
+  } else if ("module" in feature) {
+    found = MODULE_LAYERS.find(([re]) => re.test(feature.module))?.[1];
+  } else {
+    found = Object.hasOwn(NAME_LAYERS, feature.name)
+      ? NAME_LAYERS[feature.name]
+      : undefined;
+  }
+  if (!found) {
+    throw new Error(`layers: no layer for ${JSON.stringify(feature)}`);
+  }
+
+  return found;
+}
+
 /** Members that are dynamic-definition calls only on a definition registry. */
 const REGISTRY_MEMBERS = new Set([
   "register",
