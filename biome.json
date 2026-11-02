@@ -81,7 +81,8 @@
       "website/.next",
       "**/.next",
       "e2e/fixtures/**/env.d.ts",
-      "examples/**"
+      "examples/**",
+      "packages/core-next/scripts/fixtures/aperture/**"
     ]
   },
   "overrides": [

@@ -1,25 +1,29 @@
 {
-  "_README": "Gzip budgets for the 2.0 engine (packages/core-next), read by packages/core-next/scripts/size.mjs. Each entry is a fixture or module and its `gzBudget` in bytes: minified with esbuild, gzip level 9, the exact number `pnpm --filter @directive-run/core-next size` prints for it. size.mjs fails when a measured size is over its budget. Tighten-only: scripts/size-budgets-tighten.mjs fails a pull request that raises a budget, or sets one to null (no budget), unless that entry's `reason` also changed in the same pull request. A later layer that adds code raises its budget in its own pull request and writes why in `reason`. Lowering a budget needs no new reason. Keys: `graph` is src/graph.ts bundled alone; `minimal`, `two-module` and `floor` are scripts/fixtures/*.ts built against core-next; `full-entry` is `export * from '@directive-run/core'` (every export).",
+  "_README": "Gzip budgets for the 2.0 engine (packages/core-next), read by packages/core-next/scripts/size.mjs. Each entry is a fixture or module and its `gzBudget` in bytes: minified with esbuild, gzip level 9, the exact number `pnpm --filter @directive-run/core-next size` prints for it. size.mjs fails when a measured size is over its budget. Tighten-only: scripts/size-budgets-tighten.mjs fails a pull request that raises a budget, or sets one to null (no budget), unless that entry's `reason` also changed in the same pull request. A later layer that adds code raises its budget in its own pull request and writes why in `reason`. Lowering a budget needs no new reason. Keys: `graph` is src/graph.ts bundled alone; `minimal`, `two-module`, `floor` and `aperture` are scripts/fixtures/*.ts built against core-next (`aperture` is the real Aperture lab app, A5); `full-entry` is `export * from '@directive-run/core'` (every export).",
   "budgets": {
     "graph": {
       "gzBudget": 1850,
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 28400,
-      "reason": "L5b gates, linger, retry, coalesce, (aa) (ab) (ac) and the namespaced gate-write refusal, owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage): measured 28,282 B, +685 B over L5a's 27,597 B. By piece: the gate registry +165 B (99 B of it the 1.35 'both key and active' message, thrown in production as 1.35 does); gate timers, commit and evaluate (linger, backoff, (aa), (ac)) +366 B (41 B of it the 1.35 gate-returned message); coalesce +94 B; the gate-closed guard ((ab)) +26 B; folds with L5a's code -105 B; the namespaced gate-write refusal with 1.35's text in both modes +122 B (64 B of it the message). Budget = measured + 118 B, also covering rows ad and ae (approved the same day)."
+      "gzBudget": 28520,
+      "reason": "L6a: restore() as a part createSystem wires (B6), with (ag) and (ah), owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\": measured 28,464 B, +150 B over L5's 28,314 B. By piece: the core seams (load_ on the part context, the one hydrate-batch helper initialize now shares with it, and hydrate's pending count, read only in development) +13 B; the restore part +137 B, most of it 1.35's three restore() errors, thrown in production as 1.35 does; (ag) and (ah) 0 B (development only). Budget = measured + 56 B, leaving 280 B under the 28.8 KB L6 ceiling for L6b and (al)."
     },
     "two-module": {
-      "gzBudget": 28500,
-      "reason": "L5b, as minimal (owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage)): measured 28,374 B, +687 B over L5a's 27,687 B, the same pieces."
+      "gzBudget": 28610,
+      "reason": "L6a, as minimal (owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\"): measured 28,558 B, +155 B over L5's 28,403 B, the same pieces. Budget = measured + 52 B."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
     },
+    "aperture": {
+      "gzBudget": 33250,
+      "reason": "L6a, as minimal (owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\"): measured 33,192 B, +167 B over the 33,025 B measured on main 3adf0c41 before restore() landed (A5: the real Aperture lab's three Directive files verbatim, its system setup with history off, 1.35's persistence plugin standing in until L6b; 1.35 on the same copy is 59,798 B by this script). Budget = measured + 58 B; the plan's 6 KB and 8 KB for it are retired."
+    },
     "full-entry": {
-      "gzBudget": 30550,
-      "reason": "L5b, as minimal (owner-approved 2026-11-01 in chat, \"Approve up to 28.4 KB\" (A1's 2.5 KB plus the L5b overage)): measured 30,419 B, +686 B over L5a's 29,733 B, the same pieces."
+      "gzBudget": 30650,
+      "reason": "L6a, as minimal (owner-approved 2026-11-02 in chat, \"Approve up to 28.8 KB\"): measured 30,595 B, +147 B over L5's 30,448 B, the same pieces. Budget = measured + 55 B."
     }
   }
 }
