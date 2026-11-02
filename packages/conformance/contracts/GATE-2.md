@@ -165,10 +165,13 @@ Three pieces, each described in `README.md` under "Divergences":
   that covered nothing is stale as a whole. `group` changes only the stale
   check, never what an entry covers.
 
-Fuzz entries by group (52, as of #301): `quirk-a` 13, `quirk-p` 5, `quirk-j` 5,
+Fuzz entries by group (53, as of the L5 gate; 52 at #301): `quirk-a` 13,
+`quirk-p` 5, `quirk-j` 5,
 `quirk-n` 10 (`timeout`, `aborted`, `wrote` and `start` records; `when:
-timeout`), `quirk-b` 10 (`when: resolverRejects`), `quirk-t` 5 (no `when`: the
-shape needs only a resolver whose write retracts its own constraint), `quirk-z`
+timeout`), `quirk-b` 10 (`when: resolverRejects`), `quirk-t` 6 (no `when`: the
+shape needs only a resolver whose write retracts its own constraint; the sixth,
+`l3-cand-t-fuzz-observe-requirement-canceled-changed`, was found by deep fuzz
+seed 24301 at the L5 gate, see GATE-4.md), `quirk-z`
 3 (`when: settleStop`) and the L2 console-warning entry `l2-quirk-b-console-warn`
 (no group, no `when`).
 
@@ -184,8 +187,15 @@ observe event for it. 2.0 reports the completion only (it still aborts the
 signal), and `onReconcileEnd` lists the requirement canceled on both, as in
 row l. No `stop()` is involved. The scenario "a run retracted after it reported
 complete: complete, then cancel" (L2) shows it; its three entries are
-`l3-cand-t-*` for the plugin hooks and the observe event, and the five fuzz
-entries are group `quirk-t`.
+`l3-cand-t-*` for the plugin hooks and the observe event, and the six fuzz
+entries are group `quirk-t`. The sixth, `l3-cand-t-fuzz-observe-requirement-canceled-changed`,
+was added at the L5 gate: deep fuzz seed 24301 found it, and it was latent at
+L4. When one run's own write retracts its constraint while another run is
+canceled in the same pass, the comparison pairs 1.35's extra
+`requirement.canceled` observe event for the first run with 2.0's cancel of the
+other, as changed in `event.id`. It is the observe-event twin of
+`l3-cand-t-fuzz-hook-onRequirementCanceled-changed`. A pinned case
+(`pinned.json`) shows it on every seed; GATE-4.md describes it.
 
 ## Pinned fuzz cases
 

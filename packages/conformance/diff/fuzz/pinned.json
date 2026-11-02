@@ -616,5 +616,87 @@
         }
       ]
     }
+  },
+  {
+    "group": "quirk-t",
+    "why": "Deep seed 24301 at L5 (shrunk; latent at L4): row t's third path, where r1's own write retracts c1 while r0 is canceled in the same pass; 1.35's extra requirement.canceled for r1 pairs as changed (event.id) with 2.0's cancel of r0. Needs l3-cand-t-fuzz-observe-requirement-canceled-changed.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 1,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": -1,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": -1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        }
+      ]
+    }
   }
 ]
