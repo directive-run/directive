@@ -162,6 +162,29 @@ describe("the persistence plugin (ak): saved keys the schema dropped", () => {
     }
   });
 
+  it("leave storage untouched until the program writes, as in 1.35 development", () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const storage = memoryStorage({ prefs: { removedLater: true } });
+      const setItem = vi.spyOn(storage, "setItem");
+      const system: any = createSystem({
+        module: scene(() => {}),
+        plugins: [plugin(storage, { debounce: 10 })],
+      });
+      system.start();
+      vi.advanceTimersByTime(50);
+      expect(setItem).not.toHaveBeenCalled();
+      expect(storage.raw("prefs")).toBe('{"removedLater":true}');
+      system.facts.fps = 3;
+      vi.advanceTimersByTime(20);
+      expect(storage.raw("prefs")).toBe('{"fps":3}');
+      system.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("are left out of a save before initialize(), while the saved values are held (ai)", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const storage = memoryStorage({ prefs: { fps: 2, removedLater: true } });

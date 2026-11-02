@@ -161,7 +161,8 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   /**
    * The persisted entries of `data`, in storage order. The keys the schema
    * dropped stay among them, so they are tracked in their place, and go to
-   * `kept` for `sys`: not restored, written back by every save (ak).
+   * `kept` for `sys`: not restored (ak); production writes them back on every
+   * save, development leaves them out, as each 1.35 build does.
    */
   const entriesOf = (
     sys: System<M>,
@@ -326,8 +327,8 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       const entries = entriesOf(sys, data, context);
       if (context && !sys.isInitialized) {
         // (ai): held for the turn. Tracked now, as 1.35 tracks a restored
-        // key here, so each save writes the keys in 1.35's order, a kept
-        // key (ak) in its place.
+        // key here, so each save writes the keys in 1.35's order, and in
+        // production a kept key (ak) in its place.
         for (const [factKey] of entries) {
           trackedKeys.add(factKey);
         }
