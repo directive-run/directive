@@ -1,6 +1,7 @@
 /**
  * L6: every t.* builder validating good and bad writes in development, and
- * the schema introspection functions over the same schema.
+ * the schema introspection functions over the same schema. Validating a
+ * predicate against the schema is an L11 export: l11-predicates.test.ts.
  */
 
 import { type BuildContext, scenario, suite } from "../scenario.js";
@@ -108,7 +109,7 @@ suite("L6 schema kinds", () => {
   );
 
   scenario(
-    "schema introspection: kinds, operators and predicate validation",
+    "schema introspection: kinds and operators",
     (ctx) => ({
       module: ctx.core.createModule("m", {
         schema: { facts: schema(ctx), derivations: {}, events: {} },
@@ -141,15 +142,6 @@ suite("L6 schema kinds", () => {
           attempt("field kinds", () => c.getSchemaFieldKinds({ facts }));
           attempt("operators", () => c.getOperatorsForKind("number"));
           attempt("all operators", () => c.listAllPredicateOperators());
-          attempt("validate good", () =>
-            c.validatePredicateAgainstSchema({ n: { $gte: 1 } }, { facts }),
-          );
-          attempt("validate bad", () =>
-            c.validatePredicateAgainstSchema(
-              { s: { $gte: 1 }, zz: 1 },
-              { facts },
-            ),
-          );
         },
       },
     ],
