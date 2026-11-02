@@ -1,5 +1,7 @@
 // core-next, from the BUILT dist (what ships, mangled). Own process, own adapter.
-import { createGraph } from "../dist/index.js";
+// dist/graph.js is a private build output (not in package.json `exports`):
+// the graph is not public API.
+import { createGraph } from "../dist/graph.js";
 import { emit, runAll } from "./runner.mjs";
 
 function world() {

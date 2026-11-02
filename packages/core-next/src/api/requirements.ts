@@ -106,7 +106,13 @@ export function isRequirementType<T extends string>(
   return req.type === type;
 }
 
-/** A resolver `requirement` predicate for one type. */
+/** A resolver `requirement` predicate for one type (1.35's two overloads). */
+export function forType<R extends Requirement>(
+  type: R["type"],
+): (req: Requirement) => req is R;
+export function forType<T extends string>(
+  type: T,
+): (req: Requirement) => req is Requirement & { type: T };
 export function forType<T extends string>(
   type: T,
 ): (req: Requirement) => req is Requirement & { type: T } {
