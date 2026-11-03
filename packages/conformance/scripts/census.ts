@@ -22,6 +22,7 @@ import {
   checkAheadOfV1,
   checkConfig,
   checkDivergences,
+  checkExcuses,
   checkFuzzRuns,
   checkHooksFired,
   checkScenarioLayers,
@@ -97,6 +98,14 @@ try {
       new Set(readLines("divergences-used.txt")),
     ),
   );
+  {
+    // How many records each excuse excused (diff/scenario.ts `logResult`).
+    const uses = new Map<string, number>();
+    for (const line of readLines("excuses-used.txt")) {
+      uses.set(line, (uses.get(line) ?? 0) + 1);
+    }
+    failures.push(...checkExcuses(conformanceRoot, uses));
+  }
   failures.push(
     ...checkHooksFired(conformanceRoot, new Set(readLines("hooks-fired.txt"))),
   );

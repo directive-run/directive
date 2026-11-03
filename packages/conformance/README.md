@@ -205,13 +205,54 @@ table, or `diff/compare.ts`, changes the contract: it is an oracle change
 `diff/divergences.json`, keyed by what differs, never by trace index:
 `{ id, scenario, stream, kind, reason, approvedBy, date }`, optionally
 narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed`) and
-`path` (inside the entry; a prefix covers everything under it). **Jason
+`path` (inside the entry; a prefix covers everything under it), and named
+exactly by `excuses` or `bound` (below). **Jason
 approves every entry; an agent never adds one, and never fills in
 `approvedBy`.** The census fails an entry that is incomplete or unsigned,
 or that covered no difference in the run (stale). The file is part of the
 harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review. It is the one harness
 file an engine PR may change (see "Engine and oracle land separately").
+
+**An entry names what it excuses** (P3-F1, `diff/fingerprint.ts`). The
+fields above only name a class of differences; on their own they would
+excuse any number of same-kind records in the entry's step, and any value
+under a changed entry's path. So every entry also carries one of:
+
+- `excuses` (a hand scenario's entry): the records it excuses, each with a
+  `count`. A missing or extra excuse is `{ count, record }`, the whole
+  record as compared (1.35's for missing, 2.0's for extra); a changed one is
+  `{ count, path, from, to }`, the field's full path with its 1.35 and 2.0
+  values (a side with no value is left out). A record no excuse names is
+  unexplained, and so is a copy past an excuse's count. The census also
+  fails an excuse that excused fewer records than its count (stale).
+- `bound` (a fuzz entry, whose records differ from seed to seed): `{ match:
+  [patterns] }`. A pattern is the record (or, for changed, `{ path, from,
+  to }`) with only the parts a seed varies left open: `{ "$like": name }`
+  for a resolver, constraint, requirement or effect identifier of the fuzz
+  model's naming grammar, an integer (an attempt or a count), the error a
+  fuzz resolver's attempt ended with (its thrown message or its timeout,
+  one class: quirk b excuses either), a fuzz derivation's or effect's
+  thrown error and id (on 2.0's side of quirk b's pairing shift: 1.35's
+  extra attempt error pairs with 2.0's next error of the stream), or an absent side, and `[*]` for an array index under the entry's path. A changed
+  pattern's `to` may instead be `{ "$lt": "from" }`: 2.0's number is below
+  1.35's, for a quirk whose approval says which way a count moves (quirk
+  z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused). Field names,
+  tags, structure, array lengths and every other value stay literal, so a
+  fuzz entry no longer excuses an unrelated record kind or key.
+
+The census requires one of them on every entry. They were added by
+`scripts/fingerprint-divergences.ts`, which records what each entry covered
+on the current engines (the PR run; for fuzz samples, the fuzz at seeds
+1–20 and 24301 at the PR run count plus seed 24301 at 5000, so a bound
+describes its record class rather than one seed's literals: `--rebound
+--seeds 1-20` regenerates every bound that way, each entry run as the old
+wildcard over its class) and writes exactly that: an excuse per distinct record with its
+count, or the patterns the covered records generalize to (for a fuzz entry
+that covered nothing itself, the records of its class). That only narrows
+an entry, so it keeps its `approvedBy`, `date` and `reason`: narrowing an
+approved entry needs no new approval. A new entry, or one that excuses
+more, needs Jason's sign-off as before.
 
 An entry may also say `ends: true`: the approved quirk it covers ends the
 comparison of a fuzz case. It exists for a quirk whose consequences

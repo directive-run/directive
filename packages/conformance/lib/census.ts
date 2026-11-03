@@ -27,6 +27,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
+import { LIKE, canonicalJson, isLower } from "../diff/fingerprint.js";
+import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
@@ -869,6 +871,8 @@ export interface DivergenceEntry {
   ends?: boolean;
   when?: string[];
   group?: string;
+  excuses?: unknown;
+  bound?: unknown;
   reason: string;
   approvedBy: string;
   date: string;
@@ -884,8 +888,10 @@ const DIVERGENCE_REQUIRED = [
   "stream",
 ];
 const DIVERGENCE_OPTIONAL = [
+  "bound",
   "ends",
   "engine",
+  "excuses",
   "group",
   "op",
   "path",
@@ -1107,6 +1113,238 @@ export function checkDivergences(
   }
 
   return failures;
+}
+
+/**
+ * Every divergence names what it excuses (P3-F1; diff/scenario.ts
+ * `Excuse`, `Bound`): without it an entry is a wildcard over its class
+ * (scenario, stream, kind, step, op, path prefix), excusing any number of
+ * records with any payload.
+ *
+ * - A hand scenario's entry has an `op` and a non-empty `excuses` list, and
+ *   no `bound`. Each excuse has a positive integer `count`; a missing or
+ *   extra entry's excuses each name a `record` (and nothing else); a changed
+ *   entry's each name the full `path` (inside the entry's `path`, if it has
+ *   one) and `from` and/or `to`. No two excuses of an entry name the same
+ *   record (one excuse, a higher count).
+ * - A fuzz entry has a `bound` and no `excuses` (`checkBound`).
+ *
+ * `uses` counts, per `<id>\t<index>`, the records each excuse excused in
+ * the run (null when not known). Each excuse of an entry the run used must
+ * have excused exactly `count` records: `explain` never lets it excuse more
+ * (a further copy is unexplained), and fewer means it names a record that
+ * no longer differs, or no longer that often (stale).
+ */
+export function checkExcuses(
+  conformanceRoot: string,
+  uses: Map<string, number> | null,
+): string[] {
+  const failures: string[] = [];
+  let entries: unknown;
+  try {
+    entries = readJson(join(conformanceRoot, "diff/divergences.json"));
+  } catch {
+    return ["diff/divergences.json: missing or not JSON"];
+  }
+  if (!Array.isArray(entries)) {
+    return ["diff/divergences.json: must be an array"];
+  }
+  const used = uses
+    ? new Set([...uses.keys()].map((k) => k.split("\t")[0]))
+    : null;
+  for (const [i, raw] of entries.entries()) {
+    const e = (raw ?? {}) as Partial<DivergenceEntry>;
+    const label = typeof e.id === "string" && e.id ? e.id : `entry ${i}`;
+    const fail = (m: string) =>
+      failures.push(`diff/divergences.json: ${label} ${m}`);
+    if (e.scenario === FUZZ_SCENARIO) {
+      if (e.excuses !== undefined) {
+        fail(
+          "has excuses, which only a hand scenario's entry may have: a fuzz case's records differ from seed to seed (give a bound)",
+        );
+      }
+      for (const m of checkBound(e)) {
+        fail(m);
+      }
+      continue;
+    }
+    if (e.bound !== undefined) {
+      fail(
+        "has a bound, which only a fuzz entry may have: a hand scenario's entry names its records (excuses)",
+      );
+    }
+    if (e.op === undefined) {
+      fail(
+        "needs an op (missing, extra or changed): its excuses name records of one op",
+      );
+    }
+    if (!Array.isArray(e.excuses) || e.excuses.length === 0) {
+      fail(
+        "needs excuses: the records it excuses, each with a count (without them it excuses any record of its kind in its step)",
+      );
+      continue;
+    }
+    const seen = new Set<string>();
+    for (const [k, x] of (e.excuses as unknown[]).entries()) {
+      const at = `excuse ${k}`;
+      if (x === null || typeof x !== "object" || Array.isArray(x)) {
+        fail(`${at} must be an object`);
+        continue;
+      }
+      const ex = x as Record<string, unknown>;
+      const keys = Object.keys(ex);
+      if (!Number.isInteger(ex.count) || (ex.count as number) < 1) {
+        fail(`${at} needs a positive integer count`);
+      }
+      if (e.op === "changed") {
+        const extra = keys.filter(
+          (key) => !["count", "path", "from", "to"].includes(key),
+        );
+        if (typeof ex.path !== "string" || extra.length > 0) {
+          fail(
+            `${at} of a changed entry must have count, path and from and/or to (only)`,
+          );
+        } else if (!("from" in ex) && !("to" in ex)) {
+          fail(`${at} must say from and/or to (the value on each side)`);
+        } else if (
+          typeof e.path === "string" &&
+          ex.path !== e.path &&
+          !ex.path.startsWith(`${e.path}.`) &&
+          !ex.path.startsWith(`${e.path}[`)
+        ) {
+          fail(`${at} path ${ex.path} is outside the entry's path ${e.path}`);
+        }
+      } else if (
+        e.op !== undefined &&
+        (!("record" in ex) ||
+          keys.some((key) => !["count", "record"].includes(key)))
+      ) {
+        fail(`${at} of a ${e.op} entry must have count and record (only)`);
+      }
+      const { count: _count, ...fingerprint } = ex;
+      const key = canonicalJson(fingerprint as Json);
+      if (seen.has(key)) {
+        fail(
+          `${at} names the same record as an earlier excuse: give one excuse a higher count`,
+        );
+      }
+      seen.add(key);
+      if (
+        uses &&
+        used?.has(e.id as string) &&
+        Number.isInteger(ex.count) &&
+        (uses.get(`${e.id}\t${k}`) ?? 0) !== ex.count
+      ) {
+        fail(
+          `${at} excused ${uses.get(`${e.id}\t${k}`) ?? 0} record(s) in this run, not its count ${ex.count} (stale: the record no longer differs, or not that often); narrow it`,
+        );
+      }
+    }
+  }
+
+  return failures;
+}
+
+/** The `$like` classes a fuzz entry's bound may name. */
+const BOUND_LIKES = Object.keys(LIKE);
+
+/**
+ * A fuzz entry's `bound` (diff/scenario.ts `Bound`): `{ match }`, a
+ * non-empty list of distinct patterns, each naming only known `$like`
+ * classes. A changed entry's patterns are `{ path, from, to }` with the path
+ * inside the entry's own `path`; a missing or extra entry's are records
+ * (objects).
+ */
+function checkBound(e: Partial<DivergenceEntry>): string[] {
+  const out: string[] = [];
+  const b = e.bound as { match?: unknown } | undefined;
+  if (
+    b === undefined ||
+    b === null ||
+    typeof b !== "object" ||
+    Object.keys(b).join() !== "match" ||
+    !Array.isArray(b.match) ||
+    b.match.length === 0
+  ) {
+    return [
+      "needs a bound: { match: [patterns] }, the payloads it excuses (without it it excuses any record of its kind)",
+    ];
+  }
+  const likes = (v: unknown): string[] => {
+    if (Array.isArray(v)) {
+      return v.flatMap(likes);
+    }
+    if (v !== null && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (Object.keys(o).length === 1 && "$like" in o) {
+        return [String(o.$like)];
+      }
+
+      return Object.values(o).flatMap(likes);
+    }
+
+    return [];
+  };
+  // `{ "$lt": "from" }` is read only as a changed pattern's `to`.
+  const lts = (v: unknown): number => {
+    if (Array.isArray(v)) {
+      return v.reduce((n: number, x) => n + lts(x), 0);
+    }
+    if (v !== null && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+
+      return (
+        ("$lt" in o ? 1 : 0) +
+        Object.values(o).reduce((n: number, x) => n + lts(x), 0)
+      );
+    }
+
+    return 0;
+  };
+  const seen = new Set<string>();
+  for (const [k, p] of b.match.entries()) {
+    const at = `bound pattern ${k}`;
+    const to = (p as Record<string, unknown> | null)?.to as Json | undefined;
+    const lower =
+      e.op === "changed" &&
+      p !== null &&
+      typeof p === "object" &&
+      !Array.isArray(p) &&
+      isLower(to);
+    if (lts(p) !== (lower ? 1 : 0)) {
+      out.push(
+        `${at} uses $lt other than as a changed pattern's to: { "$lt": "from" }`,
+      );
+    }
+    for (const name of likes(p).filter((n) => !BOUND_LIKES.includes(n))) {
+      out.push(`${at} names an unknown $like "${name}"`);
+    }
+    if (p === null || typeof p !== "object" || Array.isArray(p)) {
+      out.push(`${at} must be an object`);
+    } else if (e.op === "changed") {
+      const q = p as Record<string, unknown>;
+      if (
+        Object.keys(q).sort().join() !== "from,path,to" ||
+        typeof q.path !== "string"
+      ) {
+        out.push(`${at} of a changed entry must be { path, from, to }`);
+      } else if (
+        typeof e.path === "string" &&
+        q.path !== e.path &&
+        !q.path.startsWith(`${e.path}.`) &&
+        !q.path.startsWith(`${e.path}[`)
+      ) {
+        out.push(`${at} path ${q.path} is outside the entry's path ${e.path}`);
+      }
+    }
+    const key = canonicalJson(p as Json);
+    if (seen.has(key)) {
+      out.push(`${at} repeats an earlier pattern`);
+    }
+    seen.add(key);
+  }
+
+  return out;
 }
 
 /** The plugin hooks, read from diff/hooks.ts (the list the recorder installs). */
