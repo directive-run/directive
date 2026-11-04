@@ -7,6 +7,12 @@
 export { createFactsProxy } from "./api/facts.js";
 export { createFacts, createFactsStore } from "./api/validate.js";
 export { createEffectsManager } from "./api/effects.js";
+export { stableStringify } from "./api/requirements.js";
+export { isPrototypeSafe } from "./api/utils.js";
+export {
+  createConstraintFactory,
+  createResolverFactory,
+} from "./types/helpers.js";
 
 // 1.35's public types for this entry, exactly: copied from 1.35 into
 // src/types/ (types only, no runtime code).
