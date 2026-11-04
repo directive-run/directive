@@ -13,56 +13,134 @@
   "author": "Jason Comes",
   "sideEffects": false,
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "development": {
-        "import": "./dist/development/index.js"
+        "import": "./dist/development/index.js",
+        "require": "./dist/development/index.cjs"
       },
       "production": {
-        "import": "./dist/production/index.js"
+        "import": "./dist/production/index.js",
+        "require": "./dist/production/index.cjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
       },
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
     },
-    "./testing": {
+    "./internals": {
       "development": {
-        "import": "./dist/development/testing.js"
+        "import": "./dist/development/internals.js",
+        "require": "./dist/development/internals.cjs"
       },
       "production": {
-        "import": "./dist/production/testing.js"
+        "import": "./dist/production/internals.js",
+        "require": "./dist/production/internals.cjs"
+      },
+      "require": {
+        "types": "./dist/internals.d.cts",
+        "default": "./dist/internals.cjs"
       },
       "import": {
-        "types": "./dist/testing.d.ts",
-        "default": "./dist/testing.js"
+        "types": "./dist/internals.d.ts",
+        "default": "./dist/internals.js"
       }
     },
     "./plugins": {
       "development": {
-        "import": "./dist/development/plugins.js"
+        "import": "./dist/development/plugins.js",
+        "require": "./dist/development/plugins.cjs"
       },
       "production": {
-        "import": "./dist/production/plugins.js"
+        "import": "./dist/production/plugins.js",
+        "require": "./dist/production/plugins.cjs"
+      },
+      "require": {
+        "types": "./dist/plugins.d.cts",
+        "default": "./dist/plugins.cjs"
       },
       "import": {
         "types": "./dist/plugins.d.ts",
         "default": "./dist/plugins.js"
       }
     },
-    "./internals": {
+    "./testing": {
       "development": {
-        "import": "./dist/development/internals.js"
+        "import": "./dist/development/testing.js",
+        "require": "./dist/development/testing.cjs"
       },
       "production": {
-        "import": "./dist/production/internals.js"
+        "import": "./dist/production/testing.js",
+        "require": "./dist/production/testing.cjs"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
       },
       "import": {
-        "types": "./dist/internals.d.ts",
-        "default": "./dist/internals.js"
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
+    },
+    "./migration": {
+      "development": {
+        "import": "./dist/development/migration.js",
+        "require": "./dist/development/migration.cjs"
+      },
+      "production": {
+        "import": "./dist/production/migration.js",
+        "require": "./dist/production/migration.cjs"
+      },
+      "require": {
+        "types": "./dist/migration.d.cts",
+        "default": "./dist/migration.cjs"
+      },
+      "import": {
+        "types": "./dist/migration.d.ts",
+        "default": "./dist/migration.js"
+      }
+    },
+    "./adapter-utils": {
+      "development": {
+        "import": "./dist/development/adapter-utils.js",
+        "require": "./dist/development/adapter-utils.cjs"
+      },
+      "production": {
+        "import": "./dist/production/adapter-utils.js",
+        "require": "./dist/production/adapter-utils.cjs"
+      },
+      "require": {
+        "types": "./dist/adapter-utils.d.cts",
+        "default": "./dist/adapter-utils.cjs"
+      },
+      "import": {
+        "types": "./dist/adapter-utils.d.ts",
+        "default": "./dist/adapter-utils.js"
+      }
+    },
+    "./worker": {
+      "development": {
+        "import": "./dist/development/worker.js",
+        "require": "./dist/development/worker.cjs"
+      },
+      "production": {
+        "import": "./dist/production/worker.js",
+        "require": "./dist/production/worker.cjs"
+      },
+      "require": {
+        "types": "./dist/worker.d.cts",
+        "default": "./dist/worker.cjs"
+      },
+      "import": {
+        "types": "./dist/worker.d.ts",
+        "default": "./dist/worker.js"
       }
     }
   },
@@ -77,7 +155,11 @@
     "size": "node scripts/size.mjs",
     "size:check": "node scripts/size.mjs --check",
     "size:tighten": "node scripts/size-budgets-tighten.mjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "pack:alpha": "node scripts/alpha/pack.mjs",
+    "smoke:alpha": "node scripts/alpha/install-smoke.mjs",
+    "consumer:alpha": "node scripts/alpha/consumer-check.mjs",
+    "api-reference:alpha": "node scripts/alpha/api-reference.mjs"
   },
   "devDependencies": {
     "alien-signals": "3.1.2",
