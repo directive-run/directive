@@ -1,0 +1,4 @@
+{
+  "about": "Parity rows the alpha may differ from 1.35 on, each with the owner-approved reason. A row is `<checkpoint> | <implementation> | <field>` or `error | <implementation> | <message>`, as consumer-check.mjs prints it.",
+  "rows": []
+}
