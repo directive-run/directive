@@ -233,9 +233,20 @@ export function createNamespacedSystem(
             return factsOf(src, key);
           }
           if (isDevelopment) {
-            console.warn(
-              `[Directive] Module "${ns}" accessed undeclared cross-module property "${key}". Add it to crossModuleDeps or use "facts.self.${key}" for own module facts.`,
-            );
+            if (role !== "gate") {
+              console.warn(
+                `[Directive] Module "${ns}" accessed undeclared cross-module property "${key}". Add it to crossModuleDeps or use "facts.self.${key}" for own module facts.`,
+              );
+            } else if (!RUNTIME_PROBE_PROPS.has(key)) {
+              // 1.35's source gate view: its own text, once per system.
+              const id = `gate-undeclared|${ns}|${key}`;
+              if (!warned.has(id)) {
+                warned.add(id);
+                console.warn(
+                  `[Directive] Module "${ns}" read undeclared property "${key}" in a source gate. This module declares crossModuleDeps, so gate facts are namespaced: use "facts.self.${key}" for its own fact, or add the module to crossModuleDeps.`,
+                );
+              }
+            }
           }
 
           return undefined;
