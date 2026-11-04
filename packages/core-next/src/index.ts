@@ -27,6 +27,12 @@ export {
   req,
 } from "./api/requirements.js";
 export { t } from "./api/schema-builders.js";
+export { Backoff, shallowEqual } from "./api/utils.js";
+export {
+  isNamespacedSystem,
+  isSingleModuleSystem,
+} from "./types/composition.js";
+export { typedConstraint, typedResolver } from "./types/helpers.js";
 // Schema introspection (L6, B5): root exports only, so a system that does
 // not call them bundles none of it.
 export {
