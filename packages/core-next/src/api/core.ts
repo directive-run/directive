@@ -1043,9 +1043,7 @@ export function createSystemCore<const M extends ModuleSchema>(
         origin = "authored";
       }
     });
-  /** Non-JSON warnings already given, shared by every facts view. */
-  const nonJson = new Set<string>();
-  const facts = createFactsProxy(store, schema, tracker, nonJson);
+  const facts = createFactsProxy(store, schema, tracker);
 
   // --- reconcile -------------------------------------------------------------
   function scheduleReconcile(): void {
@@ -1641,14 +1639,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     watch: (id) => watched.add(id),
     writers,
     factsFor: (writer, allow) =>
-      createFactsProxy(
-        store,
-        schema,
-        tracker,
-        nonJson,
-        writer,
-        allow,
-      ) as Facts<Schema>,
+      createFactsProxy(store, schema, tracker, writer, allow) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
   };
   for (const part of parts) {
