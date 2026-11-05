@@ -95,11 +95,13 @@ export type Boundary = "skip" | "retry" | "retry-later" | "disable" | "throw";
 
 /**
  * One constraint that feeds the batched resolver. While its fact is at least
- * `atLeast` it raises one requirement per item, and item `i` needs the fact
- * at `atLeast + i`, so a falling fact retracts the later items first and
- * keeps the rest: a write can take one requirement out of a running batch
- * and leave its siblings wanted (quirk g). With `abortOn`, the constraint
- * binds its runs to the fact the handler writes.
+ * `atLeast` it raises one requirement per item: items 0 and 1 need the fact
+ * at `atLeast`, so an active source of two or more items puts two into one
+ * call (quirk i needs one item to fail and another to succeed), and item
+ * `i` from 2 on needs `atLeast + i - 1`, so a falling fact retracts the
+ * later items first and keeps the rest: a write can take one requirement
+ * out of a running batch and leave its siblings wanted (quirk g). With
+ * `abortOn`, the constraint binds its runs to the fact the handler writes.
  */
 export interface FuzzBatchSource {
   fact: number;
@@ -721,7 +723,7 @@ function batchedResolver(
       require: (fs: any) => {
         const reqs: Array<{ type: string; item: string }> = [];
         for (let i = 0; i < src.items; i++) {
-          if (fs[fact] >= src.atLeast + i) {
+          if (fs[fact] >= src.atLeast + Math.max(0, i - 1)) {
             reqs.push({ type, item: `${s}.${i}` });
           }
         }

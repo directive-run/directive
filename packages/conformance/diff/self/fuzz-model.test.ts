@@ -178,11 +178,12 @@ describe("fuzz generator ceiling", () => {
     );
     const reach = {
       // g: a write can retract one requirement of a running batch and keep
-      // a sibling: a source with two or more items, a wait, and a later set.
+      // a sibling: a source with three items (the third needs one more than
+      // the first two), a wait, and a later set.
       g: batches.some(
         ({ batch, steps }) =>
           batch.delay > 0 &&
-          batch.sources.some((src) => src.items > 1) &&
+          batch.sources.some((src) => src.items > 2) &&
           steps.some((x) => x.op === "set"),
       ),
       // h: a with-results call fails every item.

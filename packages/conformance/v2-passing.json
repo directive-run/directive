@@ -3,7 +3,6 @@
   "tests": {
     "conformance:v2": {
       "tests/core/batch-resolve-fallback.test.ts": [
-        "batch + cancel > stops batched resolvers when system is stopped during batch window",
         "batch + resolve fallback > emits dev warning when batch.enabled without resolveBatch"
       ],
       "tests/core/batched-read-your-write.test.ts": [
@@ -1493,7 +1492,6 @@
       ],
       "tests/core/resolver-loading-flag.test.ts": [
         "a loading flag survives a failure after satisfying > a loading guard in when: timeout plus retry does not deadlock (L3)",
-        "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)",
         "a loading flag survives a failure after satisfying > satisfied, then timed out: the finally lands (L4)",
         "constraint errors > a require() that throws keeps what it read (H1)",
         "constraint errors > retry-later retries with no retryLater config (H4)"
@@ -1960,6 +1958,18 @@
       "file": "tests/core/l1-derivations-effects.test.ts",
       "test": "an effect reading a derivation > re-runs when it only tested the derivation's membership",
       "reason": "Renamed and rewritten by L4-pre: the old test pinned 1.35's re-run on a membership-only read, which quirk (c) changes at L4. The new test, \"sees the derivation as present when it only tests its membership\", keeps every other assertion and passes on both engines."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/batch-resolve-fallback.test.ts",
+      "test": "batch + cancel > stops batched resolvers when system is stopped during batch window",
+      "reason": "L7-pre (U12): the test passed on v2 only because no batch handler ran; it now has a control run with no stop() where the handler must run, so it fails until L7a builds batching."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/resolver-loading-flag.test.ts",
+      "test": "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)",
+      "reason": "L7-pre (U12): the test passed on v2 only because no batch handler ran (loading starts false); it now samples loading true while the handler runs and checks the handler ran, so it fails until L7a builds batching."
     }
   ]
 }
