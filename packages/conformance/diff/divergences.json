@@ -7065,6 +7065,7 @@
     "stream": "console",
     "kind": "warn",
     "engine": "v2",
+    "when": ["resolverRejects"],
     "bound": {
       "match": [
         {
@@ -7081,6 +7082,57 @@
     "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-10-30"
+  },
+  {
+    "id": "l3-quirk-o-fuzz-console-warn-missing",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["namespacedDateWrite"],
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$incidental": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row o (owner-approved 2026-11-01 on the decisions page: \"A non-JSON write through a module warns once\"): 1.35 prints the development warning for a non-JSON fact write (a Date) twice for a namespaced fact, once by its module-qualified name (`a.when`) and once by the internal key (`a::when`); 2.0 prints it once, by the module-qualified name. In the fuzz this is the Date fact `when` of module a or b (`a::when`, `b::when`): the second warning is missing on 2.0. The compare masks console text as incidental (diff/compare.ts `contract`), so the bound can name only a warning with one string argument, and `when: namespacedDateWrite` limits it to a case with two modules and a Date fact (a Date written to a namespaced fact); a fuzz bound has no count, so the hand scenario \"a Date written to a namespaced fact warns once\" (diff/scenarios/l1-modules.test.ts; entry `l1-quirk-o-namespaced-date-console-warn-missing-step0`) pins the count at one missing warning; `op: missing` keeps an extra warning on 2.0 unexcused. Signed 2026-11-04 on the owner's instruction: he approved this row (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-04"
+  },
+  {
+    "id": "l1-quirk-o-namespaced-date-console-warn-missing-step0",
+    "scenario": "a Date written to a namespaced fact warns once",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$incidental": "string"
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row o (GATE-2.md:41, \"A non-JSON write through a module warns once\"; owner-approved 2026-11-01): 1.35 prints the development warning for a non-JSON fact write (a Date) twice for a namespaced fact, once by its module-qualified name (`a.when`) and once by the internal key (`a::when`); 2.0 prints it once, by the module-qualified name. In this scenario module a's init writes `new Date(0)` to its Date fact `when` (as the fuzz model does) when the system starts (step 0), so 1.35 warns twice and 2.0 once. This covers the one console \"warn\" record (the `a::when` warning) that only 1.35 records in step 0. It pins the count the fuzz entry `l3-quirk-o-fuzz-console-warn-missing` cannot: 2.0 warning zero times leaves a second missing warning unexcused, and 2.0 warning twice leaves this entry stale. Signed 2026-11-04 on the owner's instruction: he approved this row (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-04"
   },
   {
     "id": "l4-quirk-c-member-only-hook-onEffectRun-missing-step1",

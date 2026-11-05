@@ -19,6 +19,7 @@
     "timer facts start, pause, resume, tick and complete": "L0",
     "virtual and real clocks": "L0",
     "namespaced modules keep their facts apart": "L1",
+    "a Date written to a namespaced fact warns once": "L1",
     "an effect's write is blocked (facts are read-only in effects)": "L1",
     "an effect sees the previous facts in prev": "L1",
     "data-form when, on and comparison operators": "L11",

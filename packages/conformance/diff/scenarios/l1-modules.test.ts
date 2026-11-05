@@ -39,6 +39,36 @@ suite("L1 modules and namespacing", () => {
     ],
   );
 
+  // Row o (GATE-2.md): a non-JSON write through a module warns once. The
+  // fuzz entry for it has no count, so this pins it: 1.35 warns of the Date
+  // twice (`a.when`, then `a::when`), 2.0 once. As in the fuzz model
+  // (diff/fuzz/model.ts), the module's init writes `new Date(0)` to `when`.
+  scenario(
+    "a Date written to a namespaced fact warns once",
+    ({ core: { createModule, t } }) => ({
+      modules: {
+        a: createModule("a", {
+          schema: {
+            facts: { n: t.number(), when: t.date() },
+            derivations: {},
+            events: {},
+          },
+          init: (facts: any) => {
+            facts.n = 0;
+            facts.when = new Date(0);
+          },
+        } as any),
+        b: createModule("b", {
+          schema: { facts: { n: t.number() }, derivations: {}, events: {} },
+          init: (facts: any) => {
+            facts.n = 0;
+          },
+        } as any),
+      },
+    }),
+    [{ op: "start" }, { op: "settle" }],
+  );
+
   scenario(
     "an effect's write is blocked (facts are read-only in effects)",
     ({ core: { createModule, t }, external }) => ({

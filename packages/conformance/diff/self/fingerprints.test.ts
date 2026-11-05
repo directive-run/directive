@@ -346,6 +346,28 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     ).unexplained.map((d) => `${d.op} ${d.kind} ${d.path ?? ""}`);
   };
 
+  it("row o's warning is excused only in a case with a namespaced Date write, and only as missing on 2.0", () => {
+    const warn: TraceEntry = {
+      k: "console",
+      level: "warn",
+      args: ['[Directive] Fact "a::when" assigned a Date instance.'],
+    };
+    const id = "l3-quirk-o-fuzz-console-warn-missing";
+    // Control: 1.35's second warning, missing on 2.0, where a Date is
+    // written to a namespaced fact.
+    expect(left([warn], [], id, ["namespacedDateWrite"])).toEqual([]);
+    // Without a namespaced Date write, a warning 2.0 lacks is unexplained,
+    // whatever other triggers the case has.
+    expect(left([warn], [], id, [])).toEqual(["missing warn "]);
+    expect(
+      left([warn], [], id, ["resolverRejects", "settleStop", "restart"]),
+    ).toEqual(["missing warn "]);
+    // An extra warning on 2.0 is never row o.
+    expect(left([], [warn], id, ["namespacedDateWrite"])).toEqual([
+      "extra warn ",
+    ]);
+  });
+
   it("quirk z's timer counts: 2.0 holding fewer timers is excused, more is not", () => {
     const timers = (at: string, pending: number): TraceEntry => ({
       k: "timers",
@@ -453,6 +475,63 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
         ["resolverRejects"],
       ),
     ).toEqual(["missing onErrorRecovery "]);
+  });
+});
+
+describe("row o's hand entry pins the warning count the fuzz entry cannot", () => {
+  const id = "l1-quirk-o-namespaced-date-console-warn-missing-step0";
+  const name = "a Date written to a namespaced fact warns once";
+  const committed = (
+    JSON.parse(
+      readFileSync(join(import.meta.dirname, "../divergences.json"), "utf8"),
+    ) as Divergence[]
+  ).filter((x) => x.scenario === name);
+  const warn = (key: string): TraceEntry => ({
+    k: "console",
+    level: "warn",
+    args: [`[Directive] Fact "${key}" assigned a Date instance.`],
+  });
+  /** 1.35's two warnings (step 0) against 2.0's `warnings` there. */
+  const run = (...warnings: string[]) =>
+    explain(
+      name,
+      compareContract(
+        [
+          { k: "step", i: 0, step: { op: "start" } },
+          warn("a.when"),
+          warn("a::when"),
+          { k: "async", i: 0 },
+        ],
+        [
+          { k: "step", i: 0, step: { op: "start" } },
+          ...warnings.map(warn),
+          { k: "async", i: 0 },
+        ],
+        "v2",
+      ),
+      committed,
+    );
+
+  it("is the scenario's only entry", () => {
+    expect(committed.map((x) => x.id)).toEqual([id]);
+  });
+
+  it("control: 2.0 warning once is excused, by this entry", () => {
+    const once = run("a.when");
+    expect(once.unexplained).toEqual([]);
+    expect(once.used).toEqual([id]);
+  });
+
+  it("2.0 warning zero times fails: the second missing warning is past the count", () => {
+    expect(run().unexplained.map((d) => `${d.op} ${d.kind}`)).toEqual([
+      "missing warn",
+    ]);
+  });
+
+  it("2.0 warning twice covers nothing, so the census finds the entry stale", () => {
+    const twice = run("a.when", "a::when");
+    expect(twice.unexplained).toEqual([]);
+    expect(twice.used).toEqual([]);
   });
 });
 

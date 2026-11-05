@@ -254,6 +254,27 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     expect(specTriggers(withEffect("throw"))).toEqual(["settleStop", "throw"]);
   });
 
+  it("namespacedDateWrite needs two modules, one with a Date fact", () => {
+    const plain = spec().modules[0] as FuzzSpec["modules"][number];
+    const dated = { ...plain, date: true };
+    // One module is not namespaced, even with a Date fact.
+    expect(specTriggers(spec({ modules: [dated] }))).toEqual(["settleStop"]);
+    // Two modules with no Date fact write no Date.
+    expect(specTriggers(spec({ modules: [plain, plain] }))).toEqual([
+      "settleStop",
+    ]);
+    for (const modules of [
+      [dated, plain],
+      [plain, dated],
+      [dated, dated],
+    ]) {
+      expect(specTriggers(spec({ modules }))).toEqual([
+        "settleStop",
+        "namespacedDateWrite",
+      ]);
+    }
+  });
+
   it("toScenario gives the case its triggers", () => {
     const s = spec({ boundary: "retry" }, [constraint({ timeout: 3 })]);
 

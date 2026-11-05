@@ -694,6 +694,17 @@ const TRIGGERS = {
    * to (resolvers; the model passes "skip" to effects then).
    */
   throw: (spec, boundary) => usesStrategy(spec, boundary, "throw"),
+  /**
+   * A Date is written to a fact of a namespaced module, where 1.35 warns of
+   * the non-JSON write twice (row o: by `a.when` and again by `a::when`).
+   * The model namespaces its modules (as a and b) only when it has two, and
+   * a module's Date fact is `when`, which its init sets to `new Date(0)`
+   * whenever the module has one: every case starts its system, so a case of
+   * two modules with a Date fact always writes one. The spec cannot narrow
+   * it further.
+   */
+  namespacedDateWrite: (spec) =>
+    spec.modules.length > 1 && spec.modules.some((m) => m.date),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
