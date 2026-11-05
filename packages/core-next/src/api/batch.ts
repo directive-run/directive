@@ -36,14 +36,15 @@ import type { BatchHost, Batcher, ResolverDef, Run } from "./resolvers.js";
 import { withTimeout } from "./timeout.js";
 
 type Baseline = ReadonlyMap<string, unknown> | undefined;
+// biome-ignore lint/suspicious/noExplicitAny: a user handler
+type Fn = (...args: any[]) => any;
 
 interface Queue {
+  id_: string;
   reqs_: RequirementWithId[];
   bases_: Baseline[];
   /** The window's timer, 0 when the queue is empty. */
   timer_: number;
-  ms_: number;
-  max_: number | undefined;
 }
 
 export const withBatch: SystemPart = (context) => {
@@ -55,111 +56,95 @@ export const withBatch: SystemPart = (context) => {
   const { clock } = kernel;
   const queues = new Map<string, Queue>();
   let host: BatchHost;
-  /** settle() calls still waiting: they flush the queues on each change. */
-  let waiting = 0;
   const flushAll = () => {
     for (const id of queues.keys()) {
       flush(id);
     }
   };
+  // 1.35's settle() runs the queues at its start, and again at each
+  // settled change while it waits.
   const settle = system.settle as (maxWait?: number) => Promise<void>;
   system.settle = (maxWait?: number) => {
     flushAll();
-    waiting++;
+    const off = (system.onSettledChange as (fn: () => void) => () => void)(
+      flushAll,
+    );
     const done = settle(maxWait);
-    const off = () => {
-      waiting--;
-    };
     done.then(off, off);
 
     return done;
   };
-  (system.onSettledChange as (fn: () => void) => void)(() => {
-    if (waiting > 0) {
-      flushAll();
-    }
-  });
 
-  /** 1.35's awaitWithTimeout: async, so a batch's ticks are 1.35's. */
-  const within = async (def: ResolverDef, run: Run, pending: unknown) => {
+  /**
+   * 1.35's executeAllOrNothing and executeWithResults: the handler's sync
+   * start in one store batch, then the outcomes. Each requirement is one;
+   * the run's mark is set first, so a stop() from a hook cancels nothing
+   * more (row t). Async at 1.35's depth, so a batch's ticks are 1.35's.
+   */
+  async function finish(def: ResolverDef, run: Run, ctx: object, fn: Fn) {
+    const reqs = run.reqs_!;
+    const name = run.resolver_;
+    const many = def.resolveBatchWithResults;
     const ms = def.batch!.timeoutMs ?? def.timeout;
-
-    return ms && ms > 0
-      ? withTimeout(
-          clock,
-          pending,
-          ms,
-          `Batch resolver "${run.resolver_}" timed out after ${ms}ms`,
-        )
-      : pending;
-  };
-  /** The handler's sync start, in one store batch. */
-  const begin = (fn: Function, run: Run, ctx: object) => {
     let pending: unknown;
     store.batch(() => {
       pending = fn(
-        run.reqs_!.map((req) => req.requirement),
+        reqs.map((req) => req.requirement),
         ctx,
       );
     });
-
-    return pending;
-  };
-  /** 1.35's executeAllOrNothing: every requirement completes on return. */
-  async function all(def: ResolverDef, run: Run, ctx: object) {
-    await within(def, run, begin(def.resolveBatch!, run, ctx));
+    const results = (await (async () =>
+      ms && ms > 0
+        ? withTimeout(
+            clock,
+            pending,
+            ms,
+            `Batch resolver "${name}" timed out after ${ms}ms`,
+          )
+        : pending)()) as Array<{ success: boolean; error?: Error }>;
     // Canceled or superseded: that was its one outcome.
-    if (!run.controller_.signal.aborted) {
-      host.report_(run);
-    }
-  }
-  /** 1.35's executeWithResults: each item reports on its own. */
-  async function each(def: ResolverDef, run: Run, ctx: object) {
-    const reqs = run.reqs_!;
-    const results = (await within(
-      def,
-      run,
-      begin(def.resolveBatchWithResults!, run, ctx),
-    )) as Array<{ success: boolean; error?: Error }>;
     if (run.controller_.signal.aborted) {
       return;
     }
-    if (results.length !== reqs.length) {
+    if (many && results.length !== reqs.length) {
       throw new Error(
-        `[Directive] Batch resolver "${run.resolver_}" returned ${results.length} results but expected ${reqs.length}. Results array must match input order.`,
+        `[Directive] Batch resolver "${name}" returned ${results.length} results but expected ${reqs.length}. Results array must match input order.`,
       );
     }
-    // The run's mark first: a stop() from a hook cancels nothing (row t).
     run.done_ = true;
     reqs.forEach((req, i) => {
-      const result = results[i]!;
       host.tell_(
         run,
         req,
-        result.success
+        !many || results[i]!.success
           ? undefined
-          : (result.error ?? new Error("Batch item failed")),
+          : (results[i]!.error ?? new Error("Batch item failed")),
       );
     });
   }
   /** 1.35's executeBatchAttempt: the handler in place of `resolve()`. */
   async function call(def: ResolverDef, run: Run, ctx: object) {
-    if (def.resolveBatchWithResults) {
-      return each(def, run, ctx);
+    const many = def.resolveBatchWithResults;
+    if (many) {
+      return finish(def, run, ctx, many);
     }
-    await all(def, run, ctx);
+    await finish(def, run, ctx, def.resolveBatch!);
   }
+
+  /** End a queue's window and put an empty one in its place; returns it. */
+  const take = (queue: Queue) => {
+    clock.clearTimeout(queue.timer_);
+    queues.set(queue.id_, { id_: queue.id_, reqs_: [], bases_: [], timer_: 0 });
+
+    return queue;
+  };
 
   function flush(id: string) {
     const queue = queues.get(id)!;
-    const { reqs_: reqs, bases_: bases } = queue;
-    if (reqs.length === 0) {
+    if (queue.reqs_.length === 0) {
       return;
     }
-    clock.clearTimeout(queue.timer_);
-    queue.timer_ = 0;
-    queue.reqs_ = [];
-    queue.bases_ = [];
+    const { reqs_: reqs, bases_: bases } = take(queue);
     const def = defs[id]!;
     if (!def.resolveBatch && !def.resolveBatchWithResults) {
       // (at): each one an ordinary single run, as 1.35 runs it unbound.
@@ -183,12 +168,7 @@ export const withBatch: SystemPart = (context) => {
       try {
         await host.execute_(def, run, baseline, call);
       } finally {
-        host.detached.delete(run);
-        for (const req of reqs) {
-          if (host.inflight.get(req.id) === run) {
-            host.inflight.delete(req.id);
-          }
-        }
+        host.leave_(run);
       }
     })().then(() => {
       context.settled();
@@ -198,29 +178,23 @@ export const withBatch: SystemPart = (context) => {
 
   const batcher: Batcher = {
     add_(id, def, req, baseline) {
-      let queue = queues.get(id);
-      if (!queue) {
-        // Read once per definition, with 1.35's default window.
-        const { windowMs, maxSize } = { windowMs: 50, ...def.batch };
-        queue = {
-          reqs_: [],
-          bases_: [],
-          timer_: 0,
-          ms_: windowMs,
-          max_: maxSize,
-        };
-        queues.set(id, queue);
+      if (!queues.has(id)) {
+        take({ id_: id, reqs_: [], bases_: [], timer_: 0 });
       }
-      if (queue.reqs_.length >= (queue.max_ || 10_000)) {
+      // 1.35's defaults, read at each add.
+      const { windowMs, maxSize } = { windowMs: 50, ...def.batch };
+      if (queues.get(id)!.reqs_.length >= (maxSize || 10_000)) {
         flush(id);
       }
+      // A flush leaves a fresh queue in its place.
+      const queue = queues.get(id)!;
       queue.reqs_.push(req);
       queue.bases_.push(baseline);
-      if (queue.max_ && queue.reqs_.length >= queue.max_) {
+      if (maxSize && queue.reqs_.length >= maxSize) {
         flush(id);
       } else if (!queue.timer_) {
         // (ap): from the first add to an empty queue, not moved by later ones.
-        queue.timer_ = clock.setTimeout(() => flush(id), queue.ms_, {
+        queue.timer_ = clock.setTimeout(() => flush(id), windowMs, {
           owner: kernel.owner,
           kind: "batch",
         });
@@ -234,8 +208,7 @@ export const withBatch: SystemPart = (context) => {
           queue.bases_.splice(i, 1);
           if (queue.reqs_.length === 0) {
             // An empty queue keeps no timer: the next add opens a window.
-            clock.clearTimeout(queue.timer_);
-            queue.timer_ = 0;
+            take(queue);
           }
           host.canceled_(id, req!);
 
@@ -245,12 +218,7 @@ export const withBatch: SystemPart = (context) => {
     },
     clear_(ids) {
       for (const [id, queue] of queues) {
-        clock.clearTimeout(queue.timer_);
-        queue.timer_ = 0;
-        const reqs = queue.reqs_;
-        queue.reqs_ = [];
-        queue.bases_ = [];
-        for (const req of reqs) {
+        for (const req of take(queue).reqs_) {
           ids.push(req.id);
           host.canceled_(id, req);
         }

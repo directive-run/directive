@@ -189,10 +189,10 @@ export interface BatchHost {
   ): Promise<void>;
   /** One requirement's outcome. */
   tell_(run: Run, req: RequirementWithId, error?: Error): void;
-  /** The run's one outcome, for each of its requirements. */
-  report_(run: Run, error?: Error): void;
   /** A requirement canceled before it ran. */
   canceled_(resolver: string, req: RequirementWithId): void;
+  /** A batch run leaves flight: its rows that are still its own go. */
+  leave_(run: Run): void;
 }
 
 /** The batch window, as the resolvers use it. */
@@ -326,14 +326,18 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     emit("resolver.cancel", () => ({ resolver, req }));
     emit("requirement.canceled", () => ({ req }));
   };
+  const leave = (run: Run) => {
+    detached.delete(run);
+    for (const { id } of run.reqs_!) {
+      if (inflight.get(id) === run) {
+        inflight.delete(id);
+      }
+    }
+  };
   const cancel = (run: Run) => {
     const reqs = run.reqs_;
     if (reqs) {
-      for (const { id } of reqs) {
-        if (inflight.get(id) === run) {
-          inflight.delete(id);
-        }
-      }
+      leave(run);
     } else {
       inflight.delete(run.req_.id);
     }
@@ -694,8 +698,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     start_: start,
     execute_: execute,
     tell_: tell,
-    report_: report,
     canceled_: canceled,
+    leave_: leave,
   });
 
   return {
@@ -763,21 +767,21 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     abortAll() {
       const ids: string[] = [];
       const runs = [...inflight.values()];
-      // As 1.35: single runs, then queued requirements, then batch runs.
-      for (const batches of [false, true]) {
-        if (batches) {
-          batcher?.clear_(ids);
-        }
-        for (const run of runs) {
-          if (!run.reqs_ === !batches) {
-            if (!run.done_) {
-              for (const req of run.reqs_ ?? [run.req_]) {
-                ids.push(req.id);
-              }
-            }
-            cancel(run);
+      const end = (run: Run) => {
+        if (!run.done_) {
+          for (const req of run.reqs_ ?? [run.req_]) {
+            ids.push(req.id);
           }
         }
+        cancel(run);
+      };
+      // As 1.35: single runs, then queued requirements, then batch runs.
+      for (const run of runs) {
+        run.reqs_ || end(run);
+      }
+      batcher?.clear_(ids);
+      for (const run of runs) {
+        run.reqs_ && end(run);
       }
 
       return ids;
