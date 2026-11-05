@@ -488,20 +488,24 @@ const NON_JSON_HINTS: Record<string, string> = {
   ClassInstance: "a plain-object snapshot",
 };
 
-/** Warn once per key and type; the cache belongs to the caller (a system). */
-export function warnNonJson(
-  cache: Set<string>,
-  factPath: string,
-  valueType: string,
-): void {
+/**
+ * Non-JSON warnings already given, in this process: 1.35 warns once per fact
+ * path and type for the process (tracking.ts `nonJsonWarningCache`), so a
+ * second system from the same definitions stays quiet. Only warnNonJson,
+ * which runs in development, reads it, so production drops it.
+ */
+const nonJsonWarned = /* @__PURE__ */ new Set<string>();
+
+/** Warn once per key and type, per process (1.35's dedupe). */
+export function warnNonJson(factPath: string, valueType: string): void {
   const cacheKey = `${factPath}|${valueType}`;
-  if (cache.has(cacheKey)) {
+  if (nonJsonWarned.has(cacheKey)) {
     return;
   }
-  if (cache.size >= 1000) {
-    cache.delete(cache.values().next().value as string);
+  if (nonJsonWarned.size >= 1000) {
+    nonJsonWarned.delete(nonJsonWarned.values().next().value as string);
   }
-  cache.add(cacheKey);
+  nonJsonWarned.add(cacheKey);
   const hint = NON_JSON_HINTS[valueType] ?? "a JSON-roundtrippable value";
   console.warn(
     `[Directive] Fact "${factPath}" assigned a ${valueType} instance.\nFacts must be JSON-roundtrippable for reactivity to work correctly.\n${valueType} mutations are not tracked.\nUse ${hint} instead.\nSee: https://directive.run/docs/facts#json-rule`,
@@ -569,7 +573,6 @@ export function createFactsProxy<S extends Schema>(
   store: FactsStore<S>,
   schema: S,
   tracker: Tracker = { deps: null },
-  warned: Set<string> = new Set(),
   writer?: Writer,
   allow?: Allow,
 ): Facts<S> {
@@ -627,7 +630,7 @@ export function createFactsProxy<S extends Schema>(
         const nonJson = detectNonJsonValueType(value);
         if (nonJson) {
           // A module's fact by its module-qualified name, `ns.key` (o).
-          warnNonJson(warned, prop.replace("::", "."), nonJson);
+          warnNonJson(prop.replace("::", "."), nonJson);
         }
       }
       s.set(prop, value, stamp);
