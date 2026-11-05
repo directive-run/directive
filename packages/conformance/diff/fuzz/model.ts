@@ -933,6 +933,19 @@ const TRIGGERS = {
    */
   namespacedDateWrite: (spec) =>
     spec.modules.length > 1 && spec.modules.some((m) => m.date),
+  /**
+   * Some resolver's write can retract its own constraint (row t's third
+   * path: the run reported complete, and its own write made the condition
+   * false before it left flight). A constraint's condition reads its own
+   * fact `fact` (and, in module b with `crossAtLeast`, module a's fact 0,
+   * which b's resolvers never write), and its resolver writes `value` to its
+   * own fact `writes`: the write retracts the constraint exactly when it is
+   * to the fact the condition reads and the value is below `atLeast`.
+   */
+  ownWriteRetracts: (spec) =>
+    spec.modules.some((m) =>
+      m.constraints.some((c) => c.writes === c.fact && c.value < c.atLeast),
+    ),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean

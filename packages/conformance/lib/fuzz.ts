@@ -56,6 +56,7 @@ export const FUZZ_TRIGGERS = [
   "disable",
   "throw",
   "namespacedDateWrite",
+  "ownWriteRetracts",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
