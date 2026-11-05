@@ -28,7 +28,7 @@ import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
 import { describeDrift, gateBuiltNext } from "../contracts/lib/next-surface.js";
-import { LIKE, canonicalJson, isLower } from "../diff/fingerprint.js";
+import { LIKE, TEXT, canonicalJson, isLower } from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
@@ -1249,6 +1249,9 @@ export function checkExcuses(
 /** The `$like` classes a fuzz entry's bound may name. */
 const BOUND_LIKES = Object.keys(LIKE);
 
+/** The `$text` classes a fuzz entry's bound may name. */
+const BOUND_TEXTS = Object.keys(TEXT);
+
 /**
  * A fuzz entry's `bound` (diff/scenario.ts `Bound`): `{ match }`, a
  * non-empty list of distinct patterns, each naming only known `$like`
@@ -1286,6 +1289,23 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
 
     return [];
   };
+  // `{ "$text": name }` reads a console argument's wording, kept only for a
+  // missing or extra console record (diff/compare.ts `Difference.raw`).
+  const texts = (v: unknown): string[] => {
+    if (Array.isArray(v)) {
+      return v.flatMap(texts);
+    }
+    if (v !== null && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (Object.keys(o).length === 1 && "$text" in o) {
+        return [String(o.$text)];
+      }
+
+      return Object.values(o).flatMap(texts);
+    }
+
+    return [];
+  };
   // `{ "$lt": "from" }` is read only as a changed pattern's `to`.
   const lts = (v: unknown): number => {
     if (Array.isArray(v)) {
@@ -1319,6 +1339,15 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
     }
     for (const name of likes(p).filter((n) => !BOUND_LIKES.includes(n))) {
       out.push(`${at} names an unknown $like "${name}"`);
+    }
+    const named = texts(p);
+    for (const name of named.filter((n) => !BOUND_TEXTS.includes(n))) {
+      out.push(`${at} names an unknown $text "${name}"`);
+    }
+    if (named.length > 0 && (e.stream !== "console" || e.op === "changed")) {
+      out.push(
+        `${at} uses $text, which only a missing or extra console entry's pattern may (only those records keep their wording)`,
+      );
     }
     if (p === null || typeof p !== "object" || Array.isArray(p)) {
       out.push(`${at} must be an object`);

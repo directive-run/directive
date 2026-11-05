@@ -104,6 +104,45 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
 };
 
+/**
+ * The `$text` classes of a `Bound` pattern: the wording of a console
+ * argument, which the contract masks (`{ "$incidental": "string" }`,
+ * diff/compare.ts). `{ "$text": name }` stands where that mask is, in a
+ * missing or extra console entry's pattern, and matches only an argument the
+ * engine printed in the named wording (`Difference.raw`), so an entry can
+ * name the one development warning its approval is for. Every other console
+ * comparison still sees the mask only.
+ */
+export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
+  /**
+   * The development warning a fuzz resolver's error prints when no error
+   * strategy handles it, once per source (packages/core errors.ts, and
+   * core-next's api/core.ts, word for word): `[Directive] resolver "a::r0"
+   * threw: a.r0 attempt 1. Requirement "A0" stays unmet. The default error
+   * strategy skips it silently. …`. The error is a fuzz attempt's own
+   * (`attemptError`: its thrown message or its timeout, the full stop the
+   * warning adds in place of the message's own), and the sentence on the
+   * requirement is there unless the requirement was already met. Quirk b's
+   * console entry names it: 1.35 spends it on the extra error after a cancel.
+   */
+  resolverThrew: (v) =>
+    typeof v === "string" &&
+    /^\[Directive\] resolver "([a-z]::)?r\d+" threw: ([a-z]\.r\d+ attempt \d+|Resolver "([a-z]::)?r\d+" timed out after \d+ms)\.( Requirement "[A-Z]\d+" stays unmet\.)? The default error strategy skips it silently\. Configure errorBoundary\.onResolverError \(or errorBoundary\.onError\) to handle it; this warning shows once per source and only in development\.$/.test(
+      v,
+    ),
+};
+
+/** The masked form of a string the contract hides (diff/compare.ts `tag`). */
+function isMaskedString(v: Json | undefined): boolean {
+  return (
+    v !== null &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    Object.keys(v).length === 1 &&
+    v.$incidental === "string"
+  );
+}
+
 /** A changed pattern's `to` that requires a number below the `from` value. */
 export const LOWER = { $lt: "from" } as const;
 
@@ -118,8 +157,17 @@ export function isLower(p: Json | undefined): boolean {
   );
 }
 
-/** Whether `value` fits `pattern` (`Bound`). */
-export function fits(pattern: Json, value: Json | undefined): boolean {
+/**
+ * Whether `value` fits `pattern` (`Bound`). `raw` is the same place in the
+ * record before the contract masked it (`Difference.raw`), walked alongside
+ * `value` and read only by a `$text` pattern; without it a `$text` pattern
+ * matches nothing.
+ */
+export function fits(
+  pattern: Json,
+  value: Json | undefined,
+  raw?: Json,
+): boolean {
   if (
     pattern !== null &&
     typeof pattern === "object" &&
@@ -131,22 +179,33 @@ export function fits(pattern: Json, value: Json | undefined): boolean {
 
       return test?.(value) === true;
     }
+    if (keys.length === 1 && keys[0] === "$text") {
+      const test = TEXT[pattern.$text as string];
+
+      return isMaskedString(value) && test?.(raw) === true;
+    }
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
       return false;
     }
     const o = value as Record<string, Json | undefined>;
     const have = Object.keys(o).filter((k) => o[k] !== undefined);
+    const r =
+      raw !== null && typeof raw === "object" && !Array.isArray(raw)
+        ? raw
+        : undefined;
 
     return (
       have.length === keys.length &&
-      keys.every((k) => k in o && fits(pattern[k] as Json, o[k]))
+      keys.every((k) => k in o && fits(pattern[k] as Json, o[k], r?.[k]))
     );
   }
   if (Array.isArray(pattern)) {
+    const r = Array.isArray(raw) ? raw : undefined;
+
     return (
       Array.isArray(value) &&
       value.length === pattern.length &&
-      pattern.every((p, i) => fits(p, value[i]))
+      pattern.every((p, i) => fits(p, value[i], r?.[i]))
     );
   }
 
@@ -177,7 +236,7 @@ export function admits(b: Bound, d: Difference): boolean {
 
   return b.match.some((p) => {
     if (d.op !== "changed") {
-      return fits(p, payload);
+      return fits(p, payload, d.raw);
     }
     const q = p as Record<string, Json>;
     const path = q.path;

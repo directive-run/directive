@@ -237,7 +237,21 @@ under a changed entry's path. So every entry also carries one of:
   extra attempt error pairs with 2.0's next error of the stream), or an absent side, and `[*]` for an array index under the entry's path. A changed
   pattern's `to` may instead be `{ "$lt": "from" }`: 2.0's number is below
   1.35's, for a quirk whose approval says which way a count moves (quirk
-  z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused). Field names,
+  z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused).
+  In a missing or extra console entry's pattern, `{ "$text": name }` may
+  stand where the contract masks an argument's wording (`{ "$incidental":
+  "string" }`): it matches only an argument printed in the named wording
+  (diff/fingerprint.ts `TEXT`; today `resolverThrew`, the development
+  warning a resolver's unhandled error prints). No committed entry uses it
+  today: quirk b's console entry did, but narrowed to that warning it
+  covered no fuzz case and was removed (the census failed it as stale; on
+  main it had been covering row o's warnings). Row o's entry
+  (`l3-quirk-o-fuzz-console-warn-missing`) is the next to use the
+  mechanism. The self-tests in diff/self/fingerprints.test.ts keep it
+  covered through a synthetic entry. The comparison keeps the unmasked record for missing and
+  extra console records only (`Difference.raw`), and only a `$text` pattern
+  reads it: every other comparison, report and entry sees the mask. The
+  census rejects an unknown `$text`, and one in any other entry. Field names,
   tags, structure, array lengths and every other value stay literal, so a
   fuzz entry no longer excuses an unrelated record kind or key.
 
@@ -355,6 +369,7 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `disable` | some `errorBoundary` strategy is `"disable"` and the case has what it applies to: a resolver (`onResolverError`) or an effect (`onEffectError`) |
 | `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |
 | `namespacedDateWrite` | the case has two modules (the model namespaces them only then, as `a` and `b`) and one has the Date fact `when`, which its init sets to a `Date`, so a Date is written to a namespaced fact (row o: 1.35 warns of it twice, by `a.when` and `a::when`) |
+| `ownWriteRetracts` | some resolver's write can retract its own constraint: it writes the fact its constraint's condition reads (`writes` is `fact`) a value below the condition's `atLeast`, so the run that wrote it can be retracted after it reported complete (row t's third path). A module b constraint's cross condition reads module a's fact 0, which b's resolvers never write |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

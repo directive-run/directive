@@ -146,18 +146,23 @@ describe("the fuzz records starts and writes under their own kinds", () => {
 
 describe("a fuzz case's triggers come from its spec, exactly", () => {
   it("a plain case with a resolver has only settleStop", () => {
-    expect(specTriggers(spec())).toEqual(["settleStop"]);
-    expect(specTriggers(spec({ boundary: "skip" }))).toEqual(["settleStop"]);
+    expect(specTriggers(spec())).toEqual(["settleStop", "ownWriteRetracts"]);
+    expect(specTriggers(spec({ boundary: "skip" }))).toEqual([
+      "settleStop",
+      "ownWriteRetracts",
+    ]);
   });
 
   it("resolverRetry and resolverRetryLater need the strategy and a resolver", () => {
     expect(specTriggers(spec({ boundary: "retry" }))).toEqual([
       "resolverRetry",
       "settleStop",
+      "ownWriteRetracts",
     ]);
     expect(specTriggers(spec({ boundary: "retry-later" }))).toEqual([
       "resolverRetryLater",
       "settleStop",
+      "ownWriteRetracts",
     ]);
     expect(specTriggers(spec({ boundary: "retry" }, []))).toEqual([]);
     expect(specTriggers(spec({ boundary: "retry-later" }, []))).toEqual([]);
@@ -181,10 +186,12 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     expect(specTriggers(spec({}, [constraint({ retry: 1 })]))).toEqual([
       "retryPolicy",
       "settleStop",
+      "ownWriteRetracts",
     ]);
     expect(specTriggers(spec({}, [constraint({ timeout: 10 })]))).toEqual([
       "timeout",
       "settleStop",
+      "ownWriteRetracts",
     ]);
   });
 
@@ -192,14 +199,15 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     expect(specTriggers(spec({}, [constraint({ fails: 1 })]))).toEqual([
       "resolverRejects",
       "settleStop",
+      "ownWriteRetracts",
     ]);
     // A timeout no longer than the wait can fire before the write.
     expect(
       specTriggers(spec({}, [constraint({ delay: 5, timeout: 5 })])),
-    ).toEqual(["timeout", "resolverRejects", "settleStop"]);
+    ).toEqual(["timeout", "resolverRejects", "settleStop", "ownWriteRetracts"]);
     expect(
       specTriggers(spec({}, [constraint({ delay: 5, timeout: 6 })])),
-    ).toEqual(["timeout", "settleStop"]);
+    ).toEqual(["timeout", "settleStop", "ownWriteRetracts"]);
     // No resolver: neither.
     expect(specTriggers(spec({}, []))).toEqual([]);
   });
@@ -207,16 +215,37 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     const steps = (...ops: Array<"stop" | "start" | "settle" | "destroy">) =>
       specTriggers(spec({ steps: ops.map((op) => ({ op })) }));
 
-    expect(steps("stop", "start")).toEqual(["settleStop", "restart"]);
-    expect(steps("stop", "settle", "start")).toEqual(["settleStop", "restart"]);
-    expect(steps("start", "stop", "start")).toEqual(["settleStop", "restart"]);
-    expect(steps("start", "stop")).toEqual(["settleStop"]);
-    expect(steps("start", "start")).toEqual(["settleStop"]);
-    expect(steps("destroy", "start")).toEqual(["settleStop"]);
+    expect(steps("stop", "start")).toEqual([
+      "settleStop",
+      "restart",
+      "ownWriteRetracts",
+    ]);
+    expect(steps("stop", "settle", "start")).toEqual([
+      "settleStop",
+      "restart",
+      "ownWriteRetracts",
+    ]);
+    expect(steps("start", "stop", "start")).toEqual([
+      "settleStop",
+      "restart",
+      "ownWriteRetracts",
+    ]);
+    expect(steps("start", "stop")).toEqual(["settleStop", "ownWriteRetracts"]);
+    expect(steps("start", "start")).toEqual(["settleStop", "ownWriteRetracts"]);
+    expect(steps("destroy", "start")).toEqual([
+      "settleStop",
+      "ownWriteRetracts",
+    ]);
     // A destroy between the stop and the start: the start is ignored.
-    expect(steps("stop", "destroy", "start")).toEqual(["settleStop"]);
+    expect(steps("stop", "destroy", "start")).toEqual([
+      "settleStop",
+      "ownWriteRetracts",
+    ]);
     // A destroyed system is never restarted, whatever follows.
-    expect(steps("destroy", "stop", "start")).toEqual(["settleStop"]);
+    expect(steps("destroy", "stop", "start")).toEqual([
+      "settleStop",
+      "ownWriteRetracts",
+    ]);
   });
 
   const effect = {
@@ -238,10 +267,12 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
     expect(specTriggers(spec({ boundary: "disable" }))).toEqual([
       "settleStop",
       "disable",
+      "ownWriteRetracts",
     ]);
     expect(specTriggers(spec({ boundary: "throw" }))).toEqual([
       "settleStop",
       "throw",
+      "ownWriteRetracts",
     ]);
     // No resolver and no effect: the strategy applies to nothing.
     expect(specTriggers(spec({ boundary: "disable" }, []))).toEqual([]);
@@ -251,17 +282,25 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
   it("disable also counts an effect; throw does not (effects skip then)", () => {
     expect(specTriggers(withEffect("disable", []))).toEqual(["disable"]);
     expect(specTriggers(withEffect("throw", []))).toEqual([]);
-    expect(specTriggers(withEffect("throw"))).toEqual(["settleStop", "throw"]);
+    expect(specTriggers(withEffect("throw"))).toEqual([
+      "settleStop",
+      "throw",
+      "ownWriteRetracts",
+    ]);
   });
 
   it("namespacedDateWrite needs two modules, one with a Date fact", () => {
     const plain = spec().modules[0] as FuzzSpec["modules"][number];
     const dated = { ...plain, date: true };
     // One module is not namespaced, even with a Date fact.
-    expect(specTriggers(spec({ modules: [dated] }))).toEqual(["settleStop"]);
+    expect(specTriggers(spec({ modules: [dated] }))).toEqual([
+      "settleStop",
+      "ownWriteRetracts",
+    ]);
     // Two modules with no Date fact write no Date.
     expect(specTriggers(spec({ modules: [plain, plain] }))).toEqual([
       "settleStop",
+      "ownWriteRetracts",
     ]);
     for (const modules of [
       [dated, plain],
@@ -271,8 +310,41 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
       expect(specTriggers(spec({ modules }))).toEqual([
         "settleStop",
         "namespacedDateWrite",
+        "ownWriteRetracts",
       ]);
     }
+  });
+
+  it("ownWriteRetracts needs a resolver whose write to the fact its own constraint reads makes the condition false", () => {
+    // The default constraint (f0 >= 0) writes -1 to f0: it retracts itself.
+    expect(specTriggers(spec())).toEqual(["settleStop", "ownWriteRetracts"]);
+    const plain = spec().modules[0] as FuzzSpec["modules"][number];
+    // A write to another fact leaves the condition as it was.
+    expect(
+      specTriggers(
+        spec({
+          modules: [
+            { ...plain, facts: 2, constraints: [constraint({ writes: 1 })] },
+          ],
+        }),
+      ),
+    ).toEqual(["settleStop"]);
+    // A write to the fact it reads, of a value that keeps it true.
+    expect(specTriggers(spec({}, [constraint({ value: 0 })]))).toEqual([
+      "settleStop",
+    ]);
+    expect(
+      specTriggers(spec({}, [constraint({ atLeast: 2, value: 3 })])),
+    ).toEqual(["settleStop"]);
+    // One constraint of several is enough.
+    expect(
+      specTriggers(
+        spec({}, [
+          constraint({ value: 0 }),
+          constraint({ atLeast: 2, value: 1 }),
+        ]),
+      ),
+    ).toEqual(["settleStop", "ownWriteRetracts"]);
   });
 
   it("toScenario gives the case its triggers", () => {
@@ -282,6 +354,7 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
       "resolverRetry",
       "timeout",
       "settleStop",
+      "ownWriteRetracts",
     ]);
   });
 });
