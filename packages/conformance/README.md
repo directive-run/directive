@@ -112,6 +112,11 @@ the traces to agree.
   cancel-time `aborted`. An effect's run and its cleanup are kinded the
   same way, `["effect" | "cleanup", "<module>.x<index>", values read]`, so
   an entry for an extra effect run does not depend on the effect's id.
+  The batched resolver (L7: at most one per case, in the first module, fed
+  by one or two constraints, with `resolveBatch`, `resolveBatchWithResults`
+  or the resolve() fallback) records the same kinds under `<module>.rb`,
+  with the call's items last; a batch timeout's message counts as a
+  timeout too.
   PR CI runs the fixed seed for 205
   cases across every layer (`FUZZ_DEFAULT_RUNS`); the census fails fewer than
   200 compared (`lib/fuzz.ts` `FUZZ_FLOOR`) or more than max(1% of cases, 2)
