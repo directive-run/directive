@@ -41,12 +41,13 @@ function build(resolver: Record<string, unknown>, options: Options = {}) {
   const at = () => Date.now() - t0;
   const log: string[] = [];
   const cancelArgs: Array<Record<string, unknown>> = [];
-  let system: any;
+  // The plugin reaches the system it is part of through this holder.
+  const holder: { system?: any } = {};
   const plugin = {
     name: "rec",
     onResolverComplete: (_resolver: string, req: { id: string }) => {
       log.push(`complete ${req.id} @${at()}`);
-      options.onComplete?.(req.id, system);
+      options.onComplete?.(req.id, holder.system);
     },
     onResolverError: (
       _resolver: string,
@@ -94,7 +95,11 @@ function build(resolver: Record<string, unknown>, options: Options = {}) {
       },
     },
   } as never);
-  system = createSystem({ module: mod, plugins: [plugin] } as never) as any;
+  const system = createSystem({
+    module: mod,
+    plugins: [plugin],
+  } as never) as any;
+  holder.system = system;
   system.start();
 
   return { system, log, cancelArgs, at };
