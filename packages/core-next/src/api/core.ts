@@ -485,6 +485,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     plugins?: Tail;
     errors?: ErrorsFeature;
     sources?: SourcesFeature;
+    /** The batch part (batch.ts): run every batch queue now. */
+    batch?: () => void;
   };
   // `effect_` from the start: the effects part sets it on its first run, and
   // a field added then would give every hot tracker read a second shape.
@@ -1569,6 +1571,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       });
     },
     async settle(maxWait = 5000) {
+      // 1.35 runs the batch queues first, and again at each settled change
+      // while it waits.
+      features.batch?.();
       await tick();
       if (isSettled()) {
         return;
@@ -1598,6 +1603,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           );
         });
         const off = system.onSettledChange(() => {
+          features.batch?.();
           queueMicrotask(() => {
             if (!done && isSettled()) {
               finish();

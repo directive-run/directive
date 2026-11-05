@@ -6,24 +6,24 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 28760,
-      "reason": "P3-F3 (features 2.0 has not built say so): `history` reads null and `onHistoryChange` subscribes a listener that never fires in every build, as 1.35 does without the history option (engine.ts:2605, 4343-4348), set by the withMissing part (api/missing.ts) and `register` reads the plugin's name first so `plugins: [undefined]` throws 1.35's TypeError. The option warnings, the featureMissing member stubs and the invalid-plugin error are development only (0 B here: the stub names alone measured about +150 B, which would have put minimal past the 28,800 B ceiling); the /plugins and /testing stubs live in their own entries. Measured 28,709 B, +66 B over main 095874dc's 28,643 B. Budget = measured + 51 B, under the owner's 28,800 B L6 ceiling (\"Approve up to 28.8 KB\")."
+      "gzBudget": 29779,
+      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 29,749 B, +1,066 B over 28,683 B (cap +1,100 B, so 29,783 B): the seam +363 B (measured with the part unwired), the part +703 B. Budget = measured + 30 B. The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
     },
     "two-module": {
-      "gzBudget": 28800,
-      "reason": "P3-F3 (features 2.0 has not built say so): `history` reads null and `onHistoryChange` subscribes a listener that never fires in every build, as 1.35 does without the history option (engine.ts:2605, 4343-4348), set by the withMissing part (api/missing.ts) and `register` reads the plugin's name first so `plugins: [undefined]` throws 1.35's TypeError. The option warnings, the featureMissing member stubs and the invalid-plugin error are development only (0 B here: the stub names alone measured about +150 B, which would have put minimal past the 28,800 B ceiling); the /plugins and /testing stubs live in their own entries. Measured 28,795 B, +62 B over main 095874dc's 28,733 B. Budget = the owner's 28,800 B ceiling (\"Approve up to 28.8 KB\"), measured + 5 B."
+      "gzBudget": 29871,
+      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 29,842 B, +1,071 B over 28,771 B (cap +1,100 B, so 29,871 B): the seam +366 B (measured with the part unwired), the part +705 B. Budget = measured + 29 B, which is the cap. The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B."
     },
     "aperture": {
-      "gzBudget": 33660,
-      "reason": "P3-F3 (features 2.0 has not built say so): `history` reads null and `onHistoryChange` subscribes a listener that never fires in every build, as 1.35 does without the history option (engine.ts:2605, 4343-4348), set by the withMissing part (api/missing.ts) and `register` reads the plugin's name first so `plugins: [undefined]` throws 1.35's TypeError. The option warnings, the featureMissing member stubs and the invalid-plugin error are development only (0 B here: the stub names alone measured about +150 B, which would have put minimal past the 28,800 B ceiling); the /plugins and /testing stubs live in their own entries. Measured 33,609 B, +66 B over main 095874dc's 33,543 B. Budget = measured + 51 B."
+      "gzBudget": 34673,
+      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 34,643 B, +1,066 B over 33,577 B (cap +1,100 B, so 34,677 B): the seam +360 B (measured with the part unwired), the part +706 B. Budget = measured + 30 B. The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
     },
     "full-entry": {
-      "gzBudget": 31671,
-      "reason": "P3-F3 (features 2.0 has not built say so): `history` reads null and `onHistoryChange` subscribes a listener that never fires in every build, as 1.35 does without the history option (engine.ts:2605, 4343-4348), set by the withMissing part (api/missing.ts) and `register` reads the plugin's name first so `plugins: [undefined]` throws 1.35's TypeError. The option warnings, the featureMissing member stubs and the invalid-plugin error are development only (0 B here: the stub names alone measured about +150 B, which would have put minimal past the 28,800 B ceiling); the /plugins and /testing stubs live in their own entries. Measured 31,620 B, +65 B over main 095874dc's 31,555 B. Budget = measured + 51 B, inside A3's 31,950 B."
+      "gzBudget": 32026,
+      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 31,996 B, +1,051 B over 30,945 B (cap +1,100 B, so 32,045 B): the seam +338 B (measured with the part unwired), the part +713 B. Budget = measured + 30 B. The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
     }
   }
 }
