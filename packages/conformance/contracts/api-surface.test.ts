@@ -6,13 +6,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultRepoRoot, v1PackageDir } from "../lib/core-entries.js";
+import {
+  defaultRepoRoot,
+  nextPackageDir,
+  v1PackageDir,
+} from "../lib/core-entries.js";
 import {
   type ApiChange,
   REF_PREFIX,
   type Surface,
   checkSurface,
   diffSurface,
+  differenceKeys,
   extractSurface,
   pendingApprovals,
 } from "./lib/surface.js";
@@ -35,6 +40,19 @@ const removal = (extra: Partial<ApiChange> = {}) =>
     ...extra,
   }) as ApiChange;
 const local = extractSurface(join(defaultRepoRoot, "packages/core"));
+// The ledger covers core-next too: its removals are not stale here.
+const nextDiffers = differenceKeys(frozen, extractSurface(nextPackageDir()));
+const workspaceDiffers = new Set(
+  diffSurface(frozen, local).map((d) => `${d.entry} ${d.name} (${d.change})`),
+);
+/** Listed removals core-next shows and the workspace does not. */
+const nextOnlyRemovals = changes
+  .filter((c) => "change" in c && c.change === "removed")
+  .map(
+    (c) =>
+      `${(c as { entry: string }).entry} ${(c as { name: string }).name} (removed)`,
+  )
+  .filter((k) => nextDiffers.has(k) && !workspaceDiffers.has(k));
 const copy = (s: Surface): Surface => JSON.parse(JSON.stringify(s));
 
 describe("public API surface", () => {
@@ -55,7 +73,7 @@ describe("public API surface", () => {
     if (pending.length > 0) {
       console.info(`[contracts] pending approvals: ${pending.join("; ")}`);
     }
-    expect(checkSurface(frozen, local, changes)).toEqual([]);
+    expect(checkSurface(frozen, local, changes, nextDiffers)).toEqual([]);
   });
 
   it("the snapshot is deterministic: keys are sorted", () => {
@@ -85,7 +103,7 @@ describe("public API surface", () => {
       "readonly prevHash: string | null",
       "prevHash?: number",
     );
-    expect(checkSurface(frozen, tampered, changes)).toEqual([
+    expect(checkSurface(frozen, tampered, changes, nextDiffers)).toEqual([
       `public API . ${key} (changed) differs from the 1.35 snapshot and is not in contracts/api-changes.json`,
     ]);
   });
@@ -93,7 +111,7 @@ describe("public API surface", () => {
   it("an unlisted addition fails; a pending-gate one passes", () => {
     const added = copy(local);
     (added["."] as Record<string, string>).BrandNewThing = "TypeAlias x";
-    expect(checkSurface(frozen, added, changes)).toEqual([
+    expect(checkSurface(frozen, added, changes, nextDiffers)).toEqual([
       "public API . BrandNewThing (added) is new since 1.35 and is not listed in contracts/api-changes.json",
     ]);
     const listed: ApiChange = {
@@ -103,12 +121,16 @@ describe("public API surface", () => {
       approvedBy: null,
       status: "pending-gate",
     };
-    expect(checkSurface(frozen, added, [...changes, listed])).toEqual([]);
     expect(
-      checkSurface(frozen, added, [
-        ...changes,
-        { ...listed, status: undefined },
-      ]),
+      checkSurface(frozen, added, [...changes, listed], nextDiffers),
+    ).toEqual([]);
+    expect(
+      checkSurface(
+        frozen,
+        added,
+        [...changes, { ...listed, status: undefined }],
+        nextDiffers,
+      ),
     ).toEqual([
       "api-changes.json: . BrandNewThing (added) has no approvedBy and is not pending-gate",
     ]);
@@ -117,7 +139,7 @@ describe("public API surface", () => {
   it("a removed export fails the check", () => {
     const tampered = copy(local);
     delete tampered["."]?.createSystem;
-    expect(checkSurface(frozen, tampered, changes)).toEqual([
+    expect(checkSurface(frozen, tampered, changes, nextDiffers)).toEqual([
       "public API . createSystem (removed) differs from the 1.35 snapshot and is not in contracts/api-changes.json",
     ]);
   });
@@ -126,7 +148,7 @@ describe("public API surface", () => {
     const tampered = copy(local);
     (tampered["./plugins"] as Record<string, string>).persistencePlugin += " ";
     delete tampered["./migration"];
-    const failures = checkSurface(frozen, tampered, changes);
+    const failures = checkSurface(frozen, tampered, changes, nextDiffers);
     expect(failures).toContain(
       "public API ./plugins persistencePlugin (changed) differs from the 1.35 snapshot and is not in contracts/api-changes.json",
     );
@@ -139,11 +161,39 @@ describe("public API surface", () => {
     const tampered = copy(local);
     delete tampered["."]?.createSystem;
     const approved = removal();
-    expect(checkSurface(frozen, tampered, [approved, ...changes])).toEqual([]);
     expect(
-      checkSurface(frozen, tampered, [removal({ approvedBy: "" }), ...changes]),
+      checkSurface(frozen, tampered, [approved, ...changes], nextDiffers),
+    ).toEqual([]);
+    expect(
+      checkSurface(
+        frozen,
+        tampered,
+        [removal({ approvedBy: "" }), ...changes],
+        nextDiffers,
+      ),
     ).toEqual(["api-changes.json: . createSystem (removed) has no approvedBy"]);
-    expect(checkSurface(frozen, local, [approved, ...changes])).toEqual([
+    expect(
+      checkSurface(frozen, local, [approved, ...changes], nextDiffers),
+    ).toEqual([
+      "api-changes.json: . createSystem (removed) is stale (no such difference)",
+    ]);
+  });
+
+  it("a removal only core-next shows is not stale; one neither engine shows is", () => {
+    // The owner's /internals removals (2026-11-03): core-next drops them, the
+    // workspace's 1.x keeps them.
+    expect(nextOnlyRemovals).toHaveLength(13);
+    for (const k of nextOnlyRemovals) {
+      expect(nextDiffers.has(k)).toBe(true);
+    }
+    expect(checkSurface(frozen, local, changes)).toEqual(
+      nextOnlyRemovals.map(
+        (k) => `api-changes.json: ${k} is stale (no such difference)`,
+      ),
+    );
+    expect(
+      checkSurface(frozen, local, [removal(), ...changes], nextDiffers),
+    ).toEqual([
       "api-changes.json: . createSystem (removed) is stale (no such difference)",
     ]);
   });

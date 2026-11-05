@@ -113,6 +113,12 @@ To approve an API change: Jason adds `{ entry, name, change, reason,
 approvedBy, date }` to `api-changes.json`, then `oracle:update`, with the
 `oracle-change` label. An agent never adds an API-change entry or fills its
 `approvedBy` (golden changes: see "Golden changes" above).
+One exception, by owner decision (Jason, 2026-11-03): the 13 `/internals`
+removals he chose one name at a time ("I'd go with your recommendation but
+let's go through them one at a time so o can see what's being removed"),
+each answered "Remove (Recommended)" or, for `withoutTracking`, "Remove it
+(Recommended)". Claude signed those 13 entries for him, each quoting his
+answer; it covers no other entry.
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 

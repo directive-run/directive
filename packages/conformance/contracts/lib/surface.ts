@@ -204,6 +204,23 @@ export function diffSurface(frozen: Surface, actual: Surface): SurfaceDiff[] {
 const changeKey = (d: { entry: string; name: string; change: string }) =>
   `${d.entry} ${d.name} (${d.change})`;
 
+/**
+ * The removed/changed keys (`<entry> <name> (<change>)`) of `actual` against
+ * `frozen`, on the entries `actual` ships only: an entry core-next does not
+ * ship yet is not a removal of its names.
+ */
+export function differenceKeys(frozen: Surface, actual: Surface): Set<string> {
+  const shipped: Surface = Object.fromEntries(
+    Object.entries(frozen).filter(([entry]) => entry in actual),
+  );
+
+  return new Set(
+    diffSurface(shipped, actual)
+      .filter((d) => d.change !== "added")
+      .map(changeKey),
+  );
+}
+
 /** Additions listed with no signature yet, for the census to print. */
 export function pendingApprovals(changes: readonly ApiChange[]): string[] {
   return changes
@@ -222,11 +239,18 @@ export function pendingApprovals(changes: readonly ApiChange[]): string[] {
  * and every listed entry must still occur. Referenced-but-unexported
  * declarations (`#ref:` keys) are held to the same removed/changed rule; a new
  * one needs no entry (the export that reaches it is what changed).
+ *
+ * The ledger covers both engines: `alsoDiffers` holds the removed/changed
+ * keys of core-next's built surface (`differenceKeys`). A removal or change
+ * entry is stale only when neither engine shows it, so a signed removal of a
+ * name core-next drops (the 13 `/internals` names, 2026-11-03) is not stale
+ * while the workspace's 1.x still exports it.
  */
 export function checkSurface(
   frozen: Surface,
   actual: Surface,
   changes: readonly ApiChange[],
+  alsoDiffers: ReadonlySet<string> = new Set(),
 ): string[] {
   const failures: string[] = [];
   const listed = new Map<string, ApiChange>();
@@ -276,7 +300,7 @@ export function checkSurface(
     }
   }
   for (const k of listed.keys()) {
-    if (!seen.has(k)) {
+    if (!seen.has(k) && !alsoDiffers.has(k)) {
       failures.push(`api-changes.json: ${k} is stale (no such difference)`);
     }
   }

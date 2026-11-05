@@ -125,6 +125,69 @@ describe("core-next public API surface", () => {
     ).toBe(baseline.failures.length + 1);
   });
 
+  it("the owner's 13 signed /internals removals each cover one missing built-layer name", () => {
+    const removals = changes.filter(
+      (c): c is Extract<ApiChange, { change: string }> =>
+        "change" in c && c.change === "removed",
+    );
+    expect(removals.map((c) => c.name).sort()).toEqual(
+      [
+        "createConstraintsManager",
+        "createDerivationsManager",
+        "createEngine",
+        "createErrorBoundaryManager",
+        "createPluginManager",
+        "createResolversManager",
+        "createRetryLaterManager",
+        "createSourcesManager",
+        "getCurrentDeps",
+        "isTracking",
+        "trackAccess",
+        "withTracking",
+        "withoutTracking",
+      ].sort(),
+    );
+    for (const c of removals) {
+      expect(c.entry).toBe("./internals");
+      expect(next["./internals"]?.[c.name]).toBeUndefined();
+      expect(frozen["./internals"]?.[c.name]).toBeDefined();
+      const message = `core-next ./internals ${c.name} (missing): 1.35 exports it and its layer ${layers.get(`./internals ${c.name}`)?.layer} is built (current ${current})`;
+      // Unsigned, or not listed at all, the name fails; signed, it passes.
+      for (const without of [
+        changes.map((x) => (x === c ? { ...c, approvedBy: "" } : x)),
+        changes.filter((x) => x !== c),
+      ]) {
+        expect(gate(next, { changes: without }).failures).toEqual([message]);
+      }
+    }
+    expect(baseline.failures).toEqual([]);
+  });
+
+  it("the shipped stub entries (/worker, /migration, /adapter-utils) carry exactly 1.35's names", () => {
+    expect(baseline.unshipped).toEqual([]);
+    const stubs = ["./worker", "./migration", "./adapter-utils"];
+    const names = (s: Surface, entry: string) =>
+      Object.keys(s[entry] ?? {})
+        .filter((n) => !n.startsWith("#ref:"))
+        .sort();
+    const mismatched = (s: Surface) =>
+      stubs.filter(
+        (entry) =>
+          names(s, entry).join() !== names(frozen, entry).join() ||
+          names(s, entry).length === 0,
+      );
+    expect(mismatched(next)).toEqual([]);
+    // Most stub names sit at unbuilt layers, where the layer rule accepts a
+    // missing name; this equality is what holds a stub entry to 1.35's names.
+    const dropped = names(next, "./worker")[0] as string;
+    const tampered = copy(next);
+    delete tampered["./worker"]?.[dropped];
+    expect(mismatched(tampered)).toEqual(["./worker"]);
+    console.info(
+      `[contracts] core-next stub entries: ${stubs.map((e) => `${e} ${names(next, e).length} names (layers ${[...new Set(names(next, e).map((n) => layers.get(`${e} ${n}`)?.layer ?? "?"))].sort().join("/")})`).join("; ")}`,
+    );
+  });
+
   it("an added public name fails unless a signed addition covers it", () => {
     expect(next["./plugins"]?.ClobberSummaryEvent).toBeDefined();
     expect(
