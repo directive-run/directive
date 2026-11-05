@@ -1,0 +1,11 @@
+{
+  "$comment": "The shared names whose printed declaration in core-next differs from 1.35's (apart from the type bundler's $N renames), each with why it differs today. Hand-maintained, never generated, and tighten-only: remove a name when core-next's declaration matches 1.35's again. The core-next surface gate (contracts/lib/next-surface.ts) fails a drifted name this file does not list, and fails a listed name that no longer drifts as stale. A reason says how the two declarations differ; it is a description, not an approval. This file is in harness.lock.json: changing it needs the oracle-change label.",
+  ". DirectiveError": "1.35 prints the optional context as `unknown | undefined` (the readonly property and the constructor parameter); core-next prints it as `unknown`.",
+  ". RequirementSet": "1.35's private field is named `map`; core-next's is named `map_`.",
+  ". generateRequirementId": "1.35 declares it as a function with an explicit (req, keyFn?) => string signature; core-next declares it as a constant of type `typeof requirementId`.",
+  ". t": "1.35 declares each schema builder as a method with its own generics and a chainable return type (`string<T>(): ChainableStringType<T>`); core-next declares each as a property of type `typeof <function>` (`string: typeof string`).",
+  "./internals createEffectsManager": "1.35 returns `EffectsManager<S>`; core-next returns `EffectsManager` without the schema parameter.",
+  "./internals createFacts": "1.35 takes `CreateFactsStoreOptions<S>`; core-next takes `StoreOptions<S>`.",
+  "./internals createFactsProxy": "core-next takes three optional parameters after `schema` (`tracker`, `writer` and `allow`); 1.35 takes only `(store, schema)`.",
+  "./internals createFactsStore": "1.35 takes `CreateFactsStoreOptions<S>`; core-next takes `StoreOptions<S>`."
+}

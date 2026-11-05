@@ -19,18 +19,28 @@
  *   core-next exports the name. The workspace check ignores such an entry.
  * - A name 1.35 lacks fails, unless a signed api-changes.json addition covers
  *   it. `pending-gate` does not count here, and an agent never signs.
- * - Signature drift is reported, not failed: a shared name whose printed
- *   declaration differs from 1.35's apart from the type bundler's `$N`
- *   renames. check.ts compiled against core-next (contracts/lib/types.ts) is
- *   the usage-level gate. `#ref:` keys are not compared: they are keyed by
- *   chunk file, which differs between the two builds.
+ * - Signature drift fails unless contracts/next-drift.json lists it: a shared
+ *   name whose printed declaration differs from 1.35's apart from the type
+ *   bundler's `$N` renames. The list is hand-maintained and tighten-only: a
+ *   drifted name it does not list fails, and a listed name that no longer
+ *   drifts fails as stale. check.ts compiled against core-next
+ *   (contracts/lib/types.ts) is the usage-level gate. `#ref:` keys are not
+ *   compared: they are keyed by chunk file, which differs between the two
+ *   builds.
+ * - layers.rules.json `current` must be a layer. Without one the gate cannot
+ *   tell built names from unbuilt ones, so it fails and checks nothing else.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Project } from "ts-morph";
 import { coreEntries } from "../../lib/core-entries.js";
-import { type Layer, layerIndex, layerOfExport } from "../../lib/layers.js";
+import {
+  LAYERS,
+  type Layer,
+  layerIndex,
+  layerOfExport,
+} from "../../lib/layers.js";
 import {
   type ApiChange,
   REF_PREFIX,
@@ -65,13 +75,27 @@ export function readUnshipped(conformanceRoot: string): Unshipped {
   );
 }
 
+/** contracts/next-drift.json: `<entry> <name>` → why it differs today. */
+export type Drift = Readonly<Record<string, string>>;
+
+/** contracts/next-drift.json, without its `$comment`. */
+export function readDrift(conformanceRoot: string): Drift {
+  const raw: Record<string, string> = JSON.parse(
+    readFileSync(join(conformanceRoot, "contracts/next-drift.json"), "utf8"),
+  );
+
+  return Object.fromEntries(
+    Object.entries(raw).filter(([key]) => !key.startsWith("$")),
+  );
+}
+
 export interface NextSurfaceResult {
   failures: string[];
   /** Missing names accepted: listed in next-unshipped.json, layer above `current`. */
   unbuilt: { entry: string; name: string; layer: Layer }[];
   /** Frozen entries core-next does not ship (each name is also checked). */
   unshipped: string[];
-  /** Shared names whose declaration differs from 1.35's (reported only). */
+  /** Shared names whose declaration differs from 1.35's (listed or not). */
   drift: { entry: string; name: string; v1: string; next: string }[];
 }
 
@@ -133,6 +157,7 @@ export function checkNextSurface(
   current: Layer | null,
   layers: ExportLayers,
   unshipped: Unshipped,
+  drift: Drift,
 ): NextSurfaceResult {
   const result: NextSurfaceResult = {
     failures: [],
@@ -140,7 +165,17 @@ export function checkNextSurface(
     unshipped: [],
     drift: [],
   };
-  const built = current === null ? -1 : layerIndex(current);
+  if (
+    typeof current !== "string" ||
+    !(LAYERS as readonly string[]).includes(current)
+  ) {
+    result.failures.push(
+      `layers.rules.json: "current" is ${JSON.stringify(current ?? null)}, not a layer (${LAYERS[0]} to ${LAYERS[LAYERS.length - 1]}): set it to the highest layer core-next has built, since without one the gate cannot tell built names from unbuilt ones`,
+    );
+
+    return result;
+  }
+  const built = layerIndex(current);
   const signedAdd = new Set<string>();
   const signedRemove = new Set<string>();
   for (const c of changes) {
@@ -238,13 +273,35 @@ export function checkNextSurface(
         withoutBundlerRenames(v1[name] as string) !==
         withoutBundlerRenames(v2[name] as string)
       ) {
-        result.drift.push({
+        const d = {
           entry,
           name,
           v1: v1[name] as string,
           next: v2[name] as string,
-        });
+        };
+        result.drift.push(d);
+        if (drift[key] === undefined) {
+          result.failures.push(
+            `core-next ${key} (drift): its declaration differs from 1.35's and contracts/next-drift.json does not list it: ${describeDrift(d)}`,
+          );
+        }
       }
+    }
+  }
+  const drifted = new Set(result.drift.map((d) => `${d.entry} ${d.name}`));
+  for (const [key, reason] of Object.entries(drift)) {
+    const [entry = "", name = ""] = key.split(" ");
+    if (!(name in (frozen[entry] ?? {})) || !(name in (next[entry] ?? {}))) {
+      result.failures.push(
+        `contracts/next-drift.json: ${key} is not a name both 1.35 and core-next export`,
+      );
+    } else if (!drifted.has(key)) {
+      result.failures.push(
+        `contracts/next-drift.json: ${key} is stale: core-next's declaration matches 1.35's (remove it from next-drift.json)`,
+      );
+    }
+    if (typeof reason !== "string" || reason.trim() === "") {
+      result.failures.push(`contracts/next-drift.json: ${key} has no reason`);
     }
   }
 
@@ -287,5 +344,6 @@ export function gateBuiltNext(repoRoot: string): NextSurfaceResult | undefined {
     currentLayer(conformanceRoot),
     exportLayers(repoRoot, frozen, Object.keys(frozen)),
     readUnshipped(conformanceRoot),
+    readDrift(conformanceRoot),
   );
 }
