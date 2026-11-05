@@ -134,6 +134,10 @@ and tighten-only: a name leaves it when core-next ships it (a listed name
 core-next ships fails as stale), a missing name it does not list fails at
 any layer, and a listed name whose layer is built fails. It is pinned by
 `harness.lock.json`, so changing it needs the `oracle-change` label.
+`next-drift.json` is the same kind of list for signatures: a shared name whose
+printed declaration differs from 1.35's fails unless the file lists it with the
+reason it differs today, and a listed name that no longer differs fails as
+stale. The gate also fails when `layers.rules.json` `current` is not a layer.
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 
