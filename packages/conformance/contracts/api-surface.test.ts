@@ -35,6 +35,10 @@ const removal = (extra: Partial<ApiChange> = {}) =>
     ...extra,
   }) as ApiChange;
 const local = extractSurface(join(defaultRepoRoot, "packages/core"));
+/** The `engine: "next"` entries: core-next's, ignored by this check. */
+const nextOnly = changes.filter(
+  (c) => (c as { engine?: string }).engine === "next",
+);
 const copy = (s: Surface): Surface => JSON.parse(JSON.stringify(s));
 
 describe("public API surface", () => {
@@ -144,6 +148,34 @@ describe("public API surface", () => {
       checkSurface(frozen, tampered, [removal({ approvedBy: "" }), ...changes]),
     ).toEqual(["api-changes.json: . createSystem (removed) has no approvedBy"]);
     expect(checkSurface(frozen, local, [approved, ...changes])).toEqual([
+      "api-changes.json: . createSystem (removed) is stale (no such difference)",
+    ]);
+  });
+
+  // Self-test 4: before `engine`, core-next's removals excused the workspace
+  // too, so this drop passed.
+  it('an engine "next" removal excuses nothing in the workspace and is never stale here', () => {
+    expect(nextOnly).toHaveLength(13);
+    const tampered = copy(local);
+    expect(tampered["./internals"]?.createEngine).toBeDefined();
+    delete tampered["./internals"]?.createEngine;
+    expect(checkSurface(frozen, tampered, changes)).toEqual([
+      "public API ./internals createEngine (removed) differs from the 1.35 snapshot and is not in contracts/api-changes.json",
+    ]);
+    // The workspace still exports all 13: none is stale here.
+    for (const c of nextOnly) {
+      const { entry, name } = c as { entry: string; name: string };
+      expect(local[entry]?.[name]).toBeDefined();
+    }
+    expect(checkSurface(frozen, local, changes)).toEqual([]);
+    // Any other engine value fails, whatever the entry.
+    expect(
+      checkSurface(frozen, local, [
+        ...changes,
+        removal({ engine: "v1" } as unknown as Partial<ApiChange>),
+      ]),
+    ).toEqual([
+      'api-changes.json: . createSystem (removed) has engine "v1"; engine takes only "next", on a removal',
       "api-changes.json: . createSystem (removed) is stale (no such difference)",
     ]);
   });

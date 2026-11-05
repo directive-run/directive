@@ -21,6 +21,12 @@ export interface ApiRemovalOrChange {
   entry: string;
   name: string;
   change: "removed" | "changed";
+  /**
+   * `"next"`: a removal for core-next only. checkSurface (the workspace's 1.x)
+   * ignores the entry; the core-next gate (next-surface.ts) uses it and
+   * stale-checks it.
+   */
+  engine?: "next";
   reason: string;
   /** Filled in by Jason, never by an agent. */
   approvedBy: string;
@@ -222,6 +228,10 @@ export function pendingApprovals(changes: readonly ApiChange[]): string[] {
  * and every listed entry must still occur. Referenced-but-unexported
  * declarations (`#ref:` keys) are held to the same removed/changed rule; a new
  * one needs no entry (the export that reaches it is what changed).
+ *
+ * An `engine: "next"` entry is core-next's (the 13 `/internals` removals,
+ * 2026-11-03): it is ignored here completely, excusing nothing and never
+ * stale. The core-next gate checks it (contracts/lib/next-surface.ts).
  */
 export function checkSurface(
   frozen: Surface,
@@ -232,6 +242,15 @@ export function checkSurface(
   const listed = new Map<string, ApiChange>();
   for (const c of changes) {
     const key = isAdd(c) ? `${c.export} (added)` : changeKey(c);
+    const engine = (c as { engine?: unknown }).engine;
+    if (engine === "next" && !isAdd(c)) {
+      continue;
+    }
+    if (engine !== undefined) {
+      failures.push(
+        `api-changes.json: ${key} has engine ${JSON.stringify(engine)}; engine takes only "next", on a removal`,
+      );
+    }
     listed.set(key, c);
     if (typeof c.reason !== "string" || c.reason.trim() === "") {
       failures.push(`api-changes.json: ${key} has no reason`);
