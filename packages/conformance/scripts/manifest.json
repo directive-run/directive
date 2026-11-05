@@ -100,6 +100,8 @@
   "tests/core/l6-schema-oracle.test.ts": "packages/core/src/core/__tests__/l6-schema-oracle.test.ts",
   "tests/core/l6-snapshots-oracle-production.test.ts": "packages/core/src/core/__tests__/l6-snapshots-oracle-production.test.ts",
   "tests/core/l6-snapshots-oracle.test.ts": "packages/core/src/core/__tests__/l6-snapshots-oracle.test.ts",
+  "tests/core/l7-batch-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l7-batch-pins-oracle-production.test.ts",
+  "tests/core/l7-batch-pins-oracle.test.ts": "packages/core/src/core/__tests__/l7-batch-pins-oracle.test.ts",
   "tests/core/l7-batch-resolvers-oracle.test.ts": "packages/core/src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
   "tests/core/l8-system-oracle-production.test.ts": "packages/core/src/core/__tests__/l8-system-oracle-production.test.ts",
   "tests/core/l8-system-oracle.test.ts": "packages/core/src/core/__tests__/l8-system-oracle.test.ts",
