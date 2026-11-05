@@ -20,6 +20,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { checkExcuses } from "../../lib/census.js";
 import { compareContract } from "../compare.js";
 import { pathFits } from "../fingerprint.js";
+import { type FuzzSpec, specTriggers } from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
 import { type Divergence, FUZZ_SCENARIO, explain } from "../scenario.js";
@@ -476,6 +477,160 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
       ),
     ).toEqual(["missing onErrorRecovery "]);
   });
+
+  // P4-F2: quirk b's console entry was signed for one development warning,
+  // the one a resolver's unhandled error prints, but its bound read only the
+  // masked record ({ "$incidental": "string" }), so in every case where a
+  // resolver can reject it excused any warning 2.0 lacked or added.
+  const warn = (text: string): TraceEntry => ({
+    k: "console",
+    level: "warn",
+    args: [text],
+  });
+  const tail =
+    "The default error strategy skips it silently. Configure errorBoundary.onResolverError (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.";
+
+  it("quirk b's console warning still excuses the resolver-threw warning, missing or extra", () => {
+    const id = "l2-quirk-b-console-warn";
+    for (const text of [
+      `[Directive] resolver "r0" threw: a.r0 attempt 1. Requirement "A0" stays unmet. ${tail}`,
+      `[Directive] resolver "a::r2" threw: a.r2 attempt 2. ${tail}`,
+      `[Directive] resolver "b::r1" threw: Resolver "b::r1" timed out after 3ms. Requirement "B1" stays unmet. ${tail}`,
+    ]) {
+      expect(left([warn(text)], [], id, ["resolverRejects"])).toEqual([]);
+      expect(left([], [warn(text)], id, ["resolverRejects"])).toEqual([]);
+      // Its `when` still applies.
+      expect(left([warn(text)], [], id, ["settleStop"])).toEqual([
+        "missing warn ",
+      ]);
+    }
+  });
+
+  it("quirk b's console warning does not excuse another development warning, where a resolver can reject", () => {
+    const id = "l2-quirk-b-console-warn";
+    for (const text of [
+      // The cross-module gate warning (P3-F6): its own row, not quirk b.
+      '[Directive] Module "b" read undeclared property "f0" in a source gate. This module declares crossModuleDeps, so gate facts are namespaced: use "facts.self.f0" for its own fact, or add the module to crossModuleDeps.',
+      // Row o's non-JSON write warning.
+      '[Directive] Fact "a::when" assigned a Date instance.',
+      // Another source's unhandled error, in the same wording.
+      `[Directive] derivation "d0" threw: a.d0 throws at 8. ${tail.replace("onResolverError", "onDerivationError")}`,
+      // A resolver's warning of another kind.
+      '[Directive] resolver "a::r0" failed 3 retries in a row; it will run again when its requirement changes.',
+      // The resolver-threw wording around an error no fuzz resolver throws,
+      // or with anything added.
+      `[Directive] resolver "r0" threw: boom. ${tail}`,
+      `[Directive] resolver "r0" threw: a.r0 attempt 1. ${tail} (again)`,
+    ]) {
+      expect(left([warn(text)], [], id, ["resolverRejects"])).toEqual([
+        "missing warn ",
+      ]);
+      expect(left([], [warn(text)], id, ["resolverRejects"])).toEqual([
+        "extra warn ",
+      ]);
+    }
+    // The wording is read from the first argument only, where it is: a
+    // second argument is another record shape.
+    expect(
+      left(
+        [
+          {
+            k: "console",
+            level: "warn",
+            args: [
+              `[Directive] resolver "r0" threw: a.r0 attempt 1. ${tail}`,
+              "x",
+            ],
+          },
+        ],
+        [],
+        id,
+        ["resolverRejects"],
+      ),
+    ).toEqual(["missing warn "]);
+  });
+
+  it("row t's cancel 2.0 lacks is excused only in a case whose resolver's write retracts its own constraint", () => {
+    // One module, f0 and f1; c0 needs f0 >= 1 and its resolver writes `value`
+    // to fact `writes`.
+    const caseOf = (writes: number, value: number): string[] =>
+      specTriggers({
+        modules: [
+          {
+            facts: 2,
+            date: false,
+            derivations: [],
+            events: [{ target: 0, add: false }],
+            constraints: [
+              {
+                fact: 0,
+                atLeast: 1,
+                crossAtLeast: null,
+                priority: 0,
+                writes,
+                value,
+                delay: 0,
+                fails: 0,
+                retry: 0,
+                timeout: null,
+              },
+            ],
+            effects: [],
+            source: null,
+          },
+        ],
+        boundary: null,
+        history: false,
+        trace: false,
+        steps: [{ op: "settle" }],
+      } as FuzzSpec);
+    const records: [string, TraceEntry][] = [
+      [
+        "l3-cand-t-fuzz-hook-onResolverCancel-missing",
+        {
+          k: "hook",
+          hook: "onResolverCancel",
+          args: [
+            "r0",
+            { fromConstraint: "c0", id: "A0:{}", requirement: { type: "A0" } },
+          ],
+        },
+      ],
+      [
+        "l3-cand-t-fuzz-hook-onRequirementCanceled-missing",
+        {
+          k: "hook",
+          hook: "onRequirementCanceled",
+          args: [
+            { fromConstraint: "c0", id: "A0:{}", requirement: { type: "A0" } },
+          ],
+        },
+      ],
+      [
+        "l3-cand-t-fuzz-observe-requirement-canceled-missing",
+        {
+          k: "observe",
+          event: { type: "requirement.canceled", id: "A0:{}" },
+        },
+      ],
+    ];
+    // The write to f0 of 0 makes f0 >= 1 false: the run retracts itself.
+    expect(caseOf(0, 0)).toContain("ownWriteRetracts");
+    // A write to another fact, or of a value that keeps the condition true,
+    // cannot retract its own constraint.
+    expect(caseOf(1, 0)).not.toContain("ownWriteRetracts");
+    expect(caseOf(0, 1)).not.toContain("ownWriteRetracts");
+    for (const [id, cancel] of records) {
+      const kind = cancel.k === "hook" ? cancel.hook : "requirement.canceled";
+      expect(left([cancel], [], id, caseOf(0, 0)), id).toEqual([]);
+      expect(left([cancel], [], id, caseOf(1, 0)), id).toEqual([
+        `missing ${kind} `,
+      ]);
+      expect(left([cancel], [], id, caseOf(0, 1)), id).toEqual([
+        `missing ${kind} `,
+      ]);
+    }
+  });
 });
 
 describe("row o's hand entry pins the warning count the fuzz entry cannot", () => {
@@ -557,6 +712,48 @@ describe("the census requires every entry to name what it excuses", () => {
   it("control: a named hand entry and a bounded fuzz entry pass", () => {
     expect(census([excused, { ...bounded, id: "f" }])).toBe("");
     expect(census([excused], new Map([["q\t0", 1]]))).toBe("");
+  });
+
+  it("checks $text: a known class, in a missing or extra console entry only", () => {
+    const text = (more: Partial<Divergence>, name = "resolverThrew") =>
+      census([
+        entry({
+          scenario: FUZZ_SCENARIO,
+          step: undefined,
+          stream: "console",
+          kind: "warn",
+          op: undefined,
+          bound: {
+            match: [{ k: "console", level: "warn", args: [{ $text: name }] }],
+          },
+          ...more,
+        }),
+      ]);
+    expect(text({})).toBe("");
+    expect(text({ op: "missing" })).toBe("");
+    expect(text({}, "nope")).toMatch(/names an unknown \$text "nope"/);
+    expect(text({ stream: "external", kind: "q" })).toMatch(/uses \$text/);
+    expect(
+      census([
+        entry({
+          scenario: FUZZ_SCENARIO,
+          step: undefined,
+          stream: "console",
+          kind: "warn",
+          op: "changed",
+          path: "args",
+          bound: {
+            match: [
+              {
+                path: "args[0]",
+                from: { $text: "resolverThrew" },
+                to: { $text: "resolverThrew" },
+              },
+            ],
+          },
+        }),
+      ]),
+    ).toMatch(/uses \$text/);
   });
 
   it("rejects a hand entry without excuses, with a bound, or without an op", () => {

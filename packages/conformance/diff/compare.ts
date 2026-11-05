@@ -83,6 +83,15 @@ export interface Difference {
   path?: string;
   reference?: Json;
   candidate?: Json;
+  /**
+   * For a missing or extra console record only: the record as printed,
+   * before `contract()` masked its wording. Nothing in the comparison reads
+   * it (the alignment, `reference`, `candidate`, the report and the
+   * advisories all see the masked record); only a fuzz bound's `$text`
+   * pattern does (diff/fingerprint.ts `TEXT`), so an entry can name the one
+   * development warning it was approved for.
+   */
+  raw?: Json;
   /** Trace positions, for context. */
   at: { reference?: number; candidate?: number };
   /**
@@ -921,6 +930,7 @@ function compareWith(
           ...base(k),
           op: "missing",
           reference: project(k.entry),
+          ...(stream === "console" ? { raw: k.entry as unknown as Json } : {}),
           at: { reference: k.index },
           where: { reference: at.get(k) as Position },
         });
@@ -932,6 +942,7 @@ function compareWith(
           ...base(k),
           op: "extra",
           candidate: project(k.entry),
+          ...(stream === "console" ? { raw: k.entry as unknown as Json } : {}),
           at: { candidate: k.index },
           where: { candidate: at.get(k) as Position },
         });

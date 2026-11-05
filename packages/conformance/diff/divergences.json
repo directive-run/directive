@@ -6763,6 +6763,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -6789,7 +6790,7 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). No trigger fits (the path needs only a resolver whose write retracts its own constraint), so this entry has no `when`. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -6801,6 +6802,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -6824,7 +6826,7 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). No trigger fits (the path needs only a resolver whose write retracts its own constraint), so this entry has no `when`. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -6836,6 +6838,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -6849,7 +6852,7 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). No trigger fits (the path needs only a resolver whose write retracts its own constraint), so this entry has no `when`. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -6862,6 +6865,7 @@
     "op": "changed",
     "path": "args",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -6902,7 +6906,7 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). No trigger fits (the path needs only a resolver whose write retracts its own constraint), so this entry has no `when`. This covers 1.35's extra onResolverCancel call where the comparison pairs it with another run's cancel on 2.0 (changed in args). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onResolverCancel call where the comparison pairs it with another run's cancel on 2.0 (changed in args). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -6915,6 +6919,7 @@
     "op": "changed",
     "path": "args[0]",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -6946,7 +6951,7 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). No trigger fits (the path needs only a resolver whose write retracts its own constraint), so this entry has no `when`. This covers 1.35's extra onRequirementCanceled call where the comparison pairs it with another run's on 2.0 (changed in args[0]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onRequirementCanceled call where the comparison pairs it with another run's on 2.0 (changed in args[0]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
   },
@@ -6959,6 +6964,7 @@
     "op": "changed",
     "path": "event.id",
     "group": "quirk-t",
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7073,7 +7079,7 @@
           "level": "warn",
           "args": [
             {
-              "$incidental": "string"
+              "$text": "resolverThrew"
             }
           ]
         }
