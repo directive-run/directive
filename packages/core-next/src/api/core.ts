@@ -47,6 +47,7 @@ import {
   withTracking,
 } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
+import type { BatchHost, Batcher } from "./resolvers.js";
 import type { SourcesFeature } from "./sources.js";
 import type {
   FactChange,
@@ -166,6 +167,11 @@ export interface SystemContext {
   ): Strategy;
   /** Set by the error boundary part (errors.ts); absent, everything skips. */
   decide_?: Decide;
+  /**
+   * Set by the batch part (batch.ts) when a resolver batches: the resolvers
+   * hand it their run machinery and queue batched requirements with it.
+   */
+  batch_?: (host: BatchHost) => Batcher;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
