@@ -346,6 +346,28 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     ).unexplained.map((d) => `${d.op} ${d.kind} ${d.path ?? ""}`);
   };
 
+  it("row o's warning is excused only in a case with a namespaced Date write, and only as missing on 2.0", () => {
+    const warn: TraceEntry = {
+      k: "console",
+      level: "warn",
+      args: ['[Directive] Fact "a::when" assigned a Date instance.'],
+    };
+    const id = "l3-quirk-o-fuzz-console-warn-missing";
+    // Control: 1.35's second warning, missing on 2.0, where a Date is
+    // written to a namespaced fact.
+    expect(left([warn], [], id, ["namespacedDateWrite"])).toEqual([]);
+    // Without a namespaced Date write, a warning 2.0 lacks is unexplained,
+    // whatever other triggers the case has.
+    expect(left([warn], [], id, [])).toEqual(["missing warn "]);
+    expect(
+      left([warn], [], id, ["resolverRejects", "settleStop", "restart"]),
+    ).toEqual(["missing warn "]);
+    // An extra warning on 2.0 is never row o.
+    expect(left([], [warn], id, ["namespacedDateWrite"])).toEqual([
+      "extra warn ",
+    ]);
+  });
+
   it("quirk z's timer counts: 2.0 holding fewer timers is excused, more is not", () => {
     const timers = (at: string, pending: number): TraceEntry => ({
       k: "timers",

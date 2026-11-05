@@ -354,6 +354,7 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `restart` | the steps have a `stop` with a `start` after it and no `destroy` anywhere before that `start` (1.35 ignores `start()` after `destroy()`) |
 | `disable` | some `errorBoundary` strategy is `"disable"` and the case has what it applies to: a resolver (`onResolverError`) or an effect (`onEffectError`) |
 | `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |
+| `namespacedDateWrite` | the case has two modules (the model namespaces them only then, as `a` and `b`) and one has the Date fact `when`, which its init sets to a `Date`, so a Date is written to a namespaced fact (row o: 1.35 warns of it twice, by `a.when` and `a::when`) |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown
