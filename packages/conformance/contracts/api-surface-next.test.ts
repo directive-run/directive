@@ -10,11 +10,13 @@ import { defaultRepoRoot, nextPackageDir } from "../lib/core-entries.js";
 import { harnessFiles } from "../lib/harness.js";
 import { type Layer, layerIndex } from "../lib/layers.js";
 import {
+  type Drift,
   type Unshipped,
   checkNextSurface,
   currentLayer,
   describeDrift,
   exportLayers,
+  readDrift,
   readUnshipped,
   withoutBundlerRenames,
 } from "./lib/next-surface.js";
@@ -32,6 +34,7 @@ const next = extractSurface(nextPackageDir());
 const current = currentLayer(conformanceRoot);
 const layers = exportLayers(defaultRepoRoot, frozen, Object.keys(frozen));
 const unshipped = readUnshipped(conformanceRoot);
+const drift = readDrift(conformanceRoot);
 const copy = (s: Surface): Surface => JSON.parse(JSON.stringify(s));
 const gate = (
   s: Surface,
@@ -39,6 +42,7 @@ const gate = (
     current?: typeof current;
     changes?: ApiChange[];
     unshipped?: Unshipped;
+    drift?: Drift;
   } = {},
 ) =>
   checkNextSurface(
@@ -48,6 +52,7 @@ const gate = (
     options.current === undefined ? current : options.current,
     layers,
     options.unshipped ?? unshipped,
+    options.drift ?? drift,
   );
 const baseline = gate(next);
 const layerOf = (key: string) => layers.get(key)?.layer as Layer;
@@ -71,7 +76,7 @@ describe("core-next public API surface", () => {
     );
     for (const d of baseline.drift) {
       console.info(
-        `[contracts] core-next signature drift (reported): ${describeDrift(d)}`,
+        `[contracts] core-next signature drift (listed in next-drift.json): ${describeDrift(d)}`,
       );
     }
     expect(baseline.failures).toEqual([]);
@@ -121,8 +126,15 @@ describe("core-next public API surface", () => {
       layer: undefined,
     });
     expect(
-      checkNextSurface(frozen, tampered, changes, current, unplaced, unshipped)
-        .failures,
+      checkNextSurface(
+        frozen,
+        tampered,
+        changes,
+        current,
+        unplaced,
+        unshipped,
+        drift,
+      ).failures,
     ).toContain(
       "core-next . createSystem (missing): no layer for it (declared in core/system.ts); add it to NAME_LAYERS or MODULE_LAYERS in lib/layers.ts",
     );
@@ -311,19 +323,125 @@ describe("core-next public API surface", () => {
     ).toEqual(baseline.failures);
   });
 
-  it("signature drift is reported, not failed; bundler $N renames are not drift", () => {
+  it("next-drift.json is exactly the names whose signatures drift, each with a reason, and is in the harness lock", () => {
+    expect(Object.keys(drift).sort()).toEqual(
+      baseline.drift.map((d) => `${d.entry} ${d.name}`).sort(),
+    );
+    for (const [key, reason] of Object.entries(drift)) {
+      expect(reason.trim(), key).not.toBe("");
+    }
+    expect(harnessFiles(conformanceRoot)).toContain(
+      "contracts/next-drift.json",
+    );
+  });
+
+  // Self-test (b): before next-drift.json, drift was reported and never failed.
+  it("a signature drift next-drift.json does not list fails; bundler $N renames are not drift", () => {
     expect(withoutBundlerRenames("f<S extends Schema$1>(): Facts$12<S>")).toBe(
       "f<S extends Schema>(): Facts<S>",
     );
+    const v1 = (frozen["."] as Record<string, string>).createSystem as string;
     const tampered = copy(next);
-    (tampered["."] as Record<string, string>).createSystem += " ";
+    (tampered["."] as Record<string, string>).createSystem += "\n// drift";
     const result = gate(tampered);
-    expect(result.failures).toEqual(baseline.failures);
+    expect(result.failures).toEqual([
+      `core-next . createSystem (drift): its declaration differs from 1.35's and contracts/next-drift.json does not list it: ${describeDrift(
+        {
+          entry: ".",
+          name: "createSystem",
+          v1,
+          next: (tampered["."] as Record<string, string>)
+            .createSystem as string,
+        },
+      )}`,
+    ]);
     expect(result.drift.map((d) => `${d.entry} ${d.name}`)).toContain(
       ". createSystem",
     );
     expect(baseline.drift.map((d) => `${d.entry} ${d.name}`)).not.toContain(
       ". createSystem",
     );
+    // Listed, the same drift passes.
+    expect(
+      gate(tampered, { drift: { ...drift, ". createSystem": "test" } })
+        .failures,
+    ).toEqual([]);
+    // A bundler rename of a type name is not drift.
+    const renamed = copy(next);
+    const decl = (renamed["."] as Record<string, string>)
+      .createSystem as string;
+    expect(decl).toMatch(/\b(ModuleSchema|ModulesMap)\b/);
+    (renamed["."] as Record<string, string>).createSystem = decl.replace(
+      /\b(ModuleSchema|ModulesMap)\b/g,
+      "$1$$9",
+    );
+    expect((renamed["."] as Record<string, string>).createSystem).not.toBe(
+      decl,
+    );
+    expect(gate(renamed)).toEqual(baseline);
+  });
+
+  // Self-test (c).
+  it("a next-drift.json entry that no longer drifts, is not a shared name or has no reason fails", () => {
+    const fixed = copy(next);
+    (fixed["./internals"] as Record<string, string>).createFacts = (
+      frozen["./internals"] as Record<string, string>
+    ).createFacts as string;
+    const stale = (key: string) =>
+      `contracts/next-drift.json: ${key} is stale: core-next's declaration matches 1.35's (remove it from next-drift.json)`;
+    const fixedResult = gate(fixed);
+    expect(fixedResult.failures).toEqual([stale("./internals createFacts")]);
+    expect(fixedResult.drift.map((d) => `${d.entry} ${d.name}`)).not.toContain(
+      "./internals createFacts",
+    );
+    // A listed name that never drifted is stale too.
+    expect(
+      gate(next, { drift: { ...drift, ". createSystem": "test" } }).failures,
+    ).toEqual([stale(". createSystem")]);
+    expect(
+      gate(next, { drift: { ...drift, ". noSuchName": "test" } }).failures,
+    ).toEqual([
+      "contracts/next-drift.json: . noSuchName is not a name both 1.35 and core-next export",
+    ]);
+    expect(
+      gate(next, { drift: { ...drift, ". RequirementSet": " " } }).failures,
+    ).toEqual(["contracts/next-drift.json: . RequirementSet has no reason"]);
+  });
+
+  // Self-test (a): `current: null` used to mean "nothing built", so every
+  // name core-next lacks passed as unbuilt and the gate checked nothing.
+  it('a "current" that is not a layer fails, naming the field, and nothing else is checked', () => {
+    expect(baseline.failures).toEqual([]);
+    for (const bad of [null, undefined, "L99", "", 6]) {
+      const result = checkNextSurface(
+        frozen,
+        next,
+        changes,
+        bad as Layer | null,
+        layers,
+        unshipped,
+        drift,
+      );
+      expect(result.failures, String(bad)).toEqual([
+        `layers.rules.json: "current" is ${JSON.stringify(bad ?? null)}, not a layer (L0 to L13): set it to the highest layer core-next has built, since without one the gate cannot tell built names from unbuilt ones`,
+      ]);
+    }
+    expect(gate(next, { current: null }).failures).toHaveLength(1);
+    expect(gate(next, { current: "L0" }).failures).toEqual([]);
+  });
+
+  it("every 1.35 export is placed in a layer, the distributable-snapshot types at L12", () => {
+    expect([...layers].filter(([, v]) => !v.layer).map(([key]) => key)).toEqual(
+      [],
+    );
+    for (const name of [
+      "isSignedSnapshot",
+      "DistributableSnapshotLike",
+      "SignedSnapshot",
+      "SnapshotDiff",
+      "SnapshotDiffEntry",
+    ]) {
+      expect(layers.get(`. ${name}`)?.layer, name).toBe("L12");
+    }
   });
 });

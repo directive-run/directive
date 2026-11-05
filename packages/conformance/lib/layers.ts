@@ -108,6 +108,14 @@ const NAME_LAYERS: Record<string, Layer> = {
   isSignedSnapshot: "L12",
   isSnapshotExpired: "L12",
   validateSnapshot: "L12",
+  // The types those helpers take and return (utils/utils.ts, like the
+  // helpers): DistributableSnapshotLike is the snapshot shape they accept,
+  // SignedSnapshot is what signSnapshot returns, and SnapshotDiff and
+  // SnapshotDiffEntry are what diffSnapshots returns.
+  DistributableSnapshotLike: "L12",
+  SignedSnapshot: "L12",
+  SnapshotDiff: "L12",
+  SnapshotDiffEntry: "L12",
   // The documented `equalityFn` for `system.watch` (L0); adapter-utils
   // re-exports it for selectors.
   shallowEqual: "L0",
