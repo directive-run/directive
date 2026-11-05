@@ -1,5 +1,5 @@
 {
-  "$comment": "Every difference from the frozen 1.35 public API (contracts/api-surface.json) must be listed. Removals/changes: { entry, name, change: removed|changed, reason, approvedBy, date }. Additions: { kind: \"add\", export: \"<entry> <name>\", reason, approvedBy, status? }; approvedBy may be null only with status \"pending-gate\" (signed by Jason at the Phase 0 gate). An agent never fills in approvedBy. goldenChanges (contracts/STABILITY.md \"Golden changes\"): one entry per named golden case and approved row: { case, direction: read-1.35|1.35-reads, engines, row, part, expected2, reason, approvedBy, date }. For that case, direction and engines only, the recorded 2.0 value expected2 replaces 1.35.0's; any other value fails, and unsigned, malformed, overlapping or stale entries fail. Owner decision 2026-11-02: \"Extend it; Claude signs (Recommended)\": Claude may sign read-1.35 entries for approved rows only, quoting the approval; rollback stays strict, so a 1.35-reads entry is signed by Jason himself.",
+  "$comment": "Every difference from the frozen 1.35 public API (contracts/api-surface.json) must be listed. Removals/changes: { entry, name, change: removed|changed, engine?, reason, approvedBy, date }. engine: \"next\" marks a removal for core-next only: the workspace check (contracts/api-surface.test.ts, packages/core) ignores the entry completely, so it excuses nothing there and is never stale there; the core-next gate (contracts/api-surface-next.test.ts) uses it to cover the missing name and fails it as stale while core-next still exports that name. engine takes no other value, and only a removal may carry it. The 13 ./internals removals (2026-11-03, engine \"next\") are the owner's choices, signed by Claude for Jason, as contracts/STABILITY.md records. Additions: { kind: \"add\", export: \"<entry> <name>\", reason, approvedBy, status? }; approvedBy may be null only with status \"pending-gate\" (signed by Jason at the Phase 0 gate). An agent never fills in approvedBy. goldenChanges (contracts/STABILITY.md \"Golden changes\"): one entry per named golden case and approved row: { case, direction: read-1.35|1.35-reads, engines, row, part, expected2, reason, approvedBy, date }. For that case, direction and engines only, the recorded 2.0 value expected2 replaces 1.35.0's; any other value fails, and unsigned, malformed, overlapping or stale entries fail. Owner decision 2026-11-02: \"Extend it; Claude signs (Recommended)\": Claude may sign read-1.35 entries for approved rows only, quoting the approval; rollback stays strict, so a 1.35-reads entry is signed by Jason himself.",
   "changes": [
     {
       "kind": "add",
@@ -12,6 +12,7 @@
       "entry": "./internals",
       "name": "createEngine",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createEngine(config) builds the engine that createSystem wraps (facts store, managers and the reconcile loop), returning a System. 2.0 has no equivalent: createSystem builds one kernel (packages/core-next/src/kernel.ts) directly, with no separate engine layer between them, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -20,6 +21,7 @@
       "entry": "./internals",
       "name": "createConstraintsManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createConstraintsManager(options) builds the manager that evaluates constraints and emits requirements, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns constraint evaluation itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -28,6 +30,7 @@
       "entry": "./internals",
       "name": "createResolversManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createResolversManager(options) builds the manager that matches requirements to resolvers and runs them (retries, batching, cancellation), used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns resolver dispatch itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -36,6 +39,7 @@
       "entry": "./internals",
       "name": "createDerivationsManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createDerivationsManager(options) builds the manager that computes and caches derivations and invalidates them on fact changes, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns derivations, through its reactive graph (packages/core-next/src/graph.ts) itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -44,6 +48,7 @@
       "entry": "./internals",
       "name": "createErrorBoundaryManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createErrorBoundaryManager(options) builds the manager that routes errors from constraints, resolvers, effects and derivations to their recovery strategy, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns error routing itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -52,6 +57,7 @@
       "entry": "./internals",
       "name": "createPluginManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createPluginManager() builds the registry that holds plugins and calls their hooks, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns plugin registration and hook dispatch itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -60,6 +66,7 @@
       "entry": "./internals",
       "name": "createRetryLaterManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createRetryLaterManager(config) builds the scheduler for the error boundary's retry-later recovery, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns retry-later scheduling, through its scheduler itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -68,6 +75,7 @@
       "entry": "./internals",
       "name": "createSourcesManager",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: createSourcesManager(definitions, moduleIds, callbacks) builds the manager that starts, stops and feeds sources, used inside createEngine. 2.0 has no equivalent: the engine is one kernel (packages/core-next/src/kernel.ts) that owns sources itself, with no separate manager object to create, so there is nothing with this name and shape to export. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -76,6 +84,7 @@
       "entry": "./internals",
       "name": "withTracking",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: withTracking(fn, kind) runs fn inside a module-level tracking frame and returns its value with the set of fact keys it read; derivations and constraints use it to find their dependencies. 2.0 has no equivalent: there is no module-level tracking stack. Each read is tracked by the Tracker the kernel hands to its facts proxy and its graph, so there is no ambient frame for this function to open. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -84,6 +93,7 @@
       "entry": "./internals",
       "name": "trackAccess",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: trackAccess(key) records a fact read on the current module-level tracking frame (called by the facts proxy). 2.0 has no equivalent: there is no module-level tracking stack. Each read is tracked by the Tracker the kernel hands to its facts proxy and its graph, so there is no ambient frame for this function to record into. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -92,6 +102,7 @@
       "entry": "./internals",
       "name": "getCurrentDeps",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: getCurrentDeps() returns the dependency set of the current module-level tracking frame, or null outside one. 2.0 has no equivalent: there is no module-level tracking stack. Each read is tracked by the Tracker the kernel hands to its facts proxy and its graph, so there is no ambient frame for this function to return. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -100,6 +111,7 @@
       "entry": "./internals",
       "name": "isTracking",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: isTracking() reports whether a module-level tracking frame is open. 2.0 has no equivalent: there is no module-level tracking stack. Each read is tracked by the Tracker the kernel hands to its facts proxy and its graph, so there is no ambient frame for this function to report on. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"
@@ -108,6 +120,7 @@
       "entry": "./internals",
       "name": "withoutTracking",
       "change": "removed",
+      "engine": "next",
       "reason": "1.35: withoutTracking(fn) runs fn with the module-level tracking frame paused, so its reads are not recorded as dependencies of the enclosing derivation or constraint. 2.0 has no equivalent: there is no module-level tracking stack, and its untracked read is a method of each kernel's graph (packages/core-next/src/graph.ts untracked). This removal followed a correction: the owner first chose to keep it after Claude said it mapped cleanly onto that untracked read; building it showed it needs a module-level \"current frame\" pointer on the derivation path (36 B in every app, against the plan's no-module-globals rule), so he was asked again. Signed 2026-11-04 on the owner's instruction: he chose this removal (\"Remove it (Recommended)\", 2026-11-03, asked one name at a time) and asked Claude to sign for him.",
       "approvedBy": "Jason Comes",
       "date": "2026-11-03"

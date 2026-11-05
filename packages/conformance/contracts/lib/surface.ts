@@ -21,6 +21,12 @@ export interface ApiRemovalOrChange {
   entry: string;
   name: string;
   change: "removed" | "changed";
+  /**
+   * `"next"`: a removal for core-next only. checkSurface (the workspace's 1.x)
+   * ignores the entry; the core-next gate (next-surface.ts) uses it and
+   * stale-checks it.
+   */
+  engine?: "next";
   reason: string;
   /** Filled in by Jason, never by an agent. */
   approvedBy: string;
@@ -204,23 +210,6 @@ export function diffSurface(frozen: Surface, actual: Surface): SurfaceDiff[] {
 const changeKey = (d: { entry: string; name: string; change: string }) =>
   `${d.entry} ${d.name} (${d.change})`;
 
-/**
- * The removed/changed keys (`<entry> <name> (<change>)`) of `actual` against
- * `frozen`, on the entries `actual` ships only: an entry core-next does not
- * ship yet is not a removal of its names.
- */
-export function differenceKeys(frozen: Surface, actual: Surface): Set<string> {
-  const shipped: Surface = Object.fromEntries(
-    Object.entries(frozen).filter(([entry]) => entry in actual),
-  );
-
-  return new Set(
-    diffSurface(shipped, actual)
-      .filter((d) => d.change !== "added")
-      .map(changeKey),
-  );
-}
-
 /** Additions listed with no signature yet, for the census to print. */
 export function pendingApprovals(changes: readonly ApiChange[]): string[] {
   return changes
@@ -240,22 +229,28 @@ export function pendingApprovals(changes: readonly ApiChange[]): string[] {
  * declarations (`#ref:` keys) are held to the same removed/changed rule; a new
  * one needs no entry (the export that reaches it is what changed).
  *
- * The ledger covers both engines: `alsoDiffers` holds the removed/changed
- * keys of core-next's built surface (`differenceKeys`). A removal or change
- * entry is stale only when neither engine shows it, so a signed removal of a
- * name core-next drops (the 13 `/internals` names, 2026-11-03) is not stale
- * while the workspace's 1.x still exports it.
+ * An `engine: "next"` entry is core-next's (the 13 `/internals` removals,
+ * 2026-11-03): it is ignored here completely, excusing nothing and never
+ * stale. The core-next gate checks it (contracts/lib/next-surface.ts).
  */
 export function checkSurface(
   frozen: Surface,
   actual: Surface,
   changes: readonly ApiChange[],
-  alsoDiffers: ReadonlySet<string> = new Set(),
 ): string[] {
   const failures: string[] = [];
   const listed = new Map<string, ApiChange>();
   for (const c of changes) {
     const key = isAdd(c) ? `${c.export} (added)` : changeKey(c);
+    const engine = (c as { engine?: unknown }).engine;
+    if (engine === "next" && !isAdd(c)) {
+      continue;
+    }
+    if (engine !== undefined) {
+      failures.push(
+        `api-changes.json: ${key} has engine ${JSON.stringify(engine)}; engine takes only "next", on a removal`,
+      );
+    }
     listed.set(key, c);
     if (typeof c.reason !== "string" || c.reason.trim() === "") {
       failures.push(`api-changes.json: ${key} has no reason`);
@@ -300,7 +295,7 @@ export function checkSurface(
     }
   }
   for (const k of listed.keys()) {
-    if (!seen.has(k) && !alsoDiffers.has(k)) {
+    if (!seen.has(k)) {
       failures.push(`api-changes.json: ${k} is stale (no such difference)`);
     }
   }

@@ -119,6 +119,21 @@ let's go through them one at a time so o can see what's being removed"),
 each answered "Remove (Recommended)" or, for `withoutTracking`, "Remove it
 (Recommended)". Claude signed those 13 entries for him, each quoting his
 answer; it covers no other entry.
+Those 13 carry `engine: "next"`: a removal for core-next only. The
+workspace check (`api-surface.test.ts`, on `packages/core`) ignores such an
+entry completely, so it excuses nothing in 1.x and is never stale there. The
+core-next gate (`api-surface-next.test.ts`) uses it to cover the missing name
+and fails it as stale while core-next still exports that name. `engine`
+takes no other value, and only a removal may carry it.
+
+**The core-next gate.** At the committed `current` layer, core-next ships
+exactly 1.35's names, except a name at a layer above `current` that
+`next-unshipped.json` lists, a missing name a signed removal covers, and an
+extra name a signed addition covers. `next-unshipped.json` is hand-maintained
+and tighten-only: a name leaves it when core-next ships it (a listed name
+core-next ships fails as stale), a missing name it does not list fails at
+any layer, and a listed name whose layer is built fails. It is pinned by
+`harness.lock.json`, so changing it needs the `oracle-change` label.
 To re-freeze after the v1 pin moves: `contracts:freeze`, review the diff,
 `oracle:update`, label.
 

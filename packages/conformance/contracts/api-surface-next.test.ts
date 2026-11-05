@@ -7,12 +7,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultRepoRoot, nextPackageDir } from "../lib/core-entries.js";
+import { harnessFiles } from "../lib/harness.js";
 import { type Layer, layerIndex } from "../lib/layers.js";
 import {
+  type Unshipped,
   checkNextSurface,
   currentLayer,
   describeDrift,
   exportLayers,
+  readUnshipped,
   withoutBundlerRenames,
 } from "./lib/next-surface.js";
 import { type ApiChange, type Surface, extractSurface } from "./lib/surface.js";
@@ -27,11 +30,16 @@ const changes: ApiChange[] = JSON.parse(
 ).changes;
 const next = extractSurface(nextPackageDir());
 const current = currentLayer(conformanceRoot);
-const layers = exportLayers(defaultRepoRoot, frozen, Object.keys(next));
+const layers = exportLayers(defaultRepoRoot, frozen, Object.keys(frozen));
+const unshipped = readUnshipped(conformanceRoot);
 const copy = (s: Surface): Surface => JSON.parse(JSON.stringify(s));
 const gate = (
   s: Surface,
-  options: { current?: typeof current; changes?: ApiChange[] } = {},
+  options: {
+    current?: typeof current;
+    changes?: ApiChange[];
+    unshipped?: Unshipped;
+  } = {},
 ) =>
   checkNextSurface(
     frozen,
@@ -39,12 +47,18 @@ const gate = (
     options.changes ?? changes,
     options.current === undefined ? current : options.current,
     layers,
+    options.unshipped ?? unshipped,
   );
 const baseline = gate(next);
+const layerOf = (key: string) => layers.get(key)?.layer as Layer;
+/** The failure for a name core-next ships at an unbuilt layer, dropped. */
+const dropped = (key: string) =>
+  `core-next ${key} (missing): 1.35 exports it and contracts/next-unshipped.json does not list it (layer ${layerOf(key)}, unbuilt at current ${current}): a name core-next ships may not be dropped`;
 const signedRemoval: ApiChange = {
   entry: ".",
   name: "createSystem",
   change: "removed",
+  engine: "next",
   reason: "test",
   approvedBy: "jason",
   date: "2026-11-03",
@@ -92,8 +106,9 @@ describe("core-next public API surface", () => {
       layer: "L11",
     });
     expect(baseline.failures.some((f) => f.includes(" . doctor "))).toBe(false);
+    expect(unshipped[". doctor"]).toBe("L11");
     expect(gate(next, { current: "L11" }).failures).toContain(
-      "core-next . doctor (missing): 1.35 exports it and its layer L11 is built (current L11)",
+      "core-next . doctor (missing): contracts/next-unshipped.json lists it at L11, but layer L11 is built (current L11)",
     );
   });
 
@@ -106,7 +121,8 @@ describe("core-next public API surface", () => {
       layer: undefined,
     });
     expect(
-      checkNextSurface(frozen, tampered, changes, current, unplaced).failures,
+      checkNextSurface(frozen, tampered, changes, current, unplaced, unshipped)
+        .failures,
     ).toContain(
       "core-next . createSystem (missing): no layer for it (declared in core/system.ts); add it to NAME_LAYERS or MODULE_LAYERS in lib/layers.ts",
     );
@@ -149,6 +165,7 @@ describe("core-next public API surface", () => {
     );
     for (const c of removals) {
       expect(c.entry).toBe("./internals");
+      expect(c.engine).toBe("next");
       expect(next["./internals"]?.[c.name]).toBeUndefined();
       expect(frozen["./internals"]?.[c.name]).toBeDefined();
       const message = `core-next ./internals ${c.name} (missing): 1.35 exports it and its layer ${layers.get(`./internals ${c.name}`)?.layer} is built (current ${current})`;
@@ -163,29 +180,105 @@ describe("core-next public API surface", () => {
     expect(baseline.failures).toEqual([]);
   });
 
-  it("the shipped stub entries (/worker, /migration, /adapter-utils) carry exactly 1.35's names", () => {
+  it("next-unshipped.json is exactly the names core-next lacks, and is in the harness lock", () => {
     expect(baseline.unshipped).toEqual([]);
-    const stubs = ["./worker", "./migration", "./adapter-utils"];
-    const names = (s: Surface, entry: string) =>
-      Object.keys(s[entry] ?? {})
-        .filter((n) => !n.startsWith("#ref:"))
-        .sort();
-    const mismatched = (s: Surface) =>
-      stubs.filter(
-        (entry) =>
-          names(s, entry).join() !== names(frozen, entry).join() ||
-          names(s, entry).length === 0,
-      );
-    expect(mismatched(next)).toEqual([]);
-    // Most stub names sit at unbuilt layers, where the layer rule accepts a
-    // missing name; this equality is what holds a stub entry to 1.35's names.
-    const dropped = names(next, "./worker")[0] as string;
-    const tampered = copy(next);
-    delete tampered["./worker"]?.[dropped];
-    expect(mismatched(tampered)).toEqual(["./worker"]);
-    console.info(
-      `[contracts] core-next stub entries: ${stubs.map((e) => `${e} ${names(next, e).length} names (layers ${[...new Set(names(next, e).map((n) => layers.get(`${e} ${n}`)?.layer ?? "?"))].sort().join("/")})`).join("; ")}`,
+    const listed = Object.keys(unshipped).sort();
+    expect(baseline.unbuilt.map((u) => `${u.entry} ${u.name}`).sort()).toEqual(
+      listed,
     );
+    const perLayer: Record<string, number> = {};
+    for (const layer of Object.values(unshipped)) {
+      perLayer[layer] = (perLayer[layer] ?? 0) + 1;
+    }
+    expect(perLayer).toEqual({ L8: 2, L11: 33, L12: 11, L13: 1 });
+    expect(harnessFiles(conformanceRoot)).toContain(
+      "contracts/next-unshipped.json",
+    );
+  });
+
+  // Self-tests 1 and 2: before next-unshipped.json, the layer rule accepted
+  // any missing name above `current`, so these drops passed silently.
+  it("a name core-next ships at an unbuilt layer may not be dropped (root, /plugins, /testing, stub entries)", () => {
+    /** A name `entry` ships, 1.35 has, at a layer above `current`. */
+    const shippedUnbuilt = (entry: string) =>
+      `${entry} ${Object.keys(next[entry] ?? {}).find(
+        (n) =>
+          !n.startsWith("#ref:") &&
+          n in (frozen[entry] ?? {}) &&
+          layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
+      )}`;
+    for (const key of [
+      "./plugins loggingPlugin",
+      "./testing CoverageReport",
+      shippedUnbuilt("."),
+      shippedUnbuilt("./worker"),
+    ]) {
+      const [entry = "", name = ""] = key.split(" ");
+      expect(next[entry]?.[name]).toBeDefined();
+      expect(layerIndex(layerOf(key))).toBeGreaterThan(
+        layerIndex(current as Layer),
+      );
+      const tampered = copy(next);
+      delete tampered[entry]?.[name];
+      const result = gate(tampered);
+      expect(result.failures).toEqual([dropped(key)]);
+      expect(result.unbuilt).toEqual(baseline.unbuilt);
+    }
+    // An entry core-next stops shipping is a drop of each of its names.
+    const noWorker = copy(next);
+    delete noWorker["./worker"];
+    const workerNames = Object.keys(frozen["./worker"] ?? {}).filter(
+      (n) => !n.startsWith("#ref:"),
+    );
+    expect(gate(noWorker).failures).toHaveLength(workerNames.length);
+  });
+
+  // Self-test 3, and the list's other rules.
+  it("a stale, built-layer, misplaced or unknown next-unshipped.json entry fails", () => {
+    expect(
+      gate(next, {
+        unshipped: { ...unshipped, "./plugins loggingPlugin": "L11" },
+      }).failures,
+    ).toEqual([
+      "contracts/next-unshipped.json: ./plugins loggingPlugin is stale: core-next ships it (remove it from next-unshipped.json)",
+    ]);
+    const tampered = copy(next);
+    delete tampered["."]?.createSystem;
+    expect(
+      gate(tampered, { unshipped: { ...unshipped, ". createSystem": "L0" } })
+        .failures,
+    ).toEqual([
+      `core-next . createSystem (missing): contracts/next-unshipped.json lists it at L0, but layer L0 is built (current ${current})`,
+    ]);
+    expect(
+      gate(next, { unshipped: { ...unshipped, ". doctor": "L12" } }).failures,
+    ).toEqual([
+      "contracts/next-unshipped.json: . doctor is listed at L12, but lib/layers.ts places it at L11",
+    ]);
+    expect(
+      gate(next, { unshipped: { ...unshipped, ". noSuchName": "L11" } })
+        .failures,
+    ).toEqual([
+      "contracts/next-unshipped.json: . noSuchName is not a 1.35 name",
+    ]);
+  });
+
+  // Self-test 5.
+  it('a signed engine "next" removal of a name core-next exports fails as stale', () => {
+    expect(next["."]?.createSystem).toBeDefined();
+    expect(
+      gate(next, { changes: [signedRemoval, ...changes] }).failures,
+    ).toEqual([
+      'api-changes.json: . createSystem (removed, engine "next") is stale: core-next exports . createSystem',
+    ]);
+    expect(
+      gate(next, {
+        changes: [{ ...signedRemoval, change: "changed" }, ...changes],
+      }).failures,
+    ).toEqual([
+      'api-changes.json: . createSystem (changed, engine "next"): only a removal may carry engine "next"',
+      'api-changes.json: . createSystem (changed, engine "next") is stale: core-next exports . createSystem',
+    ]);
   });
 
   it("an added public name fails unless a signed addition covers it", () => {
