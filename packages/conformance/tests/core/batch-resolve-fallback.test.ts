@@ -194,47 +194,59 @@ describe("batch + cancel", () => {
   it("stops batched resolvers when system is stopped during batch window", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const resolvedIds: string[] = [];
-
-    const mod = createModule("cancel-test", {
-      schema: {
-        facts: {
-          trigger: t.number(),
-        },
-        requirements: {
-          FETCH: { id: t.string() },
-        },
-      },
-      init: (facts) => {
-        facts.trigger = 0;
-      },
-      constraints: {
-        load: {
-          when: (facts) => facts.trigger > 0,
-          require: (facts) => {
-            const reqs = [];
-            for (let i = 0; i < facts.trigger; i++) {
-              reqs.push({ type: "FETCH" as const, id: `item-${i}` });
-            }
-
-            return reqs;
+    const makeModule = (into: string[]) =>
+      createModule("cancel-test", {
+        schema: {
+          facts: {
+            trigger: t.number(),
+          },
+          requirements: {
+            FETCH: { id: t.string() },
           },
         },
-      },
-      resolvers: {
-        fetch: {
-          requirement: "FETCH",
-          batch: {
-            enabled: true,
-            windowMs: 500, // Long window so we can stop before it fires
-          },
-          resolve: async (req) => {
-            resolvedIds.push(req.id);
+        init: (facts) => {
+          facts.trigger = 0;
+        },
+        constraints: {
+          load: {
+            when: (facts) => facts.trigger > 0,
+            require: (facts) => {
+              const reqs = [];
+              for (let i = 0; i < facts.trigger; i++) {
+                reqs.push({ type: "FETCH" as const, id: `item-${i}` });
+              }
+
+              return reqs;
+            },
           },
         },
-      },
-    });
+        resolvers: {
+          fetch: {
+            requirement: "FETCH",
+            batch: {
+              enabled: true,
+              windowMs: 500, // Long window so we can stop before it fires
+            },
+            resolve: async (req) => {
+              into.push(req.id);
+            },
+          },
+        },
+      });
 
-    const system = createSystem({ module: mod });
+    // The control: with no stop(), the same window runs the handler for
+    // each requirement, so the stopped run below can fail for its reason.
+    const controlIds: string[] = [];
+    const control = createSystem({ module: makeModule(controlIds) });
+    control.start();
+    control.facts.trigger = 2;
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(600);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(controlIds.sort()).toEqual(["item-0", "item-1"]);
+    control.destroy();
+
+    const system = createSystem({ module: makeModule(resolvedIds) });
     system.start();
 
     system.facts.trigger = 2;
