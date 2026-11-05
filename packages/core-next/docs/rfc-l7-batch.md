@@ -281,6 +281,18 @@ Measured with `node scripts/size.mjs --check` in `packages/core-next` on this br
 
 ## Decisions for the owner
 
+**Owner decisions, 2026-11-05.** Jason answered four questions, quoted here in his words. Everything this section recommends is approved.
+
+| Question | Jason's answer | What it settles |
+|---|---|---|
+| A1, the L7 size | "Approve up to +1.1 KB (Recommended)" | Batching is a `withBatch` part wired by `createSystem`. `minimal`, `two-module`, `aperture` and `full-entry` may each grow by up to 1.1 KB (`minimal` ceiling 29,900 B), and `floor` by up to 20 B. Each slice does the attribution step first and comes back above the cap. |
+| (as) `settle()` waits for a running batch | "Approve (Recommended)" | Built in L7a, with the fake-timer and 5 s risks stated in its entries. |
+| (ap), (aq), (ar), (at), B1 to B4, and signing | "Approve all (Recommended)" | (ap) and (at) in L7a, (aq) and (ar) in L7b; B1 to B4 as written (B3 in L7-pre); Claude signs the entries for these rows and for quirks g, h, i and k "on the owner's instruction" (GATE-2 rule 1). |
+| The plan's all-in size target (22 KB, ceiling 25) | "Budget per layer; aim ≤ half of 1.35 (Recommended)" | Each layer's raise is approved at its gate. At L13 the all-in ceiling is set from measurement, aiming at no more than half of 1.35's all-in (about 95 KB measured with size.mjs's method on 2026-11-05, so about 48 KB). |
+
+**In plain terms:** every L7 recommendation is approved, so the slices build all five candidates and sign their entries. The plan's 22 KB all-in number is retired.
+
+
 **Questions for Jason.** Seven answers settle L7. The table below them has a product verdict for each, so Jason can bulk-approve.
 
 1. **A1, where batching lives and its size.** A part wired by `createSystem` (O1), with `minimal`, `two-module` and `aperture` allowed up to +1.1 KB, `full-entry` up to +1.1 KB, and `floor` up to +20 B. **Recommend: approve.**
