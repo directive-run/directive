@@ -126,6 +126,26 @@ must be filled before that layer's gate.
   fact) and U9's stale saved key (ak) as diff scenarios, and U10's envelope
   and next save as a golden test. U13 (the 41 validation cases v2 skips) is
   L0 triage, a separate slice.
+- **L7 batch resolvers.** `resolvers.test.ts` is internals (v2 skips it),
+  and 6 of its cases sit at L7. They drive `createResolversManager`'s batch
+  queue directly, so none says what a system does. Each has a black-box
+  counterpart at L7 (files in `packages/core/src/core/__tests__/`):
+  "resolver with batch.enabled queues requirements" by
+  `l7-batch-resolvers-oracle` "the batch window" and the U1 scenarios in
+  `diff/scenarios/l7-batch-pins.test.ts`; "processBatches executes queued
+  batch resolvers" and "hasPendingBatches returns true when queued" by the
+  oracle's "settle() runs a queued batch now instead of waiting out the
+  window" and `l7-batch-pins-oracle` U7 (settle() flushes the queue at
+  0 ms); "cancel(reqId) aborts an in-flight batch via the shared
+  controller" by the oracle's "retracting every requirement of a running
+  batch aborts it", the U2 scenario and U14's retraction case; "cancelAll()
+  aborts every in-flight batch" by the oracle's "stopping or destroying a
+  system ends batched work" and U14's stop case; "in-flight cancel cleans
+  up the reverse index so the same reqId can be re-resolved later" by the
+  oracle's "a batch that is running when the system stops does not take its
+  requirement away from the new batch". Filled at L7-pre, with the L7 RFC's
+  U1 to U16 and the fuzz model's batched resolver (`diff/fuzz/model.ts`,
+  placed at L7).
 
 ### `sources.test.ts`: the 68 L5 cases (L5-pre)
 

@@ -6,7 +6,8 @@
  * derivations over facts and earlier derivations (some throw), events,
  * constraint → resolver pairs with delays, failures, retries, timeouts and
  * self-retracting writes, effects (auto-tracked or with deps, some with a
- * cleanup, some throwing), an optional source with an `active` gate, and
+ * cleanup, some throwing), an optional source with an `active` gate, an
+ * optional batched resolver fed by one or two constraints, and
  * system options (error boundary with every strategy including "throw",
  * history, trace) — plus a sequence of steps that also stop, start and
  * destroy the system mid-run, snapshot and restore, navigate history,
@@ -92,12 +93,57 @@ export type FuzzStep =
 
 export type Boundary = "skip" | "retry" | "retry-later" | "disable" | "throw";
 
+/**
+ * One constraint that feeds the batched resolver. While its fact is at least
+ * `atLeast` it raises one requirement per item: items 0 and 1 need the fact
+ * at `atLeast`, so an active source of two or more items puts two into one
+ * call (quirk i needs one item to fail and another to succeed), and item
+ * `i` from 2 on needs `atLeast + i - 1`, so a falling fact retracts the
+ * later items first and keeps the rest: a write can take one requirement
+ * out of a running batch and leave its siblings wanted (quirk g). With
+ * `abortOn`, the constraint binds its runs to the fact the handler writes.
+ */
+export interface FuzzBatchSource {
+  fact: number;
+  atLeast: number;
+  items: number;
+  abortOn: boolean;
+}
+
+/**
+ * A batched resolver in the first module (L7). One or two sources raise its
+ * requirements, so a batch can mix constraints (quirk k). `handler` picks
+ * `resolveBatch`, `resolveBatchWithResults` (on a failing attempt, every
+ * item fails, or every second one: quirks h and i) or the resolve()
+ * fallback. Its first `fails` calls fail; it waits `delay`, then writes
+ * `value` to fact `writes`. Fact indices wrap at the module's fact count.
+ */
+export interface FuzzBatch {
+  sources: FuzzBatchSource[];
+  handler: "batch" | "results" | "fallback";
+  failing: "all" | "some";
+  windowMs: number;
+  maxSize: number | null;
+  delay: number;
+  fails: number;
+  retry: number;
+  timeout: number | null;
+  writes: number;
+  value: number;
+}
+
 export interface FuzzSpec {
   modules: FuzzModule[];
   boundary: Boundary | null;
   history: boolean;
   trace: boolean;
   steps: FuzzStep[];
+  /**
+   * Optional so that a spec written before L7 (diff/fuzz/pinned.json) still
+   * reads as one with no batch. The generator draws it last, so every other
+   * part of a seed's cases is drawn as before.
+   */
+  batch?: FuzzBatch | null;
 }
 
 /**
@@ -130,6 +176,8 @@ export const FEATURE_LAYERS = {
   snapshots: 6,
   /** The twin step: it reads the second system's getSnapshot (L6). */
   twin: 6,
+  /** A batched resolver (`resolvers.<id>.batch` is L7 in lib/layers.ts). */
+  batch: 7,
   /** The history option and the back and forward steps. */
   history: 8,
   /** The trace option. */
@@ -370,9 +418,44 @@ export function specArbitrary(
         minLength: 1,
         maxLength: 14,
       }),
+      // Drawn last, so the draws above are the ones a seed made before L7. A
+      // third of the cases get one: each moves the case to L7, where v2
+      // does not run it until `current` is L7.
+      batch: allows("batch")
+        ? fc.oneof(
+            { weight: 2, arbitrary: fc.constant<FuzzBatch | null>(null) },
+            { weight: 1, arbitrary: batchArbitrary },
+          )
+        : fc.constant<FuzzBatch | null>(null),
     }),
   );
 }
+
+const batchArbitrary: fc.Arbitrary<FuzzBatch> = fc.record({
+  sources: fc.array(
+    fc.record({
+      fact: fc.nat({ max: 2 }),
+      atLeast: fc.integer({ min: 0, max: 3 }),
+      items: fc.integer({ min: 1, max: 3 }),
+      abortOn: fc.boolean(),
+    }),
+    { minLength: 1, maxLength: 2 },
+  ),
+  handler: fc.constantFrom(
+    "batch" as const,
+    "results" as const,
+    "fallback" as const,
+  ),
+  failing: fc.constantFrom("all" as const, "some" as const),
+  windowMs: fc.constantFrom(0, 1, 5),
+  maxSize: fc.option(fc.constantFrom(1, 2), { nil: null, freq: 3 }),
+  delay: fc.constantFrom(0, 1, 5, 20),
+  fails: fc.integer({ min: 0, max: 2 }),
+  retry: fc.integer({ min: 0, max: 2 }),
+  timeout: fc.option(fc.constantFrom(3, 10, 50), { nil: null, freq: 3 }),
+  writes: fc.nat({ max: 2 }),
+  value,
+});
 
 /** The highest layer (the plan's ladder) a case uses. */
 export function specLayer(spec: FuzzSpec): string {
@@ -411,6 +494,9 @@ export function specLayer(spec: FuzzSpec): string {
       use(STEP_FEATURES[s.op as keyof typeof STEP_FEATURES]);
     }
   }
+  if (spec.batch) {
+    use("batch");
+  }
 
   return `L${n}`;
 }
@@ -422,7 +508,7 @@ const f = (i: number) => `f${i}`;
  * with: `Resolver "<id>" timed out after <ms>ms`, the same message on every
  * engine.
  */
-const TIMED_OUT = /^Resolver ".*" timed out after \d+ms$/;
+const TIMED_OUT = /^(?:Batch r|R)esolver ".*" timed out after \d+ms$/;
 const isTimeoutError = (reason: unknown): boolean => {
   const message = (reason as { message?: unknown } | null)?.message;
 
@@ -435,6 +521,7 @@ function moduleDef(
   m: FuzzModule,
   index: number,
   schemas: Record<string, unknown>[],
+  batch: FuzzBatch | null = null,
 ) {
   const id = NAMES[index] as string;
   const cross = index === 1;
@@ -534,6 +621,15 @@ function moduleDef(
       },
     };
   });
+  if (batch) {
+    batchedResolver(batch, id, m.facts, {
+      t,
+      external,
+      requirements,
+      constraints,
+      resolvers,
+    });
+  }
   const effects: Record<string, unknown> = {};
   m.effects.forEach((e, i) => {
     effects[`x${i}`] = {
@@ -598,6 +694,131 @@ function moduleDef(
 }
 
 /**
+ * Adds the batched resolver `rb` and its source constraints `b<n>` to a
+ * module's definitions. Its records are the single resolvers' kinds
+ * ("start", "wrote", "aborted", "timeout") under the tag `<module>.rb`, with
+ * the call's items last, so the comparison pairs them as it pairs a single
+ * run's; `n` counts the handler's calls (each fallback run is a call).
+ */
+function batchedResolver(
+  b: FuzzBatch,
+  id: string,
+  factCount: number,
+  out: {
+    t: any;
+    external: (data: unknown) => void;
+    requirements: Record<string, unknown>;
+    constraints: Record<string, unknown>;
+    resolvers: Record<string, unknown>;
+  },
+) {
+  const type = `${id.toUpperCase()}B`;
+  const tag = `${id}.rb`;
+  const writes = f(b.writes % factCount);
+  out.requirements[type] = { item: out.t.string() };
+  b.sources.forEach((src, s) => {
+    const fact = f(src.fact % factCount);
+    out.constraints[`b${s}`] = {
+      when: (fs: any) => fs[fact] >= src.atLeast,
+      require: (fs: any) => {
+        const reqs: Array<{ type: string; item: string }> = [];
+        for (let i = 0; i < src.items; i++) {
+          if (fs[fact] >= src.atLeast + Math.max(0, i - 1)) {
+            reqs.push({ type, item: `${s}.${i}` });
+          }
+        }
+
+        return reqs;
+      },
+      ...(src.abortOn ? { abortOn: [writes] } : {}),
+    };
+  });
+  let calls = 0;
+  // One call: report its start and any abort, wait, then fail (a thrown
+  // batch or run) or write. Returns the call's number.
+  const run = async (items: string[], context: any, throws: boolean) => {
+    calls += 1;
+    const n = calls;
+    out.external(["start", tag, n, items]);
+    context.signal?.addEventListener?.("abort", () =>
+      out.external([
+        isTimeoutError(context.signal.reason) ? "timeout" : "aborted",
+        tag,
+        n,
+        items,
+      ]),
+    );
+    if (b.delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, b.delay));
+    }
+    if (throws && n <= b.fails) {
+      throw new Error(`${tag} attempt ${n}`);
+    }
+    context.facts[writes] = b.value;
+    out.external(["wrote", tag, n, items]);
+
+    return n;
+  };
+  const handler =
+    b.handler === "batch"
+      ? {
+          resolveBatch: async (reqs: Array<{ item: string }>, context: any) => {
+            await run(
+              reqs.map((r) => r.item),
+              context,
+              true,
+            );
+          },
+        }
+      : b.handler === "results"
+        ? {
+            resolveBatchWithResults: async (
+              reqs: Array<{ item: string }>,
+              context: any,
+            ) => {
+              const n = await run(
+                reqs.map((r) => r.item),
+                context,
+                false,
+              );
+
+              return reqs.map((r, i) =>
+                n <= b.fails && (b.failing === "all" || i % 2 === 1)
+                  ? {
+                      success: false,
+                      error: new Error(`${tag} ${r.item} attempt ${n}`),
+                    }
+                  : { success: true },
+              );
+            },
+          }
+        : {
+            resolve: async (req: { item: string }, context: any) => {
+              await run([req.item], context, true);
+            },
+          };
+  out.resolvers.rb = {
+    requirement: type,
+    batch: {
+      enabled: true,
+      windowMs: b.windowMs,
+      ...(b.maxSize === null ? {} : { maxSize: b.maxSize }),
+      ...(b.timeout === null ? {} : { timeoutMs: b.timeout }),
+    },
+    ...(b.retry > 0
+      ? {
+          retry: {
+            attempts: b.retry + 1,
+            backoff: "linear",
+            initialDelay: 2,
+          },
+        }
+      : {}),
+    ...handler,
+  };
+}
+
+/**
  * A strategy the model passes in `errorBoundary`. Only a string can be read
  * here: a function strategy (which the model never passes) would need its
  * own trigger rule, so it is an error, never a guess.
@@ -617,7 +838,8 @@ function strategy(value: unknown): string | undefined {
  * of its spec. A fuzz divergence with `when` applies only to the cases that
  * have every trigger it lists (diff/scenario.ts `covers`), so each one is the
  * spec feature its quirk needs, read from the options the case really passes
- * (`options()`), never wider. Every resolver belongs to one constraint.
+ * (`options()`), never wider. Every resolver belongs to a constraint: a
+ * single resolver to its pair, the batched one to its one or two sources.
  */
 const TRIGGERS = {
   /** `onResolverError` is "retry", and the case has a resolver. */
@@ -637,10 +859,12 @@ const TRIGGERS = {
     strategy(boundary?.onConstraintError) === "retry-later",
   /** Some resolver has a retry policy (`retry` > 0: more than one attempt). */
   retryPolicy: (spec) =>
-    spec.modules.some((m) => m.constraints.some((c) => c.retry > 0)),
+    spec.modules.some((m) => m.constraints.some((c) => c.retry > 0)) ||
+    (spec.batch?.retry ?? 0) > 0,
   /** Some resolver has a timeout. */
   timeout: (spec) =>
-    spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)),
+    spec.modules.some((m) => m.constraints.some((c) => c.timeout !== null)) ||
+    (spec.batch != null && spec.batch.timeout !== null),
   /**
    * Some resolver can reject: it throws on its first `fails` attempts
    * (`fails` > 0), or it has a timeout no longer than its wait (`delay`), so
@@ -652,7 +876,11 @@ const TRIGGERS = {
       m.constraints.some(
         (c) => c.fails > 0 || (c.timeout !== null && c.timeout <= c.delay),
       ),
-    ),
+    ) ||
+    (spec.batch != null &&
+      (spec.batch.fails > 0 ||
+        (spec.batch.timeout !== null &&
+          spec.batch.timeout <= spec.batch.delay))),
   /**
    * A settle() can still be waiting when stop() or destroy() runs (row z):
    * the case has a resolver. A settle step's settle() is left waiting only
@@ -723,8 +951,11 @@ const TRIGGERS = {
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
 >;
 
+/** A constraint, and so a resolver: a pair, or the batched resolver's sources. */
 function hasConstraint(spec: FuzzSpec): boolean {
-  return spec.modules.some((m) => m.constraints.length > 0);
+  return (
+    spec.modules.some((m) => m.constraints.length > 0) || spec.batch != null
+  );
 }
 
 /**
@@ -796,10 +1027,15 @@ function options(spec: FuzzSpec) {
 function build(spec: FuzzSpec) {
   return (ctx: BuildContext) => {
     const schemas: Record<string, unknown>[] = [];
-    const defs = spec.modules.map((m, i) => moduleDef(ctx, m, i, schemas));
+    const batch = spec.batch ?? null;
+    const defs = spec.modules.map((m, i) =>
+      moduleDef(ctx, m, i, schemas, i === 0 ? batch : null),
+    );
     ctx.handles.rebuild = () => {
       const again: Record<string, unknown>[] = [];
-      const more = spec.modules.map((m, i) => moduleDef(ctx, m, i, again));
+      const more = spec.modules.map((m, i) =>
+        moduleDef(ctx, m, i, again, i === 0 ? batch : null),
+      );
 
       return more.length === 1
         ? { module: more[0], ...options(spec) }

@@ -112,10 +112,12 @@ describe("a loading flag survives a failure after satisfying", () => {
 
   it("a satisfied batch that times out: the finally lands (L10)", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
+    let runs = 0;
     const system = loadSystem(
       {
         batch: { enabled: true, windowMs: 0, timeoutMs: 10 },
         resolveBatch: async (_reqs: unknown, context: any) => {
+          runs += 1;
           try {
             context.facts.loading = true;
             context.facts.done = true;
@@ -128,8 +130,15 @@ describe("a loading flag survives a failure after satisfying", () => {
       { batch: true },
     );
     system.facts.go = true;
-    await sleep(80);
+    // While the handler waits (it started at about 0 ms and its finally
+    // lands at about 30), its own write is visible: a test that never sees
+    // `loading` true could pass with no handler run at all.
+    await sleep(15);
+    expect(runs).toBe(1);
+    expect(system.facts.loading).toBe(true);
+    await sleep(65);
     expect(system.facts.loading).toBe(false);
+    expect(runs).toBe(1);
     system.destroy();
     vi.restoreAllMocks();
   });

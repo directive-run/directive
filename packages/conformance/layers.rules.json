@@ -131,6 +131,16 @@
     "a batch window collects requirements into one resolveBatch": "L7",
     "batch enabled with only resolve() falls back to one call each": "L7",
     "a failing batch retries and reports per batch": "L7",
+    "the window restarts on every add: adds 40 ms apart with a 50 ms window run as one call (U1)": "L7",
+    "a steady trickle never flushes until it stops: eight adds 20 ms apart (U1)": "L7",
+    "retracting one requirement of a running batch cancels all of it, and the still-wanted ones never run again (U2)": "L7",
+    "an all-failed with-results batch reruns at once, with no backoff or shouldRetry, and errors each item on every attempt (U4)": "L7",
+    "a partly failed with-results batch is never retried, not even by a later pass (U5)": "L7",
+    "a single-source batch is bound to its constraint's abortOn keys: a changed key drops its write (U6)": "L7",
+    "a mixed-source batch is not bound: its write replaces a changed abortOn key, and both complete (U6)": "L7",
+    "the resolve() fallback's runs ignore a retraction: nothing is canceled and all three complete (U8)": "L7",
+    "the resolve() fallback's runs outlive stop(): nothing is canceled and both complete after it (U8)": "L7",
+    "the error boundary hears an all-failed with-results item once per attempt (U11)": "L7",
     "history goTo a snapshot id, then replay": "L8",
     "history pause and resume skip snapshots while paused": "L8",
     "onNavigate rerun vs skip on goTo, and onHistoryChange": "L8",
@@ -597,6 +607,15 @@
       "rule": "L7"
     },
     "tests/core/l7-batch-resolvers-oracle.test.ts": {
+      "rule": "L7",
+      "pin": true
+    },
+    "tests/core/l7-batch-pins-oracle.test.ts": {
+      "rule": "L7",
+      "pin": true,
+      "instruments": ["member .inspect"]
+    },
+    "tests/core/l7-batch-pins-oracle-production.test.ts": {
       "rule": "L7",
       "pin": true
     },

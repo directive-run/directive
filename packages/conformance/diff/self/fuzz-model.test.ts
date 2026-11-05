@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { engines } from "../engines.js";
 import {
   FEATURE_LAYERS,
+  type FuzzBatch,
   type FuzzEffect,
   type FuzzModule,
   type FuzzSpec,
@@ -27,6 +28,21 @@ const sample = (ceiling?: string, numRuns = 400): FuzzSpec[] =>
   });
 
 const layer = (spec: FuzzSpec) => Number(specLayer(spec).slice(1));
+
+const batchOf = (over: Partial<FuzzBatch>): FuzzBatch => ({
+  sources: [{ fact: 0, atLeast: 1, items: 1, abortOn: false }],
+  handler: "batch",
+  failing: "all",
+  windowMs: 1,
+  maxSize: null,
+  delay: 0,
+  fails: 0,
+  retry: 0,
+  timeout: null,
+  writes: 0,
+  value: 0,
+  ...over,
+});
 
 describe("fuzz generator ceiling", () => {
   it("uses nothing built above the ceiling", () => {
@@ -86,6 +102,7 @@ describe("fuzz generator ceiling", () => {
       twin: steps("twin"),
       history: specs.some((s) => s.history) && steps("back", "forward"),
       trace: specs.some((s) => s.trace),
+      batch: specs.some((s) => s.batch != null),
     };
 
     expect(Object.keys(used).sort()).toEqual(
@@ -150,6 +167,51 @@ describe("fuzz generator ceiling", () => {
     expect(specLayer({ ...base, steps: [{ op: "twin" }] })).toBe("L6");
     expect(specLayer({ ...base, steps: [{ op: "snapshot" }] })).toBe("L6");
     expect(specLayer({ ...base, steps: [{ op: "stop" }] })).toBe("L3");
+    // A batched resolver is L7 (lib/layers.ts: `resolvers.<id>.batch`).
+    expect(specLayer({ ...base, batch: batchOf({}) })).toBe("L7");
+    expect(specLayer({ ...base, batch: null })).toBe("L0");
+  });
+
+  it("generates batches that can show quirks g, h, i and k, not only the happy path", () => {
+    const batches = sample(undefined, 1500).flatMap((s) =>
+      s.batch ? [{ batch: s.batch, steps: s.steps }] : [],
+    );
+    const reach = {
+      // g: a write can retract one requirement of a running batch and keep
+      // a sibling: a source with three items (the third needs one more than
+      // the first two), a wait, and a later set.
+      g: batches.some(
+        ({ batch, steps }) =>
+          batch.delay > 0 &&
+          batch.sources.some((src) => src.items > 2) &&
+          steps.some((x) => x.op === "set"),
+      ),
+      // h: a with-results call fails every item.
+      h: batches.some(
+        ({ batch }) =>
+          batch.handler === "results" &&
+          batch.failing === "all" &&
+          batch.fails > 0,
+      ),
+      // i: a with-results call fails some items: every second one, so it
+      // needs a call of two or more.
+      i: batches.some(
+        ({ batch }) =>
+          batch.handler === "results" &&
+          batch.failing === "some" &&
+          batch.fails > 0 &&
+          batch.sources.reduce((n, src) => n + src.items, 0) > 1,
+      ),
+      // k: a batch can mix two constraints that bind to the written fact.
+      k: batches.some(
+        ({ batch }) =>
+          batch.handler !== "fallback" &&
+          batch.sources.length === 2 &&
+          batch.sources.some((src) => src.abortOn),
+      ),
+    };
+
+    expect(reach).toEqual({ g: true, h: true, i: true, k: true });
   });
 
   it("yields only cases v2 runs at the current layer", () => {

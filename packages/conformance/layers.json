@@ -9448,6 +9448,66 @@
         }
       }
     },
+    "tests/core/l7-batch-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L7",
+      "pin": true,
+      "tests": {
+        "a batched resolver with no handler, in production (U9) > builds with no error and completes each requirement once the window closes": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        }
+      }
+    },
+    "tests/core/l7-batch-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L7",
+      "pin": true,
+      "tests": {
+        "the cancel hook for a batched requirement (U3) > gets the whole requirement when the requirement is still queued": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "the cancel hook for a batched requirement (U3) > gets only the id for each requirement of a batch that is running": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "settle() and inspect() while a batch runs (U7) > settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight": {
+          "layer": "L7",
+          "by": ["option batch resolver"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "stop() from a completion hook during a batch's completion loop (U10) > cancels every requirement of the batch, the completed one too, and still completes the rest after": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "requeue() inside a batch handler (U13) > \"requeue %s: a requeue runs every requirement of the batch again at the next reconcile\"": {
+          "layer": "L7",
+          "by": ["option batch resolver"],
+          "dynamic": true
+        },
+        "what a batch's signal carries when it aborts (U14) > an AbortError when a requirement of the running batch is retracted": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "what a batch's signal carries when it aborts (U14) > an AbortError when the system stops": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "what a batch's signal carries when it aborts (U14) > the clobber detail, at the write, when a fact the batch is bound to changed": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "a queue with no maxSize (U15) > runs at once when it holds 10,000 requirements and one more arrives, and leaves that one to the window": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "the attempt number a batch reports (U16) > passes each failed attempt's number to shouldRetry once per batch, and the next attempt's to onRetry for each requirement": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        }
+      }
+    },
     "tests/core/l7-batch-resolvers-oracle.test.ts": {
       "category": "black-box",
       "rule": "L7",
