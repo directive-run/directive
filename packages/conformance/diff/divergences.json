@@ -7065,6 +7065,7 @@
     "stream": "console",
     "kind": "warn",
     "engine": "v2",
+    "when": ["resolverRejects"],
     "bound": {
       "match": [
         {
@@ -7081,6 +7082,30 @@
     "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-10-30"
+  },
+  {
+    "id": "l3-quirk-o-fuzz-console-warn-missing",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "missing",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$incidental": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row o (owner-approved 2026-11-01 on the decisions page: \"A non-JSON write through a module warns once\"): 1.35 prints the development warning for a non-JSON fact write (a Date) twice for a namespaced fact, once by its module-qualified name (`a.when`) and once by the internal key (`a::when`); 2.0 prints it once, by the module-qualified name. In the fuzz this is the Date fact `when` of module a or b (`a::when`, `b::when`): the second warning is missing on 2.0. The compare masks console text as incidental (diff/compare.ts `contract`), so the bound can name only a warning with one string argument, and no fuzz trigger marks a Date fact, so the entry has no `when`; `op: missing` keeps an extra warning on 2.0 unexcused. Signed 2026-11-04 on the owner's instruction: he approved this row (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-04"
   },
   {
     "id": "l4-quirk-c-member-only-hook-onEffectRun-missing-step1",
