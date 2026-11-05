@@ -242,8 +242,13 @@ under a changed entry's path. So every entry also carries one of:
   stand where the contract masks an argument's wording (`{ "$incidental":
   "string" }`): it matches only an argument printed in the named wording
   (diff/fingerprint.ts `TEXT`; today `resolverThrew`, the development
-  warning a resolver's unhandled error prints, which quirk b's console
-  entry names). The comparison keeps the unmasked record for missing and
+  warning a resolver's unhandled error prints). No committed entry uses it
+  today: quirk b's console entry did, but narrowed to that warning it
+  covered no fuzz case and was removed (the census failed it as stale; on
+  main it had been covering row o's warnings). Row o's entry
+  (`l3-quirk-o-fuzz-console-warn-missing`) is the next to use the
+  mechanism. The self-tests in diff/self/fingerprints.test.ts keep it
+  covered through a synthetic entry. The comparison keeps the unmasked record for missing and
   extra console records only (`Difference.raw`), and only a `$text` pattern
   reads it: every other comparison, report and entry sees the mask. The
   census rejects an unknown `$text`, and one in any other entry. Field names,

@@ -330,7 +330,7 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
   const left = (
     reference: TraceEntry[],
     candidate: TraceEntry[],
-    id: string,
+    id: string | Divergence,
     triggers: string[],
   ) => {
     const step = (records: TraceEntry[]): TraceEntry[] => [
@@ -342,7 +342,7 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     return explain(
       FUZZ_SCENARIO,
       compareContract(step(reference), step(candidate), "v2"),
-      [real(id)],
+      [typeof id === "string" ? real(id) : id],
       triggers,
     ).unexplained.map((d) => `${d.op} ${d.kind} ${d.path ?? ""}`);
   };
@@ -481,7 +481,33 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
   // P4-F2: quirk b's console entry was signed for one development warning,
   // the one a resolver's unhandled error prints, but its bound read only the
   // masked record ({ "$incidental": "string" }), so in every case where a
-  // resolver can reject it excused any warning 2.0 lacked or added.
+  // resolver can reject it excused any warning 2.0 lacked or added. Narrowed
+  // to `$text: "resolverThrew"` it covered no fuzz case at all (quirk b's
+  // other entries `end` the comparison before its shifted warning appears,
+  // and on main it had been covering row o's warnings), so the census
+  // rejected it as stale and it was removed. The `$text` mechanism stays, for
+  // row o's entry to narrow with; these tests keep it covered through a
+  // synthetic entry with the bound quirk b's entry had.
+  const resolverThrewEntry: Divergence = {
+    id: "synthetic-resolver-threw-console-warn",
+    scenario: FUZZ_SCENARIO,
+    stream: "console",
+    kind: "warn",
+    engine: "v2",
+    when: ["resolverRejects"],
+    bound: {
+      match: [
+        {
+          k: "console",
+          level: "warn",
+          args: [{ $text: "resolverThrew" }],
+        },
+      ],
+    },
+    reason: "Synthetic: a self-test entry for the $text bound; not committed.",
+    approvedBy: "test",
+    date: "2026-11-05",
+  };
   const warn = (text: string): TraceEntry => ({
     k: "console",
     level: "warn",
@@ -490,8 +516,8 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
   const tail =
     "The default error strategy skips it silently. Configure errorBoundary.onResolverError (or errorBoundary.onError) to handle it; this warning shows once per source and only in development.";
 
-  it("quirk b's console warning still excuses the resolver-threw warning, missing or extra", () => {
-    const id = "l2-quirk-b-console-warn";
+  it("a $text: resolverThrew bound excuses the resolver-threw warning, missing or extra", () => {
+    const id = resolverThrewEntry;
     for (const text of [
       `[Directive] resolver "r0" threw: a.r0 attempt 1. Requirement "A0" stays unmet. ${tail}`,
       `[Directive] resolver "a::r2" threw: a.r2 attempt 2. ${tail}`,
@@ -506,8 +532,8 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     }
   });
 
-  it("quirk b's console warning does not excuse another development warning, where a resolver can reject", () => {
-    const id = "l2-quirk-b-console-warn";
+  it("a $text: resolverThrew bound does not excuse another development warning, where a resolver can reject", () => {
+    const id = resolverThrewEntry;
     for (const text of [
       // The cross-module gate warning (P3-F6): its own row, not quirk b.
       '[Directive] Module "b" read undeclared property "f0" in a source gate. This module declares crossModuleDeps, so gate facts are namespaced: use "facts.self.f0" for its own fact, or add the module to crossModuleDeps.',
@@ -548,6 +574,12 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
         ["resolverRejects"],
       ),
     ).toEqual(["missing warn "]);
+  });
+
+  it("no committed entry is left for quirk b's resolver-threw console warning", () => {
+    // It covered 0 fuzz cases (seed 24301 PR count, deep seed 1), which the
+    // census rejects as stale; a stale entry returning would fail it again.
+    expect(committed.map((e) => e.id)).not.toContain("l2-quirk-b-console-warn");
   });
 
   it("row t's cancel 2.0 lacks is excused only in a case whose resolver's write retracts its own constraint", () => {

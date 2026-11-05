@@ -7066,30 +7066,6 @@
     "date": "2026-11-01"
   },
   {
-    "id": "l2-quirk-b-console-warn",
-    "scenario": "fuzz",
-    "stream": "console",
-    "kind": "warn",
-    "engine": "v2",
-    "when": ["resolverRejects"],
-    "bound": {
-      "match": [
-        {
-          "k": "console",
-          "level": "warn",
-          "args": [
-            {
-              "$text": "resolverThrew"
-            }
-          ]
-        }
-      ]
-    },
-    "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. This covers the development warning that the resolver threw, printed once per source: 1.35 spends it on the extra error after the cancel, so on 2.0 it is missing there and appears later instead (extra). Owner approved covering both directions, 2026-11-01 (decisions page row 2). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
-    "approvedBy": "Jason Comes",
-    "date": "2026-10-30"
-  },
-  {
     "id": "l3-quirk-o-fuzz-console-warn-missing",
     "scenario": "fuzz",
     "stream": "console",
