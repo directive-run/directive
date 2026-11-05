@@ -14,7 +14,9 @@
  *            the write to a later microtask is a behaviour change
  *
  * and each stream is aligned with a longest-common-subsequence over those
- * keys. Matched entries are compared field by field; unmatched ones are
+ * keys (in the console stream, of the longest pairings the one with the
+ * most records of identical text, so an unmatched record is the one the
+ * other engine did not print). Matched entries are compared field by field; unmatched ones are
  * reported as `missing` (reference only) or `extra` (candidate only). One
  * inserted hook is one difference.
  *
@@ -85,11 +87,14 @@ export interface Difference {
   candidate?: Json;
   /**
    * For a missing or extra console record only: the record as printed,
-   * before `contract()` masked its wording. Nothing in the comparison reads
-   * it (the alignment, `reference`, `candidate`, the report and the
-   * advisories all see the masked record); only a fuzz bound's `$text`
-   * pattern does (diff/fingerprint.ts `TEXT`), so an entry can name the one
-   * development warning it was approved for.
+   * before `contract()` masked its wording. `reference`, `candidate`, the
+   * report and the advisories all see the masked record; only a fuzz
+   * bound's `$text` pattern reads this (diff/fingerprint.ts `TEXT`), so an
+   * entry can name the one development warning it was approved for. It
+   * names the record the other engine did not print because the console
+   * alignment breaks ties by text (`lcs`): of the longest pairings it takes
+   * the one that pairs the most records of identical text, so 1.35 printing
+   * [X, Y] and 2.0 [Y] leaves X unpaired, not Y.
    */
   raw?: Json;
   /** Trace positions, for context. */
@@ -769,18 +774,50 @@ export function drawProblems(
 
 const keyOf = (k: Keyed) => `${k.kind}\u0000${k.step}\u0000${k.phase}`;
 
-/** Longest common subsequence of keys: pairs of matched indexes. */
-function lcs(a: string[], b: string[]): [number, number][] {
+/** A console record's arguments as printed (unmasked): `lcs` ties broken by text. */
+const printed = (k: Keyed) =>
+  k.entry.k === "console" ? JSON.stringify(k.entry.args) : "";
+
+/**
+ * Longest common subsequence of keys: pairs of matched indexes.
+ *
+ * With `text` (the console stream: each record's printed arguments, which
+ * the contract masks), the pairing is still a longest one, so as many
+ * records pair, in each step and phase, as by keys alone; of the longest it
+ * takes the one that pairs the most records of identical text. Keys alone
+ * paired 2.0's [Y] with the first of 1.35's [X, Y] and left Y unpaired,
+ * so `Difference.raw` named the wrong record. Without `text` it is the
+ * plain LCS, unchanged.
+ */
+function lcs(
+  a: string[],
+  b: string[],
+  text?: [string[], string[]],
+): [number, number][] {
   const n = a.length;
   const m = b.length;
-  // Trim the common prefix and suffix: traces mostly agree.
+  const sameText = (i: number, j: number) =>
+    text === undefined || text[0][i] === text[1][j];
+  // Trim the common prefix and suffix: traces mostly agree. Only records
+  // identical in key and text are trimmed: some longest pairing with the
+  // most identical texts pairs them.
   let start = 0;
-  while (start < n && start < m && a[start] === b[start]) {
+  while (
+    start < n &&
+    start < m &&
+    a[start] === b[start] &&
+    sameText(start, start)
+  ) {
     start++;
   }
   let endA = n;
   let endB = m;
-  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+  while (
+    endA > start &&
+    endB > start &&
+    a[endA - 1] === b[endB - 1] &&
+    sameText(endA - 1, endB - 1)
+  ) {
     endA--;
     endB--;
   }
@@ -792,22 +829,38 @@ function lcs(a: string[], b: string[]): [number, number][] {
   const cols = endB - start;
   if (rows > 0 && cols > 0) {
     const width = cols + 1;
+    // A pair scores `unit`, and one more with identical text: `unit` is
+    // above the most identical texts a pairing can have, so a longer
+    // pairing always scores higher. Without text every pair scores 1 (the
+    // plain LCS). The largest score, about min(rows, cols)², fits 32 bits
+    // whenever the table itself can be allocated.
+    const unit = text === undefined ? 1 : Math.min(rows, cols) + 1;
+    const score = (i: number, j: number) =>
+      unit + (text !== undefined && sameText(start + i, start + j) ? 1 : 0);
     const table = new Uint32Array((rows + 1) * width);
     for (let i = rows - 1; i >= 0; i--) {
       for (let j = cols - 1; j >= 0; j--) {
+        const skip = Math.max(
+          table[(i + 1) * width + j] as number,
+          table[i * width + j + 1] as number,
+        );
         table[i * width + j] =
           a[start + i] === b[start + j]
-            ? (table[(i + 1) * width + j + 1] as number) + 1
-            : Math.max(
-                table[(i + 1) * width + j] as number,
-                table[i * width + j + 1] as number,
-              );
+            ? Math.max(
+                (table[(i + 1) * width + j + 1] as number) + score(i, j),
+                skip,
+              )
+            : skip;
       }
     }
     let i = 0;
     let j = 0;
     while (i < rows && j < cols) {
-      if (a[start + i] === b[start + j]) {
+      if (
+        a[start + i] === b[start + j] &&
+        table[i * width + j] ===
+          (table[(i + 1) * width + j + 1] as number) + score(i, j)
+      ) {
         pairs.push([start + i, start + j]);
         i++;
         j++;
@@ -875,7 +928,12 @@ function compareWith(
     const a = left.filter((k) => k.stream === stream);
     const b = right.filter((k) => k.stream === stream);
 
-    return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf)) };
+    const text =
+      stream === "console"
+        ? ([a.map(printed), b.map(printed)] as [string[], string[]])
+        : undefined;
+
+    return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf), text) };
   });
   const matchedLeft = new Set<Keyed>();
   const matchedRight = new Set<Keyed>();
