@@ -209,7 +209,7 @@ describe("the census", () => {
   });
 
   describe("layer-tagged golden checks", () => {
-    // current is L6 in this repo: the history (L8) and ledger (L12) parts are
+    // current is L7 in this repo: the history (L8) and ledger (L12) parts are
     // gated, persistence (L6) and L0 are not.
     const LEDGER = "[L12] v2: the ledger golden round-trips with 1.35.0";
     const HISTORY = "[L8] v2: the history golden round-trips with 1.35.0";
