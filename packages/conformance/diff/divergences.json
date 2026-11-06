@@ -388,10 +388,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2
-          ]
+          "data": ["attempt", 2]
         }
       }
     ],
@@ -578,11 +575,7 @@
         "record": {
           "k": "hook",
           "hook": "onFactSet",
-          "args": [
-            "done",
-            true,
-            false
-          ]
+          "args": ["done", true, false]
         }
       }
     ],
@@ -984,10 +977,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2
-          ]
+          "data": ["attempt", 2]
         }
       }
     ],
@@ -1130,11 +1120,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "choose",
-            "failure 2",
-            "work"
-          ]
+          "data": ["choose", "failure 2", "work"]
         }
       }
     ],
@@ -1564,10 +1550,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2
-          ]
+          "data": ["attempt", 2]
         }
       }
     ],
@@ -1686,11 +1669,7 @@
         "record": {
           "k": "hook",
           "hook": "onFactSet",
-          "args": [
-            "done",
-            true,
-            false
-          ]
+          "args": ["done", true, false]
         }
       }
     ],
@@ -2228,22 +2207,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2,
-            250
-          ]
+          "data": ["attempt", 2, 250]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            3,
-            502
-          ]
+          "data": ["attempt", 3, 502]
         }
       }
     ],
@@ -2553,11 +2524,7 @@
         "record": {
           "k": "hook",
           "hook": "onFactSet",
-          "args": [
-            "done",
-            true,
-            false
-          ]
+          "args": ["done", true, false]
         }
       }
     ],
@@ -2863,33 +2830,21 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            4,
-            200
-          ]
+          "data": ["tick", 4, 200]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            5,
-            300
-          ]
+          "data": ["tick", 5, 300]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            6,
-            300
-          ]
+          "data": ["tick", 6, 300]
         }
       }
     ],
@@ -3303,33 +3258,21 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            7,
-            400
-          ]
+          "data": ["tick", 7, 400]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            8,
-            500
-          ]
+          "data": ["tick", 8, 500]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            9,
-            600
-          ]
+          "data": ["tick", 9, 600]
         }
       }
     ],
@@ -3509,33 +3452,21 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            10,
-            700
-          ]
+          "data": ["tick", 10, 700]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            11,
-            800
-          ]
+          "data": ["tick", 11, 800]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            12,
-            900
-          ]
+          "data": ["tick", 12, 900]
         }
       }
     ],
@@ -3677,66 +3608,42 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            13,
-            1000
-          ]
+          "data": ["tick", 13, 1000]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            14,
-            1000
-          ]
+          "data": ["tick", 14, 1000]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            15,
-            1100
-          ]
+          "data": ["tick", 15, 1100]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            16,
-            1100
-          ]
+          "data": ["tick", 16, 1100]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            17,
-            1200
-          ]
+          "data": ["tick", 17, 1200]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            18,
-            1200
-          ]
+          "data": ["tick", 18, 1200]
         }
       }
     ],
@@ -3971,33 +3878,21 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            4,
-            700
-          ]
+          "data": ["tick", 4, 700]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            5,
-            800
-          ]
+          "data": ["tick", 5, 800]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tick",
-            6,
-            900
-          ]
+          "data": ["tick", 6, 900]
         }
       }
     ],
@@ -4415,10 +4310,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "settle",
-            "resolved"
-          ]
+          "data": ["settle", "resolved"]
         }
       }
     ],
@@ -4460,10 +4352,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "settle",
-            "rejected"
-          ]
+          "data": ["settle", "rejected"]
         }
       }
     ],
@@ -4590,11 +4479,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2,
-            5
-          ]
+          "data": ["attempt", 2, 5]
         }
       }
     ],
@@ -4716,9 +4601,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4750,9 +4633,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4791,9 +4672,7 @@
     "kind": "onResolverRetry",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4836,9 +4715,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4869,9 +4746,7 @@
     "op": "changed",
     "path": "data[2]",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4899,9 +4774,7 @@
     "op": "changed",
     "path": "data[2]",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4929,9 +4802,7 @@
     "op": "changed",
     "path": "data[1]",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -4958,9 +4829,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5004,9 +4873,7 @@
     "op": "changed",
     "path": "args[2]",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5034,9 +4901,7 @@
     "op": "changed",
     "path": "args[0].inflight",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5116,9 +4981,7 @@
     "op": "changed",
     "path": "args[0].unmet",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5202,9 +5065,7 @@
     "op": "changed",
     "path": "args",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5259,9 +5120,7 @@
     "op": "changed",
     "path": "event",
     "ends": true,
-    "when": [
-      "resolverRetry"
-    ],
+    "when": ["resolverRetry"],
     "group": "quirk-a",
     "bound": {
       "match": [
@@ -5297,9 +5156,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetryLater"
-    ],
+    "when": ["resolverRetryLater"],
     "group": "quirk-p",
     "bound": {
       "match": [
@@ -5331,9 +5188,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetryLater"
-    ],
+    "when": ["resolverRetryLater"],
     "group": "quirk-p",
     "bound": {
       "match": [
@@ -5374,9 +5229,7 @@
     "op": "changed",
     "path": "data[2]",
     "ends": true,
-    "when": [
-      "resolverRetryLater"
-    ],
+    "when": ["resolverRetryLater"],
     "group": "quirk-p",
     "bound": {
       "match": [
@@ -5403,9 +5256,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetryLater"
-    ],
+    "when": ["resolverRetryLater"],
     "group": "quirk-p",
     "bound": {
       "match": [
@@ -5474,9 +5325,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "resolverRetryLater"
-    ],
+    "when": ["resolverRetryLater"],
     "group": "quirk-p",
     "bound": {
       "match": [
@@ -5545,9 +5394,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "restart"
-    ],
+    "when": ["restart"],
     "group": "quirk-j",
     "bound": {
       "match": [
@@ -5587,9 +5434,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": [
-      "restart"
-    ],
+    "when": ["restart"],
     "group": "quirk-j",
     "bound": {
       "match": [
@@ -5622,9 +5467,7 @@
     "op": "changed",
     "path": "args[0].inflight",
     "ends": true,
-    "when": [
-      "restart"
-    ],
+    "when": ["restart"],
     "group": "quirk-j",
     "bound": {
       "match": [
@@ -5704,9 +5547,7 @@
     "op": "changed",
     "path": "args[0].unmet",
     "ends": true,
-    "when": [
-      "restart"
-    ],
+    "when": ["restart"],
     "group": "quirk-j",
     "bound": {
       "match": [
@@ -5790,9 +5631,7 @@
     "op": "changed",
     "path": "args",
     "ends": true,
-    "when": [
-      "restart"
-    ],
+    "when": ["restart"],
     "group": "quirk-j",
     "bound": {
       "match": [
@@ -5845,9 +5684,7 @@
     "kind": "timeout",
     "engine": "v2",
     "op": "extra",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -5876,9 +5713,7 @@
     "kind": "aborted",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -5908,9 +5743,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -5937,9 +5770,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -5965,9 +5796,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -5996,9 +5825,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "extra",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6028,9 +5855,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6057,9 +5882,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6085,9 +5908,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6116,9 +5937,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "extra",
-    "when": [
-      "timeout"
-    ],
+    "when": ["timeout"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6148,9 +5967,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6200,9 +6017,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6250,9 +6065,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6435,9 +6248,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6475,9 +6286,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6525,9 +6334,7 @@
     "op": "changed",
     "path": "error.$error",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6591,9 +6398,7 @@
     "op": "changed",
     "path": "args[0].$error",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6721,9 +6526,7 @@
     "op": "changed",
     "path": "args[0].$error",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6851,9 +6654,7 @@
     "op": "changed",
     "path": "args",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6917,9 +6718,7 @@
     "op": "changed",
     "path": "event",
     "ends": true,
-    "when": [
-      "resolverRejects"
-    ],
+    "when": ["resolverRejects"],
     "group": "quirk-b",
     "bound": {
       "match": [
@@ -6964,9 +6763,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7005,9 +6802,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7043,9 +6838,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7072,9 +6865,7 @@
     "op": "changed",
     "path": "args",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7128,9 +6919,7 @@
     "op": "changed",
     "path": "args[0]",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7175,9 +6964,7 @@
     "op": "changed",
     "path": "event.id",
     "group": "quirk-t",
-    "when": [
-      "ownWriteRetracts"
-    ],
+    "when": ["ownWriteRetracts"],
     "bound": {
       "match": [
         {
@@ -7203,9 +6990,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "pending",
-    "when": [
-      "settleStop"
-    ],
+    "when": ["settleStop"],
     "group": "quirk-z",
     "bound": {
       "match": [
@@ -7232,9 +7017,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "pending",
-    "when": [
-      "settleStop"
-    ],
+    "when": ["settleStop"],
     "group": "quirk-z",
     "bound": {
       "match": [
@@ -7260,9 +7043,7 @@
     "kind": "threw settle",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "settleStop"
-    ],
+    "when": ["settleStop"],
     "group": "quirk-z",
     "bound": {
       "match": [
@@ -7291,9 +7072,7 @@
     "kind": "warn",
     "engine": "v2",
     "op": "missing",
-    "when": [
-      "namespacedDateWrite"
-    ],
+    "when": ["namespacedDateWrite"],
     "bound": {
       "match": [
         {
@@ -7351,9 +7130,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7398,10 +7175,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: d is a derivation?",
-            true
-          ]
+          "data": ["asks: d is a derivation?", true]
         }
       }
     ],
@@ -7423,9 +7197,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7470,10 +7242,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: d is a derivation?",
-            true
-          ]
+          "data": ["asks: d is a derivation?", true]
         }
       }
     ],
@@ -7495,9 +7264,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7542,10 +7309,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: d is a derivation?",
-            true
-          ]
+          "data": ["asks: d is a derivation?", true]
         }
       }
     ],
@@ -7567,9 +7331,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7614,10 +7376,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: d is a derivation?",
-            true
-          ]
+          "data": ["asks: d is a derivation?", true]
         }
       }
     ],
@@ -7639,9 +7398,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7686,10 +7443,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -7711,9 +7465,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7758,10 +7510,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -7783,9 +7532,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7830,10 +7577,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -7855,9 +7599,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7902,10 +7644,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -7927,9 +7666,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -7974,10 +7711,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -7999,9 +7733,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "asks"
-          ]
+          "args": ["asks"]
         }
       }
     ],
@@ -8046,10 +7778,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "asks: nope is a derivation?",
-            false
-          ]
+          "data": ["asks: nope is a derivation?", false]
         }
       }
     ],
@@ -8071,9 +7800,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "declared"
-          ]
+          "args": ["declared"]
         }
       }
     ],
@@ -8118,10 +7845,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "declared",
-            2
-          ]
+          "data": ["declared", 2]
         }
       }
     ],
@@ -8143,9 +7867,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "declared"
-          ]
+          "args": ["declared"]
         }
       }
     ],
@@ -8190,10 +7912,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "declared",
-            2
-          ]
+          "data": ["declared", 2]
         }
       }
     ],
@@ -8215,9 +7934,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "derived"
-          ]
+          "args": ["derived"]
         }
       }
     ],
@@ -8262,10 +7979,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "derived",
-            3
-          ]
+          "data": ["derived", 3]
         }
       }
     ],
@@ -8287,9 +8001,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "derived"
-          ]
+          "args": ["derived"]
         }
       }
     ],
@@ -8334,10 +8046,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "derived",
-            3
-          ]
+          "data": ["derived", 3]
         }
       }
     ],
@@ -8359,9 +8068,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "tracked"
-          ]
+          "args": ["tracked"]
         }
       }
     ],
@@ -8406,10 +8113,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "tracked",
-            1
-          ]
+          "data": ["tracked", 1]
         }
       }
     ],
@@ -8431,9 +8135,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "fragile"
-          ]
+          "args": ["fragile"]
         }
       }
     ],
@@ -8478,10 +8180,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "fragile",
-            2
-          ]
+          "data": ["fragile", 2]
         }
       }
     ],
@@ -8503,9 +8202,7 @@
         "record": {
           "k": "hook",
           "hook": "onEffectRun",
-          "args": [
-            "fragile"
-          ]
+          "args": ["fragile"]
         }
       }
     ],
@@ -8550,10 +8247,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "fragile",
-            2
-          ]
+          "data": ["fragile", 2]
         }
       }
     ],
@@ -8574,10 +8268,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "rerun cleanup of the run at",
-            1
-          ]
+          "data": ["rerun cleanup of the run at", 1]
         }
       }
     ],
@@ -8598,10 +8289,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "rerun cleanup of the run at",
-            1
-          ]
+          "data": ["rerun cleanup of the run at", 1]
         }
       }
     ],
@@ -8622,10 +8310,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "stopped cleanup of the run at",
-            1
-          ]
+          "data": ["stopped cleanup of the run at", 1]
         }
       }
     ],
@@ -8646,10 +8331,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "stopped cleanup of the run at",
-            1
-          ]
+          "data": ["stopped cleanup of the run at", 1]
         }
       }
     ],
@@ -8670,10 +8352,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "enabledThenStopped cleanup of the run at",
-            1
-          ]
+          "data": ["enabledThenStopped cleanup of the run at", 1]
         }
       }
     ],
@@ -8694,10 +8373,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "enabledThenStopped cleanup of the run at",
-            1
-          ]
+          "data": ["enabledThenStopped cleanup of the run at", 1]
         }
       }
     ],
@@ -8718,10 +8394,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2
-          ]
+          "data": ["attempt", 2]
         }
       }
     ],
@@ -8743,10 +8416,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "feed",
-            "m"
-          ]
+          "args": ["feed", "m"]
         }
       }
     ],
@@ -8856,10 +8526,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2
-          ]
+          "data": ["attempt", 2]
         }
       }
     ],
@@ -8881,10 +8548,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "feed",
-            "m"
-          ]
+          "args": ["feed", "m"]
         }
       }
     ],
@@ -8994,10 +8658,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attach",
-            "b"
-          ]
+          "data": ["attach", "b"]
         }
       }
     ],
@@ -9196,10 +8857,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attach",
-            "b"
-          ]
+          "data": ["attach", "b"]
         }
       }
     ],
@@ -9221,10 +8879,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "chat",
-            "m"
-          ]
+          "args": ["chat", "m"]
         }
       }
     ],
@@ -9524,10 +9179,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceDetach",
-          "args": [
-            "chat",
-            "m"
-          ]
+          "args": ["chat", "m"]
         }
       }
     ],
@@ -9574,10 +9226,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "detach",
-            "b"
-          ]
+          "data": ["detach", "b"]
         }
       }
     ],
@@ -9599,12 +9248,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceDrop",
-          "args": [
-            "latest",
-            "m",
-            "tick",
-            "gate-closed"
-          ]
+          "args": ["latest", "m", "tick", "gate-closed"]
         }
       }
     ],
@@ -9779,10 +9423,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attach",
-            "b"
-          ]
+          "data": ["attach", "b"]
         }
       }
     ],
@@ -9981,10 +9622,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attach",
-            "a"
-          ]
+          "data": ["attach", "a"]
         }
       }
     ],
@@ -10132,10 +9770,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "chat",
-            "m"
-          ]
+          "args": ["chat", "m"]
         }
       }
     ],
@@ -10434,10 +10069,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attach",
-            "a"
-          ]
+          "data": ["attach", "a"]
         }
       }
     ],
@@ -10459,10 +10091,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "chat",
-            "m"
-          ]
+          "args": ["chat", "m"]
         }
       }
     ],
@@ -10699,10 +10328,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceDetach",
-          "args": [
-            "s1",
-            "m"
-          ]
+          "args": ["s1", "m"]
         }
       }
     ],
@@ -10723,10 +10349,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "subscribe",
-            "s2"
-          ]
+          "data": ["subscribe", "s2"]
         }
       }
     ],
@@ -10748,10 +10371,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "s2",
-            "m"
-          ]
+          "args": ["s2", "m"]
         }
       }
     ],
@@ -10824,10 +10444,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "unsubscribe",
-            "s1"
-          ]
+          "data": ["unsubscribe", "s1"]
         }
       }
     ],
@@ -11058,10 +10675,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "subscribe",
-            "b"
-          ]
+          "data": ["subscribe", "b"]
         }
       }
     ],
@@ -11083,10 +10697,7 @@
         "record": {
           "k": "hook",
           "hook": "onSourceAttach",
-          "args": [
-            "chat",
-            "m"
-          ]
+          "args": ["chat", "m"]
         }
       }
     ],
@@ -11281,11 +10892,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "attempt",
-            2,
-            5
-          ]
+          "data": ["attempt", 2, 5]
         }
       }
     ],
@@ -11413,9 +11020,7 @@
         "record": {
           "k": "hook",
           "hook": "onDerivationInvalidate",
-          "args": [
-            "label"
-          ]
+          "args": ["label"]
         }
       }
     ],
@@ -11496,14 +11101,7 @@
         "record": {
           "k": "hook",
           "hook": "onDerivationCompute",
-          "args": [
-            "label",
-            "5/0",
-            [
-              "n",
-              "tags"
-            ]
-          ]
+          "args": ["label", "5/0", ["n", "tags"]]
         }
       }
     ],
@@ -11912,9 +11510,7 @@
         "record": {
           "k": "hook",
           "hook": "onDerivationInvalidate",
-          "args": [
-            "label"
-          ]
+          "args": ["label"]
         }
       }
     ],
@@ -11995,14 +11591,7 @@
         "record": {
           "k": "hook",
           "hook": "onDerivationCompute",
-          "args": [
-            "label",
-            "7/0",
-            [
-              "n",
-              "tags"
-            ]
-          ]
+          "args": ["label", "7/0", ["n", "tags"]]
         }
       }
     ],
@@ -17962,11 +17551,7 @@
         "record": {
           "k": "hook",
           "hook": "onFactSet",
-          "args": [
-            "status",
-            "from-batch",
-            "external"
-          ]
+          "args": ["status", "from-batch", "external"]
         }
       }
     ],
@@ -18198,14 +17783,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "aborted",
-            [
-              "a",
-              "b"
-            ],
-            80
-          ]
+          "data": ["aborted", ["a", "b"], 80]
         }
       }
     ],
@@ -18819,26 +18397,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "b"
-            ],
-            60
-          ]
+          "data": ["call", ["b"], 60]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "b"
-            ],
-            110
-          ]
+          "data": ["call", ["b"], 110]
         }
       }
     ],
@@ -19484,15 +19050,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b",
-              "c"
-            ],
-            50
-          ]
+          "data": ["call", ["a", "b", "c"], 50]
         }
       }
     ],
@@ -19994,15 +19552,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "d",
-              "e",
-              "f"
-            ],
-            110
-          ]
+          "data": ["call", ["d", "e", "f"], 110]
         }
       }
     ],
@@ -21277,11 +20827,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "shouldRetry",
-            "nope a",
-            1
-          ]
+          "data": ["shouldRetry", "nope a", 1]
         }
       }
     ],
@@ -21694,28 +21240,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            110
-          ]
+          "data": ["call", ["a", "b"], 110]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            310
-          ]
+          "data": ["call", ["a", "b"], 310]
         }
       }
     ],
@@ -21736,14 +21268,7 @@
         "count": 2,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            10
-          ]
+          "data": ["call", ["a", "b"], 10]
         }
       }
     ],
@@ -21764,22 +21289,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "shouldRetry",
-            "nope a",
-            2
-          ]
+          "data": ["shouldRetry", "nope a", 2]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "shouldRetry",
-            "nope a",
-            3
-          ]
+          "data": ["shouldRetry", "nope a", 3]
         }
       }
     ],
@@ -23097,15 +22614,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "aborted",
-            [
-              "a",
-              "b",
-              "c"
-            ],
-            30
-          ]
+          "data": ["aborted", ["a", "b", "c"], 30]
         }
       }
     ],
@@ -23586,12 +23095,7 @@
         "count": 4,
         "record": {
           "k": "external",
-          "data": [
-            "boundary",
-            "resolver",
-            "fetch",
-            10
-          ]
+          "data": ["boundary", "resolver", "fetch", 10]
         }
       }
     ],
@@ -23966,27 +23470,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            20
-          ]
+          "data": ["call", ["a", "b"], 20]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a"
-            ],
-            270
-          ]
+          "data": ["call", ["a"], 270]
         }
       }
     ],
@@ -24047,24 +23538,14 @@
         "count": 2,
         "record": {
           "k": "external",
-          "data": [
-            "boundary",
-            "resolver",
-            "fetch",
-            20
-          ]
+          "data": ["boundary", "resolver", "fetch", 20]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "boundary",
-            "resolver",
-            "fetch",
-            270
-          ]
+          "data": ["boundary", "resolver", "fetch", 270]
         }
       }
     ],
@@ -24164,14 +23645,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            10
-          ]
+          "data": ["call", ["a", "b"], 10]
         }
       }
     ],
@@ -25053,13 +24527,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a"
-            ],
-            260
-          ]
+          "data": ["call", ["a"], 260]
         }
       }
     ],
@@ -25297,11 +24765,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "aborted",
-            "b",
-            75
-          ]
+          "data": ["aborted", "b", 75]
         }
       }
     ],
@@ -25839,22 +25303,14 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "aborted",
-            "a",
-            75
-          ]
+          "data": ["aborted", "a", 75]
         }
       },
       {
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "aborted",
-            "b",
-            75
-          ]
+          "data": ["aborted", "b", 75]
         }
       }
     ],
@@ -26204,14 +25660,7 @@
         "count": 1,
         "record": {
           "k": "external",
-          "data": [
-            "call",
-            [
-              "a",
-              "b"
-            ],
-            50
-          ]
+          "data": ["call", ["a", "b"], 50]
         }
       }
     ],
