@@ -178,14 +178,17 @@ export const withBatch: SystemPart = (context) => {
       undefined,
     );
     const run = host.run_(id, reqs[0]!, reqs);
-    // 1.35's executeBatch, then its onResolutionComplete after every batch.
+    // 1.35's executeBatch, then its onResolutionComplete after every batch,
+    // however it ends, as a single run's: one ended by a rethrow (boundary
+    // "throw") still lets settle() go, and escapes as 1.35's one unhandled
+    // rejection.
     (async () => {
       try {
         await host.execute_(def, run, baseline, call);
       } finally {
         host.leave_(run);
       }
-    })().then(() => {
+    })().finally(() => {
       context.settled();
       context.schedule();
     });
