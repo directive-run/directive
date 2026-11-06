@@ -2060,7 +2060,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: the runs of one batch share one writes record, counted once (identity check); needs resolveBatch to observe",
+    "note": "L7 batch resolvers: the runs of one batch share one writes record, counted once (identity check); needs resolveBatch to observe. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
     "endLine": 1353,
     "endCol": 39
   },
@@ -2071,7 +2071,7 @@
     "replacement": "only !== null",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
     "endLine": 1356,
     "endCol": 24
   },
@@ -2082,7 +2082,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
     "endLine": 1356,
     "endCol": 24
   },
@@ -2093,7 +2093,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
     "endLine": 1359,
     "endCol": 8
   },
@@ -3770,8 +3770,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "feature-layer",
-    "layer": "L7",
-    "note": "batch resolvers (L7): an empty {} baseline when no added requirement is bound. createBoundFacts reads a baseline only for a bound resolver's own fields, but a batch takes the LAST non-undefined baseline of its window (resolvers.ts processBatch), so an empty {} added on a later tick shadows an earlier tick's bound baseline; observable only through batch."
+    "layer": "L10",
+    "note": "L10 dynamic definitions (constraints.assign): an empty {} baseline when no added requirement is bound. A batch takes the LAST non-undefined baseline of its window and reads it only for its binding's keys, and a requirement's binding is fixed by its constraint, so through L7 a {} baseline never meets a bound batch (proved by hand: the whole conformance:local suite passes with the mutant). It does once assign() gives a constraint abortOn while its unbound add is queued: the batch's write to the key is then dropped and its signal aborted. Killed by hand (L7-pre-b): l10-batch-resolvers-dynamic-oracle 'assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands'."
   },
   {
     "line": 2113,
@@ -3779,8 +3779,8 @@
     "mutator": "EqualityOperator",
     "replacement": "ownedKeysThisTick.size >= 0",
     "reason": "feature-layer",
-    "layer": "L7",
-    "note": "batch resolvers (L7): an empty {} baseline when no added requirement is bound. createBoundFacts reads a baseline only for a bound resolver's own fields, but a batch takes the LAST non-undefined baseline of its window (resolvers.ts processBatch), so an empty {} added on a later tick shadows an earlier tick's bound baseline; observable only through batch."
+    "layer": "L10",
+    "note": "L10 dynamic definitions (constraints.assign): an empty {} baseline when no added requirement is bound. A batch takes the LAST non-undefined baseline of its window and reads it only for its binding's keys, and a requirement's binding is fixed by its constraint, so through L7 a {} baseline never meets a bound batch (proved by hand: the whole conformance:local suite passes with the mutant). It does once assign() gives a constraint abortOn while its unbound add is queued: the batch's write to the key is then dropped and its signal aborted. Killed by hand (L7-pre-b): l10-batch-resolvers-dynamic-oracle 'assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands'."
   },
   {
     "line": 2126,
@@ -7053,7 +7053,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early"
+    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window' and 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'."
   },
   {
     "line": 4043,
@@ -7062,7 +7062,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L7",
-    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early"
+    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'."
   },
   {
     "line": 4044,

@@ -601,7 +601,7 @@
   {
     "file": "src/core/__tests__/l10-batch-resolvers-dynamic-oracle.test.ts",
     "category": "black-box",
-    "cases": 6,
+    "cases": 7,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -944,6 +944,15 @@
     "file": "src/core/__tests__/l6-snapshots-oracle.test.ts",
     "category": "black-box",
     "cases": 16,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l7-batch-gate-debt-oracle.test.ts",
+    "category": "black-box",
+    "cases": 7,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

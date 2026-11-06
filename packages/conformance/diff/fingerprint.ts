@@ -130,6 +130,21 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
     /^\[Directive\] resolver "([a-z]::)?r\d+" threw: ([a-z]\.r\d+ attempt \d+|Resolver "([a-z]::)?r\d+" timed out after \d+ms)\.( Requirement "[A-Z]\d+" stays unmet\.)? The default error strategy skips it silently\. Configure errorBoundary\.onResolverError \(or errorBoundary\.onError\) to handle it; this warning shows once per source and only in development\.$/.test(
       v,
     ),
+  /**
+   * The development warning for a Date written to a fuzz module's Date
+   * fact `when`, by the fact's internal key (`a::when`, `b::when`), word
+   * for word as both engines print it (packages/core tracking.ts
+   * `warnNonJsonFactAssignment`, core-next api/facts.ts `warnNonJson`):
+   * `[Directive] Fact "a::when" assigned a Date instance.\nFacts must be
+   * JSON-roundtrippable …`. Row o's fuzz entry names it: 1.35 prints the
+   * warning by the module-qualified name (`a.when`) and again by this key,
+   * 2.0 by the module-qualified name only.
+   */
+  dateWriteByKey: (v) =>
+    typeof v === "string" &&
+    /^\[Directive\] Fact "[a-z]::when" assigned a Date instance\.\nFacts must be JSON-roundtrippable for reactivity to work correctly\.\nDate mutations are not tracked\.\nUse \.getTime\(\) for timestamps instead\.\nSee: https:\/\/directive\.run\/docs\/facts#json-rule$/.test(
+      v,
+    ),
 };
 
 /** The masked form of a string the contract hides (diff/compare.ts `tag`). */
