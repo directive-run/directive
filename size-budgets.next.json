@@ -6,24 +6,24 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 29779,
-      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 29,749 B, +1,066 B over 28,683 B (cap +1,100 B, so 29,783 B): the seam +363 B (measured with the part unwired), the part +703 B. With (au) (owner decision 2026-11-05, \"Same as single runs (Recommended)\": a superseded batch member reports a cancel from the old batch) the fix round measured 29,772 B, +1,089 B over 28,683 B: (au) +23 B. Budget 29,779 B kept (measured + 7 B, within the cap). The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
+      "gzBudget": 29858,
+      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 29,855 B, +1,172 B over the pre-L7 28,683 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 3 B, at or under the cap 29,858 B."
     },
     "two-module": {
-      "gzBudget": 29871,
-      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 29,842 B, +1,071 B over 28,771 B (cap +1,100 B, so 29,871 B): the seam +366 B (measured with the part unwired), the part +705 B. With (au) (owner decision 2026-11-05, \"Same as single runs (Recommended)\": a superseded batch member reports a cancel from the old batch) the fix round measured 29,866 B, +1,095 B over 28,771 B: (au) +24 B. Budget 29,871 B kept (measured + 5 B, within the cap). The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
+      "gzBudget": 29946,
+      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 29,942 B, +1,171 B over the pre-L7 28,771 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 4 B, at or under the cap 29,946 B."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B. L7a adds the batch seam only: measured 10,446 B, +7 B over 10,439 B (A1 allows +20 B); budget kept."
     },
     "aperture": {
-      "gzBudget": 34673,
-      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 34,643 B, +1,066 B over 33,577 B (cap +1,100 B, so 34,677 B): the seam +360 B (measured with the part unwired), the part +706 B. With (au) (owner decision 2026-11-05, \"Same as single runs (Recommended)\": a superseded batch member reports a cancel from the old batch) the fix round measured 34,670 B, +1,093 B over 33,577 B: (au) +27 B. Budget 34,673 B kept (measured + 3 B, within the cap). The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
+      "gzBudget": 34752,
+      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 34,748 B, +1,171 B over the pre-L7 33,577 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 4 B, at or under the cap 34,752 B."
     },
     "full-entry": {
-      "gzBudget": 32026,
-      "reason": "L7a, batch resolvers: the withBatch part wired by createSystem (O1) plus its seam in the core. The owner approved A1 on 2026-11-05: \"Approve up to +1.1 KB (Recommended)\" (L7 RFC, Decisions for the owner). Measured 31,996 B, +1,051 B over 30,945 B (cap +1,100 B, so 32,045 B): the seam +338 B (measured with the part unwired), the part +713 B. With (au) (owner decision 2026-11-05, \"Same as single runs (Recommended)\": a superseded batch member reports a cancel from the old batch) the fix round measured 32,021 B, +1,076 B over 30,945 B: (au) +25 B. Budget 32,026 B kept (measured + 5 B, within the cap). The attribution step cut 163 to 175 B from the first build with R5 (29,912 B on minimal): run rows leave through one helper, one queue-drop path, and settle() runs the queues from a core hook at 1.35's two points."
+      "gzBudget": 32118,
+      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 32,098 B, +1,153 B over the pre-L7 30,945 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 20 B, at or under the cap 32,120 B."
     }
   }
 }
