@@ -10,6 +10,12 @@
 // repo root. A measured size over its budget fails the run (any mode), naming
 // the fixture, its size, the budget and the overage. scripts/size-budgets-tighten.mjs
 // keeps those budgets from rising without a written reason.
+// The line "fixture minimal, beta wiring" is reported, not budgeted: it is the
+// minimal fixture's size if `createSystem` wired only the parts the fixture uses
+// (the beta turns batch, sources, restore, inspect, observe and missing into
+// imports), measured by dropping those parts from api/system.ts at bundle time
+// and changing no shipped code. It shows what the smallest app weighs at the beta,
+// so the size win stays visible while the alpha wires every part into every app.
 // Run from the package: `pnpm --filter @directive-run/core-next size`.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -351,6 +357,17 @@ const IS_DEV_IMPORT =
   /^import\s+isDevelopment\s+from\s+["']#is-development["'];?$/m;
 const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
+const inlineDevSource = (source) =>
+  source
+    .replace(IS_DEV_IMPORT, "\0")
+    .replace(
+      /\bisDevelopment\b/g,
+      '(__directiveDev && process.env.NODE_ENV !== "production")',
+    )
+    .replace(
+      "\0",
+      `const __directiveDev = /* @__PURE__ */ (() => (${DEV_CHECK}))();`,
+    );
 const inlineIsDevelopment = {
   name: "inline-is-development",
   setup(b) {
@@ -360,19 +377,7 @@ const inlineIsDevelopment = {
         return undefined;
       }
 
-      return {
-        contents: source
-          .replace(IS_DEV_IMPORT, "\0")
-          .replace(
-            /\bisDevelopment\b/g,
-            '(__directiveDev && process.env.NODE_ENV !== "production")',
-          )
-          .replace(
-            "\0",
-            `const __directiveDev = /* @__PURE__ */ (() => (${DEV_CHECK}))();`,
-          ),
-        loader: "ts",
-      };
+      return { contents: inlineDevSource(source), loader: "ts" };
     });
   },
 };
@@ -523,6 +528,76 @@ for (const [name, engine] of Object.entries(engines)) {
   console.log(`fixture minimal on ${name}: ${m.text}`);
   if (engine.mangleProps) {
     checkBudget("minimal", "fixture minimal on core-next", m.gz);
+  }
+}
+// The beta wiring of the minimal fixture: reported, not budgeted (no entry in
+// size-budgets.next.json, and nothing here sets an exit code). `createSystem`
+// wires every part into every app; the beta turns the six below into imports,
+// so an app that does not use one does not pay for it. This builds the same
+// fixture against api/system.ts with those parts' imports and `parts` entries
+// removed, as a source edit at bundle time (the inlining of `#is-development`
+// still applies). Effects, reconcile, defaults, plugins and, in development,
+// validation stay: the fixture uses them. If system.ts no longer has that
+// shape the line is skipped with a warning rather than reported wrong.
+const BETA_OMITTED = [
+  "withBatch",
+  "withSources",
+  "withRestore",
+  "withInspect",
+  "withObserve",
+  "withMissing",
+];
+const betaWiringSource = (source) => {
+  const names = BETA_OMITTED.join("|");
+  const importLine = new RegExp(
+    `^import \\{ (?:${names}) \\} from "\\./[a-z]+\\.js";\\n`,
+    "gm",
+  );
+  const partEntry = new RegExp(`^\\s+(?:${names}),\\n`, "gm");
+  const imports = source.match(importLine)?.length ?? 0;
+  const entries = source.match(partEntry)?.length ?? 0;
+  if (imports !== BETA_OMITTED.length || entries !== BETA_OMITTED.length) {
+    return undefined;
+  }
+
+  return source.replace(importLine, "").replace(partEntry, "");
+};
+let betaApplied = false;
+const betaWiring = {
+  name: "beta-wiring",
+  setup(b) {
+    b.onLoad({ filter: /\/src\/api\/system\.ts$/ }, (args) => {
+      const edited = betaWiringSource(readFileSync(args.path, "utf8"));
+      if (edited === undefined) {
+        return undefined;
+      }
+      betaApplied = true;
+
+      return { contents: inlineDevSource(edited), loader: "ts" };
+    });
+  },
+};
+const beta = await measure(
+  "minimal beta wiring",
+  minimal,
+  fixtures,
+  engines["core-next"],
+  [betaWiring],
+);
+if (betaApplied) {
+  console.log(
+    `fixture minimal, beta wiring (only the parts it uses) on core-next: ${beta.text}`,
+  );
+} else {
+  const message =
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve and withMissing as one import and one `parts` entry each; update BETA_OMITTED / betaWiringSource in scripts/size.mjs";
+  // Not a budget, but under --check (CI) a skipped line fails, so it cannot
+  // vanish from the report unnoticed.
+  if (process.argv.includes("--check")) {
+    console.error(message);
+    process.exitCode = 1;
+  } else {
+    console.warn(message);
   }
 }
 // Two namespaced modules with a cross-module read (fixtures/two-module.ts).
