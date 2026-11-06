@@ -10,6 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DirectiveError } from "../api/core.js";
 import { createModule } from "../api/module.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
@@ -184,6 +185,75 @@ describe("settle() counts a running batch (as)", () => {
       /^\[Directive\] settle\(\) timed out after 5000ms/,
     );
     system.destroy();
+  });
+
+  it('a batch ended by a rethrow (boundary "throw") lets settle() resolve, and escapes as 1.35\'s one unhandled rejection', async () => {
+    // Vitest's own listener would fail the run; collect them instead.
+    const caught: unknown[] = [];
+    const saved = process.listeners("unhandledRejection");
+    process.removeAllListeners("unhandledRejection");
+    const mine = (reason: unknown) => caught.push(reason);
+    process.on("unhandledRejection", mine);
+    try {
+      const mod = createModule("m", {
+        schema: {
+          facts: { want: t.array<string>() },
+          derivations: {},
+          events: {},
+          requirements: { FETCH: { id: t.string() } },
+        },
+        init: (f: any) => {
+          f.want = [];
+        },
+        constraints: {
+          fetch: {
+            when: (f: any) => f.want.length > 0,
+            require: (f: any) =>
+              f.want.map((id: string) => ({ type: "FETCH", id })),
+          },
+        },
+        resolvers: {
+          fetch: {
+            requirement: "FETCH",
+            key: (r: any) => r.id,
+            batch: { enabled: true, windowMs: 10 },
+            resolveBatch: async () => {
+              throw new Error("batch boom");
+            },
+          },
+        },
+      } as never);
+      const system = createSystem({
+        module: mod,
+        errorBoundary: { onResolverError: "throw" },
+      } as never) as any;
+      system.start();
+      system.facts.want = ["a", "b"];
+      await advance(0);
+      const outcome = system.settle().then(
+        () => "resolved",
+        (error: Error) => error.message,
+      );
+      await advance(5_000);
+
+      expect(await outcome).toBe("resolved");
+      expect(system.isSettled).toBe(true);
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(caught).toHaveLength(1);
+      expect(caught[0]).toBeInstanceOf(DirectiveError);
+      expect(caught[0]).toMatchObject({
+        message: "batch boom",
+        source: "resolver",
+        sourceId: "fetch",
+      });
+      system.destroy();
+    } finally {
+      process.off("unhandledRejection", mine);
+      for (const fn of saved) {
+        process.on("unhandledRejection", fn);
+      }
+    }
   });
 });
 
