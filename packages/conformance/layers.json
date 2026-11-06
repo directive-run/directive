@@ -6597,6 +6597,10 @@
         "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": {
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands": {
+          "layer": "L10",
+          "by": ["member .constraints.assign"]
         }
       }
     },
@@ -9445,6 +9449,37 @@
         "hydrate() (U5, U6) > a namespaced snapshot has flat keys: restore() takes them, hydrate() loads none (U6)": {
           "layer": "L6",
           "by": ["member .getSnapshot", "member .hydrate", "member .restore"]
+        }
+      }
+    },
+    "tests/core/l7-batch-gate-debt-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L7",
+      "pin": true,
+      "tests": {
+        "a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "the batch retry loop's exits > a batch aborted as its retry is announced never runs again": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
+        },
+        "a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded": {
+          "layer": "L7",
+          "by": ["option batch resolver"]
         }
       }
     },

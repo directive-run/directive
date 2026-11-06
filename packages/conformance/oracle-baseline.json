@@ -9,6 +9,7 @@
     "tests/core/l2-resolvers-oracle.test.ts",
     "tests/core/l3-system-oracle-production.test.ts",
     "tests/core/l3-system-oracle.test.ts",
+    "tests/core/l7-batch-gate-debt-oracle.test.ts",
     "tests/core/l7-batch-pins-oracle-production.test.ts",
     "tests/core/l7-batch-pins-oracle.test.ts",
     "tests/core/l7-batch-resolvers-oracle.test.ts",
@@ -38,6 +39,7 @@
     ],
     "tests/core/l3-system-oracle-production.test.ts": [],
     "tests/core/l3-system-oracle.test.ts": [],
+    "tests/core/l7-batch-gate-debt-oracle.test.ts": [],
     "tests/core/l7-batch-pins-oracle-production.test.ts": [],
     "tests/core/l7-batch-pins-oracle.test.ts": ["member .inspect"],
     "tests/core/l7-batch-resolvers-oracle.test.ts": [],
@@ -63,6 +65,7 @@
     "tests/core/l2-resolvers-oracle.test.ts": [],
     "tests/core/l3-system-oracle-production.test.ts": [],
     "tests/core/l3-system-oracle.test.ts": [],
+    "tests/core/l7-batch-gate-debt-oracle.test.ts": [],
     "tests/core/l7-batch-pins-oracle-production.test.ts": [],
     "tests/core/l7-batch-pins-oracle.test.ts": [],
     "tests/core/l7-batch-resolvers-oracle.test.ts": [],
@@ -141,7 +144,8 @@
       "unregistering a batched resolver > aborts a batch that is running, and what it returns afterwards completes nothing": "L10",
       "unregistering a batched resolver > leaves another batched resolver's queue and running batch alone": "L10",
       "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves": "L10",
-      "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": "L10"
+      "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": "L10",
+      "assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands": "L10"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
@@ -283,6 +287,14 @@
       "zeroConfig > skips an error from each kind of source, without the unhandled-error warning": "L3",
       "zeroConfig > without zeroConfig the same errors skip too, but development says so once per source": "L3",
       "zeroConfig > an errorBoundary given alongside wins over the zeroConfig defaults": "L3"
+    },
+    "tests/core/l7-batch-gate-debt-oracle.test.ts": {
+      "a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly": "L7",
+      "settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window": "L7",
+      "settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window": "L7",
+      "the batch retry loop's exits > a batch aborted as its retry is announced never runs again": "L7",
+      "the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again": "L7",
+      "a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded": "L7"
     },
     "tests/core/l7-batch-pins-oracle-production.test.ts": {
       "a batched resolver with no handler, in production (U9) > builds with no error and completes each requirement once the window closes": "L7"

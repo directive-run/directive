@@ -380,9 +380,8 @@
     "endCol": 6,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "batch.enabled with no resolve(), resolveBatch() or resolveBatchWithResults() is refused when the manager is built. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
-    "layer": "L7"
+    "reason": "not-observable",
+    "note": "batch.enabled with no resolve(), resolveBatch() or resolveBatchWithResults(): unreachable through a plain definition, because the check just above (line 562) already throws for a resolver with none of the three, so this else branch runs only when a definition's handler properties read differently on two reads in one validation (an accessor). Proved by hand: the whole conformance:local suite passes with the mutant. Counted, not excused."
   },
   {
     "line": 671,
@@ -1350,7 +1349,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "note": "resolveBatch retry loop (runBatchRetryLoop) (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "note": "resolveBatch retry loop (runBatchRetryLoop) (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > a batch aborted as its retry is announced never runs again'.",
     "layer": "L7"
   },
   {
@@ -1361,7 +1360,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "note": "resolveBatch retry loop (runBatchRetryLoop): a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "note": "resolveBatch retry loop (runBatchRetryLoop): a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again'.",
     "layer": "L7"
   },
   {
@@ -1382,7 +1381,7 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "note": "supersedeSatisfiedBatches: a batch whose run is not yet satisfied is skipped rather than superseded. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "note": "supersedeSatisfiedBatches: a batch whose run is not yet satisfied is skipped rather than superseded. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded'.",
     "layer": "L7"
   },
   {

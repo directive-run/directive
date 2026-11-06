@@ -293,3 +293,49 @@ describe("unregistering a module that owns a batched resolver", () => {
     await system.stop();
   });
 });
+
+describe("assigning abortOn to a constraint whose requirement is queued in a batch", () => {
+  // The add was dispatched while the constraint had no abortOn, so it was
+  // bound to nothing; the batch reads the binding when it flushes.
+  it("binds the batch to the live facts: its write to the key lands", async () => {
+    const seen: string[] = [];
+    const fetch = {
+      when: (f: any) => f.want.length > 0,
+      require: (f: any) => f.want.map((id: string) => ({ type: "FETCH", id })),
+    };
+    const mod = createModule("m", {
+      schema: {
+        facts: { want: t.array<string>(), status: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { FETCH: { id: t.string() } },
+      },
+      init: (f: any) => {
+        f.want = [];
+        f.status = "idle";
+      },
+      constraints: { fetch },
+      resolvers: {
+        fetch: {
+          requirement: "FETCH",
+          key: (req: { id: string }) => req.id,
+          batch: { enabled: true, windowMs: 50 },
+          resolveBatch: async (_reqs: unknown, context: any) => {
+            context.facts.status = "from-batch";
+            seen.push(`aborted ${context.signal.aborted}`);
+          },
+        },
+      },
+    } as never);
+    const system = createSystem({ module: mod } as never) as any;
+    system.start();
+    system.facts.want = ["a"];
+    await advance(10);
+    system.constraints.assign("fetch", { ...fetch, abortOn: ["status"] });
+    await advance(100);
+
+    expect(seen).toEqual(["aborted false"]);
+    expect(system.facts.status).toBe("from-batch");
+    system.destroy();
+  });
+});
