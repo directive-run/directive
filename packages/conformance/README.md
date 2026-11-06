@@ -84,7 +84,14 @@ the traces to agree.
   console, error, external, state, timers), aligning each stream with a
   longest common subsequence keyed by kind (hook name, event type, …), step
   and phase (`sync`: inside the step's call; `async`: after it returned).
-  One inserted hook is one difference, not a cascade.
+  One inserted hook is one difference, not a cascade. The console stream
+  breaks ties by text: of the longest alignments it takes the one that
+  pairs the most records of identical wording, so as many records pair as
+  by keys alone and a missing or extra warning is the one the other engine
+  did not print (1.35 printing [X, Y] and 2.0 [Y] leaves X missing, not Y),
+  provided the records both engines print appear in the same order. If
+  they swap order, a printed record can be left unpaired, so a `$text`
+  class should name a wording the other engine never prints.
 - `diff/scenario.ts`: `scenario(name, build, steps)` runs the reference
   twice (the runs must match exactly, incidental parts included, or the
   scenario/recorder is not deterministic — never approvable) and each
@@ -246,14 +253,17 @@ under a changed entry's path. So every entry also carries one of:
   In a missing or extra console entry's pattern, `{ "$text": name }` may
   stand where the contract masks an argument's wording (`{ "$incidental":
   "string" }`): it matches only an argument printed in the named wording
-  (diff/fingerprint.ts `TEXT`; today `resolverThrew`, the development
-  warning a resolver's unhandled error prints). No committed entry uses it
-  today: quirk b's console entry did, but narrowed to that warning it
-  covered no fuzz case and was removed (the census failed it as stale; on
-  main it had been covering row o's warnings). Row o's entry
-  (`l3-quirk-o-fuzz-console-warn-missing`) is the next to use the
-  mechanism. The self-tests in diff/self/fingerprints.test.ts keep it
-  covered through a synthetic entry. The comparison keeps the unmasked record for missing and
+  (diff/fingerprint.ts `TEXT`: `resolverThrew`, the development warning a
+  resolver's unhandled error prints, and `dateWriteByKey`, 1.35's second
+  non-JSON warning for a Date written to a namespaced fact). Row o's entry
+  (`l3-quirk-o-fuzz-console-warn-missing`) uses `dateWriteByKey`, so in a
+  namespaced Date case it no longer excuses any other warning 2.0 lacks
+  (it had been excusing the source-gate warning, which the masked console
+  pairing named in place of the Date warning). Quirk b's console entry used
+  `resolverThrew`, but narrowed to that warning it covered no fuzz case and
+  was removed (the census failed it as stale; on main it had been covering
+  row o's warnings); the self-tests in diff/self/fingerprints.test.ts keep
+  that class covered through a synthetic entry. The comparison keeps the unmasked record for missing and
   extra console records only (`Difference.raw`), and only a `$text` pattern
   reads it: every other comparison, report and entry sees the mask. The
   census rejects an unknown `$text`, and one in any other entry. Field names,
