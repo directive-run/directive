@@ -720,14 +720,20 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         // The requirement came back while the run that satisfied it is
         // still going: a fresh run takes over, the old one's writes drop.
         // A batch that owns others goes on without it (1.35's
-        // supersedeSatisfiedBatches).
+        // supersedeSatisfiedBatches) and, as a superseded single run does,
+        // reports a cancel for it, the hook given the requirement (owner
+        // decision (au); 1.35 completes it from both runs). A new list, so
+        // the handler's own stays aligned with its results.
         const reqs = current.reqs_;
         if (reqs?.[1]) {
-          reqs.splice(
-            reqs.findIndex((r) => r.id === req.id),
-            1,
-          );
           inflight.delete(req.id);
+          canceled(
+            current.resolver_,
+            (current.reqs_ = [...reqs]).splice(
+              reqs.findIndex((r) => r.id === req.id),
+              1,
+            )[0]!,
+          );
         } else {
           current.dropped_ = true;
           cancel(current);

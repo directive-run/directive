@@ -279,3 +279,139 @@ describe("nothing is left behind", () => {
     system.destroy();
   });
 });
+
+/**
+ * Owner decision (au): the batch [A, B] satisfies A by its own write and A
+ * comes back while it runs. The old batch reports a cancel for A, the hook
+ * given the requirement, as a superseded single run does; the new run
+ * completes A. 1.35 completes A from both runs.
+ */
+describe("a superseded batch member reports a cancel from the old batch (au)", () => {
+  function superseded(opts: { withResults?: boolean; stopOnB?: boolean }) {
+    const t0 = Date.now();
+    const log: string[] = [];
+    const cancels: unknown[] = [];
+    const at = () => `@${Date.now() - t0}`;
+    let calls = 0;
+    const handler = async (reqs: Array<{ id: string }>, ctx: any) => {
+      const ids = reqs.map((r) => r.id).join(",");
+      log.push(`call ${ids} ${at()}`);
+      // The second call (A alone) leaves A wanted, so stop() and start()
+      // have something to dispatch again (quirk j).
+      if (++calls !== 2 || !opts.stopOnB) {
+        for (const r of reqs) {
+          ctx.facts[`done${r.id}`] = true;
+        }
+      }
+      await sleep(60);
+      log.push(`return ${ids} ${at()}`);
+
+      return reqs.map(() => ({ success: true }));
+    };
+    const name = (req: any) => req.requirement?.id ?? req.id;
+    const mod = createModule("m", {
+      schema: {
+        facts: { doneA: t.boolean(), doneB: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { LOAD: { id: t.string() } },
+      },
+      init: (f: any) => {
+        f.doneA = false;
+        f.doneB = false;
+      },
+      constraints: {
+        a: { when: (f: any) => !f.doneA, require: { type: "LOAD", id: "A" } },
+        b: { when: (f: any) => !f.doneB, require: { type: "LOAD", id: "B" } },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          key: (r: any) => r.id,
+          batch: { enabled: true, windowMs: 10 },
+          [opts.withResults ? "resolveBatchWithResults" : "resolveBatch"]:
+            handler,
+        },
+      },
+    } as never);
+    const system = createSystem({
+      module: mod,
+      plugins: [
+        {
+          name: "rec",
+          onResolverComplete: (_r: string, req: any) => {
+            log.push(`complete ${name(req)} ${at()}`);
+            if (opts.stopOnB && name(req) === "B") {
+              system.stop();
+            }
+          },
+          onResolverCancel: (_r: string, req: any) => {
+            log.push(`cancel ${name(req)} ${at()}`);
+            cancels.push(req);
+          },
+          onResolverError: (_r: string, req: any) => {
+            log.push(`error ${name(req)} ${at()}`);
+          },
+        },
+      ],
+    } as never) as any;
+    system.start();
+
+    return { system, log, cancels, at };
+  }
+
+  for (const withResults of [false, true]) {
+    it(`old batch cancels A at the supersede, new run completes it (${withResults ? "resolveBatchWithResults" : "resolveBatch"})`, async () => {
+      const { system, log, cancels, at } = superseded({ withResults });
+      await advance(30);
+      log.push(`doneA = false ${at()}`);
+      system.facts.doneA = false;
+      await advance(200);
+      expect(log).toEqual([
+        "call A,B @10",
+        "doneA = false @30",
+        "cancel A @30",
+        "call A @40",
+        "return A,B @70",
+        "complete B @70",
+        "return A @100",
+        "complete A @100",
+      ]);
+      // The whole requirement, as a superseded single run's cancel.
+      expect(cancels[0]).toMatchObject({
+        id: "A",
+        requirement: { type: "LOAD", id: "A" },
+      });
+      expect(system.inspect().inflight).toEqual([]);
+      system.destroy();
+    });
+  }
+
+  it("composes with a stop() inside the completion loop (row t) and start() after it (quirk j)", async () => {
+    const { system, log, at } = superseded({ stopOnB: true });
+    await advance(30);
+    log.push(`doneA = false ${at()}`);
+    system.facts.doneA = false;
+    await advance(45);
+    log.push(`start ${at()}`);
+    system.start();
+    await advance(200);
+    expect(log).toEqual([
+      "call A,B @10",
+      "doneA = false @30",
+      "cancel A @30",
+      "call A @40",
+      "return A,B @70",
+      "complete B @70",
+      // stop() from B's hook: the new run's one outcome; the old batch
+      // has reported all of its own.
+      "cancel A @70",
+      "start @75",
+      "call A @85",
+      "return A @100",
+      "return A @145",
+      "complete A @145",
+    ]);
+    system.destroy();
+  });
+});

@@ -105,13 +105,15 @@ export const withBatch: SystemPart = (context) => {
       }
       run.done_ = true;
       reqs.forEach((req, i) => {
-        host.tell_(
-          run,
-          req,
-          !many || results[i]!.success
-            ? undefined
-            : (results[i]!.error ?? new Error("Batch item failed")),
-        );
+        // One superseded meanwhile reported its cancel (au).
+        run.reqs_!.includes(req) &&
+          host.tell_(
+            run,
+            req,
+            !many || results[i]!.success
+              ? undefined
+              : (results[i]!.error ?? new Error("Batch item failed")),
+          );
       });
 
       // R5, as 1.35: every item failed, so it runs again at once.
