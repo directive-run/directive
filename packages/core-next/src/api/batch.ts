@@ -14,11 +14,10 @@
  *   loop, timeout, abort and outcome mark. The handler's sync start runs in
  *   one store batch. `resolveBatch` completes each requirement on return;
  *   `resolveBatchWithResults` reports each item on its own, with 1.35's
- *   count check and "Batch item failed". The binding is the last
- *   non-undefined baseline of the queued requirements (W5).
+ *   count check and "Batch item failed". The binding compares each key with
+ *   the last baseline that read it (W5).
  * - Retracting a queued requirement takes it out of the queue and cancels
- *   it; one of a running batch cancels the whole batch, as 1.35 (quirk g is
- *   L7b). stop() cancels the queued ones, then the running batches.
+ *   it. stop() cancels the queued ones, then the running batches.
  *
  * Three owner-approved changes from 1.35 (L7 RFC, 2026-11-05):
  * - (ap) the window starts at the first add to an empty queue and does not
@@ -28,6 +27,17 @@
  * - (at) with only `resolve()`, each requirement starts as an ordinary
  *   single run when the window closes (1.35 runs it on a private
  *   controller that retraction, stop() and settle() cannot reach).
+ *
+ * L7b, approved at GATE-1 (quirks g, h, i, k) and on 2026-11-05 ((aq), (ar)):
+ * - quirk g, (aq): retracting one requirement of a running batch cancels it
+ *   alone, the hook given the whole requirement (resolvers.ts);
+ * - quirks h and i, (ar): failed with-results items retry under the batch's
+ *   policy, as a smaller call holding only them, and each reports its error
+ *   once, after its last attempt; the ones that succeeded complete at once
+ *   (1.35 reruns an all-failed batch at once, erroring each item on every
+ *   attempt, and never retries a partly failed one);
+ * - quirk k: a mixed-source batch is bound to the union of its
+ *   requirements' `abortOn` keys (resolvers.ts; 1.35 binds it to none).
  */
 
 import type { SystemPart } from "./core.js";
@@ -65,8 +75,8 @@ export const withBatch: SystemPart = (context) => {
    * 1.35's executeBatchAttempt, with executeAllOrNothing or
    * executeWithResults: the handler's sync start in one store batch, then
    * the outcomes. Each requirement is one; the run's mark is set first, so
-   * a stop() from a hook cancels nothing more (row t). Resolves true when
-   * every item failed (R5). At 1.35's depth, so a batch's ticks are 1.35's:
+   * a stop() from a hook cancels nothing more (row t). Failed items throw
+   * (quirks h and i). At 1.35's depth, so a batch's ticks are 1.35's:
    * executeBatchAttempt hands back executeWithResults' promise (two ticks
    * more) and awaits executeAllOrNothing's (one more), on every exit.
    */
@@ -75,8 +85,8 @@ export const withBatch: SystemPart = (context) => {
     const name = run.resolver_;
     const many = def.resolveBatchWithResults;
     const ms = def.batch!.timeoutMs ?? def.timeout;
-    // An attempt after an all-failed one may report again (R5).
-    run.done_ = false;
+    // This attempt's item errors, for the run's one report.
+    const errors = (run.errors_ = new Map());
     try {
       let pending: unknown;
       store.batch(() => {
@@ -103,21 +113,34 @@ export const withBatch: SystemPart = (context) => {
           `[Directive] Batch resolver "${name}" returned ${results.length} results but expected ${reqs.length}. Results array must match input order.`,
         );
       }
-      run.done_ = true;
-      reqs.forEach((req, i) => {
-        // One superseded meanwhile reported its cancel (au).
-        run.reqs_!.includes(req) &&
-          host.tell_(
-            run,
-            req,
-            !many || results[i]!.success
-              ? undefined
-              : (results[i]!.error ?? new Error("Batch item failed")),
-          );
-      });
-
-      // R5, as 1.35: every item failed, so it runs again at once.
-      return many && !results.some((result) => result.success);
+      // One retracted or superseded meanwhile reported its cancel (g, au).
+      const done = reqs.filter(
+        (req, i) =>
+          run.reqs_!.includes(req) &&
+          (!many ||
+            results[i]!.success ||
+            !errors.set(
+              req,
+              results[i]!.error ?? new Error("Batch item failed"),
+            )),
+      );
+      const [first] = errors.values();
+      if (first) {
+        // Quirk i: the rest leave flight; the failed ones are the batch now,
+        // and a sibling's write that satisfied its own requirement does not
+        // end their retries.
+        run.reqs_ = [...errors.keys()];
+        run.satisfied_ &&= !done[0];
+        host.leave_(run, done);
+      } else {
+        run.done_ = true;
+      }
+      for (const req of done) {
+        host.tell_(run, req);
+      }
+      if (first) {
+        throw first;
+      }
     } finally {
       if (many) {
         await 0;
@@ -149,8 +172,11 @@ export const withBatch: SystemPart = (context) => {
 
       return;
     }
-    // W5: the last baseline a dispatch gave (each one is a Map).
-    const baseline = bases.filter(Boolean).pop();
+    // W5: each key's last baseline; a mixed batch's span its passes (k).
+    const baseline = bases.reduce<Baseline>(
+      (all, base) => (base && new Map([...(all ?? []), ...base])) || all,
+      undefined,
+    );
     const run = host.run_(id, reqs[0]!, reqs);
     // 1.35's executeBatch, then its onResolutionComplete after every batch.
     (async () => {

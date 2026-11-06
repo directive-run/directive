@@ -64,7 +64,12 @@
  *   This file keeps its one seam, in `resolve()`, and the run machinery a
  *   batch shares: a batch run is a Run that owns `reqs_`, with one row in
  *   flight per requirement, one stamp, one retry loop and one outcome mark.
- *   Binding for a mixed batch (quirk k) is L7b.
+ *   L7b's approved changes from 1.35: a retracted requirement leaves a
+ *   running batch alone, with its cancel, and the batch goes on for the rest
+ *   (quirk g; the last one to leave aborts it); a batch is bound to the
+ *   union of its requirements' `abortOn` keys (quirk k; 1.35 binds a
+ *   mixed-source batch to none); every cancel hook gets the whole
+ *   requirement ((aq); 1.35 gives a running batch's `{ id }`).
  */
 
 import isDevelopment from "#is-development";
@@ -130,6 +135,8 @@ export interface Run extends Writer {
   attempt_: number;
   /** Its one outcome has been reported. */
   done_: boolean;
+  /** A with-results batch's item errors, from its latest attempt. */
+  errors_?: Map<RequirementWithId, Error>;
 }
 
 /** 1.35's per-attempt cap on clobber reports, then one summary. */
@@ -183,15 +190,14 @@ export interface BatchHost {
     def: ResolverDef,
     run: Run,
     baseline: ReadonlyMap<string, unknown> | undefined,
-    /** Resolves true to run again at once (R5). */
     call: (def: ResolverDef, run: Run, context: object) => Promise<unknown>,
   ): Promise<void>;
   /** One requirement's outcome. */
   tell_(run: Run, req: RequirementWithId, error?: Error): void;
   /** A requirement canceled before it ran. */
   canceled_(resolver: string, req: RequirementWithId): void;
-  /** A batch run leaves flight: its rows that are still its own go. */
-  leave_(run: Run): boolean;
+  /** A batch run leaves flight, or only `reqs` of it: its own rows go. */
+  leave_(run: Run, reqs?: RequirementWithId[]): boolean;
 }
 
 /** The batch window, as the resolvers use it. */
@@ -328,11 +334,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   };
   /** A run's requirements: a batch run's, or its one. */
   const all = (run: Run) => run.reqs_ ?? [run.req_];
-  /** A run leaves flight: its rows that are still its own go. */
-  const leave = (run: Run) => {
-    detached.delete(run);
+  /** A run leaves flight, or only `reqs` of a batch: its own rows go. */
+  const leave = (run: Run, reqs?: RequirementWithId[]) => {
+    reqs || detached.delete(run);
     let left = false;
-    for (const { id } of all(run)) {
+    for (const { id } of reqs ?? all(run)) {
       if (inflight.get(id) === run) {
         left = inflight.delete(id);
       }
@@ -346,14 +352,27 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     if (!run.done_) {
       run.done_ = true;
       for (const req of all(run)) {
-        // As 1.35: a running batch's cancel hook gets `{ id }` only; a
-        // superseded one's gets the requirement.
-        canceled(
-          run.resolver_,
-          !run.reqs_ || run.dropped_ ? req : ({ id: req.id } as never),
-        );
+        // (aq): the whole requirement (1.35 gives a running batch's `{ id }`).
+        canceled(run.resolver_, req);
       }
     }
+  };
+  /**
+   * Retracted (quirk g) or superseded (au): a batch that owns others goes on
+   * without it, and its cancel is its outcome unless the batch reported
+   * already (a new list, so the handler's own stays aligned with its
+   * results). Any other run is canceled.
+   */
+  const part = (run: Run, id: string) => {
+    if (!run.reqs_?.[1]) {
+      cancel(run);
+
+      return;
+    }
+    let req: RequirementWithId;
+    inflight.delete(id);
+    run.reqs_ = run.reqs_.filter((r) => r.id !== id || !(req = r));
+    run.done_ || canceled(run.resolver_, req!);
   };
 
   const tell = (run: Run, req: RequirementWithId, error?: Error) => {
@@ -372,7 +391,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     // (row t), so the rest of a batch still completes.
     run.done_ = true;
     for (const req of all(run)) {
-      tell(run, req, error);
+      // A with-results item: its own error (quirks h and i, (ar)).
+      tell(run, req, error && (run.errors_?.get(req) ?? error));
     }
   };
 
@@ -588,8 +608,9 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       }
       run.attempt_ = attempt;
       // Asked each attempt, as 1.35: a constraint found async since loses it.
-      const keys = options.bindingOf(run.req_);
-      const facts = keys
+      // A batch's is the union of its requirements' (quirk k, B1).
+      const keys = all(run).flatMap((req) => options.bindingOf(req) ?? []);
+      const facts = keys[0]
         ? options.factsFor(run, bind(run, keys, baseline))
         : (shared ??= options.factsFor(run));
       const child = new AbortController();
@@ -606,12 +627,9 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         },
       };
       try {
-        // R5, as 1.35: a with-results batch whose every item failed runs
-        // again at once (no backoff, onRetry or shouldRetry); it reported
-        // each item's error already (L7b's quirk h changes this).
-        if (await call(def, run, context)) {
-          continue;
-        }
+        // A with-results batch with failed items throws the first one's
+        // error, so they retry under the policy (quirks h and i).
+        await call(def, run, context);
         // Aborted while it ran: that was its one outcome (1.35). For a
         // clobbered run it is no outcome at all; it just leaves flight.
         if (!signal.aborted) {
@@ -722,22 +740,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         // A batch that owns others goes on without it (1.35's
         // supersedeSatisfiedBatches) and, as a superseded single run does,
         // reports a cancel for it, the hook given the requirement (owner
-        // decision (au); 1.35 completes it from both runs). A new list, so
-        // the handler's own stays aligned with its results.
-        const reqs = current.reqs_;
-        if (reqs?.[1]) {
-          inflight.delete(req.id);
-          canceled(
-            current.resolver_,
-            (current.reqs_ = [...reqs]).splice(
-              reqs.findIndex((r) => r.id === req.id),
-              1,
-            )[0]!,
-          );
-        } else {
+        // decision (au); 1.35 completes it from both runs).
+        if (!current.reqs_?.[1]) {
           current.dropped_ = true;
-          cancel(current);
         }
+        part(current, req.id);
       }
       const resolverId = find(req.requirement);
       if (!resolverId) {
@@ -770,7 +777,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     abort(requirementId) {
       const run = inflight.get(requirementId);
       if (run) {
-        cancel(run);
+        // Quirk g: a batch goes on for the rest (1.35 cancels them all).
+        part(run, requirementId);
       } else {
         batcher?.drop_([], requirementId);
       }
