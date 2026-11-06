@@ -294,6 +294,10 @@ Measured with `node scripts/size.mjs --check` in `packages/core-next` on this br
 
 **Owner decision (au), 2026-11-05, found in the L7a review.** A requirement of a running batch is superseded: the batch [A, B] satisfied A by its own write, and A comes back while the batch still runs. 1.35 completes A twice, once from the old batch and once from its new run, with no cancel. L7a's first build reported nothing for A from the old batch. RFC C5 promised "L2's supersede, per requirement", which for a single run means the old run reports a cancel and the new run completes. Jason chose "Same as single runs (Recommended)". So the old batch reports a cancel for A (the hook gets the whole requirement), and the new run completes it, one outcome per run. Product verdict: better, small change. L7a builds it. The L7 oracle pins 1.35's double completion, and the gate signs the (au) entry.
 
+**Owner decision, L7b size, 2026-11-05.** L7b built quirks g, h, i and k with (aq) and (ar), and every fixture ended 53 to 72 B over A1's +1.1 KB, mostly for quirk i's failed-item split (about 110 B). Jason chose "Approve +1,175 B (Recommended)". L7 as a whole may grow each fixture by up to 1,175 B over its pre-L7 size: `minimal` at most 29,858 B.
+
+**Owner decision, Phase 4, 2026-11-05.** Asked how Phase 4 continues after the L7 gate, Jason chose "Re-plan first (Recommended)". A short re-plan comes to him before L8 starts: feature imports before L8 to L12, lighter checks for the opt-in layers, and a Sizls app on 2.0 sooner.
+
 
 **Questions for Jason.** Seven answers settle L7. The table below them has a product verdict for each, so Jason can bulk-approve.
 
