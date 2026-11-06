@@ -589,9 +589,16 @@ if (betaApplied) {
     `fixture minimal, beta wiring (only the parts it uses) on core-next: ${beta.text}`,
   );
 } else {
-  console.warn(
-    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve and withMissing as one import and one `parts` entry each; update BETA_OMITTED / betaWiringSource in scripts/size.mjs",
-  );
+  const message =
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve and withMissing as one import and one `parts` entry each; update BETA_OMITTED / betaWiringSource in scripts/size.mjs";
+  // Not a budget, but under --check (CI) a skipped line fails, so it cannot
+  // vanish from the report unnoticed.
+  if (process.argv.includes("--check")) {
+    console.error(message);
+    process.exitCode = 1;
+  } else {
+    console.warn(message);
+  }
 }
 // Two namespaced modules with a cross-module read (fixtures/two-module.ts).
 const twoModule = readFileSync(join(fixtures, "two-module.ts"), "utf8");
