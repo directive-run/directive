@@ -5707,6 +5707,182 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-timeout-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "timeout",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "timeout",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-timeout-extra`, on the batch's records (an external \"timeout\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l2-quirk-n-fuzz-aborted-missing",
     "scenario": "fuzz",
     "stream": "external",
@@ -5736,6 +5912,182 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-aborted-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-missing`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l2-quirk-n-fuzz-aborted-changed",
     "scenario": "fuzz",
     "stream": "external",
@@ -5763,6 +6115,33 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-aborted-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[2]",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "path": "data[2]",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-changed`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l3-quirk-n-fuzz-aborted-changed-tag",
     "scenario": "fuzz",
     "stream": "external",
@@ -5788,6 +6167,60 @@
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers an external aborted record paired with another run's abort: the tag differs (data[1]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
+  },
+  {
+    "id": "l7-quirk-n-fuzz-batch-aborted-changed-tag",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "resolverTag"
+          },
+          "to": {
+            "$like": "resolverTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "resolverTag"
+          },
+          "to": {
+            "$like": "batchTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "batchTag"
+          },
+          "to": {
+            "$like": "resolverTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "batchTag"
+          },
+          "to": {
+            "$like": "batchTag"
+          }
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-aborted-changed-tag`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
   },
   {
     "id": "l3-quirk-n-fuzz-wrote-missing",
@@ -5819,6 +6252,182 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-wrote-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-missing`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l3-quirk-n-fuzz-wrote-extra",
     "scenario": "fuzz",
     "stream": "external",
@@ -5848,6 +6457,182 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-wrote-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "wrote",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-extra`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l3-quirk-n-fuzz-wrote-changed-tag",
     "scenario": "fuzz",
     "stream": "external",
@@ -5875,6 +6660,60 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-wrote-changed-tag",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "resolverTag"
+          },
+          "to": {
+            "$like": "resolverTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "resolverTag"
+          },
+          "to": {
+            "$like": "batchTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "batchTag"
+          },
+          "to": {
+            "$like": "resolverTag"
+          }
+        },
+        {
+          "path": "data[1]",
+          "from": {
+            "$like": "batchTag"
+          },
+          "to": {
+            "$like": "batchTag"
+          }
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-tag`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l3-quirk-n-fuzz-wrote-changed-attempt",
     "scenario": "fuzz",
     "stream": "external",
@@ -5900,6 +6739,33 @@
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander wrote record paired with another write: the attempt number differs (data[2]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
+  },
+  {
+    "id": "l7-quirk-n-fuzz-batch-wrote-changed-attempt",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[2]",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "path": "data[2]",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-attempt`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
   },
   {
     "id": "l3-quirk-n-fuzz-start-missing",
@@ -5931,6 +6797,182 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-quirk-n-fuzz-batch-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-missing`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
+  },
+  {
     "id": "l3-quirk-n-fuzz-start-extra",
     "scenario": "fuzz",
     "stream": "external",
@@ -5958,6 +7000,182 @@
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external start record on 2.0's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
+  },
+  {
+    "id": "l7-quirk-n-fuzz-batch-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batchTimeout"],
+    "group": "quirk-n",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "resolverTag"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-extra`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-06"
   },
   {
     "id": "l2-quirk-b-hook-onError-missing",
