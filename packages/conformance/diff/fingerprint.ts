@@ -102,6 +102,30 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
   /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
+  /** The batched resolver's id (L7), own or namespaced: `rb`, `a::rb`. */
+  batchResolver: (v) => typeof v === "string" && /^([a-z]::)?rb$/.test(v),
+  /** A constraint that feeds the batched resolver: `b0`, `a::b1`. */
+  batchConstraint: (v) => typeof v === "string" && /^([a-z]::)?b\d+$/.test(v),
+  /** A batch requirement's type: `AB`. */
+  batchRequirementType: (v) => typeof v === "string" && /^[A-Z]B$/.test(v),
+  /** A batch requirement's id: `AB:{"item":"0.1"}`. */
+  batchRequirementId: (v) =>
+    typeof v === "string" && /^[A-Z]B:\{"item":"\d+\.\d+"\}$/.test(v),
+  /** A batch requirement's item, `<source>.<index>`: `0.1`. */
+  batchItem: (v) => typeof v === "string" && /^\d+\.\d+$/.test(v),
+  /** The batched resolver's record tag: `a.rb`. */
+  batchTag: (v) => typeof v === "string" && /^[a-z]\.rb$/.test(v),
+  /**
+   * The error a batched call or item ended with: a thrown batch's or
+   * fallback run's own message (`a.rb attempt 1`), a with-results item's
+   * (`a.rb 0.1 attempt 1`), or the engine's timeout of the batch
+   * (`Batch resolver "rb" timed out after 3ms`). One class, as
+   * `attemptError` is for a single run.
+   */
+  batchAttemptError: (v) =>
+    typeof v === "string" &&
+    (/^[a-z]\.rb( \d+\.\d+)? attempt \d+$/.test(v) ||
+      /^Batch resolver "([a-z]::)?rb" timed out after \d+ms$/.test(v)),
 };
 
 /**
@@ -280,6 +304,13 @@ const ORDER = [
   "resolverTag",
   "effectTag",
   "attemptError",
+  "batchResolver",
+  "batchConstraint",
+  "batchRequirementType",
+  "batchRequirementId",
+  "batchItem",
+  "batchTag",
+  "batchAttemptError",
 ];
 
 /**

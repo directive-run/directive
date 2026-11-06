@@ -946,6 +946,56 @@ const TRIGGERS = {
     spec.modules.some((m) =>
       m.constraints.some((c) => c.writes === c.fact && c.value < c.atLeast),
     ),
+  /**
+   * The case has the batched resolver (L7): quirk g, rows (ap), (as) and
+   * (au) need nothing more of the spec. Each of them shows wherever a batch
+   * runs: a retraction, a later add or a settle step can reach any batch,
+   * and which one a case makes depends on its steps' timing.
+   */
+  batched: (spec) => spec.batch != null,
+  /** The batched resolver is `resolveBatchWithResults` (quirks h and i, row (ar)). */
+  batchWithResults: (spec) => spec.batch?.handler === "results",
+  /** The batched resolver has only `resolve()`, the fallback (row (at)). */
+  batchFallback: (spec) => spec.batch?.handler === "fallback",
+  /** Two constraints feed the batched resolver, so a batch can mix them (quirk k). */
+  batchMixed: (spec) => (spec.batch?.sources.length ?? 0) > 1,
+  /** Some constraint that feeds the batched resolver has `abortOn` (quirk k, RFC B-1). */
+  batchAbortOn: (spec) =>
+    spec.batch?.sources.some((src) => src.abortOn) ?? false,
+  /**
+   * The sources can raise two requirements at once (their items add up to
+   * more than one), so a batch can hold a requirement and a sibling: a
+   * write can retract one and keep the other wanted (quirk g).
+   */
+  batchSiblings: (spec) =>
+    (spec.batch?.sources.reduce((n, src) => n + src.items, 0) ?? 0) > 1,
+  /**
+   * Some call of the batched resolver fails (`fails` > 0): a thrown batch
+   * or fallback run, or failed items of a with-results call.
+   */
+  batchFails: (spec) => (spec.batch?.fails ?? 0) > 0,
+  /**
+   * A with-results call fails every item (`failing` "all", `fails` > 0):
+   * an all-failed with-results batch (quirk h, row (ar)).
+   */
+  batchAllFail: (spec) =>
+    spec.batch?.handler === "results" &&
+    spec.batch.failing === "all" &&
+    spec.batch.fails > 0,
+  /**
+   * A with-results call can fail some items and not others (quirk i): it
+   * fails every second item (`failing` "some", `fails` > 0), so it needs a
+   * call of two or more, and the sources must be able to raise two.
+   */
+  batchSomeFail: (spec) =>
+    spec.batch?.handler === "results" &&
+    spec.batch.failing === "some" &&
+    spec.batch.fails > 0 &&
+    spec.batch.sources.reduce((n, src) => n + src.items, 0) > 1,
+  /** The batched resolver has a retry policy (`retry` > 0: more than one attempt). */
+  batchRetry: (spec) => (spec.batch?.retry ?? 0) > 0,
+  /** The batched resolver has a timeout (`timeoutMs`). */
+  batchTimeout: (spec) => spec.batch != null && spec.batch.timeout !== null,
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean

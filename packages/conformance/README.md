@@ -270,6 +270,30 @@ under a changed entry's path. So every entry also carries one of:
   tags, structure, array lengths and every other value stay literal, so a
   fuzz entry no longer excuses an unrelated record kind or key.
 
+The `$like` classes (diff/fingerprint.ts `LIKE`; `generalize` reads a value
+as the first that matches, in the order below):
+
+| Class | Matches |
+| --- | --- |
+| `integer` | any integer: an attempt, a count, a duration |
+| `requirementId` | a single resolver's requirement id: `A0:{}` |
+| `requirementType` | a single resolver's requirement type: `A0` |
+| `resolver` | a single resolver's id, own or namespaced: `r0`, `a::r0` |
+| `constraint` | a constraint id: `c0`, `a::c0` |
+| `resolverTag` | a single resolver's record tag: `a.r0` |
+| `effectTag` | an effect's record tag: `a.x0` |
+| `attemptError` | a single resolver's attempt error: `a.r0 attempt 1`, or `Resolver "a::r0" timed out after 3ms` |
+| `batchResolver` | the batched resolver's id (L7): `rb`, `a::rb` |
+| `batchConstraint` | a constraint that feeds the batched resolver: `b0`, `a::b1` |
+| `batchRequirementType` | a batch requirement's type: `AB` |
+| `batchRequirementId` | a batch requirement's id: `AB:{"item":"0.1"}` |
+| `batchItem` | a batch requirement's item, `<source>.<index>`: `0.1` |
+| `batchTag` | the batched resolver's record tag: `a.rb` |
+| `batchAttemptError` | a batched call's or item's error: `a.rb attempt 1`, `a.rb 0.1 attempt 1`, or `Batch resolver "rb" timed out after 3ms` |
+
+`absent`, `settleTimeout`, `thrownError` and `thrower` are matched only
+where a pattern names them (`generalize` never writes them).
+
 The census requires one of them on every entry. They were added by
 `scripts/fingerprint-divergences.ts`, which records what each entry covered
 on the current engines (the PR run; for fuzz samples, the fuzz at seeds
@@ -385,6 +409,17 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |
 | `namespacedDateWrite` | the case has two modules (the model namespaces them only then, as `a` and `b`) and one has the Date fact `when`, which its init sets to a `Date`, so a Date is written to a namespaced fact (row o: 1.35 warns of it twice, by `a.when` and `a::when`) |
 | `ownWriteRetracts` | some resolver's write can retract its own constraint: it writes the fact its constraint's condition reads (`writes` is `fact`) a value below the condition's `atLeast`, so the run that wrote it can be retracted after it reported complete (row t's third path). A module b constraint's cross condition reads module a's fact 0, which b's resolvers never write |
+| `batched` | the case has the batched resolver (L7). Quirk g and rows (ap), (as) and (au) need nothing more of the spec: a retraction, a later add or a settle step can reach any batch, and which one a case makes depends on its steps' timing |
+| `batchWithResults` | the batched resolver is `resolveBatchWithResults` |
+| `batchFallback` | the batched resolver has only `resolve()`, the fallback (row (at)) |
+| `batchMixed` | two constraints feed the batched resolver, so a batch can mix them (quirk k) |
+| `batchAbortOn` | some constraint that feeds the batched resolver has `abortOn` (quirk k; RFC B-1) |
+| `batchSiblings` | the batch's sources can raise more than one requirement at once (their `items` add up to two or more), so a write can retract one and keep a sibling wanted (quirk g) |
+| `batchFails` | some call of the batched resolver fails (`fails` > 0): a thrown batch or fallback run, or failed items of a with-results call |
+| `batchAllFail` | a with-results call fails every item (`failing` `"all"`, `fails` > 0): quirk h and row (ar) |
+| `batchSomeFail` | a with-results call fails every second item (`failing` `"some"`, `fails` > 0) and the sources can raise two requirements, so a call can fail some items and not others (quirk i) |
+| `batchRetry` | the batched resolver has a retry policy (more than one attempt) |
+| `batchTimeout` | the batched resolver has a `timeoutMs` |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

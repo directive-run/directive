@@ -57,6 +57,17 @@ export const FUZZ_TRIGGERS = [
   "throw",
   "namespacedDateWrite",
   "ownWriteRetracts",
+  "batched",
+  "batchWithResults",
+  "batchFallback",
+  "batchMixed",
+  "batchAbortOn",
+  "batchSiblings",
+  "batchFails",
+  "batchAllFail",
+  "batchSomeFail",
+  "batchRetry",
+  "batchTimeout",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

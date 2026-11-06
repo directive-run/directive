@@ -19,8 +19,13 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { checkExcuses } from "../../lib/census.js";
 import { compareContract } from "../compare.js";
-import { pathFits } from "../fingerprint.js";
-import { type FuzzSpec, specTriggers } from "../fuzz/model.js";
+import { LIKE, generalizeValue, pathFits } from "../fingerprint.js";
+import {
+  type FuzzBatch,
+  type FuzzBatchSource,
+  type FuzzSpec,
+  specTriggers,
+} from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
 import { type Divergence, FUZZ_SCENARIO, explain } from "../scenario.js";
@@ -983,5 +988,169 @@ describe("the census requires every entry to name what it excuses", () => {
 
   it("accepts the committed divergences", () => {
     expect(checkExcuses(join(import.meta.dirname, "../.."), null)).toEqual([]);
+  });
+});
+
+describe("the batch triggers and classes (L7) name only the batched resolver's features", () => {
+  // One module with one fact and no constraint of its own, so every
+  // resolver trigger below can come only from the batched resolver.
+  const one: FuzzBatchSource = {
+    fact: 0,
+    atLeast: 1,
+    items: 1,
+    abortOn: false,
+  };
+  const base: FuzzBatch = {
+    sources: [one],
+    handler: "batch",
+    failing: "all",
+    windowMs: 1,
+    maxSize: null,
+    delay: 0,
+    fails: 0,
+    retry: 0,
+    timeout: null,
+    writes: 0,
+    value: 0,
+  };
+  const triggersOf = (batch: FuzzBatch | null): string[] =>
+    specTriggers({
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [],
+          events: [{ target: 0, add: false }],
+          constraints: [],
+          effects: [],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: false,
+      steps: [{ op: "settle" }],
+      batch,
+    } as FuzzSpec).filter((t) => t.startsWith("batch"));
+  const two = [
+    { fact: 0, atLeast: 1, items: 1, abortOn: false },
+    { fact: 0, atLeast: 1, items: 1, abortOn: true },
+  ];
+
+  it("a case with no batch has none of them; the plainest batch has only batched", () => {
+    expect(triggersOf(null)).toEqual([]);
+    expect(triggersOf(base)).toEqual(["batched"]);
+  });
+
+  it("each trigger is the spec feature its row needs, and no wider", () => {
+    expect(triggersOf({ ...base, handler: "results" })).toEqual([
+      "batched",
+      "batchWithResults",
+    ]);
+    expect(triggersOf({ ...base, handler: "fallback" })).toEqual([
+      "batched",
+      "batchFallback",
+    ]);
+    // Quirk k needs two sources and an abortOn; each alone is its own trigger.
+    expect(triggersOf({ ...base, sources: two })).toEqual([
+      "batched",
+      "batchMixed",
+      "batchAbortOn",
+      "batchSiblings",
+    ]);
+    expect(triggersOf({ ...base, sources: [{ ...one, items: 2 }] })).toEqual([
+      "batched",
+      "batchSiblings",
+    ]);
+    // A failing with-results call: every item (h, (ar)) or every second (i).
+    expect(triggersOf({ ...base, handler: "results", fails: 1 })).toEqual([
+      "batched",
+      "batchWithResults",
+      "batchFails",
+      "batchAllFail",
+    ]);
+    // "some" fails every second item, so one item can never fail: not i.
+    expect(
+      triggersOf({ ...base, handler: "results", failing: "some", fails: 1 }),
+    ).toEqual(["batched", "batchWithResults", "batchFails"]);
+    expect(
+      triggersOf({
+        ...base,
+        handler: "results",
+        failing: "some",
+        fails: 1,
+        sources: [{ ...one, items: 2 }],
+      }),
+    ).toEqual([
+      "batched",
+      "batchWithResults",
+      "batchSiblings",
+      "batchFails",
+      "batchSomeFail",
+    ]);
+    // A thrown batch that fails is not an all-failed with-results batch.
+    expect(triggersOf({ ...base, fails: 1 })).toEqual([
+      "batched",
+      "batchFails",
+    ]);
+    expect(triggersOf({ ...base, retry: 1 })).toEqual([
+      "batched",
+      "batchRetry",
+    ]);
+    expect(triggersOf({ ...base, timeout: 3 })).toEqual([
+      "batched",
+      "batchTimeout",
+    ]);
+  });
+
+  it("each batch class matches the batch's identifiers only, never a single resolver's", () => {
+    const cases: [string, Json, Json][] = [
+      ["batchResolver", "a::rb", "a::r0"],
+      ["batchConstraint", "b1", "c1"],
+      ["batchRequirementType", "AB", "A0"],
+      ["batchRequirementId", 'AB:{"item":"0.1"}', "A0:{}"],
+      ["batchItem", "1.0", "x"],
+      ["batchTag", "a.rb", "a.r0"],
+      ["batchAttemptError", "a.rb 0.1 attempt 2", "a.r0 attempt 2"],
+    ];
+    for (const [name, yes, no] of cases) {
+      expect(LIKE[name]?.(yes), name).toBe(true);
+      expect(LIKE[name]?.(no), name).toBe(false);
+      expect(generalizeValue(yes), name).toEqual({ $like: name });
+    }
+    expect(LIKE.batchAttemptError?.("a.rb attempt 1")).toBe(true);
+    expect(
+      LIKE.batchAttemptError?.('Batch resolver "rb" timed out after 3ms'),
+    ).toBe(true);
+    // A record of the batched resolver generalizes to the batch classes,
+    // its kind and structure kept literal.
+    expect(
+      generalizeValue({
+        k: "hook",
+        hook: "onResolverCancel",
+        args: [
+          "rb",
+          {
+            fromConstraint: "b0",
+            id: 'AB:{"item":"0.0"}',
+            requirement: { item: "0.0", type: "AB" },
+          },
+        ],
+      }),
+    ).toEqual({
+      k: "hook",
+      hook: "onResolverCancel",
+      args: [
+        { $like: "batchResolver" },
+        {
+          fromConstraint: { $like: "batchConstraint" },
+          id: { $like: "batchRequirementId" },
+          requirement: {
+            item: { $like: "batchItem" },
+            type: { $like: "batchRequirementType" },
+          },
+        },
+      ],
+    });
   });
 });
