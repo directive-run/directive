@@ -141,6 +141,7 @@
     "the resolve() fallback's runs ignore a retraction: nothing is canceled and all three complete (U8)": "L7",
     "the resolve() fallback's runs outlive stop(): nothing is canceled and both complete after it (U8)": "L7",
     "the error boundary hears an all-failed with-results item once per attempt (U11)": "L7",
+    "a batch that satisfied A by its own write, with A raised again while it runs: A completes twice, from the old batch and the new run, with no cancel (au)": "L7",
     "history goTo a snapshot id, then replay": "L8",
     "history pause and resume skip snapshots while paused": "L8",
     "onNavigate rerun vs skip on goTo, and onHistoryChange": "L8",
@@ -616,6 +617,10 @@
       "instruments": ["member .inspect"]
     },
     "tests/core/l7-batch-pins-oracle-production.test.ts": {
+      "rule": "L7",
+      "pin": true
+    },
+    "tests/core/l7-batch-gate-debt-oracle.test.ts": {
       "rule": "L7",
       "pin": true
     },
