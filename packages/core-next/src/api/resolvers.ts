@@ -60,7 +60,11 @@
  *   not aborted. It runs to the end, retries included, and reports its
  *   outcome; the requirement can be dispatched again meanwhile.
  *
- * Not here yet: batch resolvers (L7), and binding for them (quirk k).
+ * - Batch resolvers (L7a): the window is the `withBatch` part (batch.ts).
+ *   This file keeps its one seam, in `resolve()`, and the run machinery a
+ *   batch shares: a batch run is a Run that owns `reqs_`, with one row in
+ *   flight per requirement, one stamp, one retry loop and one outcome mark.
+ *   Binding for a mixed batch (quirk k) is L7b.
  */
 
 import isDevelopment from "#is-development";
@@ -94,18 +98,25 @@ export interface ResolverDef {
   requirement: string | ((req: Requirement) => boolean);
   key?: (req: Requirement) => string;
   resolve?: Fn;
-  /** Batching is L7; only their presence is checked (1.35's validation). */
   resolveBatch?: Fn;
   resolveBatchWithResults?: Fn;
   retry?: RetryPolicy;
   timeout?: number;
-  /** Batching is L7: until it is built, a batched resolver is not run. */
-  batch?: { enabled?: boolean };
+  /** Run by the `withBatch` part (batch.ts); without it, not run. */
+  batch?: {
+    enabled?: boolean;
+    windowMs?: number;
+    maxSize?: number;
+    timeoutMs?: number;
+  };
 }
 
 /** One run: a requirement being resolved. Its stamp is its writer id. */
 export interface Run extends Writer {
+  /** A batch run's first requirement. */
   req_: RequirementWithId;
+  /** A batch run's requirements (batch.ts); absent for a single run. */
+  reqs_?: RequirementWithId[];
   resolver_: string;
   controller_: AbortController;
   startedAt_: number;
@@ -147,11 +158,57 @@ export interface ResolversOptions {
   random: () => number;
   /** Emit a record when someone listens (the data is built lazily). */
   emit: (at: string, data: () => Record<string, unknown>) => void;
-  onComplete: (run: Run) => void;
-  onError: (run: Run, error: Error) => void;
+  /** One requirement's outcome: the run's own, or one of a batch's. */
+  onComplete: (run: Run, req: RequirementWithId) => void;
+  onError: (run: Run, req: RequirementWithId, error: Error) => void;
   /** A run left flight on its own (not canceled), after its outcome. */
   onEnd: (run: Run) => void;
   onRequeue: (requirementId: string) => void;
+  /** The batch part's factory (SystemContext `batch_`), if wired. */
+  batch_?: (host: BatchHost) => Batcher;
+}
+
+/** The run machinery the batch part drives (batch.ts). */
+export interface BatchHost {
+  /** A fresh run, stamped and in flight; `reqs` makes it a batch run. */
+  run_(
+    resolverId: string,
+    req: RequirementWithId,
+    reqs?: RequirementWithId[],
+  ): Run;
+  /** A single run, started as `resolve()` starts one. */
+  start_(def: ResolverDef, resolverId: string, req: RequirementWithId): void;
+  /** The retry loop, with `call` in place of `resolve()`. */
+  execute_(
+    def: ResolverDef,
+    run: Run,
+    baseline: ReadonlyMap<string, unknown> | undefined,
+    /** Resolves true to run again at once (R5). */
+    call: (def: ResolverDef, run: Run, context: object) => Promise<unknown>,
+  ): Promise<void>;
+  /** One requirement's outcome. */
+  tell_(run: Run, req: RequirementWithId, error?: Error): void;
+  /** A requirement canceled before it ran. */
+  canceled_(resolver: string, req: RequirementWithId): void;
+  /** A batch run leaves flight: its rows that are still its own go. */
+  leave_(run: Run): boolean;
+}
+
+/** The batch window, as the resolvers use it. */
+export interface Batcher {
+  add_(
+    resolverId: string,
+    def: ResolverDef,
+    req: RequirementWithId,
+    baseline: ReadonlyMap<string, unknown> | undefined,
+  ): void;
+  /**
+   * Cancel the queued requirement `only`, or with none every queued one
+   * (stop()), adding each id to `ids`.
+   */
+  drop_(ids: string[], only?: string): void;
+  /** Some requirement waits in a queue. */
+  queued_(): boolean;
 }
 
 export interface Resolvers {
@@ -167,8 +224,10 @@ export interface Resolvers {
   detached: ReadonlySet<Run>;
   /** Cancel every run in flight; returns the ids of those with no outcome yet. */
   abortAll(): string[];
-  /** The run in flight for a requirement. */
+  /** The run in flight for a requirement (a batch run has one row each). */
   inflight: ReadonlyMap<string, Run>;
+  /** A batched requirement waits in a queue. */
+  queued_(): boolean;
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -263,29 +322,57 @@ export function createResolvers(options: ResolversOptions): Resolvers {
    * Take a run out of flight and abort it. The cancel is its outcome unless
    * it reported one already (1.35 would report the cancel as well).
    */
+  const canceled = (resolver: string, req: RequirementWithId) => {
+    emit("resolver.cancel", () => ({ resolver, req }));
+    emit("requirement.canceled", () => ({ req }));
+  };
+  /** A run's requirements: a batch run's, or its one. */
+  const all = (run: Run) => run.reqs_ ?? [run.req_];
+  /** A run leaves flight: its rows that are still its own go. */
+  const leave = (run: Run) => {
+    detached.delete(run);
+    let left = false;
+    for (const { id } of all(run)) {
+      if (inflight.get(id) === run) {
+        left = inflight.delete(id);
+      }
+    }
+
+    return left;
+  };
   const cancel = (run: Run) => {
-    inflight.delete(run.req_.id);
+    leave(run);
     run.controller_.abort();
     if (!run.done_) {
       run.done_ = true;
-      emit("resolver.cancel", () => ({
-        resolver: run.resolver_,
-        req: run.req_,
-      }));
-      emit("requirement.canceled", () => ({ req: run.req_ }));
+      for (const req of all(run)) {
+        // As 1.35: a running batch's cancel hook gets `{ id }` only; a
+        // superseded one's gets the requirement.
+        canceled(
+          run.resolver_,
+          !run.reqs_ || run.dropped_ ? req : ({ id: req.id } as never),
+        );
+      }
     }
   };
 
+  const tell = (run: Run, req: RequirementWithId, error?: Error) => {
+    if (error) {
+      options.onError(run, req, error);
+    } else {
+      options.onComplete(run, req);
+    }
+  };
   /** Complete or error: the run's one outcome. It leaves flight later. */
   const report = (run: Run, error?: Error) => {
     if (run.done_) {
       return;
     }
+    // Marked first: a stop() from a completion hook cancels nothing more
+    // (row t), so the rest of a batch still completes.
     run.done_ = true;
-    if (error) {
-      options.onError(run, error);
-    } else {
-      options.onComplete(run);
+    for (const req of all(run)) {
+      tell(run, req, error);
     }
   };
 
@@ -383,16 +470,19 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       // listener sees the run unaborted.
       if (++clobbers <= CLOBBER_EMIT_CAP + 1) {
         const capped = clobbers > CLOBBER_EMIT_CAP;
-        emit("resolver.write.rejected", () => ({
-          event: {
-            kind: capped ? "summary" : "rejection",
-            resolver: run.resolver_,
-            req: run.req_,
-            reason: "clobbered",
-            // 1.35 sends its summary at the first report past the cap.
-            ...(capped ? { dropped: 1 } : detail),
-          },
-        }));
+        // A batch reports it for each of its requirements (1.35).
+        for (const req of all(run)) {
+          emit("resolver.write.rejected", () => ({
+            event: {
+              kind: capped ? "summary" : "rejection",
+              resolver: run.resolver_,
+              req,
+              reason: "clobbered",
+              // 1.35 sends its summary at the first report past the cap.
+              ...(capped ? { dropped: 1 } : detail),
+            },
+          }));
+        }
       }
       run.controller_.abort({ kind: "clobbered", ...detail });
 
@@ -437,11 +527,14 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   ): Promise<boolean> {
     const go = await backoff(policy, error, attempt, run.controller_.signal);
     if (go && policy && attempt < policy.attempts) {
-      emit("resolver.retry", () => ({
-        resolver: run.resolver_,
-        req: run.req_,
-        attempt: attempt + 1,
-      }));
+      // A batch tells each of its requirements (1.35's notifyBatchRetry).
+      for (const req of all(run)) {
+        emit("resolver.retry", () => ({
+          resolver: run.resolver_,
+          req,
+          attempt: attempt + 1,
+        }));
+      }
     }
 
     return go;
@@ -452,6 +545,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     def: ResolverDef,
     run: Run,
     baseline: ReadonlyMap<string, unknown> | undefined,
+    call: (
+      def: ResolverDef,
+      run: Run,
+      context: object,
+    ) => Promise<unknown> = invoke,
   ): Promise<void> {
     const policy = def.retry;
     const attempts = policy?.attempts ?? 1;
@@ -500,10 +598,20 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         facts,
         signal: child.signal,
         snapshot: () => facts.$snapshot(),
-        requeue: () => options.onRequeue(run.req_.id),
+        // A batch's requeue asks for every requirement it owns (1.35).
+        requeue: () => {
+          for (const req of all(run)) {
+            options.onRequeue(req.id);
+          }
+        },
       };
       try {
-        await invoke(def, run, context);
+        // R5, as 1.35: a with-results batch whose every item failed runs
+        // again at once (no backoff, onRetry or shouldRetry); it reported
+        // each item's error already (L7b's quirk h changes this).
+        if (await call(def, run, context)) {
+          continue;
+        }
         // Aborted while it ran: that was its one outcome (1.35). For a
         // clobbered run it is no outcome at all; it just leaves flight.
         if (!signal.aborted) {
@@ -547,9 +655,62 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     report(run, last);
   }
 
+  /** A fresh run, stamped and in flight; `reqs` makes it a batch run. */
+  const make = (
+    resolverId: string,
+    req: RequirementWithId,
+    reqs?: RequirementWithId[],
+  ) => {
+    const run: Run = {
+      stamp_: ++stamps,
+      req_: req,
+      reqs_: reqs,
+      resolver_: resolverId,
+      controller_: new AbortController(),
+      startedAt_: clock.now(),
+      satisfied_: false,
+      dropped_: false,
+      detached_: false,
+      attempt_: 0,
+      done_: false,
+    };
+    for (const { id } of all(run)) {
+      inflight.set(id, run);
+    }
+
+    return run;
+  };
+  const start = (
+    def: ResolverDef,
+    resolverId: string,
+    req: RequirementWithId,
+    baseline?: ReadonlyMap<string, unknown>,
+  ) => {
+    const run = make(resolverId, req);
+    emit("resolver.start", () => ({ resolver: resolverId, req }));
+    execute(def, run, baseline).finally(() => {
+      // 1.35 leaves flight here, a microtask after the outcome: a run
+      // canceled or detached meanwhile has left already and asks for no
+      // pass.
+      if (leave(run)) {
+        options.onEnd(run);
+      }
+    });
+  };
+  // The batch part, given the machinery it shares; nothing without it.
+  const batcher = options.batch_?.({
+    run_: make,
+    start_: start,
+    execute_: execute,
+    tell_: tell,
+    canceled_: canceled,
+    leave_: leave,
+  });
+
   return {
     inflight,
     detached,
+    queued_: () => !!batcher?.queued_(),
     resolve(req, baseline) {
       const current = inflight.get(req.id);
       if (current) {
@@ -558,8 +719,25 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         }
         // The requirement came back while the run that satisfied it is
         // still going: a fresh run takes over, the old one's writes drop.
-        current.dropped_ = true;
-        cancel(current);
+        // A batch that owns others goes on without it (1.35's
+        // supersedeSatisfiedBatches) and, as a superseded single run does,
+        // reports a cancel for it, the hook given the requirement (owner
+        // decision (au); 1.35 completes it from both runs). A new list, so
+        // the handler's own stays aligned with its results.
+        const reqs = current.reqs_;
+        if (reqs?.[1]) {
+          inflight.delete(req.id);
+          canceled(
+            current.resolver_,
+            (current.reqs_ = [...reqs]).splice(
+              reqs.findIndex((r) => r.id === req.id),
+              1,
+            )[0]!,
+          );
+        } else {
+          current.dropped_ = true;
+          cancel(current);
+        }
       }
       const resolverId = find(req.requirement);
       if (!resolverId) {
@@ -573,34 +751,13 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       }
       const def = defs[resolverId]!;
       if (def.batch?.enabled) {
-        // L7 builds the batch window; until then the requirement waits
-        // unmet, as it did before L2 (and the ratchet's L7 tests hold).
+        // The seam: the batch part queues it. Without the part (the system
+        // core) the requirement waits unmet.
+        batcher?.add_(resolverId, def, req, baseline);
+
         return;
       }
-      const run: Run = {
-        stamp_: ++stamps,
-        req_: req,
-        resolver_: resolverId,
-        controller_: new AbortController(),
-        startedAt_: clock.now(),
-        satisfied_: false,
-        dropped_: false,
-        detached_: false,
-        attempt_: 0,
-        done_: false,
-      };
-      inflight.set(req.id, run);
-      emit("resolver.start", () => ({ resolver: resolverId, req }));
-      execute(def, run, baseline).finally(() => {
-        // 1.35 leaves flight here, a microtask after the outcome: a run
-        // canceled or detached meanwhile has left already and asks for no
-        // pass.
-        detached.delete(run);
-        if (inflight.get(req.id) === run) {
-          inflight.delete(req.id);
-          options.onEnd(run);
-        }
-      });
+      start(def, resolverId, req, baseline);
     },
     detach(requirementId) {
       const run = inflight.get(requirementId);
@@ -614,15 +771,28 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       const run = inflight.get(requirementId);
       if (run) {
         cancel(run);
+      } else {
+        batcher?.drop_([], requirementId);
       }
     },
     abortAll() {
       const ids: string[] = [];
-      for (const run of [...inflight.values()]) {
+      const runs = [...inflight.values()];
+      const end = (run: Run) => {
         if (!run.done_) {
-          ids.push(run.req_.id);
+          for (const req of all(run)) {
+            ids.push(req.id);
+          }
         }
         cancel(run);
+      };
+      // As 1.35: single runs, then queued requirements, then batch runs.
+      for (const run of runs) {
+        run.reqs_ || end(run);
+      }
+      batcher?.drop_(ids);
+      for (const run of runs) {
+        run.reqs_ && end(run);
       }
 
       return ids;

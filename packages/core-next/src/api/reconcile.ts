@@ -163,31 +163,31 @@ export const withReconcile: SystemPart = (context) => {
     // each draw (as 1.35 does).
     random: rng ?? (() => Math.random()),
     emit,
-    onComplete(run) {
+    batch_: context.batch_,
+    onComplete(run, req) {
       emit("resolver.complete", () => ({
         resolver: run.resolver_,
-        req: run.req_,
+        req,
         duration: clock.now() - run.startedAt_,
       }));
       emit("requirement.met", () => ({
-        req: run.req_,
+        req,
         resolver: run.resolver_,
       }));
       (kernel.features as { errors?: ErrorsFeature }).errors?.clear_(
         run.resolver_,
       );
-      redo.delete(run.req_.id);
-      later.delete(run.req_.id);
-      constraints.markResolved(run.req_);
-      if (!previous.has(run.req_.id)) {
+      redo.delete(req.id);
+      later.delete(req.id);
+      constraints.markResolved(req);
+      if (!previous.has(req.id)) {
         // A satisfied or detached run: its requirement left the set
         // already, so if it is asked again it must resolve again. Its
         // `after` dependents are asked again when it leaves flight (1.35).
-        constraints.forget(run.req_.id);
+        constraints.forget(req.id);
       }
     },
-    onError(run, error) {
-      const req = run.req_;
+    onError(run, req, error) {
       // 1.35 passes the requirement as the error's context. Under "throw"
       // this throws, so nothing below runs (no hook, no module hook).
       const strategy = reportError(
@@ -258,7 +258,10 @@ export const withReconcile: SystemPart = (context) => {
    * it left a requeue or a dirty constraint behind.
    */
   const needsPass = (run: Run) =>
-    !run.satisfied_ || requeued.size > 0 || constraints.hasDirty();
+    !run.satisfied_ ||
+    requeued.size > 0 ||
+    constraints.hasDirty() ||
+    resolvers.queued_();
 
   // --- writer stamps (RFC row 1) -------------------------------------------
   // key → who changed it: one stamp, or several once a second writer comes.
@@ -359,11 +362,12 @@ export const withReconcile: SystemPart = (context) => {
    * the constraint reads makes it an ordinary retraction, canceled.
    */
   function satisfied(
+    req: RequirementWithId,
     run: Run,
     passKeys: ReadonlySet<string>,
     joint: ReadonlySet<number>,
   ): boolean {
-    const read = constraints.depsOf(run.req_.fromConstraint);
+    const read = constraints.depsOf(req.fromConstraint);
     if (!read || !joint.has(run.stamp_)) {
       return false;
     }
@@ -396,6 +400,12 @@ export const withReconcile: SystemPart = (context) => {
   }
   /** The run in flight for `id`: until it leaves, even once it reported. */
   const runFor = (id: string) => resolvers.inflight.get(id);
+  /** As 1.35's pass result sees flight: a single run, never a batch. */
+  const solo = (id: string) => {
+    const run = runFor(id);
+
+    return run?.reqs_ ? undefined : run;
+  };
   /** Retract each removed requirement: satisfied runs go on, others cancel. */
   function retract(removed: RequirementWithId[], passKeys: Set<string>) {
     // The runs whose requirements disappeared and that wrote this pass own
@@ -413,7 +423,7 @@ export const withReconcile: SystemPart = (context) => {
       // Looked up first, as 1.35 does: it may report a disabled binding.
       const bound = bindingOf(req);
       const run = runFor(req.id);
-      if (run && joint.size > 0 && satisfied(run, passKeys, joint)) {
+      if (run && joint.size > 0 && satisfied(req, run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
         // stays in flight (stop aborts it, settle waits), is not retried,
         // and is superseded if the requirement comes back. One that has
@@ -548,24 +558,23 @@ export const withReconcile: SystemPart = (context) => {
         schedule();
       }
       const result = {
-        unmet: current.filter((r) => !resolvers.inflight.has(r.id)),
-        inflight: [...resolvers.inflight.values()].map((run) => ({
-          id: run.req_.id,
-          resolverId: run.resolver_,
-          startedAt: run.startedAt_,
-        })),
+        // As 1.35: a batch run is in neither list ((as) is for settle()
+        // and inspect() only).
+        unmet: current.filter((r) => !solo(r.id)),
+        inflight: flight(false),
         completed: [],
         // As 1.35: a canceled run is gone by now, so its resolver is
         // "unknown"; one still listed (satisfied) is named.
         canceled: removed.map((r) => ({
           id: r.id,
-          resolverId: runFor(r.id)?.resolver_ ?? "unknown",
+          resolverId: solo(r.id)?.resolver_ ?? "unknown",
         })),
       };
 
       return result;
     },
-    busy_: () => resolvers.inflight.size > 0,
+    // (as): a running batch is in flight; a queued one is pending (1.35).
+    busy_: () => resolvers.inflight.size > 0 || resolvers.queued_(),
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
     observed_: (into) => constraints.observed_(into),
@@ -594,11 +603,7 @@ export const withReconcile: SystemPart = (context) => {
     },
     inspect_: () => ({
       unmet: [...previous.values()],
-      inflight: [...resolvers.inflight.values()].map((run) => ({
-        id: run.req_.id,
-        resolverId: run.resolver_,
-        startedAt: run.startedAt_,
-      })),
+      inflight: flight(true),
       constraints: constraints.states_().map((state) => {
         const def = constraintDefs[state.id] as ConstraintDef & {
           meta?: unknown;
@@ -618,10 +623,7 @@ export const withReconcile: SystemPart = (context) => {
         };
       }),
       resolvers: Object.fromEntries(
-        [...resolvers.inflight.values()].map((run) => [
-          run.req_.id,
-          status(run),
-        ]),
+        [...resolvers.inflight].map(([id, run]) => [id, status(run, id)]),
       ),
     }),
     details_(core) {
@@ -644,17 +646,26 @@ export const withReconcile: SystemPart = (context) => {
     },
   };
   kernel.define("reconcile", feature);
+  /** What is in flight; `all`: with batch runs ((as), inspect()). */
+  const flight = (all: boolean) =>
+    [...resolvers.inflight]
+      .filter(([, run]) => all || !run.reqs_)
+      .map(([id, run]) => ({
+        id,
+        resolverId: run.resolver_,
+        startedAt: run.startedAt_,
+      }));
   /** 1.35's ResolverStatus for a run in flight: pending, then running. */
-  const status = (run: Run): Record<string, unknown> =>
+  const status = (run: Run, id: string): Record<string, unknown> =>
     run.attempt_ === 0
       ? {
           state: "pending",
-          requirementId: run.req_.id,
+          requirementId: id,
           startedAt: run.startedAt_,
         }
       : {
           state: "running",
-          requirementId: run.req_.id,
+          requirementId: id,
           startedAt: run.startedAt_,
           attempt: run.attempt_,
         };
@@ -686,7 +697,7 @@ export const withReconcile: SystemPart = (context) => {
       `├─ Constraint active: ${state?.lastResult ?? "unknown"}`,
       // Outcomes are not kept (1.35 keeps an LRU of them): a requirement
       // not in flight reads "idle".
-      `├─ Resolver status: ${run ? status(run).state : "idle"}`,
+      `├─ Resolver status: ${run ? status(run, requirementId).state : "idle"}`,
     ];
     if (meta?.description) {
       lines.push(`├─ Description: ${meta.description}`);

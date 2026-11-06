@@ -47,6 +47,7 @@ import {
   withTracking,
 } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
+import type { BatchHost, Batcher } from "./resolvers.js";
 import type { SourcesFeature } from "./sources.js";
 import type {
   FactChange,
@@ -166,6 +167,11 @@ export interface SystemContext {
   ): Strategy;
   /** Set by the error boundary part (errors.ts); absent, everything skips. */
   decide_?: Decide;
+  /**
+   * Set by the batch part (batch.ts) when a resolver batches: the resolvers
+   * hand it their run machinery and queue batched requirements with it.
+   */
+  batch_?: (host: BatchHost) => Batcher;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
@@ -479,6 +485,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     plugins?: Tail;
     errors?: ErrorsFeature;
     sources?: SourcesFeature;
+    /** The batch part (batch.ts): run every batch queue now. */
+    batch?: () => void;
   };
   // `effect_` from the start: the effects part sets it on its first run, and
   // a field added then would give every hot tracker read a second shape.
@@ -1563,6 +1571,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       });
     },
     async settle(maxWait = 5000) {
+      // 1.35 runs the batch queues first, and again at each settled change
+      // while it waits.
+      features.batch?.();
       await tick();
       if (isSettled()) {
         return;
@@ -1592,6 +1603,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           );
         });
         const off = system.onSettledChange(() => {
+          features.batch?.();
           queueMicrotask(() => {
             if (!done && isSettled()) {
               finish();

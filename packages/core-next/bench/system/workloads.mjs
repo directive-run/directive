@@ -719,6 +719,78 @@ export const workloads = {
       };
     },
   },
+  // B4 (L7 RFC): one pass raises 100 requirements for one batched resolver,
+  // its window flushes (full at `maxSize`), and the handler writes 100 facts.
+  // One step is one flush.
+  "batch-fanout-100": {
+    op: "1 batch flush (100 requirements, 1 handler call, 100 fact writes)",
+    async: true,
+    async build({ createModule, createSystem, t }) {
+      const facts = { round: t.number() };
+      for (let k = 0; k < 100; k++) {
+        facts[`d${k}`] = t.number();
+      }
+      let calls = 0;
+      let items = 0;
+      const sys = createSystem({
+        module: createModule("fanout", {
+          schema: { facts, requirements: { SET: { k: t.number() } } },
+          init: (f) => {
+            f.round = 0;
+            for (let k = 0; k < 100; k++) {
+              f[`d${k}`] = 0;
+            }
+          },
+          constraints: {
+            fan: {
+              when: (f) => f.d0 !== f.round,
+              require: Array.from({ length: 100 }, (_, k) => ({
+                type: "SET",
+                k,
+              })),
+            },
+          },
+          resolvers: {
+            set: {
+              requirement: "SET",
+              key: (req) => `set-${req.k}`,
+              batch: { enabled: true, windowMs: 50, maxSize: 100 },
+              resolveBatch: async (reqs, ctx) => {
+                calls++;
+                items += reqs.length;
+                const round = ctx.facts.round;
+                for (const req of reqs) {
+                  ctx.facts[`d${req.k}`] = round;
+                }
+              },
+            },
+          },
+        }),
+      });
+      sys.start();
+      await sys.settle();
+      let i = 0;
+
+      return {
+        async step() {
+          sys.facts.round = ++i;
+          await sys.settle();
+          // 1.35's settle() can return while its batch still runs (C6).
+          for (let k = 0; sys.facts.d99 !== i && k < 100; k++) {
+            await Promise.resolve();
+          }
+        },
+        check(steps) {
+          expect("batch-fanout-100", "handler calls", calls, steps);
+          expect("batch-fanout-100", "items", items, 100 * steps);
+          expect("batch-fanout-100", "d99", sys.facts.d99, steps);
+
+          return null;
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // 20 modules (a hub and 19 readers via crossModuleDeps): write the hub,
   // read every other module.
   "multi-module-20": {

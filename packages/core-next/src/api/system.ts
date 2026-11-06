@@ -14,6 +14,7 @@ import type {
   NamespacedSystem,
   SingleModuleSystem,
 } from "../types/index.js";
+import { withBatch } from "./batch.js";
 import {
   type ErrorSource,
   type SystemPart,
@@ -72,6 +73,9 @@ export function createSystem<
   }
   const parts: SystemPart[] = [
     withEffects,
+    // L7a: a resolver's `batch:` option needs no import (A1); before the
+    // resolvers, which take its window from the context.
+    withBatch,
     // L2: constraints -> requirements -> resolvers.
     withReconcile,
     withInspect,
