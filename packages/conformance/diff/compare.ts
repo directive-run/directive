@@ -15,8 +15,10 @@
  *
  * and each stream is aligned with a longest-common-subsequence over those
  * keys (in the console stream, of the longest pairings the one with the
- * most records of identical text, so an unmatched record is the one the
- * other engine did not print). Matched entries are compared field by field; unmatched ones are
+ * most records of identical text, so, when the records both engines print
+ * appear in the same order, an unmatched record is the one the other engine
+ * did not print; when shared records swap order, no order-keeping pairing
+ * can pair them all, and a printed record can be left unmatched). Matched entries are compared field by field; unmatched ones are
  * reported as `missing` (reference only) or `extra` (candidate only). One
  * inserted hook is one difference.
  *
@@ -94,7 +96,11 @@ export interface Difference {
    * names the record the other engine did not print because the console
    * alignment breaks ties by text (`lcs`): of the longest pairings it takes
    * the one that pairs the most records of identical text, so 1.35 printing
-   * [X, Y] and 2.0 [Y] leaves X unpaired, not Y.
+   * [X, Y] and 2.0 [Y] leaves X unpaired, not Y. That holds when the records
+   * both engines print appear in the same relative order. When they swap
+   * (1.35 [X, Y, Z], 2.0 [Y, X]), a printed record is left unpaired, so a
+   * `$text` class must name a wording the other engine never prints, as
+   * row o's `dateWriteByKey` does (2.0 never prints a `::` key).
    */
   raw?: Json;
   /** Trace positions, for context. */

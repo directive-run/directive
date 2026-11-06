@@ -88,7 +88,10 @@ the traces to agree.
   breaks ties by text: of the longest alignments it takes the one that
   pairs the most records of identical wording, so as many records pair as
   by keys alone and a missing or extra warning is the one the other engine
-  did not print (1.35 printing [X, Y] and 2.0 [Y] leaves X missing, not Y).
+  did not print (1.35 printing [X, Y] and 2.0 [Y] leaves X missing, not Y),
+  provided the records both engines print appear in the same order. If
+  they swap order, a printed record can be left unpaired, so a `$text`
+  class should name a wording the other engine never prints.
 - `diff/scenario.ts`: `scenario(name, build, steps)` runs the reference
   twice (the runs must match exactly, incidental parts included, or the
   scenario/recorder is not deterministic — never approvable) and each
