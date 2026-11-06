@@ -292,6 +292,8 @@ Measured with `node scripts/size.mjs --check` in `packages/core-next` on this br
 
 **In plain terms:** every L7 recommendation is approved, so the slices build all five candidates and sign their entries. The plan's 22 KB all-in number is retired.
 
+**Owner decision (au), 2026-11-05, found in the L7a review.** A requirement of a running batch is superseded: the batch [A, B] satisfied A by its own write, and A comes back while the batch still runs. 1.35 completes A twice, once from the old batch and once from its new run, with no cancel. L7a's first build reported nothing for A from the old batch. RFC C5 promised "L2's supersede, per requirement", which for a single run means the old run reports a cancel and the new run completes. Jason chose "Same as single runs (Recommended)". So the old batch reports a cancel for A (the hook gets the whole requirement), and the new run completes it, one outcome per run. Product verdict: better, small change. L7a builds it. The L7 oracle pins 1.35's double completion, and the gate signs the (au) entry.
+
 
 **Questions for Jason.** Seven answers settle L7. The table below them has a product verdict for each, so Jason can bulk-approve.
 
