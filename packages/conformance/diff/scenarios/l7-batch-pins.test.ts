@@ -346,4 +346,68 @@ suite("L7 batch pins", () => {
       { op: "checkpoint", label: "after the retry-later pass" },
     ],
   );
+
+  scenario(
+    "a batch that satisfied A by its own write, with A raised again while it runs: A completes twice, from the old batch and the new run, with no cancel (au)",
+    (ctx) => ({
+      // Two constraints, one LOAD requirement each: A while doneA is false, B
+      // while doneB is false. The batch sets the done flag of every
+      // requirement it gets, at once, and then runs 60 ms more.
+      module: ctx.core.createModule("m", {
+        schema: {
+          facts: { doneA: ctx.core.t.boolean(), doneB: ctx.core.t.boolean() },
+          derivations: {},
+          events: {},
+          requirements: { LOAD: { id: ctx.core.t.string() } },
+        },
+        init: (facts: any) => {
+          facts.doneA = false;
+          facts.doneB = false;
+        },
+        constraints: {
+          a: {
+            when: (facts: any) => !facts.doneA,
+            require: { type: "LOAD", id: "A" },
+          },
+          b: {
+            when: (facts: any) => !facts.doneB,
+            require: { type: "LOAD", id: "B" },
+          },
+        },
+        resolvers: {
+          load: {
+            requirement: "LOAD",
+            batch: { enabled: true, windowMs: 10 },
+            resolveBatch: async (reqs: Ids, context: any) => {
+              const ids = idsOf(reqs);
+              ctx.external(["call", ids, Date.now()]);
+              for (const id of ids) {
+                context.facts[`done${id}`] = true;
+              }
+              await wait(60);
+              ctx.external(["return", ids, Date.now(), context.signal.aborted]);
+            },
+          },
+        },
+      } as any),
+    }),
+    [
+      { op: "start" },
+      { op: "advance", ms: 30 },
+      {
+        op: "checkpoint",
+        label: "the batch [A, B] has satisfied both (30 ms)",
+      },
+      { op: "set", key: "doneA", value: false },
+      { op: "checkpoint", label: "A is raised again (30 ms)" },
+      { op: "advance", ms: 10 },
+      { op: "checkpoint", label: "A's new window (40 ms)" },
+      { op: "advance", ms: 30 },
+      { op: "checkpoint", label: "the old batch returns (70 ms)" },
+      { op: "advance", ms: 30 },
+      { op: "checkpoint", label: "the new run returns (100 ms)" },
+      { op: "advance", ms: 100 },
+      { op: "checkpoint", label: "nothing more (200 ms)" },
+    ],
+  );
 });
