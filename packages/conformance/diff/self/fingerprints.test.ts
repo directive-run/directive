@@ -347,12 +347,24 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     ).unexplained.map((d) => `${d.op} ${d.kind} ${d.path ?? ""}`);
   };
 
+  /** A one-argument console warning. */
+  const warning = (text: string): TraceEntry => ({
+    k: "console",
+    level: "warn",
+    args: [text],
+  });
+  /** The non-JSON warning both engines print for a Date written to `fact`. */
+  const dateWarning = (fact: string) =>
+    warning(
+      `[Directive] Fact "${fact}" assigned a Date instance.\nFacts must be JSON-roundtrippable for reactivity to work correctly.\nDate mutations are not tracked.\nUse .getTime() for timestamps instead.\nSee: https://directive.run/docs/facts#json-rule`,
+    );
+  /** The source-gate warning (P3-F6), which both engines print. */
+  const gateWarning = warning(
+    '[Directive] Module "b" read undeclared property "f0" in a source gate. This module declares crossModuleDeps, so gate facts are namespaced: use "facts.self.f0" for its own fact, or add the module to crossModuleDeps.',
+  );
+
   it("row o's warning is excused only in a case with a namespaced Date write, and only as missing on 2.0", () => {
-    const warn: TraceEntry = {
-      k: "console",
-      level: "warn",
-      args: ['[Directive] Fact "a::when" assigned a Date instance.'],
-    };
+    const warn = dateWarning("a::when");
     const id = "l3-quirk-o-fuzz-console-warn-missing";
     // Control: 1.35's second warning, missing on 2.0, where a Date is
     // written to a namespaced fact.
@@ -367,6 +379,82 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
     expect(left([], [warn], id, ["namespacedDateWrite"])).toEqual([
       "extra warn ",
     ]);
+  });
+
+  it("a console record left unpaired is the one the other engine did not print, so a $text entry for its neighbour does not excuse it", () => {
+    // 1.35 prints [X, Y] and 2.0 prints [Y] (X: the source-gate warning;
+    // Y: row o's Date warning by key). Paired by masked keys alone, 2.0's Y
+    // took X's place and Y was reported missing, so row o's `$text` entry
+    // for Y excused a missing X.
+    const id = "l3-quirk-o-fuzz-console-warn-missing";
+    const reference = [gateWarning, dateWarning("a::when")];
+    const candidate = [dateWarning("a::when")];
+    const step = (records: TraceEntry[]): TraceEntry[] => [
+      { k: "step", i: 0, step: "step 0" },
+      ...records,
+      { k: "async", i: 0 },
+    ];
+    const diffs = compareContract(step(reference), step(candidate), "v2");
+    expect(diffs.map((d) => [d.op, d.raw])).toEqual([
+      ["missing", gateWarning as unknown as Json],
+    ]);
+    expect(left(reference, candidate, id, ["namespacedDateWrite"])).toEqual([
+      "missing warn ",
+    ]);
+    // The same pair in the other order: still X.
+    expect(
+      left([dateWarning("a::when"), gateWarning], candidate, id, [
+        "namespacedDateWrite",
+      ]),
+    ).toEqual(["missing warn "]);
+  });
+
+  it("row o's Date warning 2.0 lacks is excused where other warnings of the step pair around it", () => {
+    const id = "l3-quirk-o-fuzz-console-warn-missing";
+    // As at fuzz seed 24301: 1.35 warns by `a.when` and `a::when`, then the
+    // source gate's warning; 2.0 by `a.when`, then the gate's.
+    expect(
+      left(
+        [dateWarning("a.when"), dateWarning("a::when"), gateWarning],
+        [dateWarning("a.when"), gateWarning],
+        id,
+        ["namespacedDateWrite"],
+      ),
+    ).toEqual([]);
+    // Module b's Date fact, and both modules' at once.
+    expect(
+      left(
+        [
+          dateWarning("a.when"),
+          dateWarning("a::when"),
+          dateWarning("b.when"),
+          dateWarning("b::when"),
+        ],
+        [dateWarning("a.when"), dateWarning("b.when")],
+        id,
+        ["namespacedDateWrite"],
+      ),
+    ).toEqual([]);
+    // The warning by the module-qualified name is not row o's: 2.0 prints it.
+    expect(
+      left([dateWarning("a.when")], [], id, ["namespacedDateWrite"]),
+    ).toEqual(["missing warn "]);
+  });
+
+  it("row o's entry does not excuse a missing source-gate warning, in a namespaced Date case", () => {
+    const id = "l3-quirk-o-fuzz-console-warn-missing";
+    expect(left([gateWarning], [], id, ["namespacedDateWrite"])).toEqual([
+      "missing warn ",
+    ]);
+    // Beside row o's own missing warning, which is still excused.
+    expect(
+      left(
+        [dateWarning("a.when"), dateWarning("a::when"), gateWarning],
+        [dateWarning("a.when")],
+        id,
+        ["namespacedDateWrite"],
+      ),
+    ).toEqual(["missing warn "]);
   });
 
   it("quirk z's timer counts: 2.0 holding fewer timers is excused, more is not", () => {
