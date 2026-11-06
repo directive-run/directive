@@ -126,6 +126,84 @@ export interface ScenarioDef {
    * with `when` covers a difference only in a case that has all of them.
    */
   triggers?: readonly string[];
+  /**
+   * Fuzz cases only (diff/fuzz/model.ts): the batch drain at a `settle`
+   * step. Hand scenarios never set it, so their signed (as) entries keep
+   * pinning 1.35's early `settle()`.
+   */
+  settleDrain?: SettleDrain;
+}
+
+/**
+ * The fuzz harness rule for 1.35's batches at a `settle` step (Jason,
+ * 2026-11-06: "Wait out 1.35's batches (Recommended)"). 1.35's `settle()`
+ * resolves while a batch still runs; 2.0's waits for it (row (as)). So on
+ * the engines in DRAIN_ENGINES only, after `settle()` resolves the harness
+ * keeps advancing the fake clock, one timer at a time, while `busy` says a
+ * batch of the case is still live, and records the `settle` checkpoint
+ * after: both engines are compared at the point their batches have
+ * finished. v2 is never drained, so a 2.0 whose `settle()` resolves early
+ * still checkpoints before its batch ends and differs. A wait past
+ * `boundMs` of fake time, or with busy true and no timer left, fails the
+ * case (`drainProblem`).
+ */
+export interface SettleDrain {
+  /** Why a batch is still live (shown if the drain fails), or false. */
+  busy(ctx: BuildContext, system: AnySystem): string | false;
+  boundMs: number;
+}
+
+/**
+ * The engines with 1.35's `settle()`, which does not wait for a batch: the
+ * reference and the workspace engine (packages/core, the 1.x line). Never
+ * v2, whose `settle()` waiting is what the drain must not stand in for.
+ */
+export const DRAIN_ENGINES: ReadonlySet<string> = new Set(["v1", "local"]);
+
+/** One run's drain: the rule, and what it did. */
+interface DrainRun {
+  rule: SettleDrain;
+  /** `settle` steps after which the drain advanced the clock. */
+  waited: number;
+  problem?: string;
+}
+
+/**
+ * Advance the fake clock while the case's batches are live (`busy`),
+ * bounded by `boundMs` of fake time from the moment `settle()` resolved.
+ */
+async function waitOutBatches(
+  drain: DrainRun,
+  system: AnySystem,
+  ctx: BuildContext,
+  step: number,
+): Promise<void> {
+  const from = Date.now();
+  let jumped = false;
+  for (
+    let why = drain.rule.busy(ctx, system);
+    why !== false;
+    why = drain.rule.busy(ctx, system)
+  ) {
+    if (Date.now() - from > drain.rule.boundMs) {
+      drain.problem ??= `the batch drain at step ${step} passed its bound: ${why}, ${Date.now() - from} ms after settle() resolved (bound ${drain.rule.boundMs} ms)`;
+
+      return;
+    }
+    if (vi.getTimerCount() === 0) {
+      // Nothing left can move the system: done, unless a call still runs.
+      if (why.startsWith("a call ")) {
+        drain.problem ??= `the batch drain at step ${step} stalled: ${why}, and no timer left`;
+      }
+      break;
+    }
+    jumped = true;
+    await vi.advanceTimersToNextTimerAsync();
+    await flushMicrotasks();
+  }
+  if (jumped) {
+    drain.waited++;
+  }
 }
 
 /**
@@ -199,6 +277,12 @@ export interface ScenarioResult {
    * discards such a case as a runaway and counts it).
    */
   runaway: boolean;
+  /**
+   * `settle` steps after which the reference's first run waited out its
+   * batches (`SettleDrain`; Jason, 2026-11-06: "Wait out 1.35's batches
+   * (Recommended)").
+   */
+  drained?: number;
   /**
    * Runs that passed the budget where the reference's first run settled:
    * an engine under test that hangs, or a second reference run that did
@@ -468,6 +552,7 @@ async function apply(
   ctx: BuildContext,
   rec: Recorder,
   snapshots: Map<string, unknown>,
+  drain: { run: DrainRun; at: number } | undefined,
 ): Promise<void> {
   // Values a step hands the engine are copied per run: the engine may keep
   // and mutate what it is given (1.35 lets an effect push into a stored
@@ -494,6 +579,9 @@ async function apply(
       break;
     case "settle":
       await drive(Promise.resolve(system.settle()), rec, "settle");
+      if (drain) {
+        await waitOutBatches(drain.run, system, ctx, drain.at);
+      }
       rec.checkpoint("settle");
       break;
     case "checkpoint":
@@ -552,6 +640,10 @@ export interface BudgetedRun {
    * runaway (its count passes the limit, which the reference's does not).
    */
   pastReferenceAt?: number;
+  /** `settle` steps the batch drain waited after (`SettleDrain`). */
+  drained: number;
+  /** The drain passed its bound or stalled: the case fails. */
+  drainProblem?: string;
 }
 
 /**
@@ -569,6 +661,10 @@ export async function runBudgeted(
   // what the engine prints, goes in before the engine loads.
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
   const budget = installBudget(limit, referenceFired, () => rec.trace.length);
+  const drain: DrainRun | undefined =
+    def.settleDrain && DRAIN_ENGINES.has(engine.name)
+      ? { rule: def.settleDrain, waited: 0 }
+      : undefined;
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -616,6 +712,7 @@ export async function runBudgeted(
         runaway: budget.state.exceeded,
         runawayAt: budget.state.at,
         pastReferenceAt: budget.state.pastAt,
+        drained: 0,
       };
     }
     const snapshots = new Map<string, unknown>();
@@ -623,7 +720,14 @@ export async function runBudgeted(
       rec.push({ k: "step", i, step: describeStep(step) });
       let pending: Promise<void>;
       try {
-        pending = apply(step, system, ctx, rec, snapshots);
+        pending = apply(
+          step,
+          system,
+          ctx,
+          rec,
+          snapshots,
+          drain && { run: drain, at: i },
+        );
       } catch (error) {
         pending = Promise.reject(error);
       }
@@ -671,6 +775,8 @@ export async function runBudgeted(
     runaway: budget.state.exceeded,
     runawayAt: budget.state.at,
     pastReferenceAt: budget.state.pastAt,
+    drained: drain?.waited ?? 0,
+    drainProblem: drain?.problem,
   };
 }
 
@@ -1013,6 +1119,7 @@ export async function runScenario(
       hung: [],
       discarded: [],
       fired: firstRun.fired,
+      drained: firstRun.drained,
       report: `runaway in scenario "${def.name}": the reference (${reference.name}) made more than ${limit} timer callbacks, so the case never settles and is not compared`,
     };
   }
@@ -1027,10 +1134,23 @@ export async function runScenario(
       `reference engine is not deterministic in scenario "${def.name}": its second run made more than ${limit} timer callbacks, the first ${firstRun.fired}`,
     );
   }
+  for (const [label, run] of [
+    [reference.name, firstRun],
+    [`${reference.name} (second run)`, againRun],
+  ] as const) {
+    if (run.drainProblem) {
+      problems.push(`${label} in scenario "${def.name}": ${run.drainProblem}`);
+    }
+  }
   const runaways = new Map<string, number | undefined>();
   for (const engine of candidates) {
     const run = await runBudgeted(engine, def, limit, firstRun.fired);
     theirs[engine.name] = run.trace;
+    if (run.drainProblem) {
+      problems.push(
+        `${engine.name} in scenario "${def.name}": ${run.drainProblem}`,
+      );
+    }
     if (run.runaway) {
       runaways.set(engine.name, run.pastReferenceAt);
     }
@@ -1145,6 +1265,7 @@ export async function runScenario(
     hung,
     discarded,
     fired: firstRun.fired,
+    drained: firstRun.drained,
     report,
   };
 }
@@ -1230,6 +1351,8 @@ export interface FuzzTally {
   endedSteps: number;
   /** Ended cases that stopped at step 0: nothing after setup was compared. */
   endedAtStep0: number;
+  /** Compared cases where the reference waited out a batch at a settle step. */
+  drained: number;
 }
 
 /** A tally before the first case. */
@@ -1243,6 +1366,7 @@ export function newFuzzTally(): FuzzTally {
     ended: 0,
     endedSteps: 0,
     endedAtStep0: 0,
+    drained: 0,
   };
 }
 
@@ -1271,6 +1395,9 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
     tally.onV2++;
   }
   tally.mostFired = Math.max(tally.mostFired, result.fired);
+  if ((result.drained ?? 0) > 0) {
+    tally.drained++;
+  }
   if (result.ended.length > 0) {
     const step = Math.min(...result.ended.map((e) => e.at.step));
     tally.ended++;

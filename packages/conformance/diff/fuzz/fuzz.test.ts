@@ -155,9 +155,10 @@ describe("differential fuzz", () => {
         }
       }
     } finally {
-      const { ran, runaway, afterStop, onV2, mostFired, ended } = tally;
+      const { ran, runaway, afterStop, onV2, mostFired, ended, drained } =
+        tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       logFuzz(SEED, tally);
     }

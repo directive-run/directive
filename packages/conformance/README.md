@@ -137,6 +137,23 @@ the traces to agree.
   60 cases compared on v2 (`FUZZ_V2_FLOOR`, counted from what each run
   compared) while `current` is not null. The cases across every layer all still
   run, as before.
+  **Batches at a settle step.** Jason, 2026-11-06: "Wait out 1.35's batches
+  (Recommended)". 1.35's `settle()` resolves while a batch still runs, and
+  2.0's waits for it (row (as)). So in the fuzz only, after `settle()`
+  resolves on 1.35's engines (the reference and the workspace engine,
+  `DRAIN_ENGINES`), the harness keeps advancing their fake clock, one timer
+  at a time, until the case's batches have finished, then records the
+  `settle` checkpoint: both engines are compared at the point their batches
+  are done. Finished is read from 1.35's own schedule (`batchDrain` in
+  diff/fuzz/model.ts): no call of the batched handler is still live (not
+  returned, not aborted, not past its timeout), no retry backoff of a failed
+  call is still running, and the system is settled. v2 is never drained, so a
+  2.0 whose `settle()` resolved early still checkpoints before its batch ends
+  and differs (diff/self/settle-drain.test.ts). The wait is bounded by 2.0's
+  own `settle()` limit, 5 s of fake time (`DRAIN_BOUND_MS`): a batch still
+  live past it fails the case, naming what kept it live. Hand scenarios are
+  not drained, and their signed (as) entries still pin 1.35's early
+  `settle()`. The fuzz line counts the cases where the reference waited.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the
