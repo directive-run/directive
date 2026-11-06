@@ -25,7 +25,6 @@
  */
 
 import fc from "fast-check";
-import { vi } from "vitest";
 import { FUZZ_TRIGGERS, type FuzzTrigger } from "../../lib/fuzz.js";
 import {
   type BuildContext,
