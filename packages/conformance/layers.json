@@ -9503,16 +9503,16 @@
           "layer": "L7",
           "by": ["option batch resolver"]
         },
-        "the cancel hook for a batched requirement (U3) > gets only the id for each requirement of a batch that is running": {
+        "the cancel hook for a batched requirement (U3) > cancels the retracted requirement of a batch that is running": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
-        "settle() and inspect() while a batch runs (U7) > settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight": {
+        "settle() and inspect() while a batch runs (U7) > settle() runs the queued batch, and inspect() lists no batch while it is queued": {
           "layer": "L7",
           "by": ["option batch resolver"],
           "pulledDown": ["member .inspect (L9)"]
         },
-        "stop() from a completion hook during a batch's completion loop (U10) > cancels every requirement of the batch, the completed one too, and still completes the rest after": {
+        "stop() from a completion hook during a batch's completion loop (U10) > still completes every requirement of the batch, and the system stops": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },
@@ -9521,7 +9521,7 @@
           "by": ["option batch resolver"],
           "dynamic": true
         },
-        "what a batch's signal carries when it aborts (U14) > an AbortError when a requirement of the running batch is retracted": {
+        "what a batch's signal carries when it aborts (U14) > the batch's write still lands when a requirement of the running batch is retracted": {
           "layer": "L7",
           "by": ["option batch resolver"]
         },

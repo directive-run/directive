@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Black-box pins of 1.35's batch behaviour that no other test states (the L7
 // RFC, "Untested behaviours" U3, U7, U10 and U13 to U16). Each pins what
-// 1.35 does today, including the parts an approved L7 entry will change:
-// (aq) for U3 and (as) for U7. Public API only; a plugin records the
-// resolver hooks in order, each with the fake time it ran at.
+// 1.35 does today. Where an approved L7 row changes that (quirk g and (aq) in
+// U3 and U14, (as) in U7, row t's batch-shaped path in U10), the case keeps
+// only what 1.35 and 2.0 share, and names the row (the L2 and L6 precedent).
+// Public API only; a plugin records the resolver hooks in order, each with
+// the fake time it ran at.
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -131,7 +133,7 @@ describe("the cancel hook for a batched requirement (U3)", () => {
     system.destroy();
   });
 
-  it("gets only the id for each requirement of a batch that is running", async () => {
+  it("cancels the retracted requirement of a batch that is running", async () => {
     const { system, cancelArgs, log } = build({
       batch: { enabled: true, windowMs: 10 },
       resolveBatch: async () => {
@@ -143,23 +145,15 @@ describe("the cancel hook for a batched requirement (U3)", () => {
     system.facts.want = ["a", "c"];
     await advance(200);
 
-    expect(cancelArgs.map((req) => Object.keys(req))).toEqual([
-      ["id"],
-      ["id"],
-      ["id"],
-    ]);
-    expect(cancelArgs.map((req) => req.requirement)).toEqual([
-      undefined,
-      undefined,
-      undefined,
-    ]);
-    expect(log).toEqual(["cancel a @30", "cancel b @30", "cancel c @30"]);
+    // Quirk g and row (aq): 1.35 cancels a, b and c with { id } only, 2.0 cancels b alone with the whole requirement (diff scenario U2).
+    expect(cancelArgs.map((req) => req.id)).toContain("b");
+    expect(log).toContain("cancel b @30");
     system.destroy();
   });
 });
 
 describe("settle() and inspect() while a batch runs (U7)", () => {
-  it("settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight", async () => {
+  it("settle() runs the queued batch, and inspect() lists no batch while it is queued", async () => {
     const { system, log, at } = build({
       batch: { enabled: true, windowMs: 50 },
       resolveBatch: async (reqs: Array<{ id: string }>) => {
@@ -175,25 +169,23 @@ describe("settle() and inspect() while a batch runs (U7)", () => {
     const settled = system.settle().then(() => {
       log.push(`settled @${at()}`);
     });
-    await advance(0);
-    const running = system.inspect();
-    await settled;
     await advance(200);
+    await settled;
 
-    expect(log).toEqual([
+    // Row (as): 1.35's settle() resolves at 0 ms and inspect() lists no running batch, 2.0 waits for the batch and lists the batch, as the diff scenario "a batch window collects requirements into one resolveBatch" records.
+    expect(log.filter((line) => !line.startsWith("settled"))).toEqual([
       "start a @0",
-      "settled @0",
       "end @100",
       "complete a @100",
     ]);
+    expect(log.filter((line) => line.startsWith("settled"))).toHaveLength(1);
     expect(queued.inflight).toEqual([]);
-    expect(running.inflight).toEqual([]);
     system.destroy();
   });
 });
 
 describe("stop() from a completion hook during a batch's completion loop (U10)", () => {
-  it("cancels every requirement of the batch, the completed one too, and still completes the rest after", async () => {
+  it("still completes every requirement of the batch, and the system stops", async () => {
     let stopped = false;
     const { system, log } = build(
       {
@@ -212,11 +204,9 @@ describe("stop() from a completion hook during a batch's completion loop (U10)",
     system.facts.want = ["a", "b", "c"];
     await advance(100);
 
-    expect(log).toEqual([
+    // Row t's batch-shaped path (L7 RFC B-4): 1.35 also cancels a, b and c after a's completion, 2.0 reports the completions only (core-next l7a-batch "composes with a stop() inside the completion loop (row t) …").
+    expect(log.filter((line) => line.startsWith("complete"))).toEqual([
       "complete a @10",
-      "cancel a @10",
-      "cancel b @10",
-      "cancel c @10",
       "complete b @10",
       "complete c @10",
     ]);
@@ -282,7 +272,7 @@ describe("what a batch's signal carries when it aborts (U14)", () => {
     name: (signal.reason as { name?: unknown } | undefined)?.name,
   });
 
-  it("an AbortError when a requirement of the running batch is retracted", async () => {
+  it("the batch's write still lands when a requirement of the running batch is retracted", async () => {
     const h = waiting();
     const { system } = build({
       batch: { enabled: true, windowMs: 10 },
@@ -293,11 +283,9 @@ describe("what a batch's signal carries when it aborts (U14)", () => {
     system.facts.want = ["a"];
     await advance(100);
 
-    expect(h.signals.map(reasonOf)).toEqual([
-      { aborted: true, name: "AbortError" },
-    ]);
-    expect(h.abortedAfter).toEqual([20]);
-    // The aborted batch's write still lands: nothing binds it.
+    // Quirk g: 1.35 aborts the batch's signal with an AbortError 20 ms in, 2.0 cancels b alone and leaves the signal clean (diff scenario U2).
+    expect(h.signals).toHaveLength(1);
+    // The batch's write lands: nothing binds it.
     expect(system.facts.status).toBe("from-batch");
     system.destroy();
   });
