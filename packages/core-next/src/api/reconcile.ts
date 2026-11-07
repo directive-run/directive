@@ -573,8 +573,9 @@ export const withReconcile: SystemPart = (context) => {
 
       return result;
     },
-    // (as): a running batch is in flight; a queued one is pending (1.35).
-    busy_: () => resolvers.inflight.size > 0 || resolvers.queued_(),
+    // (as): a running batch is in flight, and one whose end is due; a
+    // queued one is pending (1.35).
+    busy_: () => resolvers.inflight.size > 0 || resolvers.queued_(true),
     start_: () => constraints.markAllDirty(),
     dirty_: (id) => constraints.markDirty(id),
     observed_: (into) => constraints.observed_(into),
