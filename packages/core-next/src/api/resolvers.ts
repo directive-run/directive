@@ -213,8 +213,8 @@ export interface Batcher {
    * (stop()), adding each id to `ids`.
    */
   drop_(ids: string[], only?: string): void;
-  /** Some requirement waits in a queue. */
-  queued_(): boolean;
+  /** Some requirement waits in a queue; `busy`: or a batch's end is due. */
+  queued_(busy?: boolean): boolean;
 }
 
 export interface Resolvers {
@@ -232,8 +232,8 @@ export interface Resolvers {
   abortAll(): string[];
   /** The run in flight for a requirement (a batch run has one row each). */
   inflight: ReadonlyMap<string, Run>;
-  /** A batched requirement waits in a queue. */
-  queued_(): boolean;
+  /** A batched requirement waits in a queue (see Batcher). */
+  queued_(busy?: boolean): boolean;
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -728,7 +728,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   return {
     inflight,
     detached,
-    queued_: () => !!batcher?.queued_(),
+    queued_: (busy) => !!batcher?.queued_(busy),
     resolve(req, baseline) {
       const current = inflight.get(req.id);
       if (current) {
