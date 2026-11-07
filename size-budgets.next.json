@@ -6,24 +6,24 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 29858,
-      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 29,855 B, +1,172 B over the pre-L7 28,683 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 3 B, at or under the cap 29,858 B."
+      "gzBudget": 29893,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the batch-retry fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", then for the fixes (a batch queue holds a requirement once; settle() waits through the gap before a re-dispatch) \"Approve +1,210 B (Recommended)\". Measured 29,891 B, +1,208 B over the pre-L7 28,683 B. Budget = measured + 2 B, at or under the cap 29,893 B."
     },
     "two-module": {
-      "gzBudget": 29946,
-      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 29,942 B, +1,171 B over the pre-L7 28,771 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 4 B, at or under the cap 29,946 B."
+      "gzBudget": 29981,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the batch-retry fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", then for the fixes (a batch queue holds a requirement once; settle() waits through the gap before a re-dispatch) \"Approve +1,210 B (Recommended)\". Measured 29,980 B, +1,209 B over the pre-L7 28,771 B. Budget = measured + 1 B, at or under the cap 29,981 B."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B. L7a adds the batch seam only: measured 10,446 B, +7 B over 10,439 B (A1 allows +20 B); budget kept."
     },
     "aperture": {
-      "gzBudget": 34752,
-      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 34,748 B, +1,171 B over the pre-L7 33,577 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 4 B, at or under the cap 34,752 B."
+      "gzBudget": 34787,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the batch-retry fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", then for the fixes (a batch queue holds a requirement once; settle() waits through the gap before a re-dispatch) \"Approve +1,210 B (Recommended)\". Measured 34,786 B, +1,209 B over the pre-L7 33,577 B. Budget = measured + 1 B, at or under the cap 34,787 B."
     },
     "full-entry": {
-      "gzBudget": 32118,
-      "reason": "L7 (batch resolvers, L7a + L7b): owner-approved 2026-11-05, A1 \"Approve up to +1.1 KB (Recommended)\" raised for L7b's approved quirk fixes to +1,175 B: \"Approve +1,175 B (Recommended)\". Measured 32,098 B, +1,153 B over the pre-L7 30,945 B (L7a's withBatch part and seam, then L7b's quirks g, h, i, k, (aq) and (ar), about +83 B; quirk i's failed-item split is about 110 B of it). Budget = measured + 20 B, at or under the cap 32,120 B."
+      "gzBudget": 32154,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the batch-retry fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", then for the fixes (a batch queue holds a requirement once; settle() waits through the gap before a re-dispatch) \"Approve +1,210 B (Recommended)\". Measured 32,134 B, +1,189 B over the pre-L7 30,945 B. Budget = measured + 20 B, at or under the cap 32,155 B."
     }
   }
 }
