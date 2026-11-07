@@ -166,6 +166,8 @@ interface DrainRun {
   /** `settle` steps after which the drain advanced the clock. */
   waited: number;
   problem?: string;
+  /** The drain passed `boundMs` (not a stall): the batches outlived it. */
+  pastBound?: boolean;
 }
 
 /**
@@ -187,6 +189,7 @@ async function waitOutBatches(
   ) {
     if (Date.now() - from > drain.rule.boundMs) {
       drain.problem ??= `the batch drain at step ${step} passed its bound: ${why}, ${Date.now() - from} ms after settle() resolved (bound ${drain.rule.boundMs} ms)`;
+      drain.pastBound = true;
 
       return;
     }
@@ -283,6 +286,17 @@ export interface ScenarioResult {
    * (Recommended)").
    */
   drained?: number;
+  /**
+   * The reference's first run waited out its batches at a settle step past
+   * the drain's bound (`SettleDrain.boundMs`): 1.35's batches never settle
+   * (a "retry" boundary re-dispatching a batch whose errors 1.35 records
+   * after its run ends, or a fallback batch nothing cancels), so nothing is
+   * compared (`ok` is false). The fuzzer discards such a case, like a
+   * reference runaway, but counts it on its own, never toward the runaway
+   * limit, and fails a seed with more than MAX_NEVER_SETTLES of them
+   * (lib/fuzz.ts; Jason, 2026-11-07: "Discard, own count (Recommended)").
+   */
+  neverSettles?: boolean;
   /**
    * Runs that passed the budget where the reference's first run settled:
    * an engine under test that hangs, or a second reference run that did
@@ -642,8 +656,17 @@ export interface BudgetedRun {
   pastReferenceAt?: number;
   /** `settle` steps the batch drain waited after (`SettleDrain`). */
   drained: number;
-  /** The drain passed its bound or stalled: the case fails. */
+  /**
+   * The drain passed its bound or stalled: the case fails, except on the
+   * reference's first run past its bound (`drainPastBound`).
+   */
   drainProblem?: string;
+  /**
+   * The drain passed its bound (not a stall): 1.35's batches outlived it.
+   * On the reference's first run the case never settles on 1.35 and is
+   * discarded (`ScenarioResult.neverSettles`).
+   */
+  drainPastBound?: boolean;
 }
 
 /**
@@ -777,6 +800,7 @@ export async function runBudgeted(
     pastReferenceAt: budget.state.pastAt,
     drained: drain?.waited ?? 0,
     drainProblem: drain?.problem,
+    drainPastBound: drain?.pastBound ?? false,
   };
 }
 
@@ -1123,6 +1147,28 @@ export async function runScenario(
       report: `runaway in scenario "${def.name}": the reference (${reference.name}) made more than ${limit} timer callbacks, so the case never settles and is not compared`,
     };
   }
+  if (firstRun.drainPastBound) {
+    // Nothing to compare: the reference's batches never settle (Jason, 2026-11-07: "Discard, own count (Recommended)").
+    return {
+      name: def.name,
+      ok: false,
+      nondeterministic: [],
+      differences: [],
+      unexplained: [],
+      advisories: [],
+      used: [],
+      ended: [],
+      compared: [],
+      traces: { reference: first, candidate: [] },
+      runaway: false,
+      neverSettles: true,
+      hung: [],
+      discarded: [],
+      fired: firstRun.fired,
+      drained: firstRun.drained,
+      report: `never settles in scenario "${def.name}": on the reference (${reference.name}) ${firstRun.drainProblem}, so the case is discarded, not compared`,
+    };
+  }
   const againRun = await runBudgeted(reference, def, limit);
   const again = againRun.trace;
   const theirs: Record<string, TraceEntry[]> = {};
@@ -1353,6 +1399,12 @@ export interface FuzzTally {
   endedAtStep0: number;
   /** Compared cases where the reference waited out a batch at a settle step. */
   drained: number;
+  /**
+   * Discarded cases whose reference's batches outlived the drain's bound
+   * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
+   * own (MAX_NEVER_SETTLES; Jason, 2026-11-07: "Discard, own count (Recommended)").
+   */
+  neverSettles: number;
 }
 
 /** A tally before the first case. */
@@ -1367,6 +1419,7 @@ export function newFuzzTally(): FuzzTally {
     endedSteps: 0,
     endedAtStep0: 0,
     drained: 0,
+    neverSettles: 0,
   };
 }
 
@@ -1380,6 +1433,12 @@ export function newFuzzTally(): FuzzTally {
  */
 export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   tally.ran++;
+  if (result.neverSettles) {
+    // Discarded, on its own count, never toward the runaway limit.
+    tally.neverSettles++;
+
+    return;
+  }
   if (result.runaway) {
     tally.runaway++;
 
@@ -1419,9 +1478,10 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
   logLines("fuzz.jsonl", [
     JSON.stringify({
       seed,
-      runs: tally.ran - tally.runaway,
+      runs: tally.ran - tally.runaway - tally.neverSettles,
       runaway: tally.runaway,
       runawayAfterStop: tally.afterStop,
+      neverSettles: tally.neverSettles,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,

@@ -151,9 +151,20 @@ the traces to agree.
   2.0 whose `settle()` resolved early still checkpoints before its batch ends
   and differs (diff/self/settle-drain.test.ts). The wait is bounded by 2.0's
   own `settle()` limit, 5 s of fake time (`DRAIN_BOUND_MS`): a batch still
-  live past it fails the case, naming what kept it live. Hand scenarios are
+  live past it on the workspace engine, or on the reference's second run,
+  fails the case, naming what kept it live. Hand scenarios are
   not drained, and their signed (as) entries still pin 1.35's early
   `settle()`. The fuzz line counts the cases where the reference waited.
+  **A reference that never settles.** Jason, 2026-11-07: "Discard, own count
+  (Recommended)". When the reference's own batches are still live past the
+  bound on its first run, the case never settles on 1.35: it records a
+  batch's errors after its run ends, so a "retry" boundary re-dispatches the
+  batch forever, and a fallback batch has nothing that cancels it. 2.0 is
+  bounded there by approved rows (quirk a, (at)). Such a case is discarded
+  like a reference runaway (`ScenarioResult.neverSettles`), but counted on
+  its own census line, never toward the runaway limit, and more than 3 per
+  seed (`MAX_NEVER_SETTLES`, lib/fuzz.ts) fail the run, in the fuzz test and
+  in the census (diff/self/settle-drain.test.ts).
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the

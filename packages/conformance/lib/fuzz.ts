@@ -37,6 +37,15 @@ export function maxRunaways(cases: number): number {
 }
 
 /**
+ * Most cases per seed the fuzzer discards because the reference's batches
+ * never settle: 1.35's batches still live past the drain's bound at a settle
+ * step (diff/scenario.ts `ScenarioResult.neverSettles`). Jason, 2026-11-07: "Discard, own count (Recommended)".
+ * They are counted on their own line, never toward `maxRunaways`; one more
+ * fails the run (the fuzz test and the census).
+ */
+export const MAX_NEVER_SETTLES = 3;
+
+/**
  * The trigger names a fuzz divergence's `when` may list (diff/divergences.json;
  * README "Divergences"). Each fuzz case computes the set it has from its spec
  * (diff/fuzz/model.ts `specTriggers`, where each one is defined); an entry

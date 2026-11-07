@@ -37,6 +37,12 @@
  * (Jason, 2026-11-02: "Discard after the stop"; diff/scenario.ts
  * `stopsBefore`).
  *
+ * A case whose reference's batches are still live past the batch drain's
+ * bound at a settle step never settles on 1.35 either (diff/scenario.ts
+ * `neverSettles`): it is discarded too, but on its own count, never toward
+ * the runaway limit, and more than MAX_NEVER_SETTLES (3) per seed fail the
+ * run (Jason, 2026-11-07: "Discard, own count (Recommended)").
+ *
  * A case an `ends` divergence stops (diff/scenario.ts `explain`: an approved
  * quirk whose consequences cascade) is compared up to that difference, and
  * counts as compared like any other (`tallyCase`).
@@ -53,6 +59,7 @@ import {
   FUZZ_DEFAULT_RUNS,
   FUZZ_FLOOR,
   FUZZ_V2_FLOOR,
+  MAX_NEVER_SETTLES,
   maxRunaways,
   v2Cases,
 } from "../../lib/fuzz.js";
@@ -130,7 +137,7 @@ describe("differential fuzz", () => {
             fc.asyncProperty(phase.arbitrary, async (spec) => {
               const result = await runScenario(toScenario(spec));
               tallyCase(tally, result);
-              if (result.runaway) {
+              if (result.runaway || result.neverSettles) {
                 return;
               }
               logResult(result);
@@ -155,10 +162,21 @@ describe("differential fuzz", () => {
         }
       }
     } finally {
-      const { ran, runaway, afterStop, onV2, mostFired, ended, drained } =
-        tally;
+      const {
+        ran,
+        runaway,
+        afterStop,
+        onV2,
+        mostFired,
+        ended,
+        drained,
+        neverSettles,
+      } = tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${ran - runaway} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+      );
+      console.info(
+        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches outlived the drain's bound at a settle step; at most ${MAX_NEVER_SETTLES} per seed, not counted as runaways)`,
       );
       logFuzz(SEED, tally);
     }
@@ -166,6 +184,10 @@ describe("differential fuzz", () => {
       tally.runaway,
       `too many runaway cases (limit max(1% of ${tally.ran}, 2))`,
     ).toBeLessThanOrEqual(maxRunaways(tally.ran));
+    expect(
+      tally.neverSettles,
+      `too many cases whose reference never settles (limit ${MAX_NEVER_SETTLES} per seed; Jason, 2026-11-07: "Discard, own count (Recommended)")`,
+    ).toBeLessThanOrEqual(MAX_NEVER_SETTLES);
     if (current !== null) {
       expect(
         tally.onV2,

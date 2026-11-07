@@ -34,6 +34,7 @@ import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
   FUZZ_TRIGGERS,
+  MAX_NEVER_SETTLES,
   FUZZ_V2_FLOOR as V2_FLOOR,
   maxRunaways,
 } from "./fuzz.js";
@@ -1457,6 +1458,11 @@ export interface FuzzRun {
    * stop (diff/scenario.ts `tallyCase`; Jason, 2026-11-02).
    */
   runawayAfterStop?: number;
+  /**
+   * Discarded cases whose reference never settles (its batches outlived the
+   * drain's bound; diff/scenario.ts `neverSettles`), not in `runaway`.
+   */
+  neverSettles?: number;
   v2?: number;
   /** Compared cases an `ends` divergence stopped. */
   ended?: number;
@@ -1490,6 +1496,15 @@ export function describeFuzzRun(r: FuzzRun): string {
   return `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too, ${ended} ended early by an \`ends\` divergence${where}${discarded}`;
 }
 
+/**
+ * The census's own line for the cases discarded because the reference never
+ * settles (Jason, 2026-11-07: "Discard, own count (Recommended)"): how many
+ * per seed, against MAX_NEVER_SETTLES. Never part of the runaway count.
+ */
+export function describeNeverSettles(runs: FuzzRun[]): string {
+  return `discarded because 1.35's batches never settle (outlived the drain's bound at a settle step; at most ${MAX_NEVER_SETTLES} per seed, not counted as runaways): ${runs.map((r) => `seed ${r.seed}: ${r.neverSettles ?? 0}`).join("; ")}`;
+}
+
 export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {
   if (runs.length === 0) {
     return ["conformance:diff: the fuzzer reported no runs"];
@@ -1503,10 +1518,16 @@ export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {
       );
     }
     const runaway = r.runaway ?? 0;
-    const cap = maxRunaways(r.runs + runaway);
+    const neverSettles = r.neverSettles ?? 0;
+    const cap = maxRunaways(r.runs + runaway + neverSettles);
     if (runaway > cap) {
       out.push(
         `conformance:diff: ${runaway} runaway fuzz cases (seed ${r.seed}); at most ${cap} allowed (max(1% of cases, 2))`,
+      );
+    }
+    if (neverSettles > MAX_NEVER_SETTLES) {
+      out.push(
+        `conformance:diff: ${neverSettles} fuzz cases whose reference never settles (seed ${r.seed}); at most ${MAX_NEVER_SETTLES} allowed (Jason, 2026-11-07: "Discard, own count (Recommended)")`,
       );
     }
     if (v2Expected && !(r.v2 !== undefined && r.v2 >= FUZZ_V2_FLOOR)) {
