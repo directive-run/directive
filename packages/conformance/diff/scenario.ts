@@ -160,6 +160,15 @@ export interface SettleDrain {
  */
 export const DRAIN_ENGINES: ReadonlySet<string> = new Set(["v1", "local"]);
 
+/**
+ * Whether the drain applies to `engine`: those in DRAIN_ENGINES, and a
+ * faulted copy of the workspace engine (`local+<fault>`, diff/self/faults.ts),
+ * which is the 1.x line too. Never v2.
+ */
+export function drains(engine: { name: string }): boolean {
+  return DRAIN_ENGINES.has(engine.name) || engine.name.startsWith("local+");
+}
+
 /** One run's drain: the rule, and what it did. */
 interface DrainRun {
   rule: SettleDrain;
@@ -685,7 +694,7 @@ export async function runBudgeted(
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
   const budget = installBudget(limit, referenceFired, () => rec.trace.length);
   const drain: DrainRun | undefined =
-    def.settleDrain && DRAIN_ENGINES.has(engine.name)
+    def.settleDrain && drains(engine)
       ? { rule: def.settleDrain, waited: 0 }
       : undefined;
   const random = vi

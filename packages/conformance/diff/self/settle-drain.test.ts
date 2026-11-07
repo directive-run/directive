@@ -26,6 +26,7 @@ import {
   DRAIN_ENGINES,
   type FuzzTally,
   type ScenarioResult,
+  drains,
   newFuzzTally,
   runScenario,
   tallyCase,
@@ -123,6 +124,9 @@ describe("the fuzz batch drain at a settle step", () => {
 
   it("a 2.0 whose settle() resolves early still differs: v2 is never drained", async () => {
     expect(DRAIN_ENGINES.has("v2")).toBe(false);
+    expect([drains({ name: "v2" }), drains({ name: "local+control" })]).toEqual(
+      [false, true],
+    );
     const early = settlesEarly(v2);
     expect(early.name).toBe("v2");
     const result = await runScenario(toScenario(spec), {
