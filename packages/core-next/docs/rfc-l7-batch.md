@@ -298,6 +298,15 @@ Measured with `node scripts/size.mjs --check` in `packages/core-next` on this br
 
 **Owner decision, Phase 4, 2026-11-05.** Asked how Phase 4 continues after the L7 gate, Jason chose "Re-plan first (Recommended)". A short re-plan comes to him before L8 starts: feature imports before L8 to L12, lighter checks for the opt-in layers, and a Sizls app on 2.0 sooner.
 
+**Owner decisions from the L7 gate's fuzz, 2026-11-06 and 2026-11-07.**
+
+| Question | Jason's answer | What it settles |
+|---|---|---|
+| (as) in the fuzz | "Wait out 1.35's batches (Recommended)" | At a settle step the harness advances 1.35's clock until its batches finish. |
+| A 1.35 run that never settles | "Discard, own count (Recommended)" | The case is discarded like a 1.35 runaway, with its own census line, capped at 3 per seed. |
+| Size of the batch-retry fixes | "Approve +1,210 B (Recommended)" | L7 may grow each fixture by up to 1,210 B over pre-L7: `minimal` at most 29,893 B. |
+| (av) a queued batched requirement, retracted and raised again | "Approve: once (Recommended)" | 2.0 puts it in the batch call once and completes it once. 1.35 puts it in twice and completes it twice. Product verdict: better. |
+
 
 **Questions for Jason.** Seven answers settle L7. The table below them has a product verdict for each, so Jason can bulk-approve.
 
