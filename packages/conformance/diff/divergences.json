@@ -27507,5 +27507,116 @@
     "reason": "Row (ap) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): a batch window starts at the first add to an empty queue and is not moved, so a batch runs at most windowMs after its first requirement. 1.35 restarts the timer on every add (resolvers.ts 1899-1903; L7 RFC W2, probes B1 and B1b), so requirements raised closer together than windowMs wait until the adds stop, in one call. In this scenario (U1) adds 40 ms apart with a 50 ms window: on 2.0 the window started by the first add flushes before the last add, so the requirements run in two calls; 1.35 restarts the timer on every add and runs them as one call. This covers the observe \"requirement.met\" record in step 8, which only 1.35 records (2 records). Signed 2026-11-05 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-05"
+  },
+  {
+    "id": "l7-fuzz-av-external-start-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of a batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
+  },
+  {
+    "id": "l7-fuzz-av-external-wrote-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's write record (external \"wrote\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
+  },
+  {
+    "id": "l7-fuzz-av-external-aborted-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's abort record (external \"aborted\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
   }
 ]
