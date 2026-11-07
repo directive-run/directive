@@ -48,8 +48,11 @@ import { withTimeout } from "./timeout.js";
 type Baseline = ReadonlyMap<string, unknown> | undefined;
 
 interface Queue {
-  reqs_: RequirementWithId[];
-  bases_: Baseline[];
+  /**
+   * Each requirement once, by id, with the baseline of its latest add, in
+   * add order: one added again while it waits moves to the end.
+   */
+  reqs_: Map<string, [RequirementWithId, Baseline]>;
   /** The window's timer, 0 when the queue is empty. */
   timer_: number;
 }
@@ -62,6 +65,12 @@ export const withBatch: SystemPart = (context) => {
   }
   const { clock } = kernel;
   const queues = new Map<string, Queue>();
+  /**
+   * Batch runs out of flight whose end has not yet asked for its pass:
+   * settle() waits for them, so the pass a "retry" boundary owes still runs
+   * before it returns ((as)).
+   */
+  let ending = 0;
   let host: BatchHost;
   // settle() runs every queue at its start, and again at each settled
   // change while it waits (1.35's processBatches).
@@ -153,16 +162,17 @@ export const withBatch: SystemPart = (context) => {
   const take = (id: string) => {
     const queue = queues.get(id);
     clock.clearTimeout(queue?.timer_ as number);
-    queues.set(id, { reqs_: [], bases_: [], timer_: 0 });
+    queues.set(id, { reqs_: new Map(), timer_: 0 });
 
     return queue!;
   };
 
   function flush(id: string) {
-    if (queues.get(id)!.reqs_.length === 0) {
+    if (queues.get(id)!.reqs_.size === 0) {
       return;
     }
-    const { reqs_: reqs, bases_: bases } = take(id);
+    const queued = [...take(id).reqs_.values()];
+    const reqs = queued.map(([req]) => req);
     const def = defs[id]!;
     if (!def.resolveBatch && !def.resolveBatchWithResults) {
       // (at): each one an ordinary single run, as 1.35 runs it unbound.
@@ -173,8 +183,8 @@ export const withBatch: SystemPart = (context) => {
       return;
     }
     // W5: each key's last baseline; a mixed batch's span its passes (k).
-    const baseline = bases.reduce<Baseline>(
-      (all, base) => (base && new Map([...(all ?? []), ...base])) || all,
+    const baseline = queued.reduce<Baseline>(
+      (all, [, base]) => (base && new Map([...(all ?? []), ...base])) || all,
       undefined,
     );
     const run = host.run_(id, reqs[0]!, reqs);
@@ -187,8 +197,10 @@ export const withBatch: SystemPart = (context) => {
         await host.execute_(def, run, baseline, call);
       } finally {
         host.leave_(run);
+        ending++;
       }
     })().finally(() => {
+      ending--;
       context.settled();
       context.schedule();
     });
@@ -199,16 +211,19 @@ export const withBatch: SystemPart = (context) => {
       if (!queues.has(id)) {
         take(id);
       }
+      // A requirement is in a call at most once: one added again while it
+      // waits (the "retry" boundary's pass and quirk a's requeue, or a bound
+      // one retracted and raised) moves to the end, with its new baseline.
+      queues.get(id)!.reqs_.delete(req.id);
       // 1.35's defaults, read at each add.
       const { windowMs, maxSize } = { windowMs: 50, ...def.batch };
-      if (queues.get(id)!.reqs_.length >= (maxSize || 10_000)) {
+      if (queues.get(id)!.reqs_.size >= (maxSize || 10_000)) {
         flush(id);
       }
       // A flush leaves a fresh queue in its place.
       const queue = queues.get(id)!;
-      queue.reqs_.push(req);
-      queue.bases_.push(baseline);
-      if (maxSize && queue.reqs_.length >= maxSize) {
+      queue.reqs_.set(req.id, [req, baseline]);
+      if (maxSize && queue.reqs_.size >= maxSize) {
         flush(id);
       } else {
         // (ap): from the first add to an empty queue, not moved by later ones.
@@ -219,25 +234,23 @@ export const withBatch: SystemPart = (context) => {
       }
     },
     drop_(ids, only) {
-      for (const [id, { reqs_: reqs, bases_: bases }] of queues) {
-        for (let i = 0; i < reqs.length; ) {
-          const req = reqs[i]!;
-          if (only && req.id !== only) {
-            i++;
-          } else {
-            reqs.splice(i, 1);
-            bases.splice(i, 1);
-            ids.push(req.id);
+      for (const [id, { reqs_: reqs }] of queues) {
+        for (const [key, [req]] of reqs) {
+          if (!only || key === only) {
+            reqs.delete(key);
+            ids.push(key);
             host.canceled_(id, req);
           }
         }
         // An empty queue keeps no timer: the next add opens a window.
-        if (reqs.length === 0) {
+        if (reqs.size === 0) {
           take(id);
         }
       }
     },
-    queued_: () => [...queues.values()].some((queue) => queue.reqs_.length > 0),
+    queued_: (busy) =>
+      (busy && ending > 0) ||
+      [...queues.values()].some((queue) => queue.reqs_.size > 0),
   };
   context.batch_ = (given) => {
     host = given;
