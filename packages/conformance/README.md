@@ -152,10 +152,18 @@ the traces to agree.
   time at which neither has a batch still running, and the `settle`
   checkpoint is recorded there, on both at the same fake time. Running is
   read from 1.35's own schedule (`batchDrain` in diff/fuzz/model.ts): a call
-  of the batched handler still live (not returned, not aborted, not past its
-  timeout), a retry backoff of a failed call still running, or the system
-  not settled; on 1.35 that is any batch, on 2.0 a detached run, since its
-  attached ones are what its `settle()` waited for. The engines run one
+  of the batched handler still live (not returned, and not past its
+  timeout, the timer due at it included), a retry backoff of a failed call
+  still running (its end included), or the system not settled; on 1.35 that
+  is any batch, on 2.0 a detached run, since its
+  attached ones are what its `settle()` waited for. A call whose signal a
+  clobber or a retraction aborted still counts while its timeout timer is
+  pending: 1.35's `withTimeout` clears that timer only when the call settles
+  or the timer fires, never on abort, so its timeout still fires (and its
+  run's end still asks a pass); with no timeout, an aborted call is an
+  orphan, as a canceled single run is. That is the coordinator's reading of
+  the rule's "until neither has a batch still running" (2026-11-08, seed
+  19), not a separate owner decision. The engines run one
   after the other, so the common time is found in rounds
   (`nextTargets`, diff/scenario.ts): where the reference and v2 ended a
   settle step's wait at different times, the later becomes that step's

@@ -752,10 +752,14 @@ export const DRAIN_BOUND_MS = 5000;
  * `settle()` has resolved, it reads a batch as live while one of these
  * holds, each 1.35's own schedule (packages/core/src/core/resolvers.ts):
  *
- * - a call of the batched handler has not returned, its signal is not
- *   aborted (a canceled call is an orphan, as a canceled single run is),
- *   and its timeout has not passed (a timer due exactly at it has yet to
- *   run, so the bound is inclusive): 1.35 ends a `resolveBatch` or
+ * - a call of the batched handler has not returned and its timeout has
+ *   not passed (a timer due exactly at it has yet to run, so the bound is
+ *   inclusive), even if its signal was aborted: 1.35 clears a call's
+ *   timeout timer only when the call settles or the timer fires
+ *   (`withTimeout`), so a clobbered or retracted call's timeout still fires
+ *   (the coordinator's reading of "until neither has a batch still
+ *   running", 2026-11-08); with no timeout, an aborted call is an orphan,
+ *   as a canceled single run is. 1.35 ends a `resolveBatch` or
  *   `resolveBatchWithResults` call at `batch.timeoutMs` and never aborts
  *   its signal (row n); the fallback runs each requirement on the single
  *   run path, which reads the resolver's `timeout`, never set here;
@@ -800,7 +804,15 @@ export function batchDrain(b: FuzzBatch): SettleDrain {
       const aborted = call.signal?.aborted === true;
       // Inclusive: the timer due at `timedOutAt` (or at the backoff's end)
       // is still the batch's own, and the wait stops only once it has run.
-      if (call.end === undefined && !aborted && now <= timedOutAt) {
+      // An aborted call (a clobber or a retraction aborted its signal) is
+      // still live while its timeout timer is pending: 1.35's `withTimeout`
+      // clears that timer only when the call settles or the timer fires,
+      // never on abort. With no timeout, an aborted call is an orphan.
+      if (
+        call.end === undefined &&
+        (!aborted || Number.isFinite(timedOutAt)) &&
+        now <= timedOutAt
+      ) {
         return `a call of the batched handler (attempt ${call.attempt}, started at ${call.start} ms) is live`;
       }
       const failedAt =

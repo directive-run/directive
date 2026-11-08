@@ -104,8 +104,21 @@ const SEED_12: FuzzSpec = JSON.parse(
   '{"modules": [{"facts": 1, "date": true, "derivations": [{"facts": [0], "derived": [], "threshold": null, "throwsAt": 7}], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 2, "crossAtLeast": null, "priority": 1, "writes": 0, "value": 5, "delay": 1, "fails": 0, "retry": 0, "timeout": 3}, {"fact": 0, "atLeast": 2, "crossAtLeast": null, "priority": 1, "writes": 0, "value": -1, "delay": 5, "fails": 1, "retry": 0, "timeout": 3}], "effects": [{"reads": [0], "explicitDeps": false, "cleanup": true, "throwsAt": 4}], "source": null}], "boundary": "skip", "history": false, "trace": false, "steps": [{"op": "settle"}, {"op": "settle"}, {"op": "set", "module": 0, "fact": 595195548, "value": 5}, {"op": "publish", "event": "unknown", "value": 3}, {"op": "set", "module": 0, "fact": 2106050436, "value": 4}, {"op": "dispatch", "module": 0, "event": 133779519, "value": 0}, {"op": "dispatch", "module": 0, "event": 1504678319, "value": 3}, {"op": "settle"}, {"op": "tick"}, {"op": "set", "module": 0, "fact": 1539898074, "value": 2}], "batch": {"sources": [{"fact": 1, "atLeast": 2, "items": 1, "abortOn": true}, {"fact": 2, "atLeast": 0, "items": 1, "abortOn": true}], "handler": "batch", "failing": "some", "windowMs": 0, "maxSize": 1, "delay": 5, "fails": 1, "retry": 0, "timeout": 3, "writes": 1, "value": 2}}',
 );
 
-/** The steps whose records hold an `onError` hook naming every one of `parts`, one per hook. */
-function stepsOfError(trace: TraceEntry[], parts: string[]): number[] {
+/**
+ * Seed 19 (PR count, up to L7): a write clobbers the batch's write and
+ * aborts its calls' signals (abortOn) while their 10 ms timeouts are
+ * pending; each timeout still fires on 1.35, and each run end asks a pass.
+ */
+const SEED_19: FuzzSpec = JSON.parse(
+  '{"modules": [{"facts": 3, "date": true, "derivations": [{"facts": [2], "derived": [], "threshold": 4, "throwsAt": null}, {"facts": [1, 0], "derived": [0], "threshold": -1, "throwsAt": 7}, {"facts": [2], "derived": [], "threshold": 1, "throwsAt": 8}], "events": [{"target": 1, "add": true}, {"target": 2, "add": true}, {"target": 0, "add": true}], "constraints": [{"fact": 2, "atLeast": 0, "crossAtLeast": null, "priority": 1, "writes": 2, "value": 6, "delay": 5, "fails": 2, "retry": 2, "timeout": 50}, {"fact": 2, "atLeast": 0, "crossAtLeast": null, "priority": 1, "writes": 0, "value": 2, "delay": 0, "fails": 2, "retry": 0, "timeout": 50}], "effects": [{"reads": [2, 1], "explicitDeps": false, "cleanup": true, "throwsAt": 6}], "source": {"gated": false}}, {"facts": 3, "date": false, "derivations": [], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 4, "crossAtLeast": 3, "priority": 0, "writes": 2, "value": 4, "delay": 20, "fails": 0, "retry": 2, "timeout": 10}], "effects": [{"reads": [2], "explicitDeps": true, "cleanup": false, "throwsAt": 3}], "source": null}], "boundary": "skip", "history": false, "trace": false, "steps": [{"op": "dispatch", "module": 0, "event": 2060111229, "value": -2}, {"op": "settle"}, {"op": "batch", "module": 1, "writes": [[197571838, 4], [2123076522, 6]]}, {"op": "dispatch", "module": 1, "event": 308157108, "value": 6}, {"op": "advance", "ms": 1}, {"op": "tick"}, {"op": "date", "module": 1, "ms": 0}, {"op": "settle"}, {"op": "set", "module": 1, "fact": 189948781, "value": 3}, {"op": "publish", "event": "unknown", "value": -2}, {"op": "set", "module": 0, "fact": 1362201528, "value": 6}], "batch": {"sources": [{"fact": 2, "atLeast": 0, "items": 2, "abortOn": true}], "handler": "batch", "failing": "some", "windowMs": 1, "maxSize": 1, "delay": 20, "fails": 1, "retry": 2, "timeout": 10, "writes": 0, "value": -1}}',
+);
+
+/** The step of each `hook` record (each `onError` naming every one of `parts`, if given). */
+function stepsOfHook(
+  trace: TraceEntry[],
+  hook: string,
+  parts: string[] = [],
+): number[] {
   const steps: number[] = [];
   let step = -1;
   for (const entry of trace) {
@@ -113,7 +126,7 @@ function stepsOfError(trace: TraceEntry[], parts: string[]): number[] {
       step = entry.i;
     } else if (
       entry.k === "hook" &&
-      entry.hook === "onError" &&
+      entry.hook === hook &&
       parts.every((part) => JSON.stringify(entry.args).includes(part))
     ) {
       steps.push(step);
@@ -311,12 +324,38 @@ describe("the fuzz shared wait at a settle step", () => {
     const def = toScenario(SEED_12);
     const [ref] = engines() as [EngineHandle];
     const timedOut = ["Batch resolver", "rb", "timed out after 3ms"];
-    const mine = stepsOfError((await runBudgeted(ref, def)).trace, timedOut);
-    const theirs = stepsOfError((await runBudgeted(v2, def)).trace, timedOut);
+    const mine = stepsOfHook(
+      (await runBudgeted(ref, def)).trace,
+      "onError",
+      timedOut,
+    );
+    const theirs = stepsOfHook(
+      (await runBudgeted(v2, def)).trace,
+      "onError",
+      timedOut,
+    );
     // Step 8 is the settle step (`start` is step 0).
     expect(def.steps[8]).toEqual({ op: "settle" });
     expect(theirs).toContain(8);
     expect(mine).toEqual(theirs);
+  });
+
+  it("an aborted call is live while its timeout timer is pending: seed 19's clobbered calls time out inside the wait, so 1.35's passes fall in the steps 2.0's do", async () => {
+    const def = toScenario(SEED_19);
+    const [ref] = engines() as [EngineHandle];
+    const mine = stepsOfHook(
+      (await runBudgeted(ref, def)).trace,
+      "onReconcileStart",
+    );
+    const theirs = stepsOfHook(
+      (await runBudgeted(v2, def)).trace,
+      "onReconcileStart",
+    );
+    expect(mine).toEqual(theirs);
+    const result = await runScenario(def, { candidates: [local, v2] });
+    expect(
+      result.unexplained.filter((d) => d.kind === "onReconcileStart"),
+    ).toEqual([]);
   });
 
   it("(b) both engines live at the cap (seed 10's mutual-write loop): discarded as never settling", async () => {
