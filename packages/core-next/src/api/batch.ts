@@ -66,9 +66,9 @@ export const withBatch: SystemPart = (context) => {
   const { clock } = kernel;
   const queues = new Map<string, Queue>();
   /**
-   * Batch runs out of flight whose end has not yet asked for its pass:
-   * settle() waits for them, so the pass a "retry" boundary owes still runs
-   * before it returns ((as)).
+   * Batch runs out of flight whose end has not yet told settle(): it waits
+   * for them, so the pass a "retry" boundary owes still runs before it
+   * returns ((as)).
    */
   let ending = 0;
   let host: BatchHost;
@@ -85,9 +85,8 @@ export const withBatch: SystemPart = (context) => {
    * executeWithResults: the handler's sync start in one store batch, then
    * the outcomes. Each requirement is one; the run's mark is set first, so
    * a stop() from a hook cancels nothing more (row t). Failed items throw
-   * (quirks h and i). At 1.35's depth, so a batch's ticks are 1.35's:
-   * executeBatchAttempt hands back executeWithResults' promise (two ticks
-   * more) and awaits executeAllOrNothing's (one more), on every exit.
+   * (quirks h and i). Two ticks on every exit, either handler: 1.35's
+   * batch errors and passes land at one depth for both (measured).
    */
   async function call(def: ResolverDef, run: Run, ctx: object) {
     const reqs = run.reqs_!;
@@ -151,9 +150,7 @@ export const withBatch: SystemPart = (context) => {
         throw first;
       }
     } finally {
-      if (many) {
-        await 0;
-      }
+      await 0;
       await 0;
     }
   }
@@ -192,27 +189,27 @@ export const withBatch: SystemPart = (context) => {
     // however it ends, as a single run's: one ended by a rethrow (boundary
     // "throw") still lets settle() go, and escapes as 1.35's one unhandled
     // rejection.
+    const end = () => {
+      ending--;
+      context.settled();
+    };
     (async () => {
+      let ok: unknown;
       try {
         await host.execute_(def, run, baseline, call);
+        ok = 1;
       } finally {
         host.leave_(run);
         ending++;
+        // 1.35 asks for the pass only when the batch resolves (executeBatch's
+        // `.then`), one tick after it ends; a rethrow (boundary "throw")
+        // asks for none.
+        ok && context.schedule();
       }
-    })().then(
-      () => {
-        ending--;
-        context.settled();
-        context.schedule();
-      },
-      // 1.35 asks for the pass only when the batch resolves (executeBatch's
-      // `.then`); a rethrow (boundary "throw") still settles, with no pass.
-      (error) => {
-        ending--;
-        context.settled();
-        throw error;
-      },
-    );
+    })().then(end, (error) => {
+      end();
+      throw error;
+    });
   }
 
   const batcher: Batcher = {
