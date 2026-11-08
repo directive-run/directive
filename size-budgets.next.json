@@ -6,20 +6,20 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 29899,
-      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", and for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\". Measured 29,897 B, +1,214 B over the pre-L7 28,683 B. Budget = measured + 2 B, at or under the cap 29,899 B."
+      "gzBudget": 29914,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-08, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\", and for the parity fixes the L7 gate finds (a batch's pass at 1.35's depth) \"Allow up to +1,250 B (Recommended)\". Measured 29,912 B, +1,229 B over the pre-L7 28,683 B. Budget = measured + 2 B, at or under the cap 29,933 B."
     },
     "two-module": {
-      "gzBudget": 29987,
-      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", and for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\". Measured 29,986 B, +1,215 B over the pre-L7 28,771 B. Budget = measured + 1 B, at or under the cap 29,987 B."
+      "gzBudget": 30005,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-08, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\", and for the parity fixes the L7 gate finds (a batch's pass at 1.35's depth) \"Allow up to +1,250 B (Recommended)\". Measured 30,003 B, +1,232 B over the pre-L7 28,771 B. Budget = measured + 2 B, at or under the cap 30,021 B."
     },
     "floor": {
       "gzBudget": 10450,
       "reason": "L5a: the sources seams only (start_, gate_, stop_, stopAsync_ calls; fire_, gone_, untick_, down_ on the part context): measured 10,417 B, +50 B over 10,367 (cap 80 B). Budget = measured + 33 B. L7a adds the batch seam only: measured 10,446 B, +7 B over 10,439 B (A1 allows +20 B); budget kept."
     },
     "aperture": {
-      "gzBudget": 34793,
-      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-07, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", and for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\". Measured 34,793 B, +1,216 B over the pre-L7 33,577 B. Budget = measured + 0 B, at or under the cap 34,793 B."
+      "gzBudget": 34807,
+      "reason": "L7 (batch resolvers: L7a, L7b, then the fixes the L7 gate's fuzz found): owner-approved 2026-11-05 to 2026-11-08, A1 \"Approve up to +1.1 KB (Recommended)\", raised for L7b's quirk fixes \"Approve +1,175 B (Recommended)\", for the batch-retry fixes \"Approve +1,210 B (Recommended)\", for a thrown batch asking for no pass, as 1.35's, \"Approve +1,216 B (Recommended)\", and for the parity fixes the L7 gate finds (a batch's pass at 1.35's depth) \"Allow up to +1,250 B (Recommended)\". Measured 34,805 B, +1,228 B over the pre-L7 33,577 B. Budget = measured + 2 B, at or under the cap 34,827 B."
     },
     "full-entry": {
       "gzBudget": 32161,
