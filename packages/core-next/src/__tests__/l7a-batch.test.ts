@@ -187,7 +187,7 @@ describe("settle() counts a running batch (as)", () => {
     system.destroy();
   });
 
-  it('a batch ended by a rethrow (boundary "throw") lets settle() resolve, and escapes as 1.35\'s one unhandled rejection', async () => {
+  it('a batch ended by a rethrow (boundary "throw") lets settle() resolve, asks for no pass, and escapes as 1.35\'s one unhandled rejection', async () => {
     // Vitest's own listener would fail the run; collect them instead.
     const caught: unknown[] = [];
     const saved = process.listeners("unhandledRejection");
@@ -218,14 +218,28 @@ describe("settle() counts a running batch (as)", () => {
             key: (r: any) => r.id,
             batch: { enabled: true, windowMs: 10 },
             resolveBatch: async () => {
+              failed = true;
               throw new Error("batch boom");
             },
           },
         },
       } as never);
+      // 1.35's executeBatch asks for its pass only when the batch resolves.
+      let failed = false;
+      let passesAfter = 0;
       const system = createSystem({
         module: mod,
         errorBoundary: { onResolverError: "throw" },
+        plugins: [
+          {
+            name: "passes",
+            onReconcileStart: () => {
+              if (failed) {
+                passesAfter++;
+              }
+            },
+          },
+        ],
       } as never) as any;
       system.start();
       system.facts.want = ["a", "b"];
@@ -238,6 +252,7 @@ describe("settle() counts a running batch (as)", () => {
 
       expect(await outcome).toBe("resolved");
       expect(system.isSettled).toBe(true);
+      expect(passesAfter).toBe(0);
       vi.useRealTimers();
       await new Promise((r) => setTimeout(r, 0));
       expect(caught).toHaveLength(1);
