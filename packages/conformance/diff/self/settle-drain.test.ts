@@ -32,6 +32,7 @@ import {
 } from "../../lib/fuzz.js";
 import { type EngineHandle, engines } from "../engines.js";
 import { type FuzzSpec, toScenario } from "../fuzz/model.js";
+import type { TraceEntry } from "../record.js";
 import {
   DRAIN_ENGINES,
   type FuzzTally,
@@ -94,6 +95,33 @@ const SEED_4: FuzzSpec = JSON.parse(
 const SEED_10: FuzzSpec = JSON.parse(
   '{"modules": [{"facts": 1, "date": false, "derivations": [{"facts": [0], "derived": [], "threshold": 5, "throwsAt": 6}, {"facts": [0], "derived": [], "threshold": 1, "throwsAt": null}], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 1, "crossAtLeast": null, "priority": 1, "writes": 0, "value": -2, "delay": 1, "fails": 2, "retry": 1, "timeout": null}, {"fact": 0, "atLeast": 3, "crossAtLeast": null, "priority": 3, "writes": 0, "value": 4, "delay": 20, "fails": 0, "retry": 1, "timeout": 10}, {"fact": 0, "atLeast": 0, "crossAtLeast": null, "priority": 0, "writes": 0, "value": 6, "delay": 5, "fails": 0, "retry": 0, "timeout": 3}], "effects": [{"reads": [0], "explicitDeps": false, "cleanup": false, "throwsAt": 3}], "source": null}], "boundary": "retry", "history": false, "trace": false, "steps": [{"op": "dispatch", "module": 0, "event": 1672610186, "value": 3}, {"op": "date", "module": 0, "ms": 2}], "batch": {"sources": [{"fact": 2, "atLeast": 0, "items": 2, "abortOn": true}, {"fact": 0, "atLeast": 0, "items": 2, "abortOn": false}], "handler": "batch", "failing": "all", "windowMs": 1, "maxSize": null, "delay": 20, "fails": 0, "retry": 2, "timeout": 10, "writes": 1, "value": -1}}',
 );
+
+/**
+ * Seed 12 (PR count, every layer): 1.35's batch call times out (3 ms, its
+ * handler waits 5) at the very fake time its settle step's wait reached.
+ */
+const SEED_12: FuzzSpec = JSON.parse(
+  '{"modules": [{"facts": 1, "date": true, "derivations": [{"facts": [0], "derived": [], "threshold": null, "throwsAt": 7}], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 2, "crossAtLeast": null, "priority": 1, "writes": 0, "value": 5, "delay": 1, "fails": 0, "retry": 0, "timeout": 3}, {"fact": 0, "atLeast": 2, "crossAtLeast": null, "priority": 1, "writes": 0, "value": -1, "delay": 5, "fails": 1, "retry": 0, "timeout": 3}], "effects": [{"reads": [0], "explicitDeps": false, "cleanup": true, "throwsAt": 4}], "source": null}], "boundary": "skip", "history": false, "trace": false, "steps": [{"op": "settle"}, {"op": "settle"}, {"op": "set", "module": 0, "fact": 595195548, "value": 5}, {"op": "publish", "event": "unknown", "value": 3}, {"op": "set", "module": 0, "fact": 2106050436, "value": 4}, {"op": "dispatch", "module": 0, "event": 133779519, "value": 0}, {"op": "dispatch", "module": 0, "event": 1504678319, "value": 3}, {"op": "settle"}, {"op": "tick"}, {"op": "set", "module": 0, "fact": 1539898074, "value": 2}], "batch": {"sources": [{"fact": 1, "atLeast": 2, "items": 1, "abortOn": true}, {"fact": 2, "atLeast": 0, "items": 1, "abortOn": true}], "handler": "batch", "failing": "some", "windowMs": 0, "maxSize": 1, "delay": 5, "fails": 1, "retry": 0, "timeout": 3, "writes": 1, "value": 2}}',
+);
+
+/** The steps whose records hold an `onError` hook naming every one of `parts`, one per hook. */
+function stepsOfError(trace: TraceEntry[], parts: string[]): number[] {
+  const steps: number[] = [];
+  let step = -1;
+  for (const entry of trace) {
+    if (entry.k === "step") {
+      step = entry.i;
+    } else if (
+      entry.k === "hook" &&
+      entry.hook === "onError" &&
+      parts.every((part) => JSON.stringify(entry.args).includes(part))
+    ) {
+      steps.push(step);
+    }
+  }
+
+  return steps;
+}
 
 /** Marks a system of `keepsDetachedAlive`'s v2 once its settle() has resolved. */
 const KEEP = Symbol("keeps a detached batch alive");
@@ -277,6 +305,18 @@ describe("the fuzz shared wait at a settle step", () => {
     const times = result.settleTimes!;
     expect(times.v2).toEqual(times.v1);
     expect(times.local).toEqual(times.v1);
+  });
+
+  it("a timer due exactly at a call's timeout is inside the wait: seed 12's batch timeout is reported at its settle step on 1.35, as on 2.0", async () => {
+    const def = toScenario(SEED_12);
+    const [ref] = engines() as [EngineHandle];
+    const timedOut = ["Batch resolver", "rb", "timed out after 3ms"];
+    const mine = stepsOfError((await runBudgeted(ref, def)).trace, timedOut);
+    const theirs = stepsOfError((await runBudgeted(v2, def)).trace, timedOut);
+    // Step 8 is the settle step (`start` is step 0).
+    expect(def.steps[8]).toEqual({ op: "settle" });
+    expect(theirs).toContain(8);
+    expect(mine).toEqual(theirs);
   });
 
   it("(b) both engines live at the cap (seed 10's mutual-write loop): discarded as never settling", async () => {

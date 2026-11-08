@@ -754,13 +754,15 @@ export const DRAIN_BOUND_MS = 5000;
  *
  * - a call of the batched handler has not returned, its signal is not
  *   aborted (a canceled call is an orphan, as a canceled single run is),
- *   and it has not passed its timeout: 1.35 ends a `resolveBatch` or
+ *   and its timeout has not passed (a timer due exactly at it has yet to
+ *   run, so the bound is inclusive): 1.35 ends a `resolveBatch` or
  *   `resolveBatchWithResults` call at `batch.timeoutMs` and never aborts
  *   its signal (row n); the fallback runs each requirement on the single
  *   run path, which reads the resolver's `timeout`, never set here;
  * - a call threw or timed out, its signal is not aborted, attempts are
  *   left, and no later attempt has started: 1.35 waits the retry's backoff
- *   (linear from `initialDelay` 2: 2 ms times the attempt), then retries,
+ *   (linear from `initialDelay` 2: 2 ms times the attempt, its end
+ *   inclusive, as the timeout's is), then retries,
  *   or ends the batch if it was satisfied meanwhile;
  * - the system is not settled (`isSettled`): a queued batch, a single run
  *   a batch's write started, or a reconcile, as `settle()` would wait for.
@@ -796,7 +798,9 @@ export function batchDrain(b: FuzzBatch): SettleDrain {
           ? Number.POSITIVE_INFINITY
           : call.start + callTimeout;
       const aborted = call.signal?.aborted === true;
-      if (call.end === undefined && !aborted && now < timedOutAt) {
+      // Inclusive: the timer due at `timedOutAt` (or at the backoff's end)
+      // is still the batch's own, and the wait stops only once it has run.
+      if (call.end === undefined && !aborted && now <= timedOutAt) {
         return `a call of the batched handler (attempt ${call.attempt}, started at ${call.start} ms) is live`;
       }
       const failedAt =
@@ -812,7 +816,7 @@ export function batchDrain(b: FuzzBatch): SettleDrain {
         !aborted &&
         call.attempt < attempts &&
         ledger.attempts.get(call.signal ?? ledger) === call.attempt;
-      if (retries && now < (failedAt as number) + 2 * call.attempt) {
+      if (retries && now <= (failedAt as number) + 2 * call.attempt) {
         reason ||= `attempt ${call.attempt} failed at ${failedAt} ms and its retry's backoff runs to ${(failedAt as number) + 2 * call.attempt} ms`;
       } else if (call.end !== undefined || aborted) {
         ledger.calls.delete(call);
