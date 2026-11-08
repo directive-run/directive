@@ -618,6 +618,11 @@ function moduleDef(
         if (n <= c.fails) {
           throw new Error(`${id}.r${i} attempt ${n}`);
         }
+        // A write while the run's signal is aborted: the handler ignores
+        // its cancel (counted for the shared wait, `writeAfterAbort`).
+        if (context.signal?.aborted === true) {
+          ledgerOf(handles).writeAfterAbort += 1;
+        }
         context.facts[f(c.writes)] = c.value;
         external(["wrote", `${id}.r${i}`, n]);
       },
@@ -717,11 +722,24 @@ interface BatchLedger {
   calls: Set<BatchCall>;
   /** The latest attempt made on each signal. */
   attempts: WeakMap<object, number>;
+  /**
+   * Writes a handler made while its signal was aborted (the batched
+   * handler's `run` and the single resolvers alike): a canceled handler
+   * that ignores its abort. The shared wait reads it (`writeAfterAbort`;
+   * Jason, 2026-11-08: "Refine: write-after-cancel = discard
+   * (Recommended)").
+   */
+  writeAfterAbort: number;
 }
 
 /** The run's ledger. */
 function ledgerOf(handles: BuildContext["handles"]): BatchLedger {
-  handles.batchLedger ??= { own: 0, calls: new Set(), attempts: new WeakMap() };
+  handles.batchLedger ??= {
+    own: 0,
+    calls: new Set(),
+    attempts: new WeakMap(),
+    writeAfterAbort: 0,
+  };
 
   return handles.batchLedger as BatchLedger;
 }
@@ -782,6 +800,12 @@ export const DRAIN_BOUND_MS = 5000;
  * run in flight), so a call still live can only be a detached run's (a
  * bound run whose requirement was retracted, RFC-0003). With attached work
  * left, v2 takes no part, and its checkpoint differs.
+ *
+ * `writeAfterAbort` counts the handlers' writes made while their signal
+ * was aborted (`BatchLedger.writeAfterAbort`): where only v2 is live at the
+ * cap, a count above 0 during that wait marks a test-handler loop, not a
+ * 2.0 bug (Jason, 2026-11-08: "Refine: write-after-cancel = discard
+ * (Recommended)"; diff/scenario.ts `runScenario`).
  */
 export function batchDrain(b: FuzzBatch): SettleDrain {
   const callTimeout = b.handler === "fallback" ? null : b.timeout;
@@ -841,6 +865,7 @@ export function batchDrain(b: FuzzBatch): SettleDrain {
   return {
     boundMs: DRAIN_BOUND_MS,
     busy,
+    writeAfterAbort: (ctx) => ledgerOf(ctx.handles).writeAfterAbort,
     attached(_ctx, system) {
       if (!system.isSettled) {
         return "the system is not settled";
@@ -924,6 +949,11 @@ function batchedResolver(
       }
       if (throws && n <= b.fails) {
         throw new Error(`${tag} attempt ${n}`);
+      }
+      // A write while the call's signal is aborted (a retraction or a
+      // clobber canceled it): counted for the shared wait.
+      if (context.signal?.aborted === true) {
+        out.ledger.writeAfterAbort += 1;
       }
       context.facts[writes] = b.value;
       out.external(["wrote", tag, n, items]);

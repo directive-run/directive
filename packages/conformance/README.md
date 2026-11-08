@@ -178,7 +178,21 @@ the traces to agree.
     never-settles rule below;
   - only 1.35 still running while 2.0 finished: discarded the same way;
   - only 2.0 still running while 1.35 finished in the same time: the case
-    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live.
+    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live, but
+    only if 2.0's handlers made no write while their signal was aborted
+    during that wait. **Write-after-cancel.** Jason, 2026-11-08: "Refine:
+    write-after-cancel = discard (Recommended)". The fuzz handlers (the
+    batched `run` and the single resolvers, diff/fuzz/model.ts) count each
+    write made while `signal.aborted` is set (`writeAfterAbort`). Where
+    that count rose during the wait, the case is a test-handler loop: a
+    canceled handler ignoring its abort, which either engine chases once it
+    is in (seed 8; seed 10 is the both-live form), so it is no evidence
+    against 2.0. It is discarded, counted under the never-settles cap below
+    on its own sub-line (`handlerLoop`), and its report names the approved
+    row that admitted it, the first entry in the case's `used` list that
+    names a quirk (with every used quirk entry listed); with no such entry
+    it still fails. A 2.0 that stays live with no write after an abort
+    still fails (diff/self/settle-drain.test.ts).
   A batch still live at the cap on the workspace engine, or on the
   reference's second run, fails the case too. Hand scenarios never wait, and
   their signed (as) entries still pin 1.35's early `settle()`. The fuzz line

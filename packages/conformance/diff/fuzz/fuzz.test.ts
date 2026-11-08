@@ -179,13 +179,17 @@ describe("differential fuzz", () => {
         sharedRerun,
         twoOnlyLive,
         bothLive,
+        handlerLoop,
         neverSettles,
       } = tally;
       console.info(
         `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, the shared wait at a settle step advanced the reference's clock in ${drained} and v2's in ${drainedDetached}, ${sharedRerun} of them needing more than one round to find the common end time; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       console.info(
-        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished)`,
+        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too, ${handlerLoop} test-handler loops (below); at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished, with no handler write after an abort)`,
+      );
+      console.info(
+        `[diff fuzz] seed ${SEED}: ${handlerLoop} test-handler loops (discarded, inside the never-settles count and cap: only v2 was live at the cap, and its handlers wrote after their signal was aborted during the wait, in a loop an approved quirk let 2.0 into; Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)")`,
       );
       logFuzz(SEED, tally);
     }

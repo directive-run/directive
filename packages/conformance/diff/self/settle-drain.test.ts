@@ -12,8 +12,11 @@
  * engine too) with both clocks ending at the same time (seed 4's drift
  * case among them); a 2.0 whose `settle()` resolves early on an attached
  * batch still differs; both engines live at the cap (seed 10's mutual-write
- * loop) is discarded; only 2.0 live at the cap fails, as a 2.0 bug; and the
- * cap counting. A case discarded because it never settles counts on its
+ * loop) is discarded; only 2.0 live at the cap fails, as a 2.0 bug, unless
+ * 2.0's handlers wrote after their signal was aborted during the wait (a
+ * test-handler loop, seed 8: discarded under the never-settles cap, naming
+ * the approved row that admitted it; Jason, 2026-11-08: "Refine:
+ * write-after-cancel = discard (Recommended)"); and the cap counting. A case discarded because it never settles counts on its
  * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
  * "Discard, own count (Recommended)"; the cap, Jason, 2026-11-07: "Cap at
  * 1% of cases, min 3 (Recommended)").
@@ -94,6 +97,16 @@ const SEED_4: FuzzSpec = JSON.parse(
 /** Seed 10 (PR count, up to L7): two writes chase each other on both engines (scratchpad/batchfix4/repro). */
 const SEED_10: FuzzSpec = JSON.parse(
   '{"modules": [{"facts": 1, "date": false, "derivations": [{"facts": [0], "derived": [], "threshold": 5, "throwsAt": 6}, {"facts": [0], "derived": [], "threshold": 1, "throwsAt": null}], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 1, "crossAtLeast": null, "priority": 1, "writes": 0, "value": -2, "delay": 1, "fails": 2, "retry": 1, "timeout": null}, {"fact": 0, "atLeast": 3, "crossAtLeast": null, "priority": 3, "writes": 0, "value": 4, "delay": 20, "fails": 0, "retry": 1, "timeout": 10}, {"fact": 0, "atLeast": 0, "crossAtLeast": null, "priority": 0, "writes": 0, "value": 6, "delay": 5, "fails": 0, "retry": 0, "timeout": 3}], "effects": [{"reads": [0], "explicitDeps": false, "cleanup": false, "throwsAt": 3}], "source": null}], "boundary": "retry", "history": false, "trace": false, "steps": [{"op": "dispatch", "module": 0, "event": 1672610186, "value": 3}, {"op": "date", "module": 0, "ms": 2}], "batch": {"sources": [{"fact": 2, "atLeast": 0, "items": 2, "abortOn": true}, {"fact": 0, "atLeast": 0, "items": 2, "abortOn": false}], "handler": "batch", "failing": "all", "windowMs": 1, "maxSize": null, "delay": 20, "fails": 0, "retry": 2, "timeout": 10, "writes": 1, "value": -1}}',
+);
+
+/**
+ * Seed 8 (PR count, up to L7): a.r1's write retracts the batch's
+ * requirements and aborts its calls, and each aborted call still writes,
+ * raising them again (scratchpad/l7-seed8/seed8.md). Only 2.0 enters the
+ * chase, through approved quirk a's re-dispatch.
+ */
+const SEED_8: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":2,"date":false,"derivations":[{"facts":[0],"derived":[],"threshold":5,"throwsAt":7}],"events":[{"target":0,"add":true}],"constraints":[{"fact":0,"atLeast":2,"crossAtLeast":null,"priority":3,"writes":1,"value":1,"delay":0,"fails":1,"retry":1,"timeout":50},{"fact":1,"atLeast":0,"crossAtLeast":null,"priority":2,"writes":1,"value":-1,"delay":1,"fails":2,"retry":1,"timeout":3}],"effects":[],"source":null},{"facts":2,"date":true,"derivations":[{"facts":[1],"derived":[],"threshold":0,"throwsAt":null}],"events":[{"target":0,"add":true}],"constraints":[{"fact":1,"atLeast":0,"crossAtLeast":null,"priority":2,"writes":0,"value":2,"delay":20,"fails":0,"retry":2,"timeout":3},{"fact":0,"atLeast":1,"crossAtLeast":2,"priority":3,"writes":0,"value":-2,"delay":0,"fails":1,"retry":2,"timeout":10}],"effects":[],"source":{"gated":true}}],"boundary":"retry","history":false,"trace":false,"steps":[{"op":"set","module":0,"fact":481019608,"value":2}],"batch":{"sources":[{"fact":0,"atLeast":0,"items":3,"abortOn":false},{"fact":1,"atLeast":1,"items":3,"abortOn":false}],"handler":"batch","failing":"some","windowMs":0,"maxSize":1,"delay":5,"fails":0,"retry":0,"timeout":10,"writes":1,"value":2}}',
 );
 
 /**
@@ -364,6 +377,7 @@ describe("the fuzz shared wait at a settle step", () => {
     });
     expect(result.neverSettles).toBe(true);
     expect(result.bothLive).toBe(true);
+    expect(result.handlerLoop).toBeFalsy();
     expect(result.runaway).toBe(false);
     expect(result.twoOnlyLive).toBeUndefined();
     expect(result.compared).toEqual([]);
@@ -389,15 +403,146 @@ describe("the fuzz shared wait at a settle step", () => {
       { candidates: [keepsDetachedAlive(v2)], divergences: [] },
     );
     expect(result.neverSettles).toBeFalsy();
+    expect(result.handlerLoop).toBeFalsy();
     expect(result.ok).toBe(false);
     expect(result.twoOnlyLive).toMatch(
-      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, \d+ ms after settle\(\) resolved \(cap 5000 ms\)\) while the reference's batches had finished by \d+ ms/,
+      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, \d+ ms after settle\(\) resolved \(cap 5000 ms\)\) while the reference's batches had finished by \d+ ms, and its handlers made no write after an abort during the wait; a 2\.0 bug/,
     );
     expect(result.report).toContain(
       'v2+keepalive in scenario "fuzz": 2.0-only live',
     );
     // 1.35's clock ran as long as v2's, and its batch had still finished.
     expect(result.settleTimes!.v1).toEqual(result.settleTimes!["v2+keepalive"]);
+  });
+
+  it("seed 8: only 2.0 live at the cap, its handlers writing after an abort: discarded as a test-handler loop, naming the approved row that admitted it", async () => {
+    const result = await runScenario(toScenario(SEED_8), {
+      candidates: [local, v2],
+    });
+    expect(result.twoOnlyLive).toBeUndefined();
+    expect(result.handlerLoop).toBe(true);
+    expect(result.neverSettles).toBe(true);
+    expect(result.bothLive).toBe(false);
+    expect(result.runaway).toBe(false);
+    expect(result.compared).toEqual([]);
+    expect(result.used).toEqual([]);
+    // The first used entry naming a quirk (`used` is in explain's order,
+    // not the loop's cause); quirk a, whose re-dispatch let 2.0 in, is
+    // among the used quirk entries the report lists.
+    expect(result.admittedBy).toMatch(/^l\d+-quirk-/);
+    expect(result.report).toMatch(
+      /^test-handler loop in scenario "fuzz": at step \d+ v2 still had a batch live at the shared wait's cap \(.*\) while the reference's batches had finished by \d+ ms, and its handlers wrote \d+ time\(s\) after their signal was aborted during the wait .*admitted by the approved row l\d+-quirk-.*every used quirk entry: .*l\d+-quirk-a-/,
+    );
+    const tally = newFuzzTally();
+    tallyCase(tally, result);
+    expect(tally).toMatchObject({
+      neverSettles: 1,
+      handlerLoop: 1,
+      bothLive: 0,
+      twoOnlyLive: 0,
+    });
+  });
+
+  it("only 2.0 live at the cap with a write after an abort, but no used entry naming a quirk: still fails, as 2.0-only live", async () => {
+    const def = toScenario(spec);
+    const base = def.settleDrain!;
+    const result = await runScenario(
+      {
+        ...def,
+        settleDrain: {
+          ...base,
+          busy: (ctx, system) =>
+            (system as any)[KEEP]
+              ? "a detached batch run of v2+keepalive is live"
+              : base.busy(ctx, system),
+          // One write after an abort, inside the wait on v2.
+          writeAfterAbort: () => (Date.now() >= 1000 ? 1 : 0),
+        },
+      },
+      { candidates: [keepsDetachedAlive(v2)], divergences: [] },
+    );
+    expect(result.handlerLoop).toBeFalsy();
+    expect(result.neverSettles).toBeFalsy();
+    expect(result.ok).toBe(false);
+    expect(result.twoOnlyLive).toMatch(
+      /^2\.0-only live: .*its handlers wrote 1 time\(s\) after an abort during the wait, but no used entry names an approved quirk/,
+    );
+  });
+
+  it("a handler's write after its signal is aborted is counted, for a single resolver and for the batched handler, on both engines", async () => {
+    // A write raises the run (r0, and the batch's one item), a second
+    // retracts it while the handler waits 5 ms: both runs are canceled and
+    // their signals aborted, and each handler still writes.
+    const steps: FuzzSpec["steps"] = [
+      { op: "set", module: 0, fact: 0, value: 5 },
+      { op: "advance", ms: 1 },
+      { op: "set", module: 0, fact: 0, value: 0 },
+      { op: "advance", ms: 10 },
+    ];
+    const single: FuzzSpec = {
+      ...spec,
+      modules: [
+        {
+          ...spec.modules[0]!,
+          constraints: [
+            {
+              fact: 0,
+              atLeast: 1,
+              crossAtLeast: null,
+              priority: 1,
+              writes: 1,
+              value: 3,
+              delay: 5,
+              fails: 0,
+              retry: 0,
+              timeout: null,
+            },
+          ],
+        },
+      ],
+      steps,
+      // The batch never raises here.
+      batch: {
+        ...spec.batch!,
+        sources: [{ fact: 0, atLeast: 100, items: 1, abortOn: false }],
+      },
+    };
+    const batched: FuzzSpec = {
+      ...spec,
+      steps,
+      batch: { ...spec.batch!, writes: 2, value: 4 },
+    };
+    const counts: Record<string, number> = {};
+    for (const [label, s] of [
+      ["single", single],
+      ["batch", batched],
+    ] as const) {
+      for (const engine of [engines()[0]!, v2]) {
+        const def = toScenario(s);
+        const base = def.settleDrain!;
+        let seen: unknown;
+        const run = await runBudgeted(engine, {
+          ...def,
+          settleDrain: {
+            ...base,
+            busy: (ctx, system) => {
+              seen = ctx;
+
+              return base.busy(ctx, system);
+            },
+          },
+        });
+        counts[`${label} ${engine.name}`] = base.writeAfterAbort!(seen as any);
+        // The writes landed before the closing settle: none during its wait.
+        expect(run.waits.map((w) => w.writeAfterAbort)).toEqual([0]);
+      }
+    }
+    expect(counts).toEqual({
+      "single v1": 1,
+      "single v2": 1,
+      "batch v1": 1,
+      "batch v2": 1,
+    });
   });
 
   it("the targets: the later end time wins, later steps' targets drop, and a live engine sets the other's clock", () => {
@@ -554,6 +699,7 @@ describe("the fuzz shared wait at a settle step", () => {
       neverSettles: 2,
       bothLive: 1,
       twoOnlyLive: 1,
+      handlerLoop: 0,
       onV2: 2,
       sharedRerun: 1,
       drained: 1,

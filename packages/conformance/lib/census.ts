@@ -1463,6 +1463,11 @@ export interface FuzzRun {
    * shared wait's cap; diff/scenario.ts `neverSettles`), not in `runaway`.
    */
   neverSettles?: number;
+  /**
+   * Of `neverSettles`, test-handler loops (only v2 live at the cap, its
+   * handlers writing after an abort; diff/scenario.ts `handlerLoop`).
+   */
+  handlerLoop?: number;
   v2?: number;
   /** Compared cases an `ends` divergence stopped. */
   ended?: number;
@@ -1504,6 +1509,17 @@ export function describeFuzzRun(r: FuzzRun): string {
  */
 export function describeNeverSettles(runs: FuzzRun[]): string {
   return `discarded because 1.35's batches never settle (still live at the shared wait's 5 s cap at a settle step, Jason, 2026-11-07: "One shared wait (Recommended)"; at most max(1% of the seed's cases, 3), not counted as runaways): ${runs.map((r) => `seed ${r.seed}: ${r.neverSettles ?? 0} of at most ${maxNeverSettles(r.runs + (r.runaway ?? 0) + (r.neverSettles ?? 0))}`).join("; ")}`;
+}
+
+/**
+ * The census's own sub-line for the test-handler loops (Jason, 2026-11-08:
+ * "Refine: write-after-cancel = discard (Recommended)"): of each seed's
+ * never-settles discards, how many were loops where only 2.0 was live at
+ * the cap and its handlers wrote after their signal was aborted. They
+ * count inside the never-settles cap (`describeNeverSettles`).
+ */
+export function describeHandlerLoops(runs: FuzzRun[]): string {
+  return `test-handler loops (only 2.0 live at the shared wait's cap, its handlers writing after an abort; Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)"; counted inside the never-settles cap): ${runs.map((r) => `seed ${r.seed}: ${r.handlerLoop ?? 0} of ${r.neverSettles ?? 0}`).join("; ")}`;
 }
 
 export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {

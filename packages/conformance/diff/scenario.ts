@@ -162,7 +162,15 @@ export interface ScenarioDef {
  *   2026-11-07: "Discard, own count (Recommended)");
  * - only 1.35 still running while 2.0 finished: discarded the same way;
  * - only 2.0 still running while 1.35 finished in the same time: the case
- *   fails, as a 2.0 bug, naming what kept 2.0 live.
+ *   fails, as a 2.0 bug, naming what kept 2.0 live, but only if 2.0's
+ *   handlers made no write while their signal was aborted during that
+ *   wait (`writeAfterAbort`). With such a write it is a test-handler loop
+ *   (a canceled handler ignoring its abort, which either engine chases;
+ *   Jason, 2026-11-08: "Refine: write-after-cancel = discard
+ *   (Recommended)"): discarded under the never-settles cap, on its own
+ *   count (`ScenarioResult.handlerLoop`), naming the approved row that
+ *   admitted it, the first used entry naming a quirk. With no such entry
+ *   it still fails.
  *
  * A v2 whose `settle()` resolved with attached work left (`attached`; its
  * settle() resolved early) takes no part: its clock does not advance and
@@ -180,6 +188,12 @@ export interface SettleDrain {
    */
   attached?(ctx: BuildContext, system: AnySystem): string | false;
   boundMs: number;
+  /**
+   * How many writes the run's handlers have made so far while their signal
+   * was aborted (diff/fuzz/model.ts `BatchLedger.writeAfterAbort`). Read at
+   * each wait's start and end (`SettleWait.writeAfterAbort`).
+   */
+  writeAfterAbort?(ctx: BuildContext): number;
 }
 
 /**
@@ -220,6 +234,8 @@ export interface SettleWait {
   live?: string;
   /** Whether the clock advanced. */
   waited: boolean;
+  /** Writes the handlers made while their signal was aborted, during this wait. */
+  writeAfterAbort?: number;
 }
 
 /** One run's part in the shared wait: the rule, the targets, and what it did. */
@@ -275,6 +291,7 @@ async function waitOutBatches(
   const judge = drain.judge.has(step);
   const sentinel =
     target > from ? setTimeout(() => {}, target - from) : undefined;
+  const wroteBefore = drain.rule.writeAfterAbort?.(ctx) ?? 0;
   for (;;) {
     const why = drain.rule.busy(ctx, system);
     if (why === false && Date.now() >= target) {
@@ -301,6 +318,7 @@ async function waitOutBatches(
   }
   clearTimeout(sentinel);
   wait.endAt = Date.now();
+  wait.writeAfterAbort = (drain.rule.writeAfterAbort?.(ctx) ?? 0) - wroteBefore;
 }
 
 /** Rounds of the shared wait before it is called unsettled. */
@@ -481,6 +499,16 @@ export interface ScenarioResult {
    * shared wait (Recommended)"). Names what kept v2 live.
    */
   twoOnlyLive?: string;
+  /**
+   * Only v2 was live at the cap, but its handlers wrote while their signal
+   * was aborted during that wait: a test-handler loop, discarded (with
+   * `neverSettles` set, so it counts under that cap) and counted on its own
+   * (Jason, 2026-11-08: "Refine: write-after-cancel = discard
+   * (Recommended)"). `admittedBy` is the approved row that let 2.0 into
+   * the loop: the first used entry naming a quirk.
+   */
+  handlerLoop?: boolean;
+  admittedBy?: string;
   /**
    * Fuzz cases with the shared wait: each run's `settle` checkpoint times
    * (`SettleWait.endAt`), by engine (the reference's first run, and each
@@ -1462,10 +1490,19 @@ export async function runScenario(
     }
   }
   let twoOnlyLive: string | undefined;
+  // Only v2 live at the cap: its handlers' writes after abort during that
+  // wait decide between a 2.0 bug and a test-handler loop (Jason,
+  // 2026-11-08: "Refine: write-after-cancel = discard (Recommended)"); the
+  // loop is judged once `used` is known, after the comparison.
+  const loopWrites = twoAlone ? (twoLive.writeAfterAbort ?? 0) : 0;
+  let twoOnlyAt = "";
   if (twoAlone && twoOh) {
     const ref = firstRun.waits.find((w) => w.step === twoLive.step);
-    twoOnlyLive = `2.0-only live: at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.endAt ?? "?"} ms; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
-    problems.push(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
+    twoOnlyAt = `at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.endAt ?? "?"} ms`;
+    if (loopWrites === 0) {
+      twoOnlyLive = `2.0-only live: ${twoOnlyAt}, and its handlers made no write after an abort during the wait; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
+      problems.push(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
+    }
   } else if (rounds >= SHARED_WAIT_ROUNDS && twoRun) {
     if (nextTargets(firstRun.waits, twoRun.waits, targets, judge)) {
       problems.push(
@@ -1529,6 +1566,39 @@ export async function runScenario(
     divergences,
     def.triggers,
   );
+  if (loopWrites > 0 && twoOh) {
+    const quirks = used.filter((id) => /quirk/.test(id));
+    const admittedBy = quirks[0];
+    if (admittedBy !== undefined) {
+      // A test-handler loop: discarded under the never-settles cap, on its
+      // own count, naming the approved row that admitted it.
+      return {
+        name: def.name,
+        ok: false,
+        nondeterministic: [],
+        differences: [],
+        unexplained: [],
+        advisories: [],
+        used: [],
+        ended: [],
+        compared: [],
+        traces: { reference: first, candidate: [] },
+        runaway: false,
+        neverSettles: true,
+        bothLive: false,
+        handlerLoop: true,
+        admittedBy,
+        hung: [],
+        discarded: [],
+        fired: firstRun.fired,
+        drained: firstRun.drained,
+        sharedRounds: rounds,
+        report: `test-handler loop in scenario "${def.name}": ${twoOnlyAt}, and its handlers wrote ${loopWrites} time(s) after their signal was aborted during the wait (a canceled handler ignoring its abort, which either engine chases), admitted by the approved row ${admittedBy} (the first used entry naming a quirk; every used quirk entry: ${quirks.join(", ")}); discarded under the never-settles cap, not compared (Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)")`,
+      };
+    }
+    twoOnlyLive = `2.0-only live: ${twoOnlyAt}; its handlers wrote ${loopWrites} time(s) after an abort during the wait, but no used entry names an approved quirk that admitted the loop, so it is not discarded (Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)")`;
+    problems.unshift(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
+  }
   for (const e of ended) {
     advisories.push(
       `ended on ${e.engine} by ${e.id} at ${describeDifference(e.at)}: ${e.dropped} later difference(s) not compared`,
@@ -1706,6 +1776,11 @@ export interface FuzzTally {
   /** Of `neverSettles`, cases where v2 was live at the cap too. */
   bothLive: number;
   /**
+   * Of `neverSettles`, test-handler loops (`ScenarioResult.handlerLoop`;
+   * Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)").
+   */
+  handlerLoop: number;
+  /**
    * Discarded cases whose reference's batches were live at the shared wait's cap
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
    * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
@@ -1729,6 +1804,7 @@ export function newFuzzTally(): FuzzTally {
     sharedRerun: 0,
     twoOnlyLive: 0,
     bothLive: 0,
+    handlerLoop: 0,
     neverSettles: 0,
   };
 }
@@ -1748,6 +1824,9 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
     tally.neverSettles++;
     if (result.bothLive) {
       tally.bothLive++;
+    }
+    if (result.handlerLoop) {
+      tally.handlerLoop++;
     }
 
     return;
@@ -1809,6 +1888,7 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
       sharedRerun: tally.sharedRerun,
       twoOnlyLive: tally.twoOnlyLive,
       bothLive: tally.bothLive,
+      handlerLoop: tally.handlerLoop,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,
