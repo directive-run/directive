@@ -237,14 +237,16 @@ interface DrainRun {
 /**
  * The shared wait on one run at `settle` step `step`: advance the fake
  * clock to the step's target, if one is set, then while a batch is live
- * (`busy`), bounded by `boundMs` of fake time from the moment `settle()`
- * resolved.
+ * (`busy`), up to the cap: `boundMs` of fake time after the step began
+ * (`stepStart`, the same time on both engines, whose clocks agree there),
+ * so both engines are judged at the same fake time.
  */
 async function waitOutBatches(
   drain: DrainRun,
   system: AnySystem,
   ctx: BuildContext,
   step: number,
+  stepStart: number,
 ): Promise<void> {
   const from = Date.now();
   const wait: SettleWait = {
@@ -264,24 +266,30 @@ async function waitOutBatches(
 
     return;
   }
-  const target = drain.targets.get(step);
-  if (target !== undefined && target > Date.now()) {
-    wait.waited = true;
-    await vi.advanceTimersByTimeAsync(target - Date.now());
-    await flushMicrotasks();
-  }
-  for (
-    let why = drain.rule.busy(ctx, system);
-    why !== false;
-    why = drain.rule.busy(ctx, system)
-  ) {
-    if (Date.now() - from > drain.rule.boundMs) {
-      wait.live = `${why}, ${Date.now() - from} ms after settle() resolved (cap ${drain.rule.boundMs} ms)`;
+  // One timer at a time, as the engine's own wait goes, so a run whose own
+  // end is the target stops at the very same point; before the target it
+  // goes on even when nothing is live. A sentinel timer at the target keeps
+  // the clock moving there and is cleared after.
+  const cap = stepStart + drain.rule.boundMs;
+  const target = Math.min(
+    Math.max(drain.targets.get(step) ?? from, from),
+    Math.max(cap, from),
+  );
+  const sentinels = [target, cap]
+    .filter((at) => at > from)
+    .map((at) => setTimeout(() => {}, at - from));
+  for (;;) {
+    const why = drain.rule.busy(ctx, system);
+    if (why === false && Date.now() >= target) {
+      break;
+    }
+    if (why !== false && Date.now() >= cap) {
+      wait.live = `${why}, at ${Date.now()} ms, ${Date.now() - stepStart} ms after the settle step began (cap ${drain.rule.boundMs} ms)`;
       break;
     }
     if (vi.getTimerCount() === 0) {
       // Nothing left can move the system: done, unless a call still runs.
-      if (why.startsWith("a call ")) {
+      if (why !== false && why.startsWith("a call ")) {
         drain.problem ??= `the shared wait at step ${step} stalled: ${why}, and no timer left`;
       }
       break;
@@ -289,6 +297,9 @@ async function waitOutBatches(
     wait.waited = true;
     await vi.advanceTimersToNextTimerAsync();
     await flushMicrotasks();
+  }
+  for (const sentinel of sentinels) {
+    clearTimeout(sentinel);
   }
   wait.endAt = Date.now();
 }
@@ -312,10 +323,27 @@ export function nextTargets(
   targets: ReadonlyMap<number, number>,
 ): Map<number, number> | undefined {
   for (const r of reference) {
-    const c = v2?.find((w) => w.step === r.step);
-    const joins = c !== undefined && c.attached === undefined;
-    const end = Math.max(r.endAt, joins ? c.endAt : r.endAt);
-    if (r.endAt !== end || (joins && c.endAt !== end)) {
+    const found = v2?.find((w) => w.step === r.step);
+    const c = found?.attached === undefined ? found : undefined;
+    const rLive = r.live !== undefined;
+    const cLive = c?.live !== undefined;
+    let end: number | undefined;
+    if (rLive && cLive) {
+      return undefined;
+    }
+    if (rLive || cLive) {
+      // One live at its cap: the other must have run as long, then the
+      // case is judged (it cannot be advanced past the cap).
+      const live = rLive ? r : (c as SettleWait);
+      const other = rLive ? c : r;
+      if (other === undefined || other.endAt >= live.endAt) {
+        return undefined;
+      }
+      end = live.endAt;
+    } else if (c !== undefined && c.endAt !== r.endAt) {
+      end = Math.max(r.endAt, c.endAt);
+    }
+    if (end !== undefined) {
       const next = new Map<number, number>();
       for (const [step, at] of targets) {
         if (step < r.step) {
@@ -325,9 +353,6 @@ export function nextTargets(
       next.set(r.step, end);
 
       return next;
-    }
-    if (r.live !== undefined || (joins && c.live !== undefined)) {
-      return undefined;
     }
   }
 
@@ -745,13 +770,15 @@ async function apply(
     case "tick":
       await flushMicrotasks();
       break;
-    case "settle":
+    case "settle": {
+      const stepStart = Date.now();
       await drive(Promise.resolve(system.settle()), rec, "settle");
       if (drain) {
-        await waitOutBatches(drain.run, system, ctx, drain.at);
+        await waitOutBatches(drain.run, system, ctx, drain.at, stepStart);
       }
       rec.checkpoint("settle");
       break;
+    }
     case "checkpoint":
       rec.checkpoint(step.label);
       break;
