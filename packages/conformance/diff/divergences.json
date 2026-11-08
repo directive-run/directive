@@ -5678,6 +5678,173 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-fuzz-av-external-start-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of a batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
+  },
+  {
+    "id": "l7-fuzz-av-external-wrote-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's write record (external \"wrote\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
+  },
+  {
+    "id": "l7-fuzz-av-external-aborted-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's abort record (external \"aborted\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-07"
+  },
+  {
+    "id": "l7-fuzz-av-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "reason": "Row (av): a bound queued batched requirement retracted and raised again goes into 1.35's call twice, so 1.35 fails it twice and reports its error twice; 2.0 holds it once and reports once. This covers the second error record 1.35 makes. Batch-shaped twin of `l7-fuzz-av-external-aborted-changed-items` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-av-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "reason": "Row (av): a bound queued batched requirement retracted and raised again goes into 1.35's call twice, so 1.35 fails it twice and reports its error twice; 2.0 holds it once and reports once. This covers the second error record 1.35 makes. Batch-shaped twin of `l7-fuzz-av-external-aborted-changed-items` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-av-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "reason": "Row (av): a bound queued batched requirement retracted and raised again goes into 1.35's call twice, so 1.35 fails it twice and reports its error twice; 2.0 holds it once and reports once. This covers the second error record 1.35 makes. Batch-shaped twin of `l7-fuzz-av-external-aborted-changed-items` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-av-observe-resolver.error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "reason": "Row (av): a bound queued batched requirement retracted and raised again goes into 1.35's call twice, so 1.35 fails it twice and reports its error twice; 2.0 holds it once and reports once. This covers the second error record 1.35 makes. Batch-shaped twin of `l7-fuzz-av-external-aborted-changed-items` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
     "id": "l2-quirk-n-fuzz-timeout-extra",
     "scenario": "fuzz",
     "stream": "external",
@@ -7972,6 +8139,174 @@
     "reason": "GATE-1 quirk b (L2): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run. 2.0 reports exactly one outcome per run: cancel. Where the comparison pairs 1.35's extra error after the cancel with another run's error record of the same kind, the record shows as changed instead of missing. This covers the resolver.error observe event, changed in its resolver, requirement and error (event). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-01"
+  },
+  {
+    "id": "l7-fuzz-t-b4-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchTimeout"],
+    "group": "quirk-t-batch",
+    "reason": "Row t's batch-shaped path (RFC B-4, one outcome per requirement per run), with quirk n: a batch call ended by a clobber or abort (its constraint has `abortOn`) still has 1.35 report the batch's timeout error after it; 2.0 reports the one outcome. This covers that later error record on 1.35. Batch-shaped twin of `l3-cand-t-fuzz-hook-onResolverCancel-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-t-b4-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchTimeout"],
+    "group": "quirk-t-batch",
+    "reason": "Row t's batch-shaped path (RFC B-4, one outcome per requirement per run), with quirk n: a batch call ended by a clobber or abort (its constraint has `abortOn`) still has 1.35 report the batch's timeout error after it; 2.0 reports the one outcome. This covers that later error record on 1.35. Batch-shaped twin of `l3-cand-t-fuzz-hook-onResolverCancel-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-t-b4-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchTimeout"],
+    "group": "quirk-t-batch",
+    "reason": "Row t's batch-shaped path (RFC B-4, one outcome per requirement per run), with quirk n: a batch call ended by a clobber or abort (its constraint has `abortOn`) still has 1.35 report the batch's timeout error after it; 2.0 reports the one outcome. This covers that later error record on 1.35. Batch-shaped twin of `l3-cand-t-fuzz-hook-onResolverCancel-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-t-b4-observe-resolver.error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchTimeout"],
+    "group": "quirk-t-batch",
+    "reason": "Row t's batch-shaped path (RFC B-4, one outcome per requirement per run), with quirk n: a batch call ended by a clobber or abort (its constraint has `abortOn`) still has 1.35 report the batch's timeout error after it; 2.0 reports the one outcome. This covers that later error record on 1.35. Batch-shaped twin of `l3-cand-t-fuzz-hook-onResolverCancel-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onError-missing-batchFails",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchFails"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onError-missing-batchTimeout",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchTimeout"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onErrorRecovery-missing-batchFails",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchFails"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onErrorRecovery-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onErrorRecovery-missing-batchTimeout",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchTimeout"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onErrorRecovery-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onResolverError-missing-batchFails",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchFails"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onResolverError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-hook-onResolverError-missing-batchTimeout",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchTimeout"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-hook-onResolverError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-observe-resolver.error-missing-batchFails",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchFails"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-observe-resolver-error-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-b-observe-resolver.error-missing-batchTimeout",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchTimeout"],
+    "group": "quirk-b-batch",
+    "reason": "GATE-1 quirk b, on the batch path (RFC B-4: quirk b applies to a batch): a batch canceled while it waits to retry, or in the tick it fails, reports the cancel, then 1.35 also reports the batch's error for it; 2.0 reports the cancel only. This covers the error record only 1.35 makes. Batch-shaped twin of `l2-quirk-b-observe-resolver-error-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
   },
   {
     "id": "l3-cand-t-fuzz-hook-onResolverCancel-missing",
@@ -27509,7 +27844,1061 @@
     "date": "2026-11-05"
   },
   {
-    "id": "l7-fuzz-av-external-start-changed-items",
+    "id": "l7-fuzz-at-hook-onResolverStart-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchFallback"],
+    "group": "row-at",
+    "reason": "Row (at) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): when a batched resolver has only resolve(), 2.0 starts each requirement as an ordinary single run when the window closes, so it is in flight, cancelable, stopped by stop() and waited for by settle(); 1.35 runs each on a private controller that retraction, stop() and settle() cannot reach, and reports no resolver start for it (L7 RFC R7, probes B8 and B8b). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a fallback batched resolver (only resolve()) (`when`). This covers the onResolverStart hook call 2.0 makes for a fallback run. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-at-hook-onResolverStart-changed-args",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "ends": true,
+    "when": ["batchFallback"],
+    "group": "row-at",
+    "reason": "Row (at) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): when a batched resolver has only resolve(), 2.0 starts each requirement as an ordinary single run when the window closes, so it is in flight, cancelable, stopped by stop() and waited for by settle(); 1.35 runs each on a private controller that retraction, stop() and settle() cannot reach, and reports no resolver start for it (L7 RFC R7, probes B8 and B8b). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a fallback batched resolver (only resolve()) (`when`). This covers an onResolverStart hook call whose arguments differ because 2.0 starts the fallback runs. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-at-hook-onReconcileEnd-changed-args0-inflight",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].inflight",
+    "ends": true,
+    "when": ["batchFallback"],
+    "group": "row-at",
+    "reason": "Row (at) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): when a batched resolver has only resolve(), 2.0 starts each requirement as an ordinary single run when the window closes, so it is in flight, cancelable, stopped by stop() and waited for by settle(); 1.35 runs each on a private controller that retraction, stop() and settle() cannot reach, and reports no resolver start for it (L7 RFC R7, probes B8 and B8b). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a fallback batched resolver (only resolve()) (`when`). This covers the onReconcileEnd in-flight list, which on 2.0 holds the fallback runs. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-at-observe-resolver.start-extra",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchFallback"],
+    "group": "row-at",
+    "reason": "Row (at) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): when a batched resolver has only resolve(), 2.0 starts each requirement as an ordinary single run when the window closes, so it is in flight, cancelable, stopped by stop() and waited for by settle(); 1.35 runs each on a private controller that retraction, stop() and settle() cannot reach, and reports no resolver start for it (L7 RFC R7, probes B8 and B8b). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a fallback batched resolver (only resolve()) (`when`). This covers the observe \"resolver.start\" record 2.0 makes for a fallback run. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-aq-hook-onResolverCancel-changed-args1",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[1]",
+    "when": ["batched"],
+    "group": "row-aq",
+    "reason": "Row (aq) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): the cancel hook for a requirement of a running batch gets the whole requirement on 2.0, as for a queued one; 1.35 passes { id } only, as \"the original requirement objects are not retained\" (L7 RFC C3, probe B2). Only in a case with a batched resolver (`when`). This covers the onResolverCancel requirement argument. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-aq-hook-onRequirementCanceled-changed-args0",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "when": ["batched"],
+    "group": "row-aq",
+    "reason": "Row (aq) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): the cancel hook for a requirement of a running batch gets the whole requirement on 2.0, as for a queued one; 1.35 passes { id } only, as \"the original requirement objects are not retained\" (L7 RFC C3, probe B2). Only in a case with a batched resolver (`when`). This covers the onRequirementCanceled requirement argument. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onResolverCancel call 1.35 makes for a still-wanted sibling of the batch. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onRequirementCanceled call 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-observe-requirement.canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the observe \"requirement.canceled\" record 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-external-aborted-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-external-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batched", "batchFails"],
+    "group": "quirk-g-fails",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. This entry does not end the case. Its record: a call of the batched resolver returned with an item failed, and that call's own write retracted the item's requirement before its error was reported; 2.0 keeps the run until its outcome is reported, so the requirement leaving is the last one leaving and the batch's signal aborts, after the handler returned, with no cancel hook and no state change; 1.35 cleared the batch at its run's end (core/resolvers.ts 1773-1783), before it recorded the batch's errors (1787-1795), so its abort finds nothing. Both engines report the error once, and the rest of the case lines up, so this entry covers the one record, only in a case whose batched calls can fail (`when`). This covers the abort of the batch's signal 2.0 makes once every requirement has left. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-as-external-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched"],
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle(), the settled notification and inspect() count a running batch, so settle() waits for batched work and inspect() lists a running batch's requirements in flight. 1.35 resolves settle() without waiting for the batches it started and lists no batch in flight (L7 RFC C6, probe B7). In a fuzz case, 2.0's settle() is still waiting at a settled change where 1.35's has already resolved, and settle() runs the batch queues at each settled change while it waits, as 1.35's does (core-next api/core.ts settle(), `features.batch`); so 2.0 starts a queued batch call that 1.35 leaves in its window (verified in a replay of seed 19: the call starts from that flush, inside the case's last settle()). When the call's requirement is then retracted, 2.0 aborts the running call's signal (its last requirement left, quirk g) where 1.35 cancels the queued requirement. From there on the case's timers and later records differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver (`when`). This covers the abort of that call's signal, a record 1.35 never makes. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers the onError call 1.35 makes for an item's error on an earlier attempt. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers the onErrorRecovery call 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers the onResolverError call 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-observe-resolver.error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers the observe \"resolver.error\" record 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers the onRetry hook call 2.0 makes before the batch runs again. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers a call of the batch 2.0 makes that 1.35 does not make then. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-external-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h (L7), with row (ar) (owner-approved 2026-11-05, \"Approve all (Recommended)\"): an all-failed with-results batch retries under the batch's retry policy like a thrown batch: backoff, onRetry for each requirement, and shouldRetry, which hears the first failed item's error; with (ar), each item reports its own error once, after its last attempt. 1.35 runs it again at once with no backoff, onRetry or shouldRetry, and reports each item's error on every attempt (L7 RFC R5 and B-5, probe B3: three calls at 10 ms, shouldRetry asked 0 times, 6 errors for 2 requirements). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with an all-failed with-results batch with a retry policy (`when`). This covers a call of the batch 1.35 makes at once, where 2.0 waits out the backoff. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers the onError call 1.35 makes for an item's error on an earlier attempt. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers the onErrorRecovery call 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers the onResolverError call 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-observe-resolver.error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers the observe \"resolver.error\" record 1.35 makes for that error. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers the onRetry hook call 2.0 makes before the batch runs again. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers a call of the batch 2.0 makes that 1.35 does not make then. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-external-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail", "batchRetry"],
+    "group": "quirk-i",
+    "reason": "GATE-1 quirk i (L7): after a partial failure the successful items complete at once, and the failed ones run again under the batch's retry policy as a smaller resolveBatchWithResults call holding only them, never through resolve() (the shape the L7 RFC's B2 sets, approved 2026-11-05 with \"Approve all (Recommended)\"); each reports its error once, after its last attempt. 1.35 never retries a partly failed batch (resolvers.ts 1510-1513; L7 RFC R6, probe B4: one call, a completed, b errored once, a later pass did not run b again). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a with-results batch that can fail some items, with a retry policy (`when`). This covers a call of the batch 1.35 makes at once, where 2.0 waits out the backoff. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-hook-onResolverWriteRejected-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverWriteRejected",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the onResolverWriteRejected call 2.0 makes when the clobbered write of a mixed batch is dropped. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-observe-resolver.write.rejected-extra",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.write.rejected",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the observe \"resolver.write.rejected\" record 2.0 makes for it. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-external-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the abort of the mixed batch's signal 2.0 makes on the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-hook-onFactSet-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onFactSet",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the batch's write that 1.35 lets land over the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onReconcileStart-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h, with row (ar): the failed with-results items retry under the batch's policy on 2.0, so the reconcile passes around the retries differ from 1.35's. This covers a reconcile pass on one engine only. Batch-shaped twin of `l7-fuzz-h-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onReconcileStart-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h, with row (ar): the failed with-results items retry under the batch's policy on 2.0, so the reconcile passes around the retries differ from 1.35's. This covers a reconcile pass on one engine only. Batch-shaped twin of `l7-fuzz-h-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h, with row (ar): each item reports its error once, after its last attempt, on 2.0, so the order of error reports differs. This covers an error report naming a different requirement at the same place. Batch-shaped twin of `l7-fuzz-h-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-h-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["batchAllFail", "batchRetry"],
+    "group": "quirk-h",
+    "reason": "GATE-1 quirk h, with row (ar): each item reports its error once, after its last attempt, on 2.0, so the order of error reports differs. This covers an error report naming a different requirement at the same place. Batch-shaped twin of `l7-fuzz-h-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onReconcileStart-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchSomeFail"],
+    "group": "quirk-i-passes",
+    "reason": "GATE-1 quirk i, with row (ar): the failed with-results items are reported under the batch's policy on 2.0, apart from the successful ones, so the reconcile passes around them differ from 1.35's. This covers a reconcile pass on one engine only. It applies with one attempt too (`when` names no retry): 2.0 tells the successful items at once and reports each failed item from its run's error path, and the run's end asks for its own pass, where 1.35 records successes and errors in one loop and asks one pass (L7 RFC B2: \"successful items complete at once; failed ones under the policy\"). Batch-shaped twin of `l7-fuzz-i-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onReconcileStart-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batchSomeFail"],
+    "group": "quirk-i-passes",
+    "reason": "GATE-1 quirk i, with row (ar): the failed with-results items are reported under the batch's policy on 2.0, apart from the successful ones, so the reconcile passes around them differ from 1.35's. This covers a reconcile pass on one engine only. It applies with one attempt too (`when` names no retry): 2.0 tells the successful items at once and reports each failed item from its run's error path, and the run's end asks for its own pass, where 1.35 records successes and errors in one loop and asks one pass (L7 RFC B2: \"successful items complete at once; failed ones under the policy\"). Batch-shaped twin of `l7-fuzz-i-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["batchSomeFail"],
+    "group": "quirk-i-passes",
+    "reason": "GATE-1 quirk i, with row (ar): each item reports its error once, after its last attempt, on 2.0, so the order of error reports differs. This covers an error report naming a different requirement at the same place. It applies with one attempt too (`when` names no retry): 2.0 tells the successful items at once and reports each failed item from its run's error path, and the run's end asks for its own pass, where 1.35 records successes and errors in one loop and asks one pass (L7 RFC B2: \"successful items complete at once; failed ones under the policy\"). Batch-shaped twin of `l7-fuzz-i-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-i-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["batchSomeFail"],
+    "group": "quirk-i-passes",
+    "reason": "GATE-1 quirk i, with row (ar): each item reports its error once, after its last attempt, on 2.0, so the order of error reports differs. This covers an error report naming a different requirement at the same place. It applies with one attempt too (`when` names no retry): 2.0 tells the successful items at once and reports each failed item from its run's error path, and the run's end asks for its own pass, where 1.35 records successes and errors in one loop and asks one pass (L7 RFC B2: \"successful items complete at once; failed ones under the policy\"). Batch-shaped twin of `l7-fuzz-i-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l3-quirk-p-fuzz-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRetryLater"],
+    "group": "quirk-p",
+    "reason": "Row p: 2.0 re-dispatches a \"retry-later\" requirement, so the retry hooks of the case move. This covers an onResolverRetry call on one engine only. Batch-shaped twin of `l3-quirk-p-fuzz-hook-onReconcileStart-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRejects"],
+    "group": "quirk-b",
+    "reason": "GATE-1 quirk b: 2.0 reports one outcome per run, so a retry 1.35 makes after the cancel (or the cascade from it) differs. This covers an onResolverRetry call on one engine only. Batch-shaped twin of `l2-quirk-b-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-quirk-n-fuzz-batch-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batchTimeout"],
+    "group": "quirk-n-batch",
+    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l3-quirk-p-fuzz-hook-onResolverRetry-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRetryLater"],
+    "group": "quirk-p",
+    "reason": "Row p: 2.0 re-dispatches a \"retry-later\" requirement, so the retry hooks of the case move. This covers an onResolverRetry call on one engine only. Batch-shaped twin of `l3-quirk-p-fuzz-hook-onReconcileStart-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l2-quirk-b-hook-onResolverRetry-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRejects"],
+    "group": "quirk-b",
+    "reason": "GATE-1 quirk b: 2.0 reports one outcome per run, so a retry 1.35 makes after the cancel (or the cascade from it) differs. This covers an onResolverRetry call on one engine only. Batch-shaped twin of `l2-quirk-b-hook-onError-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-01 (the nightly fuzz): the same shape also comes through a smaller window than a retry backoff, a rejection and a cancel of one run in the same timer tick (1.35 reports the cancel, then the error; 2.0 the cancel only), found at the nightly depth under a timeout and \"throw\" with no retry policy. So `when` is now `resolverRejects` (some resolver can reject: it fails, or its timeout can fire before it writes), which every case of either window has, instead of `retryPolicy`. And the entry now ends the fuzz case (`ends`): 1.35's extra error changes what the case does next (the strategy disables, throws or re-runs), and the comparison pairs the records after it differently for each seed. Re-signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-quirk-n-fuzz-batch-onResolverRetry-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batchTimeout"],
+    "group": "quirk-n-batch",
+    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l3-quirk-p-fuzz-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["resolverRetryLater"],
+    "group": "quirk-p",
+    "reason": "Row p: 2.0 re-dispatches a \"retry-later\" requirement, so the order of error reports differs. This covers an error report naming a different requirement at the same place. Batch-shaped twin of `l3-quirk-p-fuzz-hook-onReconcileStart-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l3-quirk-p-fuzz-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["resolverRetryLater"],
+    "group": "quirk-p",
+    "reason": "Row p: 2.0 re-dispatches a \"retry-later\" requirement, so the order of error reports differs. This covers an error report naming a different requirement at the same place. Batch-shaped twin of `l3-quirk-p-fuzz-hook-onReconcileStart-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-observe-requirement.canceled-changed-id",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g (with (aq)): retracting one requirement of a running batch cancels it alone on 2.0, so the cancel order differs. This covers a cancel event naming a different sibling at the same place. Batch-shaped twin of `l7-fuzz-g-observe-requirement.canceled-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-hook-onResolverWriteRejected-changed-req",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverWriteRejected",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].req",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a mixed-source batch is bound per item on 2.0, so each item's rejected write names its own requirement. This covers a rejection naming another item's requirement. Batch-shaped twin of `l7-fuzz-k-hook-onResolverWriteRejected-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-observe-resolver.write.rejected-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.write.rejected",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: as above, on the observe event. Batch-shaped twin of `l7-fuzz-k-observe-resolver.write.rejected-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-twin-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "twin",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-wrote-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-start-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-start-changed-items",
     "scenario": "fuzz",
     "stream": "external",
     "kind": "start",
@@ -27517,8 +28906,8 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchAbortOn"],
-    "group": "av",
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
     "bound": {
       "match": [
         {
@@ -27538,15 +28927,237 @@
           "to": {
             "$like": "absent"
           }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
         }
       ]
     },
-    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of a batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-07"
+    "date": "2026-11-08"
   },
   {
-    "id": "l7-fuzz-av-external-wrote-changed-items",
+    "id": "l7-fuzz-g-after-external-wrote-changed-items",
     "scenario": "fuzz",
     "stream": "external",
     "kind": "wrote",
@@ -27554,8 +29165,8 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchAbortOn"],
-    "group": "av",
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
     "bound": {
       "match": [
         {
@@ -27575,15 +29186,237 @@
           "to": {
             "$like": "absent"
           }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
         }
       ]
     },
-    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's write record (external \"wrote\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-07"
+    "date": "2026-11-08"
   },
   {
-    "id": "l7-fuzz-av-external-aborted-changed-items",
+    "id": "l7-fuzz-g-after-external-aborted-changed-items",
     "scenario": "fuzz",
     "stream": "external",
     "kind": "aborted",
@@ -27591,8 +29424,8 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchAbortOn"],
-    "group": "av",
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
     "bound": {
       "match": [
         {
@@ -27612,11 +29445,1250 @@
           "to": {
             "$like": "absent"
           }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
         }
       ]
     },
-    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of the batch call's abort record (external \"aborted\"), which repeat the call's items. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-07"
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-effect-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "effect",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-cleanup-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "cleanup",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-external-cleanup-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "cleanup",
+    "engine": "v2",
+    "op": "changed",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-hook-onFactSet-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onFactSet",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-hook-onDerivationInvalidate-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-after-hook-onResolverWriteRejected-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverWriteRejected",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-twin-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "twin",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-wrote-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-start-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-start-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-k-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-wrote-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-k-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-aborted-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ]
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "data[3]",
+          "from": [
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            },
+            {
+              "$like": "batchItem"
+            }
+          ],
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-k-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-effect-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "effect",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-cleanup-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "cleanup",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-external-cleanup-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "cleanup",
+    "engine": "v2",
+    "op": "changed",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-hook-onFactSet-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onFactSet",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-k-after-hook-onDerivationInvalidate-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batchMixed", "batchAbortOn"],
+    "group": "quirk-k",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
   }
 ]
