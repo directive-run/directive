@@ -162,9 +162,11 @@ the traces to agree.
   batch forever, and a fallback batch has nothing that cancels it. 2.0 is
   bounded there by approved rows (quirk a, (at)). Such a case is discarded
   like a reference runaway (`ScenarioResult.neverSettles`), but counted on
-  its own census line, never toward the runaway limit, and more than 3 per
-  seed (`MAX_NEVER_SETTLES`, lib/fuzz.ts) fail the run, in the fuzz test and
-  in the census (diff/self/settle-drain.test.ts).
+  its own census line, never toward the runaway limit, and more than the
+  seed's cap fail the run, in the fuzz test and in the census
+  (diff/self/settle-drain.test.ts). The cap: Jason, 2026-11-07: "Cap at 1%
+  of cases, min 3 (Recommended)", so max(1% of the seed's cases, 3)
+  (`maxNeverSettles`, lib/fuzz.ts); measured, about 0.5% of cases.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the

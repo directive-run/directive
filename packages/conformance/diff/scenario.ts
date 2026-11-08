@@ -302,7 +302,7 @@ export interface ScenarioResult {
    * after its run ends, or a fallback batch nothing cancels), so nothing is
    * compared (`ok` is false). The fuzzer discards such a case, like a
    * reference runaway, but counts it on its own, never toward the runaway
-   * limit, and fails a seed with more than MAX_NEVER_SETTLES of them
+   * limit, and fails a seed with more than maxNeverSettles of them
    * (lib/fuzz.ts; Jason, 2026-11-07: "Discard, own count (Recommended)").
    */
   neverSettles?: boolean;
@@ -1411,7 +1411,7 @@ export interface FuzzTally {
   /**
    * Discarded cases whose reference's batches outlived the drain's bound
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
-   * own (MAX_NEVER_SETTLES; Jason, 2026-11-07: "Discard, own count (Recommended)").
+   * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
    */
   neverSettles: number;
 }

@@ -40,10 +40,16 @@ export function maxRunaways(cases: number): number {
  * Most cases per seed the fuzzer discards because the reference's batches
  * never settle: 1.35's batches still live past the drain's bound at a settle
  * step (diff/scenario.ts `ScenarioResult.neverSettles`). Jason, 2026-11-07: "Discard, own count (Recommended)".
- * They are counted on their own line, never toward `maxRunaways`; one more
- * fails the run (the fuzz test and the census).
+ * They are counted on their own line, never toward `maxRunaways`. The cap
+ * is 1% of the seed's cases, never fewer than MIN_NEVER_SETTLES (Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)");
+ * one more fails the run (the fuzz test and the census).
  */
-export const MAX_NEVER_SETTLES = 3;
+export const MIN_NEVER_SETTLES = 3;
+
+/** The never-settles cap for a seed that generated `cases` cases: max(1% of them, 3). */
+export function maxNeverSettles(cases: number): number {
+  return Math.max(Math.floor(cases / 100), MIN_NEVER_SETTLES);
+}
 
 /**
  * The trigger names a fuzz divergence's `when` may list (diff/divergences.json;
