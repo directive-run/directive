@@ -199,11 +199,20 @@ export const withBatch: SystemPart = (context) => {
         host.leave_(run);
         ending++;
       }
-    })().finally(() => {
-      ending--;
-      context.settled();
-      context.schedule();
-    });
+    })().then(
+      () => {
+        ending--;
+        context.settled();
+        context.schedule();
+      },
+      // 1.35 asks for the pass only when the batch resolves (executeBatch's
+      // `.then`); a rethrow (boundary "throw") still settles, with no pass.
+      (error) => {
+        ending--;
+        context.settled();
+        throw error;
+      },
+    );
   }
 
   const batcher: Batcher = {
