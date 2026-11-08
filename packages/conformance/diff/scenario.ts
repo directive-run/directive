@@ -227,6 +227,8 @@ interface DrainRun {
   rule: SettleDrain;
   /** Each `settle` step's common end time, where one is known. */
   targets: ReadonlyMap<number, number>;
+  /** Steps whose target is the other engine's time live at its cap. */
+  judge: ReadonlySet<number>;
   waits: SettleWait[];
   /** v2: its wait is checked for attached work first. */
   v2: boolean;
@@ -237,16 +239,15 @@ interface DrainRun {
 /**
  * The shared wait on one run at `settle` step `step`: advance the fake
  * clock to the step's target, if one is set, then while a batch is live
- * (`busy`), up to the cap: `boundMs` of fake time after the step began
- * (`stepStart`, the same time on both engines, whose clocks agree there),
- * so both engines are judged at the same fake time.
+ * (`busy`), up to the cap, `boundMs` of fake time after `settle()`
+ * resolved. At a `judge` step the target is the other engine's time at its
+ * cap: still busy on reaching it, this run is live at the cap too.
  */
 async function waitOutBatches(
   drain: DrainRun,
   system: AnySystem,
   ctx: BuildContext,
   step: number,
-  stepStart: number,
 ): Promise<void> {
   const from = Date.now();
   const wait: SettleWait = {
@@ -270,21 +271,21 @@ async function waitOutBatches(
   // end is the target stops at the very same point; before the target it
   // goes on even when nothing is live. A sentinel timer at the target keeps
   // the clock moving there and is cleared after.
-  const cap = stepStart + drain.rule.boundMs;
-  const target = Math.min(
-    Math.max(drain.targets.get(step) ?? from, from),
-    Math.max(cap, from),
-  );
-  const sentinels = [target, cap]
-    .filter((at) => at > from)
-    .map((at) => setTimeout(() => {}, at - from));
+  const target = Math.max(drain.targets.get(step) ?? from, from);
+  const judge = drain.judge.has(step);
+  const sentinel =
+    target > from ? setTimeout(() => {}, target - from) : undefined;
   for (;;) {
     const why = drain.rule.busy(ctx, system);
     if (why === false && Date.now() >= target) {
       break;
     }
-    if (why !== false && Date.now() >= cap) {
-      wait.live = `${why}, at ${Date.now()} ms, ${Date.now() - stepStart} ms after the settle step began (cap ${drain.rule.boundMs} ms)`;
+    if (
+      why !== false &&
+      (Date.now() - from > drain.rule.boundMs ||
+        (judge && Date.now() >= target))
+    ) {
+      wait.live = `${why}, ${Date.now() - from} ms after settle() resolved (cap ${drain.rule.boundMs} ms${Date.now() - from > drain.rule.boundMs ? "" : `; judged at ${target} ms, where the other engine was live at its cap`})`;
       break;
     }
     if (vi.getTimerCount() === 0) {
@@ -298,9 +299,7 @@ async function waitOutBatches(
     await vi.advanceTimersToNextTimerAsync();
     await flushMicrotasks();
   }
-  for (const sentinel of sentinels) {
-    clearTimeout(sentinel);
-  }
+  clearTimeout(sentinel);
   wait.endAt = Date.now();
 }
 
@@ -321,13 +320,15 @@ export function nextTargets(
   reference: readonly SettleWait[],
   v2: readonly SettleWait[] | undefined,
   targets: ReadonlyMap<number, number>,
-): Map<number, number> | undefined {
+  judgeOf: ReadonlySet<number> = new Set(),
+): { targets: Map<number, number>; judge: Set<number> } | undefined {
   for (const r of reference) {
     const found = v2?.find((w) => w.step === r.step);
     const c = found?.attached === undefined ? found : undefined;
     const rLive = r.live !== undefined;
     const cLive = c?.live !== undefined;
     let end: number | undefined;
+    let judged = false;
     if (rLive && cLive) {
       return undefined;
     }
@@ -340,6 +341,7 @@ export function nextTargets(
         return undefined;
       }
       end = live.endAt;
+      judged = true;
     } else if (c !== undefined && c.endAt !== r.endAt) {
       end = Math.max(r.endAt, c.endAt);
     }
@@ -351,8 +353,17 @@ export function nextTargets(
         }
       }
       next.set(r.step, end);
+      const judge = new Set<number>();
+      for (const step of judgeOf) {
+        if (step < r.step) {
+          judge.add(step);
+        }
+      }
+      if (judged) {
+        judge.add(r.step);
+      }
 
-      return next;
+      return { targets: next, judge };
     }
   }
 
@@ -771,10 +782,9 @@ async function apply(
       await flushMicrotasks();
       break;
     case "settle": {
-      const stepStart = Date.now();
       await drive(Promise.resolve(system.settle()), rec, "settle");
       if (drain) {
-        await waitOutBatches(drain.run, system, ctx, drain.at, stepStart);
+        await waitOutBatches(drain.run, system, ctx, drain.at);
       }
       rec.checkpoint("settle");
       break;
@@ -892,6 +902,7 @@ export async function runBudgeted(
   limit = def.budget ?? RUN_BUDGET,
   referenceFired = limit,
   targets: ReadonlyMap<number, number> = new Map(),
+  judge: ReadonlySet<number> = new Set(),
 ): Promise<BudgetedRun> {
   const rec = createRecorder();
   // Everything that makes a run deterministic, and everything that captures
@@ -903,6 +914,7 @@ export async function runBudgeted(
       ? {
           rule: def.settleDrain,
           targets,
+          judge,
           waits: [],
           v2: drainsDetached(engine),
         }
@@ -1348,24 +1360,25 @@ export async function runScenario(
   // until every settle step ends at the same fake time on both.
   const twoOh = def.settleDrain ? candidates.find(drainsDetached) : undefined;
   let targets: ReadonlyMap<number, number> = new Map();
+  let judge: ReadonlySet<number> = new Set();
   let firstRun: BudgetedRun;
   let twoRun: BudgetedRun | undefined;
   let rounds = 0;
   for (;;) {
     rounds++;
-    firstRun = await runBudgeted(reference, def, limit, limit, targets);
+    firstRun = await runBudgeted(reference, def, limit, limit, targets, judge);
     twoRun =
       twoOh && !firstRun.runaway
-        ? await runBudgeted(twoOh, def, limit, firstRun.fired, targets)
+        ? await runBudgeted(twoOh, def, limit, firstRun.fired, targets, judge)
         : undefined;
     const next =
       twoRun && !twoRun.runaway
-        ? nextTargets(firstRun.waits, twoRun.waits, targets)
+        ? nextTargets(firstRun.waits, twoRun.waits, targets, judge)
         : undefined;
     if (!next || rounds >= SHARED_WAIT_ROUNDS) {
       break;
     }
-    targets = next;
+    ({ targets, judge } = next);
   }
   const first = firstRun.trace;
   if (firstRun.runaway) {
@@ -1422,7 +1435,14 @@ export async function runScenario(
       report: `never settles in scenario "${def.name}": on the reference (${reference.name}) ${firstRun.drainProblem}${both ? `, and on ${twoOh?.name} too (at step ${twoLive.step}: ${twoLive.live})` : ""}, so the case is discarded, not compared`,
     };
   }
-  const againRun = await runBudgeted(reference, def, limit, limit, targets);
+  const againRun = await runBudgeted(
+    reference,
+    def,
+    limit,
+    limit,
+    targets,
+    judge,
+  );
   const again = againRun.trace;
   const theirs: Record<string, TraceEntry[]> = {};
   const hung: string[] = [];
@@ -1447,7 +1467,7 @@ export async function runScenario(
     twoOnlyLive = `2.0-only live: at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.endAt ?? "?"} ms; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
     problems.push(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
   } else if (rounds >= SHARED_WAIT_ROUNDS && twoRun) {
-    if (nextTargets(firstRun.waits, twoRun.waits, targets)) {
+    if (nextTargets(firstRun.waits, twoRun.waits, targets, judge)) {
       problems.push(
         `scenario "${def.name}": the shared wait found no common end time in ${SHARED_WAIT_ROUNDS} rounds`,
       );
@@ -1462,7 +1482,7 @@ export async function runScenario(
     const run =
       engine === twoOh && twoRun
         ? twoRun
-        : await runBudgeted(engine, def, limit, firstRun.fired, targets);
+        : await runBudgeted(engine, def, limit, firstRun.fired, targets, judge);
     theirs[engine.name] = run.trace;
     settleTimes[engine.name] = run.waits.map((w) => w.endAt);
     drainedDetached += run.drainedDetached;

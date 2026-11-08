@@ -312,7 +312,7 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.neverSettles).toBeFalsy();
     expect(result.ok).toBe(false);
     expect(result.twoOnlyLive).toMatch(
-      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, at \d+ ms, 5000 ms after the settle step began \(cap 5000 ms\)\) while the reference's batches had finished by \d+ ms/,
+      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, \d+ ms after settle\(\) resolved \(cap 5000 ms\)\) while the reference's batches had finished by \d+ ms/,
     );
     expect(result.report).toContain(
       'v2+keepalive in scenario "fuzz": 2.0-only live',
@@ -334,15 +334,16 @@ describe("the fuzz shared wait at a settle step", () => {
           [5, 30],
         ]),
       ),
-    ).toEqual(new Map([[2, 250]]));
+    ).toEqual({ targets: new Map([[2, 250]]), judge: new Set() });
     expect(
       nextTargets([w(2, 5), w(5, 20)], [w(2, 5), w(5, 9)], new Map([[2, 5]])),
-    ).toEqual(
-      new Map([
+    ).toEqual({
+      targets: new Map([
         [2, 5],
         [5, 20],
       ]),
-    );
+      judge: new Set(),
+    });
     // v2 kept out (attached work) sets nothing.
     expect(
       nextTargets([w(2, 5)], [w(2, 0, { attached: "x" })], new Map()),
@@ -358,7 +359,7 @@ describe("the fuzz shared wait at a settle step", () => {
     // v2 live at the cap: 1.35's clock must run as long before it is judged.
     expect(
       nextTargets([w(2, 5)], [w(2, 5003, { live: "x" })], new Map()),
-    ).toEqual(new Map([[2, 5003]]));
+    ).toEqual({ targets: new Map([[2, 5003]]), judge: new Set([2]) });
     expect(
       nextTargets(
         [w(2, 5003)],
@@ -371,12 +372,9 @@ describe("the fuzz shared wait at a settle step", () => {
   it("only 1.35 live at the cap while 2.0 finished: the case never settles on 1.35: discarded, not compared, and not a runaway", async () => {
     const def = {
       ...toScenario(spec),
-      // Live until 3 ms: 1.35 (its settle() resolves at once) is still
-      // running at the 2 ms cap; v2's settle() waits its batch out to 5 ms.
-      settleDrain: {
-        boundMs: 2,
-        busy: () => (Date.now() < 3 ? "a test batch is live" : false),
-      },
+      // Always live: 1.35 passes its 2 ms cap at the batch's 5 ms timer;
+      // v2, whose settle() waited that batch out, has no timer left.
+      settleDrain: { boundMs: 2, busy: () => "a test batch is live" },
     };
     const result = await runScenario(def, {
       candidates: [v2],
@@ -388,7 +386,7 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.ok).toBe(false);
     expect(result.compared).toEqual([]);
     expect(result.report).toMatch(
-      /never settles in scenario "fuzz": on the reference \(v1\) the shared wait at step 2 passed its cap: a test batch is live, at 2 ms, 2 ms after the settle step began \(cap 2 ms\), so the case is discarded/,
+      /never settles in scenario "fuzz": on the reference \(v1\) the shared wait at step 2 passed its cap: a test batch is live, \d+ ms after settle\(\) resolved \(cap 2 ms\), so the case is discarded/,
     );
   });
 

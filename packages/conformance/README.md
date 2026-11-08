@@ -161,8 +161,11 @@ the traces to agree.
   settle step's wait at different times, the later becomes that step's
   target and both run again. A v2 whose `settle()` resolved with attached
   work left takes no part, so it still differs
-  (diff/self/settle-drain.test.ts). Each wait is capped at 5 s of fake time
-  (`DRAIN_BOUND_MS`), 2.0's own `settle()` limit:
+  (diff/self/settle-drain.test.ts). A run goes to its target one timer at a
+  time, as its own wait does. Each wait is capped at 5 s of fake time after
+  its `settle()` resolved (`DRAIN_BOUND_MS`), 2.0's own `settle()` limit;
+  when one engine is still running at its cap, the other is advanced to that
+  same time and judged there:
   - both engines still running at the cap: the case is discarded under the
     never-settles rule below;
   - only 1.35 still running while 2.0 finished: discarded the same way;
