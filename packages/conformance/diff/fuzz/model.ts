@@ -697,7 +697,7 @@ function moduleDef(
 }
 
 /**
- * One call of the batched handler, as the batch drain (`batchDrain`) reads
+ * One call of the batched handler, as the shared wait (`batchDrain`) reads
  * it: when it started, its signal, which attempt it is on that signal (1.35
  * keeps one controller for every attempt of a batch, and one per
  * requirement in the fallback), and when and how it returned.
@@ -710,7 +710,7 @@ interface BatchCall {
   threw?: boolean;
 }
 
-/** What the batch drain reads of one run (one per run: `ctx.handles` is). */
+/** What the shared wait reads of one run (one per run: `ctx.handles` is). */
 interface BatchLedger {
   /** The model's own timers (the resolvers' `delay` waits) still pending. */
   own: number;
@@ -746,11 +746,11 @@ function ownDelay(ledger: BatchLedger, ms: number): Promise<void> {
 export const DRAIN_BOUND_MS = 5000;
 
 /**
- * The batch drain for a case with the batched resolver (diff/scenario.ts
- * `SettleDrain`; Jason, 2026-11-06: "Wait out 1.35's batches
- * (Recommended)"). It runs on 1.35's engines only, once their `settle()`
- * has resolved, and reads a batch as live while one of these holds, each
- * 1.35's own schedule (packages/core/src/core/resolvers.ts):
+ * The shared wait's reading of a case with the batched resolver
+ * (diff/scenario.ts `SettleDrain`; Jason, 2026-11-07: "One shared wait
+ * (Recommended)", which replaced the separate drains). Once an engine's
+ * `settle()` has resolved, it reads a batch as live while one of these
+ * holds, each 1.35's own schedule (packages/core/src/core/resolvers.ts):
  *
  * - a call of the batched handler has not returned, its signal is not
  *   aborted (a canceled call is an orphan, as a canceled single run is),
@@ -770,12 +770,12 @@ export const DRAIN_BOUND_MS = 5000;
  * of canceled or timed-out calls and runs. With no timer left nothing can
  * move, so the drain ends, unless a call is still live (it stalls).
  *
- * On v2 the same calls are read, but only for its detached runs
- * (`detached`; Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)"): when `settle()` resolves with nothing attached left
- * (settled, no run in flight), a call still live can only be a detached
- * run's (a bound run whose requirement was retracted, RFC-0003), and v2's
- * clock advances until it ends and the system settles. With attached work
- * left, v2 is not waited for at all.
+ * On v2 the same calls are read, in the same shared wait (Jason,
+ * 2026-11-07: "One shared wait (Recommended)"): v2 joins it only when its
+ * `settle()` resolved with nothing attached left (`attached`: settled, no
+ * run in flight), so a call still live can only be a detached run's (a
+ * bound run whose requirement was retracted, RFC-0003). With attached work
+ * left, v2 takes no part, and its checkpoint differs.
  */
 export function batchDrain(b: FuzzBatch): SettleDrain {
   const callTimeout = b.handler === "fallback" ? null : b.timeout;
@@ -825,16 +825,13 @@ export function batchDrain(b: FuzzBatch): SettleDrain {
   return {
     boundMs: DRAIN_BOUND_MS,
     busy,
-    detached(ctx, system, waiting) {
-      if (
-        !waiting &&
-        (!system.isSettled || system.inspect().inflight.length > 0)
-      ) {
-        // Attached work left: v2's settle() resolved early, and must differ.
-        return false;
+    attached(_ctx, system) {
+      if (!system.isSettled) {
+        return "the system is not settled";
       }
+      const inflight = system.inspect().inflight.length;
 
-      return busy(ctx, system);
+      return inflight > 0 ? `${inflight} run(s) in flight` : false;
     },
   };
 }
@@ -886,7 +883,7 @@ function batchedResolver(
   const run = async (items: string[], context: any, throws: boolean) => {
     calls += 1;
     const n = calls;
-    // Live for the batch drain (toScenario) until the call ends.
+    // Live for the shared wait (toScenario) until the call ends.
     const signal = context.signal as AbortSignal | undefined;
     const key = signal ?? out.ledger;
     const call: BatchCall = {

@@ -38,7 +38,7 @@ export function maxRunaways(cases: number): number {
 
 /**
  * Most cases per seed the fuzzer discards because the reference's batches
- * never settle: 1.35's batches still live past the drain's bound at a settle
+ * never settle: 1.35's batches still live at the shared wait's cap at a settle
  * step (diff/scenario.ts `ScenarioResult.neverSettles`). Jason, 2026-11-07: "Discard, own count (Recommended)".
  * They are counted on their own line, never toward `maxRunaways`. The cap
  * is 1% of the seed's cases, never fewer than MIN_NEVER_SETTLES (Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)");

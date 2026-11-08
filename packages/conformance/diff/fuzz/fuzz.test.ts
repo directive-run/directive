@@ -37,9 +37,12 @@
  * (Jason, 2026-11-02: "Discard after the stop"; diff/scenario.ts
  * `stopsBefore`).
  *
- * A case whose reference's batches are still live past the batch drain's
- * bound at a settle step never settles on 1.35 either (diff/scenario.ts
- * `neverSettles`): it is discarded too, but on its own count, never toward
+ * At a settle step both engines' clocks advance together until neither has
+ * a batch still running, capped at 5 s (diff/scenario.ts `SettleDrain`;
+ * Jason, 2026-11-07: "One shared wait (Recommended)"). A case whose
+ * reference's batches are still live at the cap (with v2's or without)
+ * never settles on 1.35 either (diff/scenario.ts `neverSettles`): it is
+ * discarded too, but on its own count, never toward
  * the runaway limit, and more than maxNeverSettles (max(1% of the seed's
  * cases, 3)) fail the run (Jason, 2026-11-07: "Discard, own count
  * (Recommended)"; the cap, Jason, 2026-11-07: "Cap at 1% of cases, min 3
@@ -173,13 +176,16 @@ describe("differential fuzz", () => {
         ended,
         drained,
         drainedDetached,
+        sharedRerun,
+        twoOnlyLive,
+        bothLive,
         neverSettles,
       } = tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step, ${drainedDetached} where v2 waited out a detached batch run at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, the shared wait at a settle step advanced the reference's clock in ${drained} and v2's in ${drainedDetached}, ${sharedRerun} of them needing more than one round to find the common end time; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       console.info(
-        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches outlived the drain's bound at a settle step; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways)`,
+        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished)`,
       );
       logFuzz(SEED, tally);
     }

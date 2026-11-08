@@ -1460,7 +1460,7 @@ export interface FuzzRun {
   runawayAfterStop?: number;
   /**
    * Discarded cases whose reference never settles (its batches outlived the
-   * drain's bound; diff/scenario.ts `neverSettles`), not in `runaway`.
+   * shared wait's cap; diff/scenario.ts `neverSettles`), not in `runaway`.
    */
   neverSettles?: number;
   v2?: number;
@@ -1503,7 +1503,7 @@ export function describeFuzzRun(r: FuzzRun): string {
  * Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)"). Never part of the runaway count.
  */
 export function describeNeverSettles(runs: FuzzRun[]): string {
-  return `discarded because 1.35's batches never settle (outlived the drain's bound at a settle step; at most max(1% of the seed's cases, 3), not counted as runaways): ${runs.map((r) => `seed ${r.seed}: ${r.neverSettles ?? 0} of at most ${maxNeverSettles(r.runs + (r.runaway ?? 0) + (r.neverSettles ?? 0))}`).join("; ")}`;
+  return `discarded because 1.35's batches never settle (still live at the shared wait's 5 s cap at a settle step, Jason, 2026-11-07: "One shared wait (Recommended)"; at most max(1% of the seed's cases, 3), not counted as runaways): ${runs.map((r) => `seed ${r.seed}: ${r.neverSettles ?? 0} of at most ${maxNeverSettles(r.runs + (r.runaway ?? 0) + (r.neverSettles ?? 0))}`).join("; ")}`;
 }
 
 export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {

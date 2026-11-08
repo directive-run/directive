@@ -137,46 +137,56 @@ the traces to agree.
   60 cases compared on v2 (`FUZZ_V2_FLOOR`, counted from what each run
   compared) while `current` is not null. The cases across every layer all still
   run, as before.
-  **Batches at a settle step.** Jason, 2026-11-06: "Wait out 1.35's batches
-  (Recommended)". 1.35's `settle()` resolves while a batch still runs, and
-  2.0's waits for it (row (as)). So in the fuzz only, after `settle()`
-  resolves on 1.35's engines (the reference and the workspace engine,
-  `DRAIN_ENGINES`), the harness keeps advancing their fake clock, one timer
-  at a time, until the case's batches have finished, then records the
-  `settle` checkpoint: both engines are compared at the point their batches
-  are done. Finished is read from 1.35's own schedule (`batchDrain` in
-  diff/fuzz/model.ts): no call of the batched handler is still live (not
-  returned, not aborted, not past its timeout), no retry backoff of a failed
-  call is still running, and the system is settled. v2 is never drained, so a
-  2.0 whose `settle()` resolved early still checkpoints before its batch ends
-  and differs (diff/self/settle-drain.test.ts). The wait is bounded by 2.0's
-  own `settle()` limit, 5 s of fake time (`DRAIN_BOUND_MS`): a batch still
-  live past it on the workspace engine, or on the reference's second run,
-  fails the case, naming what kept it live. Hand scenarios are
-  not drained, and their signed (as) entries still pin 1.35's early
-  `settle()`. The fuzz line counts the cases where the reference waited.
-  **2.0's detached batches.** Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)". A bound run whose requirement is
-  retracted leaves flight without being aborted (RFC-0003) and runs on:
-  2.0's `settle()` does not wait for it, while 1.35's drain waits its calls
-  out. So at a settle step whose `settle()` left nothing attached (settled,
-  no run in flight), the harness also advances v2's clock while a call of
-  the batched resolver is live, then until v2 settles
-  (`SettleDrain.detached`). v2's own `settle()` is unchanged, and attached
-  batches on v2 are never waited for: a v2 whose `settle()` resolves early
-  on an attached batch still differs (diff/self/settle-drain.test.ts). The
-  fuzz line counts the cases where v2 waited.
+  **Batches at a settle step: one shared wait.** Jason, 2026-11-07: "One
+  shared wait (Recommended)". It replaced the two separate drains: 1.35's
+  (Jason, 2026-11-06: "Wait out 1.35's batches (Recommended)"), which
+  advanced only 1.35's clock until its batches finished, and v2's (Jason,
+  2026-11-07: "Wait out 2.0's detached batches too (Recommended)"), which
+  advanced only v2's until its detached runs finished. The two ended at
+  different fake times (seed 4: 12 ms against 250 ms), so the engines'
+  clocks drifted apart for every later step. 1.35's `settle()` resolves
+  while a batch still runs, and 2.0's waits for it (row (as)), but not for a
+  detached run (a bound run whose requirement is retracted leaves flight
+  unaborted, RFC-0003). So in the fuzz only, after `settle()` resolves, both
+  engines' fake clocks advance together, by the same amount, to the first
+  time at which neither has a batch still running, and the `settle`
+  checkpoint is recorded there, on both at the same fake time. Running is
+  read from 1.35's own schedule (`batchDrain` in diff/fuzz/model.ts): a call
+  of the batched handler still live (not returned, not aborted, not past its
+  timeout), a retry backoff of a failed call still running, or the system
+  not settled; on 1.35 that is any batch, on 2.0 a detached run, since its
+  attached ones are what its `settle()` waited for. The engines run one
+  after the other, so the common time is found in rounds
+  (`nextTargets`, diff/scenario.ts): where the reference and v2 ended a
+  settle step's wait at different times, the later becomes that step's
+  target and both run again. A v2 whose `settle()` resolved with attached
+  work left takes no part, so it still differs
+  (diff/self/settle-drain.test.ts). Each wait is capped at 5 s of fake time
+  (`DRAIN_BOUND_MS`), 2.0's own `settle()` limit:
+  - both engines still running at the cap: the case is discarded under the
+    never-settles rule below;
+  - only 1.35 still running while 2.0 finished: discarded the same way;
+  - only 2.0 still running while 1.35 finished in the same time: the case
+    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live.
+  A batch still live at the cap on the workspace engine, or on the
+  reference's second run, fails the case too. Hand scenarios never wait, and
+  their signed (as) entries still pin 1.35's early `settle()`. The fuzz line
+  counts the cases where each engine's clock advanced, and those that took
+  more than one round.
   **A reference that never settles.** Jason, 2026-11-07: "Discard, own count
-  (Recommended)". When the reference's own batches are still live past the
-  bound on its first run, the case never settles on 1.35: it records a
-  batch's errors after its run ends, so a "retry" boundary re-dispatches the
-  batch forever, and a fallback batch has nothing that cancels it. 2.0 is
-  bounded there by approved rows (quirk a, (at)). Such a case is discarded
-  like a reference runaway (`ScenarioResult.neverSettles`), but counted on
-  its own census line, never toward the runaway limit, and more than the
-  seed's cap fail the run, in the fuzz test and in the census
-  (diff/self/settle-drain.test.ts). The cap: Jason, 2026-11-07: "Cap at 1%
-  of cases, min 3 (Recommended)", so max(1% of the seed's cases, 3)
-  (`maxNeverSettles`, lib/fuzz.ts); measured, about 0.5% of cases.
+  (Recommended)". When the reference's own batches are still live at the
+  shared wait's cap on its first run, the case never settles on 1.35: it
+  records a batch's errors after its run ends, so a "retry" boundary
+  re-dispatches the batch forever; a fallback batch has nothing that
+  cancels it; or two writes chase each other on both engines (seed 10). 2.0
+  is bounded there by approved rows (quirk a, (at)). Such a case is
+  discarded like a reference runaway (`ScenarioResult.neverSettles`), but
+  counted on its own census line (with how many had v2 live too), never
+  toward the runaway limit, and more than the seed's cap fail the run, in
+  the fuzz test and in the census (diff/self/settle-drain.test.ts). The cap:
+  Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)", so max(1% of
+  the seed's cases, 3) (`maxNeverSettles`, lib/fuzz.ts); measured, about
+  0.5% of cases.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the
