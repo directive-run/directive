@@ -155,6 +155,16 @@ the traces to agree.
   fails the case, naming what kept it live. Hand scenarios are
   not drained, and their signed (as) entries still pin 1.35's early
   `settle()`. The fuzz line counts the cases where the reference waited.
+  **2.0's detached batches.** Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)". A bound run whose requirement is
+  retracted leaves flight without being aborted (RFC-0003) and runs on:
+  2.0's `settle()` does not wait for it, while 1.35's drain waits its calls
+  out. So at a settle step whose `settle()` left nothing attached (settled,
+  no run in flight), the harness also advances v2's clock while a call of
+  the batched resolver is live, then until v2 settles
+  (`SettleDrain.detached`). v2's own `settle()` is unchanged, and attached
+  batches on v2 are never waited for: a v2 whose `settle()` resolves early
+  on an attached batch still differs (diff/self/settle-drain.test.ts). The
+  fuzz line counts the cases where v2 waited.
   **A reference that never settles.** Jason, 2026-11-07: "Discard, own count
   (Recommended)". When the reference's own batches are still live past the
   bound on its first run, the case never settles on 1.35: it records a

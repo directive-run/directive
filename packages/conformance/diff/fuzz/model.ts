@@ -27,6 +27,7 @@
 import fc from "fast-check";
 import { FUZZ_TRIGGERS, type FuzzTrigger } from "../../lib/fuzz.js";
 import {
+  type AnySystem,
   type BuildContext,
   FUZZ_SCENARIO,
   type ScenarioDef,
@@ -768,47 +769,72 @@ export const DRAIN_BOUND_MS = 5000;
  * for is what neither engine's `settle()` waits for: the model's own waits
  * of canceled or timed-out calls and runs. With no timer left nothing can
  * move, so the drain ends, unless a call is still live (it stalls).
+ *
+ * On v2 the same calls are read, but only for its detached runs
+ * (`detached`; Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)"): when `settle()` resolves with nothing attached left
+ * (settled, no run in flight), a call still live can only be a detached
+ * run's (a bound run whose requirement was retracted, RFC-0003), and v2's
+ * clock advances until it ends and the system settles. With attached work
+ * left, v2 is not waited for at all.
  */
 export function batchDrain(b: FuzzBatch): SettleDrain {
   const callTimeout = b.handler === "fallback" ? null : b.timeout;
   const attempts = b.retry + 1;
+  const busy = (ctx: BuildContext, system: AnySystem): string | false => {
+    const reason = liveCall(ctx);
+
+    return reason || (system.isSettled ? false : "the system is not settled");
+  };
+  /** Why a call of the batched handler is still live, or false. */
+  const liveCall = (ctx: BuildContext): string | false => {
+    const ledger = ledgerOf(ctx.handles);
+    const now = Date.now();
+    let reason: string | false = false;
+    for (const call of ledger.calls) {
+      const timedOutAt =
+        callTimeout === null
+          ? Number.POSITIVE_INFINITY
+          : call.start + callTimeout;
+      const aborted = call.signal?.aborted === true;
+      if (call.end === undefined && !aborted && now < timedOutAt) {
+        return `a call of the batched handler (attempt ${call.attempt}, started at ${call.start} ms) is live`;
+      }
+      const failedAt =
+        call.end !== undefined && call.end < timedOutAt
+          ? call.threw
+            ? call.end
+            : undefined
+          : Number.isFinite(timedOutAt)
+            ? timedOutAt
+            : undefined;
+      const retries =
+        failedAt !== undefined &&
+        !aborted &&
+        call.attempt < attempts &&
+        ledger.attempts.get(call.signal ?? ledger) === call.attempt;
+      if (retries && now < (failedAt as number) + 2 * call.attempt) {
+        reason ||= `attempt ${call.attempt} failed at ${failedAt} ms and its retry's backoff runs to ${(failedAt as number) + 2 * call.attempt} ms`;
+      } else if (call.end !== undefined || aborted) {
+        ledger.calls.delete(call);
+      }
+    }
+
+    return reason;
+  };
 
   return {
     boundMs: DRAIN_BOUND_MS,
-    busy(ctx, system) {
-      const ledger = ledgerOf(ctx.handles);
-      const now = Date.now();
-      let reason: string | false = false;
-      for (const call of ledger.calls) {
-        const timedOutAt =
-          callTimeout === null
-            ? Number.POSITIVE_INFINITY
-            : call.start + callTimeout;
-        const aborted = call.signal?.aborted === true;
-        if (call.end === undefined && !aborted && now < timedOutAt) {
-          return `a call of the batched handler (attempt ${call.attempt}, started at ${call.start} ms) is live`;
-        }
-        const failedAt =
-          call.end !== undefined && call.end < timedOutAt
-            ? call.threw
-              ? call.end
-              : undefined
-            : Number.isFinite(timedOutAt)
-              ? timedOutAt
-              : undefined;
-        const retries =
-          failedAt !== undefined &&
-          !aborted &&
-          call.attempt < attempts &&
-          ledger.attempts.get(call.signal ?? ledger) === call.attempt;
-        if (retries && now < (failedAt as number) + 2 * call.attempt) {
-          reason ||= `attempt ${call.attempt} failed at ${failedAt} ms and its retry's backoff runs to ${(failedAt as number) + 2 * call.attempt} ms`;
-        } else if (call.end !== undefined || aborted) {
-          ledger.calls.delete(call);
-        }
+    busy,
+    detached(ctx, system, waiting) {
+      if (
+        !waiting &&
+        (!system.isSettled || system.inspect().inflight.length > 0)
+      ) {
+        // Attached work left: v2's settle() resolved early, and must differ.
+        return false;
       }
 
-      return reason || (system.isSettled ? false : "the system is not settled");
+      return busy(ctx, system);
     },
   };
 }

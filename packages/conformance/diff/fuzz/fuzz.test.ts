@@ -172,10 +172,11 @@ describe("differential fuzz", () => {
         mostFired,
         ended,
         drained,
+        drainedDetached,
         neverSettles,
       } = tally;
       console.info(
-        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
+        `[diff fuzz] seed ${SEED}: ${ran} cases, ${runaway} runaway (discarded: ${runaway - afterStop} where the reference passed ${RUN_BUDGET} timer callbacks, ${afterStop} after a stop, where an engine under test passed them once an \`ends\` divergence had ended the comparison), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, ${drained} where the reference waited out a batch at a settle step, ${drainedDetached} where v2 waited out a detached batch run at a settle step; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       console.info(
         `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches outlived the drain's bound at a settle step; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways)`,

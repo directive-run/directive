@@ -146,10 +146,30 @@ export interface ScenarioDef {
  * still checkpoints before its batch ends and differs. A wait past
  * `boundMs` of fake time, or with busy true and no timer left, fails the
  * case (`drainProblem`).
+ *
+ * v2's detached batch runs (Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)"). A bound run whose requirement is
+ * retracted leaves flight without being aborted (RFC-0003) and runs on;
+ * 2.0's `settle()` does not wait for it, and 1.35's drain waits its calls
+ * out. So on v2 (`drainsDetached`), when `settle()` resolves with nothing
+ * attached left (`detached`), the harness also advances v2's clock while a
+ * call of the batched resolver is still live, then while the system is not
+ * settled. v2's `settle()` is unchanged, and attached batches are never
+ * waited for: a v2 whose `settle()` resolved with attached work still
+ * checkpoints there and differs (diff/self/settle-drain.test.ts).
  */
 export interface SettleDrain {
   /** Why a batch is still live (shown if the drain fails), or false. */
   busy(ctx: BuildContext, system: AnySystem): string | false;
+  /**
+   * v2 only: why a detached batch run is still live, or false. Before the
+   * first wait (`waiting` false) it is false whenever anything attached is
+   * left (the system is not settled, or a run is in flight).
+   */
+  detached?(
+    ctx: BuildContext,
+    system: AnySystem,
+    waiting: boolean,
+  ): string | false;
   boundMs: number;
 }
 
@@ -169,6 +189,14 @@ export function drains(engine: { name: string }): boolean {
   return DRAIN_ENGINES.has(engine.name) || engine.name.startsWith("local+");
 }
 
+/**
+ * Whether `engine` is v2, whose detached batch runs alone are waited out
+ * (`SettleDrain.detached`; Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)").
+ */
+export function drainsDetached(engine: { name: string }): boolean {
+  return engine.name === "v2" || engine.name.startsWith("v2+");
+}
+
 /** One run's drain: the rule, and what it did. */
 interface DrainRun {
   rule: SettleDrain;
@@ -177,6 +205,8 @@ interface DrainRun {
   problem?: string;
   /** The drain passed `boundMs` (not a stall): the batches outlived it. */
   pastBound?: boolean;
+  /** v2's drain: only its detached batch runs (`SettleDrain.detached`). */
+  detached: boolean;
 }
 
 /**
@@ -191,13 +221,14 @@ async function waitOutBatches(
 ): Promise<void> {
   const from = Date.now();
   let jumped = false;
-  for (
-    let why = drain.rule.busy(ctx, system);
-    why !== false;
-    why = drain.rule.busy(ctx, system)
-  ) {
+  const busy = (waiting: boolean): string | false =>
+    drain.detached
+      ? (drain.rule.detached?.(ctx, system, waiting) ?? false)
+      : drain.rule.busy(ctx, system);
+  const which = drain.detached ? "detached-batch drain" : "batch drain";
+  for (let why = busy(false); why !== false; why = busy(true)) {
     if (Date.now() - from > drain.rule.boundMs) {
-      drain.problem ??= `the batch drain at step ${step} passed its bound: ${why}, ${Date.now() - from} ms after settle() resolved (bound ${drain.rule.boundMs} ms)`;
+      drain.problem ??= `the ${which} at step ${step} passed its bound: ${why}, ${Date.now() - from} ms after settle() resolved (bound ${drain.rule.boundMs} ms)`;
       drain.pastBound = true;
 
       return;
@@ -205,7 +236,7 @@ async function waitOutBatches(
     if (vi.getTimerCount() === 0) {
       // Nothing left can move the system: done, unless a call still runs.
       if (why.startsWith("a call ")) {
-        drain.problem ??= `the batch drain at step ${step} stalled: ${why}, and no timer left`;
+        drain.problem ??= `the ${which} at step ${step} stalled: ${why}, and no timer left`;
       }
       break;
     }
@@ -295,6 +326,11 @@ export interface ScenarioResult {
    * (Recommended)").
    */
   drained?: number;
+  /**
+   * `settle` steps after which v2 waited out a detached batch run
+   * (`SettleDrain.detached`; Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)").
+   */
+  drainedDetached?: number;
   /**
    * The reference's first run waited out its batches at a settle step past
    * the drain's bound (`SettleDrain.boundMs`): 1.35's batches never settle
@@ -665,6 +701,8 @@ export interface BudgetedRun {
   pastReferenceAt?: number;
   /** `settle` steps the batch drain waited after (`SettleDrain`). */
   drained: number;
+  /** `settle` steps v2's detached-batch drain waited after. */
+  drainedDetached: number;
   /**
    * The drain passed its bound or stalled: the case fails, except on the
    * reference's first run past its bound (`drainPastBound`).
@@ -695,8 +733,10 @@ export async function runBudgeted(
   const budget = installBudget(limit, referenceFired, () => rec.trace.length);
   const drain: DrainRun | undefined =
     def.settleDrain && drains(engine)
-      ? { rule: def.settleDrain, waited: 0 }
-      : undefined;
+      ? { rule: def.settleDrain, waited: 0, detached: false }
+      : def.settleDrain?.detached && drainsDetached(engine)
+        ? { rule: def.settleDrain, waited: 0, detached: true }
+        : undefined;
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -745,6 +785,7 @@ export async function runBudgeted(
         runawayAt: budget.state.at,
         pastReferenceAt: budget.state.pastAt,
         drained: 0,
+        drainedDetached: 0,
       };
     }
     const snapshots = new Map<string, unknown>();
@@ -807,7 +848,8 @@ export async function runBudgeted(
     runaway: budget.state.exceeded,
     runawayAt: budget.state.at,
     pastReferenceAt: budget.state.pastAt,
-    drained: drain?.waited ?? 0,
+    drained: drain && !drain.detached ? drain.waited : 0,
+    drainedDetached: drain?.detached ? drain.waited : 0,
     drainProblem: drain?.problem,
     drainPastBound: drain?.pastBound ?? false,
   };
@@ -1198,9 +1240,11 @@ export async function runScenario(
     }
   }
   const runaways = new Map<string, number | undefined>();
+  let drainedDetached = 0;
   for (const engine of candidates) {
     const run = await runBudgeted(engine, def, limit, firstRun.fired);
     theirs[engine.name] = run.trace;
+    drainedDetached += run.drainedDetached;
     if (run.drainProblem) {
       problems.push(
         `${engine.name} in scenario "${def.name}": ${run.drainProblem}`,
@@ -1321,6 +1365,7 @@ export async function runScenario(
     discarded,
     fired: firstRun.fired,
     drained: firstRun.drained,
+    drainedDetached,
     report,
   };
 }
@@ -1408,6 +1453,8 @@ export interface FuzzTally {
   endedAtStep0: number;
   /** Compared cases where the reference waited out a batch at a settle step. */
   drained: number;
+  /** Compared cases where v2 waited out a detached batch run at a settle step. */
+  drainedDetached: number;
   /**
    * Discarded cases whose reference's batches outlived the drain's bound
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
@@ -1428,6 +1475,7 @@ export function newFuzzTally(): FuzzTally {
     endedSteps: 0,
     endedAtStep0: 0,
     drained: 0,
+    drainedDetached: 0,
     neverSettles: 0,
   };
 }
@@ -1466,6 +1514,9 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   if ((result.drained ?? 0) > 0) {
     tally.drained++;
   }
+  if ((result.drainedDetached ?? 0) > 0) {
+    tally.drainedDetached++;
+  }
   if (result.ended.length > 0) {
     const step = Math.min(...result.ended.map((e) => e.at.step));
     tally.ended++;
@@ -1491,6 +1542,8 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
       runaway: tally.runaway,
       runawayAfterStop: tally.afterStop,
       neverSettles: tally.neverSettles,
+      drained: tally.drained,
+      drainedDetached: tally.drainedDetached,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,

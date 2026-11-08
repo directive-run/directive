@@ -7,7 +7,10 @@
  * edge: 1.35 really does checkpoint with a batch running, the drain makes
  * that case compare equal (on the workspace engine too), a 2.0 whose
  * `settle()` resolves early (1.35's behaviour, the opposite of row (as))
- * still differs, and a drain that does not end fails the case. Past its
+ * still differs, and a drain that does not end fails the case. On v2 only
+ * detached batch runs are waited out (Jason, 2026-11-07: "Wait out 2.0's detached batches too (Recommended)"): one that outlives settle() is
+ * waited for, and an early settle() on an attached batch still differs.
+ * Past its
  * bound on the reference's first run, the case never settles on 1.35: it is
  * discarded, on its own count, at most max(1% of the seed's cases, 3)
  * (Jason, 2026-11-07: "Discard, own count (Recommended)"; the cap, Jason,
@@ -32,6 +35,7 @@ import {
   type FuzzTally,
   type ScenarioResult,
   drains,
+  drainsDetached,
   newFuzzTally,
   runScenario,
   tallyCase,
@@ -127,11 +131,15 @@ describe("the fuzz batch drain at a settle step", () => {
     expect(result.drained).toBe(1);
   });
 
-  it("a 2.0 whose settle() resolves early still differs: v2 is never drained", async () => {
+  it("a 2.0 whose settle() resolves early on an attached batch still differs: v2's attached batches are never waited for", async () => {
     expect(DRAIN_ENGINES.has("v2")).toBe(false);
     expect([drains({ name: "v2" }), drains({ name: "local+control" })]).toEqual(
       [false, true],
     );
+    expect([drainsDetached({ name: "v2" }), drainsDetached(local)]).toEqual([
+      true,
+      false,
+    ]);
     const early = settlesEarly(v2);
     expect(early.name).toBe("v2");
     const result = await runScenario(toScenario(spec), {
@@ -140,6 +148,45 @@ describe("the fuzz batch drain at a settle step", () => {
     });
     expect(result.ok).toBe(false);
     expect(result.unexplained.some((d) => d.step === SETTLE_STEP)).toBe(true);
+    expect(result.drainedDetached).toBe(0);
+  });
+
+  it("v2's detached batch run is waited out at a settle step; without that, 1.35's drained run and v2 differ", async () => {
+    // A bound batch (abortOn the handler's write key, f1): its requirement is
+    // retracted (f0 back to 0) while the call waits its 5 ms, so v2 detaches
+    // the run (RFC-0003) and its settle() resolves at once; 1.35's drain
+    // waits the call out. Steps: start, raise, open the window, retract,
+    // settle (step 4).
+    const detachedSpec: FuzzSpec = {
+      ...spec,
+      steps: [
+        { op: "set", module: 0, fact: 0, value: 5 },
+        { op: "advance", ms: 1 },
+        { op: "set", module: 0, fact: 0, value: 0 },
+      ],
+      batch: {
+        ...spec.batch!,
+        sources: [{ fact: 0, atLeast: 1, items: 1, abortOn: true }],
+        writes: 1,
+      },
+    };
+    const def = toScenario(detachedSpec);
+    const withRule = await runScenario(def, {
+      candidates: [v2],
+      divergences: [],
+    });
+    expect(withRule.report).toBe("");
+    expect(withRule.ok).toBe(true);
+    expect([withRule.drained, withRule.drainedDetached]).toEqual([1, 1]);
+
+    const { detached: _, ...rule } = def.settleDrain!;
+    const without = await runScenario(
+      { ...def, settleDrain: rule },
+      { candidates: [v2], divergences: [] },
+    );
+    expect(without.ok).toBe(false);
+    expect(without.drainedDetached).toBe(0);
+    expect(without.unexplained.some((d) => d.step === 4)).toBe(true);
   });
 
   it("past its bound on the reference's first run, the case never settles on 1.35: discarded, not compared, and not a runaway", async () => {
