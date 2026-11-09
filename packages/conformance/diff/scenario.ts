@@ -43,6 +43,7 @@ import {
   compareContract,
   compareFull,
   comparePositions,
+  diffJson,
   drawProblems,
   drawnResolvers,
   interleaving,
@@ -1420,6 +1421,78 @@ export function stopsBefore(
   return where[0] < step || (where[0] === step && where[1] < phase);
 }
 
+/**
+ * File moves (`Difference.op` "moved"): a missing record in step N and the
+ * first unpaired extra record of the same engine, stream and kind in step
+ * N + 1 become one move, at the missing record's place, but only where a
+ * signed entry with op `moved` covers that move (`covers`, with the case's
+ * triggers); every other pair stays a missing and an extra, so no existing
+ * entry sees its differences change shape. A move's other fields are
+ * compared as a matched pair's are: each field that differs is a `changed`
+ * difference of its own, after the move. Its shared match point is the
+ * earlier of the two records' (`SharedPoint`: the chain is ordered in both
+ * traces at once). Self-tests: diff/self/moved.test.ts.
+ */
+export function fileMoves(
+  name: string,
+  differences: Difference[],
+  divergences: Divergence[],
+  triggers?: readonly string[],
+): Difference[] {
+  const movers = divergences.filter((div) => div.op === "moved");
+  if (movers.length === 0) {
+    return differences;
+  }
+  const taken = new Set<Difference>();
+  const filed = new Map<Difference, Difference[]>();
+  for (const m of differences) {
+    if (m.op !== "missing") {
+      continue;
+    }
+    const x = differences.find(
+      (d) =>
+        d.op === "extra" &&
+        !taken.has(d) &&
+        d.engine === m.engine &&
+        d.stream === m.stream &&
+        d.kind === m.kind &&
+        d.step === m.step + 1,
+    );
+    if (!x) {
+      continue;
+    }
+    const { raw: _raw, ...base } = m;
+    const moved: Difference = {
+      ...base,
+      op: "moved",
+      candidate: x.candidate,
+      at: { reference: m.at.reference, candidate: x.at.candidate },
+      where: { reference: m.where.reference, candidate: x.where.candidate },
+      shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
+    };
+    if (!movers.some((div) => covers(div, name, moved, triggers))) {
+      continue;
+    }
+    taken.add(x);
+    const fields: { path: string; reference?: Json; candidate?: Json }[] = [];
+    diffJson(m.reference, x.candidate, "", fields);
+    filed.set(m, [
+      moved,
+      ...fields.map((f) => ({
+        ...moved,
+        op: "changed" as const,
+        path: f.path,
+        reference: f.reference,
+        candidate: f.candidate,
+      })),
+    ]);
+  }
+
+  return differences.flatMap((d) =>
+    taken.has(d) ? [] : (filed.get(d) ?? [d]),
+  );
+}
+
 export async function runScenario(
   def: ScenarioDef,
   opts: RunOptions = {},
@@ -1592,7 +1665,13 @@ export async function runScenario(
   const differences: Difference[] = [];
   const advisories: string[] = [];
   for (const [engine, trace] of Object.entries(theirs)) {
-    const contractDiffs = compareContract(first, trace, engine);
+    const compared = compareContract(first, trace, engine);
+    const contractDiffs = fileMoves(
+      def.name,
+      compared,
+      divergences,
+      def.triggers,
+    );
     // A loop, not push(...contractDiffs): a case one engine drives far from
     // the reference (an approved quirk that cascades) can yield more
     // differences than a call may take as arguments, and spreading them
@@ -1601,7 +1680,7 @@ export async function runScenario(
       differences.push(d);
     }
     const contractKeys = new Set(
-      contractDiffs.map((d) => `${d.at.reference}|${d.at.candidate}|${d.path}`),
+      compared.map((d) => `${d.at.reference}|${d.at.candidate}|${d.path}`),
     );
     for (const d of compareFull(first, trace, engine)) {
       if (!contractKeys.has(`${d.at.reference}|${d.at.candidate}|${d.path}`)) {

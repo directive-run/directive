@@ -317,15 +317,17 @@ harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review. It is the one harness
 file an engine PR may change (see "Engine and oracle land separately").
 
-**A moved record** (`op: "moved"`, diff/compare.ts `compareWith`). A
-record left unmatched on the engine under test in step N that it has, of
-the same stream and kind, unmatched in step N + 1 is one difference, a
-move, filed once at the reference's step and phase with the reference's
-record as its payload; never a `missing` plus an `extra`. Only the step
-moved: every field that differs between the two records is a `changed`
-difference of its own, compared as a matched pair's would be. So an entry
-for a move covers that one record arriving a step later and never its
-absence: a 2.0 that never makes the record still shows it `missing`. Row
+**A moved record** (`op: "moved"`, diff/scenario.ts `fileMoves`). A
+record missing on the engine under test in step N that it has, of the same
+stream and kind, as an extra record in step N + 1 is filed as one
+difference, a move, at the reference's step and phase with the reference's
+record as its payload, but only where a signed entry with op `moved`
+covers that move; every other such pair stays a `missing` and an `extra`,
+so no other entry sees its differences change shape. Only the step moved:
+every field that differs between the two records is a `changed` difference
+of its own, compared as a matched pair's would be. So an entry for a move
+covers that one record arriving a step later and never its absence: a 2.0
+that never makes the record still shows it `missing`. Row
 (av)'s early flush on 1.35 (seed 1 at DIFF_FUZZ_RUNS=5000: 1.35's queue
 holds the re-raised item twice, which fills `maxSize` 2 and flushes a step
 before 2.0's window timer) is one: its entry

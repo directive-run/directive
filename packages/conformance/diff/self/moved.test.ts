@@ -19,7 +19,12 @@ import { type EngineHandle, engines } from "../engines.js";
 import { LIKE, generalizeValue } from "../fingerprint.js";
 import { type FuzzSpec, toScenario } from "../fuzz/model.js";
 import type { TraceEntry } from "../record.js";
-import { covers, readDivergences, runScenario } from "../scenario.js";
+import {
+  covers,
+  fileMoves,
+  readDivergences,
+  runScenario,
+} from "../scenario.js";
 
 const MOVED = "l7-fuzz-av-external-start-moved";
 const ITEMS = "l7-fuzz-av-external-start-changed-items";
@@ -73,41 +78,56 @@ const shape = (ds: Difference[]) =>
   ds.map((d) => [d.op, d.kind, d.step, d.path ?? ""]);
 
 describe("a moved record", () => {
-  it("one step later is one moved difference, and a field that differs is a changed difference of its own", () => {
+  it("a missing record and the same kind extra one step later are one move where a moved entry covers it, its other fields changed differences of their own", () => {
+    const entry = readDivergences().find((e) => e.id === MOVED)!;
+    const triggers = ["batched", "batchAbortOn", "batchMaxSize"];
+    const filed = (ref: TraceEntry[], cand: TraceEntry[], t = triggers) =>
+      shape(fileMoves("fuzz", compareContract(ref, cand, "v2"), [entry], t));
     expect(
-      shape(
-        compareContract(
-          trace([[1, ["0.0", "0.0"]]]),
-          trace([[2, ["0.0", "0.0"]]]),
-          "v2",
-        ),
-      ),
+      filed(trace([[1, ["0.0", "0.0"]]]), trace([[2, ["0.0", "0.0"]]])),
     ).toEqual([["moved", "start", 1, ""]]);
-    expect(
-      shape(
-        compareContract(
-          trace([[1, ["0.0", "0.0"]]]),
-          trace([[2, ["0.0"]]]),
-          "v2",
-        ),
-      ),
-    ).toEqual([
+    expect(filed(trace([[1, ["0.0", "0.0"]]]), trace([[2, ["0.0"]]]))).toEqual([
       ["moved", "start", 1, ""],
       ["changed", "start", 1, "data[3][1]"],
     ]);
-    // Two steps later, or a step earlier, is no move.
+    // No covering moved entry (distinct items, no maxSize trigger, or no
+    // entry at all): the pair stays a missing and an extra.
+    const pair = [
+      ["missing", "start", 1, ""],
+      ["extra", "start", 2, ""],
+    ];
+    expect(
+      filed(trace([[1, ["0.0", "0.1"]]]), trace([[2, ["0.0", "0.1"]]])),
+    ).toEqual(pair);
+    expect(
+      filed(trace([[1, ["0.0", "0.0"]]]), trace([[2, ["0.0"]]]), [
+        "batched",
+        "batchAbortOn",
+      ]),
+    ).toEqual(pair);
     expect(
       shape(
-        compareContract(trace([[0, ["0.0"]]]), trace([[2, ["0.0"]]]), "v2"),
+        fileMoves(
+          "fuzz",
+          compareContract(
+            trace([[1, ["0.0", "0.0"]]]),
+            trace([[2, ["0.0"]]]),
+            "v2",
+          ),
+          [],
+          triggers,
+        ),
       ),
+    ).toEqual(pair);
+    // Two steps later, or a step earlier, is no move.
+    expect(
+      filed(trace([[0, ["0.0", "0.0"]]]), trace([[2, ["0.0", "0.0"]]])),
     ).toEqual([
       ["missing", "start", 0, ""],
       ["extra", "start", 2, ""],
     ]);
     expect(
-      shape(
-        compareContract(trace([[2, ["0.0"]]]), trace([[1, ["0.0"]]]), "v2"),
-      ),
+      filed(trace([[2, ["0.0", "0.0"]]]), trace([[1, ["0.0", "0.0"]]])),
     ).toEqual([
       ["extra", "start", 1, ""],
       ["missing", "start", 2, ""],
