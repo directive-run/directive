@@ -698,5 +698,765 @@
         }
       ]
     }
+  },
+  {
+    "group": "av",
+    "spec": {
+      "modules": [
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0, 1, 2],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 4
+            },
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": 6,
+              "throwsAt": null
+            },
+            {
+              "facts": [1, 2],
+              "derived": [],
+              "threshold": 2,
+              "throwsAt": 7
+            }
+          ],
+          "events": [
+            {
+              "target": 2,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 2,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 2,
+              "value": 2,
+              "delay": 5,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 50
+            }
+          ],
+          "effects": [],
+          "source": {
+            "gated": false
+          }
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 6,
+              "throwsAt": 5
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": null,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": 3,
+              "priority": 0,
+              "writes": 0,
+              "value": 4,
+              "delay": 0,
+              "fails": 1,
+              "retry": 2,
+              "timeout": 3
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1692006440,
+          "value": -1
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[2054474792, 6]]
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 1345023634,
+          "value": 5
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 4
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 885776241,
+          "value": 5
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1512608069,
+          "value": 3
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 1,
+            "items": 2,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 1,
+        "delay": 1,
+        "fails": 1,
+        "retry": 2,
+        "timeout": 3,
+        "writes": 1,
+        "value": 0
+      }
+    }
+  },
+  {
+    "group": "quirk-g-fails",
+    "spec": {
+      "modules": [
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": 2,
+              "throwsAt": 5
+            },
+            {
+              "facts": [0, 2],
+              "derived": [0],
+              "threshold": 4,
+              "throwsAt": 7
+            },
+            {
+              "facts": [2, 0, 1],
+              "derived": [],
+              "threshold": -2,
+              "throwsAt": 8
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 2,
+              "add": true
+            }
+          ],
+          "constraints": [],
+          "effects": [
+            {
+              "reads": [1, 2],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 7
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "retry",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 886200931,
+          "value": 6
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 108441951,
+          "value": 3
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1506719563,
+          "value": 0
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 2124348383,
+          "value": 0
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 3,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 5,
+        "maxSize": 1,
+        "delay": 1,
+        "fails": 2,
+        "retry": 0,
+        "timeout": 50,
+        "writes": 1,
+        "value": 2
+      }
+    }
+  },
+  {
+    "group": "quirk-h",
+    "spec": {
+      "modules": [
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 7
+            }
+          ],
+          "events": [
+            {
+              "target": 2,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 6,
+              "delay": 0,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 3
+            },
+            {
+              "fact": 2,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 1,
+              "value": 2,
+              "delay": 1,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 10
+            },
+            {
+              "fact": 2,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 2,
+              "value": 6,
+              "delay": 5,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 3
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": 7
+            }
+          ],
+          "source": {
+            "gated": false
+          }
+        }
+      ],
+      "boundary": "retry-later",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 639593281,
+          "value": 4
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1026220583,
+          "value": 3
+        },
+        {
+          "op": "advance",
+          "ms": 1500
+        },
+        {
+          "op": "date",
+          "module": 0,
+          "ms": 1
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 102415402,
+          "value": 2
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1046424763, 2]]
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 2,
+            "items": 2,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 1,
+        "fails": 1,
+        "retry": 2,
+        "timeout": 3,
+        "writes": 0,
+        "value": 2
+      }
+    }
+  },
+  {
+    "group": "quirk-i",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": -2,
+              "throwsAt": 6
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 2,
+              "throwsAt": 6
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 4
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": "skip",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 495242332,
+          "value": -2
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1137203118,
+          "value": 0
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1473447759,
+          "value": 2
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[478910429, 1]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 867160805,
+          "value": 4
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1641417975,
+          "value": 4
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 1
+        },
+        {
+          "op": "advance",
+          "ms": 25
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": false
+          },
+          {
+            "fact": 1,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "some",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 1,
+        "fails": 1,
+        "retry": 2,
+        "timeout": 50,
+        "writes": 2,
+        "value": 1
+      }
+    }
+  },
+  {
+    "group": "quirk-i-passes",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 0,
+              "throwsAt": 4
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 0,
+              "delay": 5,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 3
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": null
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "retry-later",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "tick"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 0,
+            "items": 2,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "some",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 0,
+        "fails": 1,
+        "retry": 1,
+        "timeout": 3,
+        "writes": 1,
+        "value": 5
+      }
+    }
+  },
+  {
+    "group": "av-moved",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": -1
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 0
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 0
+      }
+    }
   }
 ]

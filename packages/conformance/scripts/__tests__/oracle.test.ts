@@ -627,7 +627,7 @@ describe("the differential project", () => {
       expect(text).toMatch(/stream must be one of/);
       expect(text).toMatch(/needs the kind/);
       expect(text).toMatch(/step must be an integer/);
-      expect(text).toMatch(/op must be missing, extra or changed/);
+      expect(text).toMatch(/op must be missing, extra, changed or moved/);
       expect(text).toMatch(/needs a reason/);
       expect(text).toMatch(/YYYY-MM-DD/);
       expect(text).toMatch(/d1 must have/);
