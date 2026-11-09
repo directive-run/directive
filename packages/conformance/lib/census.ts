@@ -1009,9 +1009,14 @@ export function checkDivergences(
     }
     if (
       e.op !== undefined &&
-      !["missing", "extra", "changed"].includes(e.op as string)
+      !["missing", "extra", "changed", "moved"].includes(e.op as string)
     ) {
-      fail(`${label} op must be missing, extra or changed`);
+      fail(`${label} op must be missing, extra, changed or moved`);
+    }
+    if (e.op === "moved" && e.path !== undefined) {
+      fail(
+        `${label} has op "moved" and a path: a move names the whole record, and a field that differs is a changed difference of its own`,
+      );
     }
     if (typeof e.reason !== "string" || e.reason.trim().length < 10) {
       fail(`${label} needs a reason`);
@@ -1040,7 +1045,7 @@ export function checkDivergences(
       }
       if (e.op === undefined) {
         fail(
-          `${label} has ends, so it must say which op (missing, extra or changed) stops the case`,
+          `${label} has ends, so it must say which op (missing, extra, changed or moved) stops the case`,
         );
       } else if (e.op === "changed" && e.path === undefined) {
         fail(

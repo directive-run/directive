@@ -5678,6 +5678,39 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l7-fuzz-av-external-start-moved",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "moved",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchMaxSize"],
+    "group": "av-moved",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItemsRepeated"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av): a bound queued batched requirement retracted and raised again goes into 1.35's queue twice; with a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0 holds the requirement once and its call starts when its window timer flushes, one step later. This covers that call's start record arriving one step later on 2.0 (a `moved` difference: the same record in step N + 1, never its absence), and only when 1.35's call holds an item twice (`batchItemsRepeated`) in a case with a `maxSize` (`when` `batchMaxSize`); the repeated item itself is still compared, and covered by `l7-fuzz-av-external-start-changed-items`. Every later record can differ (the call's outcomes come a step later), so this entry ends the fuzz case (`ends`). Batch-shaped twin of `l7-fuzz-av-external-start-changed-items` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-08"
+  },
+  {
     "id": "l7-fuzz-av-external-start-changed-items",
     "scenario": "fuzz",
     "stream": "external",

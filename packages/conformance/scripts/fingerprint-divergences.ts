@@ -185,8 +185,8 @@ try {
     ({
       op,
       path: x.path,
-      reference: op === "missing" ? x.record : x.from,
-      candidate: op === "extra" ? x.record : x.to,
+      reference: op === "missing" || op === "moved" ? x.record : x.from,
+      candidate: op === "extra" || op === "moved" ? x.record : x.to,
     }) as Difference;
   const migrated = entries.map((e) => {
     if (e.scenario !== FUZZ_SCENARIO) {

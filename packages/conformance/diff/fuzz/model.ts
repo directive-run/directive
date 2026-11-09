@@ -1202,6 +1202,12 @@ const TRIGGERS = {
   batchRetry: (spec) => (spec.batch?.retry ?? 0) > 0,
   /** The batched resolver has a timeout (`timeoutMs`). */
   batchTimeout: (spec) => spec.batch != null && spec.batch.timeout !== null,
+  /**
+   * The batch has a `maxSize` (1 or 2): a queue that holds a requirement
+   * twice (row (av) on 1.35) can fill it and flush a step before the other
+   * engine's window timer does.
+   */
+  batchMaxSize: (spec) => spec.batch != null && spec.batch.maxSize !== null,
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean

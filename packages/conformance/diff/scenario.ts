@@ -1136,6 +1136,8 @@ function describeDifference(d: Difference): string {
       return `${where}: extra on ${d.engine}`;
     case "changed":
       return `${where}: ${d.path} differs on ${d.engine}`;
+    case "moved":
+      return `${where}: moved to step ${d.step + 1} on ${d.engine}`;
   }
 }
 

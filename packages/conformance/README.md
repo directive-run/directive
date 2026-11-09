@@ -306,8 +306,9 @@ table, or `diff/compare.ts`, changes the contract: it is an oracle change
 **Divergences.** An intended difference between the engines goes in
 `diff/divergences.json`, keyed by what differs, never by trace index:
 `{ id, scenario, stream, kind, reason, approvedBy, date }`, optionally
-narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed`) and
-`path` (inside the entry; a prefix covers everything under it), and named
+narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed` /
+`moved`) and `path` (inside the entry; a prefix covers everything under
+it), and named
 exactly by `excuses` or `bound` (below). **Jason
 approves every entry; an agent never adds one, and never fills in
 `approvedBy`.** The census fails an entry that is incomplete or unsigned,
@@ -315,6 +316,24 @@ or that covered no difference in the run (stale). The file is part of the
 harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review. It is the one harness
 file an engine PR may change (see "Engine and oracle land separately").
+
+**A moved record** (`op: "moved"`, diff/compare.ts `compareWith`). A
+record left unmatched on the engine under test in step N that it has, of
+the same stream and kind, unmatched in step N + 1 is one difference, a
+move, filed once at the reference's step and phase with the reference's
+record as its payload; never a `missing` plus an `extra`. Only the step
+moved: every field that differs between the two records is a `changed`
+difference of its own, compared as a matched pair's would be. So an entry
+for a move covers that one record arriving a step later and never its
+absence: a 2.0 that never makes the record still shows it `missing`. Row
+(av)'s early flush on 1.35 (seed 1 at DIFF_FUZZ_RUNS=5000: 1.35's queue
+holds the re-raised item twice, which fills `maxSize` 2 and flushes a step
+before 2.0's window timer) is one: its entry
+`l7-fuzz-av-external-start-moved` bounds the moved record to 1.35's call
+with an item repeated (`$like` `batchItemsRepeated`), with `when`
+`batchMaxSize`, and the repeated item itself stays a `changed` difference
+for the (av) changed-items entry. The census accepts `moved` as an op and
+rejects a `path` on it.
 
 **An entry names what it excuses** (P3-F1, `diff/fingerprint.ts`). The
 fields above only name a class of differences; on their own they would
@@ -451,7 +470,8 @@ full, and the case still counts toward the fuzz floors. The run prints where eac
 advisory, and the census's fuzz line says how many cases ended early, at
 which step on average and how many at step 0, so a stop that comes too
 early shows. `ends` is valid only on a signed entry for scenario `fuzz`
-with engine `v2`, an `op`, and a `path` when the op is `changed` (the
+with engine `v2`, an `op`, and a `path` when the op is `changed` (none
+when it is `moved`; the
 census rejects it anywhere else, and rejects a hand scenario titled
 `fuzz`): hand scenarios are always compared to their end. An `ends` entry
 that never stopped a case is stale like any other, and it must carry
@@ -510,6 +530,7 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `batchSomeFail` | a with-results call fails every second item (`failing` `"some"`, `fails` > 0) and the sources can raise two requirements, so a call can fail some items and not others (quirk i) |
 | `batchRetry` | the batched resolver has a retry policy (more than one attempt) |
 | `batchTimeout` | the batched resolver has a `timeoutMs` |
+| `batchMaxSize` | the batch has a `maxSize` (1 or 2), so a queue holding a requirement twice (row (av) on 1.35) can fill it and flush a step before the other engine's window timer |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

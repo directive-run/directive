@@ -116,6 +116,16 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   /** The batched resolver's record tag: `a.rb`. */
   batchTag: (v) => typeof v === "string" && /^[a-z]\.rb$/.test(v),
   /**
+   * A batch call's items (`batchItem`s) where some item repeats: a queue
+   * that held one requirement twice, row (av)'s shape on 1.35 (`0.0, 0.0`).
+   * Never a class `generalize` picks: an entry names it by hand, so a
+   * call of distinct items stays outside it.
+   */
+  batchItemsRepeated: (v) =>
+    Array.isArray(v) &&
+    v.every((x) => typeof x === "string" && /^\d+\.\d+$/.test(x)) &&
+    new Set(v).size < v.length,
+  /**
    * The error a batched call or item ended with: a thrown batch's or
    * fallback run's own message (`a.rb attempt 1`), a with-results item's
    * (`a.rb 0.1 attempt 1`), or the engine's timeout of the batch
@@ -251,10 +261,19 @@ export function fits(
   return pattern === value;
 }
 
+/**
+ * The record a missing, extra or moved difference names: 1.35's for missing
+ * and moved (a moved record's other fields are `changed` differences of
+ * their own), the engine's for extra.
+ */
+export function recordOf(d: Difference): Json | undefined {
+  return d.op === "extra" ? d.candidate : d.reference;
+}
+
 /** A difference's payload, as a `Bound` pattern reads it. */
 function payloadOf(d: Difference): Json | undefined {
   if (d.op !== "changed") {
-    return d.op === "missing" ? d.reference : d.candidate;
+    return recordOf(d);
   }
 
   return { path: d.path ?? "", from: d.reference, to: d.candidate } as Json;
@@ -402,7 +421,7 @@ export function names(x: Excuse, d: Difference): boolean {
       sameSide(x, "to", d.candidate)
     );
   }
-  const record = d.op === "missing" ? d.reference : d.candidate;
+  const record = recordOf(d);
 
   return (
     !("path" in x) &&
@@ -418,7 +437,7 @@ export function excuseFor(d: Difference): Excuse {
   if (d.op !== "changed") {
     return {
       count: 1,
-      record: (d.op === "missing" ? d.reference : d.candidate) as Json,
+      record: recordOf(d) as Json,
     };
   }
 

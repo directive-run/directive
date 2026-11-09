@@ -1101,6 +1101,15 @@ describe("the batch triggers and classes (L7) name only the batched resolver's f
       "batched",
       "batchTimeout",
     ]);
+    // Row (av)'s early flush needs a maxSize to fill (1 or 2).
+    expect(triggersOf({ ...base, maxSize: 2 })).toEqual([
+      "batched",
+      "batchMaxSize",
+    ]);
+    expect(triggersOf({ ...base, maxSize: 1 })).toEqual([
+      "batched",
+      "batchMaxSize",
+    ]);
   });
 
   it("each batch class matches the batch's identifiers only, never a single resolver's", () => {

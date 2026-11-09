@@ -82,7 +82,17 @@ export interface Difference {
   kind: string;
   step: number;
   phase: Keyed["phase"];
-  op: "missing" | "extra" | "changed";
+  /**
+   * `moved`: a record missing on the engine under test in step N that it
+   * has, of the same stream and kind, as an extra record in step N + 1 (the
+   * next unmatched one of that kind there): one record that came one step
+   * later, filed once, never as an absence. Only the step moved: any field
+   * that differs between the two records is a `changed` difference of its
+   * own (`compareWith`). `step` and `phase` are the reference's; the
+   * payload is the reference's record (`reference`; `candidate` holds the
+   * engine's).
+   */
+  op: "missing" | "extra" | "changed" | "moved";
   /** For `changed`: where inside the entry. */
   path?: string;
   reference?: Json;
@@ -349,6 +359,13 @@ export function isPastSharedPoint(d: Difference, stop: Difference): boolean {
   }
   if (d.op === "extra") {
     return (d.at.candidate as number) > stop.shared.candidate;
+  }
+  if (d.op === "moved") {
+    // Two unmatched records: dropped only when each would be on its own.
+    return (
+      (d.at.reference as number) > stop.shared.reference &&
+      (d.at.candidate as number) > stop.shared.candidate
+    );
   }
 
   return false;
@@ -988,8 +1005,53 @@ function compareWith(
         });
       }
     }
+    // A record left unmatched in step N that the other trace has, of the
+    // same kind, unmatched in step N + 1: moved, one difference, with its
+    // fields compared as a matched pair's are (`Difference.op`).
+    const moves = new Map<Keyed, Keyed>();
+    const taken = new Set<number>();
+    a.forEach((ka, i) => {
+      if (matchedA.has(i)) {
+        return;
+      }
+      const j = b.findIndex(
+        (kb, jj) =>
+          !matchedB.has(jj) &&
+          !taken.has(jj) &&
+          kb.kind === ka.kind &&
+          kb.step === ka.step + 1,
+      );
+      if (j >= 0) {
+        taken.add(j);
+        moves.set(ka, b[j] as Keyed);
+      }
+    });
+    for (const [ka, kb] of moves) {
+      const where = {
+        reference: at.get(ka) as Position,
+        candidate: at.get(kb) as Position,
+      };
+      const pair = { reference: ka.index, candidate: kb.index };
+      out.push({
+        ...base(ka),
+        op: "moved",
+        reference: project(ka.entry),
+        candidate: project(kb.entry),
+        at: pair,
+        where,
+      });
+      const fields: Array<{
+        path: string;
+        reference?: Json;
+        candidate?: Json;
+      }> = [];
+      diffJson(project(ka.entry), project(kb.entry), "", fields);
+      for (const f of fields) {
+        out.push({ ...base(ka), op: "changed", ...f, at: pair, where });
+      }
+    }
     a.forEach((k, i) => {
-      if (!matchedA.has(i)) {
+      if (!matchedA.has(i) && !moves.has(k)) {
         out.push({
           ...base(k),
           op: "missing",
@@ -1001,7 +1063,7 @@ function compareWith(
       }
     });
     b.forEach((k, j) => {
-      if (!matchedB.has(j)) {
+      if (!matchedB.has(j) && !taken.has(j)) {
         out.push({
           ...base(k),
           op: "extra",
