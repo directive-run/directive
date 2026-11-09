@@ -13,10 +13,10 @@
  * case among them); a 2.0 whose `settle()` resolves early on an attached
  * batch still differs; both engines live at the cap (seed 10's mutual-write
  * loop) is discarded; only 2.0 live at the cap fails, as a 2.0 bug, unless
- * 2.0's handlers wrote after their signal was aborted during the wait (a
- * test-handler loop, seed 8: discarded under the never-settles cap, naming
- * the approved row that admitted it; Jason, 2026-11-08: "Refine:
- * write-after-cancel = discard (Recommended)"); and the cap counting. A case discarded because it never settles counts on its
+ * an approved `ends` entry had stopped 2.0's comparison before 2.0 outworked
+ * the reference (seeds 8 and 2: discarded after the stop, toward the
+ * runaway limit, naming the entry; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), while a stop after the
+ * reference finished still fails; and the cap counting. A case discarded because it never settles counts on its
  * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
  * "Discard, own count (Recommended)"; the cap, Jason, 2026-11-07: "Cap at
  * 1% of cases, min 3 (Recommended)").
@@ -45,6 +45,7 @@ import {
   drainsDetached,
   newFuzzTally,
   nextTargets,
+  readDivergences,
   runBudgeted,
   runScenario,
   tallyCase,
@@ -110,6 +111,17 @@ const SEED_8: FuzzSpec = JSON.parse(
 );
 
 /**
+ * Deep seed 2 (DIFF_FUZZ_RUNS=5000): rb's write and r0's chase each other
+ * (scratchpad/l7-deep-triage/triage.md); only 2.0 enters the chase, through
+ * approved quirk a's re-dispatch of the failed r0 under "retry", and 1.35
+ * runs the same chase once r0 writes. No write is made under an aborted
+ * signal (the one abort is rb's own, `abortOn` firing on its write).
+ */
+const SEED_2: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":1,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[{"fact":0,"atLeast":1,"crossAtLeast":null,"priority":0,"writes":0,"value":0,"delay":0,"fails":1,"retry":0,"timeout":null}],"effects":[],"source":null},{"facts":2,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":null}],"boundary":"retry","history":false,"trace":false,"steps":[{"op":"settle"}],"batch":{"sources":[{"fact":0,"atLeast":0,"items":3,"abortOn":true},{"fact":0,"atLeast":0,"items":1,"abortOn":false}],"handler":"fallback","failing":"all","windowMs":0,"maxSize":1,"delay":5,"fails":0,"retry":0,"timeout":null,"writes":0,"value":1}}',
+);
+
+/**
  * Seed 12 (PR count, every layer): 1.35's batch call times out (3 ms, its
  * handler waits 5) at the very fake time its settle step's wait reached.
  */
@@ -155,9 +167,15 @@ const KEEP = Symbol("keeps a detached batch alive");
 /**
  * v2 that keeps a detached batch run going once its `settle()` has resolved
  * (a 2.0 bug the shared wait must fail): its system reads as live to the
- * test's rule, and a timer every 100 ms keeps its clock moving.
+ * test's rule, and a timer every 100 ms keeps its clock moving. With
+ * `sayAt`, it also prints one `console.info` record (an extra record, for a
+ * test `ends` entry to stop at) at the first point its fake clock is at or
+ * past `sayAt` once its settle() resolved: at once for 0.
  */
-function keepsDetachedAlive(engine: EngineHandle): EngineHandle {
+function keepsDetachedAlive(
+  engine: EngineHandle,
+  sayAt?: number,
+): EngineHandle {
   return {
     ...engine,
     name: "v2+keepalive",
@@ -179,7 +197,12 @@ function keepsDetachedAlive(engine: EngineHandle): EngineHandle {
                 return async () => {
                   await target.settle();
                   alive = true;
+                  let said = false;
                   const tick = () => {
+                    if (!said && sayAt !== undefined && Date.now() >= sayAt) {
+                      said = true;
+                      console.info("keepalive");
+                    }
                     setTimeout(tick, 100);
                   };
                   tick();
@@ -377,7 +400,6 @@ describe("the fuzz shared wait at a settle step", () => {
     });
     expect(result.neverSettles).toBe(true);
     expect(result.bothLive).toBe(true);
-    expect(result.handlerLoop).toBeFalsy();
     expect(result.runaway).toBe(false);
     expect(result.twoOnlyLive).toBeUndefined();
     expect(result.compared).toEqual([]);
@@ -403,10 +425,10 @@ describe("the fuzz shared wait at a settle step", () => {
       { candidates: [keepsDetachedAlive(v2)], divergences: [] },
     );
     expect(result.neverSettles).toBeFalsy();
-    expect(result.handlerLoop).toBeFalsy();
+    expect(result.discarded).toEqual([]);
     expect(result.ok).toBe(false);
     expect(result.twoOnlyLive).toMatch(
-      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, \d+ ms after settle\(\) resolved \(cap 5000 ms\)\) while the reference's batches had finished by \d+ ms, and its handlers made no write after an abort during the wait; a 2\.0 bug/,
+      /^2\.0-only live: at step 2 v2\+keepalive still had a batch live at the shared wait's cap \(a detached batch run of v2\+keepalive is live, \d+ ms after settle\(\) resolved \(cap 5000 ms\)\) while the reference's batches had finished by 5 ms \(its handlers wrote 0 time\(s\) after an abort during the wait\), with no `ends` stop before it; a 2\.0 bug/,
     );
     expect(result.report).toContain(
       'v2+keepalive in scenario "fuzz": 2.0-only live',
@@ -415,57 +437,103 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.settleTimes!.v1).toEqual(result.settleTimes!["v2+keepalive"]);
   });
 
-  it("seed 8: only 2.0 live at the cap, its handlers writing after an abort: discarded as a test-handler loop, naming the approved row that admitted it", async () => {
-    const result = await runScenario(toScenario(SEED_8), {
-      candidates: [local, v2],
-    });
-    expect(result.twoOnlyLive).toBeUndefined();
-    expect(result.handlerLoop).toBe(true);
-    expect(result.neverSettles).toBe(true);
-    expect(result.bothLive).toBe(false);
-    expect(result.runaway).toBe(false);
-    expect(result.compared).toEqual([]);
-    expect(result.used).toEqual([]);
-    // The first used entry naming a quirk (`used` is in explain's order,
-    // not the loop's cause); quirk a, whose re-dispatch let 2.0 in, is
-    // among the used quirk entries the report lists.
-    expect(result.admittedBy).toMatch(/^l\d+-quirk-/);
-    expect(result.report).toMatch(
-      /^test-handler loop in scenario "fuzz": at step \d+ v2 still had a batch live at the shared wait's cap \(.*\) while the reference's batches had finished by \d+ ms, and its handlers wrote \d+ time\(s\) after their signal was aborted during the wait .*admitted by the approved row l\d+-quirk-.*every used quirk entry: .*l\d+-quirk-a-/,
+  it("seeds 8 and 2: only 2.0 live at the cap, after an approved `ends` stop (quirk a's re-dispatch) that came before 2.0 outworked the reference: discarded after the stop, naming the entry", async () => {
+    const stops: string[] = [];
+    for (const [label, s] of [
+      ["seed 8", SEED_8],
+      ["seed 2", SEED_2],
+    ] as const) {
+      const result = await runScenario(toScenario(s), {
+        candidates: [local, v2],
+      });
+      expect([label, result.twoOnlyLive]).toEqual([label, undefined]);
+      expect(result.neverSettles).toBeFalsy();
+      expect(result.runaway).toBe(false);
+      expect(result.discarded).toEqual(["v2"]);
+      expect(result.afterStop).toEqual([
+        { engine: "v2", id: expect.any(String), wait: true },
+      ]);
+      const id = result.afterStop![0]!.id;
+      // The stop is an approved, signed `ends` entry (the earliest `ends`
+      // difference on v2, the seed's own: quirk a's or row (at)'s).
+      const entry = readDivergences().find((e) => e.id === id);
+      expect([label, entry?.ends, entry?.approvedBy]).toEqual([
+        label,
+        true,
+        "Jason Comes",
+      ]);
+      stops.push(`${label}: ${id}`);
+      expect(result.ended.find((e) => e.engine === "v2")?.id).toBe(id);
+      expect(
+        result.advisories.filter((a) =>
+          a.startsWith(`2.0-only live after the stop by ${id}: at step `),
+        ),
+      ).toHaveLength(1);
+      // Its differences before the stop were still checked, and pass.
+      expect([label, result.unexplained]).toEqual([label, []]);
+      expect(result.ok).toBe(true);
+      const tally = newFuzzTally();
+      tallyCase(tally, result);
+      expect(tally).toMatchObject({
+        runaway: 1,
+        afterStop: 1,
+        afterStopAtWait: 1,
+        afterStopBy: { [id]: 1 },
+        neverSettles: 0,
+        twoOnlyLive: 0,
+      });
+    }
+    console.info(
+      `[settle-drain] discarded after the stop by: ${stops.join("; ")}`,
     );
-    const tally = newFuzzTally();
-    tallyCase(tally, result);
-    expect(tally).toMatchObject({
-      neverSettles: 1,
-      handlerLoop: 1,
-      bothLive: 0,
-      twoOnlyLive: 0,
-    });
   });
 
-  it("only 2.0 live at the cap with a write after an abort, but no used entry naming a quirk: still fails, as 2.0-only live", async () => {
+  it("only 2.0 live at the cap after an `ends` stop: discarded when the stop came before 2.0's clock reached the reference's wait end, failed when it came after", async () => {
     const def = toScenario(spec);
     const base = def.settleDrain!;
-    const result = await runScenario(
-      {
-        ...def,
-        settleDrain: {
-          ...base,
-          busy: (ctx, system) =>
-            (system as any)[KEEP]
-              ? "a detached batch run of v2+keepalive is live"
-              : base.busy(ctx, system),
-          // One write after an abort, inside the wait on v2.
-          writeAfterAbort: () => (Date.now() >= 1000 ? 1 : 0),
-        },
+    const tampered = {
+      ...def,
+      settleDrain: {
+        ...base,
+        busy: (ctx: any, system: any) =>
+          system[KEEP]
+            ? "a detached batch run of v2+keepalive is live"
+            : base.busy(ctx, system),
       },
-      { candidates: [keepsDetachedAlive(v2)], divergences: [] },
-    );
-    expect(result.handlerLoop).toBeFalsy();
-    expect(result.neverSettles).toBeFalsy();
-    expect(result.ok).toBe(false);
-    expect(result.twoOnlyLive).toMatch(
-      /^2\.0-only live: .*its handlers wrote 1 time\(s\) after an abort during the wait, but no used entry names an approved quirk/,
+    };
+    const stopAtTheRecord = {
+      id: "test-keepalive-console-ends",
+      scenario: "fuzz",
+      stream: "console",
+      kind: "info",
+      engine: "v2+keepalive",
+      op: "extra" as const,
+      ends: true,
+      reason: "test only: stops the comparison at the keepalive's record",
+      approvedBy: "test",
+      date: "2026-11-08",
+    };
+    // Its record at once (before 1.35's batch had finished, at 5 ms):
+    // the stop came first, so the case is discarded after it.
+    const early = await runScenario(tampered, {
+      candidates: [keepsDetachedAlive(v2, 0)],
+      divergences: [stopAtTheRecord],
+    });
+    expect(early.ended.map((e) => e.id)).toEqual([stopAtTheRecord.id]);
+    expect(early.twoOnlyLive).toBeUndefined();
+    expect(early.discarded).toEqual(["v2+keepalive"]);
+    expect(early.ok).toBe(true);
+    // Its record at 1 s, after 1.35's batch had finished: the stop is the
+    // loop's own, so the case still fails as 2.0-only live.
+    const late = await runScenario(tampered, {
+      candidates: [keepsDetachedAlive(v2, 1000)],
+      divergences: [stopAtTheRecord],
+    });
+    expect(late.ended.map((e) => e.id)).toEqual([stopAtTheRecord.id]);
+    expect(late.discarded).toEqual([]);
+    expect(late.ok).toBe(false);
+    expect(late.twoOnlyLive).toMatch(
+      /^2\.0-only live: .*, and the stop by test-keepalive-console-ends came only after v2\+keepalive had outworked the reference; a 2\.0 bug/,
     );
   });
 
@@ -699,7 +767,7 @@ describe("the fuzz shared wait at a settle step", () => {
       neverSettles: 2,
       bothLive: 1,
       twoOnlyLive: 1,
-      handlerLoop: 0,
+      afterStop: 0,
       onV2: 2,
       sharedRerun: 1,
       drained: 1,

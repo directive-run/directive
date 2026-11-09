@@ -725,9 +725,9 @@ interface BatchLedger {
   /**
    * Writes a handler made while its signal was aborted (the batched
    * handler's `run` and the single resolvers alike): a canceled handler
-   * that ignores its abort. The shared wait reads it (`writeAfterAbort`;
-   * Jason, 2026-11-08: "Refine: write-after-cancel = discard
-   * (Recommended)").
+   * that ignores its abort. The shared wait reports it (`writeAfterAbort`),
+   * as an annotation only: no verdict reads it since Jason, 2026-11-08:
+   * "Use 'Discard after the stop' (Recommended)".
    */
   writeAfterAbort: number;
 }
@@ -802,10 +802,9 @@ export const DRAIN_BOUND_MS = 5000;
  * left, v2 takes no part, and its checkpoint differs.
  *
  * `writeAfterAbort` counts the handlers' writes made while their signal
- * was aborted (`BatchLedger.writeAfterAbort`): where only v2 is live at the
- * cap, a count above 0 during that wait marks a test-handler loop, not a
- * 2.0 bug (Jason, 2026-11-08: "Refine: write-after-cancel = discard
- * (Recommended)"; diff/scenario.ts `runScenario`).
+ * was aborted (`BatchLedger.writeAfterAbort`), for the report only (Jason,
+ * 2026-11-08: "Use 'Discard after the stop' (Recommended)" replaced the
+ * write-after-cancel verdict; diff/scenario.ts `runScenario`).
  */
 export function batchDrain(b: FuzzBatch): SettleDrain {
   const callTimeout = b.handler === "fallback" ? null : b.timeout;

@@ -178,21 +178,31 @@ the traces to agree.
     never-settles rule below;
   - only 1.35 still running while 2.0 finished: discarded the same way;
   - only 2.0 still running while 1.35 finished in the same time: the case
-    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live, but
-    only if 2.0's handlers made no write while their signal was aborted
-    during that wait. **Write-after-cancel.** Jason, 2026-11-08: "Refine:
-    write-after-cancel = discard (Recommended)". The fuzz handlers (the
-    batched `run` and the single resolvers, diff/fuzz/model.ts) count each
-    write made while `signal.aborted` is set (`writeAfterAbort`). Where
-    that count rose during the wait, the case is a test-handler loop: a
-    canceled handler ignoring its abort, which either engine chases once it
-    is in (seed 8; seed 10 is the both-live form), so it is no evidence
-    against 2.0. It is discarded, counted under the never-settles cap below
-    on its own sub-line (`handlerLoop`), and its report names the approved
-    row that admitted it, the first entry in the case's `used` list that
-    names a quirk (with every used quirk entry listed); with no such entry
-    it still fails. A 2.0 that stays live with no write after an abort
-    still fails (diff/self/settle-drain.test.ts).
+    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live,
+    unless an approved `ends` entry had already stopped the case's
+    comparison on 2.0 before 2.0 outworked the reference. **Discard after
+    the stop.** Jason, 2026-11-08: "Use 'Discard after the stop'
+    (Recommended)". The cut is the time the reference's batches finished at
+    that step (`SettleWait.quietAt`): the stop counts as first when its
+    record comes before the point 2.0's clock reached that time
+    (`SettleWait.cutAt`), by the same `stopsBefore` test as the timer-budget
+    runaway after a stop (Jason, 2026-11-02: "Discard after the stop").
+    Then the comparison had already ended, so judging liveness there would
+    judge work it had abandoned: the case is discarded after the stop,
+    counted toward the runaway limit, max(1% of cases, 2), on the census's
+    "discarded after a stop" sub-line, which names the stopping entries
+    (seeds 8 and 2: quirk a's re-dispatch under "retry" lets 2.0 into a
+    chase of two writes that 1.35 runs too once given the same first
+    write). Its differences before the stop are still checked. With no
+    `ends` stop on 2.0, or a stop after the reference had finished, it
+    still fails (diff/self/settle-drain.test.ts). This replaces the
+    write-after-cancel verdict of the same day (Jason, 2026-11-08: "Refine:
+    write-after-cancel = discard (Recommended)"): a write a handler makes
+    while its signal is aborted (`writeAfterAbort`, counted in the fuzz
+    handlers, diff/fuzz/model.ts) is now only reported, since seed 2's chase
+    has none (its one abort is the writer's own, `abortOn` firing on its
+    write) and the count read a hand-instrumented handler rather than the
+    comparison.
   A batch still live at the cap on the workspace engine, or on the
   reference's second run, fails the case too. Hand scenarios never wait, and
   their signed (as) entries still pin 1.35's early `settle()`. The fuzz line

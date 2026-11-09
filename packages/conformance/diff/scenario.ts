@@ -162,15 +162,17 @@ export interface ScenarioDef {
  *   2026-11-07: "Discard, own count (Recommended)");
  * - only 1.35 still running while 2.0 finished: discarded the same way;
  * - only 2.0 still running while 1.35 finished in the same time: the case
- *   fails, as a 2.0 bug, naming what kept 2.0 live, but only if 2.0's
- *   handlers made no write while their signal was aborted during that
- *   wait (`writeAfterAbort`). With such a write it is a test-handler loop
- *   (a canceled handler ignoring its abort, which either engine chases;
- *   Jason, 2026-11-08: "Refine: write-after-cancel = discard
- *   (Recommended)"): discarded under the never-settles cap, on its own
- *   count (`ScenarioResult.handlerLoop`), naming the approved row that
- *   admitted it, the first used entry naming a quirk. With no such entry
- *   it still fails.
+ *   fails, as a 2.0 bug, naming what kept 2.0 live, unless an approved
+ *   `ends` entry had already stopped the case's comparison on 2.0 strictly
+ *   before 2.0 outworked the reference: the stop's record comes before the
+ *   point 2.0's clock reached the time the reference's batches finished at
+ *   that step (`SettleWait.quietAt`, cut on 2.0's trace as
+ *   `SettleWait.cutAt`), by the same `stopsBefore` test the timer-budget
+ *   runaway uses. Then the case is discarded after the stop, like that
+ *   runaway: counted toward the runaway limit, max(1%, 2), naming the
+ *   stopping entry (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)", which replaced the write-after-cancel
+ *   rule of the same day). A stop after the reference finished, or none,
+ *   still fails. `writeAfterAbort` is only an annotation in the report.
  *
  * A v2 whose `settle()` resolved with attached work left (`attached`; its
  * settle() resolved early) takes no part: its clock does not advance and
@@ -191,7 +193,8 @@ export interface SettleDrain {
   /**
    * How many writes the run's handlers have made so far while their signal
    * was aborted (diff/fuzz/model.ts `BatchLedger.writeAfterAbort`). Read at
-   * each wait's start and end (`SettleWait.writeAfterAbort`).
+   * each wait's start and end (`SettleWait.writeAfterAbort`), and only
+   * reported: it decides no verdict.
    */
   writeAfterAbort?(ctx: BuildContext): number;
 }
@@ -236,6 +239,19 @@ export interface SettleWait {
   waited: boolean;
   /** Writes the handlers made while their signal was aborted, during this wait. */
   writeAfterAbort?: number;
+  /**
+   * Fake time from which no batch was live through the wait's end: when
+   * this run's batches finished at this step, whatever target it then ran
+   * on to (the wait's end when live at the cap).
+   */
+  quietAt?: number;
+  /**
+   * v2 only: the trace's length just before its clock first reached the
+   * reference's `quietAt` at this step (the cut for `stopsBefore`): every
+   * record at a lower index was emitted while 2.0 had run no longer than
+   * the reference needed to finish its batches.
+   */
+  cutAt?: number;
 }
 
 /** One run's part in the shared wait: the rule, the targets, and what it did. */
@@ -248,6 +264,10 @@ interface DrainRun {
   waits: SettleWait[];
   /** v2: its wait is checked for attached work first. */
   v2: boolean;
+  /** The trace's current length. */
+  mark: () => number;
+  /** v2: each `settle` step's reference `quietAt`, where `cutAt` is taken. */
+  cuts: ReadonlyMap<number, number>;
   /** A wait that stalled (a call live and no timer left). */
   problem?: string;
 }
@@ -292,8 +312,18 @@ async function waitOutBatches(
   const sentinel =
     target > from ? setTimeout(() => {}, target - from) : undefined;
   const wroteBefore = drain.rule.writeAfterAbort?.(ctx) ?? 0;
+  const cut = drain.v2 ? drain.cuts.get(step) : undefined;
+  if (cut !== undefined && from >= cut) {
+    wait.cutAt = drain.mark();
+  }
+  let quietAt: number | undefined;
   for (;;) {
     const why = drain.rule.busy(ctx, system);
+    if (why === false) {
+      quietAt ??= Date.now();
+    } else {
+      quietAt = undefined;
+    }
     if (why === false && Date.now() >= target) {
       break;
     }
@@ -313,11 +343,20 @@ async function waitOutBatches(
       break;
     }
     wait.waited = true;
+    const before = drain.mark();
     await vi.advanceTimersToNextTimerAsync();
     await flushMicrotasks();
+    if (cut !== undefined && wait.cutAt === undefined && Date.now() >= cut) {
+      // Records the timers at or past the cut made are not before it.
+      wait.cutAt = before;
+    }
   }
   clearTimeout(sentinel);
   wait.endAt = Date.now();
+  wait.quietAt = quietAt ?? wait.endAt;
+  if (cut !== undefined) {
+    wait.cutAt ??= drain.mark();
+  }
   wait.writeAfterAbort = (drain.rule.writeAfterAbort?.(ctx) ?? 0) - wroteBefore;
 }
 
@@ -500,16 +539,6 @@ export interface ScenarioResult {
    */
   twoOnlyLive?: string;
   /**
-   * Only v2 was live at the cap, but its handlers wrote while their signal
-   * was aborted during that wait: a test-handler loop, discarded (with
-   * `neverSettles` set, so it counts under that cap) and counted on its own
-   * (Jason, 2026-11-08: "Refine: write-after-cancel = discard
-   * (Recommended)"). `admittedBy` is the approved row that let 2.0 into
-   * the loop: the first used entry naming a quirk.
-   */
-  handlerLoop?: boolean;
-  admittedBy?: string;
-  /**
    * Fuzz cases with the shared wait: each run's `settle` checkpoint times
    * (`SettleWait.endAt`), by engine (the reference's first run, and each
    * engine under test).
@@ -529,9 +558,16 @@ export interface ScenarioResult {
    * discarded like a reference runaway and counted toward the same limit
    * (`tallyCase`). Its differences before the stop are still checked, so
    * the case can still fail on them (Jason, 2026-11-02: "Discard after the
-   * stop").
+   * stop"). v2 is discarded the same way when it alone was live at the
+   * shared wait's cap after such a stop (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
    */
   discarded: string[];
+  /**
+   * Each discard after a stop: the engine, the `ends` entry whose stop came
+   * first, and whether it was at the shared wait's cap (`wait`) rather
+   * than past the timer budget.
+   */
+  afterStop?: { engine: string; id: string; wait: boolean }[];
   /** Timer callbacks the reference's first run made. */
   fired: number;
   report: string;
@@ -931,6 +967,7 @@ export async function runBudgeted(
   referenceFired = limit,
   targets: ReadonlyMap<number, number> = new Map(),
   judge: ReadonlySet<number> = new Set(),
+  cuts: ReadonlyMap<number, number> = new Map(),
 ): Promise<BudgetedRun> {
   const rec = createRecorder();
   // Everything that makes a run deterministic, and everything that captures
@@ -945,6 +982,8 @@ export async function runBudgeted(
           judge,
           waits: [],
           v2: drainsDetached(engine),
+          mark: () => rec.trace.length,
+          cuts,
         }
       : undefined;
   const random = vi
@@ -1397,7 +1436,15 @@ export async function runScenario(
     firstRun = await runBudgeted(reference, def, limit, limit, targets, judge);
     twoRun =
       twoOh && !firstRun.runaway
-        ? await runBudgeted(twoOh, def, limit, firstRun.fired, targets, judge)
+        ? await runBudgeted(
+            twoOh,
+            def,
+            limit,
+            firstRun.fired,
+            targets,
+            judge,
+            new Map(firstRun.waits.map((w) => [w.step, w.quietAt ?? w.endAt])),
+          )
         : undefined;
     const next =
       twoRun && !twoRun.runaway
@@ -1490,19 +1537,12 @@ export async function runScenario(
     }
   }
   let twoOnlyLive: string | undefined;
-  // Only v2 live at the cap: its handlers' writes after abort during that
-  // wait decide between a 2.0 bug and a test-handler loop (Jason,
-  // 2026-11-08: "Refine: write-after-cancel = discard (Recommended)"); the
-  // loop is judged once `used` is known, after the comparison.
-  const loopWrites = twoAlone ? (twoLive.writeAfterAbort ?? 0) : 0;
+  // Only v2 live at the cap: a 2.0 bug, unless an `ends` stop on v2 came
+  // first (judged once `ended` is known, after the comparison).
   let twoOnlyAt = "";
   if (twoAlone && twoOh) {
     const ref = firstRun.waits.find((w) => w.step === twoLive.step);
-    twoOnlyAt = `at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.endAt ?? "?"} ms`;
-    if (loopWrites === 0) {
-      twoOnlyLive = `2.0-only live: ${twoOnlyAt}, and its handlers made no write after an abort during the wait; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
-      problems.push(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
-    }
+    twoOnlyAt = `at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.quietAt ?? ref?.endAt ?? "?"} ms (its handlers wrote ${twoLive.writeAfterAbort ?? 0} time(s) after an abort during the wait)`;
   } else if (rounds >= SHARED_WAIT_ROUNDS && twoRun) {
     if (nextTargets(firstRun.waits, twoRun.waits, targets, judge)) {
       problems.push(
@@ -1566,38 +1606,27 @@ export async function runScenario(
     divergences,
     def.triggers,
   );
-  if (loopWrites > 0 && twoOh) {
-    const quirks = used.filter((id) => /quirk/.test(id));
-    const admittedBy = quirks[0];
-    if (admittedBy !== undefined) {
-      // A test-handler loop: discarded under the never-settles cap, on its
-      // own count, naming the approved row that admitted it.
-      return {
-        name: def.name,
-        ok: false,
-        nondeterministic: [],
-        differences: [],
-        unexplained: [],
-        advisories: [],
-        used: [],
-        ended: [],
-        compared: [],
-        traces: { reference: first, candidate: [] },
-        runaway: false,
-        neverSettles: true,
-        bothLive: false,
-        handlerLoop: true,
-        admittedBy,
-        hung: [],
-        discarded: [],
-        fired: firstRun.fired,
-        drained: firstRun.drained,
-        sharedRounds: rounds,
-        report: `test-handler loop in scenario "${def.name}": ${twoOnlyAt}, and its handlers wrote ${loopWrites} time(s) after their signal was aborted during the wait (a canceled handler ignoring its abort, which either engine chases), admitted by the approved row ${admittedBy} (the first used entry naming a quirk; every used quirk entry: ${quirks.join(", ")}); discarded under the never-settles cap, not compared (Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)")`,
-      };
+  // An `ends` stop on v2 before it outworked the reference (its record
+  // before v2's clock reached the reference's wait end, `stopsBefore` with
+  // `cutAt`): the comparison had already ended, so v2 alone live at the
+  // cap is discarded after the stop (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
+  // Otherwise it is a 2.0 bug.
+  const discarded: string[] = [];
+  const afterStop: { engine: string; id: string; wait: boolean }[] = [];
+  if (twoAlone && twoOh) {
+    const stop = ended.find((e) => e.engine === twoOh.name);
+    if (stop && stopsBefore(stop.at, theirs[twoOh.name] ?? [], twoLive.cutAt)) {
+      discarded.push(twoOh.name);
+      afterStop.push({ engine: twoOh.name, id: stop.id, wait: true });
+      advisories.push(
+        `2.0-only live after the stop by ${stop.id}: ${twoOnlyAt}, once that \`ends\` entry had ended the comparison (its record came before ${twoOh.name}'s clock reached the reference's wait end); discarded after the stop, not a 2.0 bug (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)")`,
+      );
+    } else {
+      twoOnlyLive = `2.0-only live: ${twoOnlyAt}, ${stop ? `and the stop by ${stop.id} came only after ${twoOh.name} had outworked the reference` : "with no `ends` stop before it"}; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
+      problems.unshift(
+        `${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`,
+      );
     }
-    twoOnlyLive = `2.0-only live: ${twoOnlyAt}; its handlers wrote ${loopWrites} time(s) after an abort during the wait, but no used entry names an approved quirk that admitted the loop, so it is not discarded (Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)")`;
-    problems.unshift(`${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`);
   }
   for (const e of ended) {
     advisories.push(
@@ -1609,11 +1638,13 @@ export async function runScenario(
   // outworked the reference, `stopsBefore`): then the comparison had
   // already ended and the case is discarded (Jason, 2026-11-02: "Discard
   // after the stop"), counted toward the runaway limit.
-  const discarded: string[] = [];
   for (const [engine, at] of runaways) {
     const stop = ended.find((e) => e.engine === engine);
     if (stop && stopsBefore(stop.at, theirs[engine] ?? [], at)) {
-      discarded.push(engine);
+      if (!discarded.includes(engine)) {
+        discarded.push(engine);
+        afterStop.push({ engine, id: stop.id, wait: false });
+      }
       advisories.push(
         `runaway on ${engine} after the stop by ${stop.id}: more than ${limit} timer callbacks once the comparison had ended; discarded, not a hang`,
       );
@@ -1674,6 +1705,7 @@ export async function runScenario(
     runaway: false,
     hung,
     discarded,
+    ...(afterStop.length > 0 ? { afterStop } : {}),
     fired: firstRun.fired,
     drained: firstRun.drained,
     drainedDetached,
@@ -1752,10 +1784,15 @@ export interface FuzzTally {
   /** Discarded cases: the reference's runaways and those in `afterStop`. */
   runaway: number;
   /**
-   * Of `runaway`, cases discarded because an engine under test ran away
-   * after an `ends` stop (`ScenarioResult.discarded`), not the reference.
+   * Of `runaway`, cases discarded after an `ends` stop
+   * (`ScenarioResult.discarded`), not the reference's: an engine under test
+   * ran away past the timer budget, or (`afterStopAtWait`) v2 alone was
+   * live at the shared wait's cap (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
    */
   afterStop: number;
+  afterStopAtWait: number;
+  /** The `ends` entries behind those discards, with how many each. */
+  afterStopBy: Record<string, number>;
   /** Compared cases that v2 took part in. */
   onV2: number;
   mostFired: number;
@@ -1776,11 +1813,6 @@ export interface FuzzTally {
   /** Of `neverSettles`, cases where v2 was live at the cap too. */
   bothLive: number;
   /**
-   * Of `neverSettles`, test-handler loops (`ScenarioResult.handlerLoop`;
-   * Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)").
-   */
-  handlerLoop: number;
-  /**
    * Discarded cases whose reference's batches were live at the shared wait's cap
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
    * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
@@ -1794,6 +1826,8 @@ export function newFuzzTally(): FuzzTally {
     ran: 0,
     runaway: 0,
     afterStop: 0,
+    afterStopAtWait: 0,
+    afterStopBy: {},
     onV2: 0,
     mostFired: 0,
     ended: 0,
@@ -1804,7 +1838,6 @@ export function newFuzzTally(): FuzzTally {
     sharedRerun: 0,
     twoOnlyLive: 0,
     bothLive: 0,
-    handlerLoop: 0,
     neverSettles: 0,
   };
 }
@@ -1825,9 +1858,6 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
     if (result.bothLive) {
       tally.bothLive++;
     }
-    if (result.handlerLoop) {
-      tally.handlerLoop++;
-    }
 
     return;
   }
@@ -1839,6 +1869,13 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   if (result.discarded.length > 0) {
     tally.runaway++;
     tally.afterStop++;
+    const first = result.afterStop?.[0];
+    if (first?.wait) {
+      tally.afterStopAtWait++;
+    }
+    if (first) {
+      tally.afterStopBy[first.id] = (tally.afterStopBy[first.id] ?? 0) + 1;
+    }
 
     return;
   }
@@ -1882,13 +1919,14 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
       runs: tally.ran - tally.runaway - tally.neverSettles,
       runaway: tally.runaway,
       runawayAfterStop: tally.afterStop,
+      runawayAfterStopAtWait: tally.afterStopAtWait,
+      afterStopBy: tally.afterStopBy,
       neverSettles: tally.neverSettles,
       drained: tally.drained,
       drainedDetached: tally.drainedDetached,
       sharedRerun: tally.sharedRerun,
       twoOnlyLive: tally.twoOnlyLive,
       bothLive: tally.bothLive,
-      handlerLoop: tally.handlerLoop,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,

@@ -1454,20 +1454,20 @@ export interface FuzzRun {
   /** Discarded cases, `runawayAfterStop` included. */
   runaway?: number;
   /**
-   * Of `runaway`, cases where an engine under test ran away after an `ends`
-   * stop (diff/scenario.ts `tallyCase`; Jason, 2026-11-02).
+   * Of `runaway`, cases discarded after an `ends` stop (diff/scenario.ts
+   * `tallyCase`; Jason, 2026-11-02: "Discard after the stop"): an engine
+   * under test ran away, or (`runawayAfterStopAtWait`) v2 alone was live at
+   * the shared wait's cap (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"). `afterStopBy` names the
+   * stopping entries.
    */
   runawayAfterStop?: number;
+  runawayAfterStopAtWait?: number;
+  afterStopBy?: Record<string, number>;
   /**
    * Discarded cases whose reference never settles (its batches outlived the
    * shared wait's cap; diff/scenario.ts `neverSettles`), not in `runaway`.
    */
   neverSettles?: number;
-  /**
-   * Of `neverSettles`, test-handler loops (only v2 live at the cap, its
-   * handlers writing after an abort; diff/scenario.ts `handlerLoop`).
-   */
-  handlerLoop?: number;
   v2?: number;
   /** Compared cases an `ends` divergence stopped. */
   ended?: number;
@@ -1493,10 +1493,13 @@ export function describeFuzzRun(r: FuzzRun): string {
       : ` (at step ${((r.endedSteps ?? 0) / ended).toFixed(1)} on average; ${r.endedAtStep0 ?? 0} at step 0)`;
 
   const afterStop = r.runawayAfterStop ?? 0;
+  const by = Object.entries(r.afterStopBy ?? {})
+    .map(([id, n]) => `${id} ×${n}`)
+    .join(", ");
   const discarded =
     afterStop === 0
       ? ""
-      : `; ${afterStop} discarded after a stop (an engine under test ran away once an \`ends\` divergence had ended the comparison; counted toward the runaway limit)`;
+      : `; ${afterStop} discarded after a stop (an engine under test ran away, or v2 alone was live at the shared wait's cap (${r.runawayAfterStopAtWait ?? 0} of them; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), once an \`ends\` divergence had ended the comparison; counted toward the runaway limit${by ? `; stopped by ${by}` : ""})`;
 
   return `${r.runs} cases compared (seed ${r.seed}), ${r.v2 ?? 0} of them on v2 too, ${ended} ended early by an \`ends\` divergence${where}${discarded}`;
 }
@@ -1509,17 +1512,6 @@ export function describeFuzzRun(r: FuzzRun): string {
  */
 export function describeNeverSettles(runs: FuzzRun[]): string {
   return `discarded because 1.35's batches never settle (still live at the shared wait's 5 s cap at a settle step, Jason, 2026-11-07: "One shared wait (Recommended)"; at most max(1% of the seed's cases, 3), not counted as runaways): ${runs.map((r) => `seed ${r.seed}: ${r.neverSettles ?? 0} of at most ${maxNeverSettles(r.runs + (r.runaway ?? 0) + (r.neverSettles ?? 0))}`).join("; ")}`;
-}
-
-/**
- * The census's own sub-line for the test-handler loops (Jason, 2026-11-08:
- * "Refine: write-after-cancel = discard (Recommended)"): of each seed's
- * never-settles discards, how many were loops where only 2.0 was live at
- * the cap and its handlers wrote after their signal was aborted. They
- * count inside the never-settles cap (`describeNeverSettles`).
- */
-export function describeHandlerLoops(runs: FuzzRun[]): string {
-  return `test-handler loops (only 2.0 live at the shared wait's cap, its handlers writing after an abort; Jason, 2026-11-08: "Refine: write-after-cancel = discard (Recommended)"; counted inside the never-settles cap): ${runs.map((r) => `seed ${r.seed}: ${r.handlerLoop ?? 0} of ${r.neverSettles ?? 0}`).join("; ")}`;
 }
 
 export function checkFuzzRuns(runs: FuzzRun[], v2Expected: boolean): string[] {
