@@ -1445,19 +1445,26 @@ export function fileMoves(
   }
   const taken = new Set<Difference>();
   const filed = new Map<Difference, Difference[]>();
+  // The extra records by engine, stream, kind and step, in order: one pass,
+  // so a case with a long cascade of differences stays linear.
+  const key = (d: Difference, step: number) =>
+    `${d.engine}\u0000${d.stream}\u0000${d.kind}\u0000${step}`;
+  const extras = new Map<string, Difference[]>();
+  for (const d of differences) {
+    if (d.op === "extra") {
+      const list = extras.get(key(d, d.step));
+      if (list) {
+        list.push(d);
+      } else {
+        extras.set(key(d, d.step), [d]);
+      }
+    }
+  }
   for (const m of differences) {
     if (m.op !== "missing") {
       continue;
     }
-    const x = differences.find(
-      (d) =>
-        d.op === "extra" &&
-        !taken.has(d) &&
-        d.engine === m.engine &&
-        d.stream === m.stream &&
-        d.kind === m.kind &&
-        d.step === m.step + 1,
-    );
+    const x = extras.get(key(m, m.step + 1))?.find((d) => !taken.has(d));
     if (!x) {
       continue;
     }
