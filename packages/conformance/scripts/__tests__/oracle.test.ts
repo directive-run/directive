@@ -615,7 +615,7 @@ describe("the differential project", () => {
             stream: "trace[3]",
             kind: "",
             step: 1.5,
-            op: "moved",
+            op: "shifted",
             reason: "x",
             date: "today",
           },
