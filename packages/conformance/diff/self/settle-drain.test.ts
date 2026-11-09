@@ -122,6 +122,15 @@ const SEED_2: FuzzSpec = JSON.parse(
 );
 
 /**
+ * Deep seed 24301 (DIFF_FUZZ_RUNS=5000): both engines' `settle()` resolve
+ * at 1 ms settled, with nothing in flight; in that same millisecond r1's
+ * canceled attempt ignores its abort, writes, and raises attempt 2 on both.
+ */
+const SEED_24301: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":2,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[{"fact":0,"atLeast":0,"crossAtLeast":null,"priority":0,"writes":0,"value":0,"delay":1,"fails":0,"retry":0,"timeout":null},{"fact":0,"atLeast":1,"crossAtLeast":null,"priority":0,"writes":0,"value":1,"delay":1,"fails":0,"retry":0,"timeout":null}],"effects":[],"source":null},{"facts":2,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":null}],"boundary":null,"history":false,"trace":false,"steps":[{"op":"dispatch","module":0,"event":0,"value":1},{"op":"publish","event":"own","value":0}],"batch":{"sources":[{"fact":0,"atLeast":0,"items":1,"abortOn":false}],"handler":"batch","failing":"all","windowMs":5,"maxSize":null,"delay":0,"fails":0,"retry":0,"timeout":null,"writes":0,"value":0}}',
+);
+
+/**
  * Seed 12 (PR count, every layer): 1.35's batch call times out (3 ms, its
  * handler waits 5) at the very fake time its settle step's wait reached.
  */
@@ -291,6 +300,19 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.drainedDetached).toBe(0);
     // It took no part: its clock stayed where its settle() resolved.
     expect(result.settleTimes).toEqual({ v1: [5], v2: [0] });
+  });
+
+  it("v2's attached work is read the instant its settle() resolves: deep seed 24301's post-settle timer, in the same millisecond, starts work both engines wait out, and they compare equal", async () => {
+    const def = toScenario(SEED_24301);
+    const own = await runBudgeted(v2, def);
+    expect(own.waits.map((w) => [w.resolvedAt, w.attached])).toEqual([
+      [1, undefined],
+    ]);
+    const result = await runScenario(def, { candidates: [local, v2] });
+    expect(result.report).toBe("");
+    expect(result.ok).toBe(true);
+    expect(result.settleTimes!.v2).toEqual(result.settleTimes!.v1);
+    expect(result.settleTimes!.v1).toEqual([2]);
   });
 
   it("v2's detached batch run is waited out in the same wait as 1.35's batch; kept out of it, v2 differs", async () => {

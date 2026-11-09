@@ -169,7 +169,12 @@ the traces to agree.
   settle step's wait at different times, the later becomes that step's
   target and both run again. A v2 whose `settle()` resolved with attached
   work left takes no part, so it still differs
-  (diff/self/settle-drain.test.ts). A run goes to its target one timer at a
+  (diff/self/settle-drain.test.ts). Attached work is read at the instant
+  `settle()` resolves, not after the harness has driven it: a timer due in
+  that same millisecond may run first, and work it starts was not left by
+  `settle()` (deep seed 24301, where both engines' `settle()` resolve
+  settled at 1 ms and a canceled run's write then raises a new attempt on
+  both). A run goes to its target one timer at a
   time, as its own wait does. Each wait is capped at 5 s of fake time after
   its `settle()` resolved (`DRAIN_BOUND_MS`), 2.0's own `settle()` limit;
   when one engine is still running at its cap, the other is advanced to that

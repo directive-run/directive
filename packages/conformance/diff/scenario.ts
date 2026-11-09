@@ -174,8 +174,8 @@ export interface ScenarioDef {
  *   rule of the same day). A stop after the reference finished, or none,
  *   still fails. `writeAfterAbort` is only an annotation in the report.
  *
- * A v2 whose `settle()` resolved with attached work left (`attached`; its
- * settle() resolved early) takes no part: its clock does not advance and
+ * A v2 whose `settle()` resolved with attached work left (`attached`, read
+ * at the instant it resolved; its settle() resolved early) takes no part: its clock does not advance and
  * it checkpoints at once, so it still differs. Hand scenarios never set
  * the rule, so their signed (as) entries keep pinning 1.35's early
  * `settle()`. Self-tests: diff/self/settle-drain.test.ts.
@@ -284,6 +284,7 @@ async function waitOutBatches(
   system: AnySystem,
   ctx: BuildContext,
   step: number,
+  attachedAtSettle: string | false | undefined,
 ): Promise<void> {
   const from = Date.now();
   const wait: SettleWait = {
@@ -293,9 +294,11 @@ async function waitOutBatches(
     waited: false,
   };
   drain.waits.push(wait);
-  const attached = drain.v2
-    ? (drain.rule.attached?.(ctx, system) ?? false)
-    : false;
+  // Read at the instant settle() resolved (`apply`), not here: driving
+  // settle() to its end can let a timer due in that same millisecond run
+  // after it resolved, and work that timer starts was not left attached by
+  // settle(); 1.35 waits such work out like any other (deep seed 24301).
+  const attached = drain.v2 ? (attachedAtSettle ?? false) : false;
   if (attached !== false) {
     // v2's settle() resolved early, with attached work left: it takes no
     // part in the wait, and its checkpoint must differ.
@@ -846,9 +849,19 @@ async function apply(
       await flushMicrotasks();
       break;
     case "settle": {
-      await drive(Promise.resolve(system.settle()), rec, "settle");
+      const settled = Promise.resolve(system.settle());
+      // v2's attached work, read the instant its settle() settles: this
+      // handler is registered before `drive`'s, so it runs first.
+      let attached: string | false | undefined;
+      if (drain?.run.v2) {
+        const read = () => {
+          attached = drain.run.rule.attached?.(ctx, system) ?? false;
+        };
+        settled.then(read, read);
+      }
+      await drive(settled, rec, "settle");
       if (drain) {
-        await waitOutBatches(drain.run, system, ctx, drain.at);
+        await waitOutBatches(drain.run, system, ctx, drain.at, attached);
       }
       rec.checkpoint("settle");
       break;
