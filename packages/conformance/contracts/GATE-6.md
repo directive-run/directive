@@ -255,6 +255,13 @@ about 290 KB.
 
 ## Follow-ups (logged)
 
+- Deep seed 1, case 1,967: an (av) pairing problem (run 9; reported by the
+  nightly, to triage).
+- Deep seed 24301, case 3,397: 1.35 cancels A0, while 2.0 cancels batch item
+  0.2. Untraced (run 9; reported by the nightly, to triage).
+- Deep seed 2, case 3,718: external aborted missing on v2. Untraced (run 9;
+  reported by the nightly, to triage).
+
 - Quirk i's per-run `satisfied_` flag: a failed item loses its retry when a
   satisfied sibling was superseded first, and a failed item the batch's own
   write satisfied still retries and errors (L7b).
