@@ -55,22 +55,37 @@
  * The cases compared on v2 are counted from what each run compared, not from
  * how the case was generated, and must reach FUZZ_V2_FLOOR (here and in the
  * census) whenever v2 has built a layer.
+ *
+ * Report mode (lib/fuzz.ts `FUZZ_BATCH_REPORT_ENV`, set only by the nightly):
+ * a failing case with the batched resolver (trigger `batched`) is reported,
+ * not failed: its spec, report and traces go to `DIFF_FUZZ_REPORT_DIR`
+ * (`case-<n>.json`) and it is listed in `summary.md`, which the nightly adds
+ * to its job summary (Jason, 2026-11-09: "Gate on short seeds; deep runs
+ * report (Recommended)"). A failing case without one still fails, and so do
+ * the run-wide limits below. Unset, as in PR CI and the census, every
+ * failing case fails.
  */
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   FUZZ_DEFAULT_RUNS,
   FUZZ_FLOOR,
+  FUZZ_REPORT_DIR,
+  FUZZ_REPORT_DIR_ENV,
   FUZZ_V2_FLOOR,
+  batchReportMode,
   maxNeverSettles,
   maxRunaways,
+  onFailingCase,
   v2Cases,
 } from "../../lib/fuzz.js";
 import {
   type FuzzTally,
   RUN_BUDGET,
+  type ScenarioResult,
   currentLayer,
   logFuzz,
   logResult,
@@ -78,7 +93,12 @@ import {
   runScenario,
   tallyCase,
 } from "../scenario.js";
-import { type FuzzSpec, specArbitrary, toScenario } from "./model.js";
+import {
+  type FuzzSpec,
+  specArbitrary,
+  specTriggers,
+  toScenario,
+} from "./model.js";
 
 /**
  * Cases the ceiling phase runs before its random ones (fast-check
@@ -101,6 +121,79 @@ const RUNS = Number(process.env.DIFF_FUZZ_RUNS ?? FUZZ_DEFAULT_RUNS);
  * and the two phases do not draw the same numbers into similar arbitraries.
  */
 const CEILING_SEED = (SEED ^ 0x7a3c91d5) | 0;
+
+/** Report mode: the nightly's deep runs only (lib/fuzz.ts `batchReportMode`). */
+const REPORT_MODE = batchReportMode();
+const REPORT_DIR = process.env[FUZZ_REPORT_DIR_ENV] || FUZZ_REPORT_DIR;
+
+/** A failing batched case report mode listed instead of failing the run. */
+interface Reported {
+  phase: string;
+  /** The case's place in its phase, from 1 (pinned examples first). */
+  index: number;
+  triggers: string[];
+  file: string;
+  /** The report's first line. */
+  summary: string;
+}
+
+/** Writes one reported case's spec, report and traces (`case-<n>.json`). */
+function reportCase(
+  reported: Reported[],
+  phase: string,
+  index: number,
+  spec: FuzzSpec,
+  result: ScenarioResult,
+): void {
+  const triggers = specTriggers(spec);
+  const file = `case-${reported.length + 1}.json`;
+  mkdirSync(REPORT_DIR, { recursive: true });
+  writeFileSync(
+    join(REPORT_DIR, file),
+    `${JSON.stringify(
+      {
+        seed: SEED,
+        runs: RUNS,
+        phase,
+        index,
+        triggers,
+        spec,
+        report: result.report,
+        traces: result.traces,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const summary =
+    result.report
+      .split("\n")
+      .find((l) => l.trim() !== "")
+      ?.trim() ?? "";
+  reported.push({ phase, index, triggers, file, summary });
+  console.warn(
+    `[diff fuzz] reported, not failed (report mode; a case with a batched resolver): seed ${SEED}, phase ${phase}, case ${index}, ${file}\n${result.report}\n\nspec: ${JSON.stringify(spec)}`,
+  );
+}
+
+/** The job summary's list of reported cases (`summary.md`). */
+function writeSummary(reported: Reported[]): void {
+  const lines = [
+    `### Differential fuzz, seed ${SEED} (${RUNS} runs): batched cases reported, not failed`,
+    "",
+    'Jason, 2026-11-09: "Gate on short seeds; deep runs report (Recommended)". Each case below is triaged in a follow-up slice; one triaged as a real 2.0 bug blocks at once. Its spec, report and traces are in the run\'s artifact.',
+    "",
+    ...(reported.length === 0
+      ? ["No case with a batched resolver failed."]
+      : reported.map(
+          (r) =>
+            `- \`${r.file}\`: ${r.phase}, case ${r.index} (${r.triggers.join(", ")}): ${r.summary}`,
+        )),
+    "",
+  ];
+  mkdirSync(REPORT_DIR, { recursive: true });
+  writeFileSync(join(REPORT_DIR, "summary.md"), lines.join("\n"));
+}
 
 describe("differential fuzz", () => {
   it("random systems trace identically on every engine", async () => {
@@ -134,12 +227,15 @@ describe("differential fuzz", () => {
       `[diff fuzz] seed ${SEED}, ${RUNS + upToCurrent} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
     );
     const tally: FuzzTally = newFuzzTally();
+    const reported: Reported[] = [];
     const started = Date.now();
     try {
       for (const phase of phases) {
+        let index = 0;
         try {
           await fc.assert(
             fc.asyncProperty(phase.arbitrary, async (spec) => {
+              index += 1;
               const result = await runScenario(toScenario(spec));
               tallyCase(tally, result);
               if (result.runaway || result.neverSettles) {
@@ -147,6 +243,12 @@ describe("differential fuzz", () => {
               }
               logResult(result);
               if (!result.ok) {
+                if (
+                  onFailingCase(specTriggers(spec), REPORT_MODE) === "report"
+                ) {
+                  reportCase(reported, phase.label, index, spec, result);
+                  return;
+                }
                 throw new Error(
                   `${result.report}\n\nspec: ${JSON.stringify(spec)}`,
                 );
@@ -196,6 +298,12 @@ describe("differential fuzz", () => {
         `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished, with no \`ends\` stop before v2 outworked the reference; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)")`,
       );
       logFuzz(SEED, tally);
+      if (REPORT_MODE) {
+        console.info(
+          `[diff fuzz] seed ${SEED}: report mode, ${reported.length} case(s) with a batched resolver failed and were reported, not failed (${REPORT_DIR}/summary.md; Jason, 2026-11-09: "Gate on short seeds; deep runs report (Recommended)")`,
+        );
+        writeSummary(reported);
+      }
     }
     expect(
       tally.runaway,

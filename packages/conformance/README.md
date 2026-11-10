@@ -227,6 +227,20 @@ the traces to agree.
   Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)", so max(1% of
   the seed's cases, 3) (`maxNeverSettles`, lib/fuzz.ts); measured, about
   0.5% of cases.
+  **Fuzz: deep runs report batched cases.** Jason, 2026-11-09: "Gate on
+  short seeds; deep runs report (Recommended)". The L7 gate passed on the
+  PR seeds (1 to 20 and 24301 at the PR count, all blocking). The nightly
+  sets `DIFF_FUZZ_BATCH_REPORT=1` (lib/fuzz.ts `FUZZ_BATCH_REPORT_ENV`; only
+  the exact value "1" turns it on): there, a failing case with a batched
+  resolver (trigger `batched`) is reported, not failed. It is listed in the
+  job summary (`summary.md`), and its spec, report and traces
+  (`case-<n>.json`, in `DIFF_FUZZ_REPORT_DIR`) are uploaded as the run's
+  artifact. Each is triaged in a follow-up slice, and a case triaged as a
+  real 2.0 bug blocks at once. A failing case with no batched resolver
+  still fails the job, as do the runaway, never-settles and v2 limits.
+  Nothing else sets the flag, so PR CI and the census stay fully blocking
+  (diff/self/batch-report.test.ts). A reported case is not shrunk: the
+  file holds the case as generated.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the

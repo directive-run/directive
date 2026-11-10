@@ -87,3 +87,45 @@ export const FUZZ_TRIGGERS = [
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
+
+/**
+ * The environment flag the nightly deep run sets
+ * (.github/workflows/diff-fuzz-nightly.yml) so that a failing case with a
+ * batched resolver (trigger `batched`) is reported, not failed. Jason,
+ * 2026-11-09: "Gate on short seeds; deep runs report (Recommended)": the L7
+ * gate passes on the PR seeds, and each deep-run failure in a batched case
+ * is triaged in a follow-up slice, where one triaged as a real 2.0 bug
+ * blocks at once. Unset (PR CI, the census, a local run), every failing
+ * case fails, as before. Only the exact value "1" turns it on.
+ */
+export const FUZZ_BATCH_REPORT_ENV = "DIFF_FUZZ_BATCH_REPORT";
+
+/**
+ * Where report mode writes each reported case (its spec, report and
+ * traces, `case-<n>.json`) and `summary.md`, the list the nightly adds to
+ * its job summary; relative to the conformance package unless absolute.
+ */
+export const FUZZ_REPORT_DIR_ENV = "DIFF_FUZZ_REPORT_DIR";
+
+/** The report directory when `DIFF_FUZZ_REPORT_DIR` is unset (gitignored). */
+export const FUZZ_REPORT_DIR = "reports/diff-fuzz";
+
+/** Whether report mode is on: `DIFF_FUZZ_BATCH_REPORT` is exactly "1". */
+export function batchReportMode(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[FUZZ_BATCH_REPORT_ENV] === "1";
+}
+
+/**
+ * What the fuzz does with a failing case: "report" only in report mode and
+ * only when the case has the batched resolver; "fail" otherwise. Runaways,
+ * never-settles and the floors are limits on the whole run, not cases, and
+ * still fail in either mode.
+ */
+export function onFailingCase(
+  triggers: readonly FuzzTrigger[],
+  reportMode: boolean,
+): "report" | "fail" {
+  return reportMode && triggers.includes("batched") ? "report" : "fail";
+}
