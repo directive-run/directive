@@ -1,12 +1,17 @@
 # Phase 3 gate decisions: the L7 gate
 
-Date: 2026-11-08. Jason approved the L7 rows of the batch-resolver RFC
+Date: 2026-11-09. Jason approved the L7 rows of the batch-resolver RFC
 (`packages/core-next/docs/rfc-l7-batch.md` on `p7/l7-rfc`, "Decisions for the
 owner") on 2026-11-05: "Approve up to +1.1 KB (Recommended)" for the size,
 "Approve (Recommended)" for (as), "Same as single runs (Recommended)" for (au),
 and "Approve all (Recommended)" for the rest, signing included. He asked
 Claude to sign the entries for the rows he approved, on his behalf, as at the
-earlier gates (GATE-2.md, rule 1).
+earlier gates (GATE-2.md, rule 1). On 2026-11-09 he decided how the gate
+finishes: "Gate on short seeds; deep runs report (Recommended)". The gate
+passes on the pull-request seeds; the nightly deep runs keep running, report
+(not fail) a failing case with a batched resolver, and each such case is
+triaged in a follow-up slice, where one triaged as a real 2.0 bug blocks at
+once (below, "Deep runs").
 
 ## What the L7 gate does
 
@@ -19,16 +24,19 @@ against the file on main; it holds 1,766.
 
 Each difference the diff harness shows at L7 is recorded in
 `diff/divergences.json`. The hand scenarios have 298 exact entries, each with
-`excuses` and counts (528 records). The fuzz has 99 new entries, each with a
+`excuses` and counts (528 records). The fuzz has 96 new entries, each with a
 `bound`, the narrowest `when` and a `group` per row (below). The bounds of the
 84 that had none were derived by `scripts/fingerprint-divergences.ts --seeds
 1-20` (the PR run covers seed 24301); 55 of them covered no record themselves
 on those seeds and are bounded by their class's records. Six drafted entries
 that never covered a record, and that the census rejected (four quirk-b
 timeout twins whose `when` split their group, two `ends` entries for a changed
-record with no path), were removed. Four conformance pins,
-U3, U7, U10 and U14, are 1.35-only by #339's mechanism, each naming its row,
-with 2.0's side pinned in core-next.
+record with no path), were removed, and so were row t's four B-4 fuzz
+entries (`quirk-t-batch`), which no case of any pull-request seed used
+(below). One entry covers (av)'s early flush on 1.35 as a `moved` record
+(`av-moved`). No entry on main changed or was removed. Four conformance
+pins, U3, U7, U10 and U14, are 1.35-only by #339's mechanism, each naming
+its row, with 2.0's side pinned in core-next.
 
 ## The L7 decisions
 
@@ -54,7 +62,8 @@ the right column are Jason's own words.
 The fuzz compares both engines at each `settle` step. 1.35's `settle()`
 resolves while a batch still runs, and 2.0's waits for it ((as)), so a plain
 comparison there would show (as) in every later record. Jason chose how the
-harness meets that, and how it judges a case that never ends, in six steps:
+harness meets that, how it judges a case that never ends, and how the gate
+finishes, in eight steps:
 
 | Date | Decision | Jason's words |
 | --- | --- | --- |
@@ -63,18 +72,26 @@ harness meets that, and how it judges a case that never ends, in six steps:
 | 2026-11-07 | Replace both with one wait: both clocks advance together until neither has a batch still running, capped at 5 s | "One shared wait (Recommended)" |
 | 2026-11-07 | A case whose 1.35 batches never finish (1.35 re-dispatches a "retry" batch forever) is discarded on its own count | "Discard, own count (Recommended)" |
 | 2026-11-07 | That count may reach 1% of a seed's cases, at least 3 | "Cap at 1% of cases, min 3 (Recommended)" |
-| 2026-11-08 | Where only 2.0 is still running at the cap, it fails as a 2.0 bug only if no fuzz handler wrote while its signal was aborted during the wait; otherwise it is a test-handler loop, discarded under the never-settles cap on its own sub-line, naming the approved row that let 2.0 in | "Refine: write-after-cancel = discard (Recommended)" |
+| 2026-11-08 | Where only 2.0 is still running at the cap, it fails as a 2.0 bug only if no fuzz handler wrote while its signal was aborted during the wait; otherwise it is a test-handler loop, discarded under the never-settles cap (replaced the same day, next row) | "Refine: write-after-cancel = discard (Recommended)" |
+| 2026-11-08 | Where only 2.0 is still running at the cap, the "2.0-only live" verdict is void when an approved `ends` entry had already stopped the case's comparison on 2.0 before 2.0 outworked the reference; such a case is discarded under the runaway limit, max(1% of cases, 2), on the "discarded after a stop" sub-line, naming the entry. A write after an abort (`writeAfterAbort`) is now only reported | "Use 'Discard after the stop' (Recommended)" |
+| 2026-11-09 | The gate passes on the 21 pull-request seeds. Nightly deep runs report, and do not fail on, a failing case with a batched resolver; each is triaged in a follow-up slice, and one triaged as a real 2.0 bug blocks at once | "Gate on short seeds; deep runs report (Recommended)" |
 
-Why the last one: in seed 8, a canceled fuzz handler ignores its aborted
-signal and still writes, which raises the batch again, and the two writes
-chase each other. Only 2.0 enters the chase, through approved quirk a's
-re-dispatch; given the same first write, 1.35 runs the identical chase
+Why "Discard after the stop": in seed 8, a canceled fuzz handler ignores its
+aborted signal and still writes, which raises the batch again, and the two
+writes chase each other. Only 2.0 enters the chase, through approved quirk
+a's re-dispatch; given the same first write, 1.35 runs the identical chase
 (6,005 calls in 5 s), and with a handler that respects its signal 2.0 stops
-after 6 calls. So the loop is the test handler's, not the engine's
-(seed 10 is the same pattern with both engines live). A 2.0 that stays live
-with no write after an abort still fails (diff/self/settle-drain.test.ts).
+after 6 calls. Deep seed 2 showed the same chase with ordinary writes (its
+one abort is the writer's own), so a write after an abort was the wrong
+input: what matters is that the comparison had already ended at an approved
+row's `ends` stop. A 2.0 that stays live with no `ends` stop before it,
+or with a stop after the reference had finished, still fails
+(diff/self/settle-drain.test.ts).
 
-Three readings are the coordinator's, not separate owner
+Why "Gate on short seeds; deep runs report": the last five rounds of deep
+triage found no 2.0 bug, and each round cost about 400k tokens.
+
+These readings are the coordinator's, not separate owner
 decisions (README, "one shared wait"):
 
 - a call reads as live up to and including its timeout's due time, and a
@@ -83,11 +100,23 @@ decisions (README, "one shared wait"):
 - an aborted call is live while its timeout timer is pending: 1.35's
   `withTimeout` clears that timer only when the call settles or the timer
   fires (seed 19);
-- a test-handler loop names "the first entry in the case's `used` list that
-  names a quirk". `used` is in the order the comparison explained the
-  differences, not the loop's cause, so seed 8 names quirk o's console entry
-  first; the report also lists every used quirk entry (quirk a's among
-  them), and a loop with no used quirk entry still fails.
+- 2.0's attached work is read at the instant its `settle()` resolves, not
+  after the harness has driven it: a timer due in that same millisecond may
+  run first, and work it starts was not left by `settle()`. This fixed a
+  harness bug (deep seed 24301), not an engine difference;
+- a record missing on 2.0 in step N that 2.0 has, of the same stream and
+  kind, one step later is one `moved` difference, filed only where a signed
+  `moved` entry covers it, with a `batchMaxSize` trigger (deep seed 1:
+  1.35's queue holds a re-raised item twice, which fills `maxSize` 2 and
+  flushes a step before 2.0's window timer). This is tooling for approved
+  row (av), so the entry covers the move and never an absence
+  (diff/self/moved.test.ts);
+- a fuzz group the census's own run (seed 24301) never uses gets a pinned
+  case (`diff/fuzz/pinned.json`), the earlier gates' precedent; a group no
+  pull-request seed uses at all is removed instead, since removing an
+  entry only narrows what is excused (`quirk-t-batch`, below);
+- report mode applies to a failing case whose spec has the batched resolver
+  (trigger `batched`), on the nightly only (`DIFF_FUZZ_BATCH_REPORT=1`).
 
 ## Fixes found in review and at the gate
 
@@ -142,87 +171,112 @@ all (Recommended)", 2026-11-05).
 | (as) | 61 | 1 (`row-as`) |
 | (at) | 45 | 4 (`row-at`) |
 | (au) | 7 | 0 |
-| (av) | 0 | 7 (`av`) |
+| (av) | 0 | 8 (`av` 7, `av-moved` 1) |
 | Quirk g | 12 | 19 (`quirk-g` 18, `quirk-g-fails` 1) |
 | Quirk h, with (ar) (53 hand) and (as) (8 hand) | 61 | 11 (`quirk-h`) |
 | Quirk i | 24 | 11 (`quirk-i` 7, `quirk-i-passes` 4) |
 | Quirk k | 19 | 18 (`quirk-k`) |
 | Row p, per requirement (U11) | 12 | 4 (`quirk-p`) |
-| Row t's batch path (B-4) | 0 | 4 (`quirk-t-batch`) |
+| Row t's batch path (B-4) | 0 | 0 (the 4 `quirk-t-batch` entries were removed) |
 | Quirk b (GATE-1), batch shape | 0 | 6 (`quirk-b` 2, `quirk-b-batch` 4) |
 | Row n, batch shape | 0 | 12 (`quirk-n-batch`) |
-| **Total** | **298** (528 records) | **99** |
+| **Total** | **298** (528 records) | **96** |
 
 A fuzz `group` is one signed decision with one `when`. Where a row's batch
 shape needs a different trigger, its entries form their own group:
 `quirk-g-fails` (a call can fail), `quirk-i-passes` (one attempt too),
-`quirk-n-batch`, `quirk-b-batch`, `quirk-t-batch` and `row-as`.
+`quirk-n-batch`, `quirk-b-batch`, `av-moved` and `row-as`.
+
+**The census's stale groups.** The census's own run (seed 24301 at the
+pull-request count) used no entry of nine L7 fuzz groups. Eight now have a
+pinned case in `diff/fuzz/pinned.json`, found by sampling the up-to-L7
+cases and keeping the first passing case that uses an entry of the group:
+`av`, `av-moved` (deep seed 1), `quirk-g-fails`, `quirk-h`, `quirk-i` and
+`quirk-i-passes` in run 9; `row-as` (seed 19, up-to-L7 case 57) and
+`quirk-b-batch` (seed 13, up-to-L7 case 12) in run 10. The ninth,
+`quirk-t-batch` (row t's B-4 path, 4 entries), was removed: no case of any
+pull-request seed, in either phase, used it; the (av) onError entry sits
+before them and ends such cases first (follow-ups, entry order).
 
 ## Results
 
-**Fuzz, pull-request count** (287 cases a seed; seeds 1 to 20 and 24301):
-all 21 exit 0. Over the 21 seeds, 6,000 cases were compared, 2,736 of them on
-2.0 too (117 to 140 a seed), and 564 ended early at an `ends` stop. Three
-1.35 runaways were discarded (seeds 5, 18 and 20), none after a stop. The
-shared wait advanced 1.35's clock in 684 compared cases and 2.0's in 101, and
-102 needed more than one round.
+**Fuzz, pull-request count** (287 cases a seed, 205 across every layer and
+82 up to L7, the pinned cases among them; seeds 1 to 20 and 24301, on the
+final tree): all 21 exit 0. Over the 21 seeds, 6,027 cases ran and 6,003
+were compared, 2,739 of them on 2.0 too (117 to 140 a seed), and 707 ended
+early at an `ends` stop. Four runaways were discarded: three where 1.35
+itself passed the timer budget (seeds 5, 18 and 20), and one after a stop
+(seed 8, where only 2.0 was live at the shared wait's cap after quirk a's
+`l3-quirk-a-fuzz-hook-onReconcileStart-extra` had stopped the comparison).
+The shared wait advanced 1.35's clock in 711 cases and 2.0's in 125, and 121
+needed more than one round.
 
 | Census line | Total | Per seed | Cap |
 | --- | --- | --- | --- |
-| Never settles (discarded) | 24 | 0 to 3 | 3 a seed (max(1% of 287, 3)) |
-| of them, both engines live | 2 | seeds 10 and 18 | |
-| of them, test-handler loops | 1 | seed 8 | |
+| Never settles (discarded) | 20 | 0 to 3 | 3 a seed (max(1% of 287, 3)) |
+| of them, both engines live | 1 | seed 18 | |
+| Discarded after a stop | 1 | seed 8 | max(1% of 287, 2) runaways a seed |
 | Failed as 2.0-only live | 0 | | |
 
-Seeds 1, 3, 7 and 10 sit at the cap of 3.
+Seeds 1, 3 and 7 sit at the never-settles cap of 3.
+
+**The census** (its own run: seed 24301 at the pull-request count) exits 0.
+Its fuzz lines:
+
+```text
+[census] fuzz: 287 cases compared (seed 24301), 135 of them on v2 too, 26 ended early by an `ends` divergence (at step 3.6 on average; 3 at step 0)
+[census] fuzz, discarded because 1.35's batches never settle (still live at the shared wait's 5 s cap at a settle step, Jason, 2026-11-07: "One shared wait (Recommended)"; at most max(1% of the seed's cases, 3), not counted as runaways): seed 24301: 0 of at most 3
+```
 
 **Trigger rates** among the 1,722 cases generated up to L7 over these seeds
 (each case can set several): `batched` 33%, `batchSiblings` 27%,
 `batchTimeout` 22%, `batchFails` 22%, `batchRetry` 22%, `batchAbortOn` 20%,
 `batchMixed` 15%, `batchFallback` 11%, `batchWithResults` 11%,
-`batchAllFail` 3.7%, `batchSomeFail` 3.2%.
+`batchAllFail` 3.7%, `batchSomeFail` 3.2% (measured in run 8).
 
-**Deep runs** (`DIFF_FUZZ_RUNS=5000 --testTimeout=1200000`): not yet passing.
-Each failing seed stops at its first failing case, which fast-check then
-shrinks, so a seed shows one case at a time.
+## Deep runs: report-only for batched cases
 
-- **Seed 1** (failed at case 2,175 of 7,000, 11 never-settles discards so
-  far): approved row (av) in a new shape. A bound batched requirement is
-  retracted and raised again; 1.35's queue holds it twice, which fills
-  `maxSize` 2 and flushes the call at once, with the item twice; 2.0's queue
-  holds it once, so its call waits for the window timer and runs one step
-  later. Not yet entered: the narrowest `when` available
-  (`batched`, `batchAbortOn`) would let an `ends` entry for a missing batch
-  start stop any abortOn case, which would also excuse a 2.0 that never
-  starts a batch. It needs a narrower trigger (a set `maxSize`) first.
-- **Seed 24301** (failed at case 1,311): not a 2.0 bug, but a shape no rule
-  covers yet. Both engines' `settle()` resolve at 1 ms with the system
-  settled and nothing in flight. In that same millisecond a canceled run's
-  handler writes after its abort (the write-after-cancel pattern) and raises
-  a new run. The shared wait then waits out 1.35, which is not settled, but
-  leaves 2.0 out as "settle() resolved with attached work left", so the two
-  checkpoints differ. Open for a decision.
-- **Seed 2** (failed at case 3,294; the tallies include fast-check's
-  shrink runs, so its 22 "2.0-only live" and 50 runaways are one case and
-  its shrinks): "2.0-only live" with no handler write after an abort, which
-  the rule fails as a 2.0 bug. The shrunk case: under "retry", r0 (f0 ≥ 1
-  → write 0) fails its first attempt; quirk a re-dispatches it on 2.0 only,
-  and its write of 0 starts a chase with the fallback batch (f0 ≥ 0 →
-  write 1, `abortOn`), whose requirement is raised anew at each change. In
-  5 s, 2.0 makes 2,007 batch calls and 2,005 r0 runs; 1.35 makes 4 calls,
-  and r0 never writes. It looks like seed 8's mechanism with ordinary writes
-  in place of writes after an abort. It is not entered or discarded: it
-  goes back to the coordinator.
+Jason, 2026-11-09: "Gate on short seeds; deep runs report (Recommended)".
+The nightly (`.github/workflows/diff-fuzz-nightly.yml`, 5,000 cases from a
+random seed plus 2,000 up to L7) sets `DIFF_FUZZ_BATCH_REPORT=1`. In that
+mode a failing case with a batched resolver (trigger `batched`) is reported,
+not failed: it is listed in the job summary, and its spec, report and traces
+are uploaded as the run's artifact. A failing case with no batched resolver
+still fails the job, as before, and so do the runaway, never-settles and
+v2 limits. Nothing else sets the flag, so the pull-request fuzz (run by the
+census in CI) stays fully blocking (diff/self/batch-report.test.ts). Each
+reported case is triaged in a follow-up slice; one triaged as a real 2.0
+bug blocks at once.
 
-**Open at this commit (the gate has not passed yet).**
+Measured at this gate in report mode (`DIFF_FUZZ_SEED=<seed>
+DIFF_FUZZ_RUNS=5000 DIFF_FUZZ_BATCH_REPORT=1`, `--testTimeout=1200000`),
+the three deep seeds each run all 7,000 cases and exit 0:
 
-- The two deep seeds above.
-- `pnpm census` fails on staleness. Its own run (seed 24301 at the PR count)
-  uses no entry of seven L7 fuzz groups: `av`, `quirk-t-batch`,
-  `quirk-g-fails`, `row-as`, `quirk-h`, `quirk-i` and `quirk-i-passes`
-  (30 entries). Each group covers records on other PR seeds. The fix
-  proposed is a pinned fuzz example for each group (diff/fuzz/pinned.json),
-  so that every census run exercises them.
+| Seed | Compared | On 2.0 too | Runaways (after a stop) | Never settles | Reported batched cases | 2.0-only live |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 6,951 | 3,157 | 10 (0) | 39 of at most 70 | 14 | 0 |
+| 24301 | 6,959 | 3,162 | 10 (2) | 31 of at most 70 | 12 | 0 |
+| 2 | 6,955 | 3,164 | 12 (3) | 33 of at most 70 | 16 | 0 |
+
+That is 42 reported cases, not 3: a blocking run stops at its first
+failing case, so each seed had shown one case at a time. Every reported
+difference is on 2.0; none is on the workspace engine. The 39 beyond the
+three known ones are untriaged. Two of them (seed 24301, up-to-L7 cases 372
+and 530) start with an extra `unhandled` error on 2.0, which an app could
+see, so they come first in triage.
+
+Three deep cases are known and logged as follow-ups (below). Each has a
+batched resolver, so the nightly reports it:
+
+- **Seed 1, case 1,967:** an (av) pairing problem.
+- **Seed 24301, case 3,397:** 1.35 cancels A0, while 2.0 cancels batch item
+  0.2. Untraced.
+- **Seed 2, case 3,718:** an external `aborted` record missing on v2.
+  Untraced.
+
+The deep seeds' earlier cases (run 8: seed 1's (av) flush, seed 24301's
+attached-work read, seed 2's chase) were resolved in run 9 by the `moved`
+record, the attached-work snapshot and "Discard after the stop" above.
 
 ## Sizes
 
@@ -261,6 +315,13 @@ about 290 KB.
   0.2. Untraced (run 9; reported by the nightly, to triage).
 - Deep seed 2, case 3,718: external aborted missing on v2. Untraced (run 9;
   reported by the nightly, to triage).
+- The 39 other batched cases the deep seeds report (42 in all: 14, 12 and
+  16 on seeds 1, 24301 and 2, the known three among them), all differing
+  on 2.0 only; start with seed 24301's up-to-L7 cases 372 and 530 (an extra
+  `unhandled` error on 2.0).
+- Row t's B-4 path has no fuzz entry now (`quirk-t-batch` removed). Re-add it
+  with a narrower trigger than `batchTimeout`, once the entry order below
+  lets a B-4 case reach it.
 
 - Quirk i's per-run `satisfied_` flag: a failed item loses its retry when a
   satisfied sibling was superseded first, and a failed item the batch's own
@@ -273,8 +334,6 @@ about 290 KB.
   quirk k's reason, and word the size reason so the +83 B reads as `minimal`
   only (L7b).
 - The fuzz's quirk-i reach (L7a).
-- The B-4 entries' `batchTimeout` trigger still fires on fallback specs and
-  when the timeout is longer than the delay; a narrower trigger is needed.
 - `l7-fuzz-av-hook-onError-missing` sits before the `l7-fuzz-t-b4-*`
   entries, so it ends cases that are row t's B-4 path (seed 5's
   "retry" case: 1.35 reports a batch timeout after a clobber, 2.0 does
@@ -288,7 +347,6 @@ about 290 KB.
   entries covered nothing themselves on the 21 seeds. They are worth a review
   for width, starting with `l7-fuzz-k-external-aborted-extra`, whose bound
   also takes single-resolver `aborted` records.
-- A test-handler loop names the first used entry that names a quirk. `used`
-  is in the order the comparison explained the differences, so seed 8 names
-  quirk o's console entry; quirk a is in the listed set. A causal choice
-  would need the loop's first post-abort write traced to its row.
+- Report mode reports any failing batched case, whichever engine differs.
+  A narrower mode would report only differences on 2.0 and keep a
+  workspace-engine (1.x) difference in a batched case blocking.
