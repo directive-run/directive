@@ -41,7 +41,11 @@ export interface Excuse {
  * - in a changed pattern's `path`, `[*]` matches any array index;
  * - a changed pattern's `to` may be `{ "$lt": "from" }` (`LOWER`): the
  *   engine under test's value is a number below 1.35's, for a quirk whose
- *   approval says which way a count moves (quirk z: 2.0 holds fewer timers).
+ *   approval says which way a count moves (quirk z: 2.0 holds fewer timers);
+ * - a changed pattern may add `record`, a pattern 1.35's whole record must
+ *   fit (`Difference.record`), for a change excused only inside a record of
+ *   a given shape (row (av): an item changed only in a batch call whose
+ *   items repeat on 1.35, `batchItemsRepeated`).
  *
  * Why this bound is honest (P3-F1): a fuzz entry covers a quirk wherever a
  * seed puts it, so the resolver, requirement or attempt it shows up on
@@ -102,6 +106,40 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
   /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
+  /** The batched resolver's id (L7), own or namespaced: `rb`, `a::rb`. */
+  batchResolver: (v) => typeof v === "string" && /^([a-z]::)?rb$/.test(v),
+  /** A constraint that feeds the batched resolver: `b0`, `a::b1`. */
+  batchConstraint: (v) => typeof v === "string" && /^([a-z]::)?b\d+$/.test(v),
+  /** A batch requirement's type: `AB`. */
+  batchRequirementType: (v) => typeof v === "string" && /^[A-Z]B$/.test(v),
+  /** A batch requirement's id: `AB:{"item":"0.1"}`. */
+  batchRequirementId: (v) =>
+    typeof v === "string" && /^[A-Z]B:\{"item":"\d+\.\d+"\}$/.test(v),
+  /** A batch requirement's item, `<source>.<index>`: `0.1`. */
+  batchItem: (v) => typeof v === "string" && /^\d+\.\d+$/.test(v),
+  /** The batched resolver's record tag: `a.rb`. */
+  batchTag: (v) => typeof v === "string" && /^[a-z]\.rb$/.test(v),
+  /**
+   * A batch call's items (`batchItem`s) where some item repeats: a queue
+   * that held one requirement twice, row (av)'s shape on 1.35 (`0.0, 0.0`).
+   * Never a class `generalize` picks: an entry names it by hand, so a
+   * call of distinct items stays outside it.
+   */
+  batchItemsRepeated: (v) =>
+    Array.isArray(v) &&
+    v.every((x) => typeof x === "string" && /^\d+\.\d+$/.test(x)) &&
+    new Set(v).size < v.length,
+  /**
+   * The error a batched call or item ended with: a thrown batch's or
+   * fallback run's own message (`a.rb attempt 1`), a with-results item's
+   * (`a.rb 0.1 attempt 1`), or the engine's timeout of the batch
+   * (`Batch resolver "rb" timed out after 3ms`). One class, as
+   * `attemptError` is for a single run.
+   */
+  batchAttemptError: (v) =>
+    typeof v === "string" &&
+    (/^[a-z]\.rb( \d+\.\d+)? attempt \d+$/.test(v) ||
+      /^Batch resolver "([a-z]::)?rb" timed out after \d+ms$/.test(v)),
 };
 
 /**
@@ -227,10 +265,19 @@ export function fits(
   return pattern === value;
 }
 
+/**
+ * The record a missing, extra or moved difference names: 1.35's for missing
+ * and moved (a moved record's other fields are `changed` differences of
+ * their own), the engine's for extra.
+ */
+export function recordOf(d: Difference): Json | undefined {
+  return d.op === "extra" ? d.candidate : d.reference;
+}
+
 /** A difference's payload, as a `Bound` pattern reads it. */
 function payloadOf(d: Difference): Json | undefined {
   if (d.op !== "changed") {
-    return d.op === "missing" ? d.reference : d.candidate;
+    return recordOf(d);
   }
 
   return { path: d.path ?? "", from: d.reference, to: d.candidate } as Json;
@@ -256,9 +303,12 @@ export function admits(b: Bound, d: Difference): boolean {
     const q = p as Record<string, Json>;
     const path = q.path;
 
+    const keys = Object.keys(q).sort().join();
+
     return (
       typeof path === "string" &&
-      Object.keys(q).length === 3 &&
+      (keys === "from,path,to" ||
+        (keys === "from,path,record,to" && fits(q.record as Json, d.record))) &&
       pathFits(path, d.path ?? "") &&
       fits(q.from as Json, d.reference) &&
       (isLower(q.to)
@@ -280,6 +330,13 @@ const ORDER = [
   "resolverTag",
   "effectTag",
   "attemptError",
+  "batchResolver",
+  "batchConstraint",
+  "batchRequirementType",
+  "batchRequirementId",
+  "batchItem",
+  "batchTag",
+  "batchAttemptError",
 ];
 
 /**
@@ -371,7 +428,7 @@ export function names(x: Excuse, d: Difference): boolean {
       sameSide(x, "to", d.candidate)
     );
   }
-  const record = d.op === "missing" ? d.reference : d.candidate;
+  const record = recordOf(d);
 
   return (
     !("path" in x) &&
@@ -387,7 +444,7 @@ export function excuseFor(d: Difference): Excuse {
   if (d.op !== "changed") {
     return {
       count: 1,
-      record: (d.op === "missing" ? d.reference : d.candidate) as Json,
+      record: recordOf(d) as Json,
     };
   }
 

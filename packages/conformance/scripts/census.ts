@@ -27,6 +27,7 @@ import {
   checkHooksFired,
   checkScenarioLayers,
   describeFuzzRun,
+  describeNeverSettles,
   nextSurfaceReport,
 } from "../lib/census.js";
 import { defaultRepoRoot } from "../lib/core-entries.js";
@@ -156,6 +157,7 @@ console.log(
   }
 }
 console.log(`[census] fuzz: ${fuzzRuns.map(describeFuzzRun).join("; ")}`);
+console.log(`[census] fuzz, ${describeNeverSettles(fuzzRuns)}`);
 console.log(
   v2Layer === null
     ? "[census] v2: no layer built yet (layers.rules.json `current` is null); v2 runs nothing"

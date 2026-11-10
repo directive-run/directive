@@ -2058,9 +2058,9 @@
     "col": 27,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: the runs of one batch share one writes record, counted once (identity check); needs resolveBatch to observe. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
+    "note": "L7 batch resolvers: the runs of one batch share one writes record, counted once (identity check); needs resolveBatch to observe. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "endLine": 1353,
     "endCol": 39
   },
@@ -2069,9 +2069,9 @@
     "col": 11,
     "mutator": "EqualityOperator",
     "replacement": "only !== null",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "endLine": 1356,
     "endCol": 24
   },
@@ -2080,9 +2080,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "endLine": 1356,
     "endCol": 24
   },
@@ -2091,9 +2091,9 @@
     "col": 26,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'.",
+    "note": "L7 batch resolvers: remembering the first writes record so a batch sibling sharing it is counted once; with distinct records the result is the same. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "endLine": 1359,
     "endCol": 8
   },
@@ -6994,9 +6994,9 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled",
+    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled. Killed at L7 by l7-batch-pins-oracle > settle() and inspect() while a batch runs (U7) > settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test. This gate trimmed U7 to what 1.35 and 2.0 share (row (as)) and renamed it settle() and inspect() while a batch runs (U7) > settle() runs the queued batch, and inspect() lists no batch while it is queued; it still asserts the batch starts at 0 ms, and each of the three mutants applied by hand fails it on conformance:local (2026-11-05).",
     "endLine": 4020,
     "endCol": 47
   },
@@ -7005,9 +7005,9 @@
     "col": 49,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled",
+    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled. Killed at L7 by l7-batch-pins-oracle > settle() and inspect() while a batch runs (U7) > settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test. This gate trimmed U7 to what 1.35 and 2.0 share (row (as)) and renamed it settle() and inspect() while a batch runs (U7) > settle() runs the queued batch, and inspect() lists no batch while it is queued; it still asserts the batch starts at 0 ms, and each of the three mutants applied by hand fails it on conformance:local (2026-11-05).",
     "endLine": 4022,
     "endCol": 8
   },
@@ -7016,9 +7016,9 @@
     "col": 9,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled",
+    "note": "L7 batch resolvers: settle() flushes a pending batch window; needs batch enabled. Killed at L7 by l7-batch-pins-oracle > settle() and inspect() while a batch runs (U7) > settle() resolves at once while the batch it ran is still going, and inspect() lists no batch in flight (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test. This gate trimmed U7 to what 1.35 and 2.0 share (row (as)) and renamed it settle() and inspect() while a batch runs (U7) > settle() runs the queued batch, and inspect() lists no batch while it is queued; it still asserts the batch starts at 0 ms, and each of the three mutants applied by hand fails it on conformance:local (2026-11-05).",
     "endLine": 4021,
     "endCol": 43
   },
@@ -7051,18 +7051,18 @@
     "col": 11,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window' and 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'."
+    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window' and 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy the first of them (after it resolves); Stryker names only the first killer."
   },
   {
     "line": 4043,
     "col": 11,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
+    "reason": "later-layer",
     "layer": "L7",
-    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'."
+    "note": "a settle() listener left subscribed after it timed out: its only effect is to call processBatches() on a settlement change, which flushes batch resolvers (L7) early. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test."
   },
   {
     "line": 4044,

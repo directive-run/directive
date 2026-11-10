@@ -82,9 +82,26 @@ export interface Difference {
   kind: string;
   step: number;
   phase: Keyed["phase"];
-  op: "missing" | "extra" | "changed";
+  /**
+   * `moved` (diff/scenario.ts `fileMoves`): a record missing on the engine
+   * under test in step N that it has, of the same stream and kind, as an
+   * extra record in step N + 1, filed as one record that came one step
+   * later, never as an absence, and only where a signed `moved` entry
+   * covers that move. Only the step moved: any field that differs between
+   * the two records is a `changed` difference of its own. `step` and
+   * `phase` are the reference's; the payload is the reference's record
+   * (`reference`; `candidate` holds the engine's).
+   */
+  op: "missing" | "extra" | "changed" | "moved";
   /** For `changed`: where inside the entry. */
   path?: string;
+  /**
+   * For `changed` only: 1.35's whole record (as compared), the record the
+   * change is in. Only a fuzz bound's changed pattern with a `record` reads
+   * it (diff/fingerprint.ts `Bound`), so an entry can excuse a change only
+   * inside a record of a given shape.
+   */
+  record?: Json;
   reference?: Json;
   candidate?: Json;
   /**
@@ -349,6 +366,13 @@ export function isPastSharedPoint(d: Difference, stop: Difference): boolean {
   }
   if (d.op === "extra") {
     return (d.at.candidate as number) > stop.shared.candidate;
+  }
+  if (d.op === "moved") {
+    // Two unmatched records: dropped only when each would be on its own.
+    return (
+      (d.at.reference as number) > stop.shared.reference &&
+      (d.at.candidate as number) > stop.shared.candidate
+    );
   }
 
   return false;
@@ -887,7 +911,7 @@ function lcs(
   return pairs;
 }
 
-function diffJson(
+export function diffJson(
   a: Json | undefined,
   b: Json | undefined,
   path: string,
@@ -983,6 +1007,7 @@ function compareWith(
           ...base(ka),
           op: "changed",
           ...f,
+          record: project(ka.entry),
           at: { reference: ka.index, candidate: kb.index },
           where,
         });

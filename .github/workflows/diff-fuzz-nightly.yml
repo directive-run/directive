@@ -9,6 +9,16 @@ name: Differential fuzz (nightly)
 # error carries the shrunk spec and the first divergence: rerun locally with
 #   DIFF_FUZZ_SEED=<seed> DIFF_FUZZ_RUNS=5000 pnpm --filter @directive-run/conformance \
 #     exec vitest run --config vitest.config.ts --project conformance:diff diff/fuzz
+#
+# Report mode for batched cases. Jason, 2026-11-09: "Gate on short seeds;
+# deep runs report (Recommended)". This job sets DIFF_FUZZ_BATCH_REPORT=1: a
+# failing case with a batched resolver (trigger `batched`) is reported, not
+# failed. Each is listed in the job summary, and its spec, report and traces
+# are uploaded as the run's artifact, to be triaged in a follow-up slice; a
+# case triaged as a real 2.0 bug blocks at once. A failing case with no
+# batched resolver still fails the job, as do the runaway, never-settles and
+# v2 floors. Nothing else sets the flag (diff/self/batch-report.test.ts), so
+# the PR-count fuzz in CI stays fully blocking.
 
 on:
   schedule:
@@ -64,8 +74,26 @@ jobs:
         env:
           DIFF_FUZZ_SEED: ${{ steps.seed.outputs.seed }}
           DIFF_FUZZ_RUNS: ${{ inputs.runs || '5000' }}
+          DIFF_FUZZ_BATCH_REPORT: "1"
+          DIFF_FUZZ_REPORT_DIR: reports/diff-fuzz
         working-directory: packages/conformance
         # 7,000 cases (5,000 across every layer and 2,000 for v2) on three
         # engines (v1, local, v2) need more than the project's 120 s default;
         # PR runs use fewer cases and keep it.
         run: ./node_modules/.bin/vitest run --config vitest.config.ts --project conformance:diff --testTimeout=1200000 diff/fuzz
+
+      - name: List reported batched cases in the job summary
+        if: ${{ !cancelled() }}
+        working-directory: packages/conformance
+        run: |
+          if [ -f reports/diff-fuzz/summary.md ]; then
+            cat reports/diff-fuzz/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: diff-fuzz-batched-${{ steps.seed.outputs.seed }}
+          path: packages/conformance/reports/diff-fuzz/
+          if-no-files-found: ignore
+          retention-days: 30

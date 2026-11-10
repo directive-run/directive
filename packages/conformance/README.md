@@ -137,6 +137,113 @@ the traces to agree.
   60 cases compared on v2 (`FUZZ_V2_FLOOR`, counted from what each run
   compared) while `current` is not null. The cases across every layer all still
   run, as before.
+  **Batches at a settle step: one shared wait.** Jason, 2026-11-07: "One
+  shared wait (Recommended)". It replaced the two separate drains: 1.35's
+  (Jason, 2026-11-06: "Wait out 1.35's batches (Recommended)"), which
+  advanced only 1.35's clock until its batches finished, and v2's (Jason,
+  2026-11-07: "Wait out 2.0's detached batches too (Recommended)"), which
+  advanced only v2's until its detached runs finished. The two ended at
+  different fake times (seed 4: 12 ms against 250 ms), so the engines'
+  clocks drifted apart for every later step. 1.35's `settle()` resolves
+  while a batch still runs, and 2.0's waits for it (row (as)), but not for a
+  detached run (a bound run whose requirement is retracted leaves flight
+  unaborted, RFC-0003). So in the fuzz only, after `settle()` resolves, both
+  engines' fake clocks advance together, by the same amount, to the first
+  time at which neither has a batch still running, and the `settle`
+  checkpoint is recorded there, on both at the same fake time. Running is
+  read from 1.35's own schedule (`batchDrain` in diff/fuzz/model.ts): a call
+  of the batched handler still live (not returned, and not past its
+  timeout, the timer due at it included), a retry backoff of a failed call
+  still running (its end included), or the system not settled; on 1.35 that
+  is any batch, on 2.0 a detached run, since its
+  attached ones are what its `settle()` waited for. A call whose signal a
+  clobber or a retraction aborted still counts while its timeout timer is
+  pending: 1.35's `withTimeout` clears that timer only when the call settles
+  or the timer fires, never on abort, so its timeout still fires (and its
+  run's end still asks a pass); with no timeout, an aborted call is an
+  orphan, as a canceled single run is. That is the coordinator's reading of
+  the rule's "until neither has a batch still running" (2026-11-08, seed
+  19), not a separate owner decision. The engines run one
+  after the other, so the common time is found in rounds
+  (`nextTargets`, diff/scenario.ts): where the reference and v2 ended a
+  settle step's wait at different times, the later becomes that step's
+  target and both run again. A v2 whose `settle()` resolved with attached
+  work left takes no part, so it still differs
+  (diff/self/settle-drain.test.ts). Attached work is read at the instant
+  `settle()` resolves, not after the harness has driven it: a timer due in
+  that same millisecond may run first, and work it starts was not left by
+  `settle()` (deep seed 24301, where both engines' `settle()` resolve
+  settled at 1 ms and a canceled run's write then raises a new attempt on
+  both). A run goes to its target one timer at a
+  time, as its own wait does. Each wait is capped at 5 s of fake time after
+  its `settle()` resolved (`DRAIN_BOUND_MS`), 2.0's own `settle()` limit;
+  when one engine is still running at its cap, the other is advanced to that
+  same time and judged there:
+  - both engines still running at the cap: the case is discarded under the
+    never-settles rule below;
+  - only 1.35 still running while 2.0 finished: discarded the same way;
+  - only 2.0 still running while 1.35 finished in the same time: the case
+    fails, as a 2.0 bug ("2.0-only live"), naming what kept 2.0 live,
+    unless an approved `ends` entry had already stopped the case's
+    comparison on 2.0 before 2.0 outworked the reference. **Discard after
+    the stop.** Jason, 2026-11-08: "Use 'Discard after the stop'
+    (Recommended)". The cut is the time the reference's batches finished at
+    that step (`SettleWait.quietAt`): the stop counts as first when its
+    record comes before the point 2.0's clock reached that time
+    (`SettleWait.cutAt`), by the same `stopsBefore` test as the timer-budget
+    runaway after a stop (Jason, 2026-11-02: "Discard after the stop").
+    Then the comparison had already ended, so judging liveness there would
+    judge work it had abandoned: the case is discarded after the stop,
+    counted toward the runaway limit, max(1% of cases, 2), on the census's
+    "discarded after a stop" sub-line, which names the stopping entries
+    (seeds 8 and 2: quirk a's re-dispatch under "retry" lets 2.0 into a
+    chase of two writes that 1.35 runs too once given the same first
+    write). Its differences before the stop are still checked. With no
+    `ends` stop on 2.0, or a stop after the reference had finished, it
+    still fails (diff/self/settle-drain.test.ts). This replaces the
+    write-after-cancel verdict of the same day (Jason, 2026-11-08: "Refine:
+    write-after-cancel = discard (Recommended)"): a write a handler makes
+    while its signal is aborted (`writeAfterAbort`, counted in the fuzz
+    handlers, diff/fuzz/model.ts) is now only reported, since seed 2's chase
+    has none (its one abort is the writer's own, `abortOn` firing on its
+    write) and the count read a hand-instrumented handler rather than the
+    comparison.
+  A batch still live at the cap on the workspace engine, or on the
+  reference's second run, fails the case too. Hand scenarios never wait, and
+  their signed (as) entries still pin 1.35's early `settle()`. The fuzz line
+  counts the cases where each engine's clock advanced, and those that took
+  more than one round.
+  **A reference that never settles.** Jason, 2026-11-07: "Discard, own count
+  (Recommended)". When the reference's own batches are still live at the
+  shared wait's cap on its first run, the case never settles on 1.35: it
+  records a batch's errors after its run ends, so a "retry" boundary
+  re-dispatches the batch forever; a fallback batch has nothing that
+  cancels it; or two writes chase each other on both engines (seed 10). 2.0
+  is bounded there by approved rows (quirk a, (at)). Such a case is
+  discarded like a reference runaway (`ScenarioResult.neverSettles`), but
+  counted on its own census line (with how many had v2 live too), never
+  toward the runaway limit, and more than the seed's cap fail the run, in
+  the fuzz test and in the census (diff/self/settle-drain.test.ts). The cap:
+  Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)", so max(1% of
+  the seed's cases, 3) (`maxNeverSettles`, lib/fuzz.ts); measured, about
+  0.5% of cases.
+  **Fuzz: deep runs report batched cases.** Jason, 2026-11-09: "Gate on
+  short seeds; deep runs report (Recommended)". The L7 gate passed on the
+  PR seeds (1 to 20 and 24301 at the PR count, all blocking). The nightly
+  sets `DIFF_FUZZ_BATCH_REPORT=1` (lib/fuzz.ts `FUZZ_BATCH_REPORT_ENV`; only
+  the exact value "1" turns it on): there, a failing case with a batched
+  resolver (trigger `batched`) is reported, not failed. It is listed in the
+  job summary (`summary.md`), and its spec, report and traces
+  (`case-<n>.json`, in `DIFF_FUZZ_REPORT_DIR`) are uploaded as the run's
+  artifact. Each is triaged in a follow-up slice, and a case triaged as a
+  real 2.0 bug blocks at once. A failing case with no batched resolver
+  still fails the job, as do the runaway, never-settles and v2 limits, and
+  so does a case the shared wait judges a 2.0 bug ("2.0-only live"),
+  batched or not: that verdict is already the 2.0-bug finding (lib/fuzz.ts
+  `onFailingCase`).
+  Nothing else sets the flag, so PR CI and the census stay fully blocking
+  (diff/self/batch-report.test.ts). A reported case is not shrunk: the
+  file holds the case as generated.
 - `diff/self/` proves the harness. `tamper.test.ts` injects faults through
   wrappers (a reordered, dropped, extra or moved event; a changed fact; a
   leaked timer; a load-time warning; a stale read) and checks the
@@ -216,8 +323,9 @@ table, or `diff/compare.ts`, changes the contract: it is an oracle change
 **Divergences.** An intended difference between the engines goes in
 `diff/divergences.json`, keyed by what differs, never by trace index:
 `{ id, scenario, stream, kind, reason, approvedBy, date }`, optionally
-narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed`) and
-`path` (inside the entry; a prefix covers everything under it), and named
+narrowed by `engine`, `step`, `op` (`missing` / `extra` / `changed` /
+`moved`) and `path` (inside the entry; a prefix covers everything under
+it), and named
 exactly by `excuses` or `bound` (below). **Jason
 approves every entry; an agent never adds one, and never fills in
 `approvedBy`.** The census fails an entry that is incomplete or unsigned,
@@ -225,6 +333,26 @@ or that covered no difference in the run (stale). The file is part of the
 harness, so adding one needs `oracle:update` and the `oracle-change`
 label, and CODEOWNERS puts it under Jason's review. It is the one harness
 file an engine PR may change (see "Engine and oracle land separately").
+
+**A moved record** (`op: "moved"`, diff/scenario.ts `fileMoves`). A
+record missing on the engine under test in step N that it has, of the same
+stream and kind, as an extra record in step N + 1 is filed as one
+difference, a move, at the reference's step and phase with the reference's
+record as its payload, but only where a signed entry with op `moved`
+covers that move; every other such pair stays a `missing` and an `extra`,
+so no other entry sees its differences change shape. Only the step moved:
+every field that differs between the two records is a `changed` difference
+of its own, compared as a matched pair's would be. So an entry for a move
+covers that one record arriving a step later and never its absence: a 2.0
+that never makes the record still shows it `missing`. Row
+(av)'s early flush on 1.35 (seed 1 at DIFF_FUZZ_RUNS=5000: 1.35's queue
+holds the re-raised item twice, which fills `maxSize` 2 and flushes a step
+before 2.0's window timer) is one: its entry
+`l7-fuzz-av-external-start-moved` bounds the moved record to 1.35's call
+with an item repeated (`$like` `batchItemsRepeated`), with `when`
+`batchMaxSize`, and the repeated item itself stays a `changed` difference
+for the (av) changed-items entry. The census accepts `moved` as an op and
+rejects a `path` on it.
 
 **An entry names what it excuses** (P3-F1, `diff/fingerprint.ts`). The
 fields above only name a class of differences; on their own they would
@@ -250,6 +378,11 @@ under a changed entry's path. So every entry also carries one of:
   pattern's `to` may instead be `{ "$lt": "from" }`: 2.0's number is below
   1.35's, for a quirk whose approval says which way a count moves (quirk
   z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused).
+  A changed pattern may add `record`, a pattern 1.35's whole record must
+  fit, so the change is excused only inside a record of that shape: (av)'s
+  changed-items entry admits a changed item only in a batch call whose
+  items repeat on 1.35 (`batchItemsRepeated`), never 2.0 dropping a
+  distinct item.
   In a missing or extra console entry's pattern, `{ "$text": name }` may
   stand where the contract masks an argument's wording (`{ "$incidental":
   "string" }`): it matches only an argument printed in the named wording
@@ -269,6 +402,30 @@ under a changed entry's path. So every entry also carries one of:
   census rejects an unknown `$text`, and one in any other entry. Field names,
   tags, structure, array lengths and every other value stay literal, so a
   fuzz entry no longer excuses an unrelated record kind or key.
+
+The `$like` classes (diff/fingerprint.ts `LIKE`; `generalize` reads a value
+as the first that matches, in the order below):
+
+| Class | Matches |
+| --- | --- |
+| `integer` | any integer: an attempt, a count, a duration |
+| `requirementId` | a single resolver's requirement id: `A0:{}` |
+| `requirementType` | a single resolver's requirement type: `A0` |
+| `resolver` | a single resolver's id, own or namespaced: `r0`, `a::r0` |
+| `constraint` | a constraint id: `c0`, `a::c0` |
+| `resolverTag` | a single resolver's record tag: `a.r0` |
+| `effectTag` | an effect's record tag: `a.x0` |
+| `attemptError` | a single resolver's attempt error: `a.r0 attempt 1`, or `Resolver "a::r0" timed out after 3ms` |
+| `batchResolver` | the batched resolver's id (L7): `rb`, `a::rb` |
+| `batchConstraint` | a constraint that feeds the batched resolver: `b0`, `a::b1` |
+| `batchRequirementType` | a batch requirement's type: `AB` |
+| `batchRequirementId` | a batch requirement's id: `AB:{"item":"0.1"}` |
+| `batchItem` | a batch requirement's item, `<source>.<index>`: `0.1` |
+| `batchTag` | the batched resolver's record tag: `a.rb` |
+| `batchAttemptError` | a batched call's or item's error: `a.rb attempt 1`, `a.rb 0.1 attempt 1`, or `Batch resolver "rb" timed out after 3ms` |
+
+`absent`, `settleTimeout`, `thrownError` and `thrower` are matched only
+where a pattern names them (`generalize` never writes them).
 
 The census requires one of them on every entry. They were added by
 `scripts/fingerprint-divergences.ts`, which records what each entry covered
@@ -337,7 +494,8 @@ full, and the case still counts toward the fuzz floors. The run prints where eac
 advisory, and the census's fuzz line says how many cases ended early, at
 which step on average and how many at step 0, so a stop that comes too
 early shows. `ends` is valid only on a signed entry for scenario `fuzz`
-with engine `v2`, an `op`, and a `path` when the op is `changed` (the
+with engine `v2`, an `op`, and a `path` when the op is `changed` (none
+when it is `moved`; the
 census rejects it anywhere else, and rejects a hand scenario titled
 `fuzz`): hand scenarios are always compared to their end. An `ends` entry
 that never stopped a case is stale like any other, and it must carry
@@ -385,6 +543,18 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `throw` | some `errorBoundary` strategy is `"throw"` and the case has what it applies to: a resolver (effects then skip) |
 | `namespacedDateWrite` | the case has two modules (the model namespaces them only then, as `a` and `b`) and one has the Date fact `when`, which its init sets to a `Date`, so a Date is written to a namespaced fact (row o: 1.35 warns of it twice, by `a.when` and `a::when`) |
 | `ownWriteRetracts` | some resolver's write can retract its own constraint: it writes the fact its constraint's condition reads (`writes` is `fact`) a value below the condition's `atLeast`, so the run that wrote it can be retracted after it reported complete (row t's third path). A module b constraint's cross condition reads module a's fact 0, which b's resolvers never write |
+| `batched` | the case has the batched resolver (L7). Quirk g and rows (ap), (as) and (au) need nothing more of the spec: a retraction, a later add or a settle step can reach any batch, and which one a case makes depends on its steps' timing |
+| `batchWithResults` | the batched resolver is `resolveBatchWithResults` |
+| `batchFallback` | the batched resolver has only `resolve()`, the fallback (row (at)) |
+| `batchMixed` | two constraints feed the batched resolver, so a batch can mix them (quirk k) |
+| `batchAbortOn` | some constraint that feeds the batched resolver has `abortOn` (quirk k; RFC B-1) |
+| `batchSiblings` | the batch's sources can raise more than one requirement at once (their `items` add up to two or more), so a write can retract one and keep a sibling wanted (quirk g) |
+| `batchFails` | some call of the batched resolver fails (`fails` > 0): a thrown batch or fallback run, or failed items of a with-results call |
+| `batchAllFail` | a with-results call fails every item (`failing` `"all"`, `fails` > 0): quirk h and row (ar) |
+| `batchSomeFail` | a with-results call fails every second item (`failing` `"some"`, `fails` > 0) and the sources can raise two requirements, so a call can fail some items and not others (quirk i) |
+| `batchRetry` | the batched resolver has a retry policy (more than one attempt) |
+| `batchTimeout` | the batched resolver has a `timeoutMs` |
+| `batchMaxSize` | the batch has a `maxSize` (1 or 2), so a queue holding a requirement twice (row (av) on 1.35) can fill it and flush a step before the other engine's window timer |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

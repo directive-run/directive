@@ -1348,8 +1348,8 @@
     "endCol": 8,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "resolveBatch retry loop (runBatchRetryLoop) (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > a batch aborted as its retry is announced never runs again'.",
+    "reason": "later-layer",
+    "note": "resolveBatch retry loop (runBatchRetryLoop) (batch.enabled with only resolve()): an attempt does not start once the batch's controller is aborted. Before L7-pre no test reached it (NoCoverage). Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > a batch aborted as its retry is announced never runs again'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {
@@ -1359,8 +1359,8 @@
     "endCol": 8,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "resolveBatch retry loop (runBatchRetryLoop): a later attempt stops when an earlier one already satisfied the requirement. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again'.",
+    "reason": "later-layer",
+    "note": "resolveBatch retry loop (runBatchRetryLoop): a later attempt stops when an earlier one already satisfied the requirement. Before L7-pre no test reached it (NoCoverage). Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {
@@ -1380,8 +1380,8 @@
     "endCol": 8,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "supersedeSatisfiedBatches: a batch whose run is not yet satisfied is skipped rather than superseded. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will. Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded'.",
+    "reason": "later-layer",
+    "note": "supersedeSatisfiedBatches: a batch whose run is not yet satisfied is skipped rather than superseded. Before L7-pre no test reached it (NoCoverage). Killed by hand (L7-pre-b): l7-batch-gate-debt-oracle 'a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded'. At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {
@@ -1401,8 +1401,8 @@
     "endCol": 6,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "note": "batch queue hard cap: a queue already at the effective maximum is flushed before the next requirement joins. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "reason": "later-layer",
+    "note": "batch queue hard cap: a queue already at the effective maximum is flushed before the next requirement joins. Killed at L7 by l7-batch-pins-oracle > a queue with no maxSize (U15) > runs at once when it holds 10,000 requirements and one more arrives, and leaves that one to the window (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {
@@ -1412,8 +1412,8 @@
     "endCol": 30,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "note": "batch queue hard cap: the pending batch timer is cleared before the forced flush. No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "reason": "later-layer",
+    "note": "batch queue hard cap: the pending batch timer is cleared before the forced flush. Killed at L7 by l7-batch-pins-oracle > a queue with no maxSize (U15) > runs at once when it holds 10,000 requirements and one more arrives, and leaves that one to the window (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {
@@ -1423,8 +1423,8 @@
     "endCol": 32,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "note": "batch queue hard cap: the full queue is processed (forced flush). No test reaches it (NoCoverage in the ceiling and full runs); the L7 batch resolvers feature will.",
+    "reason": "later-layer",
+    "note": "batch queue hard cap: the full queue is processed (forced flush). Killed at L7 by l7-batch-pins-oracle > a queue with no maxSize (U15) > runs at once when it holds 10,000 requirements and one more arrives, and leaves that one to the window (L7-pre, #355). At the L7 gate (2026-11-05, current = L7) it became later-layer: the gate=L7 run 42146334306 (2c3758a1, ceiling L7, so every test placed at or below L7, all of which a full run also holds) records it Killed, killedBy that test.",
     "layer": "L7"
   },
   {

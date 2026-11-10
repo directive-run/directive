@@ -27,9 +27,11 @@
 import fc from "fast-check";
 import { FUZZ_TRIGGERS, type FuzzTrigger } from "../../lib/fuzz.js";
 import {
+  type AnySystem,
   type BuildContext,
   FUZZ_SCENARIO,
   type ScenarioDef,
+  type SettleDrain,
   type Step,
 } from "../scenario.js";
 
@@ -611,10 +613,15 @@ function moduleDef(
           ]),
         );
         if (c.delay > 0) {
-          await new Promise((resolve) => setTimeout(resolve, c.delay));
+          await ownDelay(ledgerOf(handles), c.delay);
         }
         if (n <= c.fails) {
           throw new Error(`${id}.r${i} attempt ${n}`);
+        }
+        // A write while the run's signal is aborted: the handler ignores
+        // its cancel (counted for the shared wait, `writeAfterAbort`).
+        if (context.signal?.aborted === true) {
+          ledgerOf(handles).writeAfterAbort += 1;
         }
         context.facts[f(c.writes)] = c.value;
         external(["wrote", `${id}.r${i}`, n]);
@@ -623,6 +630,7 @@ function moduleDef(
   });
   if (batch) {
     batchedResolver(batch, id, m.facts, {
+      ledger: ledgerOf(handles),
       t,
       external,
       requirements,
@@ -694,6 +702,181 @@ function moduleDef(
 }
 
 /**
+ * One call of the batched handler, as the shared wait (`batchDrain`) reads
+ * it: when it started, its signal, which attempt it is on that signal (1.35
+ * keeps one controller for every attempt of a batch, and one per
+ * requirement in the fallback), and when and how it returned.
+ */
+interface BatchCall {
+  start: number;
+  signal: AbortSignal | undefined;
+  attempt: number;
+  end?: number;
+  threw?: boolean;
+}
+
+/** What the shared wait reads of one run (one per run: `ctx.handles` is). */
+interface BatchLedger {
+  /** The model's own timers (the resolvers' `delay` waits) still pending. */
+  own: number;
+  calls: Set<BatchCall>;
+  /** The latest attempt made on each signal. */
+  attempts: WeakMap<object, number>;
+  /**
+   * Writes a handler made while its signal was aborted (the batched
+   * handler's `run` and the single resolvers alike): a canceled handler
+   * that ignores its abort. The shared wait reports it (`writeAfterAbort`),
+   * as an annotation only: no verdict reads it since Jason, 2026-11-08:
+   * "Use 'Discard after the stop' (Recommended)".
+   */
+  writeAfterAbort: number;
+}
+
+/** The run's ledger. */
+function ledgerOf(handles: BuildContext["handles"]): BatchLedger {
+  handles.batchLedger ??= {
+    own: 0,
+    calls: new Set(),
+    attempts: new WeakMap(),
+    writeAfterAbort: 0,
+  };
+
+  return handles.batchLedger as BatchLedger;
+}
+
+/** A resolver's own wait, counted so the drain can tell it from the engine's timers. */
+function ownDelay(ledger: BatchLedger, ms: number): Promise<void> {
+  ledger.own += 1;
+
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      ledger.own -= 1;
+      resolve();
+    }, ms),
+  );
+}
+
+/**
+ * Fake ms the drain may wait after `settle()` resolves: 2.0's `settle()`
+ * gives up at its 5 s `maxWait` (row (as)), so a batch still live past
+ * that has no point at which both engines can be compared.
+ */
+export const DRAIN_BOUND_MS = 5000;
+
+/**
+ * The shared wait's reading of a case with the batched resolver
+ * (diff/scenario.ts `SettleDrain`; Jason, 2026-11-07: "One shared wait
+ * (Recommended)", which replaced the separate drains). Once an engine's
+ * `settle()` has resolved, it reads a batch as live while one of these
+ * holds, each 1.35's own schedule (packages/core/src/core/resolvers.ts):
+ *
+ * - a call of the batched handler has not returned and its timeout has
+ *   not passed (a timer due exactly at it has yet to run, so the bound is
+ *   inclusive), even if its signal was aborted: 1.35 clears a call's
+ *   timeout timer only when the call settles or the timer fires
+ *   (`withTimeout`), so a clobbered or retracted call's timeout still fires
+ *   (the coordinator's reading of "until neither has a batch still
+ *   running", 2026-11-08); with no timeout, an aborted call is an orphan,
+ *   as a canceled single run is. 1.35 ends a `resolveBatch` or
+ *   `resolveBatchWithResults` call at `batch.timeoutMs` and never aborts
+ *   its signal (row n); the fallback runs each requirement on the single
+ *   run path, which reads the resolver's `timeout`, never set here;
+ * - a call threw or timed out, its signal is not aborted, attempts are
+ *   left, and no later attempt has started: 1.35 waits the retry's backoff
+ *   (linear from `initialDelay` 2: 2 ms times the attempt, its end
+ *   inclusive, as the timeout's is), then retries,
+ *   or ends the batch if it was satisfied meanwhile;
+ * - the system is not settled (`isSettled`): a queued batch, a single run
+ *   a batch's write started, or a reconcile, as `settle()` would wait for.
+ *
+ * Each wait a live 1.35 batch makes is one of these. What it does not wait
+ * for is what neither engine's `settle()` waits for: the model's own waits
+ * of canceled or timed-out calls and runs. With no timer left nothing can
+ * move, so the drain ends, unless a call is still live (it stalls).
+ *
+ * On v2 the same calls are read, in the same shared wait (Jason,
+ * 2026-11-07: "One shared wait (Recommended)"): v2 joins it only when its
+ * `settle()` resolved with nothing attached left (`attached`: settled, no
+ * run in flight), so a call still live can only be a detached run's (a
+ * bound run whose requirement was retracted, RFC-0003). With attached work
+ * left, v2 takes no part, and its checkpoint differs.
+ *
+ * `writeAfterAbort` counts the handlers' writes made while their signal
+ * was aborted (`BatchLedger.writeAfterAbort`), for the report only (Jason,
+ * 2026-11-08: "Use 'Discard after the stop' (Recommended)" replaced the
+ * write-after-cancel verdict; diff/scenario.ts `runScenario`).
+ */
+export function batchDrain(b: FuzzBatch): SettleDrain {
+  const callTimeout = b.handler === "fallback" ? null : b.timeout;
+  const attempts = b.retry + 1;
+  const busy = (ctx: BuildContext, system: AnySystem): string | false => {
+    const reason = liveCall(ctx);
+
+    return reason || (system.isSettled ? false : "the system is not settled");
+  };
+  /** Why a call of the batched handler is still live, or false. */
+  const liveCall = (ctx: BuildContext): string | false => {
+    const ledger = ledgerOf(ctx.handles);
+    const now = Date.now();
+    let reason: string | false = false;
+    for (const call of ledger.calls) {
+      const timedOutAt =
+        callTimeout === null
+          ? Number.POSITIVE_INFINITY
+          : call.start + callTimeout;
+      const aborted = call.signal?.aborted === true;
+      // Inclusive: the timer due at `timedOutAt` (or at the backoff's end)
+      // is still the batch's own, and the wait stops only once it has run.
+      // An aborted call (a clobber or a retraction aborted its signal) is
+      // still live while its timeout timer is pending: 1.35's `withTimeout`
+      // clears that timer only when the call settles or the timer fires,
+      // never on abort. With no timeout, an aborted call is an orphan.
+      if (
+        call.end === undefined &&
+        (!aborted || Number.isFinite(timedOutAt)) &&
+        now <= timedOutAt
+      ) {
+        return `a call of the batched handler (attempt ${call.attempt}, started at ${call.start} ms) is live`;
+      }
+      const failedAt =
+        call.end !== undefined && call.end < timedOutAt
+          ? call.threw
+            ? call.end
+            : undefined
+          : Number.isFinite(timedOutAt)
+            ? timedOutAt
+            : undefined;
+      const retries =
+        failedAt !== undefined &&
+        !aborted &&
+        call.attempt < attempts &&
+        ledger.attempts.get(call.signal ?? ledger) === call.attempt;
+      if (retries && now <= (failedAt as number) + 2 * call.attempt) {
+        reason ||= `attempt ${call.attempt} failed at ${failedAt} ms and its retry's backoff runs to ${(failedAt as number) + 2 * call.attempt} ms`;
+      } else if (call.end !== undefined || aborted) {
+        ledger.calls.delete(call);
+      }
+    }
+
+    return reason;
+  };
+
+  return {
+    boundMs: DRAIN_BOUND_MS,
+    busy,
+    writeAfterAbort: (ctx) => ledgerOf(ctx.handles).writeAfterAbort,
+    attached(_ctx, system) {
+      if (!system.isSettled) {
+        return "the system is not settled";
+      }
+      const inflight = system.inspect().inflight.length;
+
+      return inflight > 0 ? `${inflight} run(s) in flight` : false;
+    },
+  };
+}
+
+/**
  * Adds the batched resolver `rb` and its source constraints `b<n>` to a
  * module's definitions. Its records are the single resolvers' kinds
  * ("start", "wrote", "aborted", "timeout") under the tag `<module>.rb`, with
@@ -705,6 +888,7 @@ function batchedResolver(
   id: string,
   factCount: number,
   out: {
+    ledger: BatchLedger;
     t: any;
     external: (data: unknown) => void;
     requirements: Record<string, unknown>;
@@ -739,25 +923,47 @@ function batchedResolver(
   const run = async (items: string[], context: any, throws: boolean) => {
     calls += 1;
     const n = calls;
-    out.external(["start", tag, n, items]);
-    context.signal?.addEventListener?.("abort", () =>
-      out.external([
-        isTimeoutError(context.signal.reason) ? "timeout" : "aborted",
-        tag,
-        n,
-        items,
-      ]),
-    );
-    if (b.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, b.delay));
-    }
-    if (throws && n <= b.fails) {
-      throw new Error(`${tag} attempt ${n}`);
-    }
-    context.facts[writes] = b.value;
-    out.external(["wrote", tag, n, items]);
+    // Live for the shared wait (toScenario) until the call ends.
+    const signal = context.signal as AbortSignal | undefined;
+    const key = signal ?? out.ledger;
+    const call: BatchCall = {
+      start: Date.now(),
+      signal,
+      attempt: (out.ledger.attempts.get(key) ?? 0) + 1,
+    };
+    out.ledger.attempts.set(key, call.attempt);
+    out.ledger.calls.add(call);
+    try {
+      out.external(["start", tag, n, items]);
+      context.signal?.addEventListener?.("abort", () =>
+        out.external([
+          isTimeoutError(context.signal.reason) ? "timeout" : "aborted",
+          tag,
+          n,
+          items,
+        ]),
+      );
+      if (b.delay > 0) {
+        await ownDelay(out.ledger, b.delay);
+      }
+      if (throws && n <= b.fails) {
+        throw new Error(`${tag} attempt ${n}`);
+      }
+      // A write while the call's signal is aborted (a retraction or a
+      // clobber canceled it): counted for the shared wait.
+      if (context.signal?.aborted === true) {
+        out.ledger.writeAfterAbort += 1;
+      }
+      context.facts[writes] = b.value;
+      out.external(["wrote", tag, n, items]);
 
-    return n;
+      return n;
+    } catch (error) {
+      call.threw = true;
+      throw error;
+    } finally {
+      call.end = Date.now();
+    }
   };
   const handler =
     b.handler === "batch"
@@ -946,6 +1152,62 @@ const TRIGGERS = {
     spec.modules.some((m) =>
       m.constraints.some((c) => c.writes === c.fact && c.value < c.atLeast),
     ),
+  /**
+   * The case has the batched resolver (L7): quirk g, rows (ap), (as) and
+   * (au) need nothing more of the spec. Each of them shows wherever a batch
+   * runs: a retraction, a later add or a settle step can reach any batch,
+   * and which one a case makes depends on its steps' timing.
+   */
+  batched: (spec) => spec.batch != null,
+  /** The batched resolver is `resolveBatchWithResults` (quirks h and i, row (ar)). */
+  batchWithResults: (spec) => spec.batch?.handler === "results",
+  /** The batched resolver has only `resolve()`, the fallback (row (at)). */
+  batchFallback: (spec) => spec.batch?.handler === "fallback",
+  /** Two constraints feed the batched resolver, so a batch can mix them (quirk k). */
+  batchMixed: (spec) => (spec.batch?.sources.length ?? 0) > 1,
+  /** Some constraint that feeds the batched resolver has `abortOn` (quirk k, RFC B-1). */
+  batchAbortOn: (spec) =>
+    spec.batch?.sources.some((src) => src.abortOn) ?? false,
+  /**
+   * The sources can raise two requirements at once (their items add up to
+   * more than one), so a batch can hold a requirement and a sibling: a
+   * write can retract one and keep the other wanted (quirk g).
+   */
+  batchSiblings: (spec) =>
+    (spec.batch?.sources.reduce((n, src) => n + src.items, 0) ?? 0) > 1,
+  /**
+   * Some call of the batched resolver fails (`fails` > 0): a thrown batch
+   * or fallback run, or failed items of a with-results call.
+   */
+  batchFails: (spec) => (spec.batch?.fails ?? 0) > 0,
+  /**
+   * A with-results call fails every item (`failing` "all", `fails` > 0):
+   * an all-failed with-results batch (quirk h, row (ar)).
+   */
+  batchAllFail: (spec) =>
+    spec.batch?.handler === "results" &&
+    spec.batch.failing === "all" &&
+    spec.batch.fails > 0,
+  /**
+   * A with-results call can fail some items and not others (quirk i): it
+   * fails every second item (`failing` "some", `fails` > 0), so it needs a
+   * call of two or more, and the sources must be able to raise two.
+   */
+  batchSomeFail: (spec) =>
+    spec.batch?.handler === "results" &&
+    spec.batch.failing === "some" &&
+    spec.batch.fails > 0 &&
+    spec.batch.sources.reduce((n, src) => n + src.items, 0) > 1,
+  /** The batched resolver has a retry policy (`retry` > 0: more than one attempt). */
+  batchRetry: (spec) => (spec.batch?.retry ?? 0) > 0,
+  /** The batched resolver has a timeout (`timeoutMs`). */
+  batchTimeout: (spec) => spec.batch != null && spec.batch.timeout !== null,
+  /**
+   * The batch has a `maxSize` (1 or 2): a queue that holds a requirement
+   * twice (row (av) on 1.35) can fill it and flush a step before the other
+   * engine's window timer does.
+   */
+  batchMaxSize: (spec) => spec.batch != null && spec.batch.maxSize !== null,
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -1198,5 +1460,6 @@ export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {
     seed: 1,
     layer: specLayer(spec),
     triggers: specTriggers(spec),
+    ...(spec.batch ? { settleDrain: batchDrain(spec.batch) } : {}),
   };
 }

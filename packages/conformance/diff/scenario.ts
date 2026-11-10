@@ -43,6 +43,7 @@ import {
   compareContract,
   compareFull,
   comparePositions,
+  diffJson,
   drawProblems,
   drawnResolvers,
   interleaving,
@@ -126,6 +127,315 @@ export interface ScenarioDef {
    * with `when` covers a difference only in a case that has all of them.
    */
   triggers?: readonly string[];
+  /**
+   * Fuzz cases only (diff/fuzz/model.ts): the shared wait at a `settle`
+   * step. Hand scenarios never set it, so their signed (as) entries keep
+   * pinning 1.35's early `settle()`.
+   */
+  settleDrain?: SettleDrain;
+}
+
+/**
+ * The fuzz harness's shared wait at a `settle` step (Jason, 2026-11-07:
+ * "One shared wait (Recommended)", which replaced the separate drains of
+ * 1.35's batches, Jason, 2026-11-06: "Wait out 1.35's batches
+ * (Recommended)", and of 2.0's detached batch runs, Jason, 2026-11-07:
+ * "Wait out 2.0's detached batches too (Recommended)"). 1.35's `settle()`
+ * resolves while a batch still runs; 2.0's waits for it (row (as)), but not
+ * for a detached run (a bound run whose requirement was retracted leaves
+ * flight unaborted, RFC-0003). So after `settle()` resolves, both engines'
+ * fake clocks advance together to one common time: the first at which
+ * neither has a batch still running (`busy`; on 1.35 any batch, on 2.0 a
+ * detached run, since its attached ones are what its `settle()` waited
+ * for). The `settle` checkpoint is recorded there, on both engines at the
+ * same fake time.
+ *
+ * The engines run one after the other, so the common time is found in
+ * rounds (`runScenario`): each run waits until its own batches end and
+ * reports when (`SettleWait`); at the first `settle` step where the
+ * reference and v2 ended at different times, the later time becomes that
+ * step's target (`targets`), both run again advancing to it, and so on
+ * until every step ends at the same time on both. Each run's own wait is
+ * capped at `boundMs` of fake time after its `settle()` resolved:
+ *
+ * - both still running at the cap: the case never settles and is
+ *   discarded (`ScenarioResult.neverSettles`, on its own count; Jason,
+ *   2026-11-07: "Discard, own count (Recommended)");
+ * - only 1.35 still running while 2.0 finished: discarded the same way;
+ * - only 2.0 still running while 1.35 finished in the same time: the case
+ *   fails, as a 2.0 bug, naming what kept 2.0 live, unless an approved
+ *   `ends` entry had already stopped the case's comparison on 2.0 strictly
+ *   before 2.0 outworked the reference: the stop's record comes before the
+ *   point 2.0's clock reached the time the reference's batches finished at
+ *   that step (`SettleWait.quietAt`, cut on 2.0's trace as
+ *   `SettleWait.cutAt`), by the same `stopsBefore` test the timer-budget
+ *   runaway uses. Then the case is discarded after the stop, like that
+ *   runaway: counted toward the runaway limit, max(1%, 2), naming the
+ *   stopping entry (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)", which replaced the write-after-cancel
+ *   rule of the same day). A stop after the reference finished, or none,
+ *   still fails. `writeAfterAbort` is only an annotation in the report.
+ *
+ * A v2 whose `settle()` resolved with attached work left (`attached`, read
+ * at the instant it resolved; its settle() resolved early) takes no part: its clock does not advance and
+ * it checkpoints at once, so it still differs. Hand scenarios never set
+ * the rule, so their signed (as) entries keep pinning 1.35's early
+ * `settle()`. Self-tests: diff/self/settle-drain.test.ts.
+ */
+export interface SettleDrain {
+  /** Why a batch is still live (shown if the wait passes its cap), or false. */
+  busy(ctx: BuildContext, system: AnySystem): string | false;
+  /**
+   * v2 only: why its `settle()` resolved with attached work left (the
+   * system is not settled, or a run is in flight), or false. When it says
+   * why, v2 does not join the wait at that step.
+   */
+  attached?(ctx: BuildContext, system: AnySystem): string | false;
+  boundMs: number;
+  /**
+   * How many writes the run's handlers have made so far while their signal
+   * was aborted (diff/fuzz/model.ts `BatchLedger.writeAfterAbort`). Read at
+   * each wait's start and end (`SettleWait.writeAfterAbort`), and only
+   * reported: it decides no verdict.
+   */
+  writeAfterAbort?(ctx: BuildContext): number;
+}
+
+/**
+ * The engines with 1.35's `settle()`, which does not wait for a batch: the
+ * reference and the workspace engine (packages/core, the 1.x line).
+ */
+export const DRAIN_ENGINES: ReadonlySet<string> = new Set(["v1", "local"]);
+
+/**
+ * Whether `engine` is on 1.35's line: those in DRAIN_ENGINES, and a faulted
+ * copy of the workspace engine (`local+<fault>`, diff/self/faults.ts),
+ * which is the 1.x line too. Never v2.
+ */
+export function drains(engine: { name: string }): boolean {
+  return DRAIN_ENGINES.has(engine.name) || engine.name.startsWith("local+");
+}
+
+/**
+ * Whether `engine` is v2 (or a wrapped v2, `v2+<…>`): its wait is checked
+ * for attached work first (`SettleDrain.attached`), and its times set the
+ * shared targets with the reference's.
+ */
+export function drainsDetached(engine: { name: string }): boolean {
+  return engine.name === "v2" || engine.name.startsWith("v2+");
+}
+
+/** One `settle` step's wait on one run (the shared wait). */
+export interface SettleWait {
+  /** The step's index. */
+  step: number;
+  /** Fake time when `settle()` resolved. */
+  resolvedAt: number;
+  /** Fake time the wait ended: the `settle` checkpoint's time. */
+  endAt: number;
+  /** v2 only: why it took no part (attached work left at `settle()`). */
+  attached?: string;
+  /** Why a batch was still live at the cap, if one was. */
+  live?: string;
+  /** Whether the clock advanced. */
+  waited: boolean;
+  /** Writes the handlers made while their signal was aborted, during this wait. */
+  writeAfterAbort?: number;
+  /**
+   * Fake time from which no batch was live through the wait's end: when
+   * this run's batches finished at this step, whatever target it then ran
+   * on to (the wait's end when live at the cap).
+   */
+  quietAt?: number;
+  /**
+   * v2 only: the trace's length just before its clock first reached the
+   * reference's `quietAt` at this step (the cut for `stopsBefore`): every
+   * record at a lower index was emitted while 2.0 had run no longer than
+   * the reference needed to finish its batches.
+   */
+  cutAt?: number;
+}
+
+/** One run's part in the shared wait: the rule, the targets, and what it did. */
+interface DrainRun {
+  rule: SettleDrain;
+  /** Each `settle` step's common end time, where one is known. */
+  targets: ReadonlyMap<number, number>;
+  /** Steps whose target is the other engine's time live at its cap. */
+  judge: ReadonlySet<number>;
+  waits: SettleWait[];
+  /** v2: its wait is checked for attached work first. */
+  v2: boolean;
+  /** The trace's current length. */
+  mark: () => number;
+  /** v2: each `settle` step's reference `quietAt`, where `cutAt` is taken. */
+  cuts: ReadonlyMap<number, number>;
+  /** A wait that stalled (a call live and no timer left). */
+  problem?: string;
+}
+
+/**
+ * The shared wait on one run at `settle` step `step`: advance the fake
+ * clock to the step's target, if one is set, then while a batch is live
+ * (`busy`), up to the cap, `boundMs` of fake time after `settle()`
+ * resolved. At a `judge` step the target is the other engine's time at its
+ * cap: still busy on reaching it, this run is live at the cap too.
+ */
+async function waitOutBatches(
+  drain: DrainRun,
+  system: AnySystem,
+  ctx: BuildContext,
+  step: number,
+  attachedAtSettle: string | false | undefined,
+): Promise<void> {
+  const from = Date.now();
+  const wait: SettleWait = {
+    step,
+    resolvedAt: from,
+    endAt: from,
+    waited: false,
+  };
+  drain.waits.push(wait);
+  // Read at the instant settle() resolved (`apply`), not here: driving
+  // settle() to its end can let a timer due in that same millisecond run
+  // after it resolved, and work that timer starts was not left attached by
+  // settle(); 1.35 waits such work out like any other (deep seed 24301).
+  const attached = drain.v2 ? (attachedAtSettle ?? false) : false;
+  if (attached !== false) {
+    // v2's settle() resolved early, with attached work left: it takes no
+    // part in the wait, and its checkpoint must differ.
+    wait.attached = attached;
+
+    return;
+  }
+  // One timer at a time, as the engine's own wait goes, so a run whose own
+  // end is the target stops at the very same point; before the target it
+  // goes on even when nothing is live. A sentinel timer at the target keeps
+  // the clock moving there and is cleared after.
+  const target = Math.max(drain.targets.get(step) ?? from, from);
+  const judge = drain.judge.has(step);
+  const sentinel =
+    target > from ? setTimeout(() => {}, target - from) : undefined;
+  const wroteBefore = drain.rule.writeAfterAbort?.(ctx) ?? 0;
+  const cut = drain.v2 ? drain.cuts.get(step) : undefined;
+  if (cut !== undefined && from >= cut) {
+    wait.cutAt = drain.mark();
+  }
+  let quietAt: number | undefined;
+  for (;;) {
+    const why = drain.rule.busy(ctx, system);
+    if (why === false) {
+      quietAt ??= Date.now();
+    } else {
+      quietAt = undefined;
+    }
+    if (why === false && Date.now() >= target) {
+      break;
+    }
+    if (
+      why !== false &&
+      (Date.now() - from > drain.rule.boundMs ||
+        (judge && Date.now() >= target))
+    ) {
+      wait.live = `${why}, ${Date.now() - from} ms after settle() resolved (cap ${drain.rule.boundMs} ms${Date.now() - from > drain.rule.boundMs ? "" : `; judged at ${target} ms, where the other engine was live at its cap`})`;
+      break;
+    }
+    if (vi.getTimerCount() === 0) {
+      // Nothing left can move the system: done, unless a call still runs.
+      if (why !== false && why.startsWith("a call ")) {
+        drain.problem ??= `the shared wait at step ${step} stalled: ${why}, and no timer left`;
+      }
+      break;
+    }
+    wait.waited = true;
+    const before = drain.mark();
+    await vi.advanceTimersToNextTimerAsync();
+    await flushMicrotasks();
+    if (cut !== undefined && wait.cutAt === undefined && Date.now() >= cut) {
+      // Records the timers at or past the cut made are not before it.
+      wait.cutAt = before;
+    }
+  }
+  clearTimeout(sentinel);
+  wait.endAt = Date.now();
+  wait.quietAt = quietAt ?? wait.endAt;
+  if (cut !== undefined) {
+    wait.cutAt ??= drain.mark();
+  }
+  wait.writeAfterAbort = (drain.rule.writeAfterAbort?.(ctx) ?? 0) - wroteBefore;
+}
+
+/** Rounds of the shared wait before it is called unsettled. */
+export const SHARED_WAIT_ROUNDS = 12;
+
+/**
+ * The next targets for the shared wait, from the reference's and v2's
+ * waits under `targets`, or undefined once they agree: every `settle` step,
+ * up to the first with a batch still live at the cap, ended at the same
+ * fake time on both (v2 counts only where it took part). At the first step
+ * where they did not, the later end time becomes its target, and the
+ * targets of later steps are dropped (they depend on it). An engine live at
+ * the cap sets the target too: the other's clock must run as long, so
+ * "finished in the same time" is judged with both clocks advanced alike.
+ */
+export function nextTargets(
+  reference: readonly SettleWait[],
+  v2: readonly SettleWait[] | undefined,
+  targets: ReadonlyMap<number, number>,
+  judgeOf: ReadonlySet<number> = new Set(),
+): { targets: Map<number, number>; judge: Set<number> } | undefined {
+  for (const r of reference) {
+    const found = v2?.find((w) => w.step === r.step);
+    const c = found?.attached === undefined ? found : undefined;
+    const rLive = r.live !== undefined;
+    const cLive = c?.live !== undefined;
+    let end: number | undefined;
+    let judged = false;
+    if (rLive && cLive) {
+      return undefined;
+    }
+    if (rLive || cLive) {
+      // One live at its cap: the other must have run as long, then the
+      // case is judged (it cannot be advanced past the cap).
+      const live = rLive ? r : (c as SettleWait);
+      const other = rLive ? c : r;
+      if (other === undefined || other.endAt >= live.endAt) {
+        return undefined;
+      }
+      end = live.endAt;
+      judged = true;
+    } else if (c !== undefined && c.endAt !== r.endAt) {
+      end = Math.max(r.endAt, c.endAt);
+    }
+    if (end !== undefined) {
+      const next = new Map<number, number>();
+      for (const [step, at] of targets) {
+        if (step < r.step) {
+          next.set(step, at);
+        }
+      }
+      next.set(r.step, end);
+      const judge = new Set<number>();
+      for (const step of judgeOf) {
+        if (step < r.step) {
+          judge.add(step);
+        }
+      }
+      if (judged) {
+        judge.add(r.step);
+      }
+
+      return { targets: next, judge };
+    }
+  }
+
+  return undefined;
+}
+
+/** The first `settle` step a batch was still live at the cap, if any. */
+export function firstLive(
+  waits: readonly SettleWait[],
+): SettleWait | undefined {
+  return waits.find((w) => w.live !== undefined);
 }
 
 /**
@@ -138,7 +448,11 @@ export interface ScenarioDef {
  * covers ends the comparison of that fuzz case (`explain`).
  *
  * `when` (fuzz only) narrows an entry to the fuzz cases that have every
- * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `group` (fuzz
+ * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `during` (fuzz
+ * only) narrows it to a difference in a step of that op (`stepOps`): row
+ * (as)'s abort happens only while a settle step's settle() waits, so its
+ * entry has `during` "settle" and never covers an abort in another step.
+ * `group` (fuzz
  * only) is read by the census alone: an entry of a group is stale only when
  * no entry of its group covered a difference in the run.
  *
@@ -160,6 +474,8 @@ export interface Divergence {
   path?: string;
   ends?: boolean;
   when?: string[];
+  /** Fuzz only: the op of the step the difference must be in (`stepOps`). */
+  during?: string;
   group?: string;
   excuses?: Excuse[];
   bound?: Bound;
@@ -200,6 +516,45 @@ export interface ScenarioResult {
    */
   runaway: boolean;
   /**
+   * `settle` steps at which the reference's first run's clock advanced in
+   * the shared wait (`SettleDrain`; Jason, 2026-11-07: "One shared wait
+   * (Recommended)").
+   */
+  drained?: number;
+  /** `settle` steps at which v2's clock advanced in the shared wait. */
+  drainedDetached?: number;
+  /**
+   * Rounds the shared wait ran the reference and v2 to find each `settle`
+   * step's common end time (1 when their own waits already agreed).
+   */
+  sharedRounds?: number;
+  /**
+   * The reference's first run still had a batch live at the shared wait's
+   * cap (`SettleDrain.boundMs`) at a settle step: 1.35's batches never
+   * settle (a "retry" boundary re-dispatching a batch whose errors 1.35
+   * records after its run ends, a fallback batch nothing cancels, or two
+   * writes chasing each other on both engines), so nothing is compared
+   * (`ok` is false). The fuzzer discards such a case, like a reference
+   * runaway, but counts it on its own, never toward the runaway limit, and
+   * fails a seed with more than maxNeverSettles of them (lib/fuzz.ts;
+   * Jason, 2026-11-07: "Discard, own count (Recommended)"). `bothLive`
+   * says v2 was still live at the cap too, at or before that step.
+   */
+  neverSettles?: boolean;
+  bothLive?: boolean;
+  /**
+   * Only v2 still had a batch live at the cap while 1.35's had finished in
+   * the same time: the case fails, as a 2.0 bug (Jason, 2026-11-07: "One
+   * shared wait (Recommended)"). Names what kept v2 live.
+   */
+  twoOnlyLive?: string;
+  /**
+   * Fuzz cases with the shared wait: each run's `settle` checkpoint times
+   * (`SettleWait.endAt`), by engine (the reference's first run, and each
+   * engine under test).
+   */
+  settleTimes?: Record<string, number[]>;
+  /**
    * Runs that passed the budget where the reference's first run settled:
    * an engine under test that hangs, or a second reference run that did
    * (nondeterminism). Always a failure, except a run in `discarded`.
@@ -213,9 +568,16 @@ export interface ScenarioResult {
    * discarded like a reference runaway and counted toward the same limit
    * (`tallyCase`). Its differences before the stop are still checked, so
    * the case can still fail on them (Jason, 2026-11-02: "Discard after the
-   * stop").
+   * stop"). v2 is discarded the same way when it alone was live at the
+   * shared wait's cap after such a stop (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
    */
   discarded: string[];
+  /**
+   * Each discard after a stop: the engine, the `ends` entry whose stop came
+   * first, and whether it was at the shared wait's cap (`wait`) rather
+   * than past the timer budget.
+   */
+  afterStop?: { engine: string; id: string; wait: boolean }[];
   /** Timer callbacks the reference's first run made. */
   fired: number;
   report: string;
@@ -468,6 +830,7 @@ async function apply(
   ctx: BuildContext,
   rec: Recorder,
   snapshots: Map<string, unknown>,
+  drain: { run: DrainRun; at: number } | undefined,
 ): Promise<void> {
   // Values a step hands the engine are copied per run: the engine may keep
   // and mutate what it is given (1.35 lets an effect push into a stored
@@ -492,10 +855,24 @@ async function apply(
     case "tick":
       await flushMicrotasks();
       break;
-    case "settle":
-      await drive(Promise.resolve(system.settle()), rec, "settle");
+    case "settle": {
+      const settled = Promise.resolve(system.settle());
+      // v2's attached work, read the instant its settle() settles: this
+      // handler is registered before `drive`'s, so it runs first.
+      let attached: string | false | undefined;
+      if (drain?.run.v2) {
+        const read = () => {
+          attached = drain.run.rule.attached?.(ctx, system) ?? false;
+        };
+        settled.then(read, read);
+      }
+      await drive(settled, rec, "settle");
+      if (drain) {
+        await waitOutBatches(drain.run, system, ctx, drain.at, attached);
+      }
       rec.checkpoint("settle");
       break;
+    }
     case "checkpoint":
       rec.checkpoint(step.label);
       break;
@@ -552,6 +929,51 @@ export interface BudgetedRun {
    * runaway (its count passes the limit, which the reference's does not).
    */
   pastReferenceAt?: number;
+  /** `settle` steps at which a 1.35 run's clock advanced in the shared wait. */
+  drained: number;
+  /** `settle` steps at which v2's clock advanced in the shared wait. */
+  drainedDetached: number;
+  /** Each `settle` step's wait (`SettleWait`), in step order. */
+  waits: SettleWait[];
+  /**
+   * The wait stalled, or (1.35's line) a batch was still live at its cap:
+   * the case fails, except on the reference's first run past its cap
+   * (`drainPastBound`).
+   */
+  drainProblem?: string;
+  /**
+   * A batch was still live at the shared wait's cap (not a stall). On the
+   * reference's first run the case never settles on 1.35 and is discarded
+   * (`ScenarioResult.neverSettles`).
+   */
+  drainPastBound?: boolean;
+}
+
+/** What a run's shared wait did, for `BudgetedRun`. */
+function waitSummary(
+  drain: DrainRun | undefined,
+): Pick<
+  BudgetedRun,
+  "drained" | "drainedDetached" | "waits" | "drainProblem" | "drainPastBound"
+> {
+  const waits = drain?.waits ?? [];
+  const waited = waits.filter((w) => w.waited).length;
+  const live = firstLive(waits);
+  // On 1.35's line a batch live at the cap is the run's own problem; v2's
+  // is judged against the reference's (`runScenario`).
+  const pastBound = live !== undefined && drain?.v2 === false;
+
+  return {
+    drained: drain && !drain.v2 ? waited : 0,
+    drainedDetached: drain?.v2 ? waited : 0,
+    waits,
+    drainProblem:
+      drain?.problem ??
+      (pastBound
+        ? `the shared wait at step ${live.step} passed its cap: ${live.live}`
+        : undefined),
+    drainPastBound: pastBound,
+  };
 }
 
 /**
@@ -563,12 +985,27 @@ export async function runBudgeted(
   def: ScenarioDef,
   limit = def.budget ?? RUN_BUDGET,
   referenceFired = limit,
+  targets: ReadonlyMap<number, number> = new Map(),
+  judge: ReadonlySet<number> = new Set(),
+  cuts: ReadonlyMap<number, number> = new Map(),
 ): Promise<BudgetedRun> {
   const rec = createRecorder();
   // Everything that makes a run deterministic, and everything that captures
   // what the engine prints, goes in before the engine loads.
   vi.useFakeTimers({ now: 0, toFake: [...FAKED] });
   const budget = installBudget(limit, referenceFired, () => rec.trace.length);
+  const drain: DrainRun | undefined =
+    def.settleDrain && (drains(engine) || drainsDetached(engine))
+      ? {
+          rule: def.settleDrain,
+          targets,
+          judge,
+          waits: [],
+          v2: drainsDetached(engine),
+          mark: () => rec.trace.length,
+          cuts,
+        }
+      : undefined;
   const random = vi
     .spyOn(Math, "random")
     .mockImplementation(seededRandom(def.seed ?? seedOf(def.name)));
@@ -616,6 +1053,9 @@ export async function runBudgeted(
         runaway: budget.state.exceeded,
         runawayAt: budget.state.at,
         pastReferenceAt: budget.state.pastAt,
+        drained: 0,
+        drainedDetached: 0,
+        waits: [],
       };
     }
     const snapshots = new Map<string, unknown>();
@@ -623,7 +1063,14 @@ export async function runBudgeted(
       rec.push({ k: "step", i, step: describeStep(step) });
       let pending: Promise<void>;
       try {
-        pending = apply(step, system, ctx, rec, snapshots);
+        pending = apply(
+          step,
+          system,
+          ctx,
+          rec,
+          snapshots,
+          drain && { run: drain, at: i },
+        );
       } catch (error) {
         pending = Promise.reject(error);
       }
@@ -671,6 +1118,7 @@ export async function runBudgeted(
     runaway: budget.state.exceeded,
     runawayAt: budget.state.at,
     pastReferenceAt: budget.state.pastAt,
+    ...waitSummary(drain),
   };
 }
 
@@ -695,6 +1143,8 @@ function describeDifference(d: Difference): string {
       return `${where}: extra on ${d.engine}`;
     case "changed":
       return `${where}: ${d.path} differs on ${d.engine}`;
+    case "moved":
+      return `${where}: moved to step ${d.step + 1} on ${d.engine}`;
   }
 }
 
@@ -760,6 +1210,7 @@ export function covers(
   name: string,
   d: Difference,
   triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
 ): boolean {
   return (
     div.scenario === name &&
@@ -767,6 +1218,8 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         triggers !== undefined &&
         div.when.every((t) => triggers.includes(t)))) &&
+    (div.during === undefined ||
+      (name === FUZZ_SCENARIO && steps?.get(d.step) === div.during)) &&
     div.stream === d.stream &&
     div.kind === d.kind &&
     (div.engine === undefined || div.engine === d.engine) &&
@@ -780,6 +1233,23 @@ export function covers(
     (div.excuses === undefined || div.excuses.some((x) => names(x, d))) &&
     (div.bound === undefined || admits(div.bound, d))
   );
+}
+
+/**
+ * The op of each step of a trace, by the step's index (its `step` records):
+ * what an entry's `during` reads (`covers`). Both engines run the same
+ * steps, so the reference's trace names them for every engine.
+ */
+export function stepOps(trace: TraceEntry[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const e of trace) {
+    const op = e.k === "step" ? (e.step as { op?: unknown })?.op : undefined;
+    if (e.k === "step" && typeof op === "string") {
+      out.set(e.i, op);
+    }
+  }
+
+  return out;
 }
 
 /** A difference an entry covered: by which entry, and which of its excuses. */
@@ -841,6 +1311,7 @@ export function explain(
   differences: Difference[],
   divergences: Divergence[],
   triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
 ): {
   unexplained: Difference[];
   used: string[];
@@ -848,7 +1319,7 @@ export function explain(
   covered: Covered[];
 } {
   const coverOf = (d: Difference) =>
-    divergences.find((x) => covers(x, name, d, triggers));
+    divergences.find((x) => covers(x, name, d, triggers, steps));
   // How many of its records each excuse has excused so far in this run.
   const spent = new Map<Divergence, number[]>();
   // The first entry that covers `d` and, if it lists excuses, still has
@@ -856,7 +1327,7 @@ export function explain(
   // next entry, and is unexplained if none takes it).
   const take = (d: Difference): Covered | undefined => {
     for (const div of divergences) {
-      if (!covers(div, name, d, triggers)) {
+      if (!covers(div, name, d, triggers, steps)) {
         continue;
       }
       if (div.excuses === undefined) {
@@ -977,6 +1448,87 @@ export function stopsBefore(
   return where[0] < step || (where[0] === step && where[1] < phase);
 }
 
+/**
+ * File moves (`Difference.op` "moved"): a missing record in step N and the
+ * first unpaired extra record of the same engine, stream and kind in step
+ * N + 1 become one move, at the missing record's place, but only where a
+ * signed entry with op `moved` covers that move (`covers`, with the case's
+ * triggers); every other pair stays a missing and an extra, so no existing
+ * entry sees its differences change shape. A move's other fields are
+ * compared as a matched pair's are: each field that differs is a `changed`
+ * difference of its own, after the move. Its shared match point is the
+ * earlier of the two records' (`SharedPoint`: the chain is ordered in both
+ * traces at once). Self-tests: diff/self/moved.test.ts.
+ */
+export function fileMoves(
+  name: string,
+  differences: Difference[],
+  divergences: Divergence[],
+  triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
+): Difference[] {
+  const movers = divergences.filter((div) => div.op === "moved");
+  if (movers.length === 0) {
+    return differences;
+  }
+  const taken = new Set<Difference>();
+  const filed = new Map<Difference, Difference[]>();
+  // The extra records by engine, stream, kind and step, in order: one pass,
+  // so a case with a long cascade of differences stays linear.
+  const key = (d: Difference, step: number) =>
+    `${d.engine}\u0000${d.stream}\u0000${d.kind}\u0000${step}`;
+  const extras = new Map<string, Difference[]>();
+  for (const d of differences) {
+    if (d.op === "extra") {
+      const list = extras.get(key(d, d.step));
+      if (list) {
+        list.push(d);
+      } else {
+        extras.set(key(d, d.step), [d]);
+      }
+    }
+  }
+  for (const m of differences) {
+    if (m.op !== "missing") {
+      continue;
+    }
+    const x = extras.get(key(m, m.step + 1))?.find((d) => !taken.has(d));
+    if (!x) {
+      continue;
+    }
+    const { raw: _raw, ...base } = m;
+    const moved: Difference = {
+      ...base,
+      op: "moved",
+      candidate: x.candidate,
+      at: { reference: m.at.reference, candidate: x.at.candidate },
+      where: { reference: m.where.reference, candidate: x.where.candidate },
+      shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
+    };
+    if (!movers.some((div) => covers(div, name, moved, triggers, steps))) {
+      continue;
+    }
+    taken.add(x);
+    const fields: { path: string; reference?: Json; candidate?: Json }[] = [];
+    diffJson(m.reference, x.candidate, "", fields);
+    filed.set(m, [
+      moved,
+      ...fields.map((f) => ({
+        ...moved,
+        op: "changed" as const,
+        path: f.path,
+        reference: f.reference,
+        candidate: f.candidate,
+        record: m.reference,
+      })),
+    ]);
+  }
+
+  return differences.flatMap((d) =>
+    taken.has(d) ? [] : (filed.get(d) ?? [d]),
+  );
+}
+
 export async function runScenario(
   def: ScenarioDef,
   opts: RunOptions = {},
@@ -994,7 +1546,39 @@ export async function runScenario(
   const divergences = opts.divergences ?? readDivergences();
 
   const limit = def.budget ?? RUN_BUDGET;
-  const firstRun = await runBudgeted(reference, def, limit);
+  // The shared wait (`SettleDrain`; Jason, 2026-11-07: "One shared wait
+  // (Recommended)"): run the reference and v2 under each round's targets
+  // until every settle step ends at the same fake time on both.
+  const twoOh = def.settleDrain ? candidates.find(drainsDetached) : undefined;
+  let targets: ReadonlyMap<number, number> = new Map();
+  let judge: ReadonlySet<number> = new Set();
+  let firstRun: BudgetedRun;
+  let twoRun: BudgetedRun | undefined;
+  let rounds = 0;
+  for (;;) {
+    rounds++;
+    firstRun = await runBudgeted(reference, def, limit, limit, targets, judge);
+    twoRun =
+      twoOh && !firstRun.runaway
+        ? await runBudgeted(
+            twoOh,
+            def,
+            limit,
+            firstRun.fired,
+            targets,
+            judge,
+            new Map(firstRun.waits.map((w) => [w.step, w.quietAt ?? w.endAt])),
+          )
+        : undefined;
+    const next =
+      twoRun && !twoRun.runaway
+        ? nextTargets(firstRun.waits, twoRun.waits, targets, judge)
+        : undefined;
+    if (!next || rounds >= SHARED_WAIT_ROUNDS) {
+      break;
+    }
+    ({ targets, judge } = next);
+  }
   const first = firstRun.trace;
   if (firstRun.runaway) {
     // Nothing to compare: the reference itself does not settle.
@@ -1013,10 +1597,51 @@ export async function runScenario(
       hung: [],
       discarded: [],
       fired: firstRun.fired,
+      drained: firstRun.drained,
       report: `runaway in scenario "${def.name}": the reference (${reference.name}) made more than ${limit} timer callbacks, so the case never settles and is not compared`,
     };
   }
-  const againRun = await runBudgeted(reference, def, limit);
+  // Which engine was live at the cap first: the reference (discarded,
+  // whether or not v2 was live too) or v2 alone (a 2.0 bug).
+  const refLive = firstLive(firstRun.waits);
+  const twoLive = twoRun ? firstLive(twoRun.waits) : undefined;
+  const twoAlone =
+    twoLive !== undefined &&
+    (refLive === undefined || twoLive.step < refLive.step);
+  if (firstRun.drainPastBound && !twoAlone) {
+    // Nothing to compare: the reference's batches never settle (Jason, 2026-11-07: "Discard, own count (Recommended)").
+    const both = twoLive !== undefined && refLive !== undefined;
+
+    return {
+      name: def.name,
+      ok: false,
+      nondeterministic: [],
+      differences: [],
+      unexplained: [],
+      advisories: [],
+      used: [],
+      ended: [],
+      compared: [],
+      traces: { reference: first, candidate: [] },
+      runaway: false,
+      neverSettles: true,
+      bothLive: both,
+      hung: [],
+      discarded: [],
+      fired: firstRun.fired,
+      drained: firstRun.drained,
+      sharedRounds: rounds,
+      report: `never settles in scenario "${def.name}": on the reference (${reference.name}) ${firstRun.drainProblem}${both ? `, and on ${twoOh?.name} too (at step ${twoLive.step}: ${twoLive.live})` : ""}, so the case is discarded, not compared`,
+    };
+  }
+  const againRun = await runBudgeted(
+    reference,
+    def,
+    limit,
+    limit,
+    targets,
+    judge,
+  );
   const again = againRun.trace;
   const theirs: Record<string, TraceEntry[]> = {};
   const hung: string[] = [];
@@ -1027,10 +1652,46 @@ export async function runScenario(
       `reference engine is not deterministic in scenario "${def.name}": its second run made more than ${limit} timer callbacks, the first ${firstRun.fired}`,
     );
   }
+  for (const [label, run] of [
+    [reference.name, firstRun],
+    [`${reference.name} (second run)`, againRun],
+  ] as const) {
+    if (run.drainProblem) {
+      problems.push(`${label} in scenario "${def.name}": ${run.drainProblem}`);
+    }
+  }
+  let twoOnlyLive: string | undefined;
+  // Only v2 live at the cap: a 2.0 bug, unless an `ends` stop on v2 came
+  // first (judged once `ended` is known, after the comparison).
+  let twoOnlyAt = "";
+  if (twoAlone && twoOh) {
+    const ref = firstRun.waits.find((w) => w.step === twoLive.step);
+    twoOnlyAt = `at step ${twoLive.step} ${twoOh.name} still had a batch live at the shared wait's cap (${twoLive.live}) while the reference's batches had finished by ${ref?.quietAt ?? ref?.endAt ?? "?"} ms (its handlers wrote ${twoLive.writeAfterAbort ?? 0} time(s) after an abort during the wait)`;
+  } else if (rounds >= SHARED_WAIT_ROUNDS && twoRun) {
+    if (nextTargets(firstRun.waits, twoRun.waits, targets, judge)) {
+      problems.push(
+        `scenario "${def.name}": the shared wait found no common end time in ${SHARED_WAIT_ROUNDS} rounds`,
+      );
+    }
+  }
   const runaways = new Map<string, number | undefined>();
+  let drainedDetached = 0;
+  const settleTimes: Record<string, number[]> = {
+    [reference.name]: firstRun.waits.map((w) => w.endAt),
+  };
   for (const engine of candidates) {
-    const run = await runBudgeted(engine, def, limit, firstRun.fired);
+    const run =
+      engine === twoOh && twoRun
+        ? twoRun
+        : await runBudgeted(engine, def, limit, firstRun.fired, targets, judge);
     theirs[engine.name] = run.trace;
+    settleTimes[engine.name] = run.waits.map((w) => w.endAt);
+    drainedDetached += run.drainedDetached;
+    if (run.drainProblem) {
+      problems.push(
+        `${engine.name} in scenario "${def.name}": ${run.drainProblem}`,
+      );
+    }
     if (run.runaway) {
       runaways.set(engine.name, run.pastReferenceAt);
     }
@@ -1039,8 +1700,16 @@ export async function runScenario(
   const nondeterministic = compareFull(first, again, "v1 (second run)");
   const differences: Difference[] = [];
   const advisories: string[] = [];
+  const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const contractDiffs = compareContract(first, trace, engine);
+    const compared = compareContract(first, trace, engine);
+    const contractDiffs = fileMoves(
+      def.name,
+      compared,
+      divergences,
+      def.triggers,
+      steps,
+    );
     // A loop, not push(...contractDiffs): a case one engine drives far from
     // the reference (an approved quirk that cascades) can yield more
     // differences than a call may take as arguments, and spreading them
@@ -1049,7 +1718,7 @@ export async function runScenario(
       differences.push(d);
     }
     const contractKeys = new Set(
-      contractDiffs.map((d) => `${d.at.reference}|${d.at.candidate}|${d.path}`),
+      compared.map((d) => `${d.at.reference}|${d.at.candidate}|${d.path}`),
     );
     for (const d of compareFull(first, trace, engine)) {
       if (!contractKeys.has(`${d.at.reference}|${d.at.candidate}|${d.path}`)) {
@@ -1068,7 +1737,30 @@ export async function runScenario(
     differences,
     divergences,
     def.triggers,
+    steps,
   );
+  // An `ends` stop on v2 before it outworked the reference (its record
+  // before v2's clock reached the reference's wait end, `stopsBefore` with
+  // `cutAt`): the comparison had already ended, so v2 alone live at the
+  // cap is discarded after the stop (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
+  // Otherwise it is a 2.0 bug.
+  const discarded: string[] = [];
+  const afterStop: { engine: string; id: string; wait: boolean }[] = [];
+  if (twoAlone && twoOh) {
+    const stop = ended.find((e) => e.engine === twoOh.name);
+    if (stop && stopsBefore(stop.at, theirs[twoOh.name] ?? [], twoLive.cutAt)) {
+      discarded.push(twoOh.name);
+      afterStop.push({ engine: twoOh.name, id: stop.id, wait: true });
+      advisories.push(
+        `2.0-only live after the stop by ${stop.id}: ${twoOnlyAt}, once that \`ends\` entry had ended the comparison (its record came before ${twoOh.name}'s clock reached the reference's wait end); discarded after the stop, not a 2.0 bug (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)")`,
+      );
+    } else {
+      twoOnlyLive = `2.0-only live: ${twoOnlyAt}, ${stop ? `and the stop by ${stop.id} came only after ${twoOh.name} had outworked the reference` : "with no `ends` stop before it"}; a 2.0 bug (Jason, 2026-11-07: "One shared wait (Recommended)")`;
+      problems.unshift(
+        `${twoOh.name} in scenario "${def.name}": ${twoOnlyLive}`,
+      );
+    }
+  }
   for (const e of ended) {
     advisories.push(
       `ended on ${e.engine} by ${e.id} at ${describeDifference(e.at)}: ${e.dropped} later difference(s) not compared`,
@@ -1079,11 +1771,13 @@ export async function runScenario(
   // outworked the reference, `stopsBefore`): then the comparison had
   // already ended and the case is discarded (Jason, 2026-11-02: "Discard
   // after the stop"), counted toward the runaway limit.
-  const discarded: string[] = [];
   for (const [engine, at] of runaways) {
     const stop = ended.find((e) => e.engine === engine);
     if (stop && stopsBefore(stop.at, theirs[engine] ?? [], at)) {
-      discarded.push(engine);
+      if (!discarded.includes(engine)) {
+        discarded.push(engine);
+        afterStop.push({ engine, id: stop.id, wait: false });
+      }
       advisories.push(
         `runaway on ${engine} after the stop by ${stop.id}: more than ${limit} timer callbacks once the comparison had ended; discarded, not a hang`,
       );
@@ -1144,7 +1838,13 @@ export async function runScenario(
     runaway: false,
     hung,
     discarded,
+    ...(afterStop.length > 0 ? { afterStop } : {}),
     fired: firstRun.fired,
+    drained: firstRun.drained,
+    drainedDetached,
+    sharedRounds: rounds,
+    ...(twoOnlyLive ? { twoOnlyLive } : {}),
+    ...(def.settleDrain ? { settleTimes } : {}),
     report,
   };
 }
@@ -1217,10 +1917,15 @@ export interface FuzzTally {
   /** Discarded cases: the reference's runaways and those in `afterStop`. */
   runaway: number;
   /**
-   * Of `runaway`, cases discarded because an engine under test ran away
-   * after an `ends` stop (`ScenarioResult.discarded`), not the reference.
+   * Of `runaway`, cases discarded after an `ends` stop
+   * (`ScenarioResult.discarded`), not the reference's: an engine under test
+   * ran away past the timer budget, or (`afterStopAtWait`) v2 alone was
+   * live at the shared wait's cap (Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)").
    */
   afterStop: number;
+  afterStopAtWait: number;
+  /** The `ends` entries behind those discards, with how many each. */
+  afterStopBy: Record<string, number>;
   /** Compared cases that v2 took part in. */
   onV2: number;
   mostFired: number;
@@ -1230,6 +1935,22 @@ export interface FuzzTally {
   endedSteps: number;
   /** Ended cases that stopped at step 0: nothing after setup was compared. */
   endedAtStep0: number;
+  /** Compared cases where the reference's clock advanced in the shared wait. */
+  drained: number;
+  /** Compared cases where v2's clock advanced in the shared wait. */
+  drainedDetached: number;
+  /** Compared cases the shared wait needed more than one round for. */
+  sharedRerun: number;
+  /** Compared cases that failed because only v2 was live at the cap. */
+  twoOnlyLive: number;
+  /** Of `neverSettles`, cases where v2 was live at the cap too. */
+  bothLive: number;
+  /**
+   * Discarded cases whose reference's batches were live at the shared wait's cap
+   * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
+   * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
+   */
+  neverSettles: number;
 }
 
 /** A tally before the first case. */
@@ -1238,11 +1959,19 @@ export function newFuzzTally(): FuzzTally {
     ran: 0,
     runaway: 0,
     afterStop: 0,
+    afterStopAtWait: 0,
+    afterStopBy: {},
     onV2: 0,
     mostFired: 0,
     ended: 0,
     endedSteps: 0,
     endedAtStep0: 0,
+    drained: 0,
+    drainedDetached: 0,
+    sharedRerun: 0,
+    twoOnlyLive: 0,
+    bothLive: 0,
+    neverSettles: 0,
   };
 }
 
@@ -1256,6 +1985,15 @@ export function newFuzzTally(): FuzzTally {
  */
 export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   tally.ran++;
+  if (result.neverSettles) {
+    // Discarded, on its own count, never toward the runaway limit.
+    tally.neverSettles++;
+    if (result.bothLive) {
+      tally.bothLive++;
+    }
+
+    return;
+  }
   if (result.runaway) {
     tally.runaway++;
 
@@ -1264,6 +2002,13 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
   if (result.discarded.length > 0) {
     tally.runaway++;
     tally.afterStop++;
+    const first = result.afterStop?.[0];
+    if (first?.wait) {
+      tally.afterStopAtWait++;
+    }
+    if (first) {
+      tally.afterStopBy[first.id] = (tally.afterStopBy[first.id] ?? 0) + 1;
+    }
 
     return;
   }
@@ -1271,6 +2016,18 @@ export function tallyCase(tally: FuzzTally, result: ScenarioResult): void {
     tally.onV2++;
   }
   tally.mostFired = Math.max(tally.mostFired, result.fired);
+  if ((result.drained ?? 0) > 0) {
+    tally.drained++;
+  }
+  if ((result.drainedDetached ?? 0) > 0) {
+    tally.drainedDetached++;
+  }
+  if ((result.sharedRounds ?? 1) > 1) {
+    tally.sharedRerun++;
+  }
+  if (result.twoOnlyLive) {
+    tally.twoOnlyLive++;
+  }
   if (result.ended.length > 0) {
     const step = Math.min(...result.ended.map((e) => e.at.step));
     tally.ended++;
@@ -1292,9 +2049,17 @@ export function logFuzz(seed: number, tally: FuzzTally): void {
   logLines("fuzz.jsonl", [
     JSON.stringify({
       seed,
-      runs: tally.ran - tally.runaway,
+      runs: tally.ran - tally.runaway - tally.neverSettles,
       runaway: tally.runaway,
       runawayAfterStop: tally.afterStop,
+      runawayAfterStopAtWait: tally.afterStopAtWait,
+      afterStopBy: tally.afterStopBy,
+      neverSettles: tally.neverSettles,
+      drained: tally.drained,
+      drainedDetached: tally.drainedDetached,
+      sharedRerun: tally.sharedRerun,
+      twoOnlyLive: tally.twoOnlyLive,
+      bothLive: tally.bothLive,
       v2: tally.onV2,
       ended: tally.ended,
       endedSteps: tally.endedSteps,

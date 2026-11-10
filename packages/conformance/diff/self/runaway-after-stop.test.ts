@@ -359,7 +359,7 @@ describe("a runaway after an `ends` stop is discarded, and counted", () => {
     );
     expect(checkFuzzRuns([within.run], true)).toEqual([]);
     expect(describeFuzzRun(within.run)).toBe(
-      `${FUZZ_FLOOR} cases compared (seed 1), ${FUZZ_FLOOR} of them on v2 too, 0 ended early by an \`ends\` divergence; 2 discarded after a stop (an engine under test ran away once an \`ends\` divergence had ended the comparison; counted toward the runaway limit)`,
+      `${FUZZ_FLOOR} cases compared (seed 1), ${FUZZ_FLOOR} of them on v2 too, 0 ended early by an \`ends\` divergence; 2 discarded after a stop (an engine under test ran away, or v2 alone was live at the shared wait's cap (0 of them; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), once an \`ends\` divergence had ended the comparison; counted toward the runaway limit)`,
     );
 
     // One more than max(1% of cases, 2): the fuzz test's limit and the census fail it.

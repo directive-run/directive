@@ -3,12 +3,20 @@
   "tests": {
     "conformance:v2": {
       "tests/core/batch-resolve-fallback.test.ts": [
-        "batch + resolve fallback > emits dev warning when batch.enabled without resolveBatch"
+        "batch + cancel > stops batched resolvers when system is stopped during batch window",
+        "batch + error handling > handles errors in batched resolve() fallback without crashing",
+        "batch + resolve fallback > emits dev warning when batch.enabled without resolveBatch",
+        "batch + resolve fallback > resolves requirements individually when batch.enabled but no resolveBatch",
+        "batch + settle integration > settle() flushes pending batches instead of hanging",
+        "batch maxSize enforcement > flushes batch immediately when maxSize is reached"
       ],
       "tests/core/batched-read-your-write.test.ts": [
         "reading your own write inside a batched body > an effect sees its own write through derived",
         "reading your own write inside a batched body > matches what the same code does in a constraint, which was never batched",
         "reading your own write inside a batched body > still announces once, at the end, with the batch whole"
+      ],
+      "tests/core/batched-resolver-retracting-own-requirement.test.ts": [
+        "a batched resolver whose own write retracts its requirement is not canceled"
       ],
       "tests/core/blackbox-cross-module-deps.test.ts": [
         "a module sees exactly its declared dependencies > a derivation reads declared deps and not an undeclared module",
@@ -1064,7 +1072,9 @@
         "a resolver's ctx.deps > reports an in-place change to the second dependency read",
         "a source gate in a composed system > reads the module's own facts by bare name, and reflects them",
         "a source gate in a composed system > with crossModuleDeps reads under self and the dependency's name",
-        "a view of a composed system refuses a symbol-keyed write > throws on assign and on delete"
+        "a view of a composed system refuses a symbol-keyed write > throws on assign and on delete",
+        "batch resolvers in a composed system > resolveBatch writes through the module's own facts",
+        "batch resolvers in a composed system > resolveBatchWithResults writes through the module's own facts"
       ],
       "tests/core/l3-proxies-oracle-transform.test.ts": [
         "a bare module in a composed system > joins with no init, derivations, events, effects, constraints or resolvers",
@@ -1356,6 +1366,64 @@
         "restore() refuses a bad snapshot and writes nothing (U14) > whose facts is missing or not an object",
         "restore() writes one batch, filed as loaded data (U14) > plugins hear one onFactsBatch of hydrate writes, no onFactSet and no onSnapshot; derivations and effects follow"
       ],
+      "tests/core/l7-batch-gate-debt-oracle.test.ts": [
+        "a batch that retracts all its requirements by one write > completes each of them, with none canceled: the batch's runs own the write jointly",
+        "a requirement back while a bound batch that was detached from it still runs > leaves that batch running to completion: only a batch that satisfied it is superseded",
+        "settle() leaves nothing subscribed once it has answered > after it resolves, a later batch still waits out its window",
+        "settle() leaves nothing subscribed once it has answered > after it times out, a later batch still waits out its window",
+        "the batch retry loop's exits > a batch aborted as its retry is announced never runs again",
+        "the batch retry loop's exits > an all-failed with-results batch that satisfied its requirements by its own write is not run again"
+      ],
+      "tests/core/l7-batch-pins-oracle.test.ts": [
+        "a queue with no maxSize (U15) > runs at once when it holds 10,000 requirements and one more arrives, and leaves that one to the window",
+        "requeue() inside a batch handler (U13) > requeue false: a requeue runs every requirement of the batch again at the next reconcile",
+        "requeue() inside a batch handler (U13) > requeue true: a requeue runs every requirement of the batch again at the next reconcile",
+        "settle() and inspect() while a batch runs (U7) > settle() runs the queued batch, and inspect() lists no batch while it is queued",
+        "stop() from a completion hook during a batch's completion loop (U10) > still completes every requirement of the batch, and the system stops",
+        "the attempt number a batch reports (U16) > passes each failed attempt's number to shouldRetry once per batch, and the next attempt's to onRetry for each requirement",
+        "the cancel hook for a batched requirement (U3) > cancels the retracted requirement of a batch that is running",
+        "the cancel hook for a batched requirement (U3) > gets the whole requirement when the requirement is still queued",
+        "what a batch's signal carries when it aborts (U14) > an AbortError when the system stops",
+        "what a batch's signal carries when it aborts (U14) > the batch's write still lands when a requirement of the running batch is retracted",
+        "what a batch's signal carries when it aborts (U14) > the clobber detail, at the write, when a fact the batch is bound to changed"
+      ],
+      "tests/core/l7-batch-resolvers-oracle.test.ts": [
+        "a batch that fails after it was taken away from its requirements > is canceled and its later failure dropped when its requirement comes back and a new batch takes it over",
+        "a batch that fails after it was taken away from its requirements > is not retried and reports no error when it throws because it was aborted",
+        "a batch that never settles times out > resolveBatch: batch.timeoutMs fails every requirement, and wins over the resolver timeout",
+        "a batch that never settles times out > resolveBatch: with no batch.timeoutMs, the resolver timeout applies",
+        "a batch that never settles times out > resolveBatchWithResults: batch.timeoutMs fails every requirement, and wins over the resolver timeout",
+        "a batch that never settles times out > resolveBatchWithResults: with no batch.timeoutMs, the resolver timeout applies",
+        "a whole-batch failure retries the batch and reports every requirement > does not retry a batch that already satisfied its requirement before it failed",
+        "a whole-batch failure retries the batch and reports every requirement > does not run the batch again once a retry wait finds its requirements aborted",
+        "a whole-batch failure retries the batch and reports every requirement > retries after the backoff and tells each requirement about each retry",
+        "a whole-batch failure retries the batch and reports every requirement > stops retrying when shouldRetry says no",
+        "a whole-batch failure retries the batch and reports every requirement > when the attempts run out, errors every requirement once, with the last error",
+        "abortOn on a batched resolver > rejects the batch's later writes to an abortOn fact that changed meanwhile",
+        "once a batch has finished > destroy() cancels nothing",
+        "once a batch has finished > retracting its requirements later cancels nothing",
+        "once a batch has finished > stop() cancels nothing",
+        "resolveBatchWithResults reports each item on its own > completes every item that succeeds and runs the batch once, whatever the retry policy",
+        "resolveBatchWithResults reports each item on its own > drops the results of a batch that was aborted while it ran",
+        "resolveBatchWithResults reports each item on its own > errors only the item that failed, with its own error",
+        "resolveBatchWithResults reports each item on its own > fails the whole batch when the results do not match the requirements in number",
+        "resolveBatchWithResults reports each item on its own > reports a failed item that carries no error as an Error",
+        "resolveBatchWithResults reports each item on its own > runs the whole batch again when every item failed, and completes them when the rerun succeeds",
+        "resolveBatchWithResults reports each item on its own > when every item fails on every attempt, runs once per attempt and reports each item failed",
+        "retracting every requirement of a running batch aborts it > aborts the handler's signal and cancels each requirement once",
+        "stopping or destroying a system ends batched work > a batch that is running when the system stops does not take its requirement away from the new batch",
+        "stopping or destroying a system ends batched work > a second stop() does not cancel a batch that the first stop() already canceled",
+        "stopping or destroying a system ends batched work > destroy() aborts a batch that is running and cancels each of its requirements once",
+        "stopping or destroying a system ends batched work > destroy() cancels the requirements of a queued batch and the handler never runs, even through settle()",
+        "stopping or destroying a system ends batched work > stop() aborts a batch that is running and cancels each of its requirements once",
+        "stopping or destroying a system ends batched work > stop() cancels the requirements of a queued batch and the handler never runs, even through settle()",
+        "the batch window > by default collects requirements raised close together into one call and runs ones raised later in another",
+        "the batch window > maxSize runs a full batch at once and leaves the rest to the window",
+        "the batch window > never runs the handler with no requirements when the only queued one is retracted",
+        "the batch window > settle() runs a queued batch now instead of waiting out the window",
+        "the batch window > takes a retracted requirement out of the batch before it runs",
+        "the batch window > windowMs holds requirements back until it has passed"
+      ],
       "tests/core/l8-system-oracle.test.ts": [
         "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
         "hydrate() data in a single-module system > is applied over initialFacts when it is clean"
@@ -1469,12 +1537,20 @@
         "the runaway-reconcile guard > stays quiet across many separate settled changes"
       ],
       "tests/core/reconcile-timing-rules.test.ts": [
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 0 microtasks, batched, via a derivation)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 0 microtasks, batched)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 0 microtasks, via a derivation)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 0 microtasks)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 1 microtasks, batched, via a derivation)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 1 microtasks, batched)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 1 microtasks, via a derivation)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 1 microtasks)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 10 microtasks, batched, via a derivation)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 10 microtasks, batched)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 10 microtasks, via a derivation)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 10 microtasks)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks, batched, via a derivation)",
+        "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks, batched)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks, via a derivation)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks)",
         "a resolver whose own write retracts its requirement > is still canceled when something else retracts the requirement"
@@ -1492,11 +1568,13 @@
       ],
       "tests/core/resolver-loading-flag.test.ts": [
         "a loading flag survives a failure after satisfying > a loading guard in when: timeout plus retry does not deadlock (L3)",
+        "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)",
         "a loading flag survives a failure after satisfying > satisfied, then timed out: the finally lands (L4)",
         "constraint errors > a require() that throws keeps what it read (H1)",
         "constraint errors > retry-later retries with no retryLater config (H4)"
       ],
       "tests/core/resolver-outcomes.test.ts": [
+        "resolver outcomes > a batch that satisfied its requirement is superseded when it returns",
         "resolver outcomes > a canceled run that returns normally reports only the cancel",
         "resolver outcomes > a satisfied run that times out reports one error, not unmet, and its late write still lands",
         "resolver outcomes > keyed runs that each write their own entry in one pass are both satisfied"
@@ -1513,7 +1591,8 @@
         "a run that satisfied its own requirement > is canceled when something else also changed what the constraint reads",
         "a run that satisfied its own requirement > is not retried if it throws after satisfying",
         "a run that satisfied its own requirement > is superseded when the requirement returns: its late write is dropped",
-        "attribution is per run > a keyed sibling's write does not shield a run the user canceled"
+        "attribution is per run > a keyed sibling's write does not shield a run the user canceled",
+        "attribution is per run > one batch's write does not shield another batch of the same definition"
       ],
       "tests/core/round-1-findings.test.ts": [
         "a derivation may be named after an Object.prototype member > returns its value rather than the builtin",
@@ -1694,6 +1773,8 @@
       ],
       "tests/core/system.test.ts": [
         "Config Forwarding > errorBoundary config forwarded",
+        "Config Forwarding > history config forwarded (boolean)",
+        "Config Forwarding > history config forwarded (object)",
         "Config Forwarding > plugins array forwarded to engine",
         "Config Forwarding > plugins forwarded in single module mode",
         "Config Forwarding > trace config forwarded",
@@ -1925,6 +2006,9 @@
         "restore() in production > still throws its three errors, and writes nothing (U14)",
         "restore() in production > writes an unknown key and an ill-typed value unchecked (U2)",
         "the t.* corners in production (U11, U12) > a refine and a type check do not run"
+      ],
+      "tests/core/l7-batch-pins-oracle-production.test.ts": [
+        "a batched resolver with no handler, in production (U9) > builds with no error and completes each requirement once the window closes"
       ],
       "tests/core/l8-system-oracle-production.test.ts": [
         "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly"
