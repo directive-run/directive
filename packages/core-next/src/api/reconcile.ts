@@ -306,7 +306,7 @@ export const withReconcile: SystemPart = (context) => {
       // As 1.35: a write counts only while a run is in flight (or detached
       // and still going). One made with none (a plugin writing before the
       // first run starts) is nobody's.
-      if (resolvers.inflight.size === 0 && resolvers.detached.size === 0) {
+      if (resolvers.inflight.size === 0 && resolvers.detached_.size === 0) {
         return;
       }
       if (boundKeys?.has(key)) {
@@ -433,7 +433,7 @@ export const withReconcile: SystemPart = (context) => {
         // RFC-0003: not aborted, so its data writes land (the binding still
         // drops a clobbered key); out of flight, so the requirement can be
         // dispatched again.
-        resolvers.detach(req.id);
+        resolvers.detach_(req.id);
       } else {
         resolvers.abort(req.id);
       }
@@ -594,7 +594,7 @@ export const withReconcile: SystemPart = (context) => {
       // still lists it, and the pass after start() cancels it if it is no
       // longer wanted. Quirk j: that pass runs it again if it still is;
       // 1.35 never runs it again.
-      for (const id of resolvers.abortAll()) {
+      for (const id of resolvers.abortAll_()) {
         restart.add(id);
       }
       // A requeue asked by a run just canceled is not carried into start().
