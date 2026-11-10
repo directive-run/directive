@@ -229,11 +229,14 @@ try {
       const q =
         e.op === "changed"
           ? (() => {
-              const { path, from, to } = p as Record<string, Json>;
+              const { path, from, to, record } = p as Record<string, Json>;
               return {
                 path,
                 from: generalizeValue(from),
                 to: generalizeValue(to),
+                ...(record === undefined
+                  ? {}
+                  : { record: generalizeValue(record) }),
               } as Json;
             })()
           : generalizeValue(p);

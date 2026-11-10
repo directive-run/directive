@@ -244,7 +244,11 @@ describe("differential fuzz", () => {
               logResult(result);
               if (!result.ok) {
                 if (
-                  onFailingCase(specTriggers(spec), REPORT_MODE) === "report"
+                  onFailingCase(
+                    specTriggers(spec),
+                    REPORT_MODE,
+                    result.twoOnlyLive,
+                  ) === "report"
                 ) {
                   reportCase(reported, phase.label, index, spec, result);
                   return;

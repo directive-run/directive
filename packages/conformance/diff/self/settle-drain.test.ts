@@ -29,12 +29,15 @@ import {
   describeNeverSettles,
 } from "../../lib/census.js";
 import {
+  FUZZ_BATCH_REPORT_ENV,
   FUZZ_FLOOR,
   MIN_NEVER_SETTLES,
+  batchReportMode,
   maxNeverSettles,
+  onFailingCase,
 } from "../../lib/fuzz.js";
 import { type EngineHandle, engines } from "../engines.js";
-import { type FuzzSpec, toScenario } from "../fuzz/model.js";
+import { type FuzzSpec, specTriggers, toScenario } from "../fuzz/model.js";
 import type { TraceEntry } from "../record.js";
 import {
   DRAIN_ENGINES,
@@ -455,6 +458,15 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.report).toContain(
       'v2+keepalive in scenario "fuzz": 2.0-only live',
     );
+    // With the nightly's report flag on, this batched case still fails:
+    // the verdict is already a 2.0 bug, which "blocks at once" (Jason,
+    // 2026-11-09). Without the verdict, the same failing case is reported.
+    const triggers = specTriggers(spec);
+    expect(triggers).toContain("batched");
+    const flagOn = batchReportMode({ [FUZZ_BATCH_REPORT_ENV]: "1" });
+    expect(flagOn).toBe(true);
+    expect(onFailingCase(triggers, flagOn, result.twoOnlyLive)).toBe("fail");
+    expect(onFailingCase(triggers, flagOn)).toBe("report");
     // 1.35's clock ran as long as v2's, and its batch had still finished.
     expect(result.settleTimes!.v1).toEqual(result.settleTimes!["v2+keepalive"]);
   });

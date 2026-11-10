@@ -237,7 +237,10 @@ the traces to agree.
   (`case-<n>.json`, in `DIFF_FUZZ_REPORT_DIR`) are uploaded as the run's
   artifact. Each is triaged in a follow-up slice, and a case triaged as a
   real 2.0 bug blocks at once. A failing case with no batched resolver
-  still fails the job, as do the runaway, never-settles and v2 limits.
+  still fails the job, as do the runaway, never-settles and v2 limits, and
+  so does a case the shared wait judges a 2.0 bug ("2.0-only live"),
+  batched or not: that verdict is already the 2.0-bug finding (lib/fuzz.ts
+  `onFailingCase`).
   Nothing else sets the flag, so PR CI and the census stay fully blocking
   (diff/self/batch-report.test.ts). A reported case is not shrunk: the
   file holds the case as generated.
@@ -375,6 +378,11 @@ under a changed entry's path. So every entry also carries one of:
   pattern's `to` may instead be `{ "$lt": "from" }`: 2.0's number is below
   1.35's, for a quirk whose approval says which way a count moves (quirk
   z: 2.0 holds fewer pending timers, so a 2.0 timer leak is not excused).
+  A changed pattern may add `record`, a pattern 1.35's whole record must
+  fit, so the change is excused only inside a record of that shape: (av)'s
+  changed-items entry admits a changed item only in a batch call whose
+  items repeat on 1.35 (`batchItemsRepeated`), never 2.0 dropping a
+  distinct item.
   In a missing or extra console entry's pattern, `{ "$text": name }` may
   stand where the contract masks an argument's wording (`{ "$incidental":
   "string" }`): it matches only an argument printed in the named wording

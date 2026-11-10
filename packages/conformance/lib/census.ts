@@ -33,6 +33,7 @@ import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
+  FUZZ_STEP_OPS,
   FUZZ_TRIGGERS,
   FUZZ_V2_FLOOR as V2_FLOOR,
   maxNeverSettles,
@@ -872,6 +873,7 @@ export interface DivergenceEntry {
   path?: string;
   ends?: boolean;
   when?: string[];
+  during?: unknown;
   group?: string;
   excuses?: unknown;
   bound?: unknown;
@@ -891,6 +893,7 @@ const DIVERGENCE_REQUIRED = [
 ];
 const DIVERGENCE_OPTIONAL = [
   "bound",
+  "during",
   "ends",
   "engine",
   "excuses",
@@ -1082,6 +1085,18 @@ export function checkDivergences(
         }
       }
     }
+    if (e.during !== undefined) {
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has during, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}"); a hand scenario names its step`,
+        );
+      }
+      if (!FUZZ_STEP_OPS.includes(e.during as string)) {
+        fail(
+          `${label} during must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")})`,
+        );
+      }
+    }
     if (e.group !== undefined) {
       if (e.scenario !== FUZZ_SCENARIO) {
         fail(
@@ -1261,9 +1276,10 @@ const BOUND_TEXTS = Object.keys(TEXT);
 /**
  * A fuzz entry's `bound` (diff/scenario.ts `Bound`): `{ match }`, a
  * non-empty list of distinct patterns, each naming only known `$like`
- * classes. A changed entry's patterns are `{ path, from, to }` with the path
- * inside the entry's own `path`; a missing or extra entry's are records
- * (objects).
+ * classes. A changed entry's patterns are `{ path, from, to }`, or
+ * `{ path, from, to, record }` with `record` an object pattern of 1.35's
+ * whole record, with the path inside the entry's own `path`; a missing or
+ * extra entry's are records (objects).
  */
 function checkBound(e: Partial<DivergenceEntry>): string[] {
   const out: string[] = [];
@@ -1359,11 +1375,18 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
       out.push(`${at} must be an object`);
     } else if (e.op === "changed") {
       const q = p as Record<string, unknown>;
+      const keys = Object.keys(q).sort().join();
       if (
-        Object.keys(q).sort().join() !== "from,path,to" ||
-        typeof q.path !== "string"
+        (keys !== "from,path,to" && keys !== "from,path,record,to") ||
+        typeof q.path !== "string" ||
+        (keys === "from,path,record,to" &&
+          (q.record === null ||
+            typeof q.record !== "object" ||
+            Array.isArray(q.record)))
       ) {
-        out.push(`${at} of a changed entry must be { path, from, to }`);
+        out.push(
+          `${at} of a changed entry must be { path, from, to } or { path, from, to, record } (record an object)`,
+        );
       } else if (
         typeof e.path === "string" &&
         q.path !== e.path &&

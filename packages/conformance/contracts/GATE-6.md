@@ -140,6 +140,14 @@ decisions (README, "one shared wait"):
 - **#364.** A with-results success asked for its pass one tick after 1.35's
   (seed 11). Hook-only. As a side effect, an all-or-nothing error that landed
   one tick early now matches 1.35.
+- **Gate review, round 1 (2026-11-10).** Two fuzz entries were wider than
+  their rows, so they were narrowed and re-signed:
+  `l7-fuzz-as-external-aborted-extra` now covers an abort only in a settle
+  step (`during` "settle"), and `l7-fuzz-av-external-start-changed-items`
+  covers a changed item only where 1.35's call repeats one (a changed
+  pattern's `record`, `batchItemsRepeated`). In report mode, a "2.0-only live"
+  case still fails the nightly (`onFailingCase`); the self-tests are in
+  diff/self/entry-width.test.ts and settle-drain.test.ts.
 
 #361 and #362 were 2.0 bugs an app could see (a hung `settle()`, a handler
 given a requirement twice); #363 and #364 were hook-only parity. Each was its

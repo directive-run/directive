@@ -448,7 +448,11 @@ export function firstLive(
  * covers ends the comparison of that fuzz case (`explain`).
  *
  * `when` (fuzz only) narrows an entry to the fuzz cases that have every
- * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `group` (fuzz
+ * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `during` (fuzz
+ * only) narrows it to a difference in a step of that op (`stepOps`): row
+ * (as)'s abort happens only while a settle step's settle() waits, so its
+ * entry has `during` "settle" and never covers an abort in another step.
+ * `group` (fuzz
  * only) is read by the census alone: an entry of a group is stale only when
  * no entry of its group covered a difference in the run.
  *
@@ -470,6 +474,8 @@ export interface Divergence {
   path?: string;
   ends?: boolean;
   when?: string[];
+  /** Fuzz only: the op of the step the difference must be in (`stepOps`). */
+  during?: string;
   group?: string;
   excuses?: Excuse[];
   bound?: Bound;
@@ -1204,6 +1210,7 @@ export function covers(
   name: string,
   d: Difference,
   triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
 ): boolean {
   return (
     div.scenario === name &&
@@ -1211,6 +1218,8 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         triggers !== undefined &&
         div.when.every((t) => triggers.includes(t)))) &&
+    (div.during === undefined ||
+      (name === FUZZ_SCENARIO && steps?.get(d.step) === div.during)) &&
     div.stream === d.stream &&
     div.kind === d.kind &&
     (div.engine === undefined || div.engine === d.engine) &&
@@ -1224,6 +1233,23 @@ export function covers(
     (div.excuses === undefined || div.excuses.some((x) => names(x, d))) &&
     (div.bound === undefined || admits(div.bound, d))
   );
+}
+
+/**
+ * The op of each step of a trace, by the step's index (its `step` records):
+ * what an entry's `during` reads (`covers`). Both engines run the same
+ * steps, so the reference's trace names them for every engine.
+ */
+export function stepOps(trace: TraceEntry[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const e of trace) {
+    const op = e.k === "step" ? (e.step as { op?: unknown })?.op : undefined;
+    if (e.k === "step" && typeof op === "string") {
+      out.set(e.i, op);
+    }
+  }
+
+  return out;
 }
 
 /** A difference an entry covered: by which entry, and which of its excuses. */
@@ -1285,6 +1311,7 @@ export function explain(
   differences: Difference[],
   divergences: Divergence[],
   triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
 ): {
   unexplained: Difference[];
   used: string[];
@@ -1292,7 +1319,7 @@ export function explain(
   covered: Covered[];
 } {
   const coverOf = (d: Difference) =>
-    divergences.find((x) => covers(x, name, d, triggers));
+    divergences.find((x) => covers(x, name, d, triggers, steps));
   // How many of its records each excuse has excused so far in this run.
   const spent = new Map<Divergence, number[]>();
   // The first entry that covers `d` and, if it lists excuses, still has
@@ -1300,7 +1327,7 @@ export function explain(
   // next entry, and is unexplained if none takes it).
   const take = (d: Difference): Covered | undefined => {
     for (const div of divergences) {
-      if (!covers(div, name, d, triggers)) {
+      if (!covers(div, name, d, triggers, steps)) {
         continue;
       }
       if (div.excuses === undefined) {
@@ -1438,6 +1465,7 @@ export function fileMoves(
   differences: Difference[],
   divergences: Divergence[],
   triggers?: readonly string[],
+  steps?: ReadonlyMap<number, string>,
 ): Difference[] {
   const movers = divergences.filter((div) => div.op === "moved");
   if (movers.length === 0) {
@@ -1477,7 +1505,7 @@ export function fileMoves(
       where: { reference: m.where.reference, candidate: x.where.candidate },
       shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
     };
-    if (!movers.some((div) => covers(div, name, moved, triggers))) {
+    if (!movers.some((div) => covers(div, name, moved, triggers, steps))) {
       continue;
     }
     taken.add(x);
@@ -1491,6 +1519,7 @@ export function fileMoves(
         path: f.path,
         reference: f.reference,
         candidate: f.candidate,
+        record: m.reference,
       })),
     ]);
   }
@@ -1671,6 +1700,7 @@ export async function runScenario(
   const nondeterministic = compareFull(first, again, "v1 (second run)");
   const differences: Difference[] = [];
   const advisories: string[] = [];
+  const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
     const compared = compareContract(first, trace, engine);
     const contractDiffs = fileMoves(
@@ -1678,6 +1708,7 @@ export async function runScenario(
       compared,
       divergences,
       def.triggers,
+      steps,
     );
     // A loop, not push(...contractDiffs): a case one engine drives far from
     // the reference (an approved quirk that cascades) can yield more
@@ -1706,6 +1737,7 @@ export async function runScenario(
     differences,
     divergences,
     def.triggers,
+    steps,
   );
   // An `ends` stop on v2 before it outworked the reference (its record
   // before v2's clock reached the reference's wait end, `stopsBefore` with

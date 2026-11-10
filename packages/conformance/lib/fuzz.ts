@@ -89,6 +89,26 @@ export const FUZZ_TRIGGERS = [
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
 
 /**
+ * The fuzz model's step ops (diff/fuzz/model.ts `FuzzStep`): what a fuzz
+ * divergence's `during` may name (diff/scenario.ts `covers`, `stepOps`).
+ * Here, apart from the model, as `FUZZ_TRIGGERS` is.
+ */
+export const FUZZ_STEP_OPS: readonly string[] = [
+  "dispatch",
+  "set",
+  "date",
+  "batch",
+  "publish",
+  "advance",
+  "tick",
+  "settle",
+  "stop",
+  "start",
+  "destroy",
+  "snapshot",
+];
+
+/**
  * The environment flag the nightly deep run sets
  * (.github/workflows/diff-fuzz-nightly.yml) so that a failing case with a
  * batched resolver (trigger `batched`) is reported, not failed. Jason,
@@ -119,13 +139,19 @@ export function batchReportMode(
 
 /**
  * What the fuzz does with a failing case: "report" only in report mode and
- * only when the case has the batched resolver; "fail" otherwise. Runaways,
- * never-settles and the floors are limits on the whole run, not cases, and
- * still fail in either mode.
+ * only when the case has the batched resolver; "fail" otherwise. A case the
+ * shared wait judged a 2.0 bug (`twoOnlyLive`, the "2.0-only live" verdict,
+ * diff/scenario.ts `ScenarioResult`) fails in either mode: "a case triaged
+ * as a real 2.0 bug blocks at once" (Jason, 2026-11-09), and that verdict is
+ * already the 2.0-bug finding. Runaways, never-settles and the floors are
+ * limits on the whole run, not cases, and still fail in either mode.
  */
 export function onFailingCase(
   triggers: readonly FuzzTrigger[],
   reportMode: boolean,
+  twoOnlyLive?: string,
 ): "report" | "fail" {
-  return reportMode && triggers.includes("batched") ? "report" : "fail";
+  return reportMode && twoOnlyLive === undefined && triggers.includes("batched")
+    ? "report"
+    : "fail";
 }

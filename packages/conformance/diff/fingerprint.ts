@@ -41,7 +41,11 @@ export interface Excuse {
  * - in a changed pattern's `path`, `[*]` matches any array index;
  * - a changed pattern's `to` may be `{ "$lt": "from" }` (`LOWER`): the
  *   engine under test's value is a number below 1.35's, for a quirk whose
- *   approval says which way a count moves (quirk z: 2.0 holds fewer timers).
+ *   approval says which way a count moves (quirk z: 2.0 holds fewer timers);
+ * - a changed pattern may add `record`, a pattern 1.35's whole record must
+ *   fit (`Difference.record`), for a change excused only inside a record of
+ *   a given shape (row (av): an item changed only in a batch call whose
+ *   items repeat on 1.35, `batchItemsRepeated`).
  *
  * Why this bound is honest (P3-F1): a fuzz entry covers a quirk wherever a
  * seed puts it, so the resolver, requirement or attempt it shows up on
@@ -299,9 +303,12 @@ export function admits(b: Bound, d: Difference): boolean {
     const q = p as Record<string, Json>;
     const path = q.path;
 
+    const keys = Object.keys(q).sort().join();
+
     return (
       typeof path === "string" &&
-      Object.keys(q).length === 3 &&
+      (keys === "from,path,to" ||
+        (keys === "from,path,record,to" && fits(q.record as Json, d.record))) &&
       pathFits(path, d.path ?? "") &&
       fits(q.from as Json, d.reference) &&
       (isLower(q.to)

@@ -95,6 +95,13 @@ export interface Difference {
   op: "missing" | "extra" | "changed" | "moved";
   /** For `changed`: where inside the entry. */
   path?: string;
+  /**
+   * For `changed` only: 1.35's whole record (as compared), the record the
+   * change is in. Only a fuzz bound's changed pattern with a `record` reads
+   * it (diff/fingerprint.ts `Bound`), so an entry can excuse a change only
+   * inside a record of a given shape.
+   */
+  record?: Json;
   reference?: Json;
   candidate?: Json;
   /**
@@ -1000,6 +1007,7 @@ function compareWith(
           ...base(ka),
           op: "changed",
           ...f,
+          record: project(ka.entry),
           at: { reference: ka.index, candidate: kb.index },
           where,
         });

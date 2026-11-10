@@ -5730,6 +5730,21 @@
           },
           "to": {
             "$like": "batchItem"
+          },
+          "record": {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              {
+                "$like": "batchItemsRepeated"
+              }
+            ]
           }
         },
         {
@@ -5739,13 +5754,28 @@
           },
           "to": {
             "$like": "absent"
+          },
+          "record": {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              {
+                "$like": "batchItemsRepeated"
+              }
+            ]
           }
         }
       ]
     },
-    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of a batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order. Signed 2026-11-07 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into the batch call twice on 1.35, which then completes it twice (and fails it, or rejects its write, twice); 2.0 holds a requirement once in the queue (#362), so it puts it in the call once and completes it once. The distinct-requirement order can change too: a re-added requirement moves to the end, so 1.35's a,b,a is b,a on 2.0. From there on the call's outcomes differ too (1.35 completes, fails or rejects the write of the repeated requirement twice), and every later record of the case can differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by a constraint with `abortOn` (`when`). This covers the items of a batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order. Each pattern's `record` requires 1.35's call to hold an item twice (`batchItemsRepeated`, as `l7-fuzz-av-external-start-moved` does), so 2.0 dropping or replacing an item of a call of distinct items is not covered. Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-07"
+    "date": "2026-11-10"
   },
   {
     "id": "l7-fuzz-av-external-wrote-changed-items",
@@ -29867,6 +29897,7 @@
     "op": "extra",
     "ends": true,
     "when": ["batched"],
+    "during": "settle",
     "group": "row-as",
     "bound": {
       "match": [
@@ -30019,9 +30050,9 @@
         }
       ]
     },
-    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle(), the settled notification and inspect() count a running batch, so settle() waits for batched work and inspect() lists a running batch's requirements in flight. 1.35 resolves settle() without waiting for the batches it started and lists no batch in flight (L7 RFC C6, probe B7). In a fuzz case, 2.0's settle() is still waiting at a settled change where 1.35's has already resolved, and settle() runs the batch queues at each settled change while it waits, as 1.35's does (core-next api/core.ts settle(), `features.batch`); so 2.0 starts a queued batch call that 1.35 leaves in its window (verified in a replay of seed 19: the call starts from that flush, inside the case's last settle()). When the call's requirement is then retracted, 2.0 aborts the running call's signal (its last requirement left, quirk g) where 1.35 cancels the queued requirement. From there on the case's timers and later records differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver (`when`). This covers the abort of that call's signal, a record 1.35 never makes. Signed 2026-11-08 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle(), the settled notification and inspect() count a running batch, so settle() waits for batched work and inspect() lists a running batch's requirements in flight. 1.35 resolves settle() without waiting for the batches it started and lists no batch in flight (L7 RFC C6, probe B7). In a fuzz case, 2.0's settle() is still waiting at a settled change where 1.35's has already resolved, and settle() runs the batch queues at each settled change while it waits, as 1.35's does (core-next api/core.ts settle(), `features.batch`); so 2.0 starts a queued batch call that 1.35 leaves in its window (verified in a replay of seed 19: the call starts from that flush, inside the case's last settle()). When the call's requirement is then retracted, 2.0 aborts the running call's signal (its last requirement left, quirk g) where 1.35 cancels the queued requirement. From there on the case's timers and later records differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver (`when`) and only in a settle step (`during` \"settle\"): the flush comes from settle() while it waits, so an abort in any other step (a spurious abort of a running call, with no settle wait to flush it) is not covered. This covers the abort of that call's signal, a record 1.35 never makes. Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-10"
   },
   {
     "id": "l7-fuzz-h-hook-onError-missing",
