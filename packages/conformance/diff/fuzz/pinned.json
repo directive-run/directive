@@ -1458,5 +1458,290 @@
         "value": 0
       }
     }
+  },
+  {
+    "group": "row-as",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 4,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 4,
+              "delay": 0,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 1,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 1,
+              "value": -2,
+              "delay": 1,
+              "fails": 1,
+              "retry": 0,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0, 1],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": null
+            },
+            {
+              "reads": [1],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": null
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "settle"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 24,
+          "value": 1
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 1,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 5,
+        "maxSize": null,
+        "delay": 5,
+        "fails": 0,
+        "retry": 1,
+        "timeout": 10,
+        "writes": 1,
+        "value": 5
+      }
+    }
+  },
+  {
+    "group": "quirk-b-batch",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 2,
+              "throwsAt": 3
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": -2,
+              "delay": 20,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 1,
+              "fails": 2,
+              "retry": 2,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 1,
+              "delay": 1,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": null
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "disable",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1725227145, 3], [1085417911, -1]]
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1030688004, 2], [1988007529, 1], [1332468651, 2]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1972328913,
+          "value": 0
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 24,
+          "value": 1
+        },
+        {
+          "op": "publish",
+          "event": "unknown",
+          "value": 5
+        },
+        {
+          "op": "advance",
+          "ms": 1500
+        },
+        {
+          "op": "start"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 2147483622,
+          "value": 4
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "publish",
+          "event": "unknown",
+          "value": 6
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 5,
+          "value": -1
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 3,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 1,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 2,
+        "retry": 1,
+        "timeout": 3,
+        "writes": 1,
+        "value": 5
+      }
+    }
   }
 ]
