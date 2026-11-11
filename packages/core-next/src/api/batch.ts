@@ -132,7 +132,11 @@ export const withBatch: SystemPart = (context) => {
               results[i]!.error ?? new Error("Batch item failed"),
             )),
       );
-      const [first] = errors.values();
+      // With attempts left, the failed ones retry (quirks h and i); on the
+      // last, each one still in it reports here, in order, as 1.35's
+      // executeWithResults does, and the batch ends as a success does.
+      const [first] =
+        (def.retry?.attempts as number) > run.attempt_ ? errors.values() : [];
       if (first) {
         // Quirk i: the rest leave flight; the failed ones are the batch now,
         // and a sibling's write that satisfied its own requirement does not
@@ -143,8 +147,8 @@ export const withBatch: SystemPart = (context) => {
       } else {
         run.done_ = true;
       }
-      for (const req of done) {
-        host.tell_(run, req);
+      for (const req of first ? done : run.reqs_!) {
+        host.tell_(run, req, errors.get(req));
       }
       if (first) {
         throw first;

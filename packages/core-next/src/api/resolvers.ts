@@ -396,8 +396,9 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     // (row t), so the rest of a batch still completes.
     run.done_ = true;
     for (const req of all(run)) {
-      // A with-results item: its own error (quirks h and i, (ar)).
-      tell(run, req, error && (run.errors_?.get(req) ?? error));
+      // A with-results item: its own error (quirks h and i, (ar)). A batch
+      // that reports with none has none left (its last attempt told them).
+      tell(run, req, run.errors_?.get(req) ?? error);
     }
   };
 
@@ -643,6 +644,12 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
         return;
       } catch (error) {
+        // Reported already and not canceled: a rethrow from its outcome's
+        // hooks (a batch's last-attempt items, boundary "throw") escapes as
+        // report's does.
+        if (run.done_ && !signal.aborted) {
+          throw error;
+        }
         // Superseded: a newer run owns the requirement.
         if (run.dropped_) {
           return;
