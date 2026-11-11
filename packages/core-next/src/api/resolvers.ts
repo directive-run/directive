@@ -218,10 +218,15 @@ export interface Batcher {
 }
 
 export interface Resolvers {
-  /** `baseline`: the bound keys' values before this pass dispatched anything. */
+  /**
+   * `baseline`: the bound keys' values before this pass dispatched anything.
+   * `retrying`: a "retry" boundary re-dispatches it (quirk a), so a batch
+   * holding it started after its last raise and is its current run.
+   */
   resolve(
     req: RequirementWithId,
     baseline?: ReadonlyMap<string, unknown>,
+    retrying?: boolean,
   ): void;
   abort(requirementId: string): void;
   /** Take a run out of flight without aborting it (RFC-0003). */
@@ -728,7 +733,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     inflight,
     detached_: detached,
     queued_: (busy) => !!batcher?.queued_(busy),
-    resolve(req, baseline) {
+    resolve(req, baseline, retrying) {
       const current = inflight.get(req.id);
       if (current?.satisfied_) {
         // The requirement came back while the run that satisfied it is
@@ -744,15 +749,17 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       } else if (current) {
         // A single run still going owns it, as does a batch that told its
         // outcome (a "retry" boundary's pass: quirk a's requeue re-dispatches
-        // it once the batch is out of flight): the dispatch is dropped.
-        if (!current.reqs_ || current.done_) {
+        // it once the batch is out of flight), or the batch that is that
+        // re-dispatch (settle() ran it before the requeue's pass): the
+        // dispatch is dropped.
+        if (!current.reqs_ || retrying || current.done_) {
           return;
         }
-        // A batch still running holds it (a bound one retracted while queued
-        // runs there anyway): 1.35's resolve() asks only single runs, so it
-        // is queued again and the batch goes on detached, its outcome still
-        // told, its writes still bound; settle() waits only for what stays
-        // attached (fuzz case 1967).
+        // A batch it was in before its last raise still runs (a bound one
+        // retracted while queued runs there anyway): 1.35's resolve() asks
+        // only single runs, so it is queued again and the batch goes on
+        // detached, its outcome still told, its writes still bound;
+        // settle() waits only for what stays attached (fuzz case 1967).
         inflight.delete(req.id);
         detached.add(current);
       }

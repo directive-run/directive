@@ -529,7 +529,9 @@ export const withReconcile: SystemPart = (context) => {
       }
       for (const req of added) {
         if (system.isRunning) {
-          resolvers.resolve(req, baseline);
+          // Under "retry", quirk a's count since its last raise (a
+          // retraction clears it) marks a re-dispatch, not a raise.
+          resolvers.resolve(req, baseline, redo.has(req.id));
         } else {
           // Stopped while this pass waited: left for start() to dispatch.
           next.delete(req.id);

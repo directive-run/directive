@@ -90,4 +90,78 @@ describe("a batched requirement raised again while its batch runs", () => {
     expect(facts.out).toBe(20);
     system.stop();
   });
+
+  it('under "retry", raised again by the error hook: one retry run, the handler called twice (1.35)', async () => {
+    // The pass that applies quirk a's requeue comes after settle() has run
+    // the retry's batch: that batch is the requirement's current run, not
+    // one to leave detached (fix round 1 of the L7 gate's case 1967).
+    const calls: number[] = [];
+    const met: string[] = [];
+    const mod = createModule("m", {
+      schema: {
+        facts: { want: t.boolean(), out: t.number() },
+        derivations: {},
+        events: {},
+        requirements: { FETCH: { id: t.string() } },
+      },
+      init: (f: any) => {
+        f.want = false;
+        f.out = 0;
+      },
+      constraints: {
+        fetch: {
+          when: (f: any) => f.want,
+          require: () => [{ type: "FETCH", id: "x" }],
+          abortOn: ["out"],
+        },
+      },
+      resolvers: {
+        fetch: {
+          requirement: "FETCH",
+          key: (r: any) => r.id,
+          batch: { enabled: true, windowMs: 10, maxSize: 2 },
+          resolveBatch: async (_reqs: any[], ctx: any) => {
+            const n = calls.push(calls.length + 1);
+            await new Promise((r) => setTimeout(r, 20));
+            if (n === 1) {
+              throw new Error("first fails");
+            }
+            ctx.facts.out = n * 10;
+          },
+        },
+      },
+      hooks: {
+        onResolverError: (_e: Error, _r: unknown, ctx: any) => {
+          ctx.facts.want = true;
+        },
+      },
+    } as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const system = createSystem({
+      module: mod,
+      errorBoundary: { onResolverError: "retry" },
+      plugins: [
+        { name: "rec", onRequirementMet: (req: any) => met.push(req.id) },
+      ],
+    } as never);
+    system.start();
+    await tick();
+    const facts = system.facts as any;
+    facts.want = true; // x queued
+    await tick();
+    facts.want = false; // retracted; bound, so it stays queued
+    await tick();
+    const settled = system.settle(1500).then(
+      () => "resolved",
+      (e: Error) => `rejected: ${e.message}`,
+    );
+    await vi.advanceTimersByTimeAsync(400);
+    expect(await settled).toBe("resolved");
+    expect(calls).toEqual([1, 2]);
+    expect(met).toEqual(["x"]);
+    expect(facts.want).toBe(true);
+    expect(facts.out).toBe(20);
+    system.stop();
+    warn.mockRestore();
+  });
 });
