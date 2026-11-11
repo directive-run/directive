@@ -330,6 +330,16 @@ Measured with `node scripts/size.mjs --check` in `packages/core-next` on this br
 
 ## Decisions for the owner
 
+**Owner decisions, 2026-11-10.** Jason answered four questions, quoted here in his words.
+
+| Question | Jason's answer | What it settles |
+|---|---|---|
+| A1, the L8 size | "Approve up to +2.0 KB (Recommended)" | Each of `minimal`, `two-module`, `aperture` and `full-entry` may grow by up to +2.0 KB over pre-L8, and `floor` by up to +0.9 KB. Each slice trims first and comes back if it lands above the cap. |
+| A2 and A3, how L8 is checked | "Approve both (Recommended)" | Deep runs report while the 21 short seeds gate, and a real 2.0 bug still blocks. The fuzz is made ready before the gate: L8-pre leaves at most 10 unexplained cases; the gate is capped at 3 runs, then goes to the owner; case files store v2's trace; abort respect is a drawn option; L7's follow-ups come first. |
+| (aw)–(bf), and B1–B3 | "Approve all as recommended (Recommended)" | (ay), (az), (ba), (bb), (bc), (bd) and (be) are approved. (aw) and (ax) are deferred to the beta's versioned export. (bf) is declined. B1–B3 are approved, including Claude signing for the approved rows. |
+| L7's leftover row, deep case 2/352 | "Approve 2.0's (Recommended)" | When an aborted batch's late write comes after destroy(), 2.0 reports nothing; 1.35 reports it as clobbered. It is hook-only, and its entry is signed with the L7 follow-ups. |
+
+
 **Questions for Jason.** Nine answers settle L8. The table after them gives each a product verdict, so Jason can bulk-approve.
 
 1. **A1, the L8 size.** History as a `withHistory` part wired by `createSystem` (O1), with `minimal`, `two-module`, `aperture` and `full-entry` each allowed up to +2.0 KB over pre-L8, and `floor` up to +0.9 KB (the seam, which the beta cannot drop). **Recommend: approve.**
