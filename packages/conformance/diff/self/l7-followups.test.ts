@@ -15,6 +15,12 @@
  *   (`sameRecord`, 24301/4050), never another record's.
  * - The 2/352 entries cover a late write's clobbered report only after
  *   `destroy` (`afterOp`).
+ * - Row (av)'s stop entries cover 1.35's second cancel of a requirement its
+ *   queue held twice (`repeats`, PR seed 15), never a cancel 2.0 lacks
+ *   outright: an extra cancel of a requirement held once is not covered.
+ * - `meets` answers as a scan of the case's differences per difference
+ *   does, found once per case and entry (deep case 2/2137's 1.7M
+ *   differences made that scan quadratic and the seed time out).
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -30,6 +36,7 @@ import {
   covers,
   explain,
   fileMoves,
+  meets,
   readDivergences,
   runScenario,
 } from "../scenario.js";
@@ -47,6 +54,11 @@ const CASE_372: FuzzSpec = JSON.parse(
 /** Deep seed 2, case 3718: the twin's write lands in the twin step on 2.0. */
 const CASE_3718: FuzzSpec = JSON.parse(
   '{"modules":[{"facts":2,"date":true,"derivations":[{"facts":[0],"derived":[],"threshold":6,"throwsAt":7}],"events":[{"target":0,"add":false}],"constraints":[{"fact":1,"atLeast":0,"crossAtLeast":null,"priority":1,"writes":1,"value":1,"delay":0,"fails":0,"retry":2,"timeout":3}],"effects":[{"reads":[0,1],"explicitDeps":true,"cleanup":false,"throwsAt":6}],"source":{"gated":false}},{"facts":1,"date":true,"derivations":[{"facts":[0],"derived":[],"threshold":4,"throwsAt":3},{"facts":[0],"derived":[0],"threshold":4,"throwsAt":3}],"events":[{"target":0,"add":false}],"constraints":[{"fact":0,"atLeast":2,"crossAtLeast":3,"priority":1,"writes":0,"value":2,"delay":0,"fails":1,"retry":2,"timeout":3},{"fact":0,"atLeast":2,"crossAtLeast":3,"priority":0,"writes":0,"value":2,"delay":1,"fails":1,"retry":0,"timeout":10}],"effects":[],"source":null}],"boundary":"skip","history":false,"trace":false,"steps":[{"op":"dispatch","module":0,"event":1800768996,"value":-2},{"op":"twin"}],"batch":{"sources":[{"fact":1,"atLeast":1,"items":1,"abortOn":true}],"handler":"results","failing":"some","windowMs":5,"maxSize":2,"delay":1,"fails":1,"retry":1,"timeout":null,"writes":0,"value":-1}}',
+);
+
+/** PR seed 15: 1.35 holds AB 0.0 twice in its queue at the stop (row (av)). */
+const SEED_15: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":1,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":null}],"boundary":null,"history":false,"trace":false,"steps":[{"op":"batch","module":0,"writes":[[0,1]]},{"op":"set","module":0,"fact":0,"value":0},{"op":"set","module":0,"fact":0,"value":1},{"op":"stop"}],"batch":{"sources":[{"fact":0,"atLeast":1,"items":1,"abortOn":true}],"handler":"batch","failing":"all","windowMs":0,"maxSize":null,"delay":0,"fails":0,"retry":0,"timeout":null,"writes":0,"value":0}}',
 );
 
 /** Steps 0 to 3 (ops given), each with the records given for it. */
@@ -305,6 +317,110 @@ describe("L7 follow-ups", () => {
       const [d] = compareContract(ref, trace([...ops], []), "v2");
       const steps = new Map(ops.map((op, i) => [i, op] as [number, string]));
       expect(covers(hook, "fuzz", d!, triggers, steps)).toBe(covered);
+    }
+  });
+
+  it("row (av)'s stop entries cover PR seed 15's doubled cancel at the stop", async () => {
+    const result = await runScenario(toScenario(SEED_15));
+    expect(result.unexplained).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect([...result.used].sort()).toEqual([
+      "l7-fuzz-av-stop-hook-onRequirementCanceled-repeat",
+      "l7-fuzz-av-stop-hook-onResolverCancel-repeat",
+      "l7-fuzz-av-stop-observe-requirement.canceled-repeat",
+    ]);
+  });
+
+  it("row (av)'s stop entries cover only a dropped repeat, never a cancel of a requirement held once", () => {
+    const cancel = (item: string) =>
+      ({
+        k: "hook",
+        hook: "onResolverCancel",
+        args: [
+          "a::rb",
+          {
+            fromConstraint: "a::b0",
+            id: `AB:{"item":"${item}"}`,
+            requirement: { item, type: "AB" },
+          },
+        ],
+      }) as TraceEntry;
+    const triggers = ["batched", "batchAbortOn"];
+    const ops = ["start", "set", "set", "stop"];
+    const steps = new Map(ops.map((op, i) => [i, op] as [number, string]));
+    const missing = (ref: TraceEntry[], cand: TraceEntry[]) =>
+      compareContract(ref, cand, "v2").filter((d) => d.op === "missing");
+    const repeated = missing(
+      trace(ops, [
+        [3, cancel("0.0")],
+        [3, cancel("0.0")],
+      ]),
+      trace(ops, [[3, cancel("0.0")]]),
+    );
+    // 1.35 cancels 0.0 twice, 2.0 once: the second is a dropped repeat.
+    expect(repeated).toHaveLength(1);
+    expect(repeated[0]?.repeat).toBe(true);
+    const once = missing(
+      trace(ops, [
+        [3, cancel("0.0")],
+        [3, cancel("0.1")],
+      ]),
+      trace(ops, [[3, cancel("0.0")]]),
+    );
+    // 1.35 cancels 0.1 once and 2.0 not at all: an absence, not a repeat.
+    expect(once).toHaveLength(1);
+    expect(once[0]?.repeat).toBeUndefined();
+    const lacking = missing(trace(ops, [[3, cancel("0.0")]]), trace(ops, []));
+    expect(lacking[0]?.repeat).toBeUndefined();
+    const stop = entry("l7-fuzz-av-stop-hook-onResolverCancel-repeat");
+    expect(covers(stop, "fuzz", repeated[0]!, triggers, steps)).toBe(true);
+    expect(covers(stop, "fuzz", once[0]!, triggers, steps)).toBe(false);
+    expect(covers(stop, "fuzz", lacking[0]!, triggers, steps)).toBe(false);
+    // Only at a stop: the same repeat in a settle step is not covered.
+    const settle = new Map(steps).set(3, "settle");
+    expect(covers(stop, "fuzz", repeated[0]!, triggers, settle)).toBe(false);
+    // And only where the batched source has `abortOn`.
+    expect(covers(stop, "fuzz", repeated[0]!, ["batched"], steps)).toBe(false);
+    const destroy = entry("l7-fuzz-av-destroy-hook-onResolverCancel-repeat");
+    const destroyed = new Map(steps).set(3, "destroy");
+    expect(covers(destroy, "fuzz", repeated[0]!, triggers, destroyed)).toBe(
+      true,
+    );
+    expect(covers(destroy, "fuzz", once[0]!, triggers, destroyed)).toBe(false);
+  });
+
+  it("meets answers as a scan of every other difference does", () => {
+    const rec = (tag: string, n: number) => ext(tag, n);
+    const ref = trace(OPS, [
+      [0, rec("a", 0)],
+      [1, rec("b", 1)],
+      [1, rec("a", 2)],
+      [2, rec("b", 3)],
+      [3, rec("a", 4)],
+      [3, rec("b", 5)],
+    ]);
+    const diffs = compareContract(ref, trace(OPS, [[2, rec("b", 3)]]), "v2");
+    expect(diffs.length).toBeGreaterThan(3);
+    for (const kind of ["a", "b"]) {
+      for (const order of [undefined, "any"] as const) {
+        const req = { stream: "external", kind, op: "missing" as const, order };
+        for (const d of diffs) {
+          const naive = diffs.some(
+            (x) =>
+              x !== d &&
+              x.engine === d.engine &&
+              x.stream === req.stream &&
+              x.kind === req.kind &&
+              x.op === req.op &&
+              (order === "any" ||
+                x.step < d.step ||
+                (x.step === d.step &&
+                  (x.where.reference?.[2] ?? x.where.candidate?.[2] ?? 0) <=
+                    (d.where.reference?.[2] ?? d.where.candidate?.[2] ?? 0))),
+          );
+          expect(meets(req, d, diffs)).toBe(naive);
+        }
+      }
     }
   });
 });

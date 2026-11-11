@@ -509,6 +509,14 @@ export interface Divergence {
    */
   afterOp?: string;
   /**
+   * Fuzz only, op `missing`: the entry covers only a dropped repeat
+   * (`Difference.repeat`), a record the reference made more times in its
+   * step than the engine did, never one the engine lacks outright: row
+   * (av)'s second cancel at a stop of a requirement 1.35's queue held
+   * twice (PR seed 15).
+   */
+  repeats?: true;
+  /**
    * Op `moved` only: which way the engine's record moved, one step later
    * (1, the default) or one step earlier (-1) than the reference's
    * (`fileMoves`, `Difference.by`).
@@ -1322,6 +1330,8 @@ export function covers(
           d.path.startsWith(`${div.path}.`) ||
           d.path.startsWith(`${div.path}[`)))) &&
     (div.excuses === undefined || div.excuses.some((x) => names(x, d))) &&
+    (div.repeats !== true ||
+      (name === FUZZ_SCENARIO && d.op === "missing" && d.repeat === true)) &&
     (div.op !== "moved" || (div.by ?? 1) === (d.by ?? 1)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
@@ -1346,17 +1356,65 @@ export function meets(
   context: readonly Difference[],
 ): boolean {
   const at = latestPosition(d);
+  // The two earliest differences `req` describes on `d`'s engine (one may
+  // be `d` itself, which never counts): whether any is at or before `d` is
+  // whether the earliest other one is. Found once per context and entry,
+  // not once per difference covered: a runaway case holds over a million
+  // differences (deep case 2/2137, 1.7M records on v2), and a scan per
+  // difference made its `explain` quadratic.
+  const earliest = earliestMeeting(req, context).get(d.engine) ?? [];
+  const other = earliest.find((x) => x !== d);
 
-  return context.some(
-    (x) =>
-      x !== d &&
-      x.engine === d.engine &&
-      x.stream === req.stream &&
-      x.kind === req.kind &&
-      x.op === req.op &&
-      (req.bound === undefined || admits(req.bound, x)) &&
-      (req.order === "any" || comparePositions(latestPosition(x), at, 3) <= 0),
+  return (
+    other !== undefined &&
+    (req.order === "any" || comparePositions(latestPosition(other), at, 3) <= 0)
   );
+}
+
+/** Per context (and its length when read) and entry: `earliestMeeting`. */
+const MEETING = new WeakMap<
+  readonly Difference[],
+  { length: number; byReq: Map<Requirement, Map<string, Difference[]>> }
+>();
+
+/**
+ * The two earliest differences of `context` that `req` describes, by
+ * engine: its stream, kind and op, and its `bound` if given, earliest by
+ * position (`latestPosition`, as `meets` compares them).
+ */
+function earliestMeeting(
+  req: Requirement,
+  context: readonly Difference[],
+): Map<string, Difference[]> {
+  let memo = MEETING.get(context);
+  if (memo === undefined || memo.length !== context.length) {
+    memo = { length: context.length, byReq: new Map() };
+    MEETING.set(context, memo);
+  }
+  const known = memo.byReq.get(req);
+  if (known) {
+    return known;
+  }
+  const out = new Map<string, Difference[]>();
+  for (const x of context) {
+    if (
+      x.stream !== req.stream ||
+      x.kind !== req.kind ||
+      x.op !== req.op ||
+      (req.bound !== undefined && !admits(req.bound, x))
+    ) {
+      continue;
+    }
+    const two = out.get(x.engine) ?? [];
+    two.push(x);
+    two.sort((p, q) =>
+      comparePositions(latestPosition(p), latestPosition(q), 3),
+    );
+    out.set(x.engine, two.slice(0, 2));
+  }
+  memo.byReq.set(req, out);
+
+  return out;
 }
 
 /**

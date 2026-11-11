@@ -6629,6 +6629,232 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-av-stop-hook-onResolverCancel-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onResolverCancel record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-stop-hook-onRequirementCanceled-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onRequirementCanceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-stop-observe-requirement.canceled-repeat",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a requirement.canceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-hook-onResolverCancel-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onResolverCancel record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-hook-onRequirementCanceled-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onRequirementCanceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-observe-requirement.canceled-repeat",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a requirement.canceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
     "id": "l2-quirk-n-fuzz-timeout-extra",
     "scenario": "fuzz",
     "stream": "external",

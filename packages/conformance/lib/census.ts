@@ -880,6 +880,7 @@ export interface DivergenceEntry {
   requires?: unknown;
   by?: unknown;
   afterOp?: unknown;
+  repeats?: unknown;
   reason: string;
   approvedBy: string;
   date: string;
@@ -905,6 +906,7 @@ const DIVERGENCE_OPTIONAL = [
   "group",
   "op",
   "path",
+  "repeats",
   "requires",
   "step",
   "when",
@@ -1135,6 +1137,14 @@ export function checkDivergences(
     ) {
       fail(
         `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), on a fuzz entry only`,
+      );
+    }
+    if (
+      e.repeats !== undefined &&
+      (e.repeats !== true || e.scenario !== FUZZ_SCENARIO || e.op !== "missing")
+    ) {
+      fail(
+        `${label} repeats must be true, on a fuzz entry of op "missing" only: it covers a record the reference made more times in its step than the engine did`,
       );
     }
     if (
