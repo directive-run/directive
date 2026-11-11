@@ -13,9 +13,8 @@
  * case among them); a 2.0 whose `settle()` resolves early on an attached
  * batch still differs; both engines live at the cap (built in the test, a
  * batch live on each) is discarded; only 2.0 live at the cap fails, as a 2.0
- * bug, unless
- * an approved `ends` entry had stopped 2.0's comparison before 2.0 outworked
- * the reference (seeds 8 and 2: discarded after the stop, toward the
+ * bug, unless an approved `ends` entry had stopped 2.0's comparison before
+ * 2.0 outworked the reference (seeds 8 and 2: discarded after the stop, toward the
  * runaway limit, naming the entry; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), while a stop after the
  * reference finished still fails; and the cap counting. A case discarded because it never settles counts on its
  * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
