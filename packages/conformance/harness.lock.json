@@ -87,7 +87,7 @@
     "diff/self/moved.test.ts": "79f95969747f0750993d373150d4e3559ae313aab5240828540a869734603ef5",
     "diff/self/precision.test.ts": "b3609825f17437dac0f72a288691d38028ccd81c9d541e8a5b5bc811d33c02dd",
     "diff/self/runaway-after-stop.test.ts": "80a5ad53e13afba8b88a56d9d2839e5462b0d0ac341fe1584030c106e0746405",
-    "diff/self/settle-drain.test.ts": "077ac9e3c432c7c95bfee77de393b26934de776007e0811c74dc75a3d6484839",
+    "diff/self/settle-drain.test.ts": "f4a48e7b5d007f5fc45d1bb96ddc418bf5721335c7ffc19596b3d0ca7f57cf95",
     "diff/self/tamper.test.ts": "282d56b5446e6bbe0c18a322fb378cb6da7618b26ef1b64b9252ae0353f1706e",
     "diff/unfired-hooks.json": "a71dc4d52152ea4205c067278d9f8c8a0141fa4f4ca195101f59226191fd27e1",
     "helpers/engine.ts": "d18e0f01d1c8d743c9ab75a9cad3ad9fd8e695657a77e3fa1a0670420b487505",
