@@ -11,10 +11,10 @@
  * batch running; the wait makes that case compare equal (on the workspace
  * engine too) with both clocks ending at the same time (seed 4's drift
  * case among them); a 2.0 whose `settle()` resolves early on an attached
- * batch still differs; both engines live at the cap (seed 10's mutual-write
- * loop) is discarded; only 2.0 live at the cap fails, as a 2.0 bug, unless
- * an approved `ends` entry had stopped 2.0's comparison before 2.0 outworked
- * the reference (seeds 8 and 2: discarded after the stop, toward the
+ * batch still differs; both engines live at the cap (built in the test, a
+ * batch live on each) is discarded; only 2.0 live at the cap fails, as a 2.0
+ * bug, unless an approved `ends` entry had stopped 2.0's comparison before
+ * 2.0 outworked the reference (seeds 8 and 2: discarded after the stop, toward the
  * runaway limit, naming the entry; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), while a stop after the
  * reference finished still fails; and the cap counting. A case discarded because it never settles counts on its
  * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
@@ -96,11 +96,6 @@ const [, local, v2] = engines() as [EngineHandle, EngineHandle, EngineHandle];
 /** Seed 4 (PR count, up to L7): its settle checkpoints drifted 12 ms against 250 ms under the separate drains. */
 const SEED_4: FuzzSpec = JSON.parse(
   '{"modules": [{"facts": 1, "date": true, "derivations": [{"facts": [0], "derived": [], "threshold": -2, "throwsAt": 3}, {"facts": [0], "derived": [0], "threshold": 3, "throwsAt": null}], "events": [{"target": 0, "add": false}, {"target": 0, "add": true}, {"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 2, "crossAtLeast": null, "priority": 1, "writes": 0, "value": 1, "delay": 5, "fails": 0, "retry": 1, "timeout": 3}, {"fact": 0, "atLeast": 0, "crossAtLeast": null, "priority": 2, "writes": 0, "value": 2, "delay": 5, "fails": 2, "retry": 0, "timeout": null}], "effects": [], "source": {"gated": true}}], "boundary": "disable", "history": false, "trace": false, "steps": [{"op": "dispatch", "module": 0, "event": 1842972639, "value": 1}, {"op": "settle"}, {"op": "settle"}, {"op": "publish", "event": "cross", "value": 5}, {"op": "destroy"}, {"op": "publish", "event": "unknown", "value": 4}, {"op": "set", "module": 0, "fact": 845476302, "value": -2}], "batch": {"sources": [{"fact": 2, "atLeast": 0, "items": 1, "abortOn": true}, {"fact": 2, "atLeast": 2, "items": 3, "abortOn": true}], "handler": "batch", "failing": "some", "windowMs": 5, "maxSize": 1, "delay": 5, "fails": 2, "retry": 1, "timeout": 10, "writes": 0, "value": 5}}',
-);
-
-/** Seed 10 (PR count, up to L7): two writes chase each other on both engines (scratchpad/batchfix4/repro). */
-const SEED_10: FuzzSpec = JSON.parse(
-  '{"modules": [{"facts": 1, "date": false, "derivations": [{"facts": [0], "derived": [], "threshold": 5, "throwsAt": 6}, {"facts": [0], "derived": [], "threshold": 1, "throwsAt": null}], "events": [{"target": 0, "add": true}], "constraints": [{"fact": 0, "atLeast": 1, "crossAtLeast": null, "priority": 1, "writes": 0, "value": -2, "delay": 1, "fails": 2, "retry": 1, "timeout": null}, {"fact": 0, "atLeast": 3, "crossAtLeast": null, "priority": 3, "writes": 0, "value": 4, "delay": 20, "fails": 0, "retry": 1, "timeout": 10}, {"fact": 0, "atLeast": 0, "crossAtLeast": null, "priority": 0, "writes": 0, "value": 6, "delay": 5, "fails": 0, "retry": 0, "timeout": 3}], "effects": [{"reads": [0], "explicitDeps": false, "cleanup": false, "throwsAt": 3}], "source": null}], "boundary": "retry", "history": false, "trace": false, "steps": [{"op": "dispatch", "module": 0, "event": 1672610186, "value": 3}, {"op": "date", "module": 0, "ms": 2}], "batch": {"sources": [{"fact": 2, "atLeast": 0, "items": 2, "abortOn": true}, {"fact": 0, "atLeast": 0, "items": 2, "abortOn": false}], "handler": "batch", "failing": "all", "windowMs": 1, "maxSize": null, "delay": 20, "fails": 0, "retry": 2, "timeout": 10, "writes": 1, "value": -1}}',
 );
 
 /**
@@ -419,9 +414,22 @@ describe("the fuzz shared wait at a settle step", () => {
     ).toEqual([]);
   });
 
-  it("(b) both engines live at the cap (seed 10's mutual-write loop): discarded as never settling", async () => {
-    const result = await runScenario(toScenario(SEED_10), {
-      candidates: [v2],
+  it("(b) both engines live at the cap (built here: a batch live on each): discarded as never settling, on its own count, within the cap", async () => {
+    // Built, not found: the rule under test is what the wait does with a
+    // case both engines are live in at the cap, not what any engine does
+    // with one spec (seed 10's mutual-write loop was this case on 2.0 until
+    // a batched requirement re-raised while its batch runs was queued
+    // again). A batch is live on each engine for the whole wait: 1.35's own
+    // 5 ms timer carries its clock past the 2 ms cap; v2, whose settle()
+    // waited the spec's batch out, keeps a timer every 100 ms
+    // (`keepsDetachedAlive`) and is live at the cap too.
+    const def = {
+      ...toScenario(spec),
+      settleDrain: { boundMs: 2, busy: () => "a test batch is live" },
+    };
+    const result = await runScenario(def, {
+      candidates: [keepsDetachedAlive(v2)],
+      divergences: [],
     });
     expect(result.neverSettles).toBe(true);
     expect(result.bothLive).toBe(true);
@@ -429,8 +437,40 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.twoOnlyLive).toBeUndefined();
     expect(result.compared).toEqual([]);
     expect(result.report).toMatch(
-      /^never settles in scenario "fuzz": on the reference \(v1\) the shared wait at step \d+ passed its cap: .*, and on v2 too \(at step \d+: /,
+      /^never settles in scenario "fuzz": on the reference \(v1\) the shared wait at step 2 passed its cap: a test batch is live, \d+ ms after settle\(\) resolved \(cap 2 ms\), and on v2\+keepalive too \(at step 2: a test batch is live, \d+ ms after settle\(\) resolved \(cap 2 ms\)\), so the case is discarded, not compared$/,
     );
+
+    // On its own count: not a runaway, and within the cap (max(1% of the
+    // seed's cases, 3)) it fails nothing; the census prints it on its own
+    // line.
+    const compared = await runScenario(toScenario(spec), {
+      candidates: [local, v2],
+      divergences: [],
+    });
+    expect(compared.ok).toBe(true);
+    const tally: FuzzTally = newFuzzTally();
+    for (let i = 0; i < FUZZ_FLOOR; i++) {
+      tallyCase(tally, compared);
+    }
+    tallyCase(tally, result);
+    expect(tally).toMatchObject({
+      ran: FUZZ_FLOOR + 1,
+      runaway: 0,
+      afterStop: 0,
+      neverSettles: 1,
+      bothLive: 1,
+      onV2: FUZZ_FLOOR,
+    });
+    const run: FuzzRun = {
+      seed: 1,
+      runs: tally.ran - tally.runaway - tally.neverSettles,
+      runaway: tally.runaway,
+      runawayAfterStop: tally.afterStop,
+      neverSettles: tally.neverSettles,
+      v2: tally.onV2,
+    };
+    expect(checkFuzzRuns([run], true)).toEqual([]);
+    expect(describeNeverSettles([run])).toMatch(/seed 1: 1 of at most 3$/);
   });
 
   it("(c) only 2.0 live at the cap while 1.35 settled in the same time: the case fails, as a 2.0 bug, naming what kept it live", async () => {
