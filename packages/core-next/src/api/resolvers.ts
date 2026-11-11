@@ -5,7 +5,9 @@
  *   is dropped, unless the run in flight already satisfied it with its own
  *   write. Then the requirement is back, and the new dispatch supersedes
  *   the old run: it is canceled (its one outcome) and its later writes are
- *   dropped, so it cannot overwrite the new run's result.
+ *   dropped, so it cannot overwrite the new run's result. A batch run that has
+ *   not satisfied it never drops it: as 1.35 (whose dispatch asks only single runs), the batch is
+ *   detached from it and it is queued again.
  * - Exactly one outcome per run: complete, cancel or error, guarded by the
  *   run's `done_` mark. So a run canceled while it waits to retry reports
  *   the cancel and nothing else (GATE-1 quirk b: 1.35 reports the cancel,
@@ -129,8 +131,6 @@ export interface Run extends Writer {
   satisfied_: boolean;
   /** Superseded: a newer run owns the requirement, later writes drop. */
   dropped_: boolean;
-  /** Out of flight but not aborted (RFC-0003): it still reports its outcome. */
-  detached_: boolean;
   /** The attempt running, 0 while pending (inspect()'s status). */
   attempt_: number;
   /** Its one outcome has been reported. */
@@ -218,18 +218,23 @@ export interface Batcher {
 }
 
 export interface Resolvers {
-  /** `baseline`: the bound keys' values before this pass dispatched anything. */
+  /**
+   * `baseline`: the bound keys' values before this pass dispatched anything.
+   * `retrying`: a "retry" boundary re-dispatches it (quirk a), so a batch
+   * holding it started after its last raise and is its current run.
+   */
   resolve(
     req: RequirementWithId,
     baseline?: ReadonlyMap<string, unknown>,
+    retrying?: boolean,
   ): void;
   abort(requirementId: string): void;
   /** Take a run out of flight without aborting it (RFC-0003). */
-  detach(requirementId: string): void;
-  /** Detached runs still going. */
-  detached: ReadonlySet<Run>;
+  detach_(requirementId: string): void;
+  /** Detached runs still going: out of flight, not aborted, still reporting. */
+  detached_: ReadonlySet<Run>;
   /** Cancel every run in flight; returns the ids of those with no outcome yet. */
-  abortAll(): string[];
+  abortAll_(): string[];
   /** The run in flight for a requirement (a batch run has one row each). */
   inflight: ReadonlyMap<string, Run>;
   /** A batched requirement waits in a queue (see Batcher). */
@@ -688,7 +693,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       startedAt_: clock.now(),
       satisfied_: false,
       dropped_: false,
-      detached_: false,
       attempt_: 0,
       done_: false,
     };
@@ -727,14 +731,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
   return {
     inflight,
-    detached,
+    detached_: detached,
     queued_: (busy) => !!batcher?.queued_(busy),
-    resolve(req, baseline) {
+    resolve(req, baseline, retrying) {
       const current = inflight.get(req.id);
-      if (current) {
-        if (!current.satisfied_) {
-          return;
-        }
+      if (current?.satisfied_) {
         // The requirement came back while the run that satisfied it is
         // still going: a fresh run takes over, the old one's writes drop.
         // A batch that owns others goes on without it (1.35's
@@ -745,6 +746,22 @@ export function createResolvers(options: ResolversOptions): Resolvers {
           current.dropped_ = true;
         }
         part(current, req.id);
+      } else if (current) {
+        // A single run still going owns it, as does a batch that told its
+        // outcome (a "retry" boundary's pass: quirk a's requeue re-dispatches
+        // it once the batch is out of flight), or the batch that is that
+        // re-dispatch (settle() ran it before the requeue's pass): the
+        // dispatch is dropped.
+        if (!current.reqs_ || retrying || current.done_) {
+          return;
+        }
+        // A batch it was in before its last raise still runs (a bound one
+        // retracted while queued runs there anyway): 1.35's resolve() asks
+        // only single runs, so it is queued again and the batch goes on
+        // detached, its outcome still told, its writes still bound;
+        // settle() waits only for what stays attached (fuzz case 1967).
+        inflight.delete(req.id);
+        detached.add(current);
       }
       const resolverId = find(req.requirement);
       if (!resolverId) {
@@ -757,20 +774,18 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         return;
       }
       const def = defs[resolverId]!;
+      // The seam: the batch part queues it. Without the part (the system
+      // core) the requirement waits unmet.
       if (def.batch?.enabled) {
-        // The seam: the batch part queues it. Without the part (the system
-        // core) the requirement waits unmet.
         batcher?.add_(resolverId, def, req, baseline);
-
-        return;
+      } else {
+        start(def, resolverId, req, baseline);
       }
-      start(def, resolverId, req, baseline);
     },
-    detach(requirementId) {
+    detach_(requirementId) {
       const run = inflight.get(requirementId);
       if (run) {
         inflight.delete(requirementId);
-        run.detached_ = true;
         detached.add(run);
       }
     },
@@ -783,7 +798,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         batcher?.drop_([], requirementId);
       }
     },
-    abortAll() {
+    abortAll_() {
       const ids: string[] = [];
       const runs = [...inflight.values()];
       const end = (run: Run) => {
