@@ -877,6 +877,9 @@ export interface DivergenceEntry {
   group?: string;
   excuses?: unknown;
   bound?: unknown;
+  requires?: unknown;
+  by?: unknown;
+  afterOp?: unknown;
   reason: string;
   approvedBy: string;
   date: string;
@@ -892,7 +895,9 @@ const DIVERGENCE_REQUIRED = [
   "stream",
 ];
 const DIVERGENCE_OPTIONAL = [
+  "afterOp",
   "bound",
+  "by",
   "during",
   "ends",
   "engine",
@@ -900,6 +905,7 @@ const DIVERGENCE_OPTIONAL = [
   "group",
   "op",
   "path",
+  "requires",
   "step",
   "when",
 ];
@@ -1096,6 +1102,48 @@ export function checkDivergences(
           `${label} during must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")})`,
         );
       }
+    }
+    if (e.requires !== undefined) {
+      const r = e.requires as Record<string, unknown> | null;
+      if (e.scenario !== FUZZ_SCENARIO) {
+        fail(
+          `${label} has requires, which only a fuzz entry may have (scenario "${FUZZ_SCENARIO}"): it reads the case's other differences`,
+        );
+      }
+      if (
+        typeof r !== "object" ||
+        r === null ||
+        typeof r.stream !== "string" ||
+        typeof r.kind !== "string" ||
+        !["missing", "extra", "changed", "moved"].includes(r.op as string) ||
+        Object.keys(r).some(
+          (k) => !["stream", "kind", "op", "bound", "order"].includes(k),
+        ) ||
+        (r.order !== undefined && r.order !== "any") ||
+        (r.bound !== undefined &&
+          !Array.isArray((r.bound as { match?: unknown })?.match))
+      ) {
+        fail(
+          `${label} requires must be { stream, kind, op, bound? }: the difference the case must also hold, at or before the one covered`,
+        );
+      }
+    }
+    if (
+      e.afterOp !== undefined &&
+      (e.scenario !== FUZZ_SCENARIO ||
+        !FUZZ_STEP_OPS.includes(e.afterOp as string))
+    ) {
+      fail(
+        `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), on a fuzz entry only`,
+      );
+    }
+    if (
+      e.by !== undefined &&
+      (e.op !== "moved" || ![1, -1].includes(e.by as number))
+    ) {
+      fail(
+        `${label} has by, which only a moved entry may have, as 1 (one step later) or -1 (one step earlier)`,
+      );
     }
     if (e.group !== undefined) {
       if (e.scenario !== FUZZ_SCENARIO) {

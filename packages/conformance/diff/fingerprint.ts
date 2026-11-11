@@ -106,6 +106,8 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
   /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
+  /** A fuzz fact's key, own or namespaced: `f0`, `a::f1`. */
+  fact: (v) => typeof v === "string" && /^([a-z]::)?f\d+$/.test(v),
   /** The batched resolver's id (L7), own or namespaced: `rb`, `a::rb`. */
   batchResolver: (v) => typeof v === "string" && /^([a-z]::)?rb$/.test(v),
   /** A constraint that feeds the batched resolver: `b0`, `a::b1`. */

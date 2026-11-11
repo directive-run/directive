@@ -93,6 +93,11 @@ export interface Difference {
    * (`reference`; `candidate` holds the engine's).
    */
   op: "missing" | "extra" | "changed" | "moved";
+  /**
+   * For `moved` only: -1 when the engine's record came one step earlier
+   * (in step N - 1); absent when it came one step later, the default.
+   */
+  by?: -1;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**
