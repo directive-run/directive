@@ -12,7 +12,13 @@
  * history, trace) — plus a sequence of steps that also stop, start and
  * destroy the system mid-run, snapshot and restore, navigate history,
  * batch writes, write Dates twice, publish from the source, and start a
- * second system in the same engine instance.
+ * second system in the same engine instance. A case with history (L8) also
+ * draws, after everything else, the history steps of the L8 RFC's reach
+ * table (`HistoryStep`: back and forward by one to three steps, goTo,
+ * replay, an export and import round trip, changesets, pause and resume),
+ * `maxSnapshots`, `respectsAbort`, a module's `snapshotEvents` and an
+ * effect's `onNavigate: "skip"`, and records the history's state after each
+ * history step (`historyRecord`).
  *
  * Every feature carries the layer that builds it (the plan's ladder,
  * `FEATURE_LAYERS`); `specLayer()` is the highest one a case uses, so a v2
@@ -63,6 +69,12 @@ export interface FuzzEffect {
   cleanup: boolean;
   /** Throws when the first fact it reads equals this value. */
   throwsAt: number | null;
+  /**
+   * L8, history cases only: `onNavigate: "skip"`, so a navigation that
+   * restores a fact the effect reads does not run it again (the RFC's N6).
+   * Absent, the effect re-runs (1.35's default "rerun").
+   */
+  onNavigate?: "skip";
 }
 
 export interface FuzzModule {
@@ -73,6 +85,12 @@ export interface FuzzModule {
   constraints: FuzzConstraint[];
   effects: FuzzEffect[];
   source: { gated: boolean } | null;
+  /**
+   * L8, history cases only: the module's `history.snapshotEvents`, by event
+   * index, so only those events take a snapshot; a direct write always does
+   * (the RFC's T2). Absent, every event does.
+   */
+  snapshotEvents?: number[];
 }
 
 export type FuzzStep =
@@ -89,9 +107,51 @@ export type FuzzStep =
   | { op: "destroy" }
   | { op: "snapshot" }
   | { op: "restore" }
-  | { op: "back" }
-  | { op: "forward" }
+  | HistoryStep
   | { op: "twin" };
+
+/**
+ * The history steps (L8; the RFC's "The fuzz, designed in up front"). Each
+ * calls the 1.35 `HistoryAPI` the way the RFC's probes do, and is followed
+ * by a `history` record (`historyRecord`). `back` and `forward` without
+ * `steps` (a spec written before L8-pre) call `goBack()` and `goForward()`.
+ * `goTo` picks the snapshot at `position` (modulo the list's length) in the
+ * list each engine holds when the step runs, so the id is read on each
+ * engine. `roundtrip` exports the history and imports it into the same
+ * system. `begin` and `end` open and close a changeset.
+ */
+export type HistoryStep =
+  | { op: "back"; steps?: number }
+  | { op: "forward"; steps?: number }
+  | { op: "goTo"; position: number }
+  | { op: "replay" }
+  | { op: "roundtrip" }
+  | { op: "begin" }
+  | { op: "end" }
+  | { op: "pause" }
+  | { op: "resume" };
+
+/** The history step ops: each needs the history option, and each is L8. */
+export const HISTORY_OPS = [
+  "back",
+  "forward",
+  "goTo",
+  "replay",
+  "roundtrip",
+  "begin",
+  "end",
+  "pause",
+  "resume",
+] as const satisfies readonly HistoryStep["op"][];
+
+/** The history steps that restore a snapshot into the facts (`navigated`). */
+const NAVIGATIONS: ReadonlySet<string> = new Set([
+  "back",
+  "forward",
+  "goTo",
+  "replay",
+  "roundtrip",
+]);
 
 export type Boundary = "skip" | "retry" | "retry-later" | "disable" | "throw";
 
@@ -146,6 +206,23 @@ export interface FuzzSpec {
    * part of a seed's cases is drawn as before.
    */
   batch?: FuzzBatch | null;
+  /**
+   * L8, history cases only: the history option's `maxSnapshots`, drawn from
+   * 3, 5 and 20 so the ring buffer drops snapshots (the RFC's T4, N10).
+   * Absent (a spec written before L8-pre), 20.
+   */
+  maxSnapshots?: 3 | 5 | 20;
+  /**
+   * L8, history cases only (the RFC's rule 9): every resolver handler, the
+   * batched one too, stops after its wait when its signal was aborted, and
+   * writes nothing. Drawn true three times in four: with history on, a late
+   * write is a snapshot, so the engines could differ in snapshot count for
+   * a reason that has nothing to do with history. Absent or false, every
+   * handler ignores its abort and writes late, as before L8-pre: the only way
+   * the oracle tests the late-write rows (g), n and 2/352, so a case without
+   * history never draws it.
+   */
+  respectsAbort?: boolean;
 }
 
 /**
@@ -180,7 +257,11 @@ export const FEATURE_LAYERS = {
   twin: 6,
   /** A batched resolver (`resolvers.<id>.batch` is L7 in lib/layers.ts). */
   batch: 7,
-  /** The history option and the back and forward steps. */
+  /**
+   * The history option and its steps (`HISTORY_OPS`), and the options drawn
+   * only with it: `maxSnapshots`, `respectsAbort`, a module's
+   * `snapshotEvents` and an effect's `onNavigate: "skip"`.
+   */
   history: 8,
   /** The trace option. */
   trace: 9,
@@ -197,6 +278,13 @@ const STEP_FEATURES = {
   restore: "snapshots",
   back: "history",
   forward: "history",
+  goTo: "history",
+  replay: "history",
+  roundtrip: "history",
+  begin: "history",
+  end: "history",
+  pause: "history",
+  resume: "history",
   twin: "twin",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
@@ -397,40 +485,171 @@ export function specArbitrary(
     ceiling === undefined ? Number.POSITIVE_INFINITY : layerNumber(ceiling);
   const allows = (feature: Feature) => FEATURE_LAYERS[feature] <= top;
 
-  return fc.integer({ min: 1, max: allows("modules") ? 2 : 1 }).chain((count) =>
-    fc.record({
-      modules: fc.tuple(
-        ...Array.from({ length: count }, (_, i) =>
-          moduleArbitrary(i === 1, allows),
+  const drawn = fc
+    .integer({ min: 1, max: allows("modules") ? 2 : 1 })
+    .chain((count) =>
+      fc.record({
+        modules: fc.tuple(
+          ...Array.from({ length: count }, (_, i) =>
+            moduleArbitrary(i === 1, allows),
+          ),
+        ),
+        boundary: allows("boundary")
+          ? fc.constantFrom(
+              null,
+              "skip" as const,
+              "retry" as const,
+              "retry-later" as const,
+              "disable" as const,
+              "throw" as const,
+            )
+          : fc.constant<Boundary | null>(null),
+        history: allows("history") ? fc.boolean() : fc.constant(false),
+        trace: allows("trace") ? fc.boolean() : fc.constant(false),
+        steps: fc.array(stepArbitrary(count, allows), {
+          minLength: 1,
+          maxLength: 14,
+        }),
+        // Drawn last, so the draws above are the ones a seed made before L7. A
+        // third of the cases get one: each moves the case to L7, where v2
+        // does not run it until `current` is L7.
+        batch: allows("batch")
+          ? fc.oneof(
+              { weight: 2, arbitrary: fc.constant<FuzzBatch | null>(null) },
+              { weight: 1, arbitrary: batchArbitrary },
+            )
+          : fc.constant<FuzzBatch | null>(null),
+      }),
+    );
+
+  // Below L8 nothing is chained, so a case is drawn exactly as before
+  // L8-pre. At L8 a case with history draws its history additions after
+  // everything else (`historyDraws`), so the rest of it is drawn as before
+  // too, and a case without history is the same case.
+  return allows("history")
+    ? drawn.chain((spec) =>
+        spec.history ? historyDraws(spec) : fc.constant(spec),
+      )
+    : drawn;
+}
+
+const navSteps = fc.integer({ min: 1, max: 3 });
+
+const historyStep: fc.Arbitrary<HistoryStep> = fc.oneof(
+  {
+    weight: 3,
+    arbitrary: fc.record({
+      op: fc.constantFrom("back" as const, "forward" as const),
+      steps: navSteps,
+    }),
+  },
+  {
+    weight: 2,
+    arbitrary: fc.record({
+      op: fc.constant("goTo" as const),
+      position: fc.nat({ max: 5 }),
+    }),
+  },
+  ...(["replay", "roundtrip", "begin", "end", "pause", "resume"] as const).map(
+    (op) => ({ weight: 1, arbitrary: fc.record({ op: fc.constant(op) }) }),
+  ),
+) as fc.Arbitrary<HistoryStep>;
+
+/** A minority draw: `rare` once in `1 + common` draws. */
+const minority = <T>(common: T, rare: T, weight = 2) =>
+  fc.oneof(
+    { weight, arbitrary: fc.constant(common) },
+    { weight: 1, arbitrary: fc.constant(rare) },
+  );
+
+/**
+ * What a case with history adds (L8-pre; the RFC's reach table): `steps`
+ * for each `back` and `forward` it drew, up to four more history steps put
+ * in among its steps, `maxSnapshots`, `respectsAbort`, a module's
+ * `snapshotEvents` and an effect's `onNavigate: "skip"`.
+ */
+function historyDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
+  const navs = spec.steps.filter(
+    (s) => s.op === "back" || s.op === "forward",
+  ).length;
+
+  return fc
+    .record({
+      navSteps: fc.array(navSteps, { minLength: navs, maxLength: navs }),
+      inserts: fc.array(fc.record({ at: fc.nat(), step: historyStep }), {
+        maxLength: 4,
+      }),
+      maxSnapshots: fc.constantFrom(3 as const, 5 as const, 20 as const),
+      respectsAbort: minority(true, false, 3),
+      snapshotEvents: fc.tuple(
+        ...spec.modules.map((m) =>
+          fc.oneof(
+            { weight: 2, arbitrary: fc.constant<number[] | null>(null) },
+            {
+              weight: 1,
+              arbitrary: fc.uniqueArray(fc.nat({ max: m.events.length - 1 }), {
+                maxLength: m.events.length,
+              }),
+            },
+          ),
         ),
       ),
-      boundary: allows("boundary")
-        ? fc.constantFrom(
-            null,
-            "skip" as const,
-            "retry" as const,
-            "retry-later" as const,
-            "disable" as const,
-            "throw" as const,
-          )
-        : fc.constant<Boundary | null>(null),
-      history: allows("history") ? fc.boolean() : fc.constant(false),
-      trace: allows("trace") ? fc.boolean() : fc.constant(false),
-      steps: fc.array(stepArbitrary(count, allows), {
-        minLength: 1,
-        maxLength: 14,
-      }),
-      // Drawn last, so the draws above are the ones a seed made before L7. A
-      // third of the cases get one: each moves the case to L7, where v2
-      // does not run it until `current` is L7.
-      batch: allows("batch")
-        ? fc.oneof(
-            { weight: 2, arbitrary: fc.constant<FuzzBatch | null>(null) },
-            { weight: 1, arbitrary: batchArbitrary },
-          )
-        : fc.constant<FuzzBatch | null>(null),
-    }),
-  );
+      skips: fc.tuple(
+        ...spec.modules.map((m) =>
+          fc.tuple(...m.effects.map(() => minority(false, true))),
+        ),
+      ),
+    })
+    .map((d) => {
+      let nav = 0;
+      const steps: FuzzStep[] = spec.steps.map((s) =>
+        s.op === "back" || s.op === "forward"
+          ? { op: s.op, steps: d.navSteps[nav++] as number }
+          : s,
+      );
+      for (const { at, step } of d.inserts) {
+        steps.splice(at % (steps.length + 1), 0, step);
+      }
+
+      return {
+        ...spec,
+        modules: spec.modules.map((m, i) => {
+          const events = d.snapshotEvents[i] ?? null;
+
+          return {
+            ...m,
+            effects: m.effects.map((e, j) =>
+              d.skips[i]?.[j] ? { ...e, onNavigate: "skip" as const } : e,
+            ),
+            ...(events === null ? {} : { snapshotEvents: events }),
+          };
+        }),
+        steps,
+        maxSnapshots: d.maxSnapshots,
+        respectsAbort: d.respectsAbort,
+      };
+    });
+}
+
+/**
+ * A drawn spec with no history: the option, its steps and the options drawn
+ * only with it taken out, so what is left is the case as drawn before L8-pre
+ * (diff/self/tamper.test.ts, the RFC's U16).
+ */
+export function withoutHistory(spec: FuzzSpec): FuzzSpec {
+  const { maxSnapshots: _max, respectsAbort: _respects, ...rest } = spec;
+
+  return {
+    ...rest,
+    history: false,
+    modules: spec.modules.map(({ snapshotEvents: _events, ...m }) => ({
+      ...m,
+      effects: m.effects.map(({ onNavigate: _skip, ...e }) => e),
+    })),
+    steps: spec.steps.filter(
+      (s) => !(HISTORY_OPS as readonly string[]).includes(s.op),
+    ),
+  };
 }
 
 const batchArbitrary: fc.Arbitrary<FuzzBatch> = fc.record({
@@ -481,6 +700,12 @@ export function specLayer(spec: FuzzSpec): string {
     if (m.source) {
       use("sources");
     }
+    if (
+      m.snapshotEvents !== undefined ||
+      m.effects.some((e) => e.onNavigate !== undefined)
+    ) {
+      use("history");
+    }
   }
   if (spec.boundary) {
     use("boundary");
@@ -488,7 +713,11 @@ export function specLayer(spec: FuzzSpec): string {
   if (spec.trace) {
     use("trace");
   }
-  if (spec.history) {
+  if (
+    spec.history ||
+    spec.maxSnapshots !== undefined ||
+    spec.respectsAbort !== undefined
+  ) {
     use("history");
   }
   for (const s of spec.steps) {
@@ -524,6 +753,7 @@ function moduleDef(
   index: number,
   schemas: Record<string, unknown>[],
   batch: FuzzBatch | null = null,
+  respectsAbort = false,
 ) {
   const id = NAMES[index] as string;
   const cross = index === 1;
@@ -615,6 +845,11 @@ function moduleDef(
         if (c.delay > 0) {
           await ownDelay(ledgerOf(handles), c.delay);
         }
+        // A handler that respects its abort (`respectsAbort`, the RFC's
+        // rule 9) stops here, and writes nothing.
+        if (respectsAbort && context.signal?.aborted === true) {
+          return;
+        }
         if (n <= c.fails) {
           throw new Error(`${id}.r${i} attempt ${n}`);
         }
@@ -629,7 +864,7 @@ function moduleDef(
     };
   });
   if (batch) {
-    batchedResolver(batch, id, m.facts, {
+    batchedResolver(batch, id, m.facts, respectsAbort, {
       ledger: ledgerOf(handles),
       t,
       external,
@@ -642,6 +877,7 @@ function moduleDef(
   m.effects.forEach((e, i) => {
     effects[`x${i}`] = {
       ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
+      ...(e.onNavigate === undefined ? {} : { onNavigate: e.onNavigate }),
       run: (fs: any) => {
         const seen = e.reads.map((k) => own(fs)[f(k)]);
         // An effect's run and its cleanup are recorded under their own kind
@@ -684,6 +920,9 @@ function moduleDef(
   return createModule(id, {
     schema,
     ...(cross ? { crossModuleDeps: { a: schemas[0] } } : {}),
+    ...(m.snapshotEvents === undefined
+      ? {}
+      : { history: { snapshotEvents: m.snapshotEvents.map((e) => `e${e}`) } }),
     init: (fs: any) => {
       for (let i = 0; i < m.facts; i++) {
         fs[f(i)] = 0;
@@ -887,6 +1126,7 @@ function batchedResolver(
   b: FuzzBatch,
   id: string,
   factCount: number,
+  respectsAbort: boolean,
   out: {
     ledger: BatchLedger;
     t: any;
@@ -945,6 +1185,11 @@ function batchedResolver(
       );
       if (b.delay > 0) {
         await ownDelay(out.ledger, b.delay);
+      }
+      // A handler that respects its abort (`respectsAbort`, the RFC's
+      // rule 9) stops here, and writes nothing.
+      if (respectsAbort && context.signal?.aborted === true) {
+        return n;
       }
       if (throws && n <= b.fails) {
         throw new Error(`${tag} attempt ${n}`);
@@ -1208,6 +1453,39 @@ const TRIGGERS = {
    * engine's window timer does.
    */
   batchMaxSize: (spec) => spec.batch != null && spec.batch.maxSize !== null,
+  /**
+   * The case has history on and a step that restores a snapshot into the
+   * facts (L8): `back`, `forward`, `goTo`, `replay`, or `roundtrip`, whose
+   * import restores the current snapshot.
+   */
+  navigated: (spec) =>
+    spec.history && spec.steps.some((s) => NAVIGATIONS.has(s.op)),
+  /**
+   * A navigation can run while work is in flight (L8; U14 pins 1.35's
+   * shapes by hand, the RFC's rule 3): the case has a resolver, and some
+   * navigation is not preceded by a settle step. Every case starts its
+   * system first, and its init facts can raise a requirement at once, so a
+   * navigation before any settle step counts. A history step neither starts
+   * work nor waits for it, so it does not end the window; a settle step does.
+   */
+  navigatedBusy: (spec) => {
+    if (!spec.history || !hasConstraint(spec)) {
+      return false;
+    }
+    let busy = true;
+    for (const s of spec.steps) {
+      if (NAVIGATIONS.has(s.op) && busy) {
+        return true;
+      }
+      if (s.op === "settle") {
+        busy = false;
+      } else if (!(HISTORY_OPS as readonly string[]).includes(s.op)) {
+        busy = true;
+      }
+    }
+
+    return false;
+  },
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -1281,7 +1559,9 @@ function options(spec: FuzzSpec) {
             retryLater: { delayMs: 50, maxRetries: 2 },
           },
         }),
-    ...(spec.history ? { history: { maxSnapshots: 20 } } : {}),
+    ...(spec.history
+      ? { history: { maxSnapshots: spec.maxSnapshots ?? 20 } }
+      : {}),
     ...(spec.trace ? { trace: true } : {}),
   };
 }
@@ -1290,13 +1570,14 @@ function build(spec: FuzzSpec) {
   return (ctx: BuildContext) => {
     const schemas: Record<string, unknown>[] = [];
     const batch = spec.batch ?? null;
+    const respects = spec.respectsAbort === true;
     const defs = spec.modules.map((m, i) =>
-      moduleDef(ctx, m, i, schemas, i === 0 ? batch : null),
+      moduleDef(ctx, m, i, schemas, i === 0 ? batch : null, respects),
     );
     ctx.handles.rebuild = () => {
       const again: Record<string, unknown>[] = [];
       const more = spec.modules.map((m, i) =>
-        moduleDef(ctx, m, i, again, i === 0 ? batch : null),
+        moduleDef(ctx, m, i, again, i === 0 ? batch : null, respects),
       );
 
       return more.length === 1
@@ -1318,7 +1599,23 @@ function steps(spec: FuzzSpec): Step[] {
     multi
       ? system.facts[NAMES[i % spec.modules.length] as string]
       : system.facts;
-  const out: Step[] = [{ op: "start" }];
+  // A case with history counts its `onHistoryChange` calls from before the
+  // start, for the `history` record (`historyRecord`).
+  const out: Step[] = spec.history
+    ? [
+        {
+          op: "run",
+          label: "listen for history changes",
+          fn: (system, ctx) => {
+            ctx.handles.historyChanges = 0;
+            system.onHistoryChange?.(() => {
+              ctx.handles.historyChanges += 1;
+            });
+          },
+        },
+        { op: "start" },
+      ]
+    : [{ op: "start" }];
   for (const s of spec.steps) {
     const label = JSON.stringify(s);
     switch (s.op) {
@@ -1414,14 +1711,20 @@ function steps(spec: FuzzSpec): Step[] {
         break;
       case "back":
       case "forward":
+      case "goTo":
+      case "replay":
+      case "roundtrip":
+      case "begin":
+      case "end":
+      case "pause":
+      case "resume":
         out.push({
           op: "run",
           label,
-          fn: (system) => {
+          fn: (system, ctx) => {
             if (system.history) {
-              s.op === "back"
-                ? system.history.goBack()
-                : system.history.goForward();
+              historyStepRun(system.history, s);
+              historyRecord(system.history, ctx);
             }
           },
         });
@@ -1456,6 +1759,69 @@ function steps(spec: FuzzSpec): Step[] {
   out.push({ op: "settle" });
 
   return out;
+}
+
+/** One history step, on the 1.35 `HistoryAPI` as the RFC's probes call it. */
+function historyStepRun(history: any, s: HistoryStep): void {
+  switch (s.op) {
+    case "back":
+      s.steps === undefined ? history.goBack() : history.goBack(s.steps);
+      break;
+    case "forward":
+      s.steps === undefined ? history.goForward() : history.goForward(s.steps);
+      break;
+    case "goTo": {
+      const list = history.snapshots;
+      if (list.length > 0) {
+        history.goTo(list[s.position % list.length].id);
+      }
+      break;
+    }
+    case "replay":
+      history.replay();
+      break;
+    case "roundtrip":
+      history.import(history.export());
+      break;
+    case "begin":
+      history.beginChangeset("fuzz");
+      break;
+    case "end":
+      history.endChangeset();
+      break;
+    case "pause":
+      history.pause();
+      break;
+    case "resume":
+      history.resume();
+      break;
+  }
+}
+
+/**
+ * The `history` record after each history step (the RFC's reach table): the
+ * index, the length, the snapshot ids, `isPaused`, and how many times the
+ * case's `onHistoryChange` listener has been called. Snapshot timestamps
+ * come from `Date.now`, and the two engines' fake clocks can end a wait at
+ * different times (L7 run 5, seed 4), so they are compared by order, not
+ * value (rule 4): `ordered` says each is at or after the one before it.
+ */
+function historyRecord(history: any, ctx: BuildContext): void {
+  const list = history.snapshots as Array<{ id: number; timestamp: number }>;
+  ctx.external([
+    "history",
+    {
+      index: history.currentIndex,
+      length: list.length,
+      ids: list.map((snapshot) => snapshot.id),
+      paused: history.isPaused,
+      changes: ctx.handles.historyChanges ?? 0,
+      ordered: list.every(
+        (snapshot, i) =>
+          i === 0 || snapshot.timestamp >= (list[i - 1]?.timestamp ?? 0),
+      ),
+    },
+  ]);
 }
 
 export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {

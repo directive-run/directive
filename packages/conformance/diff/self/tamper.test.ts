@@ -16,7 +16,7 @@ import {
   engines,
   v2Status,
 } from "../engines.js";
-import { type FuzzSpec, specArbitrary, toScenario } from "../fuzz/model.js";
+import { specArbitrary, toScenario, withoutHistory } from "../fuzz/model.js";
 import { createRecorder } from "../record.js";
 import {
   type BuildContext,
@@ -525,13 +525,6 @@ describe("engines", () => {
   });
 });
 
-/** A drawn spec with no history: the option off and no back or forward step. */
-const withoutHistory = (spec: FuzzSpec): FuzzSpec => ({
-  ...spec,
-  history: false,
-  steps: spec.steps.filter((s) => s.op !== "back" && s.op !== "forward"),
-});
-
 describe("the fuzzer catches injected faults", () => {
   it("drops one requirement.created observe event", async () => {
     const fault = faulty({
@@ -568,6 +561,92 @@ describe("the fuzzer catches injected faults", () => {
     ).rejects.toThrow(/Property failed/);
     expect(caught).toMatch(/engines differ/);
     expect(caught).toMatch(/requirement\.created/);
+  });
+});
+
+/**
+ * The L8 RFC's rule 6: a history fault must be caught. Each tamper is
+ * applied to 1.35 itself (the reference, loaded again as the one engine under
+ * test), on cases drawn at L8 with history on, so the first difference can
+ * only be the tamper's.
+ */
+describe("the fuzzer catches injected history faults (L8-pre, rule 6)", () => {
+  const historyCases = specArbitrary({ ceiling: "L8" }).filter(
+    (s) => s.history,
+  );
+
+  async function caughtOnV1(fault: Fault): Promise<string> {
+    const [v1] = engines() as [EngineHandle];
+    let caught = "";
+    await expect(
+      fc.assert(
+        fc.asyncProperty(historyCases, async (spec) => {
+          const result = await runScenario(toScenario(spec), {
+            candidates: [faulty(fault)(v1)],
+            divergences: [],
+          });
+          if (!result.ok) {
+            caught = result.report;
+            throw new Error(result.report);
+          }
+        }),
+        { seed: 0x5eed, numRuns: 200 },
+      ),
+    ).rejects.toThrow(/Property failed/);
+    expect(caught).toMatch(/engines differ/);
+
+    return caught;
+  }
+
+  it("control: 1.35 against itself passes on the same cases", async () => {
+    const [v1] = engines() as [EngineHandle];
+    const specs = fc.sample(historyCases, { seed: 0x5eed, numRuns: 40 });
+    for (const spec of specs) {
+      const result = await runScenario(toScenario(spec), {
+        candidates: [v1],
+        divergences: [],
+      });
+      if (!result.runaway && !result.neverSettles) {
+        expect(result.report).toBe("");
+      }
+    }
+  });
+
+  it("drops one onSnapshot", async () => {
+    // The second snapshot's hook: the first is the start's, in every case.
+    let seen = 0;
+    const caught = await caughtOnV1({
+      onLoad: () => {
+        seen = 0;
+      },
+      config: wrapRecorder((key, fn) => (...args) => {
+        if (key === "onSnapshot" && ++seen === 2) {
+          return;
+        }
+        fn(...args);
+      }),
+    });
+
+    expect(caught).toMatch(/onSnapshot/);
+  });
+
+  it("sends a goBack one step too far", async () => {
+    const caught = await caughtOnV1({
+      system: (system) =>
+        system.history
+          ? {
+              history: new Proxy(system.history, {
+                get: (target, prop) =>
+                  prop === "goBack"
+                    ? (steps = 1) => target.goBack(steps + 1)
+                    : Reflect.get(target, prop),
+              }),
+            }
+          : {},
+    });
+
+    // Caught at a back step (its label, `{"op":"back",...}`, in the report).
+    expect(caught).toMatch(/op\W+back/);
   });
 });
 
