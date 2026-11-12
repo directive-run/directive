@@ -9675,6 +9675,132 @@
         }
       }
     },
+    "tests/core/l8-history-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "pin": true,
+      "tests": {
+        "a Date, a Map and a Set in production (U1, U2) > come back as themselves through goBack when the whole record clones": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "a Date, a Map and a Set in production (U1, U2) > leave an export as an ISO string and two empty objects, and import writes those": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a Date, a Map and a Set in production (U1, U2) > a fact mixing a Date with a function falls to JSON: its Date is a string, while a Date in a fact that clones stays a Date": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "a stored snapshot is the same object the caller holds, in production (U3) > a value changed through the snapshots list is what the next goTo restores": {
+          "layer": "L8",
+          "by": ["member .goTo", "member .history", "option history"]
+        },
+        "a stored snapshot is the same object the caller holds, in production (U3) > a nested value edited in place on a restored fact edits the stored snapshot too": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "redactSnapshot and a navigation, in production (U11) > a navigation writes the redacted value into the live fact": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        }
+      }
+    },
+    "tests/core/l8-history-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "pin": true,
+      "tests": {
+        "export and import of a Date, a Map and a Set (U1) > export writes a Date as an ISO string and a Map and a Set as {}": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "export and import of a Date, a Map and a Set (U1) > import writes that string and those empty objects into the facts": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a fact mixing a Date with a function is copied through JSON: the Date comes back as a string and the function is gone": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a class instance comes back as a plain object when the whole record clones": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a class instance comes back as a plain object in the per-fact tier and in the JSON tier": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a stored snapshot is the same object the caller holds (U3) > a value changed through the snapshots list is what the next goTo restores": {
+          "layer": "L8",
+          "by": ["member .goTo", "member .history", "option history"]
+        },
+        "a stored snapshot is the same object the caller holds (U3) > a nested value edited in place on a restored fact edits the stored snapshot too": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "snapshot ids after an import (U6) > repeat when the system's counter is behind the imported ids, and goTo finds the first": {
+          "layer": "L8",
+          "by": ["member .goTo", "member .history", "option history"]
+        },
+        "snapshot ids after an import (U6) > do not repeat when the system is already past the imported ids": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a changeset and goBack(steps) (U8) > (a) goBack(2) from inside a changeset lands on its start: the second step is dropped": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a changeset and goBack(steps) (U8) > (b) goBack(2) from outside, into a changeset, stops inside it": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) jumps to the start of an earlier changeset whose end is within steps": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) moves steps snapshots when no earlier changeset ends within them": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an import with a currentIndex outside the list (U9) > is accepted, changes no fact, and goBack from it restores nothing": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "going back over a fact the snapshot did not hold (U10) > leaves a fact set after the snapshot at its current value": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "going back over a fact the snapshot did not hold (U10) > goForward does not delete a fact again: delete n, goBack gives 1, goForward is still 1": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "redactSnapshot and a navigation (U11) > a navigation writes the redacted value into the live fact": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "the members of system.history (U12) > carries takeSnapshot, restore, refreshLatestSnapshot, isEnabled and isRestoring": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "the members of system.history (U12) > takeSnapshot takes one snapshot now, with the trigger it is given": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "the members of system.history (U12) > is null when history is not asked for": {
+          "layer": "L8",
+          "by": ["member .history"]
+        },
+        "pause() inside a changeset (U18) > records no range when the only write was paused, so goBack moves one snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        }
+      }
+    },
     "tests/core/l8-system-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L8",
@@ -14564,11 +14690,11 @@
         },
         "Config Forwarding > history config forwarded (boolean)": {
           "layer": "L8",
-          "by": ["member .history", "option history"]
+          "by": ["member .goBack", "member .history", "option history"]
         },
         "Config Forwarding > history config forwarded (object)": {
           "layer": "L8",
-          "by": ["member .history", "option history"]
+          "by": ["member .goBack", "member .history", "option history"]
         },
         "Config Forwarding > trace config forwarded": {
           "layer": "L9",

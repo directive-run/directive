@@ -146,6 +146,38 @@ must be filled before that layer's gate.
   requirement away from the new batch". Filled at L7-pre, with the L7 RFC's
   U1 to U16 and the fuzz model's batched resolver (`diff/fuzz/model.ts`,
   placed at L7).
+- **L8 history.** `utils/history.test.ts` is internals (v2 skips it): its 39
+  cases drive `createHistoryManager` and `createDisabledHistory` directly,
+  and all 39 sit at L8. Each now has a black-box counterpart at L8, or is listed
+  as unfilled below (files in `packages/core/src/core/__tests__/` unless
+  named `diff/`). Surface and disabled forms ("reports isEnabled", "starts
+  with empty snapshots", "takeSnapshot returns noop when disabled" and the
+  two `createDisabledHistory` cases) by `l8-history-pins-oracle` U12 (the
+  members, a manual `takeSnapshot`, `history` null when off), the
+  `system.test` "history config forwarded" cases (U15) and
+  `l8-system-oracle`. Snapshots ("takeSnapshot records", "increments id",
+  "calls onSnapshot", "returns noop when paused") by
+  `diff/scenarios/l8-history-pins.test.ts` U13 (the first snapshot, with
+  its id and label in `onSnapshot`) and "history pause and resume skip
+  snapshots while paused". Copies ("deep-clones facts") by
+  `history-clone-integrity` and U2 and U3. The buffer and redo ("enforces
+  maxSnapshots", "truncates future snapshots") by "history goTo a snapshot
+  id, then replay" (`maxSnapshots: 5`), U4's next write and the U7 and U14
+  scenarios. Navigation ("restore sets facts", "goBack", "goForward",
+  "goTo", "replay", their no-op cases) by the five existing L8 scenarios,
+  `effect-navigation-rerun`, `navigation-side-effects` and U8 to U10.
+  Export and import ("export produces valid JSON", "import restores") by
+  "history: export, import and changesets", U1, U6 and U9. Changesets (the
+  three changeset cases) by the same scenario, U7, U8 and U18. Pause and
+  resume by U4 and U18. `redactSnapshot` ("applies the redactor to every
+  snapshot", "default stores facts verbatim") by U11, both files. **Unfilled,
+  for L8a before its gate:** "restore rejects prototype pollution",
+  "import rejects invalid data" and "import noop when disabled" (the
+  "Failed to import history data" error and its `console.error`),
+  "goTo warns on invalid snapshot id" (H16), "isRestoring is true during
+  restore", and the two `redactSnapshot` cases for a throwing redactor and
+  for an export that holds the redacted form. Filled so far at L8-pre, with
+  the L8 RFC's U1 to U18; the fuzz additions (B1) are L8-pre-c.
 
 ### `sources.test.ts`: the 68 L5 cases (L5-pre)
 
