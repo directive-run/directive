@@ -439,6 +439,27 @@ describe("L7 follow-ups", () => {
     expect(result.unexplained).toEqual([]);
     expect(result.ok).toBe(true);
     expect(result.used).toContain("l7-fuzz-av-external-start-missing");
+    // 2.0's call of the batched resolver is not only later than 1.35's (step
+    // 6): it starts in step 9, where its window timer flushes. A call that is
+    // dropped, or delayed to a later step, fails here, not by the entry.
+    let at = -1;
+    const calls: number[] = [];
+    for (const rec of (result.engineTraces?.v2 ?? []) as {
+      k: string;
+      i?: number;
+      data?: unknown[];
+    }[]) {
+      if (rec.k === "step") {
+        at = rec.i as number;
+      } else if (
+        rec.k === "external" &&
+        rec.data?.[0] === "start" &&
+        rec.data[1] === "a.rb"
+      ) {
+        calls.push(at);
+      }
+    }
+    expect(calls).toEqual([9]);
     const div = entry("l7-fuzz-av-external-start-missing");
     const ops = ["start", "set", "set", "advance"];
     const steps = new Map(ops.map((op, i) => [i, op] as [number, string]));
