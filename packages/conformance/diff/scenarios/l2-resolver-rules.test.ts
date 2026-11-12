@@ -5,7 +5,7 @@
  * disablement, DirectiveError fields at the boundary, crossModuleDeps.
  */
 
-import { type BuildContext, scenario, suite } from "../scenario.js";
+import { type BuildContext, type Step, scenario, suite } from "../scenario.js";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -81,7 +81,7 @@ function letGoLoader(ctx: BuildContext) {
 }
 
 /** Start it, let it go (retract go), then `end` and let it finish. */
-function letGoSteps(end: "stop" | "destroy") {
+function letGoSteps(end: "stop" | "destroy"): Step[] {
   return [
     { op: "start" },
     { op: "set", key: "go", value: true },
@@ -91,7 +91,7 @@ function letGoSteps(end: "stop" | "destroy") {
     { op: end },
     { op: "advance", ms: 100 },
     { op: "checkpoint", label: "end" },
-  ] as const;
+  ];
 }
 
 /** The backoff delay before jitter, clamped to the default maxDelay. */

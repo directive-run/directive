@@ -54,7 +54,7 @@
     "diff/scenarios/l12-plugins.test.ts": "d7881b4c6642361f59865bcc137634a8c3be2d3a0862d7ef7aaaf5dbd8231887",
     "diff/scenarios/l13-surface.test.ts": "7efacda461145c1f512f260b98dbccdffbf3a81c35d28c47ba890bab2d13796c",
     "diff/scenarios/l2-constraints-resolvers.test.ts": "45402d44d286c7a0d6112c238c7daf977871b50431493809a1b28aa33a792a33",
-    "diff/scenarios/l2-resolver-rules.test.ts": "48df38fce66e7df443377e0a739256ea9cca94ab6c40fc86767edeb423ed7089",
+    "diff/scenarios/l2-resolver-rules.test.ts": "25fea2d873b01f349cf324dd9eeb2a0322d4078b38455ce3af186bb7f92870e1",
     "diff/scenarios/l3-lifecycle-error-boundary.test.ts": "0e98136c0c8bb13b4e4772df47711138ac7c26ada01be0f5fafddaea2c7d4754",
     "diff/scenarios/l3-lifecycle-plugins.test.ts": "6dae234762c446e6edf965b83246e4cebdae4d413203ffbcb1a66561fcc8d590",
     "diff/scenarios/l3-lifecycle-quirks.test.ts": "41839ce8f749c5e7e301afaea8b732ff9e0fe5869240e6d5d5ce5feaf9f934cc",
