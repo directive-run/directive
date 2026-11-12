@@ -198,18 +198,16 @@ export const withBatch: SystemPart = (context) => {
       context.settled();
     };
     (async () => {
-      let ok: unknown;
       try {
         await host.execute_(def, run, baseline, call);
-        ok = 1;
       } finally {
         host.leave_(run);
         ending++;
-        // 1.35 asks for the pass only when the batch resolves (executeBatch's
-        // `.then`), one tick after it ends; a rethrow (boundary "throw")
-        // asks for none.
-        ok && context.schedule();
       }
+      // 1.35 asks for the pass only when the batch resolves (executeBatch's
+      // `.then`), one tick after it ends; a rethrow (boundary "throw") asks
+      // for none.
+      context.schedule();
     })().then(end, (error) => {
       end();
       throw error;

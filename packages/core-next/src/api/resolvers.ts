@@ -597,7 +597,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
      * signal does; an attempt its timeout aborted keeps that reason. One
      * listener for the run, so they do not grow with the attempts.
      */
-    const children: AbortController[] = [];
+    let children: AbortController[] = [];
     signal.addEventListener(
       "abort",
       () => {
@@ -689,6 +689,11 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         }
       }
     }
+    // A failed batch has ended: its calls' signals are let go before it
+    // tells its error, so a cancel from a hook, or from the pass one asks
+    // for, aborts none of them (1.35's executeBatch releases it first). It
+    // stays in flight until the batch's end, so a dispatch is still dropped.
+    run.reqs_ && (children = []);
     report(run, last);
   }
 
