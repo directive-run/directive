@@ -749,11 +749,11 @@ describe("the committed fuzz entries excuse only their quirk's records", () => {
       ],
     ];
     // The write to f0 of 0 makes f0 >= 1 false: the run retracts itself.
-    expect(caseOf(0, 0)).toContain("ownWriteRetracts");
+    expect(caseOf(0, 0)).toContain("writeRetracts");
     // A write to another fact, or of a value that keeps the condition true,
     // cannot retract its own constraint.
-    expect(caseOf(1, 0)).not.toContain("ownWriteRetracts");
-    expect(caseOf(0, 1)).not.toContain("ownWriteRetracts");
+    expect(caseOf(1, 0)).not.toContain("writeRetracts");
+    expect(caseOf(0, 1)).not.toContain("writeRetracts");
     for (const [id, cancel] of records) {
       const kind = cancel.k === "hook" ? cancel.hook : "requirement.canceled";
       expect(left([cancel], [], id, caseOf(0, 0)), id).toEqual([]);

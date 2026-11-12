@@ -2150,5 +2150,137 @@
         "value": 4
       }
     }
+  },
+  {
+    "group": "quirk-t",
+    "why": "Forced-L8 fuzz seed 24301 case 49 (shrunk; its back step, a no-op with history off, dropped): row t's third path through one more constraint. b::c0's write of 3 to b.f0 activates b::c1, whose write of -1 to b.f1 retracts b::c0 while its completed run is still in flight; 1.35 also reports onResolverCancel, onRequirementCanceled and requirement.canceled for it (trigger writeRetracts, which the old ownWriteRetracts lacked).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [],
+          "events": [],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": 2,
+              "priority": 2,
+              "writes": 0,
+              "value": 3,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": 0,
+              "priority": 3,
+              "writes": 1,
+              "value": -1,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 0
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 3,
+          "value": 5
+        }
+      ],
+      "batch": null
+    }
+  },
+  {
+    "group": "row-as",
+    "why": "Forced-L8 fuzz seed 8 case 76 (shrunk): row (as), the reconcile pass a batch call's last write asks for runs inside the settle step on 2.0, whose settle() waits for it, and in the next step on 1.35 (its records moved by -1).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 1,
+              "delay": 0,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 0
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1700726008,
+          "value": 5
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 1,
+        "retry": 2,
+        "timeout": null,
+        "writes": 0,
+        "value": 3
+      }
+    }
   }
 ]

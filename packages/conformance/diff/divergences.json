@@ -11367,7 +11367,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11394,9 +11394,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-cand-t-fuzz-hook-onRequirementCanceled-missing",
@@ -11406,7 +11406,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11430,9 +11430,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-cand-t-fuzz-observe-requirement-canceled-missing",
@@ -11442,7 +11442,7 @@
     "engine": "v2",
     "op": "missing",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11456,9 +11456,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-cand-t-fuzz-hook-onResolverCancel-changed",
@@ -11469,7 +11469,7 @@
     "op": "changed",
     "path": "args",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11510,9 +11510,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onResolverCancel call where the comparison pairs it with another run's cancel on 2.0 (changed in args). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onResolverCancel call where the comparison pairs it with another run's cancel on 2.0 (changed in args). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-cand-t-fuzz-hook-onRequirementCanceled-changed",
@@ -11523,7 +11523,7 @@
     "op": "changed",
     "path": "args[0]",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11555,9 +11555,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `ownWriteRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onRequirementCanceled call where the comparison pairs it with another run's on 2.0 (changed in args[0]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers 1.35's extra onRequirementCanceled call where the comparison pairs it with another run's on 2.0 (changed in args[0]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-cand-t-fuzz-observe-requirement-canceled-changed",
@@ -11568,7 +11568,7 @@
     "op": "changed",
     "path": "event.id",
     "group": "quirk-t",
-    "when": ["ownWriteRetracts"],
+    "when": ["writeRetracts"],
     "bound": {
       "match": [
         {
@@ -11582,9 +11582,9 @@
         }
       ]
     },
-    "reason": "Row t, its third path (as the other quirk-t fuzz entries): a reconcile pass retracts a run after the run reported complete but before it left flight. 1.35 then also reports the requirement.canceled observe event for it; 2.0 reports the completion only. This covers 1.35's extra requirement.canceled event where the comparison pairs it with another run's on 2.0 (changed in event.id), as l3-cand-t-fuzz-hook-onRequirementCanceled-changed does for the hook. Found by deep fuzz seed 24301 at L5 (latent at L4). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Row t, its third path (as the other quirk-t fuzz entries): a reconcile pass retracts a run after the run reported complete but before it left flight. 1.35 then also reports the requirement.canceled observe event for it; 2.0 reports the completion only. This covers 1.35's extra requirement.canceled event where the comparison pairs it with another run's on 2.0 (changed in event.id), as l3-cand-t-fuzz-hook-onRequirementCanceled-changed does for the hook. Found by deep fuzz seed 24301 at L5 (latent at L4). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-z-fuzz-timers-teardown-changed",
@@ -32111,6 +32111,420 @@
       ]
     },
     "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). With history on (L8; the L8 RFC's rule 5), the batch's write takes a snapshot in the reconcile pass after it: inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved. The shared wait aligns the fake clocks, not that pass. This covers the same `onSnapshot` call one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record), a snapshot of fuzz facts with 1.35's pass label (`$like` `snapshot`), never a snapshot missing on either side, an extra one, or one that came a step earlier in any other step. A snapshot's `timestamp` is recorded by order, not value (`ordered`, diff/record.ts), so the step it lands in does not make it differ. Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-hook-onReconcileStart-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers the onReconcileStart hook call that opens that pass one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-observe-reconcile-start-moved",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers the reconcile.start observe event that opens that pass one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-hook-onRequirementCreated-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCreated",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCreated",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCreated",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers an onRequirementCreated hook call inside that pass (a requirement the pass raises moves with it) one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-observe-requirement-created-moved",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.created",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "requirementType": {
+              "$like": "requirementType"
+            },
+            "type": "requirement.created"
+          }
+        },
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "requirementType": {
+              "$like": "batchRequirementType"
+            },
+            "type": "requirement.created"
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers a requirement.created observe event inside that pass (a requirement the pass raises moves with it) one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-hook-onReconcileEnd-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "requirementId"
+                  },
+                  "requirement": {
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "requirementId"
+                  },
+                  "requirement": {
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "requirementId"
+                  },
+                  "requirement": {
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                },
+                {
+                  "fromConstraint": {
+                    "$like": "batchConstraint"
+                  },
+                  "id": {
+                    "$like": "batchRequirementId"
+                  },
+                  "requirement": {
+                    "item": {
+                      "$like": "batchItem"
+                    },
+                    "type": {
+                      "$like": "batchRequirementType"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers the onReconcileEnd hook call that closes that pass one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-observe-reconcile-end-moved",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": {
+              "$like": "integer"
+            },
+            "resolversCompleted": {
+              "$like": "integer"
+            },
+            "type": "reconcile.end"
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). The reconcile pass a batch call's end asks for (its last write, here a retry's after an aborted attempt) runs inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved (forced-L8 fuzz seed 8 case 76; deep seed 1 cases 1 and 8, deep seed 2 case 3). The shared wait aligns the fake clocks, not that pass. This covers the reconcile.end observe event that closes that pass one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record) and only in a case with a batched resolver (`when`): never a pass record missing on either side, an extra one, one that came a step earlier in any other step, or one that came later on 2.0 (deep seeds 1 and 2 show a pass one step later on 2.0; that shape is not this row and is not covered). Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },

@@ -71,7 +71,7 @@ export const FUZZ_TRIGGERS = [
   "disable",
   "throw",
   "namespacedDateWrite",
-  "ownWriteRetracts",
+  "writeRetracts",
   "batched",
   "batchWithResults",
   "batchFallback",

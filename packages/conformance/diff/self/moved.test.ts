@@ -24,6 +24,7 @@ import {
   fileMoves,
   readDivergences,
   runScenario,
+  stepOps,
 } from "../scenario.js";
 
 const MOVED = "l7-fuzz-av-external-start-moved";
@@ -230,5 +231,139 @@ describe("the census validates moved", () => {
     expect(census([{ ...entry, op: "shifted" }])).toMatch(
       /op must be missing, extra, changed or moved/,
     );
+  });
+});
+
+describe("the (as) moved reconcile pass (forced-L8 seed 8 case 76)", () => {
+  const PASS = [
+    "l7-fuzz-as-hook-onReconcileStart-moved",
+    "l7-fuzz-as-observe-reconcile-start-moved",
+    "l7-fuzz-as-hook-onRequirementCreated-moved",
+    "l7-fuzz-as-observe-requirement-created-moved",
+    "l7-fuzz-as-hook-onReconcileEnd-moved",
+    "l7-fuzz-as-observe-reconcile-end-moved",
+  ];
+  const entries = readDivergences().filter((e) => PASS.includes(e.id));
+  /** One pass that raises A0 and leaves a batch item unmet, as both record it. */
+  const pass: TraceEntry[] = [
+    {
+      k: "hook",
+      hook: "onReconcileStart",
+      args: [{ get: { $fn: true }, has: { $fn: true } }],
+    },
+    { k: "observe", event: { type: "reconcile.start" } },
+    {
+      k: "hook",
+      hook: "onRequirementCreated",
+      args: [
+        { fromConstraint: "c0", id: "A0:{}", requirement: { type: "A0" } },
+      ],
+    },
+    {
+      k: "observe",
+      event: {
+        id: "A0:{}",
+        requirementType: "A0",
+        type: "requirement.created",
+      },
+    },
+    {
+      k: "hook",
+      hook: "onReconcileEnd",
+      args: [
+        {
+          canceled: [],
+          completed: [],
+          inflight: [],
+          unmet: [
+            { fromConstraint: "c0", id: "A0:{}", requirement: { type: "A0" } },
+            {
+              fromConstraint: "b0",
+              id: 'AB:{"item":"0.0"}',
+              requirement: { item: "0.0", type: "AB" },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      k: "observe",
+      event: {
+        resolversCanceled: 0,
+        resolversCompleted: 0,
+        type: "reconcile.end",
+      },
+    },
+  ] as TraceEntry[];
+  /** Steps 0 to 3 (ops given), with the pass in the step given. */
+  function steps(
+    at: number,
+    ops = ["tick", "settle", "tick", "tick"],
+  ): TraceEntry[] {
+    const out: TraceEntry[] = [];
+    for (const i of [0, 1, 2, 3]) {
+      out.push({ k: "step", i, step: { op: ops[i] } } as TraceEntry);
+      if (i === at) {
+        out.push(...pass);
+      }
+      out.push({ k: "async", i } as TraceEntry);
+    }
+
+    return out;
+  }
+  const left = (ref: TraceEntry[], cand: TraceEntry[], t = ["batched"]) => {
+    const ds = fileMoves(
+      "fuzz",
+      compareContract(ref, cand, "v2"),
+      entries,
+      t,
+      stepOps(ref),
+    );
+
+    return ds.filter(
+      (d) => !entries.some((e) => covers(e, "fuzz", d, t, stepOps(ref), ds)),
+    );
+  };
+
+  it("is six moved entries in the (as) group, in a settle step, signed for the row's approval", () => {
+    expect(entries.map((e) => e.id).sort()).toEqual([...PASS].sort());
+    for (const e of entries) {
+      expect([e.op, e.by, e.during, e.group, e.date]).toEqual([
+        "moved",
+        -1,
+        "settle",
+        "row-as",
+        "2026-11-12",
+      ]);
+      expect(e.when).toEqual(["batched"]);
+      expect(e.reason).toContain('"Approve (Recommended)", 2026-11-05');
+    }
+  });
+
+  it("covers the whole pass one step earlier on 2.0 in a settle step, with a batched resolver", () => {
+    expect(left(steps(2), steps(1))).toEqual([]);
+  });
+
+  it("covers no pass moved outside a settle step, moved by two, moved later, or without a batch", () => {
+    const ticks = ["tick", "tick", "tick", "tick"];
+    // One step earlier, but 2.0's step is not a settle step.
+    expect(left(steps(2, ticks), steps(1, ticks))).toHaveLength(
+      pass.length * 2,
+    );
+    // The reference's step being a settle step is not enough.
+    expect(
+      left(
+        steps(2, ["tick", "tick", "settle", "tick"]),
+        steps(1, ["tick", "tick", "settle", "tick"]),
+      ),
+    ).toHaveLength(pass.length * 2);
+    // Two steps earlier on 2.0, from a settle step.
+    expect(left(steps(3), steps(1))).toHaveLength(pass.length * 2);
+    // One step later on 2.0 (deep seeds 1 and 2): not this row.
+    expect(left(steps(1), steps(2))).toHaveLength(pass.length * 2);
+    // Without the batched resolver.
+    expect(left(steps(2), steps(1), [])).toHaveLength(pass.length * 2);
+    // Missing on 2.0 outright.
+    expect(left(steps(2), steps(-1))).toHaveLength(pass.length);
   });
 });
