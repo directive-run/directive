@@ -149,6 +149,16 @@
     "onNavigate rerun vs skip on goTo, and onHistoryChange": "L8",
     "history: back, forward and effects re-run on navigation": "L8",
     "history: export, import and changesets": "L8",
+    "a navigation clears a pause, and the next write takes a snapshot (U4)": "L8",
+    "replay() and import() tell no listener; goTo the current id does (U5)": "L8",
+    "a changeset keeps its indexes when the buffer drops snapshots (U7)": "L8",
+    "a changeset keeps its indexes when a new snapshot cuts off redo (U7)": "L8",
+    "a changeset keeps its indexes across an import (U7)": "L8",
+    "the first snapshot is taken after start(), labelled with the init keys (U13)": "L8",
+    "a navigation while a resolver runs: its late write takes a snapshot that cuts off redo (U14)": "L8",
+    "a navigation while a batch is queued: the batch still runs and its write cuts off redo (U14)": "L8",
+    "a navigation while a batch runs: the batch still ends and its write cuts off redo (U14)": "L8",
+    "a navigation that moves a derivation an effect reads wakes the effect, and constraints do not see a change (U17)": "L8",
     "trace: per-run changelogs with causes": "L9",
     "meta, tags and tag inheritance queries": "L9",
     "observe subscribed late sees only what follows; unsubscribe is idempotent": "L9"
@@ -506,6 +516,14 @@
     },
     "tests/core/l8-system-oracle-production.test.ts": {
       "rule": "L8"
+    },
+    "tests/core/l8-history-pins-oracle.test.ts": {
+      "rule": "L8",
+      "pin": true
+    },
+    "tests/core/l8-history-pins-oracle-production.test.ts": {
+      "rule": "L8",
+      "pin": true
     },
     "tests/core/error-boundary.test.ts": {
       "rule": "L3"

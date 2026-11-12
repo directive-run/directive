@@ -986,6 +986,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l8-history-pins-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l8-history-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 23,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l8-system-oracle-production.test.ts",
     "category": "black-box",
     "cases": 2,
