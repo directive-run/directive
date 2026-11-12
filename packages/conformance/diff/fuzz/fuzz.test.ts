@@ -77,6 +77,7 @@ import {
   FUZZ_REPORT_DIR_ENV,
   FUZZ_V2_FLOOR,
   batchReportMode,
+  caseFile,
   maxNeverSettles,
   maxRunaways,
   onFailingCase,
@@ -137,7 +138,10 @@ interface Reported {
   summary: string;
 }
 
-/** Writes one reported case's spec, report and traces (`case-<n>.json`). */
+/**
+ * Writes one reported case's spec, report and traces (`case-<n>.json`):
+ * 1.35's and v2's (lib/fuzz.ts `caseFile`).
+ */
 function reportCase(
   reported: Reported[],
   phase: string,
@@ -151,16 +155,10 @@ function reportCase(
   writeFileSync(
     join(REPORT_DIR, file),
     `${JSON.stringify(
-      {
-        seed: SEED,
-        runs: RUNS,
-        phase,
-        index,
-        triggers,
-        spec,
-        report: result.report,
-        traces: result.traces,
-      },
+      caseFile(
+        { seed: SEED, runs: RUNS, phase, index, triggers, spec },
+        result,
+      ),
       null,
       2,
     )}\n`,

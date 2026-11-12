@@ -1427,17 +1427,23 @@ function steps(spec: FuzzSpec): Step[] {
         });
         break;
       case "twin":
+        // A second system from the same definitions, in the same engine
+        // instance: per-process state (warning dedupe) shows here. Its
+        // settle() goes through the shared wait, as a settle step's does
+        // (diff/scenario.ts `settleShared`; L7 follow-ups: 2.0's settle()
+        // waits for the twin's batch, row (as), and 1.35's does not).
         out.push({
-          op: "run",
+          op: "twin",
           label,
-          fn: async (_system, ctx) => {
-            // A second system from the same definitions, in the same engine
-            // instance: per-process state (warning dedupe) shows here.
+          open: (_system, ctx) => {
             const twin = ctx.core.createSystem(
               ctx.handles.rebuild() as never,
             ) as any;
             twin.start();
-            await twin.settle();
+
+            return twin;
+          },
+          close: (twin, ctx) => {
             ctx.external(["twin", twin.getSnapshot().facts]);
             twin.destroy();
           },

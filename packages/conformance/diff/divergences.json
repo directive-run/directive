@@ -5711,6 +5711,86 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-av-external-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchMaxSize"],
+    "group": "av-moved",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItemsRepeated"
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "start",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) retracted and raised again goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes: at the next step that moves the clock, which can be several steps later, or never when the system stops first (PR seed 15 after #370: its case 28's call starts in step 6 on 1.35 and in step 9 on 2.0, a tick and a dispatch between). `l7-fuzz-av-external-start-moved` covers the one-step move; this covers 1.35's call start missing on 2.0 in its step, only when 1.35's call holds an item twice (`batchItemsRepeated`, a call 2.0 never makes) in a case with a `maxSize` (`when` `batchMaxSize`) whose batched source has `abortOn` (`batchAbortOn`): a missing start of a call of distinct items is not covered. It also requires 2.0's own later call (`requires`: an extra start of the batched resolver, holding one or two items as `maxSize` allows, anywhere in the case), so a 2.0 that never runs the call is not covered (diff/self/moved.test.ts, the dropped-batch tamper), nor is a case that stops before 2.0's window runs (2.0 then cancels the queued requirement at the stop; that shape does not show in the PR seeds). Every later record can differ (2.0's call and its outcomes come later, or not at all), so this entry ends the fuzz case (`ends`). Signed 2026-11-11 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
     "id": "l7-fuzz-av-external-start-changed-items",
     "scenario": "fuzz",
     "stream": "external",
@@ -6629,6 +6709,232 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-av-stop-hook-onResolverCancel-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onResolverCancel record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-stop-hook-onRequirementCanceled-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onRequirementCanceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-stop-observe-requirement.canceled-repeat",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "stop",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a requirement.canceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a stop step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-hook-onResolverCancel-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onResolverCancel record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-hook-onRequirementCanceled-repeat",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a onRequirementCanceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-av-destroy-observe-requirement.canceled-repeat",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "repeats": true,
+    "during": "destroy",
+    "when": ["batched", "batchAbortOn"],
+    "group": "av",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) that is retracted and raised again before its call starts goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). When the system stops (or is destroyed) before the call starts, 1.35 cancels each copy it holds, so it reports the requirement's cancel twice (onResolverCancel, onRequirementCanceled, requirement.canceled; PR seed 15, after #367), and 2.0, holding it once, reports it once. This covers the second copy of a requirement.canceled record only: the difference must be a dropped repeat (`repeats`: 1.35 made the same record more times in that step than 2.0 did, and 2.0 made it at least once), in a destroy step (`during`), of the batched resolver's requirement (`bound`), in a case with a batched resolver fed by a constraint with `abortOn` (`when`). A cancel 2.0 does not make at all, or a cancel of a requirement 1.35 held once, is still compared. Later records are compared too (no `ends`). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
     "id": "l2-quirk-n-fuzz-timeout-extra",
     "scenario": "fuzz",
     "stream": "external",
@@ -7034,6 +7340,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-missing`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-06"
@@ -7087,6 +7549,162 @@
           }
         }
       ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
     },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-changed`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
@@ -7168,6 +7786,162 @@
           }
         }
       ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
     },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-aborted-changed-tag`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
@@ -7374,6 +8148,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-missing`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-06"
@@ -7579,6 +8509,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-extra`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-06"
@@ -7660,6 +8746,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-tag`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-06"
@@ -7713,6 +8955,162 @@
           }
         }
       ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
     },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-attempt`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
@@ -7919,6 +9317,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-missing`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-06"
@@ -8123,6 +9677,162 @@
           ]
         }
       ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
     },
     "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-extra`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
@@ -29718,6 +31428,493 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-g-external-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batched", "batchWithResults", "batchFails", "batchRetry"],
+    "group": "quirk-g-fails",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. This entry does not end the case. Its record: a call of the batched resolver returned with an item failed, and that call's own write retracted the item's requirement before its error was reported; 2.0 keeps the run until its outcome is reported, so the requirement leaving is the last one leaving and the batch's signal aborts, after the handler returned, with no cancel hook and no state change; 1.35 cleared the batch at its run's end (core/resolvers.ts 1773-1783), before it recorded the batch's errors (1787-1795), so its abort finds nothing. Both engines report the error once, and the rest of the case lines up, so this entry covers the one record, only in a case whose batched calls can fail (`when`). This covers the abort of the batch's signal 2.0 makes once every requirement has left. Since #369 (2026-11-11) 2.0 reports a with-results batch's last-attempt item errors inline, before the requirement can leave, so the record shows only on an attempt with retries left (the item's error goes through the retry path, after the own write has retracted the requirement), and `when` is a with-results batch that can fail and has a retry policy. Signed 2026-11-12 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
+    "id": "l7-fuzz-as-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "aborted",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "aborted",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle(), the settled notification and inspect() count a running batch, so settle() waits for batched work and inspect() lists a running batch's requirements in flight. 1.35 resolves settle() without waiting for the batches it started and lists no batch in flight (L7 RFC C6, probe B7). In a fuzz case, 2.0's settle() is still waiting at a settled change where 1.35's has already resolved, and settle() runs the batch queues at each settled change while it waits, as 1.35's does (core-next api/core.ts settle(), `features.batch`); so 2.0 starts a queued batch call that 1.35 leaves in its window (verified in a replay of seed 19: the call starts from that flush, inside the case's last settle()). When the call's requirement is then retracted, 2.0 aborts the running call's signal (its last requirement left, quirk g) where 1.35 cancels the queued requirement. From there on the case's timers and later records differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver (`when`) and only in a settle step (`during` \"settle\"): the flush comes from settle() while it waits, so an abort in any other step (a spurious abort of a running call, with no settle wait to flush it) is not covered. This covers the start of that call, which 1.35 never makes, and only in a case that also has the abort of a running call 2.0 alone makes (`requires`, anywhere in the case: the abort comes after the start), so a spurious batch start without that chain is not covered (L7 follow-ups: row n's entries, which needed no timeout record, used to absorb this start in the pinned (as) case, seed 19's). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
     "id": "l7-fuzz-as-external-aborted-extra",
     "scenario": "fuzz",
     "stream": "external",
@@ -33853,6 +36050,162 @@
         }
       ]
     },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
     "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
@@ -34036,6 +36389,162 @@
           ]
         }
       ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "timeout",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "timeout",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      }
     },
     "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
@@ -37359,5 +39868,683 @@
     "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
+  },
+  {
+    "id": "l7-fuzz-g-external-aborted-run-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchSiblings"],
+    "group": "quirk-g",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted, for a run of one or of three to six items (deep case 24301/1594: 1.35 aborts call 1 of six items, 2.0 cancels the retracted one alone; `l7-fuzz-g-external-aborted-missing` holds the two-item run). Signed 2026-11-10 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-ap-external-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batched", "batchSiblings"],
+    "group": "ap-start",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "start",
+      "op": "missing",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (ap) (L7; owner-approved 2026-11-05, \"Approve all (Recommended)\"): a batch window starts at the first add to an empty queue and is not moved, so a batch runs at most windowMs after its first requirement. 1.35 restarts the timer on every add (resolvers.ts 1899-1903; L7 RFC W2, probes B1 and B1b), so its call starts later. When a sibling requirement is retracted between the two starts (`when`: a batched resolver whose sources raise siblings), 2.0's earlier call still holds it and 1.35's later call does not, so the two calls' start records differ in their items and the comparison cannot pair them: 2.0's is extra and 1.35's missing. This covers 2.0's start of a call of two to six items, and only in a case that also has 1.35's start of a batch call missing on 2.0 (`requires`, anywhere in the case: 1.35's call comes later) (deep case 24301/4050: 2.0's call 1 holds [0.0, 0.1, 1.0, 1.1, 1.2], 1.35's [1.0, 1.1, 1.2]). Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-as-error-unhandled-moved",
+    "scenario": "fuzz",
+    "stream": "error",
+    "kind": "unhandled",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched", "throw"],
+    "group": "row-as-moved",
+    "bound": {
+      "match": [
+        {
+          "k": "unhandled",
+          "error": {
+            "$error": {
+              "name": "DirectiveError",
+              "message": {
+                "$like": "batchAttemptError"
+              },
+              "context": {
+                "fromConstraint": {
+                  "$like": "batchConstraint"
+                },
+                "id": {
+                  "$like": "batchRequirementId"
+                },
+                "requirement": {
+                  "item": {
+                    "$like": "batchItem"
+                  },
+                  "type": {
+                    "$like": "batchRequirementType"
+                  }
+                }
+              },
+              "recoverable": true,
+              "source": "resolver",
+              "sourceId": {
+                "$like": "batchResolver"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). Under the \"throw\" boundary both engines leave the same single unobserved rejection for a failed batch (1.35 core/resolvers.ts 1931-1937, 2.0 core-next api/batch.ts 209-212), but Node reports it in the macrotask after the batch's end: inside the settle step on 2.0, whose settle() waits for that end, and in the next step on 1.35, whose settle() has already resolved (deep case 24301/530). The shared wait aligns the fake clocks, not that macrotask. This covers the same `unhandled` record of a batch item's error one step earlier on 2.0 (`moved`, `by` -1), never an absence or an extra rejection. Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-destroy-hook-onResolverWriteRejected-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverWriteRejected",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batched", "batchAbortOn"],
+    "afterOp": "destroy",
+    "group": "row-352",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverWriteRejected",
+          "args": [
+            {
+              "actual": {
+                "$like": "integer"
+              },
+              "expected": {
+                "$like": "integer"
+              },
+              "fact": {
+                "$like": "fact"
+              },
+              "kind": "rejection",
+              "reason": "clobbered",
+              "req": {
+                "fromConstraint": {
+                  "$like": "batchConstraint"
+                },
+                "id": {
+                  "$like": "batchRequirementId"
+                },
+                "requirement": {
+                  "item": {
+                    "$like": "batchItem"
+                  },
+                  "type": {
+                    "$like": "batchRequirementType"
+                  }
+                }
+              },
+              "resolver": {
+                "$like": "batchResolver"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the onResolverWriteRejected call 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7-fuzz-destroy-observe-resolver.write.rejected-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.write.rejected",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["batched", "batchAbortOn"],
+    "afterOp": "destroy",
+    "group": "row-352",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "actual": {
+              "$like": "integer"
+            },
+            "expected": {
+              "$like": "integer"
+            },
+            "fact": {
+              "$like": "fact"
+            },
+            "kind": "rejection",
+            "reason": "clobbered",
+            "requirementId": {
+              "$like": "batchRequirementId"
+            },
+            "resolver": {
+              "$like": "batchResolver"
+            },
+            "type": "resolver.write.rejected"
+          }
+        }
+      ]
+    },
+    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the resolver.write.rejected event 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-10"
+  },
+  {
+    "id": "l7f-letgo-destroy-hook-onResolverComplete-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "hook",
+    "kind": "onResolverComplete",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverComplete",
+          "args": [
+            "load",
+            {
+              "fromConstraint": "load",
+              "id": "LOAD:{}",
+              "requirement": {
+                "type": "LOAD"
+              }
+            },
+            50
+          ]
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's onResolverComplete hook for the run, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-observe-resolver.complete-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "observe",
+    "kind": "resolver.complete",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "duration": 50,
+            "requirementId": "LOAD:{}",
+            "resolver": "load",
+            "type": "resolver.complete"
+          }
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's resolver.complete event for the run, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-hook-onRequirementMet-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "hook",
+    "kind": "onRequirementMet",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementMet",
+          "args": [
+            {
+              "fromConstraint": "load",
+              "id": "LOAD:{}",
+              "requirement": {
+                "type": "LOAD"
+              }
+            },
+            "load"
+          ]
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's onRequirementMet hook for the run's requirement, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-observe-requirement.met-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "observe",
+    "kind": "requirement.met",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "byResolver": "load",
+            "id": "LOAD:{}",
+            "type": "requirement.met"
+          }
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's requirement.met event for the run's requirement, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
   }
 ]
