@@ -1773,8 +1773,6 @@
       ],
       "tests/core/system.test.ts": [
         "Config Forwarding > errorBoundary config forwarded",
-        "Config Forwarding > history config forwarded (boolean)",
-        "Config Forwarding > history config forwarded (object)",
         "Config Forwarding > plugins array forwarded to engine",
         "Config Forwarding > plugins forwarded in single module mode",
         "Config Forwarding > trace config forwarded",
@@ -2054,6 +2052,18 @@
       "file": "tests/core/resolver-loading-flag.test.ts",
       "test": "a loading flag survives a failure after satisfying > a satisfied batch that times out: the finally lands (L10)",
       "reason": "L7-pre (U12): the test passed on v2 only because no batch handler ran (loading starts false); it now samples loading true while the handler runs and checks the handler ran, so it fails until L7a builds batching."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/system.test.ts",
+      "test": "Config Forwarding > history config forwarded (boolean)",
+      "reason": "L8-pre (U15): the test passed on v2 only because toBeDefined() accepts null, which is what a system without history holds; it now asserts system.history is not null and that one goBack lands, so it fails until L8 builds history."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/system.test.ts",
+      "test": "Config Forwarding > history config forwarded (object)",
+      "reason": "L8-pre (U15): the test passed on v2 only because toBeDefined() accepts null, which is what a system without history holds; it now asserts system.history is not null and that one goBack lands, so it fails until L8 builds history."
     }
   ]
 }

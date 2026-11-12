@@ -931,27 +931,48 @@ describe("Config Forwarding", () => {
     system.destroy();
   });
 
-  it("history config forwarded (boolean)", () => {
+  it("history config forwarded (boolean)", async () => {
     const system = createSystem({
       modules: { auth: authModule },
       history: true,
     });
     system.start();
+    await system.settle();
 
-    // History API should be available
+    // History API should be available. `toBeDefined()` alone passes for
+    // null, which is what a system without history holds, so the member is
+    // also exercised: one write is one snapshot, and one goBack lands on the
+    // state before it.
     expect(system.history).toBeDefined();
+    expect(system.history).not.toBeNull();
+    system.facts.auth.token = "abc";
+    await system.settle();
+    expect(system.history!.currentIndex).toBe(1);
+    system.history!.goBack();
+    await system.settle();
+    expect(system.history!.currentIndex).toBe(0);
+    expect(system.facts.auth.token).toBe("");
 
     system.destroy();
   });
 
-  it("history config forwarded (object)", () => {
+  it("history config forwarded (object)", async () => {
     const system = createSystem({
       modules: { auth: authModule },
       history: { maxSnapshots: 50 },
     });
     system.start();
+    await system.settle();
 
     expect(system.history).toBeDefined();
+    expect(system.history).not.toBeNull();
+    system.facts.auth.token = "abc";
+    await system.settle();
+    expect(system.history!.currentIndex).toBe(1);
+    system.history!.goBack();
+    await system.settle();
+    expect(system.history!.currentIndex).toBe(0);
+    expect(system.facts.auth.token).toBe("");
 
     system.destroy();
   });

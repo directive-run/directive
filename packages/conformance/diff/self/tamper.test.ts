@@ -16,7 +16,7 @@ import {
   engines,
   v2Status,
 } from "../engines.js";
-import { specArbitrary, toScenario } from "../fuzz/model.js";
+import { type FuzzSpec, specArbitrary, toScenario } from "../fuzz/model.js";
 import { createRecorder } from "../record.js";
 import {
   type BuildContext,
@@ -525,6 +525,13 @@ describe("engines", () => {
   });
 });
 
+/** A drawn spec with no history: the option off and no back or forward step. */
+const withoutHistory = (spec: FuzzSpec): FuzzSpec => ({
+  ...spec,
+  history: false,
+  steps: spec.steps.filter((s) => s.op !== "back" && s.op !== "forward"),
+});
+
 describe("the fuzzer catches injected faults", () => {
   it("drops one requirement.created observe event", async () => {
     const fault = faulty({
@@ -541,7 +548,12 @@ describe("the fuzzer catches injected faults", () => {
     let caught = "";
     await expect(
       fc.assert(
-        fc.asyncProperty(specArbitrary(), async (spec) => {
+        // Pinned to specs without history (the L8 RFC's U16). History is
+        // layer 8: once v2 is compared at L8, a drawn history option differs
+        // from 1.35 for a reason of its own, and the first failure could stop
+        // being the dropped event. The same draws are kept, with the history
+        // option and the back and forward steps taken out.
+        fc.asyncProperty(specArbitrary().map(withoutHistory), async (spec) => {
           const result = await runScenario(toScenario(spec), {
             wrapCandidate: fault,
             divergences: [],
