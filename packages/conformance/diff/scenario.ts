@@ -300,6 +300,10 @@ async function waitOutBatches(
   step: number,
   attachedAtSettle: string | false | undefined,
 ): Promise<void> {
+  // Let 2.0's end-of-batch microtask chain (handler return, the call's
+  // finally, the next `schedule()`) run before `busy` is read, or the wait
+  // breaks early and the follow-up pass lands in the next step.
+  await flushMicrotasks();
   const from = Date.now();
   const wait: SettleWait = {
     step,

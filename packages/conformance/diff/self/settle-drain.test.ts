@@ -129,6 +129,17 @@ const SEED_24301: FuzzSpec = JSON.parse(
 );
 
 /**
+ * Deep seed 1, case 4920 (DIFF_FUZZ_RUNS=5000, report mode): a batched call
+ * (retry 1, timeout 10) ends at the settle step's wait. 2.0's end-of-batch
+ * microtask chain (handler return, the call's finally, `schedule()`) had not
+ * run when the wait read `busy`, so the wait broke early and 2.0's follow-up
+ * pass landed in the next step; 1.35's landed inside the wait.
+ */
+const DEEP_1_4920: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":1,"date":false,"derivations":[{"facts":[0],"derived":[],"threshold":-1,"throwsAt":4}],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":{"gated":false}}],"boundary":"disable","history":false,"trace":false,"steps":[{"op":"tick"},{"op":"dispatch","module":0,"event":2147483638,"value":4},{"op":"publish","event":"own","value":6},{"op":"settle"},{"op":"tick"},{"op":"set","module":0,"fact":942665837,"value":-2},{"op":"dispatch","module":0,"event":2147483617,"value":4},{"op":"tick"}],"batch":{"sources":[{"fact":2,"atLeast":2,"items":3,"abortOn":false},{"fact":2,"atLeast":3,"items":3,"abortOn":false}],"handler":"batch","failing":"all","windowMs":1,"maxSize":2,"delay":5,"fails":0,"retry":1,"timeout":10,"writes":0,"value":-1}}',
+);
+
+/**
  * Seed 12 (PR count, every layer): 1.35's batch call times out (3 ms, its
  * handler waits 5) at the very fake time its settle step's wait reached.
  */
@@ -311,6 +322,15 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.ok).toBe(true);
     expect(result.settleTimes!.v2).toEqual(result.settleTimes!.v1);
     expect(result.settleTimes!.v1).toEqual([2]);
+  });
+
+  it("the wait lets 2.0's end-of-batch microtasks run before it reads `busy`: deep seed 1's case 4920 compares equal, with the follow-up pass in the same step on both engines", async () => {
+    const result = await runScenario(toScenario(DEEP_1_4920), {
+      candidates: [local, v2],
+    });
+    expect(result.report).toBe("");
+    expect(result.ok).toBe(true);
+    expect(result.settleTimes!.v2).toEqual(result.settleTimes!.v1);
   });
 
   it("v2's detached batch run is waited out in the same wait as 1.35's batch; kept out of it, v2 differs", async () => {
