@@ -31428,6 +31428,170 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-g-external-aborted-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["batched", "batchWithResults", "batchFails", "batchRetry"],
+    "group": "quirk-g-fails",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        },
+        {
+          "k": "external",
+          "data": [
+            "aborted",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              },
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. This entry does not end the case. Its record: a call of the batched resolver returned with an item failed, and that call's own write retracted the item's requirement before its error was reported; 2.0 keeps the run until its outcome is reported, so the requirement leaving is the last one leaving and the batch's signal aborts, after the handler returned, with no cancel hook and no state change; 1.35 cleared the batch at its run's end (core/resolvers.ts 1773-1783), before it recorded the batch's errors (1787-1795), so its abort finds nothing. Both engines report the error once, and the rest of the case lines up, so this entry covers the one record, only in a case whose batched calls can fail (`when`). This covers the abort of the batch's signal 2.0 makes once every requirement has left. Since #369 (2026-11-11) 2.0 reports a with-results batch's last-attempt item errors inline, before the requirement can leave, so the record shows only on an attempt with retries left (the item's error goes through the retry path, after the own write has retracted the requirement), and `when` is a with-results batch that can fail and has a retry policy. Signed 2026-11-12 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
+  },
+  {
     "id": "l7-fuzz-as-external-start-extra",
     "scenario": "fuzz",
     "stream": "external",
