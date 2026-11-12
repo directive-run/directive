@@ -82,6 +82,33 @@ interface Internal extends Recorder {
 export function createRecorder(): Recorder {
   const trace: TraceEntry[] = [];
   const markers = new Map<object, string>();
+  /**
+   * A history snapshot's `timestamp` is `Date.now` on the fake clock, and the
+   * two engines' fake clocks can end a wait at different times (L7 run 5,
+   * seed 4), so it is recorded by order, not value (the L8 RFC's rule 4, as
+   * the fuzz model's `historyRecord` does): `ordered` says it is at or after
+   * the timestamp of the engine's previous snapshot (the first has none, so
+   * it is ordered). The recorder is the engine's own, so "previous" is this
+   * engine's.
+   */
+  let lastSnapshotAt: number | undefined;
+  function orderSnapshot(shown: Json | undefined, raw: unknown): Json {
+    const at = (raw as { timestamp?: unknown } | null)?.timestamp;
+    if (
+      typeof at !== "number" ||
+      shown === null ||
+      typeof shown !== "object" ||
+      Array.isArray(shown)
+    ) {
+      return shown as Json;
+    }
+    const { timestamp: _value, ...rest } = shown as Record<string, Json>;
+    const ordered = lastSnapshotAt === undefined || at >= lastSnapshotAt;
+    lastSnapshotAt = at;
+
+    return { ...rest, ordered };
+  }
+
   const plugin: Record<string, unknown> & { name: string } = {
     name: "conformance-recorder",
   };
@@ -92,11 +119,11 @@ export function createRecorder(): Recorder {
 
         return;
       }
-      trace.push({
-        k: "hook",
-        hook,
-        args: args.map((a) => normalize(a, { markers })),
-      });
+      const out = args.map((a) => normalize(a, { markers }));
+      if (hook === "onSnapshot") {
+        out[0] = orderSnapshot(out[0], args[0]);
+      }
+      trace.push({ k: "hook", hook, args: out });
     };
   }
 
