@@ -555,6 +555,8 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `batchRetry` | the batched resolver has a retry policy (more than one attempt) |
 | `batchTimeout` | the batched resolver has a `timeoutMs` |
 | `batchMaxSize` | the batch has a `maxSize` (1 or 2), so a queue holding a requirement twice (row (av) on 1.35) can fill it and flush a step before the other engine's window timer |
+| `navigated` | history is on (L8) and some step restores a snapshot into the facts: `back`, `forward`, `goTo`, `replay`, or `roundtrip` (its import restores the current snapshot) |
+| `navigatedBusy` | a navigation can run while work is in flight (L8; U14 pins 1.35's shapes by hand, the L8 RFC's rule 3): the case has a resolver, and some navigation comes before any settle step, or after a step other than a history step since the last settle step |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

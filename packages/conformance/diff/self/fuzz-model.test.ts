@@ -14,9 +14,12 @@ import {
   type FuzzEffect,
   type FuzzModule,
   type FuzzSpec,
+  HISTORY_OPS,
   specArbitrary,
   specLayer,
+  specTriggers,
   toScenario,
+  withoutHistory,
 } from "../fuzz/model.js";
 import type { TraceEntry } from "../record.js";
 import { currentLayer, runScenario, v2Runs } from "../scenario.js";
@@ -287,5 +290,237 @@ describe("fuzz model abort records", () => {
         expect(records(own, "timeout")).toEqual([]);
       }
     }
+  });
+});
+
+describe("fuzz history reach (L8-pre; the L8 RFC's reach table)", () => {
+  const histories = () =>
+    sample("L8", 1500).filter((s) => s.history) as FuzzSpec[];
+
+  it("draws every history step and option at L8, with steps from 1 to 3", () => {
+    const specs = histories();
+    const ops = new Set(specs.flatMap((s) => s.steps.map((x) => x.op)));
+    const navSteps = new Set(
+      specs.flatMap((s) =>
+        s.steps.flatMap((x) =>
+          (x.op === "back" || x.op === "forward") && x.steps !== undefined
+            ? [x.steps]
+            : [],
+        ),
+      ),
+    );
+    const triggers = new Set(specs.flatMap((s) => specTriggers(s)));
+
+    expect(HISTORY_OPS.filter((op) => !ops.has(op))).toEqual([]);
+    expect([...navSteps].sort()).toEqual([1, 2, 3]);
+    expect(new Set(specs.map((s) => s.maxSnapshots))).toEqual(
+      new Set([3, 5, 20]),
+    );
+    expect(specs.some((s) => s.modules.some((m) => m.snapshotEvents))).toBe(
+      true,
+    );
+    expect(
+      specs.some((s) =>
+        s.modules.some((m) => m.effects.some((e) => e.onNavigate === "skip")),
+      ),
+    ).toBe(true);
+    // Rule 9: respecting by default, the ignoring handler a minority.
+    const respecting = specs.filter((s) => s.respectsAbort === true).length;
+    const ignoring = specs.filter((s) => s.respectsAbort === false).length;
+    expect(respecting + ignoring).toBe(specs.length);
+    expect(ignoring).toBeGreaterThan(0);
+    expect(ignoring).toBeLessThan(respecting);
+    expect(triggers.has("navigated")).toBe(true);
+    expect(triggers.has("navigatedBusy")).toBe(true);
+    // Every one of them places the case at L8.
+    expect(specs.every((s) => specLayer(s) === "L8" || layer(s) > 8)).toBe(
+      true,
+    );
+  });
+
+  it("draws none of it without history, nor below L8", () => {
+    const added = (s: FuzzSpec) =>
+      s.maxSnapshots !== undefined ||
+      s.respectsAbort !== undefined ||
+      s.modules.some(
+        (m) =>
+          m.snapshotEvents !== undefined ||
+          m.effects.some((e) => e.onNavigate !== undefined),
+      ) ||
+      s.steps.some(
+        (x) =>
+          ((x.op === "back" || x.op === "forward") && x.steps !== undefined) ||
+          (HISTORY_OPS.slice(2) as readonly string[]).includes(x.op),
+      );
+
+    expect(sample("L8", 600).filter((s) => !s.history && added(s))).toEqual([]);
+    expect(sample("L7", 600).filter(added)).toEqual([]);
+    // Taking the additions out gives back a case without history.
+    for (const s of histories().slice(0, 50)) {
+      const plain = withoutHistory(s);
+      expect(added(plain)).toBe(false);
+      expect(specLayer(plain)).not.toBe("L8");
+    }
+  });
+
+  it("places each addition at L8 on its own", () => {
+    const base: FuzzSpec = {
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [
+            { reads: [0], explicitDeps: false, cleanup: false, throwsAt: null },
+          ],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: false,
+      steps: [{ op: "settle" }],
+    };
+    const m = base.modules[0] as FuzzModule;
+
+    for (const op of HISTORY_OPS) {
+      const step = (op === "goTo" ? { op, position: 0 } : { op }) as never;
+      expect(specLayer({ ...base, steps: [step] })).toBe("L8");
+    }
+    expect(specLayer({ ...base, maxSnapshots: 3 })).toBe("L8");
+    expect(specLayer({ ...base, respectsAbort: true })).toBe("L8");
+    expect(
+      specLayer({ ...base, modules: [{ ...m, snapshotEvents: [0] }] }),
+    ).toBe("L8");
+    expect(
+      specLayer({
+        ...base,
+        modules: [
+          {
+            ...m,
+            effects: [{ ...(m.effects[0] as FuzzEffect), onNavigate: "skip" }],
+          },
+        ],
+      }),
+    ).toBe("L8");
+  });
+
+  it("reads navigatedBusy as a navigation before a settle, in a case with a resolver", () => {
+    const base = sample("L8", 400).find(
+      (s) => s.history && s.modules[0]?.constraints.length,
+    ) as FuzzSpec;
+    const withSteps = (steps: FuzzSpec["steps"]): FuzzSpec => ({
+      ...base,
+      steps,
+    });
+
+    expect(specTriggers(withSteps([{ op: "back", steps: 1 }]))).toContain(
+      "navigatedBusy",
+    );
+    expect(
+      specTriggers(
+        withSteps([{ op: "settle" }, { op: "pause" }, { op: "back" }]),
+      ),
+    ).not.toContain("navigatedBusy");
+    expect(
+      specTriggers(
+        withSteps([{ op: "settle" }, { op: "pause" }, { op: "back" }]),
+      ),
+    ).toContain("navigated");
+    expect(
+      specTriggers(
+        withSteps([
+          { op: "settle" },
+          { op: "tick" },
+          { op: "goTo", position: 0 },
+        ]),
+      ),
+    ).toContain("navigatedBusy");
+    expect(specTriggers(withSteps([{ op: "pause" }]))).not.toContain(
+      "navigated",
+    );
+    expect(
+      specTriggers({ ...withSteps([{ op: "back" }]), history: false }),
+    ).not.toContain("navigated");
+  });
+
+  /**
+   * Rule 9's U14 note: an ignoring handler with history on. The resolver
+   * starts at `f0 = 1` and waits 20 ms; `f0 = 0` retracts it and aborts its
+   * signal; the ignoring handler writes `f1 = 5` late, and that write takes a
+   * snapshot. A respecting handler writes nothing, and takes none.
+   */
+  const lateWriter = (respectsAbort: boolean): FuzzSpec => ({
+    modules: [
+      {
+        facts: 2,
+        date: false,
+        derivations: [],
+        events: [{ target: 0, add: false }],
+        constraints: [
+          {
+            fact: 0,
+            atLeast: 1,
+            crossAtLeast: null,
+            priority: 0,
+            writes: 1,
+            value: 5,
+            delay: 20,
+            fails: 0,
+            retry: 0,
+            timeout: null,
+          },
+        ],
+        effects: [],
+        source: null,
+      },
+    ],
+    boundary: null,
+    history: true,
+    trace: false,
+    steps: [
+      { op: "settle" },
+      { op: "set", module: 0, fact: 0, value: 1 },
+      { op: "advance", ms: 1 },
+      { op: "set", module: 0, fact: 0, value: 0 },
+      { op: "advance", ms: 25 },
+      { op: "settle" },
+      { op: "pause" },
+    ],
+    maxSnapshots: 20,
+    respectsAbort,
+  });
+  const historyAt = (trace: TraceEntry[]) =>
+    records(trace, "history").map((r) => (r as unknown[])[1]);
+  const records = (trace: TraceEntry[], tag: string) =>
+    trace.flatMap((e) =>
+      e.k === "external" && Array.isArray(e.data) && e.data[0] === tag
+        ? [e.data]
+        : [],
+    );
+
+  it("pins an ignoring handler with history on: its late write is a snapshot, on 1.35 and the workspace engine alike", async () => {
+    const ignoring = await runScenario(toScenario(lateWriter(false)));
+    const respecting = await runScenario(toScenario(lateWriter(true)));
+
+    expect(ignoring.report).toBe("");
+    expect(ignoring.ok).toBe(true);
+    expect(respecting.ok).toBe(true);
+    for (const result of [ignoring, respecting]) {
+      expect(records(result.traces.reference, "aborted")).toEqual([
+        ["aborted", "a.r0", 1],
+      ]);
+    }
+    expect(records(ignoring.traces.reference, "wrote")).toEqual([
+      ["wrote", "a.r0", 1],
+    ]);
+    expect(records(respecting.traces.reference, "wrote")).toEqual([]);
+    const late = historyAt(ignoring.traces.reference)[0] as { length: number };
+    const none = historyAt(respecting.traces.reference)[0] as {
+      length: number;
+    };
+    expect(late.length).toBe(none.length + 1);
   });
 });

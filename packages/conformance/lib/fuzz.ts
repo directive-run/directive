@@ -84,6 +84,8 @@ export const FUZZ_TRIGGERS = [
   "batchRetry",
   "batchTimeout",
   "batchMaxSize",
+  "navigated",
+  "navigatedBusy",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
