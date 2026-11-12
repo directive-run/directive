@@ -58,6 +58,8 @@
     "requeue runs a resolver again for the same requirement": "L2",
     "shouldRetry sees why each attempt aborted": "L2",
     "a write to an abortOn fact changed meanwhile is rejected (clobber)": "L2",
+    "a let-go run that finishes after stop()": "L2",
+    "a let-go run that finishes after destroy()": "L2",
     "abortOn on an async constraint is disabled, with a signal": "L2",
     "the boundary receives a DirectiveError with source, context and cause": "L3",
     "explain() and inspect() describe an unmet requirement": "L2",

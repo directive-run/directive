@@ -93,6 +93,11 @@ export interface Difference {
    * (`reference`; `candidate` holds the engine's).
    */
   op: "missing" | "extra" | "changed" | "moved";
+  /**
+   * For `moved` only: -1 when the engine's record came one step earlier
+   * (in step N - 1); absent when it came one step later, the default.
+   */
+  by?: -1;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**
@@ -120,6 +125,15 @@ export interface Difference {
    * row o's `dateWriteByKey` does (2.0 never prints a `::` key).
    */
   raw?: Json;
+  /**
+   * For `missing` only: a dropped repeat. The reference made this record
+   * (as compared) more times in its step than the engine under test did,
+   * and the engine made it at least once there: 1.35 made it again, never
+   * an absence. Only an entry with `repeats` reads it (diff/scenario.ts
+   * `covers`): row (av)'s stop-step cancel of a requirement 1.35's queue
+   * held twice (PR seed 15).
+   */
+  repeat?: true;
   /** Trace positions, for context. */
   at: { reference?: number; candidate?: number };
   /**
@@ -982,6 +996,20 @@ function compareWith(
   for (const { stream, a, b, pairs } of aligned) {
     const matchedA = new Set(pairs.map(([i]) => i));
     const matchedB = new Set(pairs.map(([, j]) => j));
+    // How many records of `ks` in `k`'s step equal `k` as compared.
+    const copies = (ks: Keyed[], k: Keyed) => {
+      const record = project(k.entry);
+
+      return ks.filter((x) => {
+        if (x.step !== k.step || x.kind !== k.kind) {
+          return false;
+        }
+        const fields: Array<{ path: string }> = [];
+        diffJson(project(x.entry), record, "", fields);
+
+        return fields.length === 0;
+      }).length;
+    };
     const base = (k: Keyed) => ({
       engine,
       stream,
@@ -1020,6 +1048,9 @@ function compareWith(
           op: "missing",
           reference: project(k.entry),
           ...(stream === "console" ? { raw: k.entry as unknown as Json } : {}),
+          ...(copies(b, k) >= 1 && copies(a, k) > copies(b, k)
+            ? { repeat: true as const }
+            : {}),
           at: { reference: k.index },
           where: { reference: at.get(k) as Position },
         });

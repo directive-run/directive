@@ -105,6 +105,19 @@ export type Step =
       op: "run";
       label: string;
       fn: (system: AnySystem, ctx: BuildContext) => unknown;
+    }
+  | {
+      /**
+       * A second system (the fuzz model's `twin` step): `open` creates and
+       * starts it, its `settle()` goes through the shared wait as a
+       * `settle` step's does (`SettleDrain`, keyed by this step's index),
+       * and `close` then reads and destroys it. In the trace it is a `run`
+       * step of its label. If its `settle()` throws, `close` does not run.
+       */
+      op: "twin";
+      label: string;
+      open: (system: AnySystem, ctx: BuildContext) => AnySystem;
+      close: (twin: AnySystem, ctx: BuildContext) => unknown;
     };
 
 export interface ScenarioDef {
@@ -479,9 +492,53 @@ export interface Divergence {
   group?: string;
   excuses?: Excuse[];
   bound?: Bound;
+  /**
+   * Fuzz only: the entry covers a difference only when the same engine's
+   * differences in the same case include one at or before it (its latest
+   * position, `[step, phase, matched]`) that `requires` describes: its
+   * stream, kind and op, and its `bound` if given (`covers`, given the
+   * case's differences). Row n's batch entries require 2.0's own timeout
+   * record of a batch call, so a batch record a case merely configured with
+   * a timeout lacks is not excused (L7 follow-ups; deep case 1/1967 hid the
+   * re-raise bug that way).
+   */
+  requires?: Requirement;
+  /**
+   * Fuzz only: the op of a step the difference must come after (`stepOps`):
+   * the 2/352 entries cover a late write's hooks only after `destroy`.
+   */
+  afterOp?: string;
+  /**
+   * Fuzz only, op `missing`: the entry covers only a dropped repeat
+   * (`Difference.repeat`), a record the reference made more times in its
+   * step than the engine did, never one the engine lacks outright: row
+   * (av)'s second cancel at a stop of a requirement 1.35's queue held
+   * twice (PR seed 15).
+   */
+  repeats?: true;
+  /**
+   * Op `moved` only: which way the engine's record moved, one step later
+   * (1, the default) or one step earlier (-1) than the reference's
+   * (`fileMoves`, `Difference.by`).
+   */
+  by?: 1 | -1;
   reason: string;
   approvedBy: string;
   date: string;
+}
+
+/** What an entry's `requires` asks of the case's other differences. */
+export interface Requirement {
+  stream: string;
+  kind: string;
+  op: Difference["op"];
+  bound?: Bound;
+  /**
+   * "any": anywhere in the case, not only at or before (the other half of
+   * a pair the comparison could not pair, such as 1.35's later call that
+   * (ap) moves).
+   */
+  order?: "any";
 }
 
 /** The scenario name every fuzz case runs under (diff/fuzz/model.ts `toScenario`). */
@@ -509,6 +566,12 @@ export interface ScenarioResult {
   /** Engines compared against the reference. */
   compared: string[];
   traces: { reference: TraceEntry[]; candidate: TraceEntry[] };
+  /**
+   * Each engine under test's trace, by name (`traces.candidate` is the
+   * first engine's, the workspace 1.x engine's by default): a reported
+   * fuzz case's file takes v2's from here (lib/fuzz.ts `caseFile`).
+   */
+  engineTraces?: Record<string, TraceEntry[]>;
   /**
    * The reference's first run passed the timer-callback budget: the case
    * itself never settles, so nothing is compared (`ok` is false; the fuzzer
@@ -764,7 +827,7 @@ async function flushMicrotasks(rounds = 50): Promise<void> {
 
 /** The step as it appears in the trace (functions by label only). */
 function describeStep(step: Step): Json {
-  if (step.op === "run") {
+  if (step.op === "run" || step.op === "twin") {
     return { op: "run", label: step.label };
   }
 
@@ -824,6 +887,42 @@ async function drive(promise: Promise<unknown>, rec: Recorder, where: string) {
   }
 }
 
+/**
+ * `system.settle()`, then the shared wait (`waitOutBatches`) when the case
+ * has one: a `settle` step's main system, or a `twin` step's second system
+ * (Jason, 2026-11-07: "One shared wait (Recommended)"; a twin's settle() is
+ * judged as a main settle step's is, L7 follow-ups). Returns whether
+ * `settle()` resolved (a rejection is recorded as thrown at `where`).
+ */
+async function settleShared(
+  system: AnySystem,
+  ctx: BuildContext,
+  rec: Recorder,
+  drain: { run: DrainRun; at: number } | undefined,
+  where: string,
+): Promise<boolean> {
+  const settled = Promise.resolve(system.settle());
+  let resolved = true;
+  settled.catch(() => {
+    resolved = false;
+  });
+  // v2's attached work, read the instant its settle() settles: this
+  // handler is registered before `drive`'s, so it runs first.
+  let attached: string | false | undefined;
+  if (drain?.run.v2) {
+    const read = () => {
+      attached = drain.run.rule.attached?.(ctx, system) ?? false;
+    };
+    settled.then(read, read);
+  }
+  await drive(settled, rec, where);
+  if (drain) {
+    await waitOutBatches(drain.run, system, ctx, drain.at, attached);
+  }
+
+  return resolved;
+}
+
 async function apply(
   step: Step,
   system: AnySystem,
@@ -855,22 +954,21 @@ async function apply(
     case "tick":
       await flushMicrotasks();
       break;
-    case "settle": {
-      const settled = Promise.resolve(system.settle());
-      // v2's attached work, read the instant its settle() settles: this
-      // handler is registered before `drive`'s, so it runs first.
-      let attached: string | false | undefined;
-      if (drain?.run.v2) {
-        const read = () => {
-          attached = drain.run.rule.attached?.(ctx, system) ?? false;
-        };
-        settled.then(read, read);
-      }
-      await drive(settled, rec, "settle");
-      if (drain) {
-        await waitOutBatches(drain.run, system, ctx, drain.at, attached);
-      }
+    case "settle":
+      await settleShared(system, ctx, rec, drain, "settle");
       rec.checkpoint("settle");
+      break;
+    case "twin": {
+      let twin: AnySystem;
+      try {
+        twin = step.open(system, ctx);
+      } catch (error) {
+        rec.push({ k: "threw", where: step.label, error: normalize(error) });
+        break;
+      }
+      if (await settleShared(twin, ctx, rec, drain, step.label)) {
+        await drive(Promise.resolve(step.close(twin, ctx)), rec, step.label);
+      }
       break;
     }
     case "checkpoint":
@@ -1211,6 +1309,7 @@ export function covers(
   d: Difference,
   triggers?: readonly string[],
   steps?: ReadonlyMap<number, string>,
+  context?: readonly Difference[],
 ): boolean {
   return (
     div.scenario === name &&
@@ -1231,8 +1330,91 @@ export function covers(
           d.path.startsWith(`${div.path}.`) ||
           d.path.startsWith(`${div.path}[`)))) &&
     (div.excuses === undefined || div.excuses.some((x) => names(x, d))) &&
-    (div.bound === undefined || admits(div.bound, d))
+    (div.repeats !== true ||
+      (name === FUZZ_SCENARIO && d.op === "missing" && d.repeat === true)) &&
+    (div.op !== "moved" || (div.by ?? 1) === (d.by ?? 1)) &&
+    (div.bound === undefined || admits(div.bound, d)) &&
+    (div.requires === undefined ||
+      (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
+    (div.afterOp === undefined ||
+      (name === FUZZ_SCENARIO &&
+        [...(steps ?? new Map<number, string>())].some(
+          ([i, op]) => op === div.afterOp && i < d.step,
+        )))
   );
+}
+
+/**
+ * Whether `context` (one case's differences) holds a difference `req`
+ * describes on `d`'s engine, at or before `d` (`Divergence.requires`).
+ * Across the two traces only `[step, phase, matched]` orders records, so
+ * the same gap counts as at or before.
+ */
+export function meets(
+  req: Requirement,
+  d: Difference,
+  context: readonly Difference[],
+): boolean {
+  const at = latestPosition(d);
+  // The two earliest differences `req` describes on `d`'s engine (one may
+  // be `d` itself, which never counts): whether any is at or before `d` is
+  // whether the earliest other one is. Found once per context and entry,
+  // not once per difference covered: a runaway case holds over a million
+  // differences (deep case 2/2137, 1.7M records on v2), and a scan per
+  // difference made its `explain` quadratic.
+  const earliest = earliestMeeting(req, context).get(d.engine) ?? [];
+  const other = earliest.find((x) => x !== d);
+
+  return (
+    other !== undefined &&
+    (req.order === "any" || comparePositions(latestPosition(other), at, 3) <= 0)
+  );
+}
+
+/** Per context (and its length when read) and entry: `earliestMeeting`. */
+const MEETING = new WeakMap<
+  readonly Difference[],
+  { length: number; byReq: Map<Requirement, Map<string, Difference[]>> }
+>();
+
+/**
+ * The two earliest differences of `context` that `req` describes, by
+ * engine: its stream, kind and op, and its `bound` if given, earliest by
+ * position (`latestPosition`, as `meets` compares them).
+ */
+function earliestMeeting(
+  req: Requirement,
+  context: readonly Difference[],
+): Map<string, Difference[]> {
+  let memo = MEETING.get(context);
+  if (memo === undefined || memo.length !== context.length) {
+    memo = { length: context.length, byReq: new Map() };
+    MEETING.set(context, memo);
+  }
+  const known = memo.byReq.get(req);
+  if (known) {
+    return known;
+  }
+  const out = new Map<string, Difference[]>();
+  for (const x of context) {
+    if (
+      x.stream !== req.stream ||
+      x.kind !== req.kind ||
+      x.op !== req.op ||
+      (req.bound !== undefined && !admits(req.bound, x))
+    ) {
+      continue;
+    }
+    const two = out.get(x.engine) ?? [];
+    two.push(x);
+    two.sort((p, q) =>
+      comparePositions(latestPosition(p), latestPosition(q), 3),
+    );
+    out.set(x.engine, two.slice(0, 2));
+  }
+  memo.byReq.set(req, out);
+
+  return out;
 }
 
 /**
@@ -1319,7 +1501,7 @@ export function explain(
   covered: Covered[];
 } {
   const coverOf = (d: Difference) =>
-    divergences.find((x) => covers(x, name, d, triggers, steps));
+    divergences.find((x) => covers(x, name, d, triggers, steps, differences));
   // How many of its records each excuse has excused so far in this run.
   const spent = new Map<Divergence, number[]>();
   // The first entry that covers `d` and, if it lists excuses, still has
@@ -1327,7 +1509,7 @@ export function explain(
   // next entry, and is unexplained if none takes it).
   const take = (d: Difference): Covered | undefined => {
     for (const div of divergences) {
-      if (!covers(div, name, d, triggers, steps)) {
+      if (!covers(div, name, d, triggers, steps, differences)) {
         continue;
       }
       if (div.excuses === undefined) {
@@ -1370,7 +1552,8 @@ export function explain(
       cut &&
       (isPastSharedPoint(d, cut.at) ||
         isPastStop(d, cut.at) ||
-        straddlesStop(d, cut.at))
+        straddlesStop(d, cut.at) ||
+        sameRecord(d, cut.at))
     ) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
@@ -1398,6 +1581,28 @@ export function explain(
       dropped: dropped.get(engine) ?? 0,
     })),
   };
+}
+
+/**
+ * Whether `d` is another field of a changed stop's own record pair: a
+ * `changed` difference at another path of the same two records. The stop's
+ * record is where the approved quirk shows, so its other fields are part of
+ * that difference, not compared on their own (L7 follow-ups, deep case
+ * 24301/4050). A move's fields are not: a move covers only the step, and
+ * each field that differs is still compared (`fileMoves`). Self-test:
+ * diff/self/l7-followups.test.ts.
+ */
+export function sameRecord(d: Difference, stop: Difference): boolean {
+  return (
+    d !== stop &&
+    d.op === "changed" &&
+    stop.op === "changed" &&
+    d.engine === stop.engine &&
+    d.stream === stop.stream &&
+    d.kind === stop.kind &&
+    d.at.reference === stop.at.reference &&
+    d.at.candidate === stop.at.candidate
+  );
 }
 
 /**
@@ -1451,8 +1656,9 @@ export function stopsBefore(
 /**
  * File moves (`Difference.op` "moved"): a missing record in step N and the
  * first unpaired extra record of the same engine, stream and kind in step
- * N + 1 become one move, at the missing record's place, but only where a
- * signed entry with op `moved` covers that move (`covers`, with the case's
+ * N + 1 (or, failing that, N - 1: `by` -1, the engine's record one step
+ * earlier) become one move, at the missing record's place, but only where a
+ * signed entry with op `moved` (and the same `by`) covers that move (`covers`, with the case's
  * triggers); every other pair stays a missing and an extra, so no existing
  * entry sees its differences change shape. A move's other fields are
  * compared as a matched pair's are: each field that differs is a `changed`
@@ -1492,29 +1698,44 @@ export function fileMoves(
     if (m.op !== "missing") {
       continue;
     }
-    const x = extras.get(key(m, m.step + 1))?.find((d) => !taken.has(d));
-    if (!x) {
+    // One step later first (the first kind of move), then one step earlier.
+    let moved: Difference | undefined;
+    let x: Difference | undefined;
+    for (const by of [1, -1] as const) {
+      x = extras.get(key(m, m.step + by))?.find((d) => !taken.has(d));
+      if (!x) {
+        continue;
+      }
+      const { raw: _raw, ...base } = m;
+      const candidate: Difference = {
+        ...base,
+        op: "moved",
+        ...(by === -1 ? { by } : {}),
+        candidate: x.candidate,
+        at: { reference: m.at.reference, candidate: x.at.candidate },
+        where: { reference: m.where.reference, candidate: x.where.candidate },
+        shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
+      };
+      if (
+        movers.some((div) =>
+          covers(div, name, candidate, triggers, steps, differences),
+        )
+      ) {
+        moved = candidate;
+        break;
+      }
+    }
+    if (!moved || !x) {
       continue;
     }
-    const { raw: _raw, ...base } = m;
-    const moved: Difference = {
-      ...base,
-      op: "moved",
-      candidate: x.candidate,
-      at: { reference: m.at.reference, candidate: x.at.candidate },
-      where: { reference: m.where.reference, candidate: x.where.candidate },
-      shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
-    };
-    if (!movers.some((div) => covers(div, name, moved, triggers, steps))) {
-      continue;
-    }
+    const move = moved;
     taken.add(x);
     const fields: { path: string; reference?: Json; candidate?: Json }[] = [];
     diffJson(m.reference, x.candidate, "", fields);
     filed.set(m, [
-      moved,
+      move,
       ...fields.map((f) => ({
-        ...moved,
+        ...move,
         op: "changed" as const,
         path: f.path,
         reference: f.reference,
@@ -1835,6 +2056,7 @@ export async function runScenario(
       reference: first,
       candidate: theirs[candidates[0]?.name ?? ""] ?? [],
     },
+    engineTraces: theirs,
     runaway: false,
     hung,
     discarded,

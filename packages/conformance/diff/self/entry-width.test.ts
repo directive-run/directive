@@ -112,8 +112,11 @@ describe("row (as): an abort only in a settle step", () => {
     const result = await runScenario(def);
     expect(result.report).toBe("");
     expect(result.ok).toBe(true);
+    // The stop is the flushed call's start, which comes before its abort
+    // (L7 follow-ups: row n's entries, which needed no timeout record, used
+    // to absorb that start); both are row (as)'s.
     expect(result.ended.map((e) => [e.engine, e.id, e.at.op])).toEqual([
-      ["v2", AS, "extra"],
+      ["v2", "l7-fuzz-as-external-start-extra", "extra"],
     ]);
     const at = result.ended[0]!.at.step;
     expect(stepOps(result.traces.reference).get(at)).toBe("settle");

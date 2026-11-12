@@ -155,3 +155,48 @@ export function onFailingCase(
     ? "report"
     : "fail";
 }
+
+/** A trace as the harness records it (diff/record.ts `TraceEntry`). */
+type Trace = readonly unknown[];
+
+/** What `caseFile` reads of a case's result (diff/scenario.ts `ScenarioResult`). */
+export interface CaseResult {
+  report: string;
+  traces: { reference: Trace; candidate: Trace };
+  engineTraces?: Record<string, Trace>;
+  unexplained: readonly { engine: string }[];
+}
+
+/**
+ * A reported case's file (`case-<n>.json`): `meta` (seed, phase, spec, …),
+ * its report, and the traces to triage it by: 1.35's as the reference and,
+ * as the candidate, v2's whenever v2 was compared, else the trace of the
+ * engine of the first unexplained difference (`candidateEngine` names it).
+ * Before the L7 follow-ups the file held `traces.candidate`, the workspace
+ * 1.x engine's, which nearly always matches 1.35's, so a triage read no
+ * 2.0 record from it. Self-test: diff/self/batch-report.test.ts.
+ */
+export function caseFile(
+  meta: Record<string, unknown>,
+  result: CaseResult,
+): Record<string, unknown> {
+  const engines = result.engineTraces ?? {};
+  const engine =
+    "v2" in engines
+      ? "v2"
+      : (result.unexplained.find((d) => d.engine in engines)?.engine ??
+        Object.keys(engines)[0]);
+
+  return {
+    ...meta,
+    report: result.report,
+    traces: {
+      reference: result.traces.reference,
+      candidate:
+        engine === undefined
+          ? result.traces.candidate
+          : (engines[engine] ?? result.traces.candidate),
+      candidateEngine: engine ?? null,
+    },
+  };
+}

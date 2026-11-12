@@ -5,7 +5,7 @@
  * disablement, DirectiveError fields at the boundary, crossModuleDeps.
  */
 
-import { type BuildContext, scenario, suite } from "../scenario.js";
+import { type BuildContext, type Step, scenario, suite } from "../scenario.js";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -63,6 +63,35 @@ function loader(
       },
     },
   } as any);
+}
+
+/** A run bound by `abortOn` that finishes 50 ms after it starts. */
+function letGoLoader(ctx: BuildContext) {
+  return loader(
+    ctx,
+    {},
+    async (context) => {
+      await wait(50);
+      context.facts.value = 1;
+      context.facts.done = true;
+      ctx.external(["done", context.facts.value]);
+    },
+    { abortOn: ["value"] },
+  );
+}
+
+/** Start it, let it go (retract go), then `end` and let it finish. */
+function letGoSteps(end: "stop" | "destroy"): Step[] {
+  return [
+    { op: "start" },
+    { op: "set", key: "go", value: true },
+    { op: "advance", ms: 5 },
+    { op: "set", key: "go", value: false },
+    { op: "advance", ms: 1 },
+    { op: end },
+    { op: "advance", ms: 100 },
+    { op: "checkpoint", label: "end" },
+  ];
 }
 
 /** The backoff delay before jitter, clamped to the default maxDelay. */
@@ -471,6 +500,24 @@ suite("L2 resolver rules at their edges", () => {
       { op: "advance", ms: 50 },
       { op: "checkpoint", label: "after" },
     ],
+  );
+
+  // A let-go run (RFC-0003): `abortOn` binds the run, so retracting its
+  // requirement detaches it instead of canceling it; it goes on and lands
+  // its writes. Owner row, Jason, 2026-11-11, "Approve 2.0's
+  // (Recommended)": after destroy() 2.0 reports nothing of it, while 1.35
+  // reports it complete and its requirement met (the divergence entries of
+  // the destroy scenario). After stop() both report it (the stop twin).
+  scenario(
+    "a let-go run that finishes after stop()",
+    (ctx) => ({ module: letGoLoader(ctx) }),
+    letGoSteps("stop"),
+  );
+
+  scenario(
+    "a let-go run that finishes after destroy()",
+    (ctx) => ({ module: letGoLoader(ctx) }),
+    letGoSteps("destroy"),
   );
 
   scenario(

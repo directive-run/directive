@@ -1743,5 +1743,462 @@
         "value": 5
       }
     }
+  },
+  {
+    "group": "row-as-moved",
+    "why": "Deep seed 24301, case 530: a batch item's unhandled rejection one step earlier on 2.0 (row (as)).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 7
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": -1,
+              "throwsAt": null
+            },
+            {
+              "facts": [1, 0],
+              "derived": [0, 1],
+              "threshold": null,
+              "throwsAt": 7
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 1,
+              "value": 1,
+              "delay": 20,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 1,
+              "delay": 20,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": -1,
+              "delay": 5,
+              "fails": 1,
+              "retry": 2,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0, 1],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 466272498,
+          "value": -1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 0,
+            "items": 2,
+            "abortOn": true
+          }
+        ],
+        "handler": "batch",
+        "failing": "some",
+        "windowMs": 1,
+        "maxSize": null,
+        "delay": 1,
+        "fails": 1,
+        "retry": 0,
+        "timeout": 3,
+        "writes": 0,
+        "value": 3
+      }
+    }
+  },
+  {
+    "group": "row-352",
+    "why": "Deep seed 2, case 352: after destroy(), 1.35 reports an aborted batch's late write as clobbered, 2.0 drops it (owner row 2/352).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 3,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 5,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": -2,
+              "delay": 20,
+              "fails": 2,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 2,
+              "delay": 5,
+              "fails": 0,
+              "retry": 2,
+              "timeout": null
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 2,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": 0,
+              "priority": 2,
+              "writes": 1,
+              "value": 3,
+              "delay": 5,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 320607563,
+          "value": 4
+        },
+        {
+          "op": "destroy"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 1,
+            "atLeast": 1,
+            "items": 2,
+            "abortOn": true
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 1,
+        "maxSize": 2,
+        "delay": 5,
+        "fails": 0,
+        "retry": 2,
+        "timeout": 3,
+        "writes": 1,
+        "value": 1
+      }
+    }
+  },
+  {
+    "group": "ap-start",
+    "why": "Deep seed 24301, case 4050: 2.0's earlier batch window holds siblings 1.35's later call lost (row (ap)).",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 3
+            },
+            {
+              "fact": 1,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 0,
+              "delay": 5,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 10
+            },
+            {
+              "fact": 1,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": -2,
+              "delay": 5,
+              "fails": 2,
+              "retry": 1,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1, 0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": null
+            },
+            {
+              "reads": [1, 0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": null
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 0,
+              "throwsAt": 8
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 2,
+              "atLeast": 2,
+              "crossAtLeast": 0,
+              "priority": 0,
+              "writes": 0,
+              "value": 6,
+              "delay": 20,
+              "fails": 1,
+              "retry": 2,
+              "timeout": 50
+            },
+            {
+              "fact": 2,
+              "atLeast": 4,
+              "crossAtLeast": 3,
+              "priority": 3,
+              "writes": 2,
+              "value": -2,
+              "delay": 0,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [2, 0, 1],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": 3
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "throw",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1900383360,
+          "value": -1
+        },
+        {
+          "op": "advance",
+          "ms": 25
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[741783908, -2], [86119040, 5], [1559251647, 5]]
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "destroy"
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 3
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 2,
+            "items": 2,
+            "abortOn": false
+          },
+          {
+            "fact": 1,
+            "atLeast": 1,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "some",
+        "windowMs": 5,
+        "maxSize": null,
+        "delay": 5,
+        "fails": 2,
+        "retry": 1,
+        "timeout": 10,
+        "writes": 1,
+        "value": 4
+      }
+    }
   }
 ]
