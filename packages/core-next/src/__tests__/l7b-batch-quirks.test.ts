@@ -180,7 +180,9 @@ describe("quirk h and (ar): an all-failed with-results batch", () => {
       `a,b @${t0 + 110}`,
       `a,b @${t0 + 310}`,
     ]);
-    expect(asked).toEqual(["no a 1", "no a 2", "no a 3"]);
+    // Asked before each retry; the last attempt's items report at once, as
+    // 1.35's executeWithResults (which never asks) does.
+    expect(asked).toEqual(["no a 1", "no a 2"]);
     expect(log).toEqual([
       "retry a #2 @110",
       "retry b #2 @110",

@@ -178,4 +178,56 @@ describe("a batch run's end asks for its pass at 1.35's depth", () => {
     expect(results).toEqual({ error: 8, pass: 10 });
     expect(all).toEqual({ error: 8, pass: 10 });
   });
+
+  it("a with-results batch's failed items report where a success would, on its last attempt", async () => {
+    const at = await depth({
+      resolveBatchWithResults: async (reqs: unknown[]) =>
+        reqs.map(() => ({ success: false, error: new Error("item") })),
+    });
+
+    // 1.35's executeWithResults errors each one inline; 2.0 threw them
+    // through the retry path ({ error: 8, pass: 10 }).
+    expect(at).toEqual({ error: 3, pass: 8 });
+  });
+});
+
+describe("a batch's failed items and a single run's error in one tick", () => {
+  it("report in 1.35's order: the batch's items, the single run, then the passes", async () => {
+    const log: string[] = [];
+    const system = build(
+      {
+        rb: {
+          requirement: "AB",
+          key: (r: any) => r.item,
+          batch,
+          resolveBatchWithResults: async (reqs: Array<{ item: string }>) =>
+            reqs.map((r) => ({
+              success: false,
+              error: new Error(`rb ${r.item}`),
+            })),
+        },
+        r2: {
+          requirement: "A2",
+          resolve: async () => {
+            throw new Error("r2 fails");
+          },
+        },
+      },
+      (s) => log.push(s),
+    );
+    await advance(5);
+    log.length = 0;
+    system.facts.x = 1;
+    await advance(30);
+
+    // 2.0 gave r2's error, a pass, then the batch's.
+    expect(log).toEqual([
+      "pass",
+      "error rb 0.0",
+      "error r2 fails",
+      "pass",
+      "pass",
+    ]);
+    system.destroy();
+  });
 });

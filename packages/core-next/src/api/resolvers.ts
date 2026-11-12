@@ -233,7 +233,11 @@ export interface Resolvers {
   detach_(requirementId: string): void;
   /** Detached runs still going: out of flight, not aborted, still reporting. */
   detached_: ReadonlySet<Run>;
-  /** Cancel every run in flight; returns the ids of those with no outcome yet. */
+  /**
+   * Cancel every run in flight and every detached batch run (1.35's detach
+   * leaves a batch in flight; a detached single run goes on). Returns the
+   * ids of the runs in flight with no outcome yet.
+   */
   abortAll_(): string[];
   /** The run in flight for a requirement (a batch run has one row each). */
   inflight: ReadonlyMap<string, Run>;
@@ -351,7 +355,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
     return left;
   };
-  const cancel = (run: Run) => {
+  /** `ids`, if given, gets each requirement it cancels (stop()'s restart). */
+  const cancel = (run: Run, ids?: string[] | false) => {
     leave(run);
     run.controller_.abort();
     if (!run.done_) {
@@ -359,6 +364,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       for (const req of all(run)) {
         // (aq): the whole requirement (1.35 gives a running batch's `{ id }`).
         canceled(run.resolver_, req);
+        // biome-ignore lint/complexity/useOptionalChain: `ids` may be false (a detached batch's are not returned), and `false?.push` throws
+        ids && ids.push(req.id);
       }
     }
   };
@@ -396,8 +403,9 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     // (row t), so the rest of a batch still completes.
     run.done_ = true;
     for (const req of all(run)) {
-      // A with-results item: its own error (quirks h and i, (ar)).
-      tell(run, req, error && (run.errors_?.get(req) ?? error));
+      // A with-results item: its own error (quirks h and i, (ar)). A batch
+      // that reports with none has none left (its last attempt told them).
+      tell(run, req, run.errors_?.get(req) ?? error);
     }
   };
 
@@ -643,6 +651,12 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
         return;
       } catch (error) {
+        // Reported already and not canceled: a rethrow from its outcome's
+        // hooks (a batch's last-attempt items, boundary "throw") escapes as
+        // report's does.
+        if (run.done_ && !signal.aborted) {
+          throw error;
+        }
         // Superseded: a newer run owns the requirement.
         if (run.dropped_) {
           return;
@@ -801,21 +815,18 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     abortAll_() {
       const ids: string[] = [];
       const runs = [...inflight.values()];
-      const end = (run: Run) => {
-        if (!run.done_) {
-          for (const req of all(run)) {
-            ids.push(req.id);
-          }
-        }
-        cancel(run);
-      };
-      // As 1.35: single runs, then queued requirements, then batch runs.
+      // As 1.35: single runs, then queued requirements, then batch runs in
+      // the order they started. 1.35's detach leaves a batch in flight, so a
+      // detached batch is aborted too and reports its cancel, its ids not
+      // returned; a detached single run goes on, as in 1.35.
       for (const run of runs) {
-        run.reqs_ || end(run);
+        run.reqs_ || cancel(run, ids);
       }
       batcher?.drop_(ids);
-      for (const run of runs) {
-        run.reqs_ && end(run);
+      for (const run of [...detached, ...runs].sort(
+        (a, b) => a.stamp_ - b.stamp_,
+      )) {
+        run.reqs_ && cancel(run, runs.includes(run) && ids);
       }
 
       return ids;
