@@ -5711,6 +5711,39 @@
     "date": "2026-11-08"
   },
   {
+    "id": "l7-fuzz-av-external-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchAbortOn", "batchMaxSize"],
+    "group": "av-moved",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItemsRepeated"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) retracted and raised again goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes: at the next step that moves the clock, which can be several steps later, or never when the system stops first (PR seed 15 after #370: its case 28's call starts in step 6 on 1.35 and in step 9 on 2.0, a tick and a dispatch between; the shrunk case stops before 2.0's window runs, and 2.0 cancels the queued requirement at the stop). `l7-fuzz-av-external-start-moved` covers the one-step move; this covers 1.35's call start missing on 2.0 in its step, only when 1.35's call holds an item twice (`batchItemsRepeated`, a call 2.0 never makes) in a case with a `maxSize` (`when` `batchMaxSize`) whose batched source has `abortOn` (`batchAbortOn`): a missing start of a call of distinct items is not covered. Every later record can differ (2.0's call and its outcomes come later, or not at all), so this entry ends the fuzz case (`ends`). Signed 2026-11-11 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
     "id": "l7-fuzz-av-external-start-changed-items",
     "scenario": "fuzz",
     "stream": "external",
@@ -40188,5 +40221,119 @@
     "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the resolver.write.rejected event 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-10"
+  },
+  {
+    "id": "l7f-letgo-destroy-hook-onResolverComplete-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "hook",
+    "kind": "onResolverComplete",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverComplete",
+          "args": [
+            "load",
+            {
+              "fromConstraint": "load",
+              "id": "LOAD:{}",
+              "requirement": {
+                "type": "LOAD"
+              }
+            },
+            50
+          ]
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's onResolverComplete hook for the run, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-observe-resolver.complete-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "observe",
+    "kind": "resolver.complete",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "duration": 50,
+            "requirementId": "LOAD:{}",
+            "resolver": "load",
+            "type": "resolver.complete"
+          }
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's resolver.complete event for the run, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-hook-onRequirementMet-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "hook",
+    "kind": "onRequirementMet",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementMet",
+          "args": [
+            {
+              "fromConstraint": "load",
+              "id": "LOAD:{}",
+              "requirement": {
+                "type": "LOAD"
+              }
+            },
+            "load"
+          ]
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's onRequirementMet hook for the run's requirement, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
+  },
+  {
+    "id": "l7f-letgo-destroy-observe-requirement.met-missing-step6",
+    "scenario": "a let-go run that finishes after destroy()",
+    "stream": "observe",
+    "kind": "requirement.met",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "byResolver": "load",
+            "id": "LOAD:{}",
+            "type": "requirement.met"
+          }
+        }
+      }
+    ],
+    "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's requirement.met event for the run's requirement, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-11"
   }
 ]

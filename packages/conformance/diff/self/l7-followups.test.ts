@@ -61,6 +61,14 @@ const SEED_15: FuzzSpec = JSON.parse(
   '{"modules":[{"facts":1,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":null}],"boundary":null,"history":false,"trace":false,"steps":[{"op":"batch","module":0,"writes":[[0,1]]},{"op":"set","module":0,"fact":0,"value":0},{"op":"set","module":0,"fact":0,"value":1},{"op":"stop"}],"batch":{"sources":[{"fact":0,"atLeast":1,"items":1,"abortOn":true}],"handler":"batch","failing":"all","windowMs":0,"maxSize":null,"delay":0,"fails":0,"retry":0,"timeout":null,"writes":0,"value":0}}',
 );
 
+/**
+ * PR seed 15, case 28, after #370: 1.35's doubled queue fills `maxSize` 2 and
+ * its call starts in step 6; 2.0's window timer flushes in step 9 (row (av)).
+ */
+const SEED_15_CASE_28: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":2,"date":false,"derivations":[{"facts":[0,1],"derived":[],"threshold":null,"throwsAt":5}],"events":[{"target":1,"add":true},{"target":0,"add":true},{"target":1,"add":false}],"constraints":[{"fact":0,"atLeast":4,"crossAtLeast":null,"priority":3,"writes":0,"value":4,"delay":5,"fails":1,"retry":2,"timeout":10},{"fact":1,"atLeast":0,"crossAtLeast":null,"priority":2,"writes":1,"value":-2,"delay":5,"fails":2,"retry":0,"timeout":3}],"effects":[],"source":null}],"boundary":null,"history":false,"trace":false,"steps":[{"op":"date","module":0,"ms":1},{"op":"set","module":0,"fact":730289825,"value":6},{"op":"tick"},{"op":"batch","module":0,"writes":[[1183874198,2]]},{"op":"set","module":0,"fact":563962962,"value":1},{"op":"set","module":0,"fact":1803790420,"value":2},{"op":"tick"},{"op":"dispatch","module":0,"event":3,"value":-2},{"op":"advance","ms":25},{"op":"publish","event":"unknown","value":1},{"op":"start"}],"batch":{"sources":[{"fact":0,"atLeast":2,"items":1,"abortOn":true}],"handler":"batch","failing":"all","windowMs":1,"maxSize":2,"delay":1,"fails":1,"retry":0,"timeout":50,"writes":1,"value":4}}',
+);
+
 /** Steps 0 to 3 (ops given), each with the records given for it. */
 function trace(ops: string[], records: [number, TraceEntry][]): TraceEntry[] {
   const out: TraceEntry[] = [];
@@ -422,5 +430,114 @@ describe("L7 follow-ups", () => {
         }
       }
     }
+  });
+
+  it("row (av)'s start-missing entry ends PR seed 15's case 28 at 1.35's early call, and covers only a call holding an item twice", async () => {
+    const result = await runScenario(toScenario(SEED_15_CASE_28));
+    expect(result.compared).toContain("v2");
+    expect(result.unexplained).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.used).toContain("l7-fuzz-av-external-start-missing");
+    const div = entry("l7-fuzz-av-external-start-missing");
+    const ops = ["start", "set", "set", "advance"];
+    const steps = new Map(ops.map((op, i) => [i, op] as [number, string]));
+    const triggers = ["batched", "batchAbortOn", "batchMaxSize"];
+    const missing = (items: string[]) =>
+      compareContract(
+        trace(ops, [[2, ext("start", "a.rb", 1, items)]]),
+        trace(ops, []),
+        "v2",
+      )[0]!;
+    const doubled = missing(["0.0", "0.0"]);
+    expect(covers(div, "fuzz", doubled, triggers, steps)).toBe(true);
+    // A call of distinct items 2.0 lacks is not 1.35's doubled queue.
+    expect(covers(div, "fuzz", missing(["0.0", "0.1"]), triggers, steps)).toBe(
+      false,
+    );
+    // Without a maxSize, or a bound source, the queue cannot fill early.
+    for (const t of [
+      ["batched", "batchAbortOn"],
+      ["batched", "batchMaxSize"],
+    ]) {
+      expect(covers(div, "fuzz", doubled, t, steps)).toBe(false);
+    }
+  });
+
+  it("the let-go destroy entries cover 1.35's completion of a detached run only in the step after its destroy", () => {
+    const name = "a let-go run that finishes after destroy()";
+    const ops = [
+      "start",
+      "set",
+      "advance",
+      "set",
+      "advance",
+      "destroy",
+      "advance",
+      "checkpoint",
+    ];
+    const req = {
+      fromConstraint: "load",
+      id: "LOAD:{}",
+      requirement: { type: "LOAD" },
+    };
+    const records = [
+      { k: "hook", hook: "onResolverComplete", args: ["load", req, 50] },
+      {
+        k: "observe",
+        event: {
+          duration: 50,
+          requirementId: "LOAD:{}",
+          resolver: "load",
+          type: "resolver.complete",
+        },
+      },
+      { k: "hook", hook: "onRequirementMet", args: [req, "load"] },
+      {
+        k: "observe",
+        event: { byResolver: "load", id: "LOAD:{}", type: "requirement.met" },
+      },
+    ] as TraceEntry[];
+    const missingAt = (step: number) =>
+      compareContract(
+        trace(
+          ops,
+          records.map((r) => [step, r] as [number, TraceEntry]),
+        ),
+        trace(ops, []),
+        "v2",
+      );
+    const after = missingAt(6);
+    expect(after).toHaveLength(4);
+    const before = missingAt(4);
+    expect(before).toHaveLength(4);
+    const ids = [
+      "l7f-letgo-destroy-hook-onResolverComplete-missing-step6",
+      "l7f-letgo-destroy-observe-resolver.complete-missing-step6",
+      "l7f-letgo-destroy-hook-onRequirementMet-missing-step6",
+      "l7f-letgo-destroy-observe-requirement.met-missing-step6",
+    ];
+    ids.forEach((id, i) => {
+      const div = entry(id);
+      expect(covers(div, name, after[i]!)).toBe(true);
+      // The same completion missing before the destroy (step 4) is not covered.
+      expect(covers(div, name, before[i]!)).toBe(false);
+      // Nor after a stop: that run is reported on both engines.
+      expect(
+        covers(div, "a let-go run that finishes after stop()", after[i]!),
+      ).toBe(false);
+    });
+    // Each entry covers its own record and no other's.
+    expect(covers(entry(ids[0]!), name, after[2]!)).toBe(false);
+    // And once: an explain over two copies leaves the second unexplained.
+    const twice = compareContract(
+      trace(ops, [
+        [6, records[0]!],
+        [6, records[0]!],
+      ]),
+      trace(ops, []),
+      "v2",
+    );
+    const { unexplained } = explain(name, twice, [entry(ids[0]!)]);
+    expect(unexplained).toHaveLength(1);
   });
 });

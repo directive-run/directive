@@ -473,6 +473,41 @@ suite("L2 resolver rules at their edges", () => {
     ],
   );
 
+  // A let-go run (RFC-0003): `abortOn` binds the run, so retracting its
+  // requirement detaches it instead of canceling it; it goes on and lands
+  // its writes. Owner row, Jason, 2026-11-11, "Approve 2.0's
+  // (Recommended)": after destroy() 2.0 reports nothing of it, while 1.35
+  // reports it complete and its requirement met (the divergence entries of
+  // the destroy scenario). After stop() both report it (the stop twin).
+  for (const end of ["stop", "destroy"] as const) {
+    scenario(
+      `a let-go run that finishes after ${end}()`,
+      (ctx) => ({
+        module: loader(
+          ctx,
+          {},
+          async (context) => {
+            await wait(50);
+            context.facts.value = 1;
+            context.facts.done = true;
+            ctx.external(["done", context.facts.value]);
+          },
+          { abortOn: ["value"] },
+        ),
+      }),
+      [
+        { op: "start" },
+        { op: "set", key: "go", value: true },
+        { op: "advance", ms: 5 },
+        { op: "set", key: "go", value: false },
+        { op: "advance", ms: 1 },
+        { op: end },
+        { op: "advance", ms: 100 },
+        { op: "checkpoint", label: "end" },
+      ],
+    );
+  }
+
   scenario(
     "abortOn on an async constraint is disabled, with a signal",
     ({ core: { createModule, t } }) => ({
