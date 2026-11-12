@@ -32095,6 +32095,7 @@
     "op": "moved",
     "by": -1,
     "when": ["batched"],
+    "during": "settle",
     "group": "row-as",
     "bound": {
       "match": [
@@ -32109,61 +32110,7 @@
         }
       ]
     },
-    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). With history on (L8; the L8 RFC's rule 5), the batch's write takes a snapshot in the reconcile pass after it: inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved. The shared wait aligns the fake clocks, not that pass. This covers the same `onSnapshot` call one step earlier on 2.0 (`moved`, `by` -1), a snapshot of fuzz facts with 1.35's pass label (`$like` `snapshot`), never a snapshot missing on either side or an extra one. Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
-    "approvedBy": "Jason Comes",
-    "date": "2026-11-12"
-  },
-  {
-    "id": "l8-fuzz-as-hook-onSnapshot-changed-timestamp",
-    "scenario": "fuzz",
-    "stream": "hook",
-    "kind": "onSnapshot",
-    "engine": "v2",
-    "op": "changed",
-    "path": "args[0].timestamp",
-    "when": ["batched"],
-    "group": "row-as",
-    "bound": {
-      "match": [
-        {
-          "path": "args[0].timestamp",
-          "from": {
-            "$like": "integer"
-          },
-          "to": {
-            "$like": "integer"
-          },
-          "record": {
-            "k": "hook",
-            "hook": "onSnapshot",
-            "args": [
-              {
-                "$like": "snapshot"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "requires": {
-      "stream": "hook",
-      "kind": "onSnapshot",
-      "op": "moved",
-      "bound": {
-        "match": [
-          {
-            "k": "hook",
-            "hook": "onSnapshot",
-            "args": [
-              {
-                "$like": "snapshot"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). With history on (L8; the L8 RFC's rule 5), the batch's write takes a snapshot in the reconcile pass after it: inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved. The shared wait aligns the fake clocks, not that pass. The twin of `l8-fuzz-as-hook-onSnapshot-moved`: a moved record's other fields are differences of their own, and a snapshot's `timestamp` (`Date.now` on the fake clock) is the one field the step it lands in can change, since 1.35's next step can advance its clock before the pass. This covers that timestamp only, only in an `onSnapshot` call (`record`), and only in a case where an `onSnapshot` call moved (`requires`); its id, facts and label are still compared. Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). With history on (L8; the L8 RFC's rule 5), the batch's write takes a snapshot in the reconcile pass after it: inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved. The shared wait aligns the fake clocks, not that pass. This covers the same `onSnapshot` call one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record), a snapshot of fuzz facts with 1.35's pass label (`$like` `snapshot`), never a snapshot missing on either side, an extra one, or one that came a step earlier in any other step. A snapshot's `timestamp` is recorded by order, not value (`ordered`, diff/record.ts), so the step it lands in does not make it differ. Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },

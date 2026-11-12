@@ -9,12 +9,18 @@
 
 import { describe, expect, it } from "vitest";
 import { FUZZ_TRIGGERS } from "../../lib/fuzz.js";
-import { type Difference, compareContract } from "../compare.js";
+import { type Difference, type Position, compareContract } from "../compare.js";
 import { LIKE, TEXT, generalizeValue } from "../fingerprint.js";
 import { type FuzzSpec, specTriggers } from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
-import type { TraceEntry } from "../record.js";
-import { covers, fileMoves, readDivergences } from "../scenario.js";
+import { type TraceEntry, createRecorder } from "../record.js";
+import {
+  type Divergence,
+  covers,
+  fileMoves,
+  readDivergences,
+  stepOps,
+} from "../scenario.js";
 
 /** One module with one fact and one event, history on, no steps. */
 const BASE: FuzzSpec = {
@@ -172,7 +178,7 @@ describe("the history rows' triggers", () => {
 const SNAPSHOT: Json = {
   facts: { "a::f0": 1, "b::when": { $date: "1970-01-01T00:00:00.000Z" } },
   id: 3,
-  timestamp: 40,
+  ordered: true,
   trigger: "facts-changed:a::f0",
 };
 
@@ -185,9 +191,20 @@ describe("the history rows' classes", () => {
         trigger: "facts-changed:f0,f1,f2,f3,f4+2more",
       }),
     ).toBe(true);
-    // Near misses: an extra key, a fact outside the model's names, id 0,
-    // a label of another shape.
+    // Near misses: an extra key, a raw timestamp, a snapshot out of order,
+    // a fact outside the model's names, id 0, a label of another shape.
     expect(LIKE.snapshot?.({ ...(SNAPSHOT as object), extra: 1 })).toBe(false);
+    expect(
+      LIKE.snapshot?.({
+        facts: {},
+        id: 3,
+        timestamp: 40,
+        trigger: "facts-changed:a::f0",
+      }),
+    ).toBe(false);
+    expect(LIKE.snapshot?.({ ...(SNAPSHOT as object), ordered: false })).toBe(
+      false,
+    );
     expect(
       LIKE.snapshot?.({ ...(SNAPSHOT as object), facts: { secret: 1 } }),
     ).toBe(false);
@@ -233,18 +250,69 @@ describe("the history rows' classes", () => {
   });
 });
 
-describe("the (as) moved twins for onSnapshot (rule 5)", () => {
-  const MOVED = "l8-fuzz-as-hook-onSnapshot-moved";
-  const STAMP = "l8-fuzz-as-hook-onSnapshot-changed-timestamp";
-  const entries = readDivergences().filter(
-    (e) => e.id === MOVED || e.id === STAMP,
-  );
+describe("the recorder keeps a snapshot's timestamp by order (rule 4)", () => {
+  it("replaces it with whether it is at or after the engine's previous snapshot", () => {
+    const recorder = createRecorder();
+    const onSnapshot = recorder.plugin.onSnapshot as (s: unknown) => void;
+    const take = (id: number, timestamp: number) =>
+      onSnapshot({ id, timestamp, trigger: "manual", facts: {} });
+    take(1, 40);
+    take(2, 40);
+    take(3, 50);
+    take(4, 45);
+    const args = recorder.trace.map((e) => (e as { args: Json[] }).args[0]);
+    expect(args).toEqual([
+      { id: 1, trigger: "manual", facts: {}, ordered: true },
+      { id: 2, trigger: "manual", facts: {}, ordered: true },
+      { id: 3, trigger: "manual", facts: {}, ordered: true },
+      { id: 4, trigger: "manual", facts: {}, ordered: false },
+    ]);
+    // Another engine's recorder starts again: the clock of one is not the other's.
+    const other = createRecorder();
+    (other.plugin.onSnapshot as (s: unknown) => void)({
+      id: 1,
+      timestamp: 10,
+      trigger: "manual",
+      facts: {},
+    });
+    expect((other.trace[0] as { args: Json[] }).args[0]).toMatchObject({
+      ordered: true,
+    });
+  });
 
-  /** Steps 0 to 2, with an onSnapshot call in the step given. */
-  function trace(at: number, snapshot: Json = SNAPSHOT): TraceEntry[] {
+  it("two engines whose clocks ended a wait at different times record the same", () => {
+    const run = (stamps: number[]) => {
+      const recorder = createRecorder();
+      for (const [i, timestamp] of stamps.entries()) {
+        (recorder.plugin.onSnapshot as (s: unknown) => void)({
+          id: i + 1,
+          timestamp,
+          trigger: "manual",
+          facts: {},
+        });
+      }
+
+      return recorder.trace;
+    };
+    expect(compareContract(run([40, 50, 60]), run([7, 90, 91]), "v2")).toEqual(
+      [],
+    );
+  });
+});
+
+describe("the (as) moved twin for onSnapshot (rule 5)", () => {
+  const MOVED = "l8-fuzz-as-hook-onSnapshot-moved";
+  const entries = readDivergences().filter((e) => e.id === MOVED);
+
+  /** Steps 0 to 2 (ops given), with an onSnapshot call in the step given. */
+  function trace(
+    at: number,
+    ops = ["tick", "settle", "tick"],
+    snapshot: Json = SNAPSHOT,
+  ): TraceEntry[] {
     const out: TraceEntry[] = [];
     for (const i of [0, 1, 2]) {
-      out.push({ k: "step", i, step: { op: "tick" } } as TraceEntry);
+      out.push({ k: "step", i, step: { op: ops[i] } } as TraceEntry);
       if (i === at) {
         out.push({
           k: "hook",
@@ -258,62 +326,96 @@ describe("the (as) moved twins for onSnapshot (rule 5)", () => {
     return out;
   }
   const filed = (ref: TraceEntry[], cand: TraceEntry[], t = ["batched"]) =>
-    fileMoves("fuzz", compareContract(ref, cand, "v2"), entries, t);
-  const covered = (ds: Difference[], t = ["batched"]) =>
+    fileMoves(
+      "fuzz",
+      compareContract(ref, cand, "v2"),
+      entries,
+      t,
+      stepOps(ref),
+    );
+  const covered = (
+    ds: Difference[],
+    ref: TraceEntry[] = trace(0),
+    t = ["batched"],
+  ) =>
     ds.map(
       (d) =>
-        entries.find((e) => covers(e, "fuzz", d, t, undefined, ds))?.id ?? null,
+        entries.find((e) => covers(e, "fuzz", d, t, stepOps(ref), ds))?.id ??
+        null,
     );
 
-  it("are in the (as) group, signed for the row's approval", () => {
-    expect(entries).toHaveLength(2);
-    for (const e of entries) {
-      expect(e.group).toBe("row-as");
-      expect(e.when).toEqual(["batched"]);
-      expect(e.reason).toContain('"Approve (Recommended)", 2026-11-05');
-    }
+  it("is in the (as) group, in a settle step, signed for the row's approval", () => {
+    expect(entries).toHaveLength(1);
+    const [e] = entries as [Divergence];
+    expect(e.group).toBe("row-as");
+    expect(e.when).toEqual(["batched"]);
+    expect(e.during).toBe("settle");
+    expect(e.reason).toContain('"Approve (Recommended)", 2026-11-05');
+    expect(e.date).toBe("2026-11-12");
+    // The timestamp twin is gone: the recorder no longer records the value.
+    expect(
+      readDivergences().some((x) => x.id.includes("onSnapshot-changed-ts")),
+    ).toBe(false);
+    expect(readDivergences().some((x) => x.path === "args[0].timestamp")).toBe(
+      false,
+    );
   });
 
-  it("cover a snapshot one step earlier on 2.0, and its timestamp, in a batched case", () => {
+  it("covers a snapshot one step earlier on 2.0 when that step is a settle step", () => {
+    // 1.35's snapshot in step 2, 2.0's in step 1, a settle step.
     const ds = filed(trace(2), trace(1));
     expect(ds.map((d) => [d.op, d.kind, d.step])).toEqual([
       ["moved", "onSnapshot", 2],
     ]);
-    expect(covered(ds)).toEqual([MOVED]);
-    const later = filed(
-      trace(2, { ...(SNAPSHOT as object), timestamp: 50 }),
-      trace(1),
-    );
-    expect(later.map((d) => [d.op, d.path ?? ""])).toEqual([
-      ["moved", ""],
-      ["changed", "args[0].timestamp"],
-    ]);
-    expect(covered(later)).toEqual([MOVED, STAMP]);
+    expect(covered(ds, trace(2))).toEqual([MOVED]);
   });
 
-  it("cover no snapshot one step later on 2.0, a missing one, another field, or a case without a batch", () => {
-    // One step later on 2.0: a move the other way, which (as) cannot
-    // make, stays a missing and an extra, neither covered.
-    expect(covered(filed(trace(1), trace(2)))).toEqual([null, null]);
+  it("covers no snapshot one step earlier outside a settle step, a later one, a missing one, another field, or a case without a batch", () => {
+    // One step earlier, but 2.0's step is not a settle step: the move is not
+    // filed (so the pair stays a missing and an extra) and the entry covers
+    // neither. The settle step is the reference's, not 2.0's: step 1 is a
+    // settle step in both cases below, 2.0's record is in step 0 or 2.
+    const ticks = ["tick", "tick", "tick"];
+    const outside = filed(trace(2, ticks), trace(1, ticks));
+    expect(outside.map((d) => d.op)).toEqual(["extra", "missing"]);
+    expect(covered(outside, trace(2, ticks))).toEqual([null, null]);
+    const refSettle = filed(trace(1), trace(0));
+    expect(refSettle.map((d) => d.op)).toEqual(["extra", "missing"]);
+    expect(covered(refSettle, trace(1))).toEqual([null, null]);
+    // The move itself, read as `covers` reads it: against 2.0's own step.
+    const [hand] = filed(trace(2), trace(1)) as [Difference];
+    expect(hand.op).toBe("moved");
+    const reads = (ref: TraceEntry[]) =>
+      covers(
+        entries[0] as Divergence,
+        "fuzz",
+        hand,
+        ["batched"],
+        stepOps(ref),
+        [hand],
+      );
+    expect(reads(trace(2))).toBe(true);
+    expect(reads(trace(2, ticks))).toBe(false);
+    // The reference's step (2) being a settle step is not enough.
+    expect(reads(trace(2, ["tick", "tick", "settle"]))).toBe(false);
+    // One step later on 2.0: a move the other way, which (as) cannot make,
+    // stays a missing and an extra, neither covered.
+    expect(covered(filed(trace(1), trace(2)), trace(1))).toEqual([null, null]);
     // Missing on 2.0.
     const missing = compareContract(trace(1), trace(-1), "v2");
     expect(missing.map((d) => d.op)).toEqual(["missing"]);
-    expect(covered(missing)).toEqual([null]);
+    expect(covered(missing, trace(1))).toEqual([null]);
     // A moved snapshot whose facts differ: the facts stay compared.
     const facts = filed(
-      trace(2, { ...(SNAPSHOT as object), facts: { "a::f0": 2 } }),
+      trace(2, undefined, { ...(SNAPSHOT as object), facts: { "a::f0": 2 } }),
       trace(1),
     );
-    expect(covered(facts)).toContain(null);
+    expect(covered(facts, trace(2))).toContain(null);
     // Without the batched resolver.
-    expect(covered(filed(trace(2), trace(1), []), [])).toEqual([null, null]);
-    // The timestamp alone, with no move: not covered.
-    const stamp = compareContract(
-      trace(1, { ...(SNAPSHOT as object), timestamp: 50 }),
-      trace(1),
-      "v2",
-    );
-    expect(covered(stamp)).toEqual([null]);
+    expect(covered(filed(trace(2), trace(1), []), trace(2), [])).toEqual([
+      null,
+      null,
+    ]);
   });
 });
 
@@ -340,21 +442,131 @@ describe("the ignoresAbort gate on the late-write entries", () => {
     }
   });
 
+  /** A sample of each `$like` class the 44 entries' patterns name. */
+  const SAMPLES: Json[] = [
+    1,
+    "r0",
+    "c0",
+    "A0",
+    "A0:{}",
+    "a.r0",
+    "a.x0",
+    "f0",
+    "rb",
+    "b0",
+    "AB",
+    'AB:{"item":"0.1"}',
+    "0.1",
+    "a.rb",
+  ];
+
+  /** A concrete value a bound pattern admits (a `$like` class gets a sample of it). */
+  function instance(pattern: Json | undefined): Json | undefined {
+    if (Array.isArray(pattern)) {
+      return pattern.map((p) => instance(p) as Json);
+    }
+    if (pattern !== null && typeof pattern === "object") {
+      const keys = Object.keys(pattern);
+      if (keys.length === 1 && keys[0] === "$like") {
+        const name = pattern.$like as string;
+        if (name === "absent") {
+          return undefined;
+        }
+        const hit = SAMPLES.find((v) => LIKE[name]?.(v));
+        if (hit === undefined) {
+          throw new Error(`no sample for the $like class "${name}"`);
+        }
+
+        return hit;
+      }
+      if (keys.some((k) => k.startsWith("$"))) {
+        throw new Error(`no instance for ${JSON.stringify(pattern)}`);
+      }
+
+      return Object.fromEntries(
+        keys.map((k) => [k, instance(pattern[k] as Json)]),
+      ) as Json;
+    }
+
+    return pattern;
+  }
+
+  const pos = (step: number): Position => [step, 1, 0, 0];
+
+  /**
+   * A difference the entry really covers, with the case's other differences
+   * and steps it needs: the first record its bound admits, in step 3, after
+   * the `destroy` step its `afterOp` names, with a 2.0 timeout record at
+   * step 1 where it `requires` one.
+   */
+  function witness(e: Divergence) {
+    const first = (e.bound?.match[0] ?? {}) as Record<string, Json>;
+    const base = {
+      engine: e.engine ?? "v2",
+      stream: e.stream,
+      kind: e.kind,
+      step: 3,
+      phase: "sync",
+      at: { reference: 30, candidate: 30 },
+      shared: { reference: 0, candidate: 0 },
+    };
+    const d = (e.op === "changed"
+      ? {
+          ...base,
+          op: "changed",
+          path: String(first.path).replace(/\[\*\]/g, "[0]"),
+          reference: instance(first.from as Json),
+          candidate: instance(first.to as Json),
+          ...(first.record ? { record: instance(first.record as Json) } : {}),
+          where: { reference: pos(3), candidate: pos(3) },
+        }
+      : e.op === "missing"
+        ? {
+            ...base,
+            op: "missing",
+            reference: instance(first),
+            where: { reference: pos(3) },
+          }
+        : {
+            ...base,
+            op: "extra",
+            candidate: instance(first),
+            where: { candidate: pos(3) },
+          }) as unknown as Difference;
+    const need = e.requires;
+    const context = need
+      ? [
+          {
+            ...base,
+            stream: need.stream,
+            kind: need.kind,
+            op: need.op,
+            step: 1,
+            at: { candidate: 10 },
+            candidate: instance(need.bound?.match[0]),
+            where: { candidate: pos(1) },
+          } as unknown as Difference,
+        ]
+      : [];
+    const steps = new Map<number, string>(e.afterOp ? [[1, e.afterOp]] : []);
+
+    return { d, context: [d, ...context], steps };
+  }
+
   it("a case whose handlers respect their abort is outside every one of them", () => {
     const entries = readDivergences().filter((e) =>
       LATE.includes(e.group as string),
     );
+    expect(entries).toHaveLength(44);
     for (const e of entries) {
-      const triggers = (e.when as string[]).filter((t) => t !== "ignoresAbort");
-      const d = {
-        engine: "v2",
-        stream: e.stream,
-        kind: e.kind,
-        op: e.op,
-        step: 1,
-      } as unknown as Difference;
-      // Whatever the difference, the entry cannot cover it without the trigger.
-      expect(covers(e, "fuzz", d, triggers), e.id).toBe(false);
+      const { d, context, steps } = witness(e);
+      const when = e.when as string[];
+      // A difference the entry really covers, in a case that draws the trigger.
+      expect(covers(e, "fuzz", d, when, steps, context), e.id).toBe(true);
+      // The same difference in a case whose handlers respect their abort: the
+      // other triggers all hold, so only the gate can be what excludes it.
+      const respects = when.filter((t) => t !== "ignoresAbort");
+      expect(covers(e, "fuzz", d, respects, steps, context), e.id).toBe(false);
     }
   });
 });

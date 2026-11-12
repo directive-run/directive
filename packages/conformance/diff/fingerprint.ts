@@ -144,10 +144,13 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
       /^Batch resolver "([a-z]::)?rb" timed out after \d+ms$/.test(v)),
   /**
    * One history snapshot as `onSnapshot` passes it (L8; the RFC's T1, T3):
-   * exactly `facts`, `id`, `timestamp` and `trigger`. `facts` holds fuzz
+   * exactly `facts`, `id`, `ordered` and `trigger`. `facts` holds fuzz
    * facts only (`f0`, `a::f1`, the Date fact `when`, `b::when`), with any
-   * values; `id` is a positive integer; `timestamp` a number at or above 0
-   * (`Date.now` on the fake clock); `trigger` is 1.35's pass label,
+   * values; `id` is a positive integer; `ordered` is true: the recorder
+   * replaces the snapshot's `timestamp` (`Date.now` on the fake clock, which
+   * the two engines' clocks can end at different times) with whether it is
+   * at or after the engine's previous snapshot (diff/record.ts, rule 4);
+   * `trigger` is 1.35's pass label,
    * `facts-changed:` and up to five keys, then `+<n>more` past five
    * (utils/history.ts). The facts are what a seed wrote, so an entry for a
    * snapshot that moved or went missing (rows (as), (ay), (bb)) names this
@@ -159,10 +162,10 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     }
     const key = /^([a-z]::)?(f\d+|when)$/;
     const keys = Object.keys(v).sort();
-    const { facts, id, timestamp, trigger } = v as Record<string, Json>;
+    const { facts, id, ordered, trigger } = v as Record<string, Json>;
 
     return (
-      keys.join() === "facts,id,timestamp,trigger" &&
+      keys.join() === "facts,id,ordered,trigger" &&
       facts !== null &&
       typeof facts === "object" &&
       !Array.isArray(facts) &&
@@ -170,8 +173,7 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
       typeof id === "number" &&
       Number.isInteger(id) &&
       id > 0 &&
-      typeof timestamp === "number" &&
-      timestamp >= 0 &&
+      ordered === true &&
       typeof trigger === "string" &&
       /^facts-changed:([a-z]::)?(f\d+|when)(,([a-z]::)?(f\d+|when)){0,4}(\+\d+more)?$/.test(
         trigger,
