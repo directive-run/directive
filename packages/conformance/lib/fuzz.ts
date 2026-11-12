@@ -86,6 +86,14 @@ export const FUZZ_TRIGGERS = [
   "batchMaxSize",
   "navigated",
   "navigatedBusy",
+  "ignoresAbort",
+  "navigatedPaused",
+  "replayedOrImported",
+  "imported",
+  "changesetMoved",
+  "importedEmpty",
+  "restoredTwice",
+  "changesetSteps",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

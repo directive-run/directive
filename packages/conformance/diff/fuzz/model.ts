@@ -1486,6 +1486,139 @@ const TRIGGERS = {
 
     return false;
   },
+  /**
+   * Every resolver handler ignores its abort (the RFC's rule 9): true unless
+   * the case drew `respectsAbort`, which only a history case (L8) draws. The
+   * late-write entries (row n, 2/352, quirk g) list it, so a respecting
+   * handler's case is never covered by them; below L8 every case has it.
+   */
+  ignoresAbort: (spec) => spec.respectsAbort !== true,
+  /**
+   * Row (ay), a navigation keeps a pause: some navigation runs while a
+   * `pause` step's pause is set, with no `resume` step since it. A
+   * navigation does not end the pause here: 1.35 clears it (N5), 2.0 with
+   * (ay) keeps it, and the trigger names the shape both start from.
+   */
+  navigatedPaused: (spec) => {
+    if (!spec.history) {
+      return false;
+    }
+    let paused = false;
+    for (const s of spec.steps) {
+      if (s.op === "pause") {
+        paused = true;
+      } else if (s.op === "resume") {
+        paused = false;
+      } else if (paused && NAVIGATIONS.has(s.op)) {
+        return true;
+      }
+    }
+
+    return false;
+  },
+  /**
+   * Row (az), `replay()` and `import()` tell listeners: history is on and
+   * the steps have a `replay` or a `roundtrip` (its import), the two calls
+   * 1.35 makes without `onHistoryNavigate` or `onHistoryChange` (N3, E4).
+   */
+  replayedOrImported: (spec) =>
+    spec.history &&
+    spec.steps.some((s) => s.op === "replay" || s.op === "roundtrip"),
+  /**
+   * Row (ba), ids continue after an import: history is on and the steps
+   * import (`roundtrip`). The collision (E3) needs a system whose counter is
+   * behind the imported ids, and the model imports only into the system
+   * that exported them, whose counter is past every id it took (the newest
+   * snapshot is always in the list), so 1.35 repeats no id in a fuzz case:
+   * the class `snapshotIdsRepeated` (diff/fingerprint.ts) is what an entry
+   * for the row must bound by, and with this trigger a case the row cannot
+   * reach stays outside it.
+   */
+  imported: (spec) =>
+    spec.history && spec.steps.some((s) => s.op === "roundtrip"),
+  /**
+   * Row (bb), changesets follow the buffer, the redo cut and import: a
+   * changeset is closed (`begin`, then `end`), then a step that can move
+   * snapshots under its range (a step other than a history step, whose
+   * write takes a snapshot that can drop the oldest one or cut off redo, or
+   * a `roundtrip`, whose import keeps 1.35's ranges), and after that a
+   * `back` or `forward`, which reads the range (N10, E3).
+   */
+  changesetMoved: (spec) => {
+    if (!spec.history) {
+      return false;
+    }
+    let state: "none" | "open" | "closed" | "moved" = "none";
+    for (const s of spec.steps) {
+      if (s.op === "begin" && state === "none") {
+        state = "open";
+      } else if (s.op === "end" && state === "open") {
+        state = "closed";
+      } else if (
+        state === "closed" &&
+        (s.op === "roundtrip" ||
+          !(HISTORY_OPS as readonly string[]).includes(s.op))
+      ) {
+        state = "moved";
+      } else if (state === "moved" && (s.op === "back" || s.op === "forward")) {
+        return true;
+      }
+    }
+
+    return false;
+  },
+  /**
+   * Row (bc), an import with an index outside the list fails: the model's
+   * only such import. A module with `snapshotEvents` makes 1.35 snapshot a
+   * pass only for a listed event, so the start takes none and the history
+   * can still be empty at a `roundtrip`: its export holds no snapshot and
+   * `currentIndex` -1, which 1.35 imports (E2). The trigger is that shape's
+   * spec: history on, some module with `snapshotEvents`, and a `roundtrip`.
+   */
+  importedEmpty: (spec) =>
+    spec.history &&
+    spec.modules.some((m) => m.snapshotEvents !== undefined) &&
+    spec.steps.some((s) => s.op === "roundtrip"),
+  /**
+   * Row (bd), stored snapshots are not shared: some module has the Date
+   * fact `when` (the model's only fact that holds an object) and the steps
+   * navigate twice. 1.35's first restore writes the stored Date into the
+   * live fact, so the two share it (T8, H4b); a later restore of the same
+   * snapshot writes that same object back, where 2.0 with (bd) writes a
+   * copy. A number restores the same on both.
+   */
+  restoredTwice: (spec) =>
+    spec.history &&
+    spec.modules.some((m) => m.date) &&
+    spec.steps.filter((s) => NAVIGATIONS.has(s.op)).length > 1,
+  /**
+   * Row (be), a changeset counts as one of the steps: a changeset is closed
+   * (`begin`, then `end`), and a later `back` or `forward` takes two or
+   * three steps. One step lands the same on both engines (inside, at the
+   * start, and outside a changeset); only the steps left after the first
+   * differ (N10, U8).
+   */
+  changesetSteps: (spec) => {
+    if (!spec.history) {
+      return false;
+    }
+    let state: "none" | "open" | "closed" = "none";
+    for (const s of spec.steps) {
+      if (s.op === "begin" && state === "none") {
+        state = "open";
+      } else if (s.op === "end" && state === "open") {
+        state = "closed";
+      } else if (
+        state === "closed" &&
+        (s.op === "back" || s.op === "forward") &&
+        (s.steps ?? 1) > 1
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  },
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean

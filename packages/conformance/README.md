@@ -383,6 +383,15 @@ under a changed entry's path. So every entry also carries one of:
   changed-items entry admits a changed item only in a batch call whose
   items repeat on 1.35 (`batchItemsRepeated`), never 2.0 dropping a
   distinct item.
+  L8's history rows have hand-named classes of their own, each with a
+  self-test (diff/self/history-triggers.test.ts) and none picked by
+  `generalize`: `snapshot`, one `onSnapshot` argument of fuzz facts and
+  1.35's `facts-changed:` label (the (as) `moved` twins, and a snapshot
+  (ay) or (bb) leaves out); `snapshotIdsRepeated`, a history record's ids
+  with one repeated ((ba) on 1.35); and `historyIndexOutside`, a history
+  record whose index is outside its list ((bc) on 1.35). The `$text` class
+  `historyImportFailed` is the first argument of 1.35's
+  `Failed to import history data` error, which 2.0 logs for (bc).
   In a missing or extra console entry's pattern, `{ "$text": name }` may
   stand where the contract masks an argument's wording (`{ "$incidental":
   "string" }`): it matches only an argument printed in the named wording
@@ -557,6 +566,14 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `batchMaxSize` | the batch has a `maxSize` (1 or 2), so a queue holding a requirement twice (row (av) on 1.35) can fill it and flush a step before the other engine's window timer |
 | `navigated` | history is on (L8) and some step restores a snapshot into the facts: `back`, `forward`, `goTo`, `replay`, or `roundtrip` (its import restores the current snapshot) |
 | `navigatedBusy` | a navigation can run while work is in flight (L8; U14 pins 1.35's shapes by hand, the L8 RFC's rule 3): the case has a resolver, and some navigation comes before any settle step, or after a step other than a history step since the last settle step |
+| `ignoresAbort` | every resolver handler ignores its abort and writes late: the case did not draw `respectsAbort` (the L8 RFC's rule 9; drawn only with history, so every case below L8 has it). The late-write entries (row n, 2/352, quirk g) list it |
+| `navigatedPaused` | row (ay): history is on and some navigation runs while a `pause` step's pause is set, with no `resume` since it |
+| `replayedOrImported` | row (az): history is on and the steps have a `replay` or a `roundtrip` (its import), which 1.35 makes without telling a listener |
+| `imported` | row (ba): history is on and the steps have a `roundtrip`. The model imports only into the system that exported, whose counter is past every id, so 1.35 repeats no id in a fuzz case; an entry bounds by `snapshotIdsRepeated` |
+| `changesetMoved` | row (bb): a changeset is closed (`begin`, then `end`), then a step that can move snapshots under its range (a step other than a history step, or a `roundtrip`), then a `back` or `forward` |
+| `importedEmpty` | row (bc): history is on, some module has `snapshotEvents` (so the history can be empty) and the steps have a `roundtrip`: the import of an empty history, index -1, the model's only index outside the list |
+| `restoredTwice` | row (bd): history is on, some module has the Date fact `when`, and two or more steps navigate, so a restore can write back the Date an earlier restore shared with the snapshot |
+| `changesetSteps` | row (be): a changeset is closed, and a later `back` or `forward` takes two or three steps |
 
 The model passes every strategy as a string; a function strategy would
 make `specTriggers` throw rather than guess. The census rejects an unknown

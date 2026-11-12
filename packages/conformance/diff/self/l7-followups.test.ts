@@ -124,7 +124,7 @@ describe("L7 follow-ups", () => {
 
   it("row n's batch entries need 2.0's timeout record of a batch call at or before the difference", () => {
     const rowN = ALL.filter((e) => e.group === "quirk-n-batch");
-    const triggers = ["batched", "batchTimeout"];
+    const triggers = ["batched", "batchTimeout", "ignoresAbort"];
     const start = ext("start", "a.rb", 2, ["0.0"]);
     const timeout = ext("timeout", "a.rb", 1, ["0.0"]);
     const mark = ext("effect", "a.x0", [1]);
@@ -317,7 +317,7 @@ describe("L7 follow-ups", () => {
         },
       ],
     } as TraceEntry;
-    const triggers = ["batched", "batchAbortOn"];
+    const triggers = ["batched", "batchAbortOn", "ignoresAbort"];
     for (const [ops, covered] of [
       [["start", "set", "destroy", "settle"], true],
       [["start", "set", "stop", "settle"], false],
