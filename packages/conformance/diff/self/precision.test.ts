@@ -24,7 +24,7 @@ import { type EngineHandle, engines } from "../engines.js";
 import {
   type FuzzConstraint,
   type FuzzSpec,
-  specTriggers,
+  specTriggers as allTriggers,
   toScenario,
 } from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
@@ -37,6 +37,15 @@ import {
   explain,
   runScenario,
 } from "../scenario.js";
+
+/**
+ * The triggers of a case other than `ignoresAbort`, which every case below
+ * L8 has (it is false only for a case that drew `respectsAbort`, a history
+ * option: diff/self/history-triggers.test.ts pins it). These tests read the
+ * triggers each spec feature adds.
+ */
+const specTriggers = (spec: FuzzSpec): string[] =>
+  allTriggers(spec).filter((t) => t !== "ignoresAbort");
 
 /** One step of `external` records. */
 function trace(...records: Json[][]): TraceEntry[] {
@@ -355,6 +364,7 @@ describe("a fuzz case's triggers come from its spec, exactly", () => {
       "timeout",
       "settleStop",
       "ownWriteRetracts",
+      "ignoresAbort",
     ]);
   });
 });

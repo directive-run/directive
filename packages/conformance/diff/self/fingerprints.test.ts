@@ -24,11 +24,20 @@ import {
   type FuzzBatch,
   type FuzzBatchSource,
   type FuzzSpec,
-  specTriggers,
+  specTriggers as allTriggers,
 } from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
 import { type Divergence, FUZZ_SCENARIO, explain } from "../scenario.js";
+
+/**
+ * The triggers of a case other than `ignoresAbort`, which every case below
+ * L8 has (it is false only for a case that drew `respectsAbort`, a history
+ * option: diff/self/history-triggers.test.ts pins it). These tests read the
+ * triggers each spec feature adds.
+ */
+const specTriggers = (spec: FuzzSpec): string[] =>
+  allTriggers(spec).filter((t) => t !== "ignoresAbort");
 
 const HAND = "a hand one";
 

@@ -142,6 +142,74 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     typeof v === "string" &&
     (/^[a-z]\.rb( \d+\.\d+)? attempt \d+$/.test(v) ||
       /^Batch resolver "([a-z]::)?rb" timed out after \d+ms$/.test(v)),
+  /**
+   * One history snapshot as `onSnapshot` passes it (L8; the RFC's T1, T3):
+   * exactly `facts`, `id`, `ordered` and `trigger`. `facts` holds fuzz
+   * facts only (`f0`, `a::f1`, the Date fact `when`, `b::when`), with any
+   * values; `id` is a positive integer; `ordered` is true: the recorder
+   * replaces the snapshot's `timestamp` (`Date.now` on the fake clock, which
+   * the two engines' clocks can end at different times) with whether it is
+   * at or after the engine's previous snapshot (diff/record.ts, rule 4);
+   * `trigger` is 1.35's pass label,
+   * `facts-changed:` and up to five keys, then `+<n>more` past five
+   * (utils/history.ts). The facts are what a seed wrote, so an entry for a
+   * snapshot that moved or went missing (rows (as), (ay), (bb)) names this
+   * class, never a seed's values. Hand-named: `generalize` never picks it.
+   */
+  snapshot: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const key = /^([a-z]::)?(f\d+|when)$/;
+    const keys = Object.keys(v).sort();
+    const { facts, id, ordered, trigger } = v as Record<string, Json>;
+
+    return (
+      keys.join() === "facts,id,ordered,trigger" &&
+      facts !== null &&
+      typeof facts === "object" &&
+      !Array.isArray(facts) &&
+      Object.keys(facts).every((k) => key.test(k)) &&
+      typeof id === "number" &&
+      Number.isInteger(id) &&
+      id > 0 &&
+      ordered === true &&
+      typeof trigger === "string" &&
+      /^facts-changed:([a-z]::)?(f\d+|when)(,([a-z]::)?(f\d+|when)){0,4}(\+\d+more)?$/.test(
+        trigger,
+      )
+    );
+  },
+  /**
+   * A history record's snapshot ids where some id repeats: row (ba)'s shape
+   * on 1.35, whose next id is not moved by an import (E3, H7: `[1, 2, 3, 4,
+   * 2]`). Hand-named, as `batchItemsRepeated` is: a list of distinct ids
+   * stays outside it.
+   */
+  snapshotIdsRepeated: (v) =>
+    Array.isArray(v) &&
+    v.every((x) => typeof x === "number" && Number.isInteger(x)) &&
+    new Set(v).size < v.length,
+  /**
+   * A history record (the fuzz model's `historyRecord`) whose `index` is
+   * outside its list: below 0 or at or past `length`. Row (bc)'s shape on
+   * 1.35, which imports any `currentIndex` (E2, H15); in the fuzz, the
+   * import of an empty history (index -1, length 0, trigger
+   * `importedEmpty`). Hand-named.
+   */
+  historyIndexOutside: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const { index, length } = v as Record<string, Json>;
+
+    return (
+      typeof index === "number" &&
+      typeof length === "number" &&
+      Number.isInteger(index) &&
+      (index < 0 || index >= length)
+    );
+  },
 };
 
 /**
@@ -185,6 +253,15 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
     /^\[Directive\] Fact "[a-z]::when" assigned a Date instance\.\nFacts must be JSON-roundtrippable for reactivity to work correctly\.\nDate mutations are not tracked\.\nUse \.getTime\(\) for timestamps instead\.\nSee: https:\/\/directive\.run\/docs\/facts#json-rule$/.test(
       v,
     ),
+  /**
+   * The error 1.35 logs when `history.import()` rejects its data (E2,
+   * utils/history.ts: `console.error("[Directive] Failed to import history
+   * data:", error)`), its first argument word for word. Row (bc)'s entry
+   * names it: 2.0 with (bc) rejects an index outside the list, which 1.35
+   * imports, so 2.0 logs this where 1.35 logs nothing (`importedEmpty`).
+   */
+  historyImportFailed: (v) =>
+    typeof v === "string" && v === "[Directive] Failed to import history data:",
 };
 
 /** The masked form of a string the contract hides (diff/compare.ts `tag`). */

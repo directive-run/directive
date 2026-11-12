@@ -464,7 +464,9 @@ export function firstLive(
  * trigger it lists (`covers`; lib/fuzz.ts `FUZZ_TRIGGERS`). `during` (fuzz
  * only) narrows it to a difference in a step of that op (`stepOps`): row
  * (as)'s abort happens only while a settle step's settle() waits, so its
- * entry has `during` "settle" and never covers an abort in another step.
+ * entry has `during` "settle" and never covers an abort in another step. For
+ * a `moved` difference the step is the engine's own record's (`engineStep`),
+ * not the reference's.
  * `group` (fuzz
  * only) is read by the census alone: an entry of a group is stale only when
  * no entry of its group covered a difference in the run.
@@ -1299,6 +1301,16 @@ export function formatReport(
 }
 
 /**
+ * The step of the record the engine under test made: a difference's `step`
+ * is the reference's, and a `moved` record is one step later on the engine
+ * (`by` 1, the default) or one step earlier (`by` -1), so `during` reads
+ * that step for it.
+ */
+function engineStep(d: Difference): number {
+  return d.op === "moved" ? d.step + (d.by ?? 1) : d.step;
+}
+
+/**
  * Whether `div` covers difference `d` of scenario `name`. An entry with
  * `when` covers only in a fuzz case whose `triggers` include every one it
  * lists: never in a hand scenario, nor in a case without a trigger set.
@@ -1318,7 +1330,7 @@ export function covers(
         triggers !== undefined &&
         div.when.every((t) => triggers.includes(t)))) &&
     (div.during === undefined ||
-      (name === FUZZ_SCENARIO && steps?.get(d.step) === div.during)) &&
+      (name === FUZZ_SCENARIO && steps?.get(engineStep(d)) === div.during)) &&
     div.stream === d.stream &&
     div.kind === d.kind &&
     (div.engine === undefined || div.engine === d.engine) &&

@@ -6941,7 +6941,7 @@
     "kind": "timeout",
     "engine": "v2",
     "op": "extra",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -6959,9 +6959,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"timeout\" record that 2.0 has and 1.35 does not: the fuzz model records an abort whose signal.reason is the resolver's timeout error as kind \"timeout\" (any other abort is \"aborted\"), so this is the timed-out attempt's abort, made when its timeout fires. 1.35 never aborts a signal on a timeout, so no engine but 2.0 makes one (the survey of seeds 1 to 20 and 24301 found none in any 1.35 or workspace trace). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: re-scoped from kind \"aborted\" to the model's new \"timeout\" kind (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the early abort no longer pairs with 1.35's later cancel-time abort.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"timeout\" record that 2.0 has and 1.35 does not: the fuzz model records an abort whose signal.reason is the resolver's timeout error as kind \"timeout\" (any other abort is \"aborted\"), so this is the timed-out attempt's abort, made when its timeout fires. 1.35 never aborts a signal on a timeout, so no engine but 2.0 makes one (the survey of seeds 1 to 20 and 24301 found none in any 1.35 or workspace trace). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: re-scoped from kind \"aborted\" to the model's new \"timeout\" kind (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the early abort no longer pairs with 1.35's later cancel-time abort. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-timeout-extra",
@@ -6970,7 +6970,7 @@
     "kind": "timeout",
     "engine": "v2",
     "op": "extra",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -7135,9 +7135,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-timeout-extra`, on the batch's records (an external \"timeout\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-timeout-extra`, on the batch's records (an external \"timeout\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l2-quirk-n-fuzz-aborted-missing",
@@ -7146,7 +7146,7 @@
     "kind": "aborted",
     "engine": "v2",
     "op": "missing",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -7164,9 +7164,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record that 1.35 has and 2.0 does not: a run is canceled after one of its attempts timed out. 1.35 never aborted the timed-out attempt, so its cancel aborts that attempt then; 2.0 aborted it at its timeout (its \"timeout\" record, l2-quirk-n-fuzz-timeout-extra), and a signal aborts once, so the cancel does not repeat it. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: its twin on 2.0 is now a \"timeout\" record (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the two never pair and this is the cancel-time abort alone.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record that 1.35 has and 2.0 does not: a run is canceled after one of its attempts timed out. 1.35 never aborted the timed-out attempt, so its cancel aborts that attempt then; 2.0 aborted it at its timeout (its \"timeout\" record, l2-quirk-n-fuzz-timeout-extra), and a signal aborts once, so the cancel does not repeat it. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: its twin on 2.0 is now a \"timeout\" record (owner decision 2026-11-01: \"timeout aborts recorded under their own kind\"), so the two never pair and this is the cancel-time abort alone. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-aborted-missing",
@@ -7175,7 +7175,7 @@
     "kind": "aborted",
     "engine": "v2",
     "op": "missing",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -7496,9 +7496,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-missing`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-missing`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l2-quirk-n-fuzz-aborted-changed",
@@ -7508,7 +7508,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -7523,9 +7523,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record whose attempt number differs (data[2]): the comparison pairs a run's cancel-time abort of an earlier attempt on 1.35 with the cancel-time abort of the later attempt on 2.0, because 2.0 already aborted the earlier one at its timeout. It is the same moved abort as the extra and missing entries, with the attempt number as the only difference. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: scoped to its quirk's trigger.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. This covers an external \"aborted\" record whose attempt number differs (data[2]): the comparison pairs a run's cancel-time abort of an earlier attempt on 1.35 with the cancel-time abort of the later attempt on 2.0, because 2.0 already aborted the earlier one at its timeout. It is the same moved abort as the extra and missing entries, with the attempt number as the only difference. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-01: scoped to its quirk's trigger. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-aborted-changed",
@@ -7535,7 +7535,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -7706,9 +7706,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-changed`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l2-quirk-n-fuzz-aborted-changed`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-aborted-changed-tag",
@@ -7718,7 +7718,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -7733,9 +7733,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers an external aborted record paired with another run's abort: the tag differs (data[1]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers an external aborted record paired with another run's abort: the tag differs (data[1]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-aborted-changed-tag",
@@ -7745,7 +7745,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -7943,9 +7943,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-aborted-changed-tag`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-aborted-changed-tag`, on the batch's records (an external \"aborted\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-wrote-missing",
@@ -7954,7 +7954,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "missing",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -7972,9 +7972,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external wrote record on 1.35's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external wrote record on 1.35's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-wrote-missing",
@@ -7983,7 +7983,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "missing",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -8304,9 +8304,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-missing`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-missing`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-wrote-extra",
@@ -8315,7 +8315,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "extra",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -8333,9 +8333,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers the same bystander wrote record on 2.0's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers the same bystander wrote record on 2.0's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-wrote-extra",
@@ -8344,7 +8344,7 @@
     "kind": "wrote",
     "engine": "v2",
     "op": "extra",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -8665,9 +8665,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-extra`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-extra`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-wrote-changed-tag",
@@ -8677,7 +8677,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -8692,9 +8692,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander wrote record paired with another run's write: the tag differs (data[1]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander wrote record paired with another run's write: the tag differs (data[1]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-wrote-changed-tag",
@@ -8704,7 +8704,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[1]",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -8902,9 +8902,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-tag`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-tag`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-wrote-changed-attempt",
@@ -8914,7 +8914,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -8929,9 +8929,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander wrote record paired with another write: the attempt number differs (data[2]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander wrote record paired with another write: the attempt number differs (data[2]). Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-wrote-changed-attempt",
@@ -8941,7 +8941,7 @@
     "engine": "v2",
     "op": "changed",
     "path": "data[2]",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -9112,9 +9112,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-attempt`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-wrote-changed-attempt`, on the batch's records (an external \"wrote\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-start-missing",
@@ -9123,7 +9123,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "missing",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -9141,9 +9141,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external start record on 1.35's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external start record on 1.35's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-start-missing",
@@ -9152,7 +9152,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "missing",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -9473,9 +9473,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-missing`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-missing`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-n-fuzz-start-extra",
@@ -9484,7 +9484,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "extra",
-    "when": ["timeout"],
+    "when": ["timeout", "ignoresAbort"],
     "group": "quirk-n",
     "bound": {
       "match": [
@@ -9502,9 +9502,9 @@
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external start record on 2.0's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. 2.0 aborts the timed-out attempt at its timeout, earlier than the cancel-time abort 1.35 makes of the same attempt; when the comparison matches the two identical abort records, every record of another run between the two positions is on the other side of that match in one trace, so it shows as missing and extra (or, paired with a different run's record of the same kind, changed). Only a case with a timeout has it (`when`). This covers a bystander run's external start record on 2.0's side of the moved abort. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-01"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-quirk-n-fuzz-batch-start-extra",
@@ -9513,7 +9513,7 @@
     "kind": "start",
     "engine": "v2",
     "op": "extra",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -9834,9 +9834,9 @@
         ]
       }
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-extra`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. Its batch path (L7): 2.0 aborts a timed-out call of a batched resolver the same way (core-next api/resolvers.ts, the batch's attempt shares the single run's timeout code), and 1.35 never aborts it (core/resolvers.ts, executeBatchAttempt), so a case whose batched resolver has a timeout (`batchTimeout`) shows the same moved abort as its single-run twin `l3-quirk-n-fuzz-start-extra`, on the batch's records (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]) and on the bystander records it moves. The batch's items are one to six batch items: two sources of up to three items each are the most one call can hold. Signed 2026-11-06 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-06"
+    "date": "2026-11-12"
   },
   {
     "id": "l2-quirk-b-hook-onError-missing",
@@ -31259,7 +31259,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -31279,9 +31279,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onResolverCancel call 1.35 makes for a still-wanted sibling of the batch. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onResolverCancel call 1.35 makes for a still-wanted sibling of the batch. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-hook-onRequirementCanceled-missing",
@@ -31291,7 +31291,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -31349,9 +31349,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onRequirementCanceled call 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the onRequirementCanceled call 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-observe-requirement.canceled-missing",
@@ -31361,7 +31361,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -31385,9 +31385,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the observe \"requirement.canceled\" record 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the observe \"requirement.canceled\" record 1.35 makes for a still-wanted sibling. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-external-aborted-missing",
@@ -31397,7 +31397,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -31423,9 +31423,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-external-aborted-extra",
@@ -31434,7 +31434,13 @@
     "kind": "aborted",
     "engine": "v2",
     "op": "extra",
-    "when": ["batched", "batchWithResults", "batchFails", "batchRetry"],
+    "when": [
+      "batched",
+      "batchWithResults",
+      "batchFails",
+      "batchRetry",
+      "ignoresAbort"
+    ],
     "group": "quirk-g-fails",
     "bound": {
       "match": [
@@ -31587,7 +31593,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. This entry does not end the case. Its record: a call of the batched resolver returned with an item failed, and that call's own write retracted the item's requirement before its error was reported; 2.0 keeps the run until its outcome is reported, so the requirement leaving is the last one leaving and the batch's signal aborts, after the handler returned, with no cancel hook and no state change; 1.35 cleared the batch at its run's end (core/resolvers.ts 1773-1783), before it recorded the batch's errors (1787-1795), so its abort finds nothing. Both engines report the error once, and the rest of the case lines up, so this entry covers the one record, only in a case whose batched calls can fail (`when`). This covers the abort of the batch's signal 2.0 makes once every requirement has left. Since #369 (2026-11-11) 2.0 reports a with-results batch's last-attempt item errors inline, before the requirement can leave, so the record shows only on an attempt with retries left (the item's error goes through the retry path, after the own write has retracted the requirement), and `when` is a with-results batch that can fail and has a retry policy. Signed 2026-11-12 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. This entry does not end the case. Its record: a call of the batched resolver returned with an item failed, and that call's own write retracted the item's requirement before its error was reported; 2.0 keeps the run until its outcome is reported, so the requirement leaving is the last one leaving and the batch's signal aborts, after the handler returned, with no cancel hook and no state change; 1.35 cleared the batch at its run's end (core/resolvers.ts 1773-1783), before it recorded the batch's errors (1787-1795), so its abort finds nothing. Both engines report the error once, and the rest of the case lines up, so this entry covers the one record, only in a case whose batched calls can fail (`when`). This covers the abort of the batch's signal 2.0 makes once every requirement has left. Since #369 (2026-11-11) 2.0 reports a with-results batch's last-attempt item errors inline, before the requirement can leave, so the record shows only on an attempt with retries left (the item's error goes through the retry path, after the own write has retracted the requirement), and `when` is a with-results batch that can fail and has a retry policy. Signed 2026-11-12 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -32079,6 +32085,34 @@
     "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle(), the settled notification and inspect() count a running batch, so settle() waits for batched work and inspect() lists a running batch's requirements in flight. 1.35 resolves settle() without waiting for the batches it started and lists no batch in flight (L7 RFC C6, probe B7). In a fuzz case, 2.0's settle() is still waiting at a settled change where 1.35's has already resolved, and settle() runs the batch queues at each settled change while it waits, as 1.35's does (core-next api/core.ts settle(), `features.batch`); so 2.0 starts a queued batch call that 1.35 leaves in its window (verified in a replay of seed 19: the call starts from that flush, inside the case's last settle()). When the call's requirement is then retracted, 2.0 aborts the running call's signal (its last requirement left, quirk g) where 1.35 cancels the queued requirement. From there on the case's timers and later records differ, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver (`when`) and only in a settle step (`during` \"settle\"): the flush comes from settle() while it waits, so an abort in any other step (a spurious abort of a running call, with no settle wait to flush it) is not covered. This covers the abort of that call's signal, a record 1.35 never makes. Signed 2026-11-10 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-10"
+  },
+  {
+    "id": "l8-fuzz-as-hook-onSnapshot-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["batched"],
+    "during": "settle",
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7; owner-approved 2026-11-05, \"Approve (Recommended)\"): settle() counts a running batch, so 2.0's settle() waits for batched work, and 1.35's resolves while the batch still runs (L7 RFC C6, probe B7). With history on (L8; the L8 RFC's rule 5), the batch's write takes a snapshot in the reconcile pass after it: inside the settle step on 2.0, whose settle() waits for that pass, and in the next step on 1.35, whose settle() has already resolved. The shared wait aligns the fake clocks, not that pass. This covers the same `onSnapshot` call one step earlier on 2.0 (`moved`, `by` -1), only where that 2.0 step is a settle step (`during` `settle`, read on 2.0's own record), a snapshot of fuzz facts with 1.35's pass label (`$like` `snapshot`), never a snapshot missing on either side, an extra one, or one that came a step earlier in any other step. A snapshot's `timestamp` is recorded by order, not value (`ordered`, diff/record.ts), so the step it lands in does not make it differ. Signed 2026-11-12 on the owner's instruction: he approved this row (\"Approve (Recommended)\", 2026-11-05) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-h-hook-onError-missing",
@@ -35991,7 +36025,7 @@
     "kind": "onResolverRetry",
     "engine": "v2",
     "op": "extra",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -36206,9 +36240,9 @@
         ]
       }
     },
-    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-p-fuzz-hook-onResolverRetry-missing",
@@ -36331,7 +36365,7 @@
     "kind": "onResolverRetry",
     "engine": "v2",
     "op": "missing",
-    "when": ["batchTimeout"],
+    "when": ["batchTimeout", "ignoresAbort"],
     "group": "quirk-n-batch",
     "bound": {
       "match": [
@@ -36546,9 +36580,9 @@
         ]
       }
     },
-    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Row n's batch path: 2.0 aborts a timed-out batch call's signal, which moves the retries that follow. This covers an onResolverRetry call moved by it. Batch-shaped twin of `l7-quirk-n-fuzz-batch-start-extra` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l3-quirk-p-fuzz-hook-onError-changed",
@@ -36919,7 +36953,7 @@
     "op": "changed",
     "path": "event.id",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -36934,9 +36968,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (with (aq)): retracting one requirement of a running batch cancels it alone on 2.0, so the cancel order differs. This covers a cancel event naming a different sibling at the same place. Batch-shaped twin of `l7-fuzz-g-observe-requirement.canceled-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (with (aq)): retracting one requirement of a running batch cancels it alone on 2.0, so the cancel order differs. This covers a cancel event naming a different sibling at the same place. Batch-shaped twin of `l7-fuzz-g-observe-requirement.canceled-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-k-hook-onResolverWriteRejected-changed-req",
@@ -37039,7 +37073,7 @@
     "op": "changed",
     "path": "data[1]",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37099,9 +37133,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-wrote-extra",
@@ -37111,7 +37145,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37154,9 +37188,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-start-extra",
@@ -37166,7 +37200,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37209,9 +37243,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-start-changed",
@@ -37222,7 +37256,7 @@
     "op": "changed",
     "path": "data[1]",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37237,9 +37271,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-start-changed-items",
@@ -37250,7 +37284,7 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37496,9 +37530,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-wrote-changed-items",
@@ -37509,7 +37543,7 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -37755,9 +37789,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-aborted-changed-items",
@@ -37768,7 +37802,7 @@
     "op": "changed",
     "path": "data[3]",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38014,9 +38048,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record's items (data[3], the requirements a batch call holds; its tag, data[1], is `l7-fuzz-g-after-external-start-changed`'s): 1.35's call and 2.0's hold different items, each a batch requirement or none. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-effect-extra",
@@ -38026,7 +38060,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38083,9 +38117,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-external-cleanup-extra",
@@ -38095,7 +38129,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38152,9 +38186,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-hook-onResolverRetry-extra",
@@ -38164,7 +38198,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38223,9 +38257,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-hook-onFactSet-extra",
@@ -38235,7 +38269,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38267,9 +38301,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-hook-onDerivationInvalidate-extra",
@@ -38279,7 +38313,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38290,9 +38324,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-g-after-hook-onResolverWriteRejected-extra",
@@ -38302,7 +38336,7 @@
     "engine": "v2",
     "op": "extra",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -38344,9 +38378,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-g-external-aborted-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-08"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-k-after-external-twin-changed",
@@ -39877,7 +39911,7 @@
     "engine": "v2",
     "op": "missing",
     "ends": true,
-    "when": ["batched", "batchSiblings"],
+    "when": ["batched", "batchSiblings", "ignoresAbort"],
     "group": "quirk-g",
     "bound": {
       "match": [
@@ -40010,9 +40044,9 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted, for a run of one or of three to six items (deep case 24301/1594: 1.35 aborts call 1 of six items, 2.0 cancels the retracted one alone; `l7-fuzz-g-external-aborted-missing` holds the two-item run). Signed 2026-11-10 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk g (L7): retracting one requirement of a running batch cancels only that requirement. 1.35 aborts the whole batch and cancels every requirement in it, and declares that intended (\"you can't abort one row of a SQL UPDATE without aborting the transaction\", resolvers.ts 2131-2136); the still-wanted ones are never run again, which is 1.35's general rule for a canceled requirement that is still wanted, the same as row j (L7 RFC C2; verified in probe B2 and again in the design review's rerun: b retracted from [a, b, c] mid-run, the signal aborted, a, b and c each canceled, the handler not run again, a and c left unmet). 2.0 cancels the retracted requirement alone; the batch keeps running for the rest and drops its outcome report for the retracted one; resolveBatch writes facts directly, so the facts it already wrote are not undone; the batch's signal aborts only when every requirement has left. From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver whose sources can raise a requirement and a sibling at once (`when`). This covers the abort of the batch's signal 1.35 makes when one requirement is retracted, for a run of one or of three to six items (deep case 24301/1594: 1.35 aborts call 1 of six items, 2.0 cancels the retracted one alone; `l7-fuzz-g-external-aborted-missing` holds the two-item run). Signed 2026-11-10 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-10"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-ap-external-start-extra",
@@ -40343,7 +40377,7 @@
     "kind": "onResolverWriteRejected",
     "engine": "v2",
     "op": "missing",
-    "when": ["batched", "batchAbortOn"],
+    "when": ["batched", "batchAbortOn", "ignoresAbort"],
     "afterOp": "destroy",
     "group": "row-352",
     "bound": {
@@ -40388,9 +40422,9 @@
         }
       ]
     },
-    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the onResolverWriteRejected call 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction.",
+    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the onResolverWriteRejected call 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approve 2.0's (Recommended)\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-10"
+    "date": "2026-11-12"
   },
   {
     "id": "l7-fuzz-destroy-observe-resolver.write.rejected-missing",
@@ -40399,7 +40433,7 @@
     "kind": "resolver.write.rejected",
     "engine": "v2",
     "op": "missing",
-    "when": ["batched", "batchAbortOn"],
+    "when": ["batched", "batchAbortOn", "ignoresAbort"],
     "afterOp": "destroy",
     "group": "row-352",
     "bound": {
@@ -40429,9 +40463,9 @@
         }
       ]
     },
-    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the resolver.write.rejected event 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction.",
+    "reason": "Owner row 2/352 (L7 follow-ups), approved by Jason, 2026-11-10: \"Approve 2.0's (Recommended)\". After destroy(), an aborted batch's late write produces no hook on 2.0, while 1.35 reports it as clobbered (onResolverWriteRejected and its resolver.write.rejected event, reason \"clobbered\"); the facts are equal on both (deep case 2/352). This covers the resolver.write.rejected event 1.35 reports for a batch requirement's late write, only in a step after `destroy` (`afterOp`), in a case with a batched resolver whose source aborts on the write (`when`). Signed on the owner's instruction. Re-signed 2026-11-12: narrowed to a handler that ignores its abort (`when` adds `ignoresAbort`, the L8 RFC's rule 9), so a case whose handlers respect their abort (`respectsAbort`, drawn only with history) is never covered; on the owner's approval of this row (\"Approve 2.0's (Recommended)\").",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-10"
+    "date": "2026-11-12"
   },
   {
     "id": "l7f-letgo-destroy-hook-onResolverComplete-missing-step6",
