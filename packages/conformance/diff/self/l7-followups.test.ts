@@ -32,6 +32,7 @@ import { compareContract } from "../compare.js";
 import { type FuzzSpec, toScenario } from "../fuzz/model.js";
 import type { TraceEntry } from "../record.js";
 import {
+  type Difference,
   type Divergence,
   covers,
   explain,
@@ -442,24 +443,29 @@ describe("L7 follow-ups", () => {
     const ops = ["start", "set", "set", "advance"];
     const steps = new Map(ops.map((op, i) => [i, op] as [number, string]));
     const triggers = ["batched", "batchAbortOn", "batchMaxSize"];
-    const missing = (items: string[]) =>
+    // 1.35's call in step 2; 2.0's own call, when it makes one, in step 3.
+    const diffs = (items: string[], later: string[] | null) =>
       compareContract(
         trace(ops, [[2, ext("start", "a.rb", 1, items)]]),
-        trace(ops, []),
+        trace(ops, later ? [[3, ext("start", "a.rb", 1, later)]] : []),
         "v2",
-      )[0]!;
-    const doubled = missing(["0.0", "0.0"]);
-    expect(covers(div, "fuzz", doubled, triggers, steps)).toBe(true);
+      );
+    const first = (ds: Difference[]) =>
+      ds.find((d) => d.op === "missing" && d.kind === "start") as Difference;
+    const covered = (ds: Difference[], t = triggers) =>
+      covers(div, "fuzz", first(ds), t, steps, ds);
+    const doubled = diffs(["0.0", "0.0"], ["0.0"]);
+    expect(covered(doubled)).toBe(true);
+    // A 2.0 that never runs the call (the dropped-batch tamper) is not covered.
+    expect(covered(diffs(["0.0", "0.0"], null))).toBe(false);
     // A call of distinct items 2.0 lacks is not 1.35's doubled queue.
-    expect(covers(div, "fuzz", missing(["0.0", "0.1"]), triggers, steps)).toBe(
-      false,
-    );
+    expect(covered(diffs(["0.0", "0.1"], ["0.1"]))).toBe(false);
     // Without a maxSize, or a bound source, the queue cannot fill early.
     for (const t of [
       ["batched", "batchAbortOn"],
       ["batched", "batchMaxSize"],
     ]) {
-      expect(covers(div, "fuzz", doubled, t, steps)).toBe(false);
+      expect(covered(doubled, t)).toBe(false);
     }
   });
 

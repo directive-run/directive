@@ -5739,7 +5739,54 @@
         }
       ]
     },
-    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) retracted and raised again goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes: at the next step that moves the clock, which can be several steps later, or never when the system stops first (PR seed 15 after #370: its case 28's call starts in step 6 on 1.35 and in step 9 on 2.0, a tick and a dispatch between; the shrunk case stops before 2.0's window runs, and 2.0 cancels the queued requirement at the stop). `l7-fuzz-av-external-start-moved` covers the one-step move; this covers 1.35's call start missing on 2.0 in its step, only when 1.35's call holds an item twice (`batchItemsRepeated`, a call 2.0 never makes) in a case with a `maxSize` (`when` `batchMaxSize`) whose batched source has `abortOn` (`batchAbortOn`): a missing start of a call of distinct items is not covered. Every later record can differ (2.0's call and its outcomes come later, or not at all), so this entry ends the fuzz case (`ends`). Signed 2026-11-11 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
+    "requires": {
+      "stream": "external",
+      "kind": "start",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a bound queued batched requirement (its constraint has `abortOn`) retracted and raised again goes into 1.35's queue twice; 2.0 holds a requirement once in the queue (#362). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes: at the next step that moves the clock, which can be several steps later, or never when the system stops first (PR seed 15 after #370: its case 28's call starts in step 6 on 1.35 and in step 9 on 2.0, a tick and a dispatch between). `l7-fuzz-av-external-start-moved` covers the one-step move; this covers 1.35's call start missing on 2.0 in its step, only when 1.35's call holds an item twice (`batchItemsRepeated`, a call 2.0 never makes) in a case with a `maxSize` (`when` `batchMaxSize`) whose batched source has `abortOn` (`batchAbortOn`): a missing start of a call of distinct items is not covered. It also requires 2.0's own later call (`requires`: an extra start of the batched resolver, holding one or two items as `maxSize` allows, anywhere in the case), so a 2.0 that never runs the call is not covered (diff/self/moved.test.ts, the dropped-batch tamper), nor is a case that stops before 2.0's window runs (2.0 then cancels the queued requirement at the stop; that shape does not show in the PR seeds). Every later record can differ (2.0's call and its outcomes come later, or not at all), so this entry ends the fuzz case (`ends`). Signed 2026-11-11 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-11"
   },

@@ -65,6 +65,35 @@ function loader(
   } as any);
 }
 
+/** A run bound by `abortOn` that finishes 50 ms after it starts. */
+function letGoLoader(ctx: BuildContext) {
+  return loader(
+    ctx,
+    {},
+    async (context) => {
+      await wait(50);
+      context.facts.value = 1;
+      context.facts.done = true;
+      ctx.external(["done", context.facts.value]);
+    },
+    { abortOn: ["value"] },
+  );
+}
+
+/** Start it, let it go (retract go), then `end` and let it finish. */
+function letGoSteps(end: "stop" | "destroy") {
+  return [
+    { op: "start" },
+    { op: "set", key: "go", value: true },
+    { op: "advance", ms: 5 },
+    { op: "set", key: "go", value: false },
+    { op: "advance", ms: 1 },
+    { op: end },
+    { op: "advance", ms: 100 },
+    { op: "checkpoint", label: "end" },
+  ] as const;
+}
+
 /** The backoff delay before jitter, clamped to the default maxDelay. */
 const MAX_DELAY = 30000;
 const exponential = (initial: number, failed: number) =>
@@ -479,34 +508,17 @@ suite("L2 resolver rules at their edges", () => {
   // (Recommended)": after destroy() 2.0 reports nothing of it, while 1.35
   // reports it complete and its requirement met (the divergence entries of
   // the destroy scenario). After stop() both report it (the stop twin).
-  for (const end of ["stop", "destroy"] as const) {
-    scenario(
-      `a let-go run that finishes after ${end}()`,
-      (ctx) => ({
-        module: loader(
-          ctx,
-          {},
-          async (context) => {
-            await wait(50);
-            context.facts.value = 1;
-            context.facts.done = true;
-            ctx.external(["done", context.facts.value]);
-          },
-          { abortOn: ["value"] },
-        ),
-      }),
-      [
-        { op: "start" },
-        { op: "set", key: "go", value: true },
-        { op: "advance", ms: 5 },
-        { op: "set", key: "go", value: false },
-        { op: "advance", ms: 1 },
-        { op: end },
-        { op: "advance", ms: 100 },
-        { op: "checkpoint", label: "end" },
-      ],
-    );
-  }
+  scenario(
+    "a let-go run that finishes after stop()",
+    (ctx) => ({ module: letGoLoader(ctx) }),
+    letGoSteps("stop"),
+  );
+
+  scenario(
+    "a let-go run that finishes after destroy()",
+    (ctx) => ({ module: letGoLoader(ctx) }),
+    letGoSteps("destroy"),
+  );
 
   scenario(
     "abortOn on an async constraint is disabled, with a signal",
