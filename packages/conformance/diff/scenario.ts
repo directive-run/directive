@@ -300,6 +300,10 @@ async function waitOutBatches(
   step: number,
   attachedAtSettle: string | false | undefined,
 ): Promise<void> {
+  // Let 2.0's end-of-batch microtask chain (handler return, the call's
+  // finally, the next `schedule()`) run before `busy` is read, or the wait
+  // breaks early and the follow-up pass lands in the next step.
+  await flushMicrotasks();
   const from = Date.now();
   const wait: SettleWait = {
     step,
@@ -2182,7 +2186,7 @@ export interface FuzzTally {
   /**
    * Discarded cases whose reference's batches were live at the shared wait's cap
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
-   * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
+   * own (maxNeverSettles, max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)"; Jason, 2026-11-07: "Discard, own count (Recommended)").
    */
   neverSettles: number;
 }
