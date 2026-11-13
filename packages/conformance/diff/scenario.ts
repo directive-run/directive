@@ -2186,7 +2186,7 @@ export interface FuzzTally {
   /**
    * Discarded cases whose reference's batches were live at the shared wait's cap
    * (`ScenarioResult.neverSettles`): not in `runaway`, and capped on their
-   * own (maxNeverSettles, max(1% of cases, 3); Jason, 2026-11-07: "Discard, own count (Recommended)").
+   * own (maxNeverSettles, max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)"; Jason, 2026-11-07: "Discard, own count (Recommended)").
    */
   neverSettles: number;
 }

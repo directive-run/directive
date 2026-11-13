@@ -17,9 +17,9 @@
  * 2.0 outworked the reference (seeds 8 and 2: discarded after the stop, toward the
  * runaway limit, naming the entry; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), while a stop after the
  * reference finished still fails; and the cap counting. A case discarded because it never settles counts on its
- * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
+ * own, at most max(1% of the seed's cases, 5) (Jason, 2026-11-07:
  * "Discard, own count (Recommended)"; the cap, Jason, 2026-11-07: "Cap at
- * 1% of cases, min 3 (Recommended)").
+ * 1% of cases, min 3 (Recommended)"; the floor, Jason, 2026-11-12: "Raise the floor to 5 (Recommended)").
  */
 
 import { describe, expect, it } from "vitest";
@@ -461,7 +461,7 @@ describe("the fuzz shared wait at a settle step", () => {
     );
 
     // On its own count: not a runaway, and within the cap (max(1% of the
-    // seed's cases, 3)) it fails nothing; the census prints it on its own
+    // seed's cases, 5)) it fails nothing; the census prints it on its own
     // line.
     const compared = await runScenario(toScenario(spec), {
       candidates: [local, v2],
@@ -490,7 +490,7 @@ describe("the fuzz shared wait at a settle step", () => {
       v2: tally.onV2,
     };
     expect(checkFuzzRuns([run], true)).toEqual([]);
-    expect(describeNeverSettles([run])).toMatch(/seed 1: 1 of at most 3$/);
+    expect(describeNeverSettles([run])).toMatch(/seed 1: 1 of at most 5$/);
   });
 
   it("(c) only 2.0 live at the cap while 1.35 settled in the same time: the case fails, as a 2.0 bug, naming what kept it live", async () => {
@@ -803,11 +803,11 @@ describe("the fuzz shared wait at a settle step", () => {
     );
   });
 
-  it("(e) the never-settles cap is max(1% of the seed's cases, 3)", () => {
-    expect(MIN_NEVER_SETTLES).toBe(3);
+  it("(e) the never-settles cap is max(1% of the seed's cases, 5)", () => {
+    expect(MIN_NEVER_SETTLES).toBe(5);
     expect(
-      [0, 205, 299, 300, 399, 400, 1010, 7000].map(maxNeverSettles),
-    ).toEqual([3, 3, 3, 3, 3, 4, 10, 70]);
+      [0, 205, 299, 300, 499, 500, 600, 1010, 7000].map(maxNeverSettles),
+    ).toEqual([5, 5, 5, 5, 5, 5, 6, 10, 70]);
   });
 
   it("(e) both-live and 1.35-only discards share the never-settles count; a 2.0-only live case is compared and fails, never discarded", () => {
@@ -908,32 +908,32 @@ describe("the fuzz shared wait at a settle step", () => {
       };
     };
 
-    // At the minimum cap (203 cases: 1% is 2, so 3): discarded, never a
+    // At the minimum cap (205 cases: 1% is 2, so 5): discarded, never a
     // runaway, nothing fails.
-    const within = runOf(3);
-    expect(maxNeverSettles(within.tally.ran)).toBe(3);
+    const within = runOf(5);
+    expect(maxNeverSettles(within.tally.ran)).toBe(5);
     expect(within.tally).toMatchObject({
-      ran: FUZZ_FLOOR + 3,
+      ran: FUZZ_FLOOR + 5,
       runaway: 0,
       afterStop: 0,
-      neverSettles: 3,
+      neverSettles: 5,
       onV2: FUZZ_FLOOR,
     });
     expect(within.run.runs).toBe(FUZZ_FLOOR);
     expect(checkFuzzRuns([within.run], true)).toEqual([]);
     expect(describeNeverSettles([within.run])).toMatch(
-      /seed 1: 3 of at most 3$/,
+      /seed 1: 5 of at most 5$/,
     );
 
     // One over the cap: the fuzz test's limit and the census fail it, and the
     // runaway limit (max(1% of cases, 2) = 2 here) is not what fires.
-    const over = runOf(4);
-    expect(over.tally).toMatchObject({ runaway: 0, neverSettles: 4 });
+    const over = runOf(6);
+    expect(over.tally).toMatchObject({ runaway: 0, neverSettles: 6 });
     expect(over.tally.neverSettles).toBeGreaterThan(
       maxNeverSettles(over.tally.ran),
     );
     expect(checkFuzzRuns([over.run], true)).toEqual([
-      'conformance:diff: 4 fuzz cases whose reference never settles (seed 1); at most 3 allowed (max(1% of cases, 3); Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)")',
+      'conformance:diff: 6 fuzz cases whose reference never settles (seed 1); at most 5 allowed (max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)")',
     ]);
 
     // A deep seed: 1% of its cases. 1,000 compared and 10 discarded is 1,010
@@ -946,7 +946,7 @@ describe("the fuzz shared wait at a settle step", () => {
     );
     const deepOver = runOf(11, 1000);
     expect(checkFuzzRuns([deepOver.run], true)).toEqual([
-      'conformance:diff: 11 fuzz cases whose reference never settles (seed 1); at most 10 allowed (max(1% of cases, 3); Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)")',
+      'conformance:diff: 11 fuzz cases whose reference never settles (seed 1); at most 10 allowed (max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)")',
     ]);
   });
 });
