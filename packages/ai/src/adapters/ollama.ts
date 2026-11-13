@@ -104,7 +104,7 @@ const OLLAMA_RATES = {
  */
 /**
  * The date the rates in {@link OLLAMA_PRICING} were last checked against
- * https://ollama.com.
+ * https://ollama.com/pricing.
  *
  * A published table is a snapshot, and a stale one is not an error anywhere: a
  * rate that moved produces a uniform arithmetic drift in every cost this
@@ -115,7 +115,7 @@ const OLLAMA_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OLLAMA_PRICING_AS_OF = "2026-08-15";
+export const OLLAMA_PRICING_AS_OF = "2026-11-12";
 
 export const OLLAMA_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OLLAMA_RATES,
