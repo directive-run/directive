@@ -210,6 +210,8 @@ const ANTHROPIC_RATES = {
   },
 
   // ---- Retired; kept for reconciling historical spend ----
+  // Retired 2026-02-19 and absent from the pricing page, so this row was NOT
+  // re-verified on 2026-11-12; the rates are carried from the earlier check.
   "claude-3-5-haiku-20241022": {
     input: 0.8,
     output: 4,
@@ -259,7 +261,7 @@ const ANTHROPIC_RATES = {
  */
 /**
  * The date the rates in {@link ANTHROPIC_PRICING} were last checked against
- * https://anthropic.com/pricing.
+ * https://platform.claude.com/docs/en/about-claude/pricing.
  *
  * A published table is a snapshot, and a stale one is not an error anywhere: a
  * rate that moved produces a uniform arithmetic drift in every cost this
@@ -270,7 +272,7 @@ const ANTHROPIC_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const ANTHROPIC_PRICING_AS_OF = "2026-08-15";
+export const ANTHROPIC_PRICING_AS_OF = "2026-11-12";
 
 export const ANTHROPIC_PRICING: Record<string, ModelPricing> =
   toTokenPricingTable(ANTHROPIC_RATES, "ANTHROPIC_PRICING");
