@@ -104,6 +104,7 @@
   "tests/core/l7-batch-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l7-batch-pins-oracle-production.test.ts",
   "tests/core/l7-batch-pins-oracle.test.ts": "packages/core/src/core/__tests__/l7-batch-pins-oracle.test.ts",
   "tests/core/l7-batch-resolvers-oracle.test.ts": "packages/core/src/core/__tests__/l7-batch-resolvers-oracle.test.ts",
+  "tests/core/l8-history-gate-debt-oracle.test.ts": "packages/core/src/core/__tests__/l8-history-gate-debt-oracle.test.ts",
   "tests/core/l8-history-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l8-history-pins-oracle-production.test.ts",
   "tests/core/l8-history-pins-oracle.test.ts": "packages/core/src/core/__tests__/l8-history-pins-oracle.test.ts",
   "tests/core/l8-system-oracle-production.test.ts": "packages/core/src/core/__tests__/l8-system-oracle-production.test.ts",

@@ -73,6 +73,16 @@ const GEMINI_RATES = {
   // not represented; a per-modality table is a separate change.
   //
   // Rates for models with a tier above 200k tokens are the ≤200k figures.
+  //
+  // Re-checked 2026-11-12. gemini-3.6-flash is priced $0.75 / $3.75 (cached
+  // $0.075) through 2026-12-31 and $1.50 / $7.50 (cached $0.15) from
+  // 2027-01-01; the row holds today's rate.
+  //
+  // gemini-3.7-flash and gemini-3.5-flash are no longer priced on the page: the
+  // API routes them to gemini-3.8-flash and gemini-3.6-flash. Their rows were
+  // NOT re-verified on 2026-11-12 and are kept so a caller naming them is still
+  // priced. gemini-2.5-pro and gemini-2.5-flash are deprecated and route to
+  // other models from 2026-12-01; their rates still match the page.
   "gemini-3.7-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
   "gemini-3.6-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
   "gemini-3.5-flash": { input: 1.5, output: 9, cacheRead: 0.15 },
@@ -128,7 +138,7 @@ const GEMINI_RATES = {
  */
 /**
  * The date the rates in {@link GEMINI_PRICING} were last checked against
- * https://ai.google.dev/pricing.
+ * https://aistudio.google.com/docs/pricing.
  *
  * A published table is a snapshot, and a stale one is not an error anywhere: a
  * rate that moved produces a uniform arithmetic drift in every cost this
@@ -139,7 +149,7 @@ const GEMINI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const GEMINI_PRICING_AS_OF = "2026-08-15";
+export const GEMINI_PRICING_AS_OF = "2026-11-12";
 
 export const GEMINI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   GEMINI_RATES,

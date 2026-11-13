@@ -9675,6 +9675,101 @@
         }
       }
     },
+    "tests/core/l8-history-gate-debt-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "pin": true,
+      "tests": {
+        "a snapshot's label > names the keys its pass changed, up to five, then counts the rest": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "onHistoryChange > is not told of a navigation after destroy()": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "onHistoryChange > is not told of a navigation after destroyAsync()": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "onHistoryChange > a write it makes while a snapshot is taken gets a snapshot of its own": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "history.snapshotEvents and writes outside an event > with no fact set at start, an unlisted event takes no snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "a navigation leaves no snapshot request behind > an unlisted event after goBack() takes no snapshot and keeps redo": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "a navigation leaves no snapshot request behind > nor does a listed event a listener dispatches during the rewind": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches synchronously refreshes the snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches after an await does not refresh it": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > an effect's own write under a filter refreshes the snapshot, not a new one": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > after a pass that took no snapshot, an effect's write refreshes none": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > a chain of two effect passes both fold into the first pass's snapshot": {
+          "layer": "L8",
+          "by": ["member .history", "option history"]
+        },
+        "an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "a batched write in the same tick as a navigation > takes its snapshot": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a navigation > an effect on a derivation re-runs with the rewound value": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a navigation > an onNavigate skip effect on a derivation sits out the rewind": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a navigation > a rewind made while a pass awaits an effect wakes effects once it ends": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a navigation > after an effect chain is cut, a listener's write during a rewind keeps redo": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
+        "effects after a navigation > start() after a navigation made while stopped does not treat its first pass as a rewind": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        }
+      }
+    },
     "tests/core/l8-history-pins-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L8",

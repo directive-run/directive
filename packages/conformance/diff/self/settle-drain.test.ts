@@ -17,9 +17,9 @@
  * 2.0 outworked the reference (seeds 8 and 2: discarded after the stop, toward the
  * runaway limit, naming the entry; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)"), while a stop after the
  * reference finished still fails; and the cap counting. A case discarded because it never settles counts on its
- * own, at most max(1% of the seed's cases, 3) (Jason, 2026-11-07:
+ * own, at most max(1% of the seed's cases, 5) (Jason, 2026-11-07:
  * "Discard, own count (Recommended)"; the cap, Jason, 2026-11-07: "Cap at
- * 1% of cases, min 3 (Recommended)").
+ * 1% of cases, min 3 (Recommended)"; the floor, Jason, 2026-11-12: "Raise the floor to 5 (Recommended)").
  */
 
 import { describe, expect, it } from "vitest";
@@ -126,6 +126,17 @@ const SEED_2: FuzzSpec = JSON.parse(
  */
 const SEED_24301: FuzzSpec = JSON.parse(
   '{"modules":[{"facts":2,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[{"fact":0,"atLeast":0,"crossAtLeast":null,"priority":0,"writes":0,"value":0,"delay":1,"fails":0,"retry":0,"timeout":null},{"fact":0,"atLeast":1,"crossAtLeast":null,"priority":0,"writes":0,"value":1,"delay":1,"fails":0,"retry":0,"timeout":null}],"effects":[],"source":null},{"facts":2,"date":false,"derivations":[],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":null}],"boundary":null,"history":false,"trace":false,"steps":[{"op":"dispatch","module":0,"event":0,"value":1},{"op":"publish","event":"own","value":0}],"batch":{"sources":[{"fact":0,"atLeast":0,"items":1,"abortOn":false}],"handler":"batch","failing":"all","windowMs":5,"maxSize":null,"delay":0,"fails":0,"retry":0,"timeout":null,"writes":0,"value":0}}',
+);
+
+/**
+ * Deep seed 1, case 4920 (DIFF_FUZZ_RUNS=5000, report mode): a batched call
+ * (retry 1, timeout 10) ends at the settle step's wait. 2.0's end-of-batch
+ * microtask chain (handler return, the call's finally, `schedule()`) had not
+ * run when the wait read `busy`, so the wait broke early and 2.0's follow-up
+ * pass landed in the next step; 1.35's landed inside the wait.
+ */
+const DEEP_1_4920: FuzzSpec = JSON.parse(
+  '{"modules":[{"facts":1,"date":false,"derivations":[{"facts":[0],"derived":[],"threshold":-1,"throwsAt":4}],"events":[{"target":0,"add":false}],"constraints":[],"effects":[],"source":{"gated":false}}],"boundary":"disable","history":false,"trace":false,"steps":[{"op":"tick"},{"op":"dispatch","module":0,"event":2147483638,"value":4},{"op":"publish","event":"own","value":6},{"op":"settle"},{"op":"tick"},{"op":"set","module":0,"fact":942665837,"value":-2},{"op":"dispatch","module":0,"event":2147483617,"value":4},{"op":"tick"}],"batch":{"sources":[{"fact":2,"atLeast":2,"items":3,"abortOn":false},{"fact":2,"atLeast":3,"items":3,"abortOn":false}],"handler":"batch","failing":"all","windowMs":1,"maxSize":2,"delay":5,"fails":0,"retry":1,"timeout":10,"writes":0,"value":-1}}',
 );
 
 /**
@@ -313,6 +324,15 @@ describe("the fuzz shared wait at a settle step", () => {
     expect(result.settleTimes!.v1).toEqual([2]);
   });
 
+  it("the wait lets 2.0's end-of-batch microtasks run before it reads `busy`: deep seed 1's case 4920 compares equal, with the follow-up pass in the same step on both engines", async () => {
+    const result = await runScenario(toScenario(DEEP_1_4920), {
+      candidates: [local, v2],
+    });
+    expect(result.report).toBe("");
+    expect(result.ok).toBe(true);
+    expect(result.settleTimes!.v2).toEqual(result.settleTimes!.v1);
+  });
+
   it("v2's detached batch run is waited out in the same wait as 1.35's batch; kept out of it, v2 differs", async () => {
     // A bound batch (abortOn the handler's write key, f1): its requirement is
     // retracted (f0 back to 0) while the call waits its 5 ms, so v2 detaches
@@ -441,7 +461,7 @@ describe("the fuzz shared wait at a settle step", () => {
     );
 
     // On its own count: not a runaway, and within the cap (max(1% of the
-    // seed's cases, 3)) it fails nothing; the census prints it on its own
+    // seed's cases, 5)) it fails nothing; the census prints it on its own
     // line.
     const compared = await runScenario(toScenario(spec), {
       candidates: [local, v2],
@@ -470,7 +490,7 @@ describe("the fuzz shared wait at a settle step", () => {
       v2: tally.onV2,
     };
     expect(checkFuzzRuns([run], true)).toEqual([]);
-    expect(describeNeverSettles([run])).toMatch(/seed 1: 1 of at most 3$/);
+    expect(describeNeverSettles([run])).toMatch(/seed 1: 1 of at most 5$/);
   });
 
   it("(c) only 2.0 live at the cap while 1.35 settled in the same time: the case fails, as a 2.0 bug, naming what kept it live", async () => {
@@ -783,11 +803,11 @@ describe("the fuzz shared wait at a settle step", () => {
     );
   });
 
-  it("(e) the never-settles cap is max(1% of the seed's cases, 3)", () => {
-    expect(MIN_NEVER_SETTLES).toBe(3);
+  it("(e) the never-settles cap is max(1% of the seed's cases, 5)", () => {
+    expect(MIN_NEVER_SETTLES).toBe(5);
     expect(
-      [0, 205, 299, 300, 399, 400, 1010, 7000].map(maxNeverSettles),
-    ).toEqual([3, 3, 3, 3, 3, 4, 10, 70]);
+      [0, 205, 299, 300, 499, 500, 600, 1010, 7000].map(maxNeverSettles),
+    ).toEqual([5, 5, 5, 5, 5, 5, 6, 10, 70]);
   });
 
   it("(e) both-live and 1.35-only discards share the never-settles count; a 2.0-only live case is compared and fails, never discarded", () => {
@@ -888,32 +908,32 @@ describe("the fuzz shared wait at a settle step", () => {
       };
     };
 
-    // At the minimum cap (203 cases: 1% is 2, so 3): discarded, never a
+    // At the minimum cap (205 cases: 1% is 2, so 5): discarded, never a
     // runaway, nothing fails.
-    const within = runOf(3);
-    expect(maxNeverSettles(within.tally.ran)).toBe(3);
+    const within = runOf(5);
+    expect(maxNeverSettles(within.tally.ran)).toBe(5);
     expect(within.tally).toMatchObject({
-      ran: FUZZ_FLOOR + 3,
+      ran: FUZZ_FLOOR + 5,
       runaway: 0,
       afterStop: 0,
-      neverSettles: 3,
+      neverSettles: 5,
       onV2: FUZZ_FLOOR,
     });
     expect(within.run.runs).toBe(FUZZ_FLOOR);
     expect(checkFuzzRuns([within.run], true)).toEqual([]);
     expect(describeNeverSettles([within.run])).toMatch(
-      /seed 1: 3 of at most 3$/,
+      /seed 1: 5 of at most 5$/,
     );
 
     // One over the cap: the fuzz test's limit and the census fail it, and the
     // runaway limit (max(1% of cases, 2) = 2 here) is not what fires.
-    const over = runOf(4);
-    expect(over.tally).toMatchObject({ runaway: 0, neverSettles: 4 });
+    const over = runOf(6);
+    expect(over.tally).toMatchObject({ runaway: 0, neverSettles: 6 });
     expect(over.tally.neverSettles).toBeGreaterThan(
       maxNeverSettles(over.tally.ran),
     );
     expect(checkFuzzRuns([over.run], true)).toEqual([
-      'conformance:diff: 4 fuzz cases whose reference never settles (seed 1); at most 3 allowed (max(1% of cases, 3); Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)")',
+      'conformance:diff: 6 fuzz cases whose reference never settles (seed 1); at most 5 allowed (max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)")',
     ]);
 
     // A deep seed: 1% of its cases. 1,000 compared and 10 discarded is 1,010
@@ -926,7 +946,7 @@ describe("the fuzz shared wait at a settle step", () => {
     );
     const deepOver = runOf(11, 1000);
     expect(checkFuzzRuns([deepOver.run], true)).toEqual([
-      'conformance:diff: 11 fuzz cases whose reference never settles (seed 1); at most 10 allowed (max(1% of cases, 3); Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)")',
+      'conformance:diff: 11 fuzz cases whose reference never settles (seed 1); at most 10 allowed (max(1% of cases, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)")',
     ]);
   });
 });

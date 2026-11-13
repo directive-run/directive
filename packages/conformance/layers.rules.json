@@ -521,6 +521,10 @@
       "rule": "L8",
       "pin": true
     },
+    "tests/core/l8-history-gate-debt-oracle.test.ts": {
+      "rule": "L8",
+      "pin": true
+    },
     "tests/core/l8-history-pins-oracle-production.test.ts": {
       "rule": "L8",
       "pin": true

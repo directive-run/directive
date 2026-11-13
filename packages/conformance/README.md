@@ -224,8 +224,8 @@ the traces to agree.
   counted on its own census line (with how many had v2 live too), never
   toward the runaway limit, and more than the seed's cap fail the run, in
   the fuzz test and in the census (diff/self/settle-drain.test.ts). The cap:
-  Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)", so max(1% of
-  the seed's cases, 3) (`maxNeverSettles`, lib/fuzz.ts); measured, about
+  Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)", with the floor
+  raised to 5 (Jason, 2026-11-12: "Raise the floor to 5 (Recommended)"), so max(1% of the seed's cases, 5) (`maxNeverSettles`, lib/fuzz.ts); measured, about
   0.5% of cases.
   **Fuzz: deep runs report batched cases.** Jason, 2026-11-09: "Gate on
   short seeds; deep runs report (Recommended)". The L7 gate passed on the
