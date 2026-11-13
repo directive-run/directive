@@ -44,9 +44,9 @@
  * never settles on 1.35 either (diff/scenario.ts `neverSettles`): it is
  * discarded too, but on its own count, never toward
  * the runaway limit, and more than maxNeverSettles (max(1% of the seed's
- * cases, 3)) fail the run (Jason, 2026-11-07: "Discard, own count
+ * cases, 5)) fail the run (Jason, 2026-11-07: "Discard, own count
  * (Recommended)"; the cap, Jason, 2026-11-07: "Cap at 1% of cases, min 3
- * (Recommended)").
+ * (Recommended)", with the floor raised to 5, Jason, 2026-11-12: "Raise the floor to 5 (Recommended)").
  *
  * A case an `ends` divergence stops (diff/scenario.ts `explain`: an approved
  * quirk whose consequences cascade) is compared up to that difference, and
@@ -297,7 +297,7 @@ describe("differential fuzz", () => {
         }), ${neverSettles} discarded because the reference never settles, ${ran - runaway - neverSettles} compared, ${onV2} of them on v2 too (v2 is built up to ${current ?? "nothing"}), ${ended} ended early by an \`ends\` divergence, the shared wait at a settle step advanced the reference's clock in ${drained} and v2's in ${drainedDetached}, ${sharedRerun} of them needing more than one round to find the common end time; most callbacks in a compared case ${mostFired}; ${((Date.now() - started) / 1000).toFixed(1)} s`,
       );
       console.info(
-        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 3), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished, with no \`ends\` stop before v2 outworked the reference; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)")`,
+        `[diff fuzz] seed ${SEED}: ${neverSettles} never settles (discarded: the reference's batches were still live at the shared wait's 5 s cap at a settle step, ${bothLive} of them with v2's live too; at most ${maxNeverSettles(ran)} for this seed, max(1% of ${ran} cases, 5), not counted as runaways); ${twoOnlyLive} failed as 2.0-only live (v2 still live at the cap where the reference had finished, with no \`ends\` stop before v2 outworked the reference; Jason, 2026-11-08: "Use 'Discard after the stop' (Recommended)")`,
       );
       logFuzz(SEED, tally);
       if (REPORT_MODE) {
@@ -313,7 +313,7 @@ describe("differential fuzz", () => {
     ).toBeLessThanOrEqual(maxRunaways(tally.ran));
     expect(
       tally.neverSettles,
-      `too many cases whose reference never settles (limit max(1% of ${tally.ran}, 3); Jason, 2026-11-07: "Cap at 1% of cases, min 3 (Recommended)")`,
+      `too many cases whose reference never settles (limit max(1% of ${tally.ran}, 5); Jason, 2026-11-12: "Raise the floor to 5 (Recommended)")`,
     ).toBeLessThanOrEqual(maxNeverSettles(tally.ran));
     if (current !== null) {
       expect(

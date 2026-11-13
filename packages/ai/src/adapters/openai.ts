@@ -55,6 +55,19 @@ const OPENAI_RATES = {
   // `cacheRead` is OpenAI's cached-input rate. There is no cache-write charge:
   // caching is automatic and storing a prefix costs nothing, so `cacheWrite` is
   // deliberately absent rather than defaulted to the input rate.
+  //
+  // Re-checked 2026-11-12. Rates for the flagship rows are the short-context
+  // (<=272k input tokens) figures; the page doubles input and raises output
+  // above that, which a per-token table cannot express.
+  //
+  // gpt-5.6-sol: the page shows $4 / $20 (cached $0.40) as promotional pricing
+  // through 2026-11-30 and does not state the price after it. This row keeps
+  // the earlier $5 / $30 / $0.50 so a budget cannot under-read once the
+  // promotion lapses.
+  //
+  // Not on the pricing page any more (shut down 2026-10-23 per the deprecations
+  // page): gpt-4.1-nano, gpt-4-turbo, o1, o1-pro, o3-mini, o4-mini. Their rates
+  // were NOT re-verified on 2026-11-12; they stay for reconciling past spend.
   "gpt-5.6-sol": { input: 5, output: 30, cacheRead: 0.5 },
   "gpt-5.6-terra": { input: 2, output: 12, cacheRead: 0.2 },
   "gpt-5.6-luna": { input: 0.2, output: 1.2, cacheRead: 0.02 },
@@ -122,7 +135,7 @@ const OPENAI_RATES = {
  */
 /**
  * The date the rates in {@link OPENAI_PRICING} were last checked against
- * https://openai.com/api/pricing.
+ * https://developers.openai.com/api/docs/pricing.
  *
  * A published table is a snapshot, and a stale one is not an error anywhere: a
  * rate that moved produces a uniform arithmetic drift in every cost this
@@ -133,7 +146,7 @@ const OPENAI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OPENAI_PRICING_AS_OF = "2026-08-15";
+export const OPENAI_PRICING_AS_OF = "2026-11-12";
 
 export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OPENAI_RATES,

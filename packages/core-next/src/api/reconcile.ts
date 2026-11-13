@@ -208,8 +208,11 @@ export const withReconcile: SystemPart = (context) => {
         schedule();
         // Quirk (a): the requeue applies once the run is out of flight, so
         // the pass after its end re-dispatches it, if it is still raised.
+        // A detached run is not the requirement's run any more: as in 1.35,
+        // that pass is a plain raise, and nothing is requeued (fuzz case
+        // 13/56: a fresh batch went on, then a second re-dispatch).
         const times = (redo.get(req.id) ?? 0) + 1;
-        if (times <= 4) {
+        if (times <= 4 && !resolvers.detached_.has(run)) {
           redo.set(req.id, times);
           if (times < 4) {
             requeued.add(req.id);
@@ -538,22 +541,20 @@ export const withReconcile: SystemPart = (context) => {
         }
       }
       previous = next;
-      if (requeued.size > 0) {
-        // Applied once the requeuing run is out of flight (RFC row 7): a
-        // run still going would drop the dispatch as a duplicate, and the
-        // requeue would be lost. Its end schedules the pass that applies it.
-        let applied = false;
-        for (const id of requeued) {
-          if (!resolvers.inflight.has(id)) {
-            previous.delete(id);
-            requeued.delete(id);
-            applied = true;
-          }
+      // Requeues are applied once the requeuing run is out of flight (RFC
+      // row 7): a run still going would drop the dispatch as a duplicate,
+      // and the requeue would be lost. Its end schedules the pass that
+      // applies it.
+      let applied = false;
+      for (const id of requeued) {
+        if (!resolvers.inflight.has(id)) {
+          previous.delete(id);
+          applied = requeued.delete(id);
         }
-        if (applied) {
-          // The next diff sees the requirement as added, if still asked.
-          schedule();
-        }
+      }
+      if (applied) {
+        // The next diff sees the requirement as added, if still asked.
+        schedule();
       }
       if (constraints.hasDirty()) {
         // A constraint held back by `after` was released (quirk e).
