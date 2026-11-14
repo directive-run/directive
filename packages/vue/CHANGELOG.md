@@ -1,5 +1,7 @@
 # @directive-run/vue
 
+## 1.36.1
+
 ## 1.36.0
 
 ### Patch Changes

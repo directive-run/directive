@@ -1,5 +1,13 @@
 # @directive-run/example-ab-testing
 
+## 0.0.85
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.36.1
+  - @directive-run/el@1.1.4
+
 ## 0.0.84
 
 ### Patch Changes
