@@ -231,6 +231,8 @@ Whether the deep runs gate L8 is decision A2. The brakes in rules 8 to 10, and t
 
 **Reading the table:** U1 to U10 are where the candidates live, and U8 now holds the dropped start rule. Each pins 1.35's behaviour now and shows the difference only with an approved, signed entry. U11 is not a candidate: a restore cannot tell a redacted value from a real one, so the fix is a sentence in the docs. U14 is the L7 lesson in table form: pin the hard combinations by hand before the random tests find them.
 
+**Found while pinning U14** (L8-pre-a, #374): on 1.35, a batch that was queued before a navigation retracted its requirement still runs. It reads like a candidate difference, but it is not a row: no one has approved a change. L8a copies 1.35, and the L8 gate's principal review decides whether it becomes a row for the beta.
+
 ## Performance
 
 **In plain terms:** history off costs one read per pass. History on copies every fact after every pass, as 1.35 does.
