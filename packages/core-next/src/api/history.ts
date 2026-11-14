@@ -78,14 +78,13 @@ export const withHistory =
       | undefined,
   ): SystemPart =>
   (context) => {
-    const { system, store, kernel, facts } = context;
+    const { system, store, facts, wants_: wants, emit_: emit } = context;
     if (!option) {
       system.history = null;
       system.onHistoryChange = () => () => {};
 
       return;
     }
-    const { hooks } = kernel;
     const { maxSnapshots = 100, redactSnapshot } =
       option === true ? {} : option;
     const snapshots: Snapshot[] = [];
@@ -103,10 +102,13 @@ export const withHistory =
         listener();
       }
     };
-    /** 1.35's onHistoryChange option: the hook, then the listeners. */
+    /**
+     * 1.35's onHistoryChange option: the hook, then the listeners. The hook
+     * goes through the core's stream, so it still fires after destroy.
+     */
     const navigated = (from: number, to: number) => {
-      if (hooks.wants("history.navigate")) {
-        hooks.emit("history.navigate", { from, to });
+      if (wants("history.navigate")) {
+        emit("history.navigate", { from, to });
       }
       notify();
     };
@@ -182,8 +184,8 @@ export const withHistory =
         snapshots.shift();
         index--;
       }
-      if (hooks.wants("history.snapshot")) {
-        hooks.emit("history.snapshot", { snapshot });
+      if (wants("history.snapshot")) {
+        emit("history.snapshot", { snapshot });
       }
       notify();
 

@@ -181,6 +181,12 @@ export interface SystemContext {
   history_?: { events_: Set<string> | null; snap_(label?: string): void };
   /** Runs `fn` as a history navigation (1.35's withNavigation). */
   nav_(fn: () => void): void;
+  /**
+   * The core's `wants` and `emit`: after destroy they go straight to the
+   * plugins, as 1.35's hooks still fire then (the history part's records).
+   */
+  wants_(at: string): boolean;
+  emit_(at: string, data?: Record<string, unknown>): void;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
@@ -678,10 +684,7 @@ export function createSystemCore<const M extends ModuleSchema>(
    * fact's subscriber in link order, depth first. A fact nothing in the graph
    * reads allocates nothing here.
    */
-  function invalidate(
-    keys: readonly string[],
-    into = changedKeys,
-  ): void {
+  function invalidate(keys: readonly string[], into = changedKeys): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
     let told: Set<ReactiveNode> | undefined;
@@ -1800,6 +1803,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   };
   const context: SystemContext = {
     load_: loadAs,
+    wants_: wants,
+    emit_: emit,
     nav_(fn) {
       navigating++;
       try {
