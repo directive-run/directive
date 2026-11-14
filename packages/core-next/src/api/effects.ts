@@ -39,7 +39,12 @@ export interface CreateEffectsOptions<S extends Schema> {
 export interface EffectsManager {
   runEffects(changedKeys: Set<string>): Promise<void>;
   /** Runs the effects due; returns a promise only when one of them is async. */
-  runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
+  runEffectsFast(
+    changedKeys: Set<string>,
+    nav?: Set<string> | null,
+  ): Promise<void> | undefined;
+  /** Development: the effect whose body runs now, or null. */
+  id_(): string | null;
   runAll(): Promise<void>;
   callOne(id: string): Promise<void>;
   cleanupAll(): void;
@@ -169,9 +174,9 @@ export function createEffectsManager<S extends Schema>(
    * when a set does (T1's swap), never per pass. A disabled effect keeps its
    * entries (y) and selection skips it, so `enable` re-indexes nothing.
    *
-   * TODO(L8): a history navigation wakes every effect but those declaring
-   * `onNavigate: "skip"`, which see only the real keys: `reach` marks per
-   * key set, so a pass can call it once for each. TODO(L10): `refreshDeps`
+   * A history navigation's restored keys (L8) wake every effect but those
+   * declaring `onNavigate: "skip"`, which see only the real keys: `reach`
+   * marks per key set, so a pass calls it once for each. TODO(L10): `refreshDeps`
    * links a declared name when it comes to exist (`link`). Neither feature
    * exists in core-next yet, so their tests land with them.
    */
@@ -385,6 +390,8 @@ export function createEffectsManager<S extends Schema>(
    */
   let running: EffectState;
   let runningDef: any;
+  /** Development: the effect whose body runs now (1.35's runningEffect). */
+  let now_: string | null = null;
   const body = () => {
     const state = running;
     const def = runningDef;
@@ -434,6 +441,9 @@ export function createEffectsManager<S extends Schema>(
     try {
       running = state;
       runningDef = def;
+      if (isDevelopment) {
+        now_ = id;
+      }
       if (state.explicit) {
         store.batch(body);
       } else {
@@ -468,6 +478,9 @@ export function createEffectsManager<S extends Schema>(
           warnAsyncAutoTracked(id, state.deps!);
         }
       }
+      if (isDevelopment) {
+        now_ = null;
+      }
       const result = state.out_;
       state.out_ = undefined;
       if (result instanceof Promise) {
@@ -476,6 +489,9 @@ export function createEffectsManager<S extends Schema>(
       keep(state, result);
       checkInPlace(id);
     } catch (error) {
+      if (isDevelopment) {
+        now_ = null;
+      }
       thrown.push([state, error]);
     }
 
@@ -526,18 +542,33 @@ export function createEffectsManager<S extends Schema>(
    * asked to run again, and auto-tracked ones that depend on nothing (never
    * run, or read nothing), which run on every change (1.35).
    */
-  function select(changed: Set<string>): EffectState[] {
+  function select(
+    changed: Set<string>,
+    nav?: Set<string> | null,
+  ): EffectState[] {
     const out: EffectState[] = [];
+    // A navigation's keys are stamped first, so a key in both sets reads
+    // as a real change (1.35 effects.ts:1300–1337).
+    const back = nav ? ++pass : -1;
+    if (nav && index.size > 0) {
+      reach(nav, back);
+    }
     const now = ++pass;
     if (index.size > 0) {
       reach(changed, now);
     }
     for (const state of order) {
+      // `onNavigate: "skip"` sits a navigation out: only real keys wake it,
+      // and in a pass with none, nothing does.
+      const skip =
+        nav && definitions[state.id]?.onNavigate === "skip";
       if (
         state.enabled &&
-        (state.hit_ === now ||
-          reruns.has(state.id) ||
-          (!state.explicit && !state.deps?.size))
+        (reruns.has(state.id) ||
+          (!(skip && changed.size === 0) &&
+            (state.hit_ === now ||
+              (state.hit_ === back && !skip) ||
+              (!state.explicit && !state.deps?.size))))
       ) {
         out.push(state);
       }
@@ -576,7 +607,8 @@ export function createEffectsManager<S extends Schema>(
     async runEffects(changed) {
       await runFast(select(changed));
     },
-    runEffectsFast: (changed) => runFast(select(changed)),
+    runEffectsFast: (changed, nav) => runFast(select(changed, nav)),
+    id_: () => now_,
     async runAll() {
       await runFast([...states.values()]);
     },
