@@ -37,7 +37,7 @@
     "diff/engines.ts": "36abc7a5e623e418c5acf7d10bc3cac227a232c33695d16f2a8e0db3a8efc4c9",
     "diff/fingerprint.ts": "bbbdd7db07bbcad7e6781a0dbe4bbc1ba635daa6dda9798c98860df5825dc27d",
     "diff/fuzz/fuzz.test.ts": "5aa8380553c96f049d2e06eb3b1bc2ee25db6eaf1e8768c703145a4b33bd2266",
-    "diff/fuzz/model.ts": "6fb629df4a1416fab6860991fe26a84052310cb1b5fcd505e58525f22e33f2a1",
+    "diff/fuzz/model.ts": "244e63515c6609930d67dc4149406b57bc68993464b363756a552d708af03b72",
     "diff/fuzz/pinned.json": "39725446d6275a14b14c129f7c6dba2ab714fa90b9e9f1fb1cd769439107f2b9",
     "diff/hooks.ts": "e8082c4f10ef20de04f1b78dcb9c38835acf01cf4e218fbe0eed029e985f4195",
     "diff/normalize.ts": "22e70d3786783ae06d7bf5458f27b917c4e0aa2b92981f352b74efda65e6640b",

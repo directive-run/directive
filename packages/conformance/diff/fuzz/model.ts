@@ -1632,11 +1632,15 @@ const TRIGGERS = {
  * `beginChangeset` (utils/history.ts:598–609; U18), so a changeset with no
  * step that can raise it records none, and no later navigation reads it.
  * A step that can: one that is not a history step, with no pause set (its
- * pass can take a snapshot), or a `forward` or `goTo`. A navigation clears
- * the pause, as on 1.35 (N5; 2.0 keeps it with (ay), so this is the wider
- * of the two). A second `begin` starts over, as 1.35's does. A full ring
- * buffer can still keep the index where it was, so the rule is not exact,
- * only no wider than the old one.
+ * pass can take a snapshot), or a `forward` or `goTo`. A navigation counts
+ * as clearing the pause: 1.35 clears it on a real restore (N5), and 2.0
+ * keeps it with (ay), so this is the wider reading. A second `begin`
+ * starts over, as 1.35's does. The rule is not exact. It is wider where
+ * the index can end where it began (a full ring buffer, or a `back` and
+ * then a write), and narrower where a late write from in-flight work lands
+ * inside a history step's flush between `begin` and `end`. The narrow case
+ * fails a case loudly rather than hiding a difference. It is never wider
+ * than the old rule, which matched any `begin` and `end`.
  */
 function afterRecordedChangeset(steps: FuzzSpec["steps"]): number {
   let open = false;
