@@ -463,33 +463,31 @@ export const withReconcile: SystemPart = (context) => {
     return false;
   };
 
-  /**
-   * L8 (1.35 engine.ts:1966–1990): a navigation restored state that was
-   * reconciled when it was taken, so its requirements become the baseline,
-   * from a full evaluation, and nothing dispatches for them. A constraint
-   * that reads a key written in the same pass was evaluated against that
-   * write, so it stays out of the baseline and diffs as added.
-   */
-  const rebuild = async (passKeys: Set<string>) => {
-    const restored = await constraints.evaluate();
-    previous = new Map();
-    for (const req of restored) {
-      const deps =
-        passKeys.size > 0 && req.fromConstraint
-          ? constraints.depsOf(req.fromConstraint)
-          : undefined;
-      if (
-        !(deps && [...deps].some((key) => passKeys.has(key))) &&
-        !previous.has(req.id)
-      ) {
-        previous.set(req.id, req);
-      }
-    }
-
-    return passKeys.size > 0 ? constraints.evaluate(passKeys) : restored;
-  };
-
   const feature: ReconcileFeature = {
+    /**
+     * L8 (1.35 engine.ts:1966–1990): a navigation restored state that was
+     * reconciled when it was taken, so the full evaluation's requirements
+     * become the baseline, and nothing dispatches for them. A constraint
+     * that reads a key written in the same pass was evaluated against that
+     * write, so it stays out of the baseline and diffs as added.
+     */
+    rebase_(restored, passKeys) {
+      previous = new Map();
+      for (const req of restored) {
+        const deps =
+          passKeys.size > 0 && req.fromConstraint
+            ? constraints.depsOf(req.fromConstraint)
+            : undefined;
+        if (
+          !(deps && [...deps].some((key) => passKeys.has(key))) &&
+          !previous.has(req.id)
+        ) {
+          previous.set(req.id, req);
+        }
+      }
+
+      return passKeys.size > 0 ? constraints.evaluate(passKeys) : restored;
+    },
     begin_() {
       const done = closed;
       closed = open;
@@ -502,9 +500,10 @@ export const withReconcile: SystemPart = (context) => {
         openTally = counted;
       }
     },
+    // After a navigation, the full evaluation (rebase_ takes it from there).
     evaluate_: (passKeys, nav) =>
       nav
-        ? rebuild(passKeys)
+        ? constraints.evaluate()
         : (constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys)),
     commit_(current, passKeys) {
       if (restart.size > 0 && system.isRunning) {

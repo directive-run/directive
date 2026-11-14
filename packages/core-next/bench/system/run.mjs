@@ -133,6 +133,7 @@ function printHeap(r) {
   );
   console.log(
     `  one batch flush (batch-fanout-100 workload, bytes per flush): v1 ${bytes(h.v1BatchFlushBytesPerOp)}, v2 ${bytes(h.v2BatchFlushBytesPerOp)}`,
+    `  100 writes and 100 undos (history-undo-100 workload, bytes per step): v1 ${bytes(h.v1HistoryUndoBytesPerOp)}, v2 ${bytes(h.v2HistoryUndoBytesPerOp)}`,
   );
   console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
@@ -536,6 +537,8 @@ const result = {
     v2FramePersistBytesPerOp: heapOf("v2", "framePersistBytesPerOp"),
     v1BatchFlushBytesPerOp: heapOf("v1", "batchFlushBytesPerOp"),
     v2BatchFlushBytesPerOp: heapOf("v2", "batchFlushBytesPerOp"),
+    v1HistoryUndoBytesPerOp: heapOf("v1", "historyUndoBytesPerOp"),
+    v2HistoryUndoBytesPerOp: heapOf("v2", "historyUndoBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),

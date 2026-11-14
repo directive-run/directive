@@ -275,6 +275,14 @@ export interface ReconcileFeature {
     passKeys: Set<string>,
     nav?: Set<string> | null,
   ): RequirementWithId[] | Promise<RequirementWithId[]>;
+  /**
+   * After a navigation: `restored` (the full evaluation) becomes the
+   * baseline; answers the pass's requirements.
+   */
+  rebase_(
+    restored: RequirementWithId[],
+    passKeys: Set<string>,
+  ): RequirementWithId[] | Promise<RequirementWithId[]>;
   /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
   commit_(
     current: RequirementWithId[],
@@ -1310,11 +1318,18 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (l2) {
         // 1.35 awaits constraint evaluation only when it must; the diff,
         // the dispatch and the pass end then share one continuation.
+        // After a navigation, 1.35 awaits the full evaluation, then the
+        // pass's own keys only when it has some (engine.ts:1966–1990).
         const asked = l2.evaluate_(passKeys, nav);
-        result = l2.commit_(
-          asked instanceof Promise ? await asked : asked,
-          passKeys,
-        );
+        let current = asked instanceof Promise ? await asked : asked;
+        if (nav) {
+          const next = l2.rebase_(current, passKeys);
+          current = next instanceof Promise ? await next : next;
+        }
+        result = l2.commit_(current, passKeys);
+      } else if (nav) {
+        // 1.35 awaits its (empty) full evaluation after a navigation.
+        await 0;
       }
       if (wants("reconcile.end")) {
         emit("reconcile.end", {

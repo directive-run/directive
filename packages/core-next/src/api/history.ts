@@ -29,7 +29,7 @@
 import isDevelopment from "#is-development";
 import type { Snapshot } from "../types/index.js";
 import type { SystemPart } from "./core.js";
-import { BLOCKED_PROPS, DEV_PROXY_TARGET, isPrototypeSafe } from "./facts.js";
+import { DEV_PROXY_TARGET, isPrototypeSafe } from "./facts.js";
 
 type Rec = Record<string, unknown>;
 
@@ -211,14 +211,10 @@ export const withHistory =
 
             return;
           }
+          // 1.35 skips a dangerous key here too, with a warning; the check
+          // above has refused any such key, so none reaches the writes.
           context.load_(() => {
             for (const [key, value] of Object.entries(values)) {
-              if (BLOCKED_PROPS.has(key)) {
-                console.warn(
-                  `[Directive] Skipping dangerous key "${key}" during fact restoration`,
-                );
-                continue;
-              }
               (facts as Rec)[key] = value;
             }
           }, "restore");

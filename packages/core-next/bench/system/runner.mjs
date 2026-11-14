@@ -286,6 +286,9 @@ async function heapProbe(engine, api) {
   // One flush of batch-fanout-100 (100 requirements, one handler call, 100
   // writes, settle) in bytes, by the same method (L7a, scope item 6).
   const batchFlushBytesPerOp = await frameBytes("batch-fanout-100", 200);
+  // One history-undo-100 step (100 writes and snapshots, 100 goBack calls)
+  // in bytes, by the same method (L8a, scope item 6).
+  const historyUndoBytesPerOp = await frameBytes("history-undo-100", 20);
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
@@ -312,6 +315,7 @@ async function heapProbe(engine, api) {
           frameSourceBytesPerOp,
           framePersistBytesPerOp,
           batchFlushBytesPerOp,
+          historyUndoBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },

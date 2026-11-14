@@ -791,6 +791,62 @@ export const workloads = {
       };
     },
   },
+  // B2 (L8 RFC): history on; 100 writes, each its own pass and snapshot, then
+  // 100 goBack calls and the pass they wake (an effect mirrors the fact).
+  // One step is the 100 writes and the 100 undos, back to where it began.
+  "history-undo-100": {
+    op: "100 writes with history on (100 snapshots), then 100 goBack calls, settle",
+    async: true,
+    async build({ createModule, createSystem, t }) {
+      let mirrored = 0;
+      const sys = createSystem({
+        module: createModule("undo", {
+          schema: {
+            facts: { n: t.number(), label: t.string() },
+            derivations: { twice: t.number() },
+          },
+          init: (f) => {
+            f.n = 0;
+            f.label = "undo";
+          },
+          derive: { twice: (f) => f.n * 2 },
+          effects: {
+            mirror: {
+              run: (f) => {
+                mirrored = f.n;
+              },
+            },
+          },
+        }),
+        history: { maxSnapshots: 200 },
+      });
+      sys.start();
+      await sys.settle();
+      let i = 0;
+      let undone = 0;
+
+      return {
+        async step() {
+          for (let k = 0; k < 100; k++) {
+            sys.facts.n = ++i;
+            await sys.settle();
+          }
+          for (let k = 0; k < 100; k++) {
+            sys.history.goBack();
+          }
+          await sys.settle();
+          undone += sys.facts.n === 0 && sys.derive.twice === 0 ? 1 : 0;
+        },
+        check(steps) {
+          expect("history-undo-100", "undone to 0", undone, steps);
+          expect("history-undo-100", "mirrored", mirrored, 0);
+
+          return null;
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // 20 modules (a hub and 19 readers via crossModuleDeps): write the hub,
   // read every other module.
   "multi-module-20": {
