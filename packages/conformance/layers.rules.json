@@ -47,6 +47,7 @@
     "retry with exponential backoff, then success": "L2",
     "retries exhausted: the error reaches the boundary": "L2",
     "a timeout aborts the run but keeps its cleanup write": "L2",
+    "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35": "L2",
     "priority and after order dependent constraints": "L2",
     "keyed requirements run concurrently and complete independently": "L2",
     "a throwing when() keeps its deps and recovers": "L2",
