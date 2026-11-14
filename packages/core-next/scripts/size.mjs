@@ -565,7 +565,8 @@ const betaWiringSource = (source) => {
   // History is wired as a call (`withHistory(option)`, L8), so it is dropped
   // apart from the six: its import and its whole call entry.
   const historyImport = /^import \{ withHistory \} from "\.\/history\.js";\n/m;
-  const historyEntry = /^\s+withHistory\([\s\S]*?\n {4}\),\n/m;
+  // One line (`withHistory(history as never),`) or wrapped over several.
+  const historyEntry = /^ {4}withHistory\((?:[^\n]*|[\s\S]*?\n {4})\),\n/m;
   if (!historyImport.test(source) || !historyEntry.test(source)) {
     return undefined;
   }

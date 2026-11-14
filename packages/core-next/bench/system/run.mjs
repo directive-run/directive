@@ -133,6 +133,8 @@ function printHeap(r) {
   );
   console.log(
     `  one batch flush (batch-fanout-100 workload, bytes per flush): v1 ${bytes(h.v1BatchFlushBytesPerOp)}, v2 ${bytes(h.v2BatchFlushBytesPerOp)}`,
+  );
+  console.log(
     `  100 writes and 100 undos (history-undo-100 workload, bytes per step): v1 ${bytes(h.v1HistoryUndoBytesPerOp)}, v2 ${bytes(h.v2HistoryUndoBytesPerOp)}`,
   );
   console.log(
