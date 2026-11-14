@@ -1,5 +1,7 @@
 # @directive-run/svelte
 
+## 1.36.1
+
 ## 1.36.0
 
 ### Patch Changes

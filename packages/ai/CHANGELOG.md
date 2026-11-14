@@ -1,5 +1,15 @@
 # @directive-run/ai
 
+## 1.36.1
+
+### Patch Changes
+
+- [#379](https://github.com/directive-run/directive/pull/379) [`5d1b93c`](https://github.com/directive-run/directive/commit/5d1b93c4e04e51c8a34f570886b6ec6691e425ee) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Re-checks the Anthropic, OpenAI, Gemini and Ollama rate tables against each
+  provider's own pricing page on 2026-11-12 and moves the four `*_PRICING_AS_OF`
+  dates. No rate changed, so the pinned digests are unchanged. Rows the providers
+  no longer list (retired or routed to another model) are kept for reconciling
+  past spend and are marked in the source as not re-verified.
+
 ## 1.36.0
 
 ### Minor Changes
