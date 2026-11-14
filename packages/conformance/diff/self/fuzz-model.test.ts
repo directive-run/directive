@@ -15,6 +15,7 @@ import {
   type FuzzModule,
   type FuzzSpec,
   HISTORY_OPS,
+  abortsAgree,
   specArbitrary,
   specLayer,
   specTriggers,
@@ -324,10 +325,16 @@ describe("fuzz history reach (L8-pre; the L8 RFC's reach table)", () => {
         s.modules.some((m) => m.effects.some((e) => e.onNavigate === "skip")),
       ),
     ).toBe(true);
-    // Rule 9: respecting by default, the ignoring handler a minority.
-    const respecting = specs.filter((s) => s.respectsAbort === true).length;
-    const ignoring = specs.filter((s) => s.respectsAbort === false).length;
-    expect(respecting + ignoring).toBe(specs.length);
+    // Rule 9: respecting by default where the engines' aborts agree (no
+    // timeout, no batch; diff/self/abort-draw.test.ts), the ignoring handler
+    // a minority there, and the only one in a case with either.
+    const agreeing = specs.filter((s) => abortsAgree(s));
+    const respecting = agreeing.filter((s) => s.respectsAbort === true).length;
+    const ignoring = agreeing.filter((s) => s.respectsAbort === false).length;
+    expect(
+      specs.filter((s) => s.respectsAbort === true).length +
+        specs.filter((s) => s.respectsAbort === false).length,
+    ).toBe(specs.length);
     expect(ignoring).toBeGreaterThan(0);
     expect(ignoring).toBeLessThan(respecting);
     expect(triggers.has("navigated")).toBe(true);

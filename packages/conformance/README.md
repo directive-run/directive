@@ -137,6 +137,29 @@ the traces to agree.
   60 cases compared on v2 (`FUZZ_V2_FLOOR`, counted from what each run
   compared) while `current` is not null. The cases across every layer all still
   run, as before.
+  **Obeying an abort: only where aborts agree.** Jason, 2026-11-14: "Obey
+  only where aborts agree (Recommended)": "The random tests draw obeying
+  resolvers only in cases with no timeout and no batch. Those cases get the
+  ignoring resolvers that today's signed exceptions cover. One handwritten
+  test pins row n's effect on an obeying resolver." A history case (L8)
+  draws `respectsAbort` (the L8 RFC's rule 9): every handler, the batched one
+  too, returns after its wait if its signal was aborted and writes nothing;
+  otherwise it ignores the abort and writes late. 2.0 aborts where 1.35 does
+  not (row n: a timed-out attempt's signal; quirk g: a batch's), so an
+  obeying handler stops on 2.0 and writes late on 1.35, and everything after
+  that write differs for a reason the late-write entries, which list
+  `ignoresAbort`, cannot cover (at a forced L8, 178 seed cases failed this
+  way; a triage found no 2.0 bug in them). So the model sets `respectsAbort`
+  false in any case with a resolver `timeout` or a batched resolver
+  (`abortsAgree` in diff/fuzz/model.ts, which reads the `timeout` and
+  `batched` triggers' own tests, so it cannot drift from them). The draw is
+  made as before and then overridden, so the random stream and every other
+  field of every case are as drawn before the rule
+  (diff/self/abort-draw.test.ts pins it). A case with neither can still draw
+  an obeying handler. Row n's effect on one is pinned by hand: the scenario
+  "a handler that obeys its abort stops at its timeout on 2.0 and writes
+  late on 1.35" (diff/scenarios/l2-constraints-resolvers.test.ts), with its
+  own signed entries (`l2-quirk-n-obeying-*`).
   **Batches at a settle step: one shared wait.** Jason, 2026-11-07: "One
   shared wait (Recommended)". It replaced the two separate drains: 1.35's
   (Jason, 2026-11-06: "Wait out 1.35's batches (Recommended)"), which
@@ -566,7 +589,7 @@ lib/fuzz.ts `FUZZ_TRIGGERS`), reading the options the case really passes:
 | `batchMaxSize` | the batch has a `maxSize` (1 or 2), so a queue holding a requirement twice (row (av) on 1.35) can fill it and flush a step before the other engine's window timer |
 | `navigated` | history is on (L8) and some step restores a snapshot into the facts: `back`, `forward`, `goTo`, `replay`, or `roundtrip` (its import restores the current snapshot) |
 | `navigatedBusy` | a navigation can run while work is in flight (L8; U14 pins 1.35's shapes by hand, the L8 RFC's rule 3): the case has a resolver, and some navigation comes before any settle step, or after a step other than a history step since the last settle step |
-| `ignoresAbort` | every resolver handler ignores its abort and writes late: the case did not draw `respectsAbort` (the L8 RFC's rule 9; drawn only with history, so every case below L8 has it). The late-write entries (row n, 2/352, quirk g) list it |
+| `ignoresAbort` | every resolver handler ignores its abort and writes late: the case did not draw `respectsAbort` (the L8 RFC's rule 9; drawn only with history, so every case below L8 has it, and never true in a case with a `timeout` or a `batched` resolver, where the engines' aborts differ: Jason, 2026-11-14, "Obey only where aborts agree (Recommended)", so every such case has it at L8 too). The late-write entries (row n, 2/352, quirk g) list it |
 | `navigatedPaused` | row (ay): history is on and some navigation runs while a `pause` step's pause is set, with no `resume` since it |
 | `replayedOrImported` | row (az): history is on and the steps have a `replay` or a `roundtrip` (its import), which 1.35 makes without telling a listener |
 | `imported` | row (ba): history is on and the steps have a `roundtrip`. The model imports only into the system that exported, whose counter is past every id, so 1.35 repeats no id in a fuzz case; an entry bounds by `snapshotIdsRepeated` |
