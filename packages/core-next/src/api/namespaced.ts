@@ -132,6 +132,8 @@ const gateWrote = (ns: string, key: string): never => {
 export function createNamespacedSystem(
   options: SystemOptions<any>,
   parts: readonly SystemPart[],
+  /** History is on (system.ts): only then are the snapshot events listed. */
+  history = false,
 ): System {
   const modules = options.modules as Record<string, ModuleDefinition>;
   const names = () => Object.keys(modules);
@@ -455,9 +457,10 @@ export function createNamespacedSystem(
   // L8: the events whose dispatch snapshots (1.35 engine.ts:422–443), each
   // module's own list prefixed, or all its events; a module left out of
   // `history.snapshotModules` lists none (system-module-transform.ts:1003).
+  // Built only with history on: a system without it pays nothing (L8a).
   const kept = (options.history as { snapshotModules?: string[] })
     ?.snapshotModules;
-  const snapEvents: string[] = [];
+  const snapEvents: string[] | undefined = history ? [] : undefined;
   let filtered = false;
   for (const ns of ordered) {
     const mod = modules[ns]!;
@@ -479,13 +482,15 @@ export function createNamespacedSystem(
       }
     }
     const p = (key: string) => ns + SEPARATOR + key;
-    const own =
-      kept && !kept.includes(ns)
-        ? []
-        : (mod.history as { snapshotEvents?: string[] } | undefined)
-            ?.snapshotEvents;
-    filtered ||= !!own;
-    snapEvents.push(...(own ?? Object.keys(mod.events ?? {})).map(p));
+    if (snapEvents) {
+      const own =
+        kept && !kept.includes(ns)
+          ? []
+          : (mod.history as { snapshotEvents?: string[] } | undefined)
+              ?.snapshotEvents;
+      filtered ||= !!own;
+      snapEvents.push(...(own ?? Object.keys(mod.events ?? {})).map(p));
+    }
     const deps = Object.keys(mod.crossModuleDeps ?? {});
     const keys: string[] = [];
     for (const [key, type] of Object.entries(mod.schema.facts)) {

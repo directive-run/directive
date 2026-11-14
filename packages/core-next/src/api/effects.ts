@@ -415,8 +415,14 @@ export function createEffectsManager<S extends Schema>(
       }
       d = checked(derived, "derived");
       runChecks.set(id, checks);
+      now_ = id;
     }
-    state.out_ = def.run(viewFor(id).view, prev, d);
+    // Set and cleared here, not in `run`, so `run` stays main's size (L8a).
+    try {
+      state.out_ = def.run(viewFor(id).view, prev, d);
+    } finally {
+      now_ = null;
+    }
   };
 
   /** Run one effect. A sync throw is returned in `thrown`; async errors are reported. */
@@ -441,9 +447,6 @@ export function createEffectsManager<S extends Schema>(
     try {
       running = state;
       runningDef = def;
-      if (isDevelopment) {
-        now_ = id;
-      }
       if (state.explicit) {
         store.batch(body);
       } else {
@@ -478,9 +481,6 @@ export function createEffectsManager<S extends Schema>(
           warnAsyncAutoTracked(id, state.deps!);
         }
       }
-      if (isDevelopment) {
-        now_ = null;
-      }
       const result = state.out_;
       state.out_ = undefined;
       if (result instanceof Promise) {
@@ -489,9 +489,6 @@ export function createEffectsManager<S extends Schema>(
       keep(state, result);
       checkInPlace(id);
     } catch (error) {
-      if (isDevelopment) {
-        now_ = null;
-      }
       thrown.push([state, error]);
     }
 
@@ -547,27 +544,25 @@ export function createEffectsManager<S extends Schema>(
     nav?: Set<string> | null,
   ): EffectState[] {
     const out: EffectState[] = [];
-    // A navigation's keys are stamped first, so a key in both sets reads
-    // as a real change (1.35 effects.ts:1300–1337).
-    const back = nav ? ++pass : -1;
-    if (nav && index.size > 0) {
-      reach(nav, back);
-    }
+    // A navigation's keys (L8) are stamped first, so a key in both sets
+    // reads as a real change (1.35 effects.ts:1300–1337).
+    const back = nav ? ++pass : 0;
     const now = ++pass;
     if (index.size > 0) {
+      if (nav) {
+        reach(nav, back);
+      }
       reach(changed, now);
     }
     for (const state of order) {
-      // `onNavigate: "skip"` sits a navigation out: only real keys wake it,
-      // and in a pass with none, nothing does.
-      const skip = nav && definitions[state.id]?.onNavigate === "skip";
+      // Main's test, and only a navigation's pass asks more (navWakes).
       if (
         state.enabled &&
-        (reruns.has(state.id) ||
-          (!(skip && changed.size === 0) &&
-            (state.hit_ === now ||
-              (state.hit_ === back && !skip) ||
-              (!state.explicit && !state.deps?.size))))
+        (state.hit_ === now ||
+          reruns.has(state.id) ||
+          (nav
+            ? navWakes(state, back, changed)
+            : !state.explicit && !state.deps?.size))
       ) {
         out.push(state);
       }
@@ -576,6 +571,23 @@ export function createEffectsManager<S extends Schema>(
 
     return out;
   }
+  /**
+   * In a navigation's pass, an effect neither reached by a real key nor
+   * asked to run again: the navigation's keys wake it, unless it declares
+   * `onNavigate: "skip"`, which sits the navigation out (only real keys
+   * wake it, and in a pass with none, nothing does).
+   */
+  const navWakes = (
+    state: EffectState,
+    back: number,
+    changed: Set<string>,
+  ): boolean => {
+    const auto = !state.explicit && !state.deps?.size;
+
+    return definitions[state.id]?.onNavigate === "skip"
+      ? changed.size > 0 && auto
+      : state.hit_ === back || auto;
+  };
 
   const snapshotPrevious = () => {
     previous = prevObserved ? { ...store.toObject() } : null;

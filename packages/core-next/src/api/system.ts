@@ -71,6 +71,11 @@ export function createSystem<
       "[Directive] createSystem requires either `{ module }` (single-module form) or `{ modules: { name: module } }` (namespaced form). Got an options object with neither.",
     );
   }
+  // 1.35's zeroConfig turns history on in development when no option is
+  // given (system.ts:926–933).
+  const history = options.zeroConfig
+    ? (options.history ?? isDevelopment)
+    : options.history;
   const parts: SystemPart[] = [
     withEffects,
     // L7a: a resolver's `batch:` option needs no import (A1); before the
@@ -86,13 +91,8 @@ export function createSystem<
     withRestore,
     // L6c: `.default()` fills facts still undefined after initialize ((al)).
     withDefaults,
-    // L8: the `history:` option needs no import (A1, O1). 1.35's zeroConfig
-    // turns it on in development when none is given (system.ts:926–933).
-    withHistory(
-      (options.zeroConfig
-        ? (options.history ?? isDevelopment)
-        : options.history) as never,
-    ),
+    // L8: the `history:` option needs no import (A1, O1).
+    withHistory(history as never),
     // 1.35 members 2.0 has not built: they throw featureMissing (P3-F3).
     withMissing,
     // Last: its onInit pass starts once the system is complete.
@@ -163,5 +163,5 @@ export function createSystem<
 
   checkTick(options.tickMs);
 
-  return createNamespacedSystem(options, parts) as System<M>;
+  return createNamespacedSystem(options, parts, !!history) as System<M>;
 }
