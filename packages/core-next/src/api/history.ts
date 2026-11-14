@@ -354,7 +354,7 @@ export const withHistory =
           // (bc): the index must name a snapshot in the list.
           if (!data.snapshots[data.currentIndex]) {
             throw new Error(
-              `[Directive] Invalid history data: currentIndex ${data.currentIndex} is outside the ${data.snapshots.length} snapshots`,
+              "[Directive] Invalid history data: currentIndex must be the index of a snapshot",
             );
           }
           snapshots.splice(0, snapshots.length, ...data.snapshots);
