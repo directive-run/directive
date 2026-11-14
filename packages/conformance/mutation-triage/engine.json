@@ -802,7 +802,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > a write it makes while a snapshot is taken gets a snapshot of its own'.",
     "endLine": 429,
     "endCol": 27
   },
@@ -813,7 +813,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > with no fact set at start, an unlisted event takes no snapshot'.",
     "endLine": 448,
     "endCol": 33
   },
@@ -1032,9 +1032,8 @@
     "col": 29,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "start() sets lastPassSnapshotted = false (3345) before it schedules the first pass, and no pass runs before start(): scheduleReconcile (1685) and the direct reconcile() at 4874 both need isRunning. The initial value is never read. Relabelled at L8-pre-b.",
     "endLine": 824,
     "endCol": 34
   },
@@ -1166,9 +1165,8 @@
     "col": 7,
     "mutator": "UpdateOperator",
     "replacement": "ordinaryWrites--",
-    "reason": "later-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "equivalent",
+    "note": "ordinaryWrites is only compared with 0 (896, 1800) and reset to 0 (777). Counting down from 0 gives -k where counting up gives k, and the two are 0 together, so no comparison changes. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 878,
     "endCol": 23
   },
@@ -1188,7 +1186,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took'.",
     "endLine": 897,
     "endCol": 4
   },
@@ -1248,7 +1246,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took'.",
     "endLine": 896,
     "endCol": 56
   },
@@ -1385,9 +1383,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "dead branch. restoreDepth > 0 only inside withRestoreOrigin, whose one caller (utils/history.ts deserializeFacts) makes its writes inside store.batch(), so each is reported through onBatch with origin \"restore\" (1029) and none reaches onChange while restoreDepth > 0. The block is NoCoverage in the full run 42470381866 (every non-internals test, no ceiling); the condition is always false, so replacing it with false, or comparing with \"\", changes nothing. Relabelled at L8-pre-b.",
     "endLine": 971,
     "endCol": 44
   },
@@ -1396,9 +1393,8 @@
     "col": 35,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "dead branch. restoreDepth > 0 only inside withRestoreOrigin, whose one caller (utils/history.ts deserializeFacts) makes its writes inside store.batch(), so each is reported through onBatch with origin \"restore\" (1029) and none reaches onChange while restoreDepth > 0. The block is NoCoverage in the full run 42470381866 (every non-internals test, no ceiling); the condition is always false, so replacing it with false, or comparing with \"\", changes nothing. Relabelled at L8-pre-b.",
     "endLine": 971,
     "endCol": 44
   },
@@ -1407,9 +1403,8 @@
     "col": 46,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "dead branch. restoreDepth > 0 only inside withRestoreOrigin, whose one caller (utils/history.ts deserializeFacts) makes its writes inside store.batch(), so each is reported through onBatch with origin \"restore\" (1029) and none reaches onChange while restoreDepth > 0. The block is NoCoverage in the full run 42470381866 (every non-internals test, no ceiling); the condition is always false, so replacing it with false, or comparing with \"\", changes nothing. Relabelled at L8-pre-b.",
     "endLine": 975,
     "endCol": 8
   },
@@ -1418,9 +1413,8 @@
     "col": 9,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "dead branch. restoreDepth > 0 only inside withRestoreOrigin, whose one caller (utils/history.ts deserializeFacts) makes its writes inside store.batch(), so each is reported through onBatch with origin \"restore\" (1029) and none reaches onChange while restoreDepth > 0. The block is NoCoverage in the full run 42470381866 (every non-internals test, no ceiling); the condition is always false, so replacing it with false, or comparing with \"\", changes nothing. Relabelled at L8-pre-b.",
     "endLine": 972,
     "endCol": 35
   },
@@ -1449,7 +1443,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot'.",
     "endLine": 985,
     "endCol": 51
   },
@@ -1460,7 +1454,7 @@
     "replacement": "dispatchDepth === 0 || !duringNavigation",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot'.",
     "endLine": 985,
     "endCol": 51
   },
@@ -1471,7 +1465,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot'.",
     "endLine": 985,
     "endCol": 30
   },
@@ -1624,7 +1618,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: a batch whose every change is a restore (time travel, L8) returns before the snapshot and reconcile bookkeeping. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
+    "note": "history: a batch whose every change is a restore (time travel, L8) returns before the snapshot and reconcile bookkeeping. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a navigation leaves no snapshot request behind > an unlisted event after goBack() takes no snapshot and keeps redo'."
   },
   {
     "line": 1035,
@@ -1633,7 +1627,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'.",
     "endLine": 1035,
     "endCol": 35
   },
@@ -1644,7 +1638,7 @@
     "replacement": "{}",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took'."
   },
   {
     "line": 1037,
@@ -1653,7 +1647,7 @@
     "replacement": "true",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'."
   },
   {
     "line": 1037,
@@ -1662,7 +1656,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
+    "note": "history: noteWrite records whether a batched write happened during a navigation (goBack/goTo, L8), which decides the snapshot; outside a navigation it records nothing. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took'."
   },
   {
     "line": 1042,
@@ -1711,7 +1705,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'.",
     "endLine": 1042,
     "endCol": 51
   },
@@ -1722,7 +1716,7 @@
     "replacement": "duringNavigation",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'.",
     "endLine": 1042,
     "endCol": 51
   },
@@ -1733,7 +1727,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'.",
     "endLine": 1044,
     "endCol": 8
   },
@@ -1744,7 +1738,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot'.",
     "endLine": 1043,
     "endCol": 34
   },
@@ -2531,7 +2525,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 1612,
     "endCol": 4
   },
@@ -2542,7 +2536,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 1611,
     "endCol": 6
   },
@@ -2553,7 +2547,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 1610,
     "endCol": 18
   },
@@ -2582,7 +2576,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 1624,
     "endCol": 33
   },
@@ -2815,7 +2809,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'effects after a navigation > after an effect chain is cut, a listener's write during a rewind keeps redo'.",
     "endLine": 1764,
     "endCol": 31
   },
@@ -3037,7 +3031,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > after a pass that took no snapshot, an effect's write refreshes none'.",
     "endLine": 1839,
     "endCol": 28
   },
@@ -3151,7 +3145,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches after an await does not refresh it'.",
     "endLine": 1851,
     "endCol": 61
   },
@@ -3162,7 +3156,7 @@
     "replacement": "snapshotEventNames === null && shouldTakeSnapshot",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches synchronously refreshes the snapshot'.",
     "endLine": 1851,
     "endCol": 61
   },
@@ -3171,9 +3165,8 @@
     "col": 12,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "with a snapshotEvents filter, snapshotEventNames === null is already false. Without one, every ordinary write sets shouldTakeSnapshot (at the write, 985 and 1042, or at its dispatch, 2349), and a pass whose writes all came from a navigation follows it (1798) and never reaches this arm. So on this arm shouldTakeSnapshot is true whenever snapshotEventNames is null, and `false || shouldTakeSnapshot` gives the same answer. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 1851,
     "endCol": 39
   },
@@ -3184,7 +3177,7 @@
     "replacement": "snapshotEventNames !== null",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches after an await does not refresh it'.",
     "endLine": 1851,
     "endCol": 39
   },
@@ -3213,7 +3206,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > after a pass that took no snapshot, an effect's write refreshes none'.",
     "endLine": 1857,
     "endCol": 34
   },
@@ -3242,7 +3235,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'an effect's writes fold into the snapshot of the pass that ran it > a chain of two effect passes both fold into the first pass's snapshot'.",
     "endLine": 1859,
     "endCol": 31
   },
@@ -3316,7 +3309,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > a write it makes while a snapshot is taken gets a snapshot of its own'.",
     "endLine": 1863,
     "endCol": 39
   },
@@ -3352,9 +3345,8 @@
     "col": 15,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "perf-only",
+    "note": "without config.history the manager is createDisabledHistory, whose takeSnapshot is a no-op that calls no onSnapshot; the mutant only builds a label nothing keeps (the comment above: the label is built only for a history that keeps it). Relabelled at L8-pre-b.",
     "endLine": 1867,
     "endCol": 29
   },
@@ -3374,7 +3366,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1870,
     "endCol": 29
   },
@@ -3385,7 +3377,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1870,
     "endCol": 29
   },
@@ -3396,7 +3388,7 @@
     "replacement": "keys.size < 5",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1870,
     "endCol": 29
   },
@@ -3407,7 +3399,7 @@
     "replacement": "keys.size > 5",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1870,
     "endCol": 29
   },
@@ -3418,7 +3410,7 @@
     "replacement": "``",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1871,
     "endCol": 57
   },
@@ -3429,7 +3421,7 @@
     "replacement": "[]",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1871,
     "endCol": 45
   },
@@ -3440,7 +3432,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1871,
     "endCol": 54
   },
@@ -3451,7 +3443,7 @@
     "replacement": "[...keys]",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1872,
     "endCol": 57
   },
@@ -3462,7 +3454,7 @@
     "replacement": "[]",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1872,
     "endCol": 45
   },
@@ -3473,7 +3465,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1872,
     "endCol": 66
   },
@@ -3484,7 +3476,7 @@
     "replacement": "keys.size + 5",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a snapshot's label > names the keys its pass changed, up to five, then counts the rest'.",
     "endLine": 1872,
     "endCol": 84
   },
@@ -3548,7 +3540,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'effects after a navigation > an onNavigate skip effect on a derivation sits out the rewind'.",
     "endLine": 1908,
     "endCol": 58
   },
@@ -3997,7 +3989,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'effects after a navigation > a rewind made while a pass awaits an effect wakes effects once it ends'.",
     "endLine": 2259,
     "endCol": 30
   },
@@ -4177,7 +4169,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a navigation leaves no snapshot request behind > nor does a listed event a listener dispatches during the rewind'.",
     "endLine": 2348,
     "endCol": 31
   },
@@ -4188,7 +4180,7 @@
     "replacement": "navigationDepth === 0 || !navigationEffectsOpen",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot'.",
     "endLine": 2348,
     "endCol": 31
   },
@@ -4199,7 +4191,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'a navigation leaves no snapshot request behind > nor does a listed event a listener dispatches during the rewind'.",
     "endLine": 2347,
     "endCol": 30
   },
@@ -5733,7 +5725,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8. Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'effects after a navigation > start() after a navigation made while stopped does not treat its first pass as a rewind'.",
     "endLine": 3339,
     "endCol": 28
   },
@@ -6049,9 +6041,8 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3448,
     "endCol": 31
   },
@@ -6060,9 +6051,8 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3449,
     "endCol": 28
   },
@@ -6081,9 +6071,8 @@
     "col": 29,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3455,
     "endCol": 34
   },
@@ -6153,7 +6142,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is not told of a navigation after destroy()'.",
     "endLine": 3498,
     "endCol": 32
   },
@@ -6221,9 +6210,8 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3519,
     "endCol": 31
   },
@@ -6232,9 +6220,8 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history navigation's restore origin (L8). Corrected from L6 at L6-pre-a by lib/layers.ts: currentFactOrigin() answers \"restore\" only while restoreDepth > 0, which only withRestoreOrigin raises, and the engine hands withRestoreOrigin to createHistoryManager alone (config.history, OPTION_LAYERS history -> L8); restoredKeys is filled only through noteRestored on that origin. system.restore() files its writes as \"hydrate\" (withHydrationOrigin), so no L6 test reaches this code; a killing test needs `history`, which places it at L8.",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3520,
     "endCol": 28
   },
@@ -6253,9 +6240,8 @@
     "col": 29,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "reason": "equivalent",
+    "note": "a stop()/stopAsync() reset that start() repeats (3338, 3339, 3345) before any pass can read it. Nothing reads it in between: scheduleReconcile (1685) runs nothing while stopped, and a pass already in flight read the navigation record and lastPassSnapshotted before its effects await, overwrites lastPassSnapshotted itself (2216), and its follow-up schedule (2263) is a no-op while stopped. start()'s own clear is the one that counts: 3339 is killed by l8-history-gate-debt-oracle 'start() after a navigation made while stopped does not treat its first pass as a rewind'. Survived in the full run 42470381866 (every non-internals test, no ceiling). Relabelled at L8-pre-b.",
     "endLine": 3526,
     "endCol": 34
   },
@@ -6306,7 +6292,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is not told of a navigation after destroyAsync()'.",
     "endLine": 3549,
     "endCol": 32
   },
@@ -7510,7 +7496,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 4348,
     "endCol": 6
   },
@@ -7521,7 +7507,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 4344,
     "endCol": 38
   },
@@ -7532,7 +7518,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 4347,
     "endCol": 8
   },
@@ -7543,7 +7529,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history Killed by hand (L8-pre-b): l8-history-gate-debt-oracle 'onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes'.",
     "endLine": 4346,
     "endCol": 43
   },
@@ -7616,8 +7602,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4501,
     "endCol": 6
   },
@@ -7627,8 +7613,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7638,8 +7624,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7649,8 +7635,8 @@
     "mutator": "EqualityOperator",
     "replacement": "snapshotEventNames !== null",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7660,8 +7646,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4497,
     "endCol": 8
   },
@@ -7671,8 +7657,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4500,
     "endCol": 8
   },
@@ -7682,8 +7668,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4499,
     "endCol": 43
   },
@@ -7693,8 +7679,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4506,
     "endCol": 6
   },
@@ -7704,8 +7690,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4505,
     "endCol": 8
   },
@@ -7715,8 +7701,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "feature-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history",
+    "layer": "L10",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
     "endLine": 4504,
     "endCol": 43
   },
