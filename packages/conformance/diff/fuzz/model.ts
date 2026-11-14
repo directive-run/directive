@@ -1556,7 +1556,8 @@ const TRIGGERS = {
     spec.history && spec.steps.some((s) => s.op === "roundtrip"),
   /**
    * Row (bb), changesets follow the buffer, the redo cut and import: a
-   * changeset is closed (`begin`, then `end`), then a step that can move
+   * changeset that can record a range is closed (`afterRecordedChangeset`;
+   * an empty one records none), then a step that can move
    * snapshots under its range (a step other than a history step, whose
    * write takes a snapshot that can drop the oldest one or cut off redo, or
    * a `roundtrip`, whose import keeps 1.35's ranges), and after that a
@@ -1566,19 +1567,14 @@ const TRIGGERS = {
     if (!spec.history) {
       return false;
     }
-    let state: "none" | "open" | "closed" | "moved" = "none";
-    for (const s of spec.steps) {
-      if (s.op === "begin" && state === "none") {
-        state = "open";
-      } else if (s.op === "end" && state === "open") {
-        state = "closed";
-      } else if (
-        state === "closed" &&
-        (s.op === "roundtrip" ||
-          !(HISTORY_OPS as readonly string[]).includes(s.op))
+    let moved = false;
+    for (const s of spec.steps.slice(afterRecordedChangeset(spec.steps))) {
+      if (
+        s.op === "roundtrip" ||
+        !(HISTORY_OPS as readonly string[]).includes(s.op)
       ) {
-        state = "moved";
-      } else if (state === "moved" && (s.op === "back" || s.op === "forward")) {
+        moved = true;
+      } else if (moved && (s.op === "back" || s.op === "forward")) {
         return true;
       }
     }
@@ -1610,37 +1606,69 @@ const TRIGGERS = {
     spec.modules.some((m) => m.date) &&
     spec.steps.filter((s) => NAVIGATIONS.has(s.op)).length > 1,
   /**
-   * Row (be), a changeset counts as one of the steps: a changeset is closed
-   * (`begin`, then `end`), and a later `back` or `forward` takes two or
+   * Row (be), a changeset counts as one of the steps: a changeset that can
+   * record a range is closed (`afterRecordedChangeset`; an empty one records
+   * none), and a later `back` or `forward` takes two or
    * three steps. One step lands the same on both engines (inside, at the
    * start, and outside a changeset); only the steps left after the first
    * differ (N10, U8).
    */
-  changesetSteps: (spec) => {
-    if (!spec.history) {
-      return false;
-    }
-    let state: "none" | "open" | "closed" = "none";
-    for (const s of spec.steps) {
-      if (s.op === "begin" && state === "none") {
-        state = "open";
-      } else if (s.op === "end" && state === "open") {
-        state = "closed";
-      } else if (
-        state === "closed" &&
-        (s.op === "back" || s.op === "forward") &&
-        (s.steps ?? 1) > 1
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  },
+  changesetSteps: (spec) =>
+    spec.history &&
+    spec.steps
+      .slice(afterRecordedChangeset(spec.steps))
+      .some(
+        (s) => (s.op === "back" || s.op === "forward") && (s.steps ?? 1) > 1,
+      ),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
 >;
+
+/**
+ * Where the steps go on after the first changeset that can record a range,
+ * for `changesetMoved` and `changesetSteps`; past the end when there is none.
+ * 1.35's `endChangeset` records a range only if the index rose since
+ * `beginChangeset` (utils/history.ts:598–609; U18), so a changeset with no
+ * step that can raise it records none, and no later navigation reads it.
+ * A step that can: one that is not a history step, with no pause set (its
+ * pass can take a snapshot), or a `forward` or `goTo`. A navigation counts
+ * as clearing the pause: 1.35 clears it on a real restore (N5), and 2.0
+ * keeps it with (ay), so this is the wider reading. A second `begin`
+ * starts over, as 1.35's does. The rule is not exact. It is wider where
+ * the index can end where it began (a full ring buffer, or a `back` and
+ * then a write), and narrower where a late write from in-flight work lands
+ * inside a history step's flush between `begin` and `end`. The narrow case
+ * fails a case loudly rather than hiding a difference. It is never wider
+ * than the old rule, which matched any `begin` and `end`.
+ */
+function afterRecordedChangeset(steps: FuzzSpec["steps"]): number {
+  let open = false;
+  let rises = false;
+  let paused = false;
+  for (const [i, s] of steps.entries()) {
+    if (s.op === "begin") {
+      open = true;
+      rises = false;
+    } else if (s.op === "end") {
+      if (open && rises) {
+        return i + 1;
+      }
+      open = false;
+    } else if (s.op === "pause") {
+      paused = true;
+    } else if (s.op === "resume") {
+      paused = false;
+    } else if (NAVIGATIONS.has(s.op)) {
+      paused = false;
+      rises ||= s.op === "forward" || s.op === "goTo";
+    } else if (!paused) {
+      rises = true;
+    }
+  }
+
+  return steps.length;
+}
 
 /** A constraint, and so a resolver: a pair, or the batched resolver's sources. */
 function hasConstraint(spec: FuzzSpec): boolean {
