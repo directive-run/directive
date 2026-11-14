@@ -1076,7 +1076,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     },
     onWrite(key) {
       one[0] = key;
-      invalidate(one);
+      // A navigation's write moves derivations for its effects alone (L8).
+      invalidate(one, origin === "restore" ? restored : changedKeys);
     },
     onBatchStart() {
       holdDepth++;
@@ -1347,7 +1348,12 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         }
       }
-      if (changedKeys.size > 0 || again || features.effects?.reruns_()) {
+      if (
+        changedKeys.size > 0 ||
+        restored.size > 0 ||
+        again ||
+        features.effects?.reruns_()
+      ) {
         scheduleReconcile();
       }
       notifySettle();

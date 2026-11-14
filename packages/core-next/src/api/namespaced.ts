@@ -452,6 +452,13 @@ export function createNamespacedSystem(
   const namespaceKeys = new Map<string, string[]>();
   /** Each module's crossModuleDeps, for its source gates' facts view. */
   const gateDeps = new Map<string, string[]>();
+  // L8: the events whose dispatch snapshots (1.35 engine.ts:422–443), each
+  // module's own list prefixed, or all its events; a module left out of
+  // `history.snapshotModules` lists none (system-module-transform.ts:1003).
+  const kept = (options.history as { snapshotModules?: string[] })
+    ?.snapshotModules;
+  const snapEvents: string[] = [];
+  let filtered = false;
   for (const ns of ordered) {
     const mod = modules[ns]!;
     for (const [section, obj] of [
@@ -472,6 +479,13 @@ export function createNamespacedSystem(
       }
     }
     const p = (key: string) => ns + SEPARATOR + key;
+    const own =
+      kept && !kept.includes(ns)
+        ? []
+        : (mod.history as { snapshotEvents?: string[] } | undefined)
+            ?.snapshotEvents;
+    filtered ||= !!own;
+    snapEvents.push(...(own ?? Object.keys(mod.events ?? {})).map(p));
     const deps = Object.keys(mod.crossModuleDeps ?? {});
     const keys: string[] = [];
     for (const [key, type] of Object.entries(mod.schema.facts)) {
@@ -633,6 +647,7 @@ export function createNamespacedSystem(
     schema: { facts, derivations, events: {} },
     inits_: inits,
     hooks_: ordered.map((ns) => modules[ns]!.hooks).filter(Boolean),
+    history: filtered ? { snapshotEvents: snapEvents } : undefined,
     // 1.35 ticks the first module, in init order, that has a `tick` event.
     tick_: Object.keys(events).find((key) => key.endsWith(`${SEPARATOR}tick`)),
     // 1.35's applyNamespacedFacts (system.ts:398–440), run at start.

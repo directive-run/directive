@@ -24,6 +24,7 @@ import {
 import { withDefaults } from "./defaults.js";
 import { withEffects } from "./effects.js";
 import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
+import { withHistory } from "./history.js";
 import { withInspect } from "./inspect.js";
 import { withMissing } from "./missing.js";
 import { createNamespacedSystem } from "./namespaced.js";
@@ -44,10 +45,9 @@ export type { ErrorSource };
  * copied from 1.35): `{ module }` gives a SingleModuleSystem, `{ modules }` a
  * NamespacedSystem (`system.facts.auth.token`).
  *
- * Declared with 1.35's types but not built yet: the `history` and `trace`
- * options warn once in development and are otherwise ignored; `history` and
- * `trace` read null and `onHistoryChange` never fires (1.35 with the options
- * off); `meta.*`, the dynamic `constraints`/`resolvers`/`effects` controls,
+ * Declared with 1.35's types but not built yet: the `trace` option warns
+ * once in development and is otherwise ignored, and `trace` reads null (1.35
+ * with the option off); `meta.*`, the dynamic `constraints`/`resolvers`/`effects` controls,
  * `registerModule`/`unregisterModule` and the distributable snapshot calls
  * throw `featureMissing` (api/missing.ts, slice P3-F3).
  */
@@ -86,6 +86,13 @@ export function createSystem<
     withRestore,
     // L6c: `.default()` fills facts still undefined after initialize ((al)).
     withDefaults,
+    // L8: the `history:` option needs no import (A1, O1). 1.35's zeroConfig
+    // turns it on in development when none is given (system.ts:926–933).
+    withHistory(
+      (options.zeroConfig
+        ? (options.history ?? isDevelopment)
+        : options.history) as never,
+    ),
     // 1.35 members 2.0 has not built: they throw featureMissing (P3-F3).
     withMissing,
     // Last: its onInit pass starts once the system is complete.
@@ -96,14 +103,26 @@ export function createSystem<
     parts.unshift(withValidation);
     // An option for a feature 2.0 has not built warns once per system; the
     // system runs as 1.35 does with the option off (P3-F3).
-    for (const [option, layer] of [
-      ["history", 8],
-      ["trace", 9],
-    ] as const) {
-      if (options[option]) {
-        console.warn(
-          `[Directive] createSystem: the \`${option}\` option is not in 2.0.0-alpha yet: ${option} arrives in layer ${layer} of the 2.0 engine. This system runs as it does without the option.`,
-        );
+    if (options.trace) {
+      console.warn(
+        "[Directive] createSystem: the `trace` option is not in 2.0.0-alpha yet: trace arrives in layer 9 of the 2.0 engine. This system runs as it does without the option.",
+      );
+    }
+    // 1.35's snapshotModules checks (system.ts:271–280, 1116–1122).
+    const listed = (options.history as { snapshotModules?: string[] })
+      ?.snapshotModules;
+    if (listed && "module" in options) {
+      console.warn(
+        "[Directive] history.snapshotModules has no effect in single-module mode. Use history.snapshotEvents on the module definition instead, or switch to createSystem({ modules: { ... } }) for multi-module filtering.",
+      );
+    } else if (listed) {
+      const names = Object.keys(options.modules as object);
+      for (const name of listed) {
+        if (!names.includes(name)) {
+          console.warn(
+            `[Directive] history.snapshotModules entry "${name}" doesn't match any module. Available modules: ${names.join(", ")}`,
+          );
+        }
       }
     }
   }

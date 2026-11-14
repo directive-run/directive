@@ -54,6 +54,9 @@ const HOOKS: Record<string, string[]> = {
   "error.recovery": ["onErrorRecovery", "error", "strategy"],
   "reconcile.start": ["onReconcileStart", "snapshot"],
   "reconcile.end": ["onReconcileEnd", "result"],
+  // L8: history.ts.
+  "history.snapshot": ["onSnapshot", "snapshot"],
+  "history.navigate": ["onHistoryNavigate", "from", "to"],
   "effect.run": ["onEffectRun", "id"],
   "effect.error": ["onEffectError", "id", "error"],
   "effect.write-blocked": ["onEffectWriteBlocked", "id", "key"],
