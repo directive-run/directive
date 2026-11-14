@@ -560,8 +560,7 @@ export function createEffectsManager<S extends Schema>(
     for (const state of order) {
       // `onNavigate: "skip"` sits a navigation out: only real keys wake it,
       // and in a pass with none, nothing does.
-      const skip =
-        nav && definitions[state.id]?.onNavigate === "skip";
+      const skip = nav && definitions[state.id]?.onNavigate === "skip";
       if (
         state.enabled &&
         (reruns.has(state.id) ||
