@@ -1,15 +1,14 @@
 /**
  * What 2.0 has not built yet says so (slice P3-F3). Three cases:
- * - An option for an unbuilt feature (`history`, `trace`) warns once per
- *   system in development, and the system runs as 1.35 does with that option
- *   off (system.ts). Production is silent.
+ * - An option for an unbuilt feature (`trace`) warns once per system in
+ *   development, and the system runs as 1.35 does with that option off
+ *   (system.ts). Production is silent.
  * - A member 1.35 always provides that 2.0 has not built throws
  *   `featureMissing` when called, in development (`withMissing`). Production
  *   leaves it out: the member names alone cost about 150 B gzip in the
  *   minimal app, past its 28,800 B ceiling, so there a call is the
- *   platform's TypeError, as before. Where 1.35 itself gives null or a no-op
- *   with the feature off (`history`, `onHistoryChange`), every build keeps
- *   that value.
+ *   platform's TypeError, as before. `history` and `onHistoryChange` are the
+ *   history part's (history.ts, L8), with the option on or off.
  * - A `/plugins` or `/testing` export 2.0 has not built is a stub with 1.35's
  *   name and signature that throws `featureMissing` when called.
  *
@@ -47,10 +46,6 @@ export const featureMissing = (name: string, layer: number): never => {
  */
 export const withMissing: SystemPart = ({ system }) => {
   const s = system as Record<string, any>;
-  // 1.35 without the history option (engine.ts:2605, 4343-4348): history is
-  // null and onHistoryChange adds a listener that nothing ever calls.
-  s.history = null;
-  s.onHistoryChange = () => () => {};
   // A dead-code `if`, not an early return: esbuild drops the block before
   // it counts uses, so production keeps neither featureMissing nor the names.
   if (isDevelopment) {

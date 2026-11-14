@@ -50,17 +50,17 @@ const thrown = (fn: () => unknown): any => {
 };
 
 describe.each(["single", "namespaced"])("%s system", (form) => {
-  it("the history and trace options each warn once, naming the feature and its layer", () => {
+  it("the trace option warns once, naming the feature and its layer; history, built in L8, warns nothing", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = build({ history: { maxSnapshots: 10 }, trace: true }, form);
     const warnings = optionWarnings(warn);
-    expect(warnings).toHaveLength(2);
-    expect(warnings[0]).toMatch(/`history`.*layer 8/);
-    expect(warnings[1]).toMatch(/`trace`.*layer 9/);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/`trace`.*layer 9/);
+    expect(warnings.some((text) => text.includes("`history`"))).toBe(false);
     // Once per system: running it warns no more.
     system.start();
     system.stop();
-    expect(optionWarnings(warn)).toHaveLength(2);
+    expect(optionWarnings(warn)).toHaveLength(1);
     system.destroy();
   });
 
@@ -71,9 +71,9 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
     expect(optionWarnings(warn)).toHaveLength(0);
   });
 
-  it("with the options set, the system runs as 1.35 does with them off", () => {
+  it("with history set, system.history is the manager; with it off, null; trace stays null", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    for (const options of [{}, { history: true, trace: true }]) {
+    for (const options of [{}, { history: false, trace: true }]) {
       const system = build(options, form);
       // 1.35: history is null and trace is null without the option
       // (engine.ts:2605); onHistoryChange subscribes and never fires.
@@ -86,6 +86,25 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
       expect(typeof off).toBe("function");
       off();
       expect(listener).not.toHaveBeenCalled();
+      system.destroy();
+    }
+    for (const options of [
+      { history: true },
+      { history: { maxSnapshots: 10 }, trace: true },
+    ]) {
+      const system = build(options, form);
+      expect(system.history).not.toBeNull();
+      for (const member of [
+        "goBack",
+        "goForward",
+        "goTo",
+        "replay",
+        "export",
+        "import",
+      ]) {
+        expect(typeof system.history[member], member).toBe("function");
+      }
+      expect(system.trace).toBeNull();
       system.destroy();
     }
   });

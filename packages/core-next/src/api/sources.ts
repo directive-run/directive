@@ -10,7 +10,8 @@
  * inside an attach ends the attach loop and detaches that source too, and
  * (ae) stopAsync clears the gate timers before its first await.
  *
- * Not here: the history-navigation gate skip (L8); runtime registration and
+ * The history-navigation gate skip (L8) is the core's: a pass a navigation
+ * made does not call `gate_`. Not here: runtime registration and
  * its timer clearing (L10).
  *
  * In the alpha a 1.35 config declares sources with no import, so

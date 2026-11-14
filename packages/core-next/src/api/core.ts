@@ -172,13 +172,29 @@ export interface SystemContext {
    * hand it their run machinery and queue batched requirements with it.
    */
   batch_?: (host: BatchHost) => Batcher;
+  /**
+   * Set by the history part (history.ts) when history is on: the pass takes
+   * its one snapshot through it (L8). `events_` are the events whose dispatch
+   * asks for one (null: every event); `snap_` takes one labelled `label`, or,
+   * given none, folds the pass into the latest (1.35's refreshLatestSnapshot).
+   */
+  history_?: { events_: Set<string> | null; snap_(label?: string): void };
+  /** Runs `fn` as a history navigation (1.35's withNavigation). */
+  nav_(fn: () => void): void;
+  /**
+   * The core's `wants` and `emit`: after destroy they go straight to the
+   * plugins, as 1.35's hooks still fire then (the history part's records).
+   */
+  wants_(at: string): boolean;
+  emit_(at: string, data?: Record<string, unknown>): void;
   /** Ask for a reconcile pass, through the kernel's scheduler. */
   schedule(): void;
   /**
-   * Runs `fn`'s writes as one store batch filed as "hydrate": loaded, not
-   * decided by this run (restore, L6; initialize uses it too).
+   * Runs `fn`'s writes as one store batch filed as `as`, "hydrate" by
+   * default: loaded, not decided by this run (restore, L6; initialize uses
+   * it too). A history navigation files its writes as "restore" (L8).
    */
-  load_(fn: () => void): void;
+  load_(fn: () => void, as?: string): void;
   /** True while `initialize()` runs: the inits, a plugin's turn, initialFacts and hydrate. */
   readonly init_: boolean;
   /**
@@ -231,8 +247,14 @@ export type SystemPart = (context: SystemContext) => void;
 
 /** The effects feature as the reconcile pass drives it. */
 export interface EffectsFeature {
-  runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
+  /** `nav`: the keys a history navigation restored (L8), or null. */
+  runEffectsFast(
+    changedKeys: Set<string>,
+    nav?: Set<string> | null,
+  ): Promise<void> | undefined;
   cleanupAll(): void;
+  /** Development: the effect whose body is running now, or null. */
+  id_(): string | null;
   /** An effect waits to run again (the "retry" strategy): pass again. */
   reruns_(): boolean;
   /** A pass from an ordinary write: failing effects get their retries back. */
@@ -256,6 +278,15 @@ export interface ReconcileFeature {
   begin_(): void;
   /** After effects: the requirements now (a promise only when it must wait). */
   evaluate_(
+    passKeys: Set<string>,
+    nav?: Set<string> | null,
+  ): RequirementWithId[] | Promise<RequirementWithId[]>;
+  /**
+   * After a navigation: `restored` (the full evaluation) becomes the
+   * baseline; answers the pass's requirements.
+   */
+  rebase_(
+    restored: RequirementWithId[],
     passKeys: Set<string>,
   ): RequirementWithId[] | Promise<RequirementWithId[]>;
   /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
@@ -539,6 +570,10 @@ export function createSystemCore<const M extends ModuleSchema>(
     chain = 0;
     chainKeys = null;
     writtenByEffect = writtenElsewhere = false;
+    // A navigation made while stopped is not carried into a later pass.
+    navWrites = plainWrites = 0;
+    restored.clear();
+    snapped = false;
   };
   /** The keys the chain's previous pass started with; null outside a chain. */
   let chainKeys: Set<string> | null = null;
@@ -552,6 +587,37 @@ export function createSystemCore<const M extends ModuleSchema>(
    */
   let again = false;
   let changedKeys = new Set<string>();
+  // --- the history seam (L8; 1.35 engine.ts:734–897) ---------------------
+  // A navigation's own writes are filed "restore": their keys skip the
+  // changed set and wake effects alone (`restored`). A write made during one
+  // (a listener's, or an effect's re-run for one) is the program's and
+  // reconciles, but a pass made only of such writes takes no snapshot and
+  // re-attaches no gated source. Counted per write, not per key: one
+  // ordinary write in the pass still snapshots. Read at the write, since the
+  // pass runs after the navigation is over.
+  let restored = new Set<string>();
+  let navigating = 0;
+  /** The effects phase of a pass that carries a navigation. */
+  let navEffects = false;
+  let navWrites = 0;
+  let plainWrites = 0;
+  /** The open batch has a navigation's writes (loadAs): else onBatch sorts nothing. */
+  let backWrites = 0;
+  /** The pass carries only a navigation's writes (set at its start). */
+  let follows = false;
+  /** In an event handler (1.35's dispatchDepth). */
+  let dispatching = 0;
+  /** A write or an event asked this pass for a snapshot. */
+  let snapAsked = false;
+  /** The last pass took or folded a snapshot (1.35's lastPassSnapshotted). */
+  let snapped = false;
+  /** This pass took or folded one (snapOf); `snapped` at the pass's end. */
+  let snapping = false;
+  /** Counts a write; true when it was made during a navigation. */
+  const noteWrite = () =>
+    navigating || navEffects ? !!++navWrites : !++plainWrites;
+  /** Development: effects warned for dispatching after a navigation (N8). */
+  let warnedNav: Set<string> | undefined;
   const settleListeners = new Set<() => void>();
   const notifySettle = () => settleListeners.forEach((fn) => fn());
 
@@ -1013,6 +1079,11 @@ export function createSystemCore<const M extends ModuleSchema>(
       } finally {
         release();
       }
+      // 1.35 (engine.ts:976–986): a write outside an event handler asks for
+      // a snapshot, unless a navigation is in flight.
+      if (!noteWrite() && !dispatching) {
+        snapAsked = true;
+      }
       one[0] = key;
       changed(one);
     },
@@ -1028,9 +1099,17 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (wants("fact.batch")) {
         emit("fact.batch", by ? { changes, by } : { changes });
       }
+      // A batch with a navigation's write takes the L8 path (navBatch);
+      // every other batch, and every batch without history, main's.
+      if (backWrites > 0) {
+        navBatch(changes);
+
+        return;
+      }
       const keys = changes.map((c) => c.key);
       invalidate(keys);
       releaseHold();
+      noteWrites(keys.length);
       changed(keys);
     },
     // Unwinds this batch's frame: the batch that wrote nothing (no
@@ -1041,14 +1120,66 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     },
   });
+  /** Counts a batch's `n` writes, all of one kind (noteWrite). */
+  function noteWrites(n: number): void {
+    if (navigating || navEffects) {
+      navWrites += n;
+    } else {
+      plainWrites += n;
+      if (!dispatching) {
+        snapAsked = true;
+      }
+    }
+  }
+  /**
+   * onBatch for a batch with a navigation's writes, decided per change (1.35
+   * engine.ts:1018–1045): its own writes need no reconciling and wake
+   * effects alone; a write a listener made meanwhile is the program's.
+   */
+  function navBatch(changes: FactChange[]): void {
+    backWrites = 0;
+    const keys: string[] = [];
+    const back: string[] = [];
+    for (const change of changes) {
+      (change.origin === "restore" ? back : keys).push(change.key);
+    }
+    invalidate(keys);
+    const kept = changedKeys;
+    changedKeys = restored;
+    try {
+      invalidate(back);
+    } finally {
+      changedKeys = kept;
+    }
+    releaseHold();
+    if (back.length > 0) {
+      for (const key of back) {
+        restored.add(key);
+      }
+      scheduleReconcile();
+    }
+    if (keys.length > 0) {
+      noteWrites(keys.length);
+      changed(keys);
+    }
+  }
   /** `fn`'s writes in one batch, filed as "hydrate" (SystemContext.load_). */
-  const loadAs = (fn: () => void) =>
+  const loadAs = (fn: () => void, as = "hydrate") =>
     store.batch(() => {
-      origin = "hydrate";
+      origin = as;
+      // L8: a navigation's writes move derivations for its effects alone,
+      // so while it writes, the changed set is the restored one (onWrite
+      // stays main's), and its batch takes navBatch.
+      const kept = changedKeys;
+      if (as === "restore") {
+        changedKeys = restored;
+        backWrites = 1;
+      }
       try {
         fn();
       } finally {
         origin = "authored";
+        changedKeys = kept;
       }
     });
   const facts = createFactsProxy(store, schema, tracker);
@@ -1114,6 +1245,67 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
   });
 
+  /**
+   * L8 (1.35 engine.ts:1794–1806), asked once at a pass's start of the
+   * writes it is about: one made only by a navigation takes no snapshot and
+   * re-attaches no gated source (`follows`). Answers the navigation's
+   * restored keys, or null; taken now, so a restore made while the pass
+   * awaits lands in the next. Kept out of `reconcile`, so the pass's own
+   * frame is main's.
+   */
+  function navOf(passKeys: Set<string>): Set<string> | null {
+    follows = !plainWrites;
+    navWrites = plainWrites = 0;
+    if (restored.size === 0) {
+      return null;
+    }
+    const nav = restored;
+    restored = new Set();
+    // With ordinary keys in the pass, the derivations the navigation moved
+    // are changes for constraints too, as 1.35 drains them (engine.ts:1907–1911).
+    if (passKeys.size > 0) {
+      for (const key of nav) {
+        if (key.startsWith(DERIVATION_DEP_PREFIX)) {
+          passKeys.add(key);
+        }
+      }
+    }
+
+    return nav;
+  }
+
+  /**
+   * 1.35 (engine.ts:1840–1877), history on: one snapshot before the
+   * effects, of the facts the pass starts from. A pass started only by an
+   * effect's writes folds them into the last pass's snapshot (T3). Notes
+   * in `snapping` whether it took or folded one. Not a local of
+   * `reconcile`: one there costs a program without history about 250 B a
+   * pass (V8, measured on frame-loop).
+   */
+  function snapOf(
+    history: NonNullable<SystemContext["history_"]>,
+    passKeys: Set<string>,
+  ): void {
+    snapping = false;
+    if (passKeys.size > 0) {
+      if (!follows && (!history.events_ || snapAsked)) {
+        if (chain === 0) {
+          const keys = [...passKeys].filter(
+            (key) => !key.startsWith(DERIVATION_DEP_PREFIX),
+          );
+          history.snap_(
+            `facts-changed:${keys.slice(0, 5).join(",")}${keys.length > 5 ? `+${keys.length - 5}more` : ""}`,
+          );
+          snapping = true;
+        } else if (snapped) {
+          history.snap_();
+          snapping = true;
+        }
+      }
+      snapAsked = false;
+    }
+  }
+
   async function reconcile(): Promise<void> {
     if (reconciling) {
       return;
@@ -1142,6 +1334,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       changedKeys.clear();
       chain = 0;
       chainKeys = null;
+      navWrites = plainWrites = 0;
       if (kept.length > 0) {
         for (const key of kept) {
           changedKeys.add(key);
@@ -1159,32 +1352,55 @@ export function createSystemCore<const M extends ModuleSchema>(
     const passKeys = changedKeys;
     changedKeys = new Set();
     chainKeys = chain > 0 ? passKeys : null;
+    // Only a pass with a navigation's writes asks more (navOf).
+    let nav: Set<string> | null = null;
+    if (navWrites > 0 || restored.size > 0) {
+      nav = navOf(passKeys);
+    } else {
+      follows = false;
+      plainWrites = 0;
+    }
     const l2 = features.reconcile;
     l2?.begin_();
     try {
+      // The history slot, read once per pass: empty unless history is on.
+      if (context.history_) {
+        snapOf(context.history_, passKeys);
+      }
       if (wants("reconcile.start")) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
       effectsOpen = true;
+      navEffects = nav !== null;
       try {
-        const done = features.effects?.runEffectsFast(passKeys);
+        const done = features.effects?.runEffectsFast(passKeys, nav);
         if (done) {
           await done;
         }
       } finally {
-        effectsOpen = false;
+        effectsOpen = navEffects = false;
       }
-      // L5: the sources' gates, after the effects phase (engine.ts:1932–1951).
-      features.sources?.gate_();
+      // L5: the sources' gates, after the effects phase (engine.ts:1932–1951);
+      // not in a pass a navigation made (L8): a replay attaches no transport.
+      if (!follows) {
+        features.sources?.gate_();
+      }
       let result: Record<string, unknown> | undefined;
       if (l2) {
         // 1.35 awaits constraint evaluation only when it must; the diff,
         // the dispatch and the pass end then share one continuation.
-        const asked = l2.evaluate_(passKeys);
-        result = l2.commit_(
-          asked instanceof Promise ? await asked : asked,
-          passKeys,
-        );
+        // After a navigation, 1.35 awaits the full evaluation, then the
+        // pass's own keys only when it has some (engine.ts:1966–1990).
+        const asked = l2.evaluate_(passKeys, nav);
+        let current = asked instanceof Promise ? await asked : asked;
+        if (nav) {
+          const next = l2.rebase_(current, passKeys);
+          current = next instanceof Promise ? await next : next;
+        }
+        result = l2.commit_(current, passKeys);
+      } else if (nav) {
+        // 1.35 awaits its (empty) full evaluation after a navigation.
+        await 0;
       }
       if (wants("reconcile.end")) {
         emit("reconcile.end", {
@@ -1203,6 +1419,8 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     } finally {
       reconciling = false;
+      // As 1.35 (engine.ts:2216), at the pass's end, after a stop's reset.
+      snapped = snapping;
       // As 1.35 (engine.ts:2244-2250): every constraint and effect of this
       // pass has finished, so the watched set keeps only what one still
       // reads. A derivation asked about once stops costing every later
@@ -1217,7 +1435,12 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         }
       }
-      if (changedKeys.size > 0 || again || features.effects?.reruns_()) {
+      if (
+        changedKeys.size > 0 ||
+        restored.size > 0 ||
+        again ||
+        features.effects?.reruns_()
+      ) {
         scheduleReconcile();
       }
       notifySettle();
@@ -1275,7 +1498,30 @@ export function createSystemCore<const M extends ModuleSchema>(
       ? eventDefs[type]
       : undefined;
     if (handler) {
-      store.batch(() => handler(facts, event));
+      if (isDevelopment && navEffects) {
+        const id = features.effects?.id_() ?? "(unknown effect)";
+        if (!(warnedNav ??= new Set()).has(id)) {
+          warnedNav.add(id);
+          console.warn(
+            `[Directive] effect "${id}" dispatched "${type}" while re-running after a history navigation. An effect that dispatches records acts rather than mirroring state, and a rewind should not repeat them. Set onNavigate: "skip" on it.`,
+          );
+        }
+      }
+      dispatching++;
+      // Not while rewinding (1.35 engine.ts:2343–2352): a snapshot here
+      // would cut off everything ahead of the point rewound to.
+      if (
+        !navigating &&
+        !navEffects &&
+        context.history_?.events_?.has(type) !== false
+      ) {
+        snapAsked = true;
+      }
+      try {
+        store.batch(() => handler(facts, event));
+      } finally {
+        dispatching--;
+      }
 
       return true;
     }
@@ -1626,6 +1872,16 @@ export function createSystemCore<const M extends ModuleSchema>(
   };
   const context: SystemContext = {
     load_: loadAs,
+    wants_: wants,
+    emit_: emit,
+    nav_(fn) {
+      navigating++;
+      try {
+        fn();
+      } finally {
+        navigating--;
+      }
+    },
     get init_() {
       return initializing;
     },

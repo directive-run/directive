@@ -39,7 +39,12 @@ export interface CreateEffectsOptions<S extends Schema> {
 export interface EffectsManager {
   runEffects(changedKeys: Set<string>): Promise<void>;
   /** Runs the effects due; returns a promise only when one of them is async. */
-  runEffectsFast(changedKeys: Set<string>): Promise<void> | undefined;
+  runEffectsFast(
+    changedKeys: Set<string>,
+    nav?: Set<string> | null,
+  ): Promise<void> | undefined;
+  /** Development: the effect whose body runs now, or null. */
+  id_(): string | null;
   runAll(): Promise<void>;
   callOne(id: string): Promise<void>;
   cleanupAll(): void;
@@ -169,9 +174,9 @@ export function createEffectsManager<S extends Schema>(
    * when a set does (T1's swap), never per pass. A disabled effect keeps its
    * entries (y) and selection skips it, so `enable` re-indexes nothing.
    *
-   * TODO(L8): a history navigation wakes every effect but those declaring
-   * `onNavigate: "skip"`, which see only the real keys: `reach` marks per
-   * key set, so a pass can call it once for each. TODO(L10): `refreshDeps`
+   * A history navigation's restored keys (L8) wake every effect but those
+   * declaring `onNavigate: "skip"`, which see only the real keys: `reach`
+   * marks per key set, so a pass calls it once for each. TODO(L10): `refreshDeps`
    * links a declared name when it comes to exist (`link`). Neither feature
    * exists in core-next yet, so their tests land with them.
    */
@@ -385,6 +390,8 @@ export function createEffectsManager<S extends Schema>(
    */
   let running: EffectState;
   let runningDef: any;
+  /** Development: the effect whose body runs now (1.35's runningEffect). */
+  let now_: string | null = null;
   const body = () => {
     const state = running;
     const def = runningDef;
@@ -408,8 +415,14 @@ export function createEffectsManager<S extends Schema>(
       }
       d = checked(derived, "derived");
       runChecks.set(id, checks);
+      now_ = id;
     }
-    state.out_ = def.run(viewFor(id).view, prev, d);
+    // Set and cleared here, not in `run`, so `run` stays main's size (L8a).
+    try {
+      state.out_ = def.run(viewFor(id).view, prev, d);
+    } finally {
+      now_ = null;
+    }
   };
 
   /** Run one effect. A sync throw is returned in `thrown`; async errors are reported. */
@@ -526,18 +539,30 @@ export function createEffectsManager<S extends Schema>(
    * asked to run again, and auto-tracked ones that depend on nothing (never
    * run, or read nothing), which run on every change (1.35).
    */
-  function select(changed: Set<string>): EffectState[] {
+  function select(
+    changed: Set<string>,
+    nav?: Set<string> | null,
+  ): EffectState[] {
     const out: EffectState[] = [];
+    // A navigation's keys (L8) are stamped first, so a key in both sets
+    // reads as a real change (1.35 effects.ts:1300–1337).
+    const back = nav ? ++pass : 0;
     const now = ++pass;
     if (index.size > 0) {
+      if (nav) {
+        reach(nav, back);
+      }
       reach(changed, now);
     }
     for (const state of order) {
+      // Main's test, and only a navigation's pass asks more (navWakes).
       if (
         state.enabled &&
         (state.hit_ === now ||
           reruns.has(state.id) ||
-          (!state.explicit && !state.deps?.size))
+          (nav
+            ? navWakes(state, back, changed)
+            : !state.explicit && !state.deps?.size))
       ) {
         out.push(state);
       }
@@ -546,6 +571,23 @@ export function createEffectsManager<S extends Schema>(
 
     return out;
   }
+  /**
+   * In a navigation's pass, an effect neither reached by a real key nor
+   * asked to run again: the navigation's keys wake it, unless it declares
+   * `onNavigate: "skip"`, which sits the navigation out (only real keys
+   * wake it, and in a pass with none, nothing does).
+   */
+  const navWakes = (
+    state: EffectState,
+    back: number,
+    changed: Set<string>,
+  ): boolean => {
+    const auto = !state.explicit && !state.deps?.size;
+
+    return definitions[state.id]?.onNavigate === "skip"
+      ? changed.size > 0 && auto
+      : state.hit_ === back || auto;
+  };
 
   const snapshotPrevious = () => {
     previous = prevObserved ? { ...store.toObject() } : null;
@@ -576,7 +618,8 @@ export function createEffectsManager<S extends Schema>(
     async runEffects(changed) {
       await runFast(select(changed));
     },
-    runEffectsFast: (changed) => runFast(select(changed)),
+    runEffectsFast: (changed, nav) => runFast(select(changed, nav)),
+    id_: () => now_,
     async runAll() {
       await runFast([...states.values()]);
     },
