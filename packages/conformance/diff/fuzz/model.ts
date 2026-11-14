@@ -221,6 +221,16 @@ export interface FuzzSpec {
    * handler ignores its abort and writes late, as before L8-pre: the only way
    * the oracle tests the late-write rows (g), n and 2/352, so a case without
    * history never draws it.
+   *
+   * Drawn only where the engines' aborts agree (`abortsAgree`): never true in
+   * a case with a resolver `timeout` (row n: 2.0 aborts a timed-out attempt's
+   * signal, 1.35 never does) or a batched resolver (quirk g: 2.0 aborts
+   * only the retracted requirement's signal, 1.35 the whole batch's). There a
+   * respecting handler stops on 2.0 and writes late on 1.35, so everything
+   * after that write would differ for a reason the late-write entries (which
+   * list `ignoresAbort`) do not cover. Jason, 2026-11-14: "Obey only where
+   * aborts agree (Recommended)". The draw is made as before and then set
+   * false there, so no other part of a case moves.
    */
   respectsAbort?: boolean;
 }
@@ -565,8 +575,9 @@ const minority = <T>(common: T, rare: T, weight = 2) =>
 /**
  * What a case with history adds (L8-pre; the RFC's reach table): `steps`
  * for each `back` and `forward` it drew, up to four more history steps put
- * in among its steps, `maxSnapshots`, `respectsAbort`, a module's
- * `snapshotEvents` and an effect's `onNavigate: "skip"`.
+ * in among its steps, `maxSnapshots`, `respectsAbort` (true only where
+ * `abortsAgree`), a module's `snapshotEvents` and an effect's
+ * `onNavigate: "skip"`.
  */
 function historyDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
   const navs = spec.steps.filter(
@@ -626,7 +637,10 @@ function historyDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
         }),
         steps,
         maxSnapshots: d.maxSnapshots,
-        respectsAbort: d.respectsAbort,
+        // Drawn above exactly as before, then set false where the engines'
+        // aborts differ, so the random stream and every other field of the
+        // case are the ones a seed made before this rule.
+        respectsAbort: d.respectsAbort && abortsAgree(spec),
       };
     });
 }
@@ -1285,6 +1299,20 @@ function strategy(value: unknown): string | undefined {
 }
 
 /**
+ * Whether the engines' aborts agree in a case, so a handler that obeys its
+ * abort (`respectsAbort`) behaves the same on both: the case has no resolver
+ * with a `timeout` (row n: 2.0 aborts a timed-out attempt's signal, 1.35
+ * leaves it clean) and no batched resolver (quirk g: 2.0 aborts only the
+ * retracted requirement, 1.35 the whole batch). Read from the `timeout` and
+ * `batched` triggers themselves, so the rule cannot drift from the facts the
+ * entries' `when` lists test. Jason, 2026-11-14: "Obey only where aborts
+ * agree (Recommended)".
+ */
+export function abortsAgree(spec: FuzzSpec): boolean {
+  return !(TRIGGERS.timeout(spec) || TRIGGERS.batched(spec));
+}
+
+/**
  * Each trigger a fuzz case can have (lib/fuzz.ts `FUZZ_TRIGGERS`), as a test
  * of its spec. A fuzz divergence with `when` applies only to the cases that
  * have every trigger it lists (diff/scenario.ts `covers`), so each one is the
@@ -1506,9 +1534,12 @@ const TRIGGERS = {
   },
   /**
    * Every resolver handler ignores its abort (the RFC's rule 9): true unless
-   * the case drew `respectsAbort`, which only a history case (L8) draws. The
-   * late-write entries (row n, 2/352, quirk g) list it, so a respecting
-   * handler's case is never covered by them; below L8 every case has it.
+   * the case drew `respectsAbort`, which only a history case (L8) draws, and
+   * only where the engines' aborts agree (`abortsAgree`: no `timeout`, no
+   * `batched`; Jason, 2026-11-14: "Obey only where aborts agree
+   * (Recommended)"). The late-write entries (row n, 2/352, quirk g) list it,
+   * so a respecting handler's case is never covered by them; below L8 every
+   * case has it, and every timeout or batched case has it at L8 too.
    */
   ignoresAbort: (spec) => spec.respectsAbort !== true,
   /**

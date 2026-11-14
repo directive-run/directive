@@ -75,6 +75,510 @@
     "date": "2026-11-01"
   },
   {
+    "id": "l2-quirk-n-obeying-external-aborted-extra-step2",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "external",
+    "kind": "aborted",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "aborted",
+            1,
+            "Error: Resolver \"load\" timed out after 20ms"
+          ]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers the one external \"aborted\" record in step 2: 2.0's abort of the timed-out attempt, at the 20 ms timeout, where 1.35 records none. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-external-wrote-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "external",
+    "kind": "wrote",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["wrote", 1]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one external \"wrote\" record in step 5, the handler's late write at 100 ms; 2.0 records none because its handler stopped. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-hook-onfactset-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "hook",
+    "kind": "onFactSet",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactSet",
+          "args": ["done", true, false]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactSet",
+          "args": ["value", 7, 0]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's two onFactSet calls in step 5 (`done` false to true, `value` 0 to 7), made by the late write; 2.0 makes neither. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-observe-fact-change-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "done",
+            "next": true,
+            "origin": "authored",
+            "prev": false,
+            "type": "fact.change"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "value",
+            "next": 7,
+            "origin": "authored",
+            "prev": 0,
+            "type": "fact.change"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's two fact.change events in step 5 (`done` false to true, `value` 0 to 7), made by the late write; 2.0 makes neither. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-late-facts-done-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "late",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "facts.done",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.done",
+        "from": true,
+        "to": false
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"late\" in step 6: facts.done is true on 1.35 and false on 2.0. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-late-facts-value-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "late",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "facts.value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.value",
+        "from": 7,
+        "to": 0
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"late\" in step 6: facts.value is 7 on 1.35 and 0 on 2.0. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-late-inspect-constraints-0-active-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "late",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.constraints[0].active",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].active",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"late\" in step 6: the `load` constraint is active on 2.0 (nothing satisfied its requirement) and not on 1.35 (the late write did). Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-late-inspect-unmet-0-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "late",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.unmet[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.unmet[0]",
+        "to": {
+          "fromConstraint": "load",
+          "id": "LOAD:{}",
+          "requirement": {
+            "type": "LOAD"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"late\" in step 6: 2.0 still lists the LOAD requirement as unmet, and 1.35 lists none. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-notify-done-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "notify",
+    "kind": "done",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "done",
+          "value": true
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one notification of the `done` subscription in step 5, made by the late write; 2.0 makes none. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-end-facts-done-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "facts.done",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.done",
+        "from": true,
+        "to": false
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"end\" in step 6: facts.done is true on 1.35 and false on 2.0. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-end-facts-value-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "facts.value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.value",
+        "from": 7,
+        "to": 0
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"end\" in step 6: facts.value is 7 on 1.35 and 0 on 2.0. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-end-inspect-constraints-0-active-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.constraints[0].active",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].active",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"end\" in step 6: the `load` constraint is active on 2.0 (nothing satisfied its requirement) and not on 1.35 (the late write did). Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-state-end-inspect-unmet-0-changed-step6",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.unmet[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.unmet[0]",
+        "to": {
+          "fromConstraint": "load",
+          "id": "LOAD:{}",
+          "requirement": {
+            "type": "LOAD"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers one field of the state \"end\" in step 6: 2.0 still lists the LOAD requirement as unmet, and 1.35 lists none. Only this path of this state is covered. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-notify-value-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "notify",
+    "kind": "value",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "value",
+          "value": 7
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one notification of the `value` subscription in step 5, made by the late write; 2.0 makes none. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-hook-onreconcilestart-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one hook \"onReconcileStart\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-observe-reconcile-start-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one observe \"reconcile.start\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-hook-onconstraintevaluate-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "load",
+            false,
+            {
+              "$undefined": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one hook \"onConstraintEvaluate\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-observe-constraint-evaluate-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": false,
+            "id": "load",
+            "type": "constraint.evaluate"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one observe \"constraint.evaluate\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-hook-onreconcileend-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [
+                {
+                  "id": "LOAD:{}",
+                  "resolverId": "unknown"
+                }
+              ],
+              "completed": [],
+              "inflight": [],
+              "unmet": []
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one hook \"onReconcileEnd\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l2-quirk-n-obeying-observe-reconcile-end-missing-step5",
+    "scenario": "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 1,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row n with a handler that obeys its abort, pinned by hand: the fuzz draws `respectsAbort` only where the engines' aborts agree (no timeout, no batch), so no random case reaches this shape. Owner-approved 2026-11-01 (decisions page row n): a timeout aborts the timed-out attempt's context.signal (1.35 leaves it clean), with the timeout error as its reason; outcomes unchanged, never a cancel. In this scenario the resolver (timeout 20 ms) waits 100 ms and returns if its signal is aborted: on 2.0 it is, so the handler stops and writes nothing; on 1.35 the signal stays clean, so it writes `done` and `value` late, and what that write sets off on 1.35 is a consequence of the same row. This covers 1.35's one observe \"reconcile.end\" record in step 5: 1.35 reconciles once after the late write, 2.0 has no write to reconcile on. Signed 2026-11-14 on the owner's decision of that day (\"Obey only where aborts agree (Recommended)\": \"One handwritten test pins row n's effect on an obeying resolver\"), under his approval of row n (\"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
     "id": "l3-quirk-a-retry-hook-onReconcileStart-extra",
     "scenario": "error boundary: onResolverError \"retry\"",
     "stream": "hook",

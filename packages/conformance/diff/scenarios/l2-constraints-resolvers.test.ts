@@ -178,6 +178,36 @@ suite("L2 constraints, requirements and resolvers", () => {
     ],
   );
 
+  // Row n with a handler that obeys its abort (the fuzz harness's rule: it
+  // draws `respectsAbort` only where aborts agree, so no random case covers
+  // this). 2.0 aborts the timed-out attempt's signal, so the handler sees it
+  // after its wait and writes nothing; 1.35 leaves the signal clean, so the
+  // same handler writes late. Jason, 2026-11-14: "Obey only where aborts
+  // agree (Recommended)"; row n's approval is in diff/divergences.json.
+  scenario(
+    "a handler that obeys its abort stops at its timeout on 2.0 and writes late on 1.35",
+    (ctx) => ({
+      module: loader(ctx, { timeout: 20 }, async (context, attempt) => {
+        await wait(100);
+        if (context.signal?.aborted === true) {
+          return;
+        }
+        ctx.external(["wrote", attempt]);
+        context.facts.done = true;
+        context.facts.value = 7;
+      }),
+    }),
+    [
+      { op: "start" },
+      { op: "set", key: "go", value: true },
+      { op: "advance", ms: 25 },
+      { op: "checkpoint", label: "timed-out" },
+      { op: "settle" },
+      { op: "advance", ms: 200 },
+      { op: "checkpoint", label: "late" },
+    ],
+  );
+
   scenario(
     "priority and after order dependent constraints",
     ({ core: { createModule, t }, external }) => ({
