@@ -1386,16 +1386,34 @@ const TRIGGERS = {
     spec.modules.length > 1 && spec.modules.some((m) => m.date),
   /**
    * Some resolver's write can retract its own constraint (row t's third
-   * path: the run reported complete, and its own write made the condition
-   * false before it left flight). A constraint's condition reads its own
-   * fact `fact` (and, in module b with `crossAtLeast`, module a's fact 0,
-   * which b's resolvers never write), and its resolver writes `value` to its
-   * own fact `writes`: the write retracts the constraint exactly when it is
-   * to the fact the condition reads and the value is below `atLeast`.
+   * path: the run reported complete, and a write made the condition false
+   * before it left flight), directly or through one other constraint. A
+   * constraint's condition reads its own fact `fact` (and, in module b with
+   * `crossAtLeast`, module a's fact 0, which b's resolvers never write), and
+   * its resolver writes `value` to its own fact `writes`. Directly: the
+   * write is to the fact the condition reads and the value is below
+   * `atLeast`. Through another constraint of the same module (fuzz seed
+   * 24301 case 49): the write is to the fact that one reads, of a value
+   * that meets its `atLeast`, so it can activate it, and its resolver's
+   * write is to the fact the first reads, of a value below the first's
+   * `atLeast`. A resolver writes only its own module's facts, and module
+   * a's conditions read only module a's, so no other path reaches across
+   * modules in one step.
    */
-  ownWriteRetracts: (spec) =>
+  writeRetracts: (spec) =>
     spec.modules.some((m) =>
-      m.constraints.some((c) => c.writes === c.fact && c.value < c.atLeast),
+      m.constraints.some(
+        (c) =>
+          (c.writes === c.fact && c.value < c.atLeast) ||
+          m.constraints.some(
+            (d) =>
+              d !== c &&
+              d.fact === c.writes &&
+              c.value >= d.atLeast &&
+              d.writes === c.fact &&
+              d.value < c.atLeast,
+          ),
+      ),
     ),
   /**
    * The case has the batched resolver (L7): quirk g, rows (ap), (as) and
