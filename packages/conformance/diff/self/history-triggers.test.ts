@@ -133,6 +133,62 @@ describe("the history rows' triggers", () => {
       has("changesetMoved", [{ op: "begin" }, set, set, { op: "back" }]),
     ).toBe(false);
     expect(has("changesetMoved", [...closed, { op: "back" }, set])).toBe(false);
+    // A changeset that records no range (1.35's endChangeset needs the index
+    // to rise): empty, paused throughout, or begun again with nothing after.
+    const moveBack = [set, { op: "back" }] as FuzzSpec["steps"];
+    expect(
+      has("changesetMoved", [{ op: "begin" }, { op: "end" }, ...moveBack]),
+    ).toBe(false);
+    expect(
+      has("changesetMoved", [
+        { op: "pause" },
+        { op: "begin" },
+        set,
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(false);
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        set,
+        { op: "begin" },
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(false);
+    // A navigation clears the pause on 1.35, and a forward can raise the
+    // index with no write: both can still record a range.
+    expect(
+      has("changesetMoved", [
+        { op: "pause" },
+        { op: "begin" },
+        { op: "back" },
+        set,
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(true);
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        { op: "forward" },
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(true);
+    // An empty first changeset, then a recorded one: the write inside the
+    // second is part of its range, not a move of it.
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        { op: "end" },
+        { op: "begin" },
+        set,
+        { op: "end" },
+        { op: "back" },
+      ]),
+    ).toBe(false);
   });
 
   it("(bc) importedEmpty: an import where the history can be empty", () => {
@@ -172,6 +228,24 @@ describe("the history rows' triggers", () => {
     expect(has("changesetSteps", [{ op: "back", steps: 2 }, ...closed])).toBe(
       false,
     );
+    // A changeset that records no range: empty, or paused throughout.
+    expect(
+      has("changesetSteps", [
+        { op: "begin" },
+        { op: "end" },
+        { op: "back", steps: 2 },
+      ]),
+    ).toBe(false);
+    expect(
+      has("changesetSteps", [
+        { op: "pause" },
+        { op: "begin" },
+        set,
+        { op: "end" },
+        { op: "resume" },
+        { op: "back", steps: 2 },
+      ]),
+    ).toBe(false);
   });
 });
 
