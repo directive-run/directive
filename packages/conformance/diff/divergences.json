@@ -42763,5 +42763,485 @@
     "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before (utils/history.ts:414-426), so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). Twin of l8-fuzz-ay-hook-onSnapshot-missing for the case with no history record between the navigation and the next write: the model records the history listener only at a history step, so when the steps after the navigation are writes, dispatches and settles, the first and only visible difference is the onSnapshot call 1.35 makes for the write and 2.0, still paused, does not (missing on 2.0), and the `requires` of the twin (the history record with data[1].paused false on 1.35 and true on 2.0) is never met. In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), this covers that onSnapshot call, a snapshot of fuzz facts with 1.35's pass label (`$like` snapshot), and nothing else: not a snapshot in a case with no pause before its navigation, and not another hook. PR seeds 14 (up to L8 #48) and 20 (all #53); deep cases 1:all#1817, 24301:all#4845 and 24301:up to L8#450. Signed 2026-11-16 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-16"
+  },
+  {
+    "id": "l9-bi-u2-dropped-hook-onTraceComplete-extra-step8",
+    "scenario": "a run dropped from the ring while its resolver runs never reports (U2)",
+    "stream": "hook",
+    "kind": "onTraceComplete",
+    "engine": "v2",
+    "step": 8,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onTraceComplete",
+          "args": [
+            {
+              "causalChain": "plan changed → charge constraint hit → CHARGE requirement added → charge resolved (Nms)",
+              "constraintsHit": [
+                {
+                  "deps": ["plan", "seats"],
+                  "id": "charge",
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "priority": 0
+                }
+              ],
+              "derivationsRecomputed": [],
+              "duration": {
+                "$time": "finite, at or above 0"
+              },
+              "effectErrors": [],
+              "effectsRun": [],
+              "factChanges": [
+                {
+                  "key": "plan",
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "newValue": "pro",
+                  "oldValue": "free"
+                }
+              ],
+              "id": {
+                "$incidental": "number"
+              },
+              "requirementsAdded": [
+                {
+                  "fromConstraint": "charge",
+                  "id": "CHARGE:{}",
+                  "type": "CHARGE"
+                }
+              ],
+              "requirementsRemoved": [],
+              "resolversCompleted": [
+                {
+                  "duration": {
+                    "$time": "finite, at or above 0"
+                  },
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "requirementId": "CHARGE:{}",
+                  "resolver": "charge"
+                }
+              ],
+              "resolversErrored": [],
+              "resolversStarted": [
+                {
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "requirementId": "CHARGE:{}",
+                  "resolver": "charge"
+                }
+              ],
+              "status": "settled",
+              "timestamp": {
+                "$time": "finite, at or above 0"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. A pending run pushed out of the ring keeps its bookkeeping until its last resolver ends, then settles and reports, though it is no longer in system.trace; what is kept is bounded by the runs in flight, and destroy() clears it. 1.35's evictOldestTrace drops a pending run's resolver attribution, so that run never reports (the L9 RFC rev 2's R6 and (bi); probe P3; U2). In this scenario (U2, maxRuns 1) a run starts the charge resolver and newer runs push it out of the ring while it runs: 1.35 never reports it; 2.0 reports it when the resolver completes. This covers that onTraceComplete call in step 8, which 2.0 makes and 1.35 does not (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l9-bi-u2-maxruns0-hook-onTraceComplete-extra-step3",
+    "scenario": "with maxRuns 0 the trace stays empty, and only runs without a resolver report (U2)",
+    "stream": "hook",
+    "kind": "onTraceComplete",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onTraceComplete",
+          "args": [
+            {
+              "causalChain": "plan changed → charge constraint hit → CHARGE requirement added → charge resolved (Nms)",
+              "constraintsHit": [
+                {
+                  "deps": ["plan", "seats"],
+                  "id": "charge",
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "priority": 0
+                }
+              ],
+              "derivationsRecomputed": [],
+              "duration": {
+                "$time": "finite, at or above 0"
+              },
+              "effectErrors": [],
+              "effectsRun": [],
+              "factChanges": [
+                {
+                  "key": "plan",
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "newValue": "pro",
+                  "oldValue": "free"
+                }
+              ],
+              "id": {
+                "$incidental": "number"
+              },
+              "requirementsAdded": [
+                {
+                  "fromConstraint": "charge",
+                  "id": "CHARGE:{}",
+                  "type": "CHARGE"
+                }
+              ],
+              "requirementsRemoved": [],
+              "resolversCompleted": [
+                {
+                  "duration": {
+                    "$time": "finite, at or above 0"
+                  },
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "requirementId": "CHARGE:{}",
+                  "resolver": "charge"
+                }
+              ],
+              "resolversErrored": [],
+              "resolversStarted": [
+                {
+                  "meta": {
+                    "$undefined": true
+                  },
+                  "requirementId": "CHARGE:{}",
+                  "resolver": "charge"
+                }
+              ],
+              "status": "settled",
+              "timestamp": {
+                "$time": "finite, at or above 0"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. A pending run pushed out of the ring keeps its bookkeeping until its last resolver ends, then settles and reports, though it is no longer in system.trace; what is kept is bounded by the runs in flight, and destroy() clears it. 1.35's evictOldestTrace drops a pending run's resolver attribution, so that run never reports (the L9 RFC rev 2's R6 and (bi); probe P3; U2). In this scenario (U2, maxRuns 0) every run is pushed out of the ring as it is stored: 1.35 still reports the runs without a resolver and never the run that started the charge resolver; 2.0 reports that run too, when the resolver completes. This covers that onTraceComplete call in step 3, which 2.0 makes and 1.35 does not (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l9-fuzz-bi-hook-onTraceComplete-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onTraceComplete",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["traceRing"],
+    "group": "row-bi",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onTraceComplete",
+          "args": [
+            {
+              "$like": "traceRunWithResolvers"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. In a fuzz case with the trace on and a ring of 1 or 3 (trigger `traceRing`: spec.trace && spec.maxRuns is 1 or 3), a run that started a resolver is pushed out of the ring by newer runs while that resolver is still in flight. 1.35's evictOldestTrace (packages/core/src/core/engine-trace.ts:263-276) deletes the run's resolverTraceMap rows, so its resolvers' completion finds no entry and the run never settles or reports. 2.0's withTrace (packages/core-next/src/api/trace.ts:161-182) keeps the pushed-out run's bookkeeping until its last in-flight resolver ends, then settles and reports it. This covers that onTraceComplete call, which 2.0 makes and 1.35 does not (extra on 2.0): a settled trace entry whose resolversStarted is non-empty (`traceRunWithResolvers`; a run without a resolver settles at once and reports on both engines, so it is outside the bound). When the pushed-out run's report lands between other reports in one step and phase, the comparison pairs onTraceComplete records by their projected run among the longest pairings (diff/compare.ts `traceRunText`), so the other runs still pair with their own and only this call is extra. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-bi-hook-onTraceComplete-changed-dropped-run",
+    "stream": "hook",
+    "kind": "onTraceComplete",
+    "op": "changed",
+    "when": ["traceRing"],
+    "group": "row-bi",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].resolversStarted[0]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "meta": {
+              "$undefined": true
+            },
+            "requirementId": {
+              "$like": "requirementId"
+            },
+            "resolver": {
+              "$like": "resolver"
+            }
+          }
+        },
+        {
+          "path": "args[0].resolversStarted[0]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "meta": {
+              "$undefined": true
+            },
+            "requirementId": {
+              "$like": "batchRequirementId"
+            },
+            "resolver": {
+              "$like": "batchResolver"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. In a fuzz case with a ring of 1 or 3 (trigger `traceRing`), 2.0 reports a run 1.35 pushed out of its ring while its resolver ran, and that report can land where 1.35 reports a different run of the same step and phase, with the same number of reports on each side (fuzz cases 8:all#181, 12:all#149: the alignment then pairs them, one to one, and no pairing leaves the extra report on its own). This covers the first such pair: 2.0's report started a resolver where the run 1.35 reports in its place started none (`resolversStarted[0]` absent on 1.35, a resolver row on 2.0), and it ends the comparison there (`ends`), since every later report of the case is paired one run off. Everything before it is still compared, and a case with a ring of 100 is outside it. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-bb-hook-onDerivationInvalidate-changed-back",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "op": "changed",
+    "when": ["changesetMoved"],
+    "during": "back",
+    "group": "row-bb",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "from": {
+            "$like": "derivation"
+          },
+          "to": {
+            "$like": "derivation"
+          }
+        }
+      ]
+    },
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): changesets follow the buffer, the redo cut and import. In a fuzz case that closes a changeset, then writes (a snapshot that can drop the oldest one from a buffer of 3 or cut off redo), then goes `back` (trigger `changesetMoved`), 1.35's changeset keeps its old indexes and the undo lands on a different snapshot than 2.0's, whose range moved with the snapshots (fuzz case 11:all#175: maxSnapshots 3; at `back 1` 1.35 goes to index 0 and restores f0, f1 and when, 2.0 to index 1 and restores f1 and when). The restore's first record is the invalidation of a derivation that reads a restored fact, so the two engines invalidate different derivations first (d0 on 1.35, d2 on 2.0). This covers that changed derivation id in a `back` step (`during` \"back\", read from the history step's run label) and ends the comparison there (`ends`): every later record reads the other snapshot's facts, as the hand entries for U7's buffer drop record them. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-t-disable-hook-onResolverCancel-missing",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "op": "missing",
+    "when": ["disableRetracts"],
+    "group": "quirk-t",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01). Under the `disable` strategy a resolver with a timeout fails, the error disables its constraint, and the next pass retracts the requirement (trigger `disableRetracts`; deep fuzz case 1:all#4038: a::r1, timeout 3, fails on its first attempt; both engines report canceled [A1, A0] in onReconcileEnd). 1.35, whose timeout race still holds the run in flight, then reports a cancel for it; 2.0 has reported its outcome, the error, and reports no cancel. This covers the onResolverCancel record 1.35 makes there and 2.0 does not (missing on 2.0), with the bound of l3-cand-t-fuzz-hook-onResolverCancel-missing, whose `writeRetracts` reads only writes and so never names this path. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row on the decisions page (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-t-disable-hook-onRequirementCanceled-missing",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "op": "missing",
+    "when": ["disableRetracts"],
+    "group": "quirk-t",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01). Under the `disable` strategy a resolver with a timeout fails, the error disables its constraint, and the next pass retracts the requirement (trigger `disableRetracts`; deep fuzz case 1:all#4038: a::r1, timeout 3, fails on its first attempt; both engines report canceled [A1, A0] in onReconcileEnd). 1.35, whose timeout race still holds the run in flight, then reports a cancel for it; 2.0 has reported its outcome, the error, and reports no cancel. This covers the onRequirementCanceled record 1.35 makes there and 2.0 does not (missing on 2.0), with the bound of l3-cand-t-fuzz-hook-onRequirementCanceled-missing, whose `writeRetracts` reads only writes and so never names this path. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row on the decisions page (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-t-disable-observe-requirement-canceled-missing",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "op": "missing",
+    "when": ["disableRetracts"],
+    "group": "quirk-t",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01). Under the `disable` strategy a resolver with a timeout fails, the error disables its constraint, and the next pass retracts the requirement (trigger `disableRetracts`; deep fuzz case 1:all#4038: a::r1, timeout 3, fails on its first attempt; both engines report canceled [A1, A0] in onReconcileEnd). 1.35, whose timeout race still holds the run in flight, then reports a cancel for it; 2.0 has reported its outcome, the error, and reports no cancel. This covers the requirement.canceled record 1.35 makes there and 2.0 does not (missing on 2.0), with the bound of l3-cand-t-fuzz-observe-requirement-canceled-missing, whose `writeRetracts` reads only writes and so never names this path. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row on the decisions page (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-t-batch-write-retracts-hook-onResolverCancel-changed",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "op": "changed",
+    "when": ["batchWriteRetracts"],
+    "group": "quirk-t-batch",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, batch path (B-4; GATE-6: \"A batch's outcome after a clobber or a stop is reported once\"; owner-approved 2026-11-01). The batched handler's own write retracts every requirement of a source that feeds it (trigger `batchWriteRetracts`; deep fuzz case 24301:all#3397: rb writes f0 = -1, its source needs f0 >= 0, and r0's own write retracts A0 in the same step). 1.35 aborts the call by that retraction and reports a cancel for r0 and for each batch member; 2.0 reports the call's outcome once and cancels only the item still queued, so the first cancel 1.35 reports, r0's, is paired with 2.0's cancel of the queued batch item (args[0] a::r0 on 1.35, a::rb on 2.0). This covers that changed resolver id and ends the comparison there (`ends`): the later cancels and completions are the same reports, one call apart. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row on the decisions page (\"If all are better or non user facing they are all approved.\", 2026-11-01) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-av-at-fallback-external-start-missing",
+    "stream": "external",
+    "kind": "start",
+    "op": "missing",
+    "when": ["batchFallback", "batchAbortOn", "batchMaxSize"],
+    "group": "row-av",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            [
+              {
+                "$like": "batchItem"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "reason": "Rows (av) and (at) (L7): a bound queued batched requirement retracted and raised again goes into 1.35's queue twice; with a `maxSize` of 1 or 2 the doubled queue fills, and 1.35 flushes at once, in the step that raised it (core resolvers.ts addToBatch, 1868-1884). With only resolve() (trigger `batchFallback`), 1.35 runs each queued item as a private resolve() run, which reports its start and write but no onResolverStart hook (executeBatchFallback, 1564-1575). 2.0 holds the item once ((av)) and waits for the window, then makes one hooked run ((at)). So 1.35's fallback run of one item starts in a step where 2.0 has not started it (fuzz case 7:all#187, step 6; 2:all#2625, 24301:all#2659). This covers that start, missing on 2.0, and ends the comparison there (`ends`): the run's write, completion and met reports follow it on 1.35, and 2.0's hooked run comes later. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved rows (at) (\"Approve all (Recommended)\", 2026-11-05) and (av) (\"Approve: once (Recommended)\", 2026-11-07) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "id": "l9-fuzz-ap-external-start-early-flush",
+    "stream": "external",
+    "kind": "start",
+    "op": "extra",
+    "when": ["batched", "batchAbortOn", "batchClobbered"],
+    "group": "row-ap",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItems"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ap) (L7): a batch window starts at the first add to an empty queue and is not moved; 1.35 restarts it on every add (core resolvers.ts 1898-1902, clearBatchTimer and setTimeout). A bound requirement (`abortOn`) whose fact another single resolver writes (trigger `batchClobbered`) is clobbered while it waits and raised again by each reconcile pass, and each re-add pushes 1.35's window out; 2.0's window holds, so its call starts at an earlier pass (fuzz case 18:all#156, step 12: 2.0 starts call 3 at the tick r0's retry starts, 1.35 one pass later). This covers that start, extra on 2.0 where 1.35 has not started the call yet, and ends the comparison there (`ends`): the pass 1.35 runs for the re-add, its trace run and the call's later start follow from the moved window. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved row (ap) (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
   }
 ]
