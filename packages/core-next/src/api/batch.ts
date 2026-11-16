@@ -218,7 +218,7 @@ const build = (
     };
     (async () => {
       try {
-        await host.execute_(def, run, baseline, call);
+        await (run.p_ = host.execute_(def, run, baseline, call));
       } finally {
         host.leave_(run);
         ending++;

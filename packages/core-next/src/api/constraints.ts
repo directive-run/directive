@@ -466,11 +466,16 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
 
   // --- one evaluation pass (1.35's shape, so it awaits where 1.35 does) ----
-  /** `dep` may still act: enabled, and unanswered or a requirement unresolved. */
+  /**
+   * `dep` may still act: enabled, and a requirement unresolved, or unanswered
+   * and never resolved. One that ever resolved is not held for being asked
+   * later in the pass (1.35's resolvedConstraints): a constraint registered
+   * later ranks with the first, so its dependent may come before it.
+   */
   const blocks = (dep: string) =>
     !!defs[dep] &&
     !disabled.has(dep) &&
-    (unanswered.has(dep) ||
+    ((unanswered.has(dep) && !resolved.has(dep)) ||
       (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
   const afterReady = (id: string) => !(defs[id]!.after ?? []).some(blocks);
   /** Ask again each held-back constraint that nothing blocks any more. */

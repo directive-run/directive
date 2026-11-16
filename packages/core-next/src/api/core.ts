@@ -268,6 +268,12 @@ export interface SystemContext {
    * withDynamic's registry drives them, after it writes the module's map.
    */
   kinds_: Record<string, DefHooks>;
+  /** L10b: the event handlers, unwrapped. */
+  events_: Record<string, Fn>;
+  /** L10b: a pass now (1.35's unregisterModule awaits one, engine.ts:4870). */
+  reconcile_(): Promise<void>;
+  /** L10b: the meta part's tags for keys the store registers (or drops, untyped). */
+  keys_?: (entries: [string, unknown?][]) => void;
   /** L10: builds the reconcile part late, on a system that had no constraint or resolver. */
   l2_?: () => void;
   /** L10: true while a pass runs (1.35's isReconciling). */
@@ -284,6 +290,8 @@ export interface DefHooks {
   replace_(id: string, def?: unknown): void;
   remove_(id: string, def?: unknown): void;
   call_(id: string, props?: any): unknown;
+  /** L10b, resolvers: what an unregister waits for. */
+  waits_?(ids: string[]): unknown[];
   /** L10 (D7): whether one of the kind's definitions depends on `key`. */
   reads_?(key: string): boolean;
 }
@@ -2045,6 +2053,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     derivationDeps: (id) => derivations.get(id)?.deps_,
     counts_: () => [watched, changedKeys],
     kinds_: kinds,
+    // L10b: a module's events, and a pass now (unregisterModule).
+    events_: eventDefs,
+    reconcile_: reconcile,
     get inPass_() {
       return reconciling;
     },

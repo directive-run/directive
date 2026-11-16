@@ -96,9 +96,13 @@ export const withInspect: SystemPart = ({
       sources: sources?.rows_() ?? [],
       attachedSourceCount: sources?.count_() ?? 0,
       derivations: metas(module.derive),
-      modules: (module as { modules_?: unknown[] }).modules_ ?? [
-        { id: module.id, meta: module.meta },
-      ],
+      // L10b: the module list holds each module whole.
+      modules: (
+        ((module as any).modules_ ?? [module]) as {
+          id: string;
+          meta?: unknown;
+        }[]
+      ).map(({ id, meta }) => ({ id, meta })),
       traceEnabled: false,
     };
   };

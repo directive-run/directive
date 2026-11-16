@@ -844,6 +844,7 @@ const build = (context: SystemContext) => {
       }
       resolvers.drop_(id);
     },
+    waits_: resolvers.waits_,
     // 1.35's resolversManager.callOne: the resolve, now, in a batch.
     async call_(id, req) {
       const def = resolverDefs[id]!;

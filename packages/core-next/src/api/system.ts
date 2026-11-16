@@ -152,8 +152,12 @@ export function createSystem<
         ...options,
         module: m && {
           ...m,
+          schema: { ...m.schema, facts: { ...m.schema?.facts } },
+          hooks_: m.hooks ? [m.hooks] : [],
           derive: { ...m.derive },
+          events: { ...m.events },
           effects: { ...m.effects },
+          sources: { ...m.sources },
           constraints: { ...m.constraints },
           resolvers: { ...m.resolvers },
         },

@@ -106,8 +106,7 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
   it("an unbuilt member throws featureMissing with its code, feature and layer", () => {
     const system = build({}, form);
     const cases: [() => unknown, string, number][] = [
-      [() => system.registerModule(mod()), "registerModule", 10],
-      [() => system.unregisterModule("m"), "unregisterModule", 10],
+      // L10b built registerModule and unregisterModule.
       [() => system.getDistributableSnapshot(), "getDistributableSnapshot", 12],
       [
         () => system.watchDistributableSnapshot({}, () => {}),

@@ -77,9 +77,10 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
 
   it("an unbuilt member is left out: calling it is a TypeError", () => {
     const system = build();
+    // L10b built registerModule and unregisterModule.
     for (const call of [
-      () => system.registerModule(mod()),
       () => system.getDistributableSnapshot(),
+      () => system.watchDistributableSnapshot({}, () => {}),
     ]) {
       expect(call).toThrow(TypeError);
     }

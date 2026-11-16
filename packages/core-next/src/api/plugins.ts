@@ -52,6 +52,9 @@ const HOOKS: Record<string, string[]> = {
   "definition.assign": ["onDefinitionAssign", "type", "id", "def", "original"],
   "definition.unregister": ["onDefinitionUnregister", "type", "id"],
   "definition.call": ["onDefinitionCall", "type", "id", "props"],
+  // L10b: dynamic.ts.
+  "module.registered": ["onModuleRegistered", "id"],
+  "module.unregistered": ["onModuleUnregistered", "id"],
   "fact.batch": ["onFactsBatch", "changes"],
   "derivation.invalidate": ["onDerivationInvalidate", "id"],
   "derivation.compute": ["onDerivationCompute", "id", "value", "deps"],
