@@ -1,7 +1,20 @@
 # RFC: L13 subpaths, adapters and downstream packages
 
-Status: draft for review, revision 1. No engine or oracle code merges from this document.
+Status: draft for review, revision 2. No engine or oracle code merges from this document.
 Tree: branch `p13/l13-rfc`, cut from `main` at `10d24668` (L0 to L7 gated; L8 built and waiting for its gate; L9 built, L9a and L9b merged as #394 and #395; `layers.rules.json` `current` is `"L7"`). L10, L11 and L12 have their RFCs (PRs #396, #397 and #400) and are not built. Nothing in `packages/conformance` or `packages/core-next/src` is changed by this PR.
+
+## Changes since revision 1
+
+The design review verified B1 and asked for the changes below. Evidence for each is under "Evidence: revision 2 review".
+
+1. **The all-in projection is replaced by a one-bundle measurement.** Revision 1 added separately gzipped pieces, and shared code was counted more than once. Built as one bundle with the engine external, 1.35's L11 to L13 code is 44,500 B, not the 48,702 B the sum gave: the tools were counted twice (1,214 B), and the L13 pieces are 7,652 B, not 7,956 B. The all-in is now about 92.8 to 95.3 KB at targets and about 97 KB at caps, against 1.35's 97,527 B. It is a ceiling, not a price: no app imports every entry. A plain table for the owner is under Size, and B2's fixture does the one-bundle measurement.
+2. **Seam S1 is dropped.** It already exists at 0 B: `scopes`, a `WeakMap` of each system's context, whose context carries the `tracker`. The +60 B allowance is gone.
+3. **D1, the downstream switch, is rewritten.** It is about 10 lines in the root `vitest.config.ts`, not a helper in each package's config. pnpm overrides are ruled out. Two things the plan misses are added: types, and `cli` and `scaffold`'s own configs.
+4. **A beta path to half of `minimal` is added, as an owner question (N1), not taken under the blanket instruction.** The seams since the L3 gate cost about 655 B on `floor`. The real lever is `namespaced.ts`: 8,088 B of the beta bundle's 68,102 B minified, about 3.1 KB gzipped, imported statically by `system.ts`. Making the namespaced form an import at the beta closes the 1.85 KB gap with margin, at the price of a public API change and a codemod.
+5. **Two labels change.** (ca) is "better / test-rule", not "worse for existing tests", which is a rule about our tests and not a product effect. (cc) now states its effect on 1.35 clients' `onError`: worse for existing clients.
+6. **B1 is verified and is safe to land now,** as an oracle-only PR: the 46 tests move (L0 13, L2 13, L3 6, L4 5, and 9 at L7, L9 and L12), and at L7 on v2 the 35 black-box tests pass and 0 fail (the run: 154 pass, 0 fail, 24 skipped, exit 0).
+7. **The owner line** under the A table is kept, with the option taken marked on each row. N1 is excluded from it.
+8. **A count is corrected:** `scaffold` has 1 test file (`__tests__/scaffold.test.ts`), not 0.
 
 ## What we are building
 
@@ -32,7 +45,7 @@ The plan's row reads "Subpaths: testing, migration, worker, adapter-utils, inter
 
 **Reading the table:** 34 stubs in four files are L13's work, plus one `/internals` name. The stub entries are built on their own (`tsup.config.ts`, `stubEntry`, "slice P3-F5"), so the four built entries keep their chunks.
 
-**In plain terms:** L13 is mostly porting plain helpers. Testing, worker, migration and adapter-utils are about 8.0 KB of 1.35's code on their own, and they ride on hooks and members core-next already has: plugin hooks (L3), `observe` (L9), `inspect` (L2), history (L8). One small seam is needed in the core: adapter-utils' selector tracking has to reach a system's dependency tracker, which core-next keeps per system and 1.35 keeps as a global. The other half of L13 is the downstream packages, and there nothing exists yet: no package can run its suite on core-next. The probes found four 1.35 behaviours a user could notice: a test system's `isRunning`, `isInitialized` and `isSettled` never change after it is created; `eventHistory` records `dispatch` and not `events.*`; `createFakeTimers` has no way to schedule a timer, so it fires nothing; and a worker drops messages sent before `INIT` or after `DESTROY` without a reply. They are the candidate rows (bz) to (cc). The size is an owner decision (A1): measured, 2.0's all-in will be about the size of 1.35's, not half of it.
+**In plain terms:** L13 is mostly porting plain helpers. Testing, worker, migration and adapter-utils are about 7.7 KB of 1.35's code on their own (one bundle), and they ride on hooks and members core-next already has: plugin hooks (L3), `observe` (L9), `inspect` (L2), history (L8). No core seam is needed: adapter-utils' selector tracking has to reach a system's dependency tracker, which core-next keeps per system and 1.35 keeps as a global, and core-next already hands it over (`scopes`, `src/api/plugins.ts:152`). The other half of L13 is the downstream packages, and there nothing exists yet: no package can run its suite on core-next. The probes found four 1.35 behaviours a user could notice: a test system's `isRunning`, `isInitialized` and `isSettled` never change after it is created; `eventHistory` records `dispatch` and not `events.*`; `createFakeTimers` has no way to schedule a timer, so it fires nothing; and a worker drops messages sent before `INIT` or after `DESTROY` without a reply. They are the candidate rows (bz) to (cc). The size is an owner decision (A1): measured as one bundle, 2.0's all-in will be about 93 to 97 KB against 1.35's 97.5 KB, not half of it, and it is a ceiling, not a price.
 
 ## Gap analysis, measured
 
@@ -143,12 +156,12 @@ Read with a script over each package's `src/` (`$S/imports.mjs`; output `$S/impo
 | `cli` | root: `createModule`, `createSystem`, `t`, `diffRules`, `replayUnder`, `sweepUnder`, `toReplayFrames` | L11 (the tools) | 6 |
 | `ai` | root: `createModule`, `createSystem`, `t`, `getOperatorsForKind`, `getSchemaFieldKinds`, `predicateHash`, `validatePredicate`, `validatePredicateAgainstSchema`; `/adapter-utils`: `createCallbackPlugin`, `getBridgeFact`, `requirementGuard`, `setBridgeFact`; `/internals`: `isPrototypeSafe`, `safeStringify`; `/plugins`: `createCircuitBreaker`, `CircuitBreakerOpenError`, `createOTLPExporter`, `normalizeTokenUsage` | L11, L12, L13 | 73 |
 | `ai-harness` | root: `createModule`, `createSystem`, `t`; `/plugins`: `devtoolsPlugin`, `loggingPlugin` | L12 | 15 |
-| `scaffold` | root: `createModule`, `createSystem`, `t` (in templates) | | 0 |
+| `scaffold` | root: `createModule`, `createSystem`, `t` (in templates) | | 1 |
 | `knowledge`, `claude-plugin`, `mcp`, `lint`, `sandbox`, `vite-plugin-api-proxy` | none (`sandbox` lists the dependency and imports nothing) | | |
 
 **Reading the table:** the adapters cannot switch before L12 and L13 are both built; `el` needs only `assertSystem`; `ai` is the widest consumer, of four entry points. "Test files" counts `*.test.ts(x)` under each package.
 
-**Is there a switch?** No. Each package resolves `@directive-run/core` through `workspace:*` to `packages/core` (1.36.0, the same runtime as 1.35.0, below). The only engine switch in the repository is the conformance package's vitest projects, which alias every entry point to core-next through `lib/core-entries.ts` (`v2Entries`, `v2DistEntries`, derived from each package's `exports`; `vitest.config.ts:108–124`). No downstream `vitest` config names core-next (`git grep core-next` outside `packages/core-next` and `packages/conformance` finds only CI, `RELEASING.md`, `biome.json` and `size-budgets.next.json`).
+**Is there a switch?** No. Each package resolves `@directive-run/core` through `workspace:*` to `packages/core` (1.36.0, the same runtime as 1.35.0, below). The only engine switch in the repository is the conformance package's vitest projects, which alias every entry point to core-next through `lib/core-entries.ts` (`v2Entries`, `v2DistEntries`, derived from each package's `exports`; `vitest.config.ts:108–124`). No downstream `vitest` config names core-next (`git grep core-next` outside `packages/core-next` and `packages/conformance` finds only CI, `RELEASING.md`, `biome.json` and `size-budgets.next.json`). Of the 15 packages in the table above, 13 have no vitest config of their own: their `test` script is `cd ../.. && vitest run packages/<name>/` (`query` has none, and its 18 files run under the root run), so the root `vitest.config.ts` runs them. Only `cli` and `scaffold` have a config (`include: ["__tests__/**/*.test.ts"]`, no alias), and their `test` scripts also run from the root. The root config's `buildAlias()` (`vitest.config.ts:98–147`) already aliases every `@directive-run/*` export to source, derived from each package's `exports`.
 
 **How alpha.0 ran the Aperture lab on 2.0.** `pnpm --filter @directive-run/core-next consumer:alpha <tgz>` (`scripts/alpha/consumer-check.mjs:1–20`; `RELEASING.md:85–97`): it copies the lab (default `~/Desktop/directive-size-plan/research/deep-dx/lab`, outside the repo) twice, installs `npm pack @directive-run/core@1.35.0` into one copy and the alpha tarball into the other, builds and serves each, runs `npm run parity`, and compares the two reports row by row against `consumer-approved.json`. That is one external app, not the in-repo suites.
 
@@ -156,20 +169,20 @@ Read with a script over each package's `src/` (`$S/imports.mjs`; output `$S/impo
 
 Where a row says "verified", the probe ran it against the published 1.35 (`packages/conformance/node_modules/directive-v1`, `1.35.0`), in development and production, with real timers; the output is under "Evidence". The rest is read from the code; 1.35 line numbers are in `packages/core/src/`.
 
-### Where it lives, and the seam it needs
+### Where it lives, and the seam it does not need
 
-**In plain terms:** each subpath stays its own entry point, as in 1.35, so nothing in it reaches an app that does not import it. The core gains one seam: a way for `/adapter-utils` to borrow a system's tracker.
+**In plain terms:** each subpath stays its own entry point, as in 1.35, so nothing in it reaches an app that does not import it. The core gains nothing: the way for `/adapter-utils` to borrow a system's tracker already exists.
 
 | Option | Keeps 1.35's API? | Who pays the bytes |
 |---|---|---|
-| **O1. The seven entry points as 1.35 ships them**, each built from its own file | Yes | Only apps that import a subpath; every `createSystem` build pays the tracker seam (reasoned, 20 to 40 B) |
+| **O1. The seven entry points as 1.35 ships them**, each built from its own file | Yes | Only apps that import a subpath; no `createSystem` build grows |
 | O2. The beta's moves now (`/migration` to `@directive-run/cli`, `timeline` into `/testing`, `mutator` and `optimistic` into `/mutations`, `contracts/PACKAGES-2.0.md:9–25`) | No: a 1.35 program's `/migration` import breaks | The same, minus `/migration` (1.6 KB) |
 
 **Reading the table:** O1 keeps the alpha rule; O2 is the beta's, with its codemod.
 
-**The seam: the selector needs the system's tracker.** 1.35's `runTrackedSelector` (`adapter-utils.ts:296–341`) runs the selector inside `withTracking` from `core/tracking.ts`, a module-level tracker: whatever the selector reads, through the proxy or not, is recorded. core-next keeps one tracker per system (`src/api/core.ts:540`, `const tracker: Tracker = { deps: null, effect_: undefined }`), and its `withTracking` takes it as an argument (`src/api/facts.ts:136–143`). So `/adapter-utils`, a separate entry, must reach a given system's tracker. Two ways:
+**The selector needs the system's tracker, and the core already hands it over.** 1.35's `runTrackedSelector` (`adapter-utils.ts:296–341`) runs the selector inside `withTracking` from `core/tracking.ts`, a module-level tracker: whatever the selector reads, through the proxy or not, is recorded. core-next keeps one tracker per system (`src/api/core.ts:540`, `const tracker: Tracker = { deps: null, effect_: undefined }`), and its `withTracking` takes it as an argument (`src/api/facts.ts:136–143`). So `/adapter-utils`, a separate entry, must reach a given system's tracker. It already can, at 0 B:
 
-- **S1 (recommended): the core registers each system's tracker in a module-level `WeakMap`**, in a module that the root and `/adapter-utils` share (tsup's `splitting: true` puts it in a shared chunk), and `runTrackedSelector` looks the system up. Nothing is added to the system's own keys, which stay equal to 1.35's 42 (P11). Reasoned at 20 to 40 B on every `createSystem` build, `floor` included; L13b measures it before anything else.
+- **`scopes` is a module-level `WeakMap<object, SystemContext>`** (`src/api/plugins.ts:152`), set once per system in `withPlugins` (`scopes.set(system, context)`, `:157`), and the context carries `tracker` (the type, `src/api/core.ts:154`; the value, `core.ts:1915`). `/adapter-utils` reads `scopes.get(system).tracker` and passes it to `withTracking`. Revision 1's seam S1, a new registry for the same pairing, would have duplicated it and added a reasoned 20 to 40 B to every `createSystem` build; it is dropped, and so is its +60 B allowance. Nothing is added to the system's own keys, which stay equal to 1.35's 42 (P11). `scopes` is first-party only (it says so at `plugins.ts:146–152`), and `/adapter-utils` is first-party, as `plugins/persistence.ts` is, which already imports it (`persistence.ts:42`). One thing is reasoned, not checked: `scopes` is filled by `withPlugins`, which every build wires today (the beta-wiring line omits seven other parts, not this one). If the beta makes plugins an import, an app with no plugins that imports `/adapter-utils` needs `scopes` filled some other way; decide then.
 - S2: record reads in the proxy's `get` only. It costs nothing in the core, but it misses reads the selector makes outside the proxy (a closure over `system.facts`), which 1.35's global tracker sees. That is a behaviour change, so S2 is out.
 
 `factKeys` then carries core-next's own `DERIVATION_DEP_PREFIX`, the same `\u001F` 1.35 uses (`core/tracking.ts:184`; core-next's `src/api/facts.ts`, `describeDep`), so a selector that reads a derivation returns `["\u001Fdouble", "n"]` on both engines (P8). Verified on 1.35, P10: a store subscription to that key never fires, so the adapters' extra listener is dead weight on both engines. Kept, not a candidate (C).
@@ -195,7 +208,7 @@ Where a row says "verified", the probe ran it against the published 1.35 (`packa
 
 ### `/adapter-utils`
 
-**In plain terms:** the helpers every adapter shares. Pure functions over a system's public members, except the selector, which needs the seam.
+**In plain terms:** the helpers every adapter shares. Pure functions over a system's public members, except the selector, which reads the system's tracker through `scopes`.
 
 | # | 1.35 rule | 2.0 mechanism | Pinned by |
 |---|---|---|---|
@@ -204,7 +217,7 @@ Where a row says "verified", the probe ran it against the published 1.35 (`packa
 | AU3 | `assertSystem(hook, system)` throws "[Directive] {hook}() requires a system instance as the first argument. Received {system}." in development only (`198–204`). Verified, P8: production returned. | The same. | U12 |
 | AU4 | `buildHistoryState(system)`: `null` with history off; otherwise navigation flags, snapshot metadata and bound methods over `system.history` (`216–259`). Verified, P8: `null`. | The same, over L8's history. | adapters' suites; U10 |
 | AU5 | `pickFacts`, `defaultEquality` (`Object.is`), `mergeHydrationFacts(snapshot, initial)`: a non-null object `data` is the snapshot's facts, anything else is the record itself (`207–281, 381–402`). Verified, P8. | The same. | U10 |
-| AU6 | `runTrackedSelector(system, deriveKeys, selector)`: a proxy whose derivation reads call `system.read` and are listed in `deriveKeys`, and whose other reads call `$store.get`; everything read is tracked (`296–341`). Verified, P8 and P10: `factKeys` `["\u001Fdouble", "n"]`, `deriveKeys` `["double"]`. | The seam S1; the same proxy. | U10 |
+| AU6 | `runTrackedSelector(system, deriveKeys, selector)`: a proxy whose derivation reads call `system.read` and are listed in `deriveKeys`, and whose other reads call `$store.get`; everything read is tracked (`296–341`). Verified, P8 and P10: `factKeys` `["\u001Fdouble", "n"]`, `deriveKeys` `["double"]`. | The same proxy, tracking through `scopes.get(system).tracker`, which exists. | U10 |
 | AU7 | `depsChanged` compares the two lists in order (`344–356`). Verified, P8: `["a","b"]` against `["b","a"]` is a change. | The same. | U11 |
 | AU8 | The bridge helpers `setBridgeFact`, `getBridgeFact`, `createCallbackPlugin`, `requirementGuard`, `requirementGuardMultiple` (`core/types/adapter-utils.ts:95–340`), and `shallowEqual` (`utils/utils.ts`). | Ported as code; `shallowEqual` re-exports the root's, which is built. | `ai`'s suite; U10 |
 
@@ -231,30 +244,31 @@ Where a row says "verified", the probe ran it against the published 1.35 (`packa
 
 ### The downstream switch
 
-**In plain terms:** a way to run a downstream package's own suite on core-next without editing the suite.
+**In plain terms:** a way to run a downstream package's own suite on core-next without editing the suite: about ten lines in the root vitest config, which already runs 13 of the 15 packages.
 
 | # | Rule | Mechanism | Pinned by |
 |---|---|---|---|
-| D1 | A package's suite runs unchanged on both engines. | `DIRECTIVE_ENGINE=v2`, read by each package's vitest config through one shared helper that aliases every `@directive-run/core` entry to core-next's built `dist/` from `lib/core-entries.ts`'s `v2DistEntries`, derived from `exports` and never written by hand. Without the variable, nothing changes. | each package's suite, twice in CI |
+| D1 | A package's suite runs unchanged on both engines. | `DIRECTIVE_ENGINE=v2`, read in the root `vitest.config.ts`. Its `buildAlias()` (`vitest.config.ts:98–147`) already points every `@directive-run/*` export at source. With the variable set, `@directive-run/core`'s seven entries (the same seven subpaths, from core's `exports`) read from `packages/core-next` instead of `packages/core`, and `#is-development` is aliased as the conformance config does (`packages/conformance/vitest.config.ts:91–137`). Without the variable, nothing changes. About 10 lines. **Rejected: pnpm `overrides`.** core-next is a different package (`@directive-run/core-next`), an override rewrites the lockfile, and it changes what every package builds and typechecks against, not only its tests. | each package's suite, twice in CI |
 | D2 | The switch order is the plan's: adapters, then `query`, `sources`, `mutator`, `optimistic` and `el`, then `timeline` and `cli`, then `ai` and `ai-harness`. | One CI job per group, added as each group's layers land. | A4 |
 | D3 | A package switches when its full suite passes on both engines with no test edited. | The job fails on any test that passes on 1.35 and not on 2.0. | A4 |
 | D4 | `ai` switches only when its full suite, `ai-harness` and the minglingo runner tests pass on both engines, and a checkpoint saved under 1.35 loads under 2.0 (the plan's gate). | Its own gate in Phase 4; the minglingo tests live outside this repository. | A4 |
+| D5 | Types are checked against 2.0 too. The plan misses this: `tsc --noEmit` (`react`'s `typecheck`) and tsup's declaration build still resolve `@directive-run/core` to 1.35's `dist/*.d.ts` through `workspace:*`, and the vitest alias does not reach them. A suite can pass on 2.0's runtime while typing against 1.35. | A second tsconfig per package group, with `paths` for the seven specifiers pointing at `packages/core-next/dist/*.d.ts`, and a `typecheck:v2` script (reasoned, not run). Each group's job runs it with its suite. | A4 |
+| D6 | `cli` and `scaffold` get the switch too. The plan misses this: they are the only two with their own vitest config, with no alias, so a bare `vitest` inside the package resolves core through `node_modules` (1.35). Their `test` scripts run from the root, so D1 reaches those. | Both configs read the same variable through one small shared function (`DIRECTIVE_ENGINE`, returning the alias list), so a run from the package agrees with a run from the root. | A4 |
 
 ## Where it lives
 
-**In plain terms:** four stub files become real, one name joins `/internals`, and the core gains one small seam.
+**In plain terms:** four stub files become real, one name joins `/internals`, and the core is not touched.
 
 | Piece | File | Change |
 |---|---|---|
 | `/testing` | `src/utils/testing.ts` | The 10 stubs become T2 to T10 |
-| `/adapter-utils` | `src/adapter-utils.ts` | The 15 stubs become AU1 to AU8; `shallowEqual` re-exports the root's |
+| `/adapter-utils` | `src/adapter-utils.ts` | The 15 stubs become AU1 to AU8, the selector reading `scopes`; `shallowEqual` re-exports the root's |
 | `/worker` | `src/worker.ts` | The 4 stubs become W1 to W7; the system is imported lazily |
 | `/migration` | `src/migration.ts` | The 5 stubs become MG1 |
 | `/internals` | `src/internals.ts` | `safeStringify` (IN1) |
-| **The seam** | `src/api/core.ts:540` and a shared module | Each system's tracker registered in a `WeakMap` (S1). Reasoned at 20 to 40 B; measured first in L13b |
 | The build | `tsup.config.ts` (`entry`, `stubEntry`) | The three stub entries join the built ones, as each lands; the chunk split is re-checked |
 | Leftovers | `src/unbuilt.ts`, the `featureMissing(…, 13)` calls | Removed when the last L13 entry lands (read, not checked: whether `lib/core-entries.ts` still points any specifier at `unbuilt.ts`) |
-| The switch | a shared vitest helper beside `lib/core-entries.ts`; each downstream `vitest` config | D1 |
+| The switch | the root `vitest.config.ts` (about 10 lines); `cli` and `scaffold`'s own configs; a types check | D1, D5, D6 |
 
 ## The fuzz, designed in up front
 
@@ -301,39 +315,39 @@ Whether the deep runs gate L13 is decision A2.
 
 ## Performance
 
-**In plain terms:** L13's code is off the hot path. Only the seam touches every system, once, at creation.
+**In plain terms:** L13's code is off the hot path, and no L13 slice touches the core: there is no seam.
 
 I did not run the bench for this RFC: no L13 code exists. What L13 must keep:
 
-- No workload slower than `main` by more than 5% after any L13 slice. The seam is one `WeakMap.set` per `createSystem`.
+- No workload slower than `main` by more than 5% after any L13 slice. Nothing in `createSystem` changes.
 - `runTrackedSelector` runs on every render that re-selects. It must allocate no more than 1.35's: one proxy and one tracking set per call. L13b checks it with the adapters' own benches if they have any, and otherwise with a `selector-1000` workload: 1,000 selector runs, time and bytes, judged at 1.0 or better against 1.35 (B5).
 - With (bz), the test system's flags become getters: no cost outside tests.
 
 ## Slice plan
 
-**In plain terms:** a placement fix that can land now, an oracle slice, three build slices, the downstream switch, and the gate.
+**In plain terms:** a placement fix that can land now (verified, oracle-only), an oracle slice, three build slices, the downstream switch, and the gate.
 
 | Slice | Builds | Done means (checkable) | Tier |
 |---|---|---|---|
-| L13-pre-a (now) | B1: `instruments: ["import flushMicrotasks"]` on `engine`, `system`, `derivation-deps` and `resolvers`. | `pnpm port` and `check:expects` exit 0; the 35 black-box tests land at L0 to L4 as measured above, run on v2 at `current` L7 and pass; `v2-passing.json` gains them; the census exits 0. `oracle-change` label. | test oracle; Sonnet implementer, one reviewer |
+| L13-pre-a (now) | B1: `instruments: ["import flushMicrotasks"]` on `engine`, `system`, `derivation-deps` and `resolvers`. Verified in revision 2: safe to land now, as an oracle-only PR (no engine or `src` file changes). | `pnpm port` and `check:expects` exit 0; the 46 tests move (L0 13, L2 13, L3 6, L4 5, and 9 at L7, L9 and L12); the 35 black-box tests at L0 to L4 run on v2 at `current` L7 and pass (35 pass, 0 fail; the run 154 pass, 0 fail, 24 skipped, exit 0); `v2-passing.json` gains them; the census exits 0. `oracle-change` label. | test oracle; Sonnet implementer, one reviewer |
 | Precondition 1 | The L8 to L12 gates. | `current` is L12. | coordinator |
-| Precondition 2 | The switch helper (D1) and each downstream suite green on 1.35 through it. | Every downstream suite passes with and without the helper on 1.35. | test oracle |
+| Precondition 2 | The switch (D1, about 10 lines in the root `vitest.config.ts`; D5 and D6) and each downstream suite green on 1.35 through it. | Every downstream suite passes with and without the variable on 1.35. | test oracle |
 | Precondition 3 | A `gate: L13` run of `mutation-nightly.yml`, after B3. | The L13 layer gate reports PASS, or its entries are listed as L13-pre work. | test oracle; coordinator |
-| L13-pre (oracle) | U1 to U17; the `testSystem` fuzz view with its self-test; B2's `all-in` fixture; B3; B4. | The new tests pass on `conformance:v1` and `v1:prod`, and on v2 fail only as this document predicts. `conformance:diff` at forced L13 fails only the L13 scenarios and the U-scenarios. `pnpm census`, `check:expects` and `oracle:update` exit 0. | test oracle; Sonnet implementer, Fable correctness reviewer |
+| L13-pre (oracle) | U1 to U17; the `testSystem` fuzz view with its self-test; B2's `all-in` fixture (one bundle of the seven entries, on both engines); B3; B4. | The new tests pass on `conformance:v1` and `v1:prod`, and on v2 fail only as this document predicts. `conformance:diff` at forced L13 fails only the L13 scenarios and the U-scenarios. `pnpm census`, `check:expects` and `oracle:update` exit 0. | test oracle; Sonnet implementer, Fable correctness reviewer |
 | L13a | `/testing` (T2 to T10) and `/internals` `safeStringify`. (bz), (ca), (cb) if approved. | The 19 testing failures pass on v2, v2:prod and v2:dist; U1 to U9 pass or differ only by signed entries; the census's L13 count is 0. Sizes within A1. | core; Opus implementer, Sonnet diff reviewer plus Fable correctness reviewer |
-| L13b | **The seam first**, measured and reported. Then `/adapter-utils` (AU1 to AU8) and `/migration` (MG1). | U10 to U12 and U17 match 1.35. The six adapters' suites pass on both engines through D1. The PR reports the seam's bytes and each entry's bytes. | core; as L13a |
+| L13b | `/adapter-utils` (AU1 to AU8, the selector reading `scopes`) and `/migration` (MG1). | U10 to U12 and U17 match 1.35. The six adapters' suites pass on both engines through D1. The PR reports each entry's bytes and shows `createSystem`'s bytes unchanged. | core; as L13a |
 | L13c | `/worker` (W1 to W7). (cc) if approved. | The 11 worker failures pass; U13 to U15 match 1.35 or differ only by signed entries. | core; as L13a |
-| L13d | The switch for `query`, `sources`, `mutator`, `optimistic`, `el`, then `timeline` and `cli`. | Each package's full suite passes on both engines with no test edited (D3). | test oracle; Sonnet implementer, one reviewer |
-| L13-gate | `current` to L13, `ratchet --update`, diff and fuzz at L13, the triage entries converted, `GATE-13.md`, `/principal` on L13, the all-in measured against A1. | 0 L13 failures on v2, v2:dist and v2:prod. The census exits 0. PR fuzz passes at L13. The nightly follows A2. At most 3 gate runs, then Jason. | test oracle; Sonnet plus the coordinator's read |
+| L13d | The switch for `query`, `sources`, `mutator`, `optimistic`, `el`, then `timeline` and `cli`, each with its `typecheck:v2` (D5). | Each package's full suite passes on both engines with no test edited (D3). | test oracle; Sonnet implementer, one reviewer |
+| L13-gate | `current` to L13, `ratchet --update`, diff and fuzz at L13, the triage entries converted, `GATE-13.md`, `/principal` on L13, the all-in measured against A1 (B2's one-bundle fixture). | 0 L13 failures on v2, v2:dist and v2:prod. The census exits 0. PR fuzz passes at L13. The nightly follows A2. At most 3 gate runs, then Jason. | test oracle; Sonnet plus the coordinator's read |
 | Phase 4 (not L13) | The `ai` and `ai-harness` switch (D4). | The plan's AI gate. | coordinator |
 
-**Reading the table:** L13-pre-a does not wait for anything: the 35 tests pass today, and placing them where they belong makes v2's L0 to L4 gates check them.
+**Reading the table:** L13-pre-a does not wait for anything: the 35 tests pass today (verified in revision 2), and placing them where they belong makes v2's L0 to L4 gates check them.
 
 ## Size
 
-**In plain terms:** 1.35's all-in is 97.5 KB. 2.0's is 40.5 KB today, and the approved and recommended plans for L10 to L13 add about 56.5 KB, almost all of it plugins and tools ported as code. So 2.0's all-in lands at about 1.35's size, not half. Half holds for neither the alpha nor the beta all-in; it is close only for the beta's smallest app.
+**In plain terms:** 1.35's all-in is 97.5 KB. 2.0's is 40.5 KB today. Measured as one bundle, the tools, plugins and subpaths that L11 to L13 port as code are 44.5 KB, and the engine parts L10 to L12 add are about 9 to 10.5 KB, so 2.0's all-in lands at about 93 to 97 KB: about 1.35's size, not half. The all-in is a ceiling, not a price: no app imports every entry. Half holds for neither the alpha nor the beta all-in; it is close only for the beta's smallest app.
 
-**Method.** The L9 and L12 RFCs': esbuild 0.27.7 (tsup's copy, as `scripts/size.mjs` loads it), production (`#is-development` inlined and folded as `size.mjs` does, `NODE_ENV` "production"), minified, ESM, gzip level 9 by node zlib. 1.35 is built from the workspace's `packages/core/src`, as `size.mjs` builds its "core 1.35" lines. That tree is 1.36.0, whose source differs from the `@directive-run/core@1.35.0` tag outside tests in three places (`git diff --stat`): an explicit `process.env` guard in the dev-only `warnIfNotStarted`, one type export, and an unused licence validator deleted (#186). None reaches a production bundle; that is reasoned, not measured. core-next is built with its private-member mangling, as its build does. Script: `$S/size/measure.mjs`; output `$S/size/size.log`.
+**Method.** The L9 and L12 RFCs', with one change for revision 2 (pieces are measured as one bundle, below): esbuild 0.27.7 (tsup's copy, as `scripts/size.mjs` loads it), production (`#is-development` inlined and folded as `size.mjs` does, `NODE_ENV` "production"), minified, ESM, gzip level 9 by node zlib. 1.35 is built from the workspace's `packages/core/src`, as `size.mjs` builds its "core 1.35" lines. That tree is 1.36.0, whose source differs from the `@directive-run/core@1.35.0` tag outside tests in three places (`git diff --stat`): an explicit `process.env` guard in the dev-only `warnIfNotStarted`, one type export, and an unused licence validator deleted (#186). None reaches a production bundle; that is reasoned, not measured. core-next is built with its private-member mangling, as its build does. Script: `$S/size/measure.mjs`; output `$S/size/size.log`.
 
 | Entry, bundled alone | 1.35 | core-next today |
 |---|---|---|
@@ -358,50 +372,76 @@ I did not run the bench for this RFC: no L13 code exists. What L13 must keep:
 | `/migration` (no imports) | 4,591 B | 1,592 B |
 | `/adapter-utils` with the bridge helpers, own code | 2,781 B | 1,258 B |
 | `/internals` `safeStringify` | 242 B | 211 B |
-| **Sum** | | **7,956 B** |
+| **Sum of the pieces, each gzipped alone** | | 7,956 B |
+| **The same five, one bundle, engine external** | 22,767 B | **7,652 B** |
 | What the adapters import of `/adapter-utils` (ten names, the engine external) | 2,414 B | 1,134 B |
 | What `ai` imports of it (four names) | 464 B | 248 B |
 
-**Reading the table:** L13's code is plain helpers, like L11's tools and L12's plugins, so I estimate it at 1.0, a straight port: about 8.0 KB, less about 1.0 KB of stubs it replaces (reasoned from the stub rows above, which share `featureMissing`), so **about +7.0 KB on the all-in**. It reaches no `createSystem` build: only the seam does (reasoned 20 to 40 B).
+**Reading the table:** separately gzipped pieces double-count what they share, so the sum overstates: 7,956 B against 7,652 B in one bundle (the review's `measure.mjs`). L13's code is plain helpers, like L11's tools and L12's plugins, so I estimate it at 1.0, a straight port: 7.7 KB, less about 1.0 KB of stubs it replaces (reasoned from the stub rows above, which share `featureMissing`), so **about +6.7 KB on the all-in**. It reaches no `createSystem` build, and there is no seam.
 
-**2.0's all-in after L13, projected.** From the L10, L11 and L12 RFCs' A1 rows, each a target and a cap:
+**1.35's L11 to L13 code, measured as one bundle.** Revision 1 added the L11 tools (10,946 B), the L12 plugins (29,800 B) and L13's pieces (7,956 B), each gzipped alone: 48,702 B. That double-counts. Built as one bundle with the engine external (the review's `measure.mjs`; the tools, the plugins and status plugins, and the four subpaths with `safeStringify`), the set is **44,500 B**:
 
-| Step | Basis | Target | At every cap |
+| What, esbuild 0.27.7, production, minified, ESM, gzip level 9 | Minified | Gzip |
+|---|---|---|
+| L11 tools, plugins and status, and L13 subpaths, one bundle, engine external | 149,646 B | **44,500 B** |
+| L11 tools alone | 41,327 B | 11,246 B |
+| L12 plugins and status, tools included | 91,271 B | 28,448 B |
+| L12 plugins and status, engine and tools external | 86,737 B | 27,234 B |
+| L13 four subpaths and `safeStringify` | 22,767 B | 7,652 B |
+| 1.35 root with the engine external (tools, status, snapshot tools, signing, utils) | 61,047 B | 17,822 B |
+
+**Reading the table:** the plugins' bundle carries the tools the clobber loop imports, so counting the tools again double-counts 1,214 B (28,448 B against 27,234 B), and the L13 pieces overstate by 304 B (7,956 B against 7,652 B). The pieces summed to 47,346 B on the review's own numbers, and the one bundle is 44,500 B; the rest of the gap is code the pieces share and gzip finds once.
+
+**2.0's all-in after L13, corrected.** From the L10 to L12 RFCs' engine parts (each a target and a cap) and the one-bundle set above:
+
+| Step | Basis | At targets | At every cap |
 |---|---|---|---|
 | Today, post-L9 (`10d24668`) | measured | 40,480 B | 40,480 B |
-| L10 | L10 RFC rev 2, A1: +4.1 KB target, +5.0 KB cap | 44,580 B | 45,480 B |
-| L11 | L11 RFC rev 2, A1: the engine +4.2 KB (cap +4.8 KB) and the tools' 10,946 B measured, at 1.0 | 59,730 B | 61,480 B |
-| L12 | L12 RFC, A1: the engine part +0.5 KB (cap +0.75 KB) and the plugins and tools' 29.8 KB, at 1.0 | 90,030 B | 92,480 B |
-| L13 | this RFC: +7.0 KB target, +8.0 KB cap | **97,030 B** | **100,480 B** |
-| 1.35 | measured | 97,527 B | |
+| The engine parts, L10 to L12 | L10 +4.1 KB (cap +5.0), L11 +4.2 KB (cap +4.8), L12 +0.5 KB (cap +0.75) | +8,800 B | +10,550 B |
+| 1.35's L11 to L13 code, ported at 1.0 | measured, one bundle | +44,500 B | +44,500 B |
+| Snapshot tools and signing, if outside that set | reasoned, up to | +0 to 2,500 B | +2,500 B |
+| The stubs those pieces replace | reasoned | −1,000 B | −1,000 B |
+| **All-in** | | **92,780 to 95,280 B** (92.8 to 95.3 KB) | **94,530 to 97,030 B** (about 97 KB at the top) |
+| 1.35 | measured | 97,527 B | 97,527 B |
 
-**Reading the table:** at every target, 2.0's all-in is 0.5% under 1.35's; at every cap, 3% over. The projection may count the L11 tools twice by up to a few KB, because the L12 RFC's plugin bundle includes the tools the clobber loop imports; that is reasoned, not measured. Either way, half of 1.35, 48,764 B, is about 48 KB away. The 2.0 engine is much smaller (`minimal` 35,282 B against 49,313 B), but about 49 KB of what 1.35 ships is tools, plugins and subpaths that L11 to L13 port as code at their 1.35 size.
+**Reading the table:** at targets 2.0's all-in is 2% to 5% under 1.35's; at every cap and the full 2.5 KB it is 0.5% under. Revision 1's 97,030 B at targets (100,480 B at caps) added the pieces gzipped alone, counted L11's tools twice, and added a seam that does not exist. Half of 1.35, 48,764 B, is about 44 to 48 KB away. **The all-in is a ceiling, not a price: no app imports every entry.** What an app pays is its own row below. The 2.0 engine is much smaller (`minimal` 35,282 B against 49,313 B), but about 44.5 KB of what 1.35 ships is tools, plugins and subpaths that L11 to L13 port as code at their 1.35 size.
+
+**What an app pays, for the owner.** Alpha at the layer targets and at every cap; the beta's line is measured today.
+
+| | 1.35 | 2.0 alpha, at targets / caps | 2.0 beta |
+|---|---|---|---|
+| Minimal | 49,313 B | about 44.1 / 45.8 KB (10% / 7% smaller) | 26,505 B (46% smaller; the half-mark is 24,657 B) |
+| Aperture | 53,871 B | about 49.0 / 50.7 KB | |
+| Typical app with devtools and logging | | +13.6 KB on both engines (the plugins are ported at 1.0) | |
+| All-in | 97,527 B | about 93 to 97 KB | |
+
+**Reading the table:** the first two rows are today's 2.0 fixtures (`minimal` 35,282 B, `aperture` 40,150 B) plus the engine parts (+8.8 KB at targets, +10.55 KB at caps); L13 adds 0 B to them. The third row is the L12 RFC's two rows, devtools 12,359 B and logging 1,192 B, ported at 1.0, so the same bytes on 1.35 and 2.0; it is added on top of either engine's app. The beta column is `size.mjs`'s beta-wiring line for `minimal`, reported today and not yet budgeted.
 
 **Whether "half of 1.35" holds.**
 
 - **The alpha: no.** It wires everything and keeps 1.35's API; the all-in lands at about 1.35's size.
 - **The beta's all-in: no, as planned.** "Keep the order" turns features into imports, which shrinks an app that skips them, but an all-in imports them all. `PACKAGES-2.0.md` moves `/migration` out (1.6 KB) and `devtools-ai-bridge` out (part of devtools' 12.4 KB), and moves `timeline`, `mutator` and `optimistic` in (not measured). The net is a few KB. Reaching 48 KB would need the ported tools and plugins rebuilt at well under half their size, or moved out of core.
-- **The beta's smallest app: close.** `minimal`'s beta-wiring line is 26,505 B today (`size.mjs`, exit 0), 54% of 1.35's `minimal`; half is 24,657 B, 1,848 B away. L10 to L12 add only their seams to that line, if their parts join the beta list.
+- **The beta's smallest app: close, and one change closes it (N1).** `minimal`'s beta-wiring line is 26,505 B today (`size.mjs`, exit 0), 54% of 1.35's `minimal`; half is 24,657 B, 1,848 B away. The seams since the L3 gate's `floor` of 10,367 B (`GATE-3.md:136`) total about 655 B (to 11,022 B), so trimming seams does not close it. The lever is `namespaced.ts`: 8,088 of the beta bundle's 68,102 minified bytes (esbuild's metafile for that bundle), about 3.1 KB gzipped (8,088 at the line's own ratio, 26,505 to 68,102; reasoned), imported statically by `system.ts` (`src/api/system.ts:31`) even for an app with one module. Making the namespaced form an import at the beta would close the 1.85 KB gap with about 1.3 KB to spare. It is a public API change and needs a codemod, so it is an owner question (N1), not taken under the blanket instruction. L10 to L12 add only their seams to that line, if their parts join the beta list.
 
 **`full-entry` is not the all-in.** `full-entry` is `export * from "@directive-run/core"`: the root only (`scripts/size.mjs:677–684`). No fixture measures `/plugins`, `/testing`, `/worker`, `/migration` or `/adapter-utils`. So the L12 RFC's +31.0 KB cap on `full-entry` counts about 21 KB of plugins that live in `/plugins` (devtools, logging, performance, observability, OTLP, the circuit breaker, the clobber pair) and that `full-entry` never imports; the root's share is the ledger, the status plugin, the snapshot tools and signing, about 8.5 KB by the L12 RFC's own rows. A cap with about 21 KB of slack never fires. B2 adds an `all-in` fixture where those bytes do show.
 
 ## What the plan got wrong, or left out
 
-- **"Half of 1.35" does not hold for the all-in, alpha or beta.** The plan's L10 to L13 port tools, plugins and subpaths as code; together they are about half of 1.35's all-in on their own. Measured, 2.0's all-in lands at about 1.35's 97.5 KB. Half is near only for the beta's smallest app.
+- **"Half of 1.35" does not hold for the all-in, alpha or beta.** The plan's L10 to L13 port tools, plugins and subpaths as code; together they are 44.5 KB, 46% of 1.35's all-in, measured as one bundle. Measured, 2.0's all-in lands at about 93 to 97 KB against 1.35's 97.5 KB, and it is a ceiling, not a price. Half is near only for the beta's smallest app, and N1 closes it.
 - **The flush trap is wider than the four earlier RFCs found.** 46 more flush-only tests (`engine` 38, `system` 3, `resolvers` 4, `derivation-deps` 1) are claimed by none, and 35 of them belong at L0 to L4, where v2 never runs them today; they pass at forced L13 (B1).
 - **`full-entry` is not an all-in**, and nothing measures the subpaths. L12's `full-entry` cap counts bytes that fixture never imports.
 - **The mutation gate cannot see L13's code.** Stryker mutates `src/core/*.ts` only. The 55 L13 triage entries are other layers' mutants, placed through flush-only tests.
 - **`dev-mode-bundle` and `dist-types` are not L13 work.** The first is a packaging test of 1.35's `dist/`, not ported, and its 2.0 counterpart already runs. The second's 5 tests are at L0 and already pass on v2.
 - **`/adapter-utils` and `/migration` have no 1.35 test in the oracle.** The adapters' suites are adapter-utils' only tests; migration has none at all.
 - **Two "L13" diff scenarios test L12's status plugin.**
-- **The selector needs a core seam.** 1.35's tracker is global; core-next's is per system.
-- **The downstream suites have no switch to v2.** The plan's row lists them as L13 tests, but nothing can run them on core-next yet, and `ai`'s switch needs L11 and L12 too, and tests outside this repository.
+- **The selector needs no new seam.** 1.35's tracker is global; core-next's is per system, and `scopes` already hands it over (revision 1 proposed a seam that existed).
+- **The downstream suites have no switch to v2, and it is small.** The plan's row lists them as L13 tests, but nothing can run them on core-next yet; the root vitest config already aliases every export, so the switch is about 10 lines (D1). The plan also misses types, which still resolve 1.35 (D5), and `cli` and `scaffold`'s own configs (D6). `ai`'s switch needs L11 and L12 too, and tests outside this repository.
 
 ## Decisions for the owner
 
-**Questions for Jason.** Nine answers settle L13. The table after them gives each a product verdict, so Jason can bulk-approve.
+**Questions for Jason.** Nine answers settle L13, and one beta question (N1) is asked now so it is on the record. The table after them gives each a product verdict and the option taken, so Jason can bulk-approve.
 
-1. **A1, the L13 size and the all-in ceiling.** O1, the seven entries as 1.35 ships them. The all-in may never exceed 1.35's, 97,527 B; L13 itself adds at most +8.0 KB (target +7.0 KB) to the all-in and +60 B to every app fixture and `floor`. **Recommend: approve.**
+1. **A1, the L13 size and the all-in ceiling.** O1, the seven entries as 1.35 ships them. The all-in may never exceed 1.35's, 97,527 B (a ceiling, not a price); L13 itself adds at most +8.0 KB (target about +6.7 KB) to the all-in and 0 B to every app fixture and `floor`. **Recommend: approve.**
 2. **A2, do deep fuzz runs gate L13, or report?** **Recommend: "Gate on short seeds; deep runs report"**, as at L8 and L9.
 3. **A3, fuzz-ready before the gate.** **Recommend: approve L8's brakes unchanged.**
 4. **A4, which downstream suites gate L13.** **Recommend: the six adapters, `el`, `query`, `sources`, `mutator`, `optimistic`, `timeline` and `cli`; `ai` and `ai-harness` switch at their own Phase 4 gate.**
@@ -410,37 +450,40 @@ I did not run the bench for this RFC: no L13 code exists. What L13 must keep:
 7. **(cb), `createFakeTimers` gets a way to schedule.** **Recommend: decline.**
 8. **(cc), a worker answers a message it cannot handle.** **Recommend: decline.**
 9. **B1 to B6.** **Recommend: approve; B1 now, as L13-pre-a.**
+10. **N1, a beta question: the namespaced form becomes an import.** A public API change; **not taken under the blanket instruction.** **Recommend: approve at the beta** (below).
 
-A "no", or no answer yet, means the slice keeps 1.35's behaviour, pins it with a core-next test, and writes no entry. This revision does not assume the owner's instruction of 2026-11-15 ("I approve you for to do everything"), under which the L9 to L12 RFCs took each recommended option; if it covers L13, the recommendations below are the options taken.
+A "no", or no answer yet, means the slice keeps 1.35's behaviour, pins it with a core-next test, and writes no entry. The owner's instruction of 2026-11-15 ("I approve you for to do everything"), under which the L9 to L12 RFCs took each recommended option, covers L13, so the recommendation on each row is the option taken, and the table marks it. N1 is excluded: it is a public API change, and it stays a question.
 
-| Decision | Product verdict | Recommendation |
-|---|---|---|
-| **A1** the seven entries as 1.35 ships them; the all-in ceiling; L13's budgets | Same behaviour. Apps that import no subpath grow by the seam only (20 to 40 B, reasoned). The all-in lands at about 1.35's size: 2.0 is not half of 1.35 for an app that uses everything | Approve: all-in at most 97,527 B; L13 at most +8.0 KB on the all-in (target 7.0 KB) and +60 B on `minimal`, `two-module`, `aperture`, `full-entry` and `floor`; come back above either |
-| **A2** deep runs report, short seeds gate | No behaviour change; decides when L13 can merge | "Gate on short seeds; deep runs report" |
-| **A3** fuzz-ready before the gate | No behaviour change | Approve L8's brakes |
-| **A4** which suites gate L13 | No behaviour change; decides what "done" means for the downstream packages | Adapters, `el`, `query`, `sources`, `mutator`, `optimistic`, `timeline`, `cli` at L13; `ai` and `ai-harness` at Phase 4 |
-| **(bz)** a test system's `isRunning`, `isInitialized` and `isSettled` read the system | Better, visible in tests only: a test that asserts `isRunning` after `start()` passes, where in 1.35 it reads false forever | Approve, in L13a |
-| **(ca)** `eventHistory` records `events.*` calls | Better in principle, but worse for existing tests: counts in tests written against 1.35 change | Decline; pin U2 |
-| **(cb)** `createFakeTimers` can schedule | Better, but a new API; 1.35's docs already point to `vi.useFakeTimers()` | Decline; pin U3; revisit when `timeline` joins `/testing` at the beta |
-| **(cc)** a worker posts `ERROR` for a message before `INIT` or after `DESTROY` | Better, rare: an early write is no longer lost silently; but it adds messages a 1.35 client never saw | Decline; pin U14; revisit with the beta's worker |
-| **B1** re-place the 46 unclaimed flush-only tests | No behaviour change; 35 tests start gating L0 to L4 | Approve, now, as L13-pre-a |
-| **B2** an `all-in` fixture in `size.mjs`, both engines, budgeted | No behaviour change; the all-in becomes a number every PR reports | Approve, in L13-pre |
-| **B3** Stryker mutates the four L13 files for the L13 gate | No behaviour change | Approve, in L13-pre |
-| **B4** the two status-plugin scenarios move to L12; the surface scenario covers all seven entries | No behaviour change; placements | Approve, in L13-pre |
-| **B5** a `selector-1000` workload | No behaviour change | Approve, in L13b, unless an adapter bench covers it |
-| **B6** signing for approved rows | No behaviour change; the census needs signed entries | Approve |
+| Decision | Product verdict | Recommendation | Option taken |
+|---|---|---|---|
+| **A1** the seven entries as 1.35 ships them; the all-in ceiling; L13's budgets | Same behaviour. Apps that import no subpath do not grow. The all-in lands at about 93 to 97 KB, a ceiling and not a price: 2.0 is not half of 1.35 for an app that uses everything | Approve: all-in at most 97,527 B; L13 at most +8.0 KB on the all-in (target about 6.7 KB) and 0 B on `minimal`, `two-module`, `aperture`, `full-entry` and `floor`; come back above either | O1 and the ceiling, as recommended |
+| **A2** deep runs report, short seeds gate | No behaviour change; decides when L13 can merge | "Gate on short seeds; deep runs report" | as recommended |
+| **A3** fuzz-ready before the gate | No behaviour change | Approve L8's brakes | as recommended |
+| **A4** which suites gate L13 | No behaviour change; decides what "done" means for the downstream packages | Adapters, `el`, `query`, `sources`, `mutator`, `optimistic`, `timeline`, `cli` at L13; `ai` and `ai-harness` at Phase 4 | as recommended |
+| **(bz)** a test system's `isRunning`, `isInitialized` and `isSettled` read the system | Better, visible in tests only: a test that asserts `isRunning` after `start()` passes, where in 1.35 it reads false forever | Approve, in L13a | approve |
+| **(ca)** `eventHistory` records `events.*` calls | Better / test-rule: better in principle for a test author; the "worse" is a rule about our own tests, whose `eventHistory` counts written against 1.35 would change, and not a product effect | Decline; pin U2 | decline |
+| **(cb)** `createFakeTimers` can schedule | Better, but a new API; 1.35's docs already point to `vi.useFakeTimers()` | Decline; pin U3; revisit when `timeline` joins `/testing` at the beta | decline |
+| **(cc)** a worker posts `ERROR` for a message before `INIT` or after `DESTROY` | Better for new clients, rare: an early write is no longer lost silently. **Worse for existing 1.35 clients:** a client that never saw these messages would get its `onError` fired by them | Decline; pin U14; revisit with the beta's worker | decline |
+| **B1** re-place the 46 unclaimed flush-only tests | No behaviour change; 35 tests start gating L0 to L4. Verified in revision 2: safe to land now, oracle-only | Approve, now, as L13-pre-a | approve |
+| **B2** an `all-in` fixture in `size.mjs`, both engines, budgeted, built as one bundle | No behaviour change; the all-in becomes a number every PR reports | Approve, in L13-pre | approve |
+| **B3** Stryker mutates the four L13 files for the L13 gate | No behaviour change | Approve, in L13-pre | approve |
+| **B4** the two status-plugin scenarios move to L12; the surface scenario covers all seven entries | No behaviour change; placements | Approve, in L13-pre | approve |
+| **B5** a `selector-1000` workload | No behaviour change | Approve, in L13b, unless an adapter bench covers it | approve |
+| **B6** signing for approved rows | No behaviour change; the census needs signed entries | Approve | approve |
+| **N1** (beta) the namespaced form (`createSystem({ modules })`) becomes an import | **Better (size), worse (migration):** a multi-module app adds one import, written by a codemod; a one-module app is unchanged and about 3.1 KB smaller; a public API change at the beta | Approve at the beta (below) | **not taken: asks the owner** |
 
 ### A. Decisions
 
 #### A1 where the subpaths live, the all-in ceiling, and the L13 budgets
 
 - **What 1.35 does.** Seven entry points, each its own file; an app pays only for what it imports.
-- **What 2.0 would do.** The same seven (O1). The core gains one seam: each system's tracker in a `WeakMap`, so `/adapter-utils` can track a selector (S1).
-- **The measured basis.** 1.35's all-in is 97,527 B. L13's own code is 7,956 B in 1.35, ported at 1.0 less the stubs it replaces: about +7.0 KB on the all-in. The L10 to L12 RFCs put 2.0's all-in at 90,030 B after L12 at their targets and 92,480 B at their caps (Size).
-- **The ceiling, and why it is not half.** Half of 1.35 is 48,764 B, and 2.0's all-in is projected at 97,030 B at every target. No cap at L13 can close a 48 KB gap: it comes from L11 and L12's tools and plugins, ported as code at their 1.35 size. So the ceiling I recommend is **1.35's own all-in, 97,527 B**: 2.0 is never larger than 1.35 for an app that uses everything. It binds before the layer caps do: if L10 to L12 each land at their caps, the all-in reaches 92,480 B, and L13 has 5,047 B, not 8.0 KB, so L13 comes back to the owner. That is the point of a ceiling.
-- **Half, said plainly.** It holds for neither the alpha nor the beta all-in. It is close for the beta's smallest app (26,505 B today, half of 1.35's `minimal` is 24,657 B). If Jason wants half for the all-in, it is a beta decision: rebuild the tools and plugins smaller, or move them out of core, beyond what `PACKAGES-2.0.md` already moves.
-- **Product verdict.** Same behaviour. An app that imports no subpath grows by the seam only.
-- **Recommendation.** Approve O1; the all-in ceiling at 97,527 B, measured by B2's fixture from L13-pre; L13 up to +8.0 KB on the all-in (target 7.0 KB) and +60 B on the five app fixtures (the seam's reasoned 20 to 40 B and a margin). L13b measures the seam first and comes back if it is over 60 B. Restate the plan's "half" as a beta target for the minimal line.
+- **What 2.0 would do.** The same seven (O1). The core gains nothing: `/adapter-utils` tracks a selector through `scopes`, which exists (S1 of revision 1 is dropped).
+- **The measured basis.** 1.35's all-in is 97,527 B. 1.35's L11 to L13 code, built as one bundle with the engine external, is 44,500 B; L13's share of it is 7,652 B (not the 7,956 B the pieces sum to), ported at 1.0 less the stubs it replaces: about +6.7 KB on the all-in. With today's 40,480 B, the L10 to L12 engine parts (+8.8 KB at targets, +10.55 KB at caps), up to 2.5 KB for snapshot tools and signing and 1.0 KB of stubs, 2.0's all-in is 92.8 to 95.3 KB at targets and about 97 KB at caps (Size).
+- **The ceiling, and why it is not half.** Half of 1.35 is 48,764 B, and 2.0's all-in is measured and projected at 92.8 to 95.3 KB at targets. No cap at L13 can close a 44 KB gap: it comes from L11 and L12's tools and plugins, ported as code at their 1.35 size (44.5 KB with L13's subpaths, as one bundle). So the ceiling I recommend is **1.35's own all-in, 97,527 B**: 2.0 is never larger than 1.35 for an app that uses everything. **It is a ceiling, not a price:** no app imports every entry, and what an app pays is its own row (Size). At every cap the all-in is about 97.0 KB at most, so the ceiling binds only if a layer lands over its cap, or the snapshot tools and signing cost more than the 2.5 KB allowed; then L13 comes back to the owner. That is the point of a ceiling.
+- **Half, said plainly.** It holds for neither the alpha nor the beta all-in. It is close for the beta's smallest app (26,505 B today, half of 1.35's `minimal` is 24,657 B), and N1 closes it. If Jason wants half for the all-in, it is a beta decision: rebuild the tools and plugins smaller, or move them out of core, beyond what `PACKAGES-2.0.md` already moves.
+- **Product verdict.** Same behaviour. An app that imports no subpath does not grow.
+- **Recommendation.** Approve O1; the all-in ceiling at 97,527 B, measured by B2's one-bundle fixture from L13-pre; L13 up to +8.0 KB on the all-in (target about 6.7 KB) and 0 B on the five app fixtures, since nothing in L13 touches `createSystem`; L13b shows `createSystem`'s bytes unchanged. Restate the plan's "half" as a beta target for the minimal line (N1).
+- **Taken.** Approve, as recommended.
 
 #### A2 do deep fuzz runs gate L13, or report?
 
@@ -471,8 +514,9 @@ A "no", or no answer yet, means the slice keeps 1.35's behaviour, pins it with a
 
 - **What 1.35 does.** Only `dispatch` is wrapped. `ts.events.inc()` changes the fact and adds nothing to `eventHistory` (P1).
 - **What 2.0 would do.** Record both.
-- **Product verdict.** Better in principle; worse for existing tests, whose `eventHistory` counts would change.
+- **Product verdict.** Better / test-rule. Better in principle for a test author. "Worse for existing tests" is a test-rule, not a product effect: it says our own tests written against 1.35 would see different `eventHistory` counts, and no user's app changes.
 - **Recommendation.** Decline. Pin U2.
+- **Taken.** Decline.
 
 #### (cb) `createFakeTimers` can schedule
 
@@ -485,18 +529,30 @@ A "no", or no answer yet, means the slice keeps 1.35's behaviour, pins it with a
 
 - **What 1.35 does.** A message before `INIT`, or after `DESTROY`, is dropped with no reply (P7).
 - **What 2.0 would do.** Post `ERROR` with the message type as `source`.
-- **Product verdict.** Better, rare: a write sent before the worker is ready is no longer lost silently. But a 1.35 client never saw these messages, and its `onError` would now fire.
+- **Product verdict.** Better for new clients, rare: a write sent before the worker is ready is no longer lost silently. **Worse for existing 1.35 clients:** a 1.35 client never saw these messages, so its `onError` would now fire on messages it was written without.
 - **Recommendation.** Decline. Pin U14; revisit with the beta's worker.
+- **Taken.** Decline.
+
+### N. A beta question (not taken under the blanket instruction)
+
+#### N1 the namespaced form becomes an import at the beta
+
+- **What 1.35 does, and the alpha.** `createSystem({ modules: { name: module } })` is in the root, so every app carries the namespaced code, even an app with one module. The alpha keeps this.
+- **What the beta could do.** Make the namespaced form an import, so a one-module app does not carry it. The name of the import is for the owner and the beta's design (for example a subpath, or a function passed to `createSystem`); this RFC does not choose it.
+- **The measured basis.** `namespaced.ts` is 8,088 of the beta-wiring bundle's 68,102 minified bytes (esbuild's metafile, `size-meta.log`), about 3.1 KB gzipped at the line's own ratio (reasoned), imported statically by `system.ts` (`src/api/system.ts:31`). The seams since the L3 gate total about 655 B on `floor` (10,367 B at the L3 gate, `GATE-3.md:136`, to 11,022 B), so trimming seams cannot close the gap: `minimal`'s beta line is 26,505 B and half of 1.35's is 24,657 B, 1,848 B away. Removing about 3.1 KB closes it with about 1.3 KB of margin: about 23.4 KB, 53% smaller than 1.35's `minimal`. The 3.1 KB is an estimate: the beta-wiring line, run with the namespaced import left out, is the measurement.
+- **Product verdict.** Better (size): a one-module app is about 3.1 KB smaller and meets the plan's half-of-minimal target. Worse (migration): a multi-module app adds one import, which a codemod writes; it is a public API change.
+- **Why it is not taken under the blanket instruction.** It changes a public API, so the owner decides it, and it is a beta decision: the alphas keep 1.35's API.
+- **Recommendation.** Approve at the beta, with the codemod, and measure first.
 
 ### B. Recommendations the owner may overrule
 
 #### B1 re-place the 46 unclaimed flush-only tests
 
-- **Recommendation.** Now, as L13-pre-a: `instruments: ["import flushMicrotasks"]` on the rules for `engine.test.ts`, `system.test.ts`, `derivation-deps.test.ts` and `resolvers.test.ts`, as `requeue.test.ts` has (`layers.rules.json:409–412`). Measured: 35 black-box tests land at L0 to L4 and pass on v2; the rest land at L7, L9 and L12.
+- **Recommendation.** Now, as L13-pre-a: `instruments: ["import flushMicrotasks"]` on the rules for `engine.test.ts`, `system.test.ts`, `derivation-deps.test.ts` and `resolvers.test.ts`, as `requeue.test.ts` has (`layers.rules.json:409–412`). Measured: 35 black-box tests land at L0 to L4 and pass on v2; the rest land at L7, L9 and L12. **Verified in revision 2:** the 46 tests move (L0 13, L2 13, L3 6, L4 5, L7 1, L9 7, L12 1); at L7 on v2 the 35 black-box tests pass and 0 fail (the run: 154 pass, 0 fail, 24 skipped, exit 0; `pnpm port` and vitest both exit 0). It changes the oracle only, so it is safe to land now as an oracle-only PR, with the `oracle-change` label.
 
 #### B2 an `all-in` fixture
 
-- **Recommendation.** In L13-pre, `size.mjs` measures one bundle of the seven entries on both engines and budgets core-next's against A1. From then on every PR reports it.
+- **Recommendation.** In L13-pre, `size.mjs` measures one bundle of the seven entries on both engines and budgets core-next's against A1. From then on every PR reports it. For revision 2 the fixture also does the one-bundle measurement of 1.35's L11 to L13 code (engine external), so the all-in is never again built from separately gzipped pieces (they double-count, by 1,214 B for the tools and 304 B for L13's pieces).
 
 #### B3 the mutation scope
 
@@ -534,9 +590,16 @@ A "no", or no answer yet, means the slice keeps 1.35's behaviour, pins it with a
 - Census: `pnpm census` in `packages/conformance` (exit 0). `$S/census.log`.
 - Forced L13: `$S/forced.sh` set `current` to `"L13"`, ran the three vitest commands under "Gap analysis" (exit 1 each), and restored the file with `git checkout`; `current` read `"L7"` and `git status --porcelain` was empty. Reports `$S/v2.json`, `$S/v2dist.json`, `$S/diff.json`; the join to `layers.json` in `$S/join.txt` and `$S/l13-status.txt`; the diff summary in `$S/diff-summ.txt`; the L13 placement list in `$S/l13-tests.json` and `$S/l13-placement.txt`.
 - Placement simulation: `instruments` added to nine rules in the working copy, `classify()` run through `tsx` from a temporary script at the repo root (exit 0, 0 problems), then `git checkout -- packages/conformance/layers.rules.json` and the script removed; `git status --porcelain` empty. Output `$S/sim.txt`.
-- Downstream imports: `node $S/imports.mjs`, output `$S/imports.txt`.
+- Downstream imports: `node $S/imports.mjs`, output `$S/imports.txt`. Revision 2 corrected one count by `find`: `scaffold` has 1 test file.
 - Size: `node $S/size/measure.mjs ~/dev/directive2-l13rfc` (exit 0), esbuild 0.27.7; output `$S/size/size.log`, each bundle as `<piece>.min.js` beside it.
 - Probes: `node probe.mjs <dist> <out>` and `node probe2.mjs <dist> <out>` in `$S/probe/`, against `directive-v1/dist/development` and, with `NODE_ENV=production`, `dist/production` (exit 0 each). `out-dev.json` and `out-prod.json` differ only in P8's `assertSystem` (development throws, production returns) and in one development warning; `out2-dev.json` and `out2-prod.json` are identical (`cmp`). `node keys.mjs` against 1.35's and core-next's `dist/development/index.js` (exit 0), output `$S/probe/keys.json`.
+
+**Evidence: revision 2 review.** The design review's files are in `$S/review/`:
+
+- **One-bundle size:** `node $S/review/measure.mjs ~/dev/directive2-l13rfc` (esbuild 0.27.7); `measure.out` and `measure.log`. It reproduces the all-in (97,527 B and 40,480 B), and prints the set as one bundle (44,500 B), the tools alone (11,246 B), the plugins with and without the tools (28,448 B and 27,234 B) and the L13 pieces (7,652 B). Its last line gives the sum check: 47,346 B of pieces, 44,500 B in one bundle, tools double-counted by 1,214 B.
+- **`namespaced.ts`:** `size-meta.log` and `meta-minimal_beta_wiring.json` (esbuild's metafile): `stdin.js` 68,102 B, `src/api/namespaced.ts` 8,088 B in the output.
+- **B1:** `b1.sh`, `b1.out` (`edited 4`, `port=0`, `moved 46`, by layer `{"L3":6,"L0":13,"L2":13,"L9":7,"L4":5,"L12":1,"L7":1}`, `vitest=0`, "re-placed L0-L4 on v2: pass 35, fail 0, skip 1", `totals 154 0 24`), `b1-v2.log` and `b1-v2.json`.
+- **Read in the tree:** `src/api/plugins.ts:146–158` (`scopes`), `src/api/core.ts:154` and `:1915` (`tracker` in the context), `src/api/system.ts:31` (the static import of `createNamespacedSystem`), root `vitest.config.ts:98–147`, each downstream `package.json` `test` script and the two configs in `packages/cli` and `packages/scaffold`, `GATE-3.md:136`.
 
 **What I read, not ran.** The 1.35 and core-next file and line citations above; W7 (the worker client); T3, T7 and T8; the claim that the three source differences between the 1.35.0 tag and the workspace's 1.36.0 do not reach a production bundle; the L10, L11 and L12 RFCs' A1 figures (`git -C ~/dev/directive2-l1{0,1,2}rfc show HEAD:…`); and whether `src/unbuilt.ts` is still referenced. The one development warning in `out-dev.json`, "System created but start() was never called", most likely comes from the worker probe's system, created at `INIT` and started by a later message after a `setTimeout(0)`; I did not isolate it.
 
