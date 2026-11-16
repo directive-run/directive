@@ -62,10 +62,13 @@ export const withReconcile: SystemPart = (context) => {
     // No feature: the core's pass stays exactly the L1 pass.
     return;
   }
-  const { hooks, clock, rng } = kernel;
+  const { clock, rng } = kernel;
+  // The core's wants and emit: a pass still running when destroy() is
+  // called reaches the plugins after it, as in 1.35.
+  const { wants_, emit_ } = context;
   const emit = (at: string, data: () => Record<string, unknown>) => {
-    if (hooks.wants(at)) {
-      hooks.emit(at, data());
+    if (wants_(at)) {
+      emit_(at, data());
     }
   };
   const keys: Record<string, RequirementKeyFn> = {};
