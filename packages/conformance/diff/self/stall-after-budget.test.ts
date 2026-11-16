@@ -17,6 +17,7 @@
 
 import { expect, it } from "vitest";
 import { CASE_TRACE_LIMIT, caseFile } from "../../lib/fuzz.js";
+import { type EngineHandle, engines } from "../engines.js";
 import { type FuzzSpec, toScenario } from "../fuzz/model.js";
 import { runScenario } from "../scenario.js";
 
@@ -179,4 +180,86 @@ it("a case file keeps the head of each trace, and the full length of each it cut
   expect(file.traces.candidate).toHaveLength(CASE_TRACE_LIMIT);
   expect(file.traces.candidate[0]).toEqual({ i: 0 });
   expect(file.truncated).toEqual({ candidate: CASE_TRACE_LIMIT + 5 });
+});
+
+/**
+ * The converse, which the fix must not hide: a stall BELOW the budget, with
+ * no approved `ends` stop, is a stall. One module, one write raising a
+ * batched requirement (handler 5 ms); the closing `settle` is step 2. The
+ * wait is told a call is live for good (`busy`), so once the batch's own
+ * timer has run nothing can move the system and the wait reports the stall.
+ * Nowhere near the callback budget: the run fires a handful of timers.
+ */
+const SMALL: FuzzSpec = {
+  modules: [
+    {
+      facts: 3,
+      date: false,
+      derivations: [],
+      events: [],
+      constraints: [],
+      effects: [],
+      source: null,
+    },
+  ],
+  boundary: null,
+  history: false,
+  trace: false,
+  steps: [{ op: "set", module: 0, fact: 0, value: 5 }],
+  batch: {
+    sources: [{ fact: 0, atLeast: 1, items: 1, abortOn: false }],
+    handler: "batch",
+    failing: "all",
+    windowMs: 0,
+    maxSize: null,
+    delay: 5,
+    fails: 0,
+    retry: 0,
+    timeout: null,
+    writes: 0,
+    value: -1,
+  },
+} as unknown as FuzzSpec;
+const STALLS = "a call of the test handler is live";
+const [, , v2] = engines() as [EngineHandle, EngineHandle, EngineHandle];
+
+it("a run that stalls below the budget, with no ends stop, is reported as a stall, on 2.0 and on 1.35", async () => {
+  // 2.0 only: the order runScenario builds systems in is v1, v1 again, then
+  // the candidate, so the first two (1.35's) are quiet.
+  const seen = new Map<unknown, number>();
+  const only2 = await runScenario(
+    {
+      ...toScenario(SMALL),
+      settleDrain: {
+        boundMs: 5000,
+        busy: (_ctx: unknown, system: unknown) => {
+          if (!seen.has(system)) {
+            seen.set(system, seen.size);
+          }
+
+          return (seen.get(system) ?? 0) >= 2 ? STALLS : false;
+        },
+      },
+    },
+    { candidates: [v2], divergences: [] },
+  );
+  expect(only2.runaway).toBe(false);
+  expect(only2.ok).toBe(false);
+  expect(only2.report).toMatch(
+    /v2 in scenario "fuzz": the shared wait at step 2 stalled: a call of the test handler is live, and no timer left/,
+  );
+
+  // On 1.35's side, live for good on every engine.
+  const both = await runScenario(
+    {
+      ...toScenario(SMALL),
+      settleDrain: { boundMs: 5000, busy: () => STALLS },
+    },
+    { candidates: [v2], divergences: [] },
+  );
+  expect(both.runaway).toBe(false);
+  expect(both.ok).toBe(false);
+  expect(both.report).toMatch(
+    /the shared wait at step 2 stalled: a call of the test handler is live, and no timer left/,
+  );
 });
