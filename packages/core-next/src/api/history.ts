@@ -173,7 +173,7 @@ export const withHistory =
         }
       }
       const fresh = lost.filter((key) => !reported.has(key));
-      if (fresh.length > 0) {
+      if (fresh.length) {
         for (const key of fresh) {
           reported.add(key);
         }
@@ -367,7 +367,7 @@ export const withHistory =
       },
       replay() {
         // (az): told as goTo tells.
-        if (snapshots.length > 0) {
+        if (snapshots.length) {
           move(index, 0);
         }
       },

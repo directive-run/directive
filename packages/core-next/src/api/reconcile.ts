@@ -56,8 +56,8 @@ export const withReconcile: SystemPart = (context) => {
   >;
   const resolverDefs = (module.resolvers ?? {}) as Record<string, ResolverDef>;
   if (
-    Object.keys(constraintDefs).length === 0 &&
-    Object.keys(resolverDefs).length === 0
+    !Object.keys(constraintDefs).length &&
+    !Object.keys(resolverDefs).length
   ) {
     // No feature: the core's pass stays exactly the L1 pass.
     return;
@@ -108,7 +108,7 @@ export const withReconcile: SystemPart = (context) => {
     const id = req.fromConstraint;
     const def = bindings && id ? constraintDefs[id] : undefined;
     const keys = def?.abortOn;
-    if (!keys || keys.length === 0) {
+    if (!keys || !keys.length) {
       return undefined;
     }
     if (!def.async && !constraints.isAsync(id)) {
@@ -325,12 +325,12 @@ export const withReconcile: SystemPart = (context) => {
     }
     counts.push(stamp, slot === CHANGED ? 1 : 0, slot - 1);
   };
-  if (Object.keys(resolverDefs).length > 0) {
+  if (Object.keys(resolverDefs).length) {
     context.writers.record = (key, stamp) => {
       // As 1.35: a write counts only while a run is in flight (or detached
       // and still going). One made with none (a plugin writing before the
       // first run starts) is nobody's.
-      if (resolvers.inflight.size === 0 && resolvers.detached_.size === 0) {
+      if (!resolvers.inflight.size && !resolvers.detached_.size) {
         return;
       }
       if (boundKeys?.has(key)) {
@@ -435,7 +435,7 @@ export const withReconcile: SystemPart = (context) => {
     // The runs whose requirements disappeared and that wrote this pass own
     // the pass's changes jointly (keyed siblings writing one fact).
     const joint = new Set<number>();
-    if (closed.size > 0 || closedTally.size > 0) {
+    if (closed.size || closedTally.size) {
       for (const req of removed) {
         const run = runFor(req.id);
         if (run && wrote(run.stamp_)) {
@@ -447,7 +447,7 @@ export const withReconcile: SystemPart = (context) => {
       // Looked up first, as 1.35 does: it may report a disabled binding.
       const bound = bindingOf(req);
       const run = runFor(req.id);
-      if (run && joint.size > 0 && satisfied(req, run, passKeys, joint)) {
+      if (run && joint.size && satisfied(req, run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
         // stays in flight (stop aborts it, settle waits), is not retried,
         // and is superseded if the requirement comes back. One that has
@@ -496,7 +496,7 @@ export const withReconcile: SystemPart = (context) => {
       previous = new Map();
       for (const req of restored) {
         const deps =
-          passKeys.size > 0 && req.fromConstraint
+          passKeys.size && req.fromConstraint
             ? constraints.depsOf(req.fromConstraint)
             : undefined;
         if (
@@ -507,7 +507,7 @@ export const withReconcile: SystemPart = (context) => {
         }
       }
 
-      return passKeys.size > 0 ? constraints.evaluate(passKeys) : restored;
+      return passKeys.size ? constraints.evaluate(passKeys) : restored;
     },
     begin_() {
       const done = closed;
@@ -527,7 +527,7 @@ export const withReconcile: SystemPart = (context) => {
         ? constraints.evaluate()
         : (constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys)),
     commit_(current, passKeys) {
-      if (restart.size > 0 && system.isRunning) {
+      if (restart.size && system.isRunning) {
         // Quirk j: the first pass after start() sees each one still wanted
         // as added, so it runs again; one no longer wanted is canceled.
         for (const req of current) {
@@ -537,7 +537,7 @@ export const withReconcile: SystemPart = (context) => {
         }
         restart.clear();
       }
-      const quiet = current.length === 0 && previous.size === 0;
+      const quiet = !current.length && !previous.size;
       const next = quiet ? previous : new Map<string, RequirementWithId>();
       const added: RequirementWithId[] = [];
       const removed: RequirementWithId[] = [];
@@ -576,7 +576,7 @@ export const withReconcile: SystemPart = (context) => {
           ),
         }));
       }
-      if (removed.length > 0) {
+      if (removed.length) {
         retract(removed, passKeys);
       }
       // One baseline for every run this pass dispatches, read before the
@@ -702,13 +702,13 @@ export const withReconcile: SystemPart = (context) => {
       const all = [...previous.values()];
 
       return [
-        ...(runs.length > 0
+        ...(runs.length
           ? [
               `${runs.length} resolvers inflight: ${runs.map((r) => r.resolver_).join(", ")}`,
             ]
           : []),
         ...core,
-        ...(all.length > 0
+        ...(all.length
           ? [
               `${all.length} unmet requirements: ${all.map((r) => r.requirement.type).join(", ")}`,
             ]
@@ -781,7 +781,7 @@ export const withReconcile: SystemPart = (context) => {
       lines.push(`├─ Requirement payload: { ${payload} }`);
     }
     const entries = Object.entries(relevant).slice(0, 10);
-    if (entries.length > 0) {
+    if (entries.length) {
       lines.push("└─ Relevant facts:");
       entries.forEach(([k, v], i) => {
         const text = typeof v === "object" ? JSON.stringify(v) : String(v);
