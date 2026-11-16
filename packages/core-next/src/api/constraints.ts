@@ -102,10 +102,12 @@ export interface ConstraintState {
 
 /** A `require` that threw, with what it read before it threw. */
 class RequireError {
-  constructor(
-    readonly original: unknown,
-    readonly deps: Set<string>,
-  ) {}
+  declare readonly original: unknown;
+  declare readonly deps: Set<string>;
+  constructor(original: unknown, deps: Set<string>) {
+    this.original = original;
+    this.deps = deps;
+  }
 }
 
 /** An async constraint's `when` gives up after this long, unless it sets `timeout`. */
@@ -120,7 +122,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     const spec = defs[id]?.when;
     // 1.35: `$changed` is effects-only, refused at registration in every
     // build. (The rest of the data form is the L11 compiler.)
-    if (spec !== undefined && typeof spec !== "function" && hasChanged(spec)) {
+    if (typeof spec !== "function" && hasChanged(spec)) {
       throw new Error(
         `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
@@ -209,7 +211,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       topo.get(a)! - topo.get(b)!,
   );
   const enabled = () =>
-    disabled.size === 0 ? sorted : sorted.filter((id) => !disabled.has(id));
+    disabled.size ? sorted.filter((id) => !disabled.has(id)) : sorted;
 
   // --- dependencies ------------------------------------------------------
   const named = (list: readonly string[]) =>
@@ -230,7 +232,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
    */
   function setDeps(id: string, next: Set<string>): void {
     const prev = deps.get(id);
-    if (prev !== undefined && prev.size === next.size && prev.size > 0) {
+    if (prev?.size === next.size && next.size) {
       let same = true;
       for (const key of next) {
         if (!prev.has(key)) {
@@ -382,7 +384,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   }
   function inactive(id: string): void {
     const read = whenDeps.get(id);
-    if (read !== undefined) {
+    if (read) {
       setDeps(id, read);
     }
     last.set(id, EMPTY);
@@ -484,7 +486,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         add(into, last.get(id) ?? EMPTY);
       }
     }
-    if (ready.length === 0) {
+    if (!ready.length) {
       return blocked;
     }
     const late: [string, Promise<boolean>][] = [];
@@ -501,10 +503,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         answer(id, result, into);
       }
     }
-    if (late.length > 0) {
+    if (late.length) {
       await settle(late, into);
     }
-    if (asyncReady.length > 0) {
+    if (asyncReady.length) {
       await settle(
         asyncReady.map((id) => [id, evaluateAsync(id)]),
         into,
@@ -519,7 +521,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       const into = new Map<string, RequirementWithId>();
       const all = enabled();
       let todo: string[];
-      if (!evaluated || !changed || changed.size === 0) {
+      if (!evaluated || !changed || !changed.size) {
         todo = all;
         evaluated = true;
         dirty.clear();
@@ -554,7 +556,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       for (const id of todo) {
         unanswered.add(id);
       }
-      for (let rounds = todo.length + 1; todo.length > 0 && rounds > 0; ) {
+      for (let rounds = todo.length + 1; todo.length && rounds > 0; ) {
         const before = todo.length;
         todo = await batch(todo, into);
         if (todo.length === before) {
@@ -570,10 +572,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       return [...into.values()];
     },
     unaffected(changed) {
-      if (sorted.length === 0 && dirty.size === 0) {
+      if (!sorted.length && !dirty.size) {
         return EMPTY;
       }
-      if (!evaluated || untrackedAsync().length > 0) {
+      if (!evaluated || untrackedAsync().length) {
         return null;
       }
       for (const id of dirty) {
@@ -594,7 +596,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         add(into, last.get(id) ?? EMPTY);
       }
 
-      return into.size === 0 ? EMPTY : [...into.values()];
+      return into.size ? [...into.values()] : EMPTY;
     },
     depsOf: (id) => deps.get(id),
     isAsync: (id) => asyncIds.has(id),
@@ -642,10 +644,11 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         return false;
       }
       disabled.add(id);
-      // As 1.35: its requirements leave the next pass, and what it read no
-      // longer wakes it.
+      // As 1.35: its requirements leave the next pass, what it read no
+      // longer wakes it, and its dependency record goes (constraints.ts:1596).
       last.delete(id);
       setDeps(id, new Set());
+      deps.delete(id);
       whenDeps.delete(id);
 
       // Quirk e: it no longer holds anything back.
@@ -726,7 +729,7 @@ function hasChanged(
       !(value instanceof RegExp)
     ) {
       const ops = Object.keys(value);
-      if (ops.length > 0 && ops.every((op) => op.startsWith("$"))) {
+      if (ops.length && ops.every((op) => op.startsWith("$"))) {
         if (ops.includes("$changed")) {
           return true;
         }
