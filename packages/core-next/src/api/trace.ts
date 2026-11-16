@@ -20,7 +20,8 @@
  *
  * Placed after the plugins part, so its listener hears each record after the
  * plugins do and `onTraceComplete` follows the hook that settled the run, as
- * in 1.35.
+ * in 1.35. A pass's start and end come through `context.pass_`, after their
+ * records, so neither record's payload is built for the trace alone.
  */
 
 import type { KernelEvent } from "../kernel.js";
@@ -33,16 +34,49 @@ type Entry = Rec;
 
 /** Freezes `o` and, `depth` levels down, what it holds, but not the program's values or meta (bh). */
 const lock = (o: any, depth: number): any => {
-  if (depth && o && typeof o === "object") {
-    for (const key in o) {
-      if (key !== "meta" && !key.endsWith("Value")) {
-        lock(o[key], depth - 1);
+  if (depth) {
+    if (Array.isArray(o)) {
+      for (const value of o) {
+        value && typeof value === "object" && lock(value, depth - 1);
+      }
+    } else {
+      for (const key in o) {
+        const value = o[key];
+        if (
+          value &&
+          typeof value === "object" &&
+          key !== "meta" &&
+          key !== "oldValue" &&
+          key !== "newValue"
+        ) {
+          lock(value, depth - 1);
+        }
       }
     }
   }
 
   return Object.freeze(o);
 };
+
+/**
+ * Every list the trace makes comes from here: one allocation site, which
+ * holds rows, so an empty list is made as one and freezes cheaply (bh).
+ */
+const list = (): Rec[] => [];
+
+/** The causal chain's parts, in 1.35's order (buildCausalChain). */
+const chain: [string, (row: Rec) => string][] = [
+  ["factChanges", (c) => `${c.key} changed`],
+  ["derivationsRecomputed", (d) => `${d.id} recomputed`],
+  ["constraintsHit", (c) => `${c.id} constraint hit`],
+  ["requirementsAdded", (r) => `${r.type} requirement added`],
+  [
+    "resolversCompleted",
+    (r) => `${r.resolver} resolved (${r.duration.toFixed(0)}ms)`,
+  ],
+  ["resolversErrored", (r) => `${r.resolver} errored`],
+  ["effectsRun", (e) => `${e.id} effect ran`],
+];
 
 export const withTrace =
   (option: boolean | { maxRuns?: number } | undefined): SystemPart =>
@@ -60,12 +94,13 @@ export const withTrace =
     const owners = new Map<string, Entry>();
     /** Each pending entry → its resolvers still running and its start. */
     const open = new Map<Entry, [number, number]>();
-    let queued: Rec[] = [];
+    let queued = list();
     let current: Entry | null = null;
     let started = 0;
     let added: RequirementWithId[] = [];
     let flight: Map<string, { resolver_: string; reqs_?: unknown }> | undefined;
     let cache: readonly Entry[] | null = null;
+    let head = 0;
     let id = 0;
     let count = 0;
     let total = 0;
@@ -73,19 +108,13 @@ export const withTrace =
     const settle = (entry: Entry, duration: number) => {
       entry.status = "settled";
       entry.duration = duration;
-      entry.causalChain = [
-        ...entry.factChanges.map((c: Rec) => `${c.key} changed`),
-        ...entry.derivationsRecomputed.map((d: Rec) => `${d.id} recomputed`),
-        ...entry.constraintsHit.map((c: Rec) => `${c.id} constraint hit`),
-        ...entry.requirementsAdded.map(
-          (r: Rec) => `${r.type} requirement added`,
-        ),
-        ...entry.resolversCompleted.map(
-          (r: Rec) => `${r.resolver} resolved (${r.duration.toFixed(0)}ms)`,
-        ),
-        ...entry.resolversErrored.map((r: Rec) => `${r.resolver} errored`),
-        ...entry.effectsRun.map((e: Rec) => `${e.id} effect ran`),
-      ].join(" → ");
+      let causes = "";
+      for (const [list, say] of chain) {
+        for (const row of entry[list]) {
+          causes += (causes && " → ") + say(row);
+        }
+      }
+      entry.causalChain = causes;
       // 1.35's updateTraceStats: the duration anomaly after three runs.
       count++;
       total += duration;
@@ -106,7 +135,10 @@ export const withTrace =
     };
     const report = (entry: Entry) => {
       cache = null;
-      emit("trace.complete", { entry: lock(entry, 3) });
+      lock(entry, 3);
+      if (context.wants_("trace.complete")) {
+        emit("trace.complete", { entry });
+      }
     };
     /** A resolver of `req`'s run ended: its run settles with the last one. */
     const end = (req: RequirementWithId) => {
@@ -157,13 +189,19 @@ export const withTrace =
         } else {
           open.set(entry, [running, started]);
         }
+        // The ring is `entries` from `head` on; what is before it is dropped
+        // in one splice once it outgrows the ring, so no push moves it all.
         entries.push(entry);
-        if (entries.length > maxRuns) {
+        if (entries.length - head > maxRuns) {
+          const out = entries[head++]!;
+          if (head > entries.length - head) {
+            entries.splice(0, head);
+            head = 0;
+          }
           // (bi): a pending run pushed out still settles and reports, but
           // only through a run still in flight: nothing is kept for a
           // requirement no run will end (no resolver, or a batch not yet
           // started), so what is kept is bounded by the runs in flight.
-          const out = entries.shift()!;
           const state = open.get(out);
           if (state) {
             state[0] = 0;
@@ -187,40 +225,20 @@ export const withTrace =
         }
       }
     };
+    // The schema's meta, read when the write is queued: a pass start would
+    // read the same, and the row is made whole once.
     const fact = (key: string, oldValue: unknown, newValue: unknown) =>
-      queued.push({ key, oldValue, newValue });
+      queued.push({
+        key,
+        oldValue,
+        newValue,
+        meta: m.schema?.facts?.[key]?._meta,
+      });
     const on: Record<string, (event: KernelEvent) => void> = {
       "fact.set": (e) => fact(e.key as string, e.prev, e.value),
       "fact.batch"(e) {
         for (const c of e.changes as FactChange[]) {
           fact(c.key, c.prev, c.type === "delete" ? undefined : c.value);
-        }
-      },
-      "reconcile.start"() {
-        // A pass that threw left its entry open: it ends where the next begins.
-        if (current) {
-          finish();
-        }
-        started = performance.now();
-        current = {
-          id: ++id,
-          timestamp: Date.now(),
-          duration: 0,
-          status: "pending",
-          factChanges: queued,
-          derivationsRecomputed: [],
-          constraintsHit: [],
-          requirementsAdded: [],
-          requirementsRemoved: [],
-          resolversStarted: [],
-          resolversCompleted: [],
-          resolversErrored: [],
-          effectsRun: [],
-          effectErrors: [],
-        };
-        queued = [];
-        for (const change of current.factChanges) {
-          change.meta = m.schema?.facts?.[change.key]?._meta;
         }
       },
       "derivation.compute"(e) {
@@ -278,19 +296,42 @@ export const withTrace =
         end(e.req as RequirementWithId);
       },
       "requirement.canceled": (e) => end(e.req as RequirementWithId),
-      "reconcile.end"() {
-        if (current) {
-          finish();
-        }
-      },
       "system.destroy"() {
-        entries.length = 0;
+        context.pass_ = undefined;
+        entries.length = head = 0;
         owners.clear();
         open.clear();
         queued = [];
         current = null;
         cache = null;
       },
+    };
+    // Where a pass starts and ends (core.ts): a pass that threw left its
+    // entry open, and it ends where the next begins.
+    context.pass_ = (end) => {
+      if (current) {
+        finish();
+      }
+      if (!end) {
+        started = performance.now();
+        current = {
+          id: ++id,
+          timestamp: Date.now(),
+          duration: 0,
+          status: "pending",
+          factChanges: queued,
+          derivationsRecomputed: list(),
+          constraintsHit: list(),
+          requirementsAdded: list(),
+          requirementsRemoved: list(),
+          resolversStarted: list(),
+          resolversCompleted: list(),
+          resolversErrored: list(),
+          effectsRun: list(),
+          effectErrors: list(),
+        };
+        queued = list();
+      }
     };
     kernel.hooks.on(
       Object.assign((event: KernelEvent) => on[event.at]?.(event), {
@@ -299,7 +340,7 @@ export const withTrace =
     );
     // Effect runs list what they read (effects.ts `wantsRunDeps`).
     context.trace_ = true;
-    const read = () => (cache ??= Object.freeze([...entries]));
+    const read = () => (cache ??= Object.freeze(entries.slice(head)));
     Object.defineProperty(system, "trace", { get: read });
     const inspect = system.inspect as () => Rec;
     system.inspect = () => ({

@@ -246,6 +246,12 @@ export interface SystemContext {
    */
   trace_?: unknown;
   /**
+   * The trace's pass hook (L9b), set while the trace is on: called with no
+   * argument where a pass starts and with 1 where it ends, each after its
+   * record, so the trace needs neither record's payload.
+   */
+  pass_?: (end?: 1) => void;
+  /**
    * inspect()'s counters (S3): the derivations watched by name, and the keys
    * written since the last pass began.
    */
@@ -1383,6 +1389,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (wants("reconcile.start")) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
+      context.pass_?.();
       effectsOpen = true;
       navEffects = nav !== null;
       try {
@@ -1425,6 +1432,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           },
         });
       }
+      context.pass_?.(1);
       if (!ready) {
         ready = true;
         readyResolve?.();
