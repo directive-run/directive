@@ -43019,7 +43019,13 @@
         }
       ]
     },
-    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. In a fuzz case with a ring of 1 or 3 (trigger `traceRing`), 2.0 reports a run 1.35 pushed out of its ring while its resolver ran, and that report can land where 1.35 reports a different run of the same step and phase, with the same number of reports on each side (fuzz cases 8:all#181, 12:all#149: the alignment then pairs them, one to one, and no pairing leaves the extra report on its own). This covers the first such pair: 2.0's report started a resolver where the run 1.35 reports in its place started none (`resolversStarted[0]` absent on 1.35, a resolver row on 2.0), and it ends the comparison there (`ends`), since every later report of the case is paired one run off. Everything before it is still compared, and a case with a ring of 100 is outside it. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them."
+    "requires": {
+      "stream": "hook",
+      "kind": "onTraceComplete",
+      "op": "extra",
+      "order": "any"
+    },
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once. In a fuzz case with a ring of 1 or 3 (trigger `traceRing`), 2.0 reports a run 1.35 pushed out of its ring while its resolver ran, and that report can land where 1.35 reports a different run of the same step and phase, with the same number of reports on each side (fuzz cases 8:all#181, 12:all#149: the alignment then pairs them, one to one, and no pairing leaves the extra report on its own). This covers the first such pair: 2.0's report started a resolver where the run 1.35 reports in its place started none (`resolversStarted[0]` absent on 1.35, a resolver row on 2.0), and it ends the comparison there (`ends`), since every later report of the case is paired one run off. Everything before it is still compared, and a case with a ring of 100 is outside it. It also requires an onTraceComplete call 2.0 makes and 1.35 does not, anywhere in the case (`requires`, order any): 2.0 reports the run 1.35 dropped, so over the case it reports once more than 1.35, and in 8:all#181 and 12:all#149 that extra report lands in a later step. A traceRing case in which no run was pushed out has as many reports on each engine, so it is outside the entry. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them."
   },
   {
     "scenario": "fuzz",
@@ -43048,7 +43054,13 @@
         }
       ]
     },
-    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): changesets follow the buffer, the redo cut and import. In a fuzz case that closes a changeset, then writes (a snapshot that can drop the oldest one from a buffer of 3 or cut off redo), then goes `back` (trigger `changesetMoved`), 1.35's changeset keeps its old indexes and the undo lands on a different snapshot than 2.0's, whose range moved with the snapshots (fuzz case 11:all#175: maxSnapshots 3; at `back 1` 1.35 goes to index 0 and restores f0, f1 and when, 2.0 to index 1 and restores f1 and when). The restore's first record is the invalidation of a derivation that reads a restored fact, so the two engines invalidate different derivations first (d0 on 1.35, d2 on 2.0). This covers that changed derivation id in a `back` step (`during` \"back\", read from the history step's run label) and ends the comparison there (`ends`): every later record reads the other snapshot's facts, as the hand entries for U7's buffer drop record them. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+    "requires": {
+      "stream": "hook",
+      "kind": "onHistoryNavigate",
+      "op": "changed",
+      "order": "any"
+    },
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): changesets follow the buffer, the redo cut and import. In a fuzz case that closes a changeset, then writes (a snapshot that can drop the oldest one from a buffer of 3 or cut off redo), then goes `back` (trigger `changesetMoved`), 1.35's changeset keeps its old indexes and the undo lands on a different snapshot than 2.0's, whose range moved with the snapshots (fuzz case 11:all#175: maxSnapshots 3; at `back 1` 1.35 goes to index 0 and restores f0, f1 and when, 2.0 to index 1 and restores f1 and when). The restore's first record is the invalidation of a derivation that reads a restored fact, so the two engines invalidate different derivations first (d0 on 1.35, d2 on 2.0). This covers that changed derivation id in a `back` step (`during` \"back\", read from the history step's run label) and ends the comparison there (`ends`): every later record reads the other snapshot's facts, as the hand entries for U7's buffer drop record them. It also requires a changed onHistoryNavigate call anywhere in the case (`requires`, order any): the undo lands on another snapshot, so the navigation's index differs (11:all#175, step 8, `args[1]`). A `back` that lands on the same snapshot on both engines is outside the entry, whatever it invalidates. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
   },
   {
     "scenario": "fuzz",
