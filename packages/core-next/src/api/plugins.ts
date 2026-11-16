@@ -94,6 +94,8 @@ const HOOKS: Record<string, string[]> = {
   ],
   "clobber.loop.detected": ["onClobberLoopDetected", "event"],
   "clobber.loop.resolved": ["onClobberLoopResolved", "event"],
+  // L9b: trace.ts.
+  "trace.complete": ["onTraceComplete", "entry"],
   "guardrail.coverage": [
     "onGuardrailCoverage",
     "plugin",

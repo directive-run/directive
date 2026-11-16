@@ -561,10 +561,12 @@ export const withReconcile: SystemPart = (context) => {
         // The trace's record of the pass (L9 seam): what it added and
         // removed, and each constraint with a current requirement, with its
         // priority and what it read, all read here after the evaluation, as
-        // 1.35 reads them.
+        // 1.35 reads them. `flight` is the live in-flight map: the trace reads
+        // each added requirement's resolver from it after the dispatch (L9b).
         emit("requirement.diff", () => ({
           added,
           removed,
+          flight: resolvers.inflight,
           hit: [...new Set(current.map((req) => req.fromConstraint))].map(
             (id) => ({
               id,

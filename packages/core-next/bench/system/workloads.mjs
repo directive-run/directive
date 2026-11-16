@@ -847,6 +847,63 @@ export const workloads = {
       };
     },
   },
+  // L9b (the L9 RFC's B2): the cost of the trace when it is on. Each write
+  // is its own pass, which records the fact change and the effect it runs;
+  // the ring is then read.
+  "trace-100": {
+    op: "100 writes with trace on (100 runs, each settled), then read system.trace",
+    async: true,
+    async build({ createModule, createSystem, t }) {
+      let mirrored = 0;
+      const sys = createSystem({
+        module: createModule("traced", {
+          schema: {
+            facts: { n: t.number() },
+            derivations: { twice: t.number() },
+          },
+          init: (f) => {
+            f.n = 0;
+          },
+          derive: { twice: (f) => f.n * 2 },
+          effects: {
+            mirror: {
+              run: (f) => {
+                mirrored = f.n * 2;
+              },
+            },
+          },
+        }),
+        trace: true,
+      });
+      sys.start();
+      await sys.settle();
+      let i = 0;
+      let full = 0;
+
+      return {
+        async step() {
+          for (let k = 0; k < 100; k++) {
+            sys.facts.n = ++i;
+            await sys.settle();
+          }
+          const trace = sys.trace;
+          full +=
+            trace.length === 100 &&
+            trace[99].status === "settled" &&
+            trace[99].factChanges[0].newValue === i
+              ? 1
+              : 0;
+        },
+        check(steps) {
+          expect("trace-100", "a full ring of settled runs", full, steps);
+          expect("trace-100", "mirrored", mirrored, i * 2);
+
+          return null;
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // 20 modules (a hub and 19 readers via crossModuleDeps): write the hub,
   // read every other module.
   "multi-module-20": {
