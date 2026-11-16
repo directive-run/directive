@@ -109,15 +109,17 @@ originals and re-ported. Titles say what is still pinned.
 | Pin | Row | What still runs on both | 2.0's side pinned by |
 | --- | --- | --- | --- |
 | U3, two cases (development and production) | (bd) | the stored snapshot holds its pass's value and `goTo` restores it; an in-place edit of a restored fact changes the live fact | core-next `l8b-history-rows`: "(bd) a stored snapshot is not shared" > "each stored snapshot and its facts are frozen, taken or imported; the list hands them out", and "a restore writes copies: a restored value changed in place leaves the snapshot alone" |
-| U6 (a) | (ba) | the imported ids stay, a write adds a fifth, and `goTo(2)` finds the imported snapshot | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
+| U6 (a) | (ba) | the imported ids stay, a write adds a fifth, and `goTo(2)` finds the imported snapshot | core-next `l8-history-rows-ba-bc-be` (#391) |
 | U7 | (bb) | a diff scenario, unchanged: the 29 (bb) entries record 2.0's side | core-next `l8b-history-rows`: "(bb) the changesets follow the snapshots" (10 cases) |
-| U8 (a) and (b) | (be) | one `goBack` from inside lands on the start; one from outside moves onto the end | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
-| U9 | (bc) | the import changes no fact and leaves three snapshots | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
+| U8 (a) and (b) | (be) | one `goBack` from inside lands on the start; one from outside moves onto the end | core-next `l8-history-rows-ba-bc-be` (#391) |
+| U9 | (bc) | the import changes no fact and leaves three snapshots | core-next `l8-history-rows-ba-bc-be` (#391) |
 
 Those three rows ((ba), (bc), (be)) have no core-next test on main: L8a
 added none. 2.0's side of each is pinned by core-next tests in a separate
-engine PR, branch p8/pin-ba-bc-be (a PR number will follow); this PR adds no
+engine PR, #391 (`l8-history-rows-ba-bc-be`, 11 tests); this PR adds no
 test there (it may not touch `packages/core-next/src`).
+
+A correction to the L8 RFC's (be) row. Its last sentence says "`goBack(2)` from inside still lands on the start". Its own rule says otherwise: each step is taken in turn, with the steps left counted down, and it names 1.35 dropping the second step as what (be) changes. That rule, which L8a built and its review passed, gives index 1 for a changeset over 2 to 4 from index 4; 1.35 gives 2. #391 pins 1, and U8 (a) keeps only what both engines share. The sentence was a slip in the RFC, not a different design.
 
 U8 (c), the start rule, passes unchanged on both, as (be) requires. (ay) and
 (az) have no conformance pin to trim: their pins are the diff scenarios U4
@@ -311,7 +313,7 @@ follow-ups.
 
 - core-next pins for (ba), (bc) and (be): L8a added no test file, so no test
   on main states 2.0's side of U6, U9 and U8 (a) and (b). They are in a
-  separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow); this
+  separate engine PR, #391; this
   gate may not touch `packages/core-next/src`.
 - `during` and `afterOp` cannot name a history op: the fuzz trace records it
   as a `run` step with the op in its label. Reading the label's op would let
