@@ -680,11 +680,11 @@ export function createEffectsManager<S extends Schema>(
         }
       }
     },
-    async callOne(id) {
-      const state = states.get(id);
-      if (state) {
-        await runFast([state]);
-      }
+    callOne(id) {
+      // 1.35's callOne awaits only an async run: a sync one answers now.
+      const done = runFast([states.get(id)!].filter(Boolean));
+
+      return done ? done.then(() => {}) : Promise.resolve();
     },
     cleanupAll() {
       stopped = true;

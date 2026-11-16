@@ -688,13 +688,9 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     // L10: the registry's hooks; it has written `defs` first.
     add_(id) {
       check(id);
-      const state = states.get(id);
-      if (state) {
-        state.priority = defs[id]!.priority ?? 0;
-      } else {
-        states.set(id, fresh(id));
-        unanswered.add(id);
-      }
+      // 1.35's assign starts the state again too (initState).
+      states.set(id, fresh(id));
+      unanswered.add(id);
       defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
       dirty.add(id);
       resort();

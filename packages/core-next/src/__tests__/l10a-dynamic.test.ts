@@ -180,6 +180,7 @@ describe("the registry (dynamic.ts)", () => {
     a.derive.register("z", () => 1);
     expect(a.derive.z).toBe(1);
     expect("z" in b.derive).toBe(false);
+    expect(b.inspect().derivations.map((d: Any) => d.id)).toEqual(["double"]);
     a.destroy();
     b.destroy();
   });
@@ -351,6 +352,90 @@ describe("the parts' hooks", () => {
     await system.effects.call("e");
     system.effects.assign("e", { run: () => {} });
     expect(log).toContain("cleanup");
+    system.destroy();
+  });
+});
+
+describe("inspect (inspect.ts)", () => {
+  it("resolverDefs lists a resolver registered at runtime, and drops it on unregister", () => {
+    const system = started();
+    expect(system.inspect().resolverDefs).toEqual([]);
+    system.resolvers.register("work", { requirement: "WORK", resolve() {} });
+    expect(system.inspect().resolverDefs).toEqual([
+      { id: "work", requirement: "WORK", meta: undefined },
+    ]);
+    system.resolvers.unregister("work");
+    expect(system.inspect().resolverDefs).toEqual([]);
+    system.destroy();
+  });
+
+  it("pendingInvalidations counts the derivations a write reaches, and a removed one at once", async () => {
+    const system = started({
+      constraints: {
+        watch: {
+          when: (_f: Any, d: Any) => d.double > 1e9 || (d.dyn ?? 0) > 1e9,
+          require: { type: "WORK" },
+        },
+      },
+      resolvers: { work: { requirement: "WORK", resolve() {} } },
+    });
+    system.derive.register("dyn", (f: Any) => f.n);
+    system.facts.n = 2;
+    await system.settle();
+    system.facts.n = 3;
+    expect(system.inspect().pendingInvalidations).toBe(2);
+    system.derive.unregister("dyn");
+    expect(system.inspect().pendingInvalidations).toBe(1);
+    await system.settle();
+    expect(system.inspect().pendingInvalidations).toBe(0);
+    system.destroy();
+  });
+});
+
+describe("parity with 1.35's registry (constraints.ts, dynamic.ts, effects.ts)", () => {
+  it("constraint assign starts its state again: hitCount 0, lastActiveAt null", async () => {
+    const system = started({
+      constraints: {
+        c: { when: (f: Any) => f.n === 1, require: { type: "WORK" } },
+      },
+      resolvers: { work: { requirement: "WORK", resolve() {} } },
+    });
+    await system.settle();
+    expect(system.inspect().constraints[0].hitCount).toBe(1);
+    system.constraints.assign("c", {
+      when: () => false,
+      require: { type: "WORK" },
+    });
+    expect(system.inspect().constraints[0]).toMatchObject({
+      hitCount: 0,
+      lastActiveAt: null,
+    });
+    system.destroy();
+  });
+
+  it("D7: a derivation assign with nothing watched asks for no pass", async () => {
+    let passes = 0;
+    const system = started(
+      {},
+      { plugins: [{ name: "p", onReconcileStart: () => void passes++ }] },
+    );
+    await system.settle();
+    passes = 0;
+    system.derive.assign("double", (f: Any) => f.n * 4);
+    await system.settle();
+    expect(passes).toBe(0);
+    expect(system.derive.double).toBe(4);
+    system.destroy();
+  });
+
+  it("D8: calling a sync effect answers on the next tick, as 1.35's callOne", async () => {
+    const system = started({ effects: { e: { run() {} } } });
+    let done = false;
+    system.effects.call("e").then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    expect(done).toBe(true);
     system.destroy();
   });
 });

@@ -143,8 +143,15 @@ export const withDynamic: SystemPart = (ctx) => {
     }
     ctx.metaChanged_?.();
     // D7: a constraint or resolver change asks for a pass; a derivation or
-    // an effect only when it left work owed (a changed key).
-    if (type === "constraint" || type === "resolver" || ctx.counts_()[1].size) {
+    // an effect only when it left work owed (a changed key). An assign owes
+    // none when nothing is watched (1.35's pendingInvalidationCount is 0);
+    // a register or unregister wakes who asked about the name, row (bm).
+    if (
+      type === "constraint" ||
+      type === "resolver" ||
+      (ctx.counts_()[1].size &&
+        (op !== "assign" || system.inspect().observedDerivations))
+    ) {
       ctx.schedule();
     }
   };
