@@ -1317,8 +1317,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "note": "Declared deps and data-form on resolution; an auto-tracked effect has neither \u2014 killed in the full run by data-form on swapping to a function-form effect drops the old gate",
-    "layer": "L10"
+    "note": "data-form `on` (the L11 predicate data form): onGates holds a gate only for an effect declared with a data-form `on` (effects.ts 882), so deleting it on re-init is observable only when a gated effect is swapped for a function-form one. Killed in the full run by blackbox-effects 'data-form on > swapping to a function-form effect drops the old gate', placed at L11 by `option predicate data form`. Corrected from L10 at L10-pre-b.",
+    "layer": "L11"
   },
   {
     "line": 847,

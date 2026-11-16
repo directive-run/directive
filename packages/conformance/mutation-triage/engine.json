@@ -315,24 +315,6 @@
     "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
   },
   {
-    "line": 317,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
-  },
-  {
-    "line": 317,
-    "col": 26,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
-  },
-  {
     "line": 323,
     "col": 7,
     "mutator": "CallExpression",
@@ -346,60 +328,6 @@
     "col": 75,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
-  },
-  {
-    "line": 328,
-    "col": 11,
-    "mutator": "ConditionalExpression",
-    "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
-  },
-  {
-    "line": 331,
-    "col": 43,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
-  },
-  {
-    "line": 333,
-    "col": 13,
-    "mutator": "ConditionalExpression",
-    "replacement": "false",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
-  },
-  {
-    "line": 333,
-    "col": 43,
-    "mutator": "BlockStatement",
-    "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
-  },
-  {
-    "line": 338,
-    "col": 9,
-    "mutator": "CallExpression",
-    "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10)"
-  },
-  {
-    "line": 341,
-    "col": 36,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
     "reason": "later-layer",
     "layer": "L10",
     "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
@@ -419,8 +347,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module definition collision check for a module's sources (lib/layers.ts registerModule: L10). createSystem namespaces every source key under its module's name, and a single-module system has no other module, so two modules' source keys can only meet through registerModule; no test at or below L5 can reach it. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Proved 2026-11-01: with the mutant applied the whole suite at MUTATION_LAYER=L5 passes (conformance:local and conformance:local:prod).",
+    "layer": "L5",
+    "note": "the cross-module collision check for a module's sources (sources are L5's). Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'createSystem refuses two modules whose namespaced source keys collide (L10 gate debt) > for a source', placed at L5. Corrected from later-layer L10 at L10-pre-b.",
     "endLine": 346,
     "endCol": 7
   },
@@ -430,32 +358,14 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module definition collision check for a module's sources (lib/layers.ts registerModule: L10). createSystem namespaces every source key under its module's name, and a single-module system has no other module, so two modules' source keys can only meet through registerModule; no test at or below L5 can reach it. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Proved 2026-11-01: with the mutant applied the whole suite at MUTATION_LAYER=L5 passes (conformance:local and conformance:local:prod).",
+    "layer": "L5",
+    "note": "the cross-module collision check for a module's sources (sources are L5's). Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'createSystem refuses two modules whose namespaced source keys collide (L10 gate debt) > for a source', placed at L5. Corrected from later-layer L10 at L10-pre-b.",
     "endLine": 345,
     "endCol": 15
   },
   {
     "line": 347,
     "col": 41,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
-  },
-  {
-    "line": 348,
-    "col": 39,
-    "mutator": "StringLiteral",
-    "replacement": "\"\"",
-    "reason": "later-layer",
-    "layer": "L10",
-    "note": "registerModule: the cross-module schema/definition collision check. createSystem namespaces every key under a module name that may not contain '::' (system.ts rejects it), and a single-module system has no other module, so two modules' keys can only meet through registerModule (L10). Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer."
-  },
-  {
-    "line": 349,
-    "col": 36,
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "later-layer",
@@ -2393,7 +2303,7 @@
     "replacement": "ownerModule.hooks",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "resolverIdToModule has an entry for every resolver a module declares; only a resolver registered at runtime (resolvers.register, L10) has no owner module, where ownerModule.hooks would throw"
+    "note": "resolverIdToModule has an entry for every resolver a module declares; only a resolver registered at runtime (resolvers.register, L10) has no owner module, where ownerModule.hooks would throw Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'runtime definitions (L10 gate debt) > a runtime resolver that fails reaches no module hook and settles'."
   },
   {
     "line": 1530,
@@ -2605,7 +2515,7 @@
     "replacement": "() => undefined",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe'.",
     "endLine": 1679,
     "endCol": 56
   },
@@ -4379,7 +4289,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe'.",
     "endLine": 2521,
     "endCol": 8
   },
@@ -4390,7 +4300,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe'.",
     "endLine": 2520,
     "endCol": 74
   },
@@ -5354,7 +5264,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe'.",
     "endLine": 2819,
     "endCol": 10
   },
@@ -5365,7 +5275,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe'.",
     "endLine": 2818,
     "endCol": 44
   },
@@ -6143,7 +6053,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "definitions.destroy() on destroy: only runtime-registered definitions (L10 dynamic) hold state to drop"
+    "note": "definitions.destroy() on destroy: only runtime-registered definitions (L10 dynamic) hold state to drop Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'destroy() forgets runtime definitions (L10 gate debt) > listDynamic() is empty after destroy()'."
   },
   {
     "line": 3504,
@@ -6163,7 +6073,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroy(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroy(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > forgets its listeners on destroy(), even for a module teardown that finishes later'.",
     "endLine": 3505,
     "endCol": 31
   },
@@ -6293,7 +6203,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "definitions.destroy() on destroy: only runtime-registered definitions (L10 dynamic) hold state to drop"
+    "note": "definitions.destroy() on destroy: only runtime-registered definitions (L10 dynamic) hold state to drop Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'destroy() forgets runtime definitions (L10 gate debt) > listDynamic() is empty after destroyAsync()'."
   },
   {
     "line": 3552,
@@ -6313,7 +6223,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroyAsync(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroyAsync(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'meta.subscribe over runtime definitions (L10 gate debt) > forgets its listeners on destroyAsync(), even for a module teardown that finishes later'.",
     "endLine": 3553,
     "endCol": 31
   },
@@ -6341,9 +6251,9 @@
     "col": 25,
     "mutator": "ArithmeticOperator",
     "replacement": "deadline + Date.now()",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "evict(deadline): evict is the plan's L10 (layers.ts MEMBER_LAYERS evict); no test passes a deadline yet"
+    "reason": "later-layer",
+    "layer": "L5",
+    "note": "evict(deadline) (lib/layers.ts maps evict to L5, owner B1 2026-11-01). Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'evict(deadline) (L10 gate debt; evict is L5) > waits for an eviction that finishes before the deadline', placed at L5. Corrected from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 3618,
@@ -6359,18 +6269,18 @@
     "col": 26,
     "mutator": "ArrayDeclaration",
     "replacement": "[]",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "evict(deadline): evict is the plan's L10 (layers.ts MEMBER_LAYERS evict); no test passes a deadline yet"
+    "reason": "later-layer",
+    "layer": "L5",
+    "note": "evict(deadline) (lib/layers.ts maps evict to L5, owner B1 2026-11-01). Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'evict(deadline) (L10 gate debt; evict is L5) > waits for an eviction that finishes before the deadline', placed at L5. Corrected from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 3621,
     "col": 27,
     "mutator": "ArrowFunction",
     "replacement": "() => undefined",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "evict(deadline): evict is the plan's L10 (layers.ts MEMBER_LAYERS evict); no test passes a deadline yet"
+    "reason": "later-layer",
+    "layer": "L5",
+    "note": "evict(deadline) (lib/layers.ts maps evict to L5, owner B1 2026-11-01). Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'evict(deadline) (L10 gate debt; evict is L5) > returns at the deadline while the eviction is still running', placed at L5. Corrected from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 3637,
@@ -6489,7 +6399,7 @@
     "replacement": "(mergedSchema[key as keyof S] as {\n  _meta?: DefinitionMeta;\n} | undefined)._meta",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): inspect()'s `?._meta` on a schema type: a nullish schema type cannot survive build (WeakSet.add at 411 throws); only registerKeys (L10) adds schema types afterwards. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
+    "note": "feature-layer L10 (was L9): inspect()'s `?._meta` on a schema type: a nullish schema type cannot survive build (WeakSet.add at 411 throws); only registerKeys (L10) adds schema types afterwards. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'runtime definitions (L10 gate debt) > inspect() lists a runtime constraint, and a fact a failed registerModule left with no schema type'.",
     "endLine": 3781,
     "endCol": 19
   },
@@ -6743,7 +6653,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "feature-layer L10 (was L9): explain()'s `lastResult ?? \"unknown\"`: a constraint state starts with lastResult null (constraints.ts 716) and every evaluation sets it (855, 871, 967, 977). A requirement exists only after its constraint evaluated, so at L9 it is never null; only dynamic definitions (constraints.unregister/assign, L10) can leave a requirement whose constraint has no state or a fresh one. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b."
+    "note": "feature-layer L10 (was L9): explain()'s `lastResult ?? \"unknown\"`: a constraint state starts with lastResult null (constraints.ts 716) and every evaluation sets it (855, 871, 967, 977). A requirement exists only after its constraint evaluated, so at L9 it is never null; only dynamic definitions (constraints.unregister/assign, L10) can leave a requirement whose constraint has no state or a fresh one. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'runtime definitions (L10 gate debt) > explain() says unknown for a requirement whose constraint was replaced'."
   },
   {
     "line": 3904,
@@ -6924,18 +6834,16 @@
     "col": 28,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "getOriginal / restoreOriginal: runtime definition overrides (L10 dynamic)"
+    "reason": "internals-only",
+    "note": "getOriginal / restoreOriginal: members of the engine only (createEngine, exported from ./internals). system.ts forwards neither, so a 1.35 system has no getOriginal or restoreOriginal member; l10-dynamic-pins-oracle U22 pins their absence. No public path reaches this code. Relabelled from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 4001,
     "col": 16,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "getOriginal / restoreOriginal: runtime definition overrides (L10 dynamic)"
+    "reason": "internals-only",
+    "note": "getOriginal / restoreOriginal: members of the engine only (createEngine, exported from ./internals). system.ts forwards neither, so a 1.35 system has no getOriginal or restoreOriginal member; l10-dynamic-pins-oracle U22 pins their absence. No public path reaches this code. Relabelled from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 4017,
@@ -7528,7 +7436,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule's refusals (L10 gate debt) > refuses during reconciliation, from an effect'.",
     "endLine": 4439,
     "endCol": 6
   },
@@ -7539,7 +7447,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule's refusals (L10 gate debt) > refuses on a destroyed system'.",
     "endLine": 4446,
     "endCol": 6
   },
@@ -7550,7 +7458,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule's refusals (L10 gate debt) > refuses a blocked key and a $ schema key'.",
     "endLine": 4456,
     "endCol": 10
   },
@@ -7561,7 +7469,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule's refusals (L10 gate debt) > refuses a blocked key and a $ schema key'.",
     "endLine": 4461,
     "endCol": 10
   },
@@ -7572,7 +7480,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule's refusals (L10 gate debt) > warns when a registered derivation shares a fact's name'.",
     "endLine": 4488,
     "endCol": 10
   },
@@ -7583,7 +7491,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4501,
     "endCol": 6
   },
@@ -7594,7 +7502,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7605,7 +7513,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7616,7 +7524,7 @@
     "replacement": "snapshotEventNames !== null",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4494,
     "endCol": 38
   },
@@ -7627,7 +7535,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4497,
     "endCol": 8
   },
@@ -7638,7 +7546,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4500,
     "endCol": 8
   },
@@ -7649,7 +7557,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4499,
     "endCol": 43
   },
@@ -7660,7 +7568,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4506,
     "endCol": 6
   },
@@ -7671,7 +7579,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4505,
     "endCol": 8
   },
@@ -7682,7 +7590,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b.",
+    "note": "registerModule's snapshotEvents merge (L10 dynamic modules; lib/layers.ts maps registerModule to L10). Reached only through system.registerModule: NoCoverage at gate=L8 (43154761738) and in the full run 42470381866 (every non-internals test, no ceiling), so no test at any layer registers a module with history.snapshotEvents, or one with events while a filter is on. Corrected from L8 at L8-pre-b. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module'.",
     "endLine": 4504,
     "endCol": 43
   },
@@ -7693,7 +7601,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule records module and source meta (L10 gate debt) > stores a module's meta frozen, and tells plugins a source's meta'.",
     "endLine": 4575,
     "endCol": 44
   },
@@ -7704,7 +7612,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule records module and source meta (L10 gate debt) > stores a module's meta frozen, and tells plugins a source's meta'.",
     "endLine": 4617,
     "endCol": 6
   },
@@ -7713,9 +7621,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "reason": "equivalent",
+    "note": "equivalent: freezeMeta (types/meta.ts) returns a frozen object for any truthy meta, or throws, and this guard runs only when module.meta is truthy, so `if (frozen)` is always true (the same reasoning as the createSystem twin relabelled at L9-pre-b). Applied by hand (L10-pre-b): the whole suite at ceiling L10 (MUTATION_LAYER=L10, vitest.stryker.config.ts) passes. Relabelled from feature-layer L10 at L10-pre-b.",
     "endLine": 4616,
     "endCol": 17
   },
@@ -7726,7 +7633,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule records module and source meta (L10 gate debt) > stores a module's meta frozen, and tells plugins a source's meta'.",
     "endLine": 4616,
     "endCol": 17
   },
@@ -7737,7 +7644,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'registerModule records module and source meta (L10 gate debt) > stores a module's meta frozen, and tells plugins a source's meta'.",
     "endLine": 4616,
     "endCol": 53
   },
@@ -7748,7 +7655,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule's refusals and re-entry (L10 gate debt) > names an id-less target <module> and rejects a name nothing registered'.",
     "endLine": 4673,
     "endCol": 56
   },
@@ -7759,7 +7666,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule's refusals and re-entry (L10 gate debt) > refuses during reconciliation, from an effect'.",
     "endLine": 4684,
     "endCol": 6
   },
@@ -7770,7 +7677,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule's refusals and re-entry (L10 gate debt) > names an id-less target <module> and rejects a name nothing registered'.",
     "endLine": 4694,
     "endCol": 6
   },
@@ -7781,7 +7688,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule's refusals and re-entry (L10 gate debt) > runs the teardown once for two concurrent calls'.",
     "endLine": 4703,
     "endCol": 6
   },
@@ -7792,7 +7699,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule drops a requirement key no surviving resolver owns (L10 gate debt) > so a surviving constraint's requirement is keyed without it'.",
     "endLine": 4771,
     "endCol": 10
   },
@@ -7803,7 +7710,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry",
+    "note": "dynamic definitions: registerModule/unregisterModule refusals and bookkeeping, definitions-changed notify; needs the L10 registry Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'unregisterModule drops a requirement key no surviving resolver owns (L10 gate debt) > so a surviving constraint's requirement is keyed without it'.",
     "endLine": 4770,
     "endCol": 68
   },
