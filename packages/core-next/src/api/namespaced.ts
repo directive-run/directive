@@ -15,7 +15,7 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import { createSystemCore } from "./core.js";
+import { createSystemCore, validateKeys } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
 import { BLOCKED_PROPS, isPrototypeSafe } from "./facts.js";
 import { createCheckedReadView } from "./readonly.js";
@@ -477,23 +477,7 @@ export function createNamespacedSystem(
     const sources: Rec = {};
     const constraints: Rec = {};
     const resolvers: Rec = {};
-    for (const [section, obj] of [
-      ["schema", mod.schema?.facts],
-      ["events", mod.events],
-      ["derive", mod.derive],
-      ["effects", mod.effects],
-      ["sources", mod.sources],
-      ["constraints", mod.constraints],
-      ["resolvers", mod.resolvers],
-    ] as const) {
-      for (const key of Object.keys(obj ?? {})) {
-        if (BLOCKED_PROPS.has(key)) {
-          throw new Error(
-            `[Directive] Security: Module "${ns}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-          );
-        }
-      }
-    }
+    validateKeys(ns, mod, mod.schema?.facts);
     const p = (key: string) => ns + SEPARATOR + key;
     const own =
       kept && !kept.includes(ns)
@@ -668,51 +652,46 @@ export function createNamespacedSystem(
       resolvers,
     };
   };
-  /** Each joined key's module: facts apart, one map for every definition. */
-  const factOwners = new Map<string, string>();
-  const definitionOwners = new Map<string, string>();
+  const keep = (ns: string, flat: Rec) => {
+    namespaceKeys.set(ns, flat.keys_);
+    flats.set(ns, flat);
+  };
+  const drop = (ns: string) => {
+    delete modules[ns];
+    namespaceKeys.delete(ns);
+    flats.delete(ns);
+  };
+  /** Each joined key's module: a definition's, then a fact's. */
+  const keyOwners = [new Map<string, string>(), new Map<string, string>()];
   for (const ns of ordered) {
-    const mod = modules[ns]!;
-    const flat = flattenModule(ns, mod);
+    const flat = flattenModule(ns, modules[ns]!);
+    keep(ns, flat);
     // Neither "a" nor "a:" holds the separator, nor ":x" nor "x", yet both
     // pairs join to "a:::x". 1.35 refuses two modules meeting on a key, in
     // both modes (engine.ts:314–349): a fact, or any definition, whatever
-    // its section. The flat module's keys are already joined.
-    for (const [section, obj] of [
-      ["", flat.schema.facts],
-      ["derivation", flat.derive],
-      ["effect", flat.effects],
-      ["source", flat.sources],
-      ["constraint", flat.constraints],
-      ["resolver", flat.resolvers],
-      ["event", flat.events],
+    // its section. The flat module's keys are already joined; each map is
+    // then merged into the system's.
+    for (const [section, obj, into] of [
+      ["", flat.schema.facts, facts],
+      ["derivation", flat.derive, derive],
+      ["effect", flat.effects, effects],
+      ["source", flat.sources, sources],
+      ["constraint", flat.constraints, constraints],
+      ["resolver", flat.resolvers, resolvers],
+      ["event", flat.events, events],
     ] as const) {
-      const taken = section ? definitionOwners : factOwners;
-      for (const id of Object.keys(obj)) {
+      const taken = keyOwners[+!section]!;
+      for (const id in obj) {
         const owner = taken.get(id);
         if (owner && owner !== ns) {
           throw new Error(
-            section
-              ? `[Directive] Definition collision: ${section} "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing or rename to avoid conflicts.`
-              : `[Directive] Schema collision: Fact "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing (e.g., "${ns}::${id}") or merge into one module.`,
+            `[Directive] ${section ? `Definition collision: ${section}` : "Schema collision: Fact"} "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing${section ? " or rename to avoid conflicts." : ` (e.g., "${ns}::${id}") or merge into one module.`}`,
           );
         }
         taken.set(id, ns);
+        (into as Rec)[id] = obj[id];
       }
     }
-    flats.set(ns, flat);
-    Object.assign(facts, flat.schema.facts);
-    for (const [map, into] of [
-      [flat.derive, derive],
-      [flat.events, events],
-      [flat.effects, effects],
-      [flat.sources, sources],
-      [flat.constraints, constraints],
-      [flat.resolvers, resolvers],
-    ]) {
-      Object.assign(into, map);
-    }
-    namespaceKeys.set(ns, flat.keys_);
     flat.init && inits.push(flat.init);
     if (snapEvents) {
       const own = flat.history?.snapshotEvents;
@@ -929,14 +908,11 @@ export function createNamespacedSystem(
       }
       const flat = flattenModule(ns, mod);
       modules[ns] = mod;
-      namespaceKeys.set(ns, flat.keys_);
-      flats.set(ns, flat);
+      keep(ns, flat);
       try {
         engine[0]!(flat);
       } catch (error) {
-        delete modules[ns];
-        namespaceKeys.delete(ns);
-        flats.delete(ns);
+        drop(ns);
         throw error;
       }
     },
@@ -948,9 +924,7 @@ export function createNamespacedSystem(
         );
       }
       await engine[1]!(flat);
-      flats.delete(ns);
-      delete modules[ns];
-      namespaceKeys.delete(ns);
+      drop(ns);
     },
   });
 

@@ -487,6 +487,46 @@ const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
  * events, subscriptions and the reconcile pass; each part adds a feature.
  * The 1.35 `createSystem` (system.ts) passes them all.
  */
+/**
+ * 1.35's validateKeys, a security boundary that runs in every environment:
+ * a blocked key in any section, and (`dollar`) a schema key starting with
+ * "$". createSystem, the namespaced layer (no "$" check) and registerModule
+ * (1.35's shorter text, `tail` "") share it.
+ */
+/** The sections 1.35's validateKeys walks, in its order. */
+const SECTIONS = [
+  "schema",
+  "events",
+  "derive",
+  "effects",
+  "sources",
+  "constraints",
+  "resolvers",
+];
+export function validateKeys(
+  id: string,
+  mod: Record<string, any>,
+  facts: object | undefined,
+  dollar?: unknown,
+  tail = " This could indicate a prototype pollution attempt.",
+): void {
+  for (const section of SECTIONS) {
+    const obj = section === "schema" ? facts : mod[section];
+    for (const key of obj ? Object.keys(obj) : []) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${id}" has dangerous key "${key}" in ${section}.${tail}`,
+        );
+      }
+      if (dollar && section === "schema" && key[0] === "$") {
+        throw new Error(
+          `[Directive] Module "${id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
+        );
+      }
+    }
+  }
+}
+
 export function createSystemCore<const M extends ModuleSchema>(
   options: SystemOptions<M>,
   parts: readonly SystemPart[] = [],
@@ -516,29 +556,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   const hooks_ = module.hooks_ ?? (module.hooks ? [module.hooks as Hooks] : []);
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  // A security boundary (1.35): runs in every environment.
-  for (const [section, obj] of [
-    ["schema", schema],
-    ["events", module.events],
-    ["derive", module.derive],
-    ["effects", module.effects],
-    ["sources", module.sources],
-    ["constraints", module.constraints],
-    ["resolvers", module.resolvers],
-  ] as const) {
-    for (const key of Object.keys(obj ?? {})) {
-      if (BLOCKED_PROPS.has(key)) {
-        throw new Error(
-          `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-        );
-      }
-      if (section === "schema" && key.startsWith("$")) {
-        throw new Error(
-          `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
-        );
-      }
-    }
-  }
+  validateKeys(module.id, module, schema, 1);
   if (isDevelopment) {
     if (Object.keys(module.crossModuleDeps ?? {}).length) {
       console.warn(
@@ -936,7 +954,9 @@ export function createSystemCore<const M extends ModuleSchema>(
    * something else (a branch) or by throwing before it gets there.
    *
    * So every derivation keeps one reader that never runs: the edge a read
-   * would leave, without the read.
+   * would leave, without the read. The edge is only on the derivation's
+   * side: `keep` never runs, so nothing walks its own list, and a list there
+   * would hold every derivation ever removed.
    */
   const keep = graph.computed(() => 0);
   /**
@@ -957,8 +977,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
     }));
-    const link = new Link(node, keep, keep.deps, node.subsTail);
-    keep.deps = link;
+    const link = new Link(node, keep, null, node.subsTail);
     node.subsTail ? (node.subsTail.nextSub = link) : (node.subs = link);
     node.subsTail = link;
     derivations.set(id, d);

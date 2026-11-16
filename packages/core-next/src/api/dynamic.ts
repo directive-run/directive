@@ -21,7 +21,7 @@
 
 import isDevelopment from "#is-development";
 import { type DefinitionMeta, freezeMeta } from "../types/meta.js";
-import type { SystemContext, SystemPart } from "./core.js";
+import { type SystemContext, type SystemPart, validateKeys } from "./core.js";
 import { BLOCKED_PROPS, MEMBER_DEP_PREFIX } from "./facts.js";
 
 type Fn = (...args: any[]) => any;
@@ -65,6 +65,19 @@ const computeOf = (def: any): unknown => {
 
 /** Object-form derivations given to `assign`: 1.35 keeps those as given. */
 const ASSIGNED = new WeakSet<object>();
+
+/** A change to a destroyed system is refused, with 1.35's text for each. */
+const alive = (ctx: SystemContext, op: string, type: string, id: string) => {
+  if (ctx.gone_) {
+    throw new Error(
+      `[Directive] Cannot ${op} ${type} "${id}" on a destroyed system.`,
+    );
+  }
+};
+/** The plugins' and observers' event, built only when one listens. */
+const emitter =
+  (ctx: SystemContext) => (at: string, data: Record<string, unknown>) =>
+    ctx.wants_(at) && ctx.emit_(at, data);
 
 /**
  * 1.35's updateDependencies: a derivation whose dependency set changed
@@ -187,9 +200,9 @@ const registry = (ctx: SystemContext): Kinds => {
   const dynamic: Record<string, Set<string>> = {};
   const queue: [string, string, string, any][] = [];
   const kinds: Kinds = {};
-  const emit = (at: string, data: Record<string, unknown>) =>
-    ctx.wants_(at) && ctx.emit_(at, data);
-  const check = (id: unknown) => {
+  const emit = emitter(ctx);
+  const check = (op: string, type: string, id: string) => {
+    alive(ctx, op, type, id);
     if (typeof id !== "string" || !id) {
       throw new Error(
         `[Directive] Definition ID must be a non-empty string. Received: ${String(id)}`,
@@ -334,12 +347,7 @@ const registry = (ctx: SystemContext): Kinds => {
     }
   };
   const guarded = (op: string, type: string) => (id: string, def?: unknown) => {
-    if (ctx.gone_) {
-      throw new Error(
-        `[Directive] Cannot ${op} ${type} "${id}" on a destroyed system.`,
-      );
-    }
-    check(id);
+    check(op, type, id);
     if (!ctx.inPass_) {
       return apply(op, type, id, def);
     }
@@ -354,12 +362,7 @@ const registry = (ctx: SystemContext): Kinds => {
   };
   /** D8: a derivation answers now; the others answer a promise. */
   const call = (type: string) => (id: string, props?: unknown) => {
-    if (ctx.gone_) {
-      throw new Error(
-        `[Directive] Cannot call ${type} "${id}" on a destroyed system.`,
-      );
-    }
-    check(id);
+    check("call", type, id);
     emit("definition.call", { type, id, props });
     if (!m[MAPS[type]!][id]) {
       const error = new Error(
@@ -412,8 +415,7 @@ const modules = (ctx: SystemContext): Fn[] => {
   const store = ctx.store as any;
   const list = m.modules_ as Record<string, any>[];
   const going = new Map<object, Promise<void>>();
-  const emit = (at: string, data: Record<string, unknown>) =>
-    ctx.wants_(at) && ctx.emit_(at, data);
+  const emit = emitter(ctx);
   const keys = (map?: object) => Object.keys(map ?? {});
   const freeze = (map?: Record<string, any>) => {
     for (const def of Object.values(map ?? {})) {
@@ -430,35 +432,10 @@ const modules = (ctx: SystemContext): Fn[] => {
   const register = (mod: Record<string, any>) => {
     const id = mod.id;
     busy("register", id);
-    if (ctx.gone_) {
-      throw new Error(
-        `[Directive] Cannot register module "${id}" on a destroyed system.`,
-      );
-    }
+    alive(ctx, "register", "module", id);
     const facts = mod.schema?.facts ?? {};
-    // M1, 1.35's validateKeys (engine.ts:4449–4466).
-    for (const section of [
-      "schema",
-      "events",
-      "derive",
-      "effects",
-      "sources",
-      "constraints",
-      "resolvers",
-    ]) {
-      for (const key of keys(section === "schema" ? facts : mod[section])) {
-        if (BLOCKED_PROPS.has(key)) {
-          throw new Error(
-            `[Directive] Security: Module "${id}" has dangerous key "${key}" in ${section}.`,
-          );
-        }
-        if (section === "schema" && key[0] === "$") {
-          throw new Error(
-            `[Directive] Module "${id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
-          );
-        }
-      }
-    }
+    // M1, 1.35's validateKeys (engine.ts:4449–4466), with its shorter text.
+    validateKeys(id, mod, facts, 1, "");
     for (const key in facts) {
       if (key in schema) {
         throw new Error(
@@ -485,35 +462,34 @@ const modules = (ctx: SystemContext): Fn[] => {
     }
     // The schema and its tags at once, before a source can publish (M3).
     store.registerKeys(facts);
-    const add = (type: string, map: string, def: Fn) => {
+    const add = (type: string, map: string) => {
       for (const key of keys(mod[map])) {
         const had = key in m[map];
-        m[map][key] = mod[map][key];
+        const def = (m[map][key] = mod[map][key]);
         const hooks = ctx.kinds_[type]!;
-        const arg = def(mod[map][key]);
+        const arg = type === "derivation" ? computeOf(def) : def;
         had && hooks.replace_ ? hooks.replace_(key, arg) : hooks.add_(key, arg);
       }
     };
-    const same = (def: unknown) => def;
     for (const key of keys(mod.events)) {
       const def = (m.events[key] = mod.events[key]);
       ctx.events_[key] = def?.handler ?? def;
     }
     freeze(mod.derive);
     // M2: a derivation that exists is replaced, with no word.
-    add("derivation", "derive", computeOf);
+    add("derivation", "derive");
     freeze(mod.effects);
-    add("effect", "effects", same);
+    add("effect", "effects");
     const sources = Object.entries(mod.sources ?? {}) as [string, any][];
     for (const [key, def] of sources) {
       m.sources[key] = def;
       emit("definition.register", {
         type: "source",
         id: key,
-        def:
-          def.meta === undefined
-            ? { moduleId: id }
-            : { moduleId: id, meta: def.meta },
+        def: {
+          moduleId: id,
+          ...(def.meta !== undefined && { meta: def.meta }),
+        },
       });
     }
     sources[0] && (ctx.kernel.features as any).sources.add_(sources);
@@ -523,8 +499,8 @@ const modules = (ctx: SystemContext): Fn[] => {
       m.owners_ && (m.owners_[key] = mod);
     }
     if (ctx.kinds_.constraint) {
-      add("constraint", "constraints", same);
-      add("resolver", "resolvers", same);
+      add("constraint", "constraints");
+      add("resolver", "resolvers");
     } else if (keys(mod.constraints)[0] || keys(mod.resolvers)[0]) {
       // The reconcile part is built from the maps (dynamic.ts's l2_).
       Object.assign(m.constraints, mod.constraints);
@@ -552,14 +528,17 @@ const modules = (ctx: SystemContext): Fn[] => {
     await Promise.race([
       Promise.all(waits.map((p: any) => p?.catch(() => {}))),
       new Promise<void>((done) => {
-        timer = setTimeout(() => {
-          if (isDevelopment) {
-            console.warn(
-              `[Directive] Timed out after 10000ms waiting for resolvers to finish: ${ids.join(", ")}. They were detached and aborted; one of them is not observing its abort signal.`,
-            );
-          }
-          done();
-        }, 1e4);
+        timer = setTimeout(
+          isDevelopment
+            ? () => {
+                console.warn(
+                  `[Directive] Timed out after 10000ms waiting for resolvers to finish: ${ids.join(", ")}. They were detached and aborted; one of them is not observing its abort signal.`,
+                );
+                done();
+              }
+            : done,
+          1e4,
+        );
       }),
     ]);
     clearTimeout(timer);
@@ -631,11 +610,7 @@ const modules = (ctx: SystemContext): Fn[] => {
   const unregister = async (target: any) => {
     const label =
       typeof target === "string" ? target : (target?.id ?? "<module>");
-    if (ctx.gone_) {
-      throw new Error(
-        `[Directive] Cannot unregister module "${label}" on a destroyed system.`,
-      );
-    }
+    alive(ctx, "unregister", "module", label);
     busy("unregister", label);
     const found = list.find((mod) =>
       typeof target === "string" ? mod.id === target : mod === target,

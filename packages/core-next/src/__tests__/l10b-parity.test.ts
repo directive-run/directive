@@ -183,3 +183,54 @@ describe("dynamic definitions after destroy() (dynamic.ts isDynamic, listDynamic
     expect(registered).toEqual([]);
   });
 });
+
+describe("a removed derivation is released (core.ts define, the `keep` edge)", () => {
+  it("is not held by the reader every derivation keeps, after unregister and after unregisterModule", async () => {
+    const { setFlagsFromString } = await import("node:v8");
+    const { runInNewContext } = await import("node:vm");
+    setFlagsFromString("--expose-gc");
+    const gc = runInNewContext("gc") as () => void;
+    const system = createSystem({
+      module: createModule("host", {
+        schema: { facts: { n: t.number() }, derivations: {} },
+        init: (facts: Any) => {
+          facts.n = 1;
+        },
+      } as never),
+    } as never) as Any;
+    system.start();
+    const refs: WeakRef<object>[] = [];
+    for (let i = 0; i < 3; i++) {
+      // Each compute holds a payload only it references.
+      const payload = { i };
+      refs.push(new WeakRef(payload));
+      system.derive.register(`z${i}`, (facts: Any) => facts.n + payload.i);
+      expect(system.read(`z${i}`)).toBe(1 + i);
+      system.derive.unregister(`z${i}`);
+      const mod = createModule(`m${i}`, {
+        schema: { facts: { [`c${i}`]: t.number() }, derivations: {} },
+        derive: { [`w${i}`]: () => ({ i }) },
+      } as never);
+      system.registerModule(mod);
+      refs.push(new WeakRef(system.read(`w${i}`)));
+      await system.unregisterModule(`m${i}`);
+    }
+    // A write and a pass, so nothing from the last round is still pending.
+    system.facts.n = 2;
+    await system.settle();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gc();
+    // The two earlier rounds. The newest round's compute can still be
+    // reachable for a while, so it is not asserted: what this pins is a list
+    // that grew by one removed node every round. Without the fix, both
+    // removed module derivations stay held, through the values their nodes
+    // keep.
+    expect(refs.slice(0, 4).map((ref) => ref.deref() === undefined)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    system.destroy();
+  });
+});
