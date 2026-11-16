@@ -278,6 +278,12 @@ export interface SystemContext {
    * withDynamic's registry drives them, after it writes the module's map.
    */
   kinds_: Record<string, DefHooks>;
+  /** L10, dynamic.ts relink: set by the first dynamic call. */
+  relink_?: (
+    node: ReactiveNode,
+    old: Set<string> | undefined,
+    deps: Set<string>,
+  ) => void;
   /** L10b: the event handlers, unwrapped. */
   events_: Record<string, Fn>;
   /** L10b: a pass now (1.35's unregisterModule awaits one, engine.ts:4870). */
@@ -754,7 +760,10 @@ export function createSystemCore<const M extends ModuleSchema>(
    * fact's subscriber in link order, depth first. A fact nothing in the graph
    * reads allocates nothing here.
    */
-  function invalidate(keys: readonly (string | object)[]): void {
+  function invalidate(
+    keys: readonly (string | object)[],
+    root?: ReactiveNode,
+  ): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
     let told: Set<ReactiveNode> | undefined;
@@ -798,7 +807,9 @@ export function createSystemCore<const M extends ModuleSchema>(
             pending.add(d.id_);
             // Wakes an effect that read this derivation (and maybe no fact).
             changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
-            for (let s = node.subs; s; s = s.nextSub) {
+            // A replaced root's readers are walked one by one after it, in
+            // order (1.35's invalidateReplacedDefinition), by `keys`.
+            for (let s = node === root ? null : node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
             // As in 1.35, whoever asked whether it exists goes stale with it.
@@ -886,7 +897,14 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      const old = d.deps_;
       d.deps_ = deps;
+      // 1.35's updateDependencies: a new dependency set unlinks the old one
+      // and links the new one, so this derivation's readers' lists end with
+      // it, and the next write's walk meets it last.
+      // 1.35 moves a derivation whose dependencies changed to the end of
+      // what it reads; L10's definitions change them (dynamic.ts relink).
+      context.relink_?.(d.node_, old, deps);
       if (wants("derivation.compute")) {
         emit("derivation.compute", {
           id: d.id_,
@@ -982,7 +1000,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         deriveDefs[id] = fn as Fn;
         // Announced again even when it was stale already (1.35).
         pending.add(id);
-        invalidate([{ subs: { target: derivations.get(id)!.node_ } }]);
+        const node = derivations.get(id)!.node_;
+        invalidate([{ subs: { target: node } }, node], node);
       },
       remove_(id) {
         const d = derivations.get(id)!;

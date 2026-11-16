@@ -460,6 +460,7 @@ export function createEffectsManager<S extends Schema>(
   function run(
     state: EffectState,
     thrown: Array<[EffectState, unknown]>,
+    bare?: unknown,
   ): Promise<void> | undefined {
     const def = definitions[state.id];
     if (!state.enabled || !def) {
@@ -478,7 +479,7 @@ export function createEffectsManager<S extends Schema>(
     try {
       running = state;
       runningDef = def;
-      if (state.explicit) {
+      if (state.explicit || bare) {
         store.batch(body);
       } else {
         // withTracking's frame, without its result object, into the spare
@@ -684,8 +685,16 @@ export function createEffectsManager<S extends Schema>(
     },
     reads_: (key) => index.has(key),
     callOne(id) {
-      // 1.35's callOne awaits only an async run: a sync one answers now.
-      const done = runFast([states.get(id)!].filter(Boolean));
+      // 1.35's callOne: no tracking frame of its own, so what the body reads
+      // goes to whoever called it (an effect calling it depends on those
+      // reads too), its dependencies stay, and the pass's previous facts
+      // too. It awaits only an async run: a sync one answers now.
+      const thrown: Array<[EffectState, unknown]> = [];
+      const state = states.get(id);
+      const done = state && run(state, thrown, 1);
+      for (const [s, error] of thrown) {
+        report(s, error);
+      }
 
       return done ? done.then(() => {}) : Promise.resolve();
     },

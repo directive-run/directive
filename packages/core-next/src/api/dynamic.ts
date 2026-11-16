@@ -63,6 +63,33 @@ const computeOf = (def: any): unknown => {
   return fn;
 };
 
+/** Object-form derivations given to `assign`: 1.35 keeps those as given. */
+const ASSIGNED = new WeakSet<object>();
+
+/**
+ * 1.35's updateDependencies: a derivation whose dependency set changed
+ * unlinks the old set and links the new one, so it ends each list of what
+ * it reads, and the next write's walk meets it last. Installed by the first
+ * dynamic call (a replaced definition is what changes the set here).
+ */
+const relink = (node: any, old: Set<string> | undefined, deps: Set<string>) => {
+  if (old?.size !== deps.size || [...deps].some((k) => !old!.has(k))) {
+    const end = node.cursor;
+    for (let l = end && node.deps; l; l = l === end ? null : l.nextDep) {
+      const source = l.source;
+      const last = source.subsTail;
+      const { prevSub, nextSub } = l;
+      if (nextSub) {
+        prevSub ? (prevSub.nextSub = nextSub) : (source.subs = nextSub);
+        nextSub.prevSub = prevSub;
+        l.prevSub = last;
+        l.nextSub = null;
+        last.nextSub = source.subsTail = l;
+      }
+    }
+  }
+};
+
 type Kinds = Record<string, Record<string, unknown>>;
 /** On each kind's object (`system.constraints`, ...): its type and its system's registry. */
 const OWNER = Symbol();
@@ -154,6 +181,7 @@ export const withDynamic: SystemPart = (ctx) => {
 };
 
 const registry = (ctx: SystemContext): Kinds => {
+  ctx.relink_ = relink;
   const system = ctx.system as Record<string, any>;
   const m = ctx.module as Record<string, any>;
   const dynamic: Record<string, Set<string>> = {};
@@ -220,7 +248,12 @@ const registry = (ctx: SystemContext): Kinds => {
       if (def?.meta) {
         def.meta = freezeMeta(def.meta as DefinitionMeta);
       }
-      const original = map[id];
+      // 1.35 hands a derivation's hook its compute, unwrapped at creation
+      // and register, but an assigned one as given (its merged map's entry).
+      const original =
+        type === "derivation" && !ASSIGNED.has(map[id])
+          ? computeOf(map[id])
+          : map[id];
       map[id] = def;
       if (op === "register") {
         // The reconcile part is built at the first constraint or resolver
@@ -234,6 +267,7 @@ const registry = (ctx: SystemContext): Kinds => {
           (ctx.kernel.features as any).effects?.link_(id);
         }
       } else {
+        type === "derivation" && def?.compute && ASSIGNED.add(def);
         hooks!.replace_(id, arg);
         owed = owe(op, type, id, written, n);
         emit("definition.assign", { type, id, def, original });
@@ -369,6 +403,7 @@ const ORDER: [string, string][] = [
  * flattened one (namespaced.ts flattenModule).
  */
 const modules = (ctx: SystemContext): Fn[] => {
+  ctx.relink_ = relink;
   const system = ctx.system as Record<string, any>;
   const m = ctx.module as Record<string, any>;
   const schema = m.schema.facts as Record<string, unknown>;
