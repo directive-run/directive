@@ -26,6 +26,7 @@ import { withEffects } from "./effects.js";
 import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withHistory } from "./history.js";
 import { withInspect } from "./inspect.js";
+import { withMeta } from "./meta.js";
 import { withMissing } from "./missing.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
@@ -77,6 +78,8 @@ export function createSystem<
     ? (options.history ?? isDevelopment)
     : options.history;
   const parts: SystemPart[] = [
+    // L9a: every 1.35 system has `meta`; it freezes the definitions' meta.
+    withMeta,
     withEffects,
     // L7a: a resolver's `batch:` option needs no import (A1); before the
     // resolvers, which take its window from the context.

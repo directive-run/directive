@@ -245,6 +245,11 @@ export interface SystemContext {
    * what they read on their `effect.run` record.
    */
   trace_?: unknown;
+  /**
+   * inspect()'s counters (S3): the derivations watched by name, and the keys
+   * written since the last pass began.
+   */
+  counts_(): [ReadonlySet<string>, ReadonlySet<string>];
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -1917,6 +1922,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     factsFor: (writer, allow) =>
       createFactsProxy(store, schema, tracker, writer, allow) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
+    counts_: () => [watched, changedKeys],
   };
   for (const part of parts) {
     part(context);

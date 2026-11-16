@@ -5,8 +5,10 @@
  * observation events.
  */
 
+import isDevelopment from "#is-development";
 import type { KernelEvent } from "../kernel.js";
 import type { SystemPart } from "./core.js";
+import { isRunawayError } from "./facts.js";
 import type { StreamPlugin } from "./plugins.js";
 import { localId } from "./sources.js";
 import type { FactChange, ObservationEvent } from "./types.js";
@@ -72,7 +74,15 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       return [{ type, id: event.id }];
     // L2 (reconcile.ts), shaped as 1.35's observer shapes them.
     case "constraint.evaluate":
-      return [{ type, id: event.id, active: event.active }];
+      // S6: `whenExplain` only when the record explains (a data-form when).
+      return [
+        {
+          type,
+          id: event.id,
+          active: event.active,
+          ...(event.explain ? { whenExplain: event.explain } : {}),
+        },
+      ];
     case "constraint.error":
       return [{ type, id: event.id, error: event.error }];
     case "constraint.binding.disabled":
@@ -169,9 +179,22 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
 /** The observe part. Needs the plugins part. */
 export const withObserve: SystemPart = ({ kernel, system }) => {
   let observers = 0;
+  const live = new Set<string>();
   system.observe = (observer: (event: ObservationEvent) => void) => {
+    // S1: at most 100 at once; the next gets a no-op and hears nothing, and
+    // production says nothing ((bj) declined).
+    if (live.size >= 100) {
+      if (isDevelopment) {
+        console.warn(
+          "[Directive] Maximum observer limit (100) reached. Call the unsubscribe function returned by observe() to clean up.",
+        );
+      }
+
+      return () => {};
+    }
     const plugins = kernel.feature("plugins");
     const name = `__observer_${++observers}`;
+    live.add(name);
     const plugin: StreamPlugin = {
       name,
       onInit: () => observer({ type: "system.init" }),
@@ -186,6 +209,10 @@ export const withObserve: SystemPart = ({ kernel, system }) => {
           try {
             observer(observation);
           } catch (error) {
+            // S2: a guard the runtime raised is not the observer's throw.
+            if (isRunawayError(error)) {
+              throw error;
+            }
             console.error(
               `[Directive] Observer threw on fact "${(observation as { key?: string }).key}"; the remaining keys in this batch were still delivered.`,
               error,
@@ -196,6 +223,9 @@ export const withObserve: SystemPart = ({ kernel, system }) => {
     };
     plugins.register(plugin);
 
-    return () => plugins.unregister(name);
+    return () => {
+      live.delete(name);
+      plugins.unregister(name);
+    };
   };
 };

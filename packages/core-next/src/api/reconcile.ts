@@ -686,6 +686,8 @@ export const withReconcile: SystemPart = (context) => {
           hitCount: state.hitCount,
           lastActiveAt: state.lastActiveAt,
           meta: def.meta,
+          // S6: a data-form `when` is its own spec (filled by L11's compiler).
+          ...(typeof def.when === "object" ? { whenSpec: def.when } : {}),
           ...(abortOn ? { abortOn } : {}),
         };
       }),

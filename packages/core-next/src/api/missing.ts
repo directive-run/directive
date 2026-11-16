@@ -67,12 +67,6 @@ export const withMissing: SystemPart = ({ system }) => {
         10,
       );
     }
-    stub(
-      s.meta,
-      "meta.",
-      "byTag carriesTag constraint derivation effect event fact module resolver subscribe",
-      9,
-    );
     stub(s, "", "registerModule unregisterModule", 10);
     stub(s, "", "getDistributableSnapshot watchDistributableSnapshot", 12);
   }
