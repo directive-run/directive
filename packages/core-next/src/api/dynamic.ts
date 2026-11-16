@@ -200,7 +200,9 @@ const registry = (ctx: SystemContext): Kinds => {
    * a pass, an effect's never. A derivation's asks only when it left an
    * announcement owed: an assign, or an unregister that staled a reader,
    * while something is watched (pendingInvalidationCount); a register only
-   * for who asked about the name before it existed, row (bm). Owed nothing,
+   * for who asked about the name before it existed, row (bm): a constraint,
+   * or a derivation while something is watched, as 1.35's gate (a reader
+   * outside the graph sees the name at its next read). Owed nothing,
    * the keys the change wrote go (1.35 drops its roots), so no later pass
    * carries them; an effect that tested the name keeps its membership key,
    * quirk (c) and (w).
@@ -217,10 +219,9 @@ const registry = (ctx: SystemContext): Kinds => {
       const member = MEMBER_DEP_PREFIX + id;
       const fresh = [...written].slice(n);
       owed =
-        op === "register"
-          ? fresh.length
-          : system.inspect().observedDerivations &&
-            (op === "assign" || fresh.some((key) => key !== member));
+        (system.inspect().observedDerivations &&
+          (op === "assign" || fresh.some((key) => key !== member))) ||
+        (op === "register" && ctx.kinds_.constraint?.reads_?.(member));
       if (!owed) {
         for (const key of fresh) {
           key[0]! < " " && written.delete(key);

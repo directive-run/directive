@@ -550,7 +550,7 @@ const BETA_OMITTED = [
   "withObserve",
   "withMissing",
   "withMeta",
-  // L10a: register, assign, unregister and call (`dynamic()` at the beta).
+  // L10a: register, assign, unregister and call (at the beta, as an import).
   "withDynamic",
 ];
 // The parts wired as a call, with the file each is imported from.

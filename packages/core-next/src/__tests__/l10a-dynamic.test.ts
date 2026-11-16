@@ -562,3 +562,96 @@ describe("parity with 1.35, the second finisher (constraints.ts, core.ts, dynami
     system.destroy();
   });
 });
+
+describe("parity with 1.35, review round 1 (constraints.ts, dynamic.ts, reconcile.ts)", () => {
+  const evaluated = (extra: Record<string, unknown>) => {
+    const order: string[] = [];
+    const system = started(extra, {
+      plugins: [
+        {
+          name: "p",
+          onConstraintEvaluate: (id: string) => void order.push(id),
+        },
+      ],
+    });
+
+    return { system, order };
+  };
+
+  it("`after`: a dependency that resolved before and answers again first keeps its dependent in 1.35's place", async () => {
+    const { system, order } = evaluated({
+      constraints: {
+        c0: { when: (f: Any) => f.n > 0, require: { type: "WORK" } },
+        cb: {
+          when: (f: Any) => f.n > 0,
+          require: { type: "WORK", k: "b" },
+          after: ["c0"],
+        },
+      },
+      resolvers: { work: { requirement: "WORK", resolve() {} } },
+    });
+    await system.settle();
+    system.constraints.register("a1", {
+      when: (f: Any) => f.n > 0,
+      require: { type: "WORK", k: "a" },
+    });
+    await system.settle();
+    order.length = 0;
+    system.facts.n = 2;
+    await system.settle();
+    // 1.35 asks cb in its own place (c0 resolved before); 2.0 held it until
+    // c0 answered, after a1.
+    expect(order).toEqual(["c0", "cb", "a1"]);
+    system.destroy();
+  });
+
+  it("`after`: a dependent is still held while the dependency it follows has a requirement unmet (quirk e)", async () => {
+    let calls = 0;
+    const { system, order } = evaluated({
+      constraints: {
+        c0: {
+          when: (f: Any) => f.n > 0,
+          require: (f: Any) => ({ type: "WORK", n: f.n }),
+        },
+        cb: {
+          when: (f: Any) => f.n > 0,
+          require: { type: "WORK", k: "b" },
+          after: ["c0"],
+        },
+      },
+      resolvers: {
+        work: {
+          requirement: "WORK",
+          resolve: () =>
+            ++calls > 2 ? new Promise(() => {}) : Promise.resolve(),
+        },
+      },
+    });
+    await system.settle();
+    order.length = 0;
+    system.facts.n = 2;
+    await tick();
+    expect(order).toEqual(["c0"]);
+    system.destroy();
+  });
+
+  it("D7: registering a name that only a reader outside the graph asked about starts no pass; the reader sees it at its next read (bm)", async () => {
+    let passes = 0;
+    const system = started(
+      {},
+      { plugins: [{ name: "p", onReconcileStart: () => void passes++ }] },
+    );
+    system.derive.register("asks", (_f: Any, d: Any) =>
+      "later" in d ? 10 : 0,
+    );
+    await system.settle();
+    expect(system.derive.asks).toBe(0);
+    passes = 0;
+    system.derive.register("later", () => 1);
+    await system.settle();
+    expect(passes).toBe(0);
+    expect(system.inspect().observedDerivations).toBe(0);
+    expect(system.derive.asks).toBe(10);
+    system.destroy();
+  });
+});

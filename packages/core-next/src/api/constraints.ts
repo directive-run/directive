@@ -178,6 +178,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   const unanswered = new Set(ids);
   /** Held back by an `after` dependency when last asked. */
   const held = new Set<string>();
+  /** 1.35's resolvedConstraints: a requirement of theirs once resolved. */
+  const resolved = new Set<string>();
   const asyncIds = new Set(ids.filter((id) => defs[id]!.async));
   let evaluated = false;
   if (isDevelopment) {
@@ -494,21 +496,28 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       answer(id, active, into);
     }
   }
+  /**
+   * 1.35 sorts a pass into blocked and ready before it asks any, and a
+   * dependency that ever resolved blocks nothing (isAfterDepSatisfied). Quirk
+   * e still holds a dependent while its dependency may act, checked at the
+   * dependent's turn: one asked earlier in the pass has answered by then, so
+   * with nothing unmet the dependent is asked in 1.35's place.
+   */
   async function batch(
     todo: string[],
     into: Map<string, RequirementWithId>,
   ): Promise<string[]> {
     const blocked: string[] = [];
     const ready: string[] = [];
+    const hold = (id: string) => {
+      held.add(id);
+      blocked.push(id);
+      add(into, last.get(id) ?? EMPTY);
+    };
     for (const id of todo) {
-      if (afterReady(id)) {
-        held.delete(id);
-        ready.push(id);
-      } else {
-        held.add(id);
-        blocked.push(id);
-        add(into, last.get(id) ?? EMPTY);
-      }
+      (defs[id]!.after ?? []).some((dep) => !resolved.has(dep) && blocks(dep))
+        ? hold(id)
+        : ready.push(id);
     }
     if (!ready.length) {
       return blocked;
@@ -516,6 +525,11 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     const late: [string, Promise<boolean>][] = [];
     const asyncReady: string[] = [];
     for (const id of ready) {
+      if (!afterReady(id)) {
+        hold(id);
+        continue;
+      }
+      held.delete(id);
       if (asyncIds.has(id)) {
         asyncReady.push(id);
         continue;
@@ -626,6 +640,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     isAsync: (id) => asyncIds.has(id),
     markResolved(req) {
       met.add(req.id);
+      resolved.add(req.fromConstraint);
       // As 1.35, the asking constraint's dependents are asked again; so are
       // those of any other constraint that emits the same requirement.
       const emitters = ids.filter(
@@ -718,6 +733,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         held,
         unanswered,
         asyncIds,
+        resolved,
       ]) {
         set.delete(id);
       }

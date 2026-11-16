@@ -284,6 +284,8 @@ export interface DefHooks {
   replace_(id: string, def?: unknown): void;
   remove_(id: string, def?: unknown): void;
   call_(id: string, props?: any): unknown;
+  /** L10 (D7): whether one of the kind's definitions depends on `key`. */
+  reads_?(key: string): boolean;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */

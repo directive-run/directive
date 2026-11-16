@@ -829,6 +829,10 @@ const build = (context: SystemContext) => {
       disabledBinding.delete(`${id}::async-promoted`);
     },
     call_: constraints.call_,
+    reads_: (key) =>
+      Object.keys(constraintDefs).some((id) =>
+        constraints.depsOf(id)?.has(key),
+      ),
   };
   context.kinds_.resolver = {
     add_: resolver,
