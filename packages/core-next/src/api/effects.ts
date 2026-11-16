@@ -706,13 +706,14 @@ export const withEffects: SystemPart = (ctx) => {
     store: ctx.store,
     derived: ctx.derived,
     tracker: ctx.tracker,
-    onRun(id) {
+    onRun(id, deps) {
       if (wants("effect.run")) {
-        emit("effect.run", { id });
+        emit("effect.run", { id, deps });
       }
     },
-    // The hook reports the id only: no dependency list is built per run.
-    wantsRunDeps: () => false,
+    // What the effect read is built only for the trace (its `triggeredBy`,
+    // L9): otherwise every run passes the shared empty list.
+    wantsRunDeps: () => !!ctx.trace_,
     onError(id, error) {
       // As in 1.35: the error boundary hears it before the effect hook, and
       // the strategy acts after it.

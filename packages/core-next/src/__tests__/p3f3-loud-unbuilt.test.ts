@@ -118,8 +118,6 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
       [() => system.resolvers.assign("r", {}), "resolvers.assign", 10],
       [() => system.effects.call("e"), "effects.call", 10],
       [() => system.effects.listDynamic(), "effects.listDynamic", 10],
-      [() => system.meta.fact("n"), "meta.fact", 9],
-      [() => system.meta.byTag("pii"), "meta.byTag", 9],
       [() => system.getDistributableSnapshot(), "getDistributableSnapshot", 12],
       [
         () => system.watchDistributableSnapshot({}, () => {}),

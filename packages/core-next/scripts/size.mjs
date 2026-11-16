@@ -533,7 +533,7 @@ for (const [name, engine] of Object.entries(engines)) {
 }
 // The beta wiring of the minimal fixture: reported, not budgeted (no entry in
 // size-budgets.next.json, and nothing here sets an exit code). `createSystem`
-// wires every part into every app; the beta turns the six below, and history
+// wires every part into every app; the beta turns the seven below, and history
 // (wired as a call, `withHistory(option)`), into imports,
 // so an app that does not use one does not pay for it. This builds the same
 // fixture against api/system.ts with those parts' imports and `parts` entries
@@ -548,6 +548,7 @@ const BETA_OMITTED = [
   "withInspect",
   "withObserve",
   "withMissing",
+  "withMeta",
 ];
 const betaWiringSource = (source) => {
   const names = BETA_OMITTED.join("|");
@@ -563,7 +564,7 @@ const betaWiringSource = (source) => {
   }
 
   // History is wired as a call (`withHistory(option)`, L8), so it is dropped
-  // apart from the six: its import and its whole call entry.
+  // apart from the seven: its import and its whole call entry.
   const historyImport = /^import \{ withHistory \} from "\.\/history\.js";\n/m;
   // One line (`withHistory(history as never),`) or wrapped over several.
   const historyEntry = /^ {4}withHistory\((?:[^\n]*|[\s\S]*?\n {4})\),\n/m;
@@ -605,7 +606,7 @@ if (betaApplied) {
   );
 } else {
   const message =
-    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve and withMissing as one import and one `parts` entry each, and withHistory as one import and one `withHistory(...)` entry; update BETA_OMITTED / betaWiringSource in scripts/size.mjs";
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing and withMeta as one import and one `parts` entry each, and withHistory as one import and one `withHistory(...)` entry; update BETA_OMITTED / betaWiringSource in scripts/size.mjs";
   // Not a budget, but under --check (CI) a skipped line fails, so it cannot
   // vanish from the report unnoticed.
   if (process.argv.includes("--check")) {
