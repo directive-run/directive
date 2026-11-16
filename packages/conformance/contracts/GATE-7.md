@@ -109,10 +109,15 @@ originals and re-ported. Titles say what is still pinned.
 | Pin | Row | What still runs on both | 2.0's side pinned by |
 | --- | --- | --- | --- |
 | U3, two cases (development and production) | (bd) | the stored snapshot holds its pass's value and `goTo` restores it; an in-place edit of a restored fact changes the live fact | core-next `l8b-history-rows`: "(bd) a stored snapshot is not shared" > "each stored snapshot and its facts are frozen, taken or imported; the list hands them out", and "a restore writes copies: a restored value changed in place leaves the snapshot alone" |
-| U6 (a) | (ba) | the imported ids stay, a write adds a fifth, and `goTo(2)` finds the imported snapshot | none in core-next (follow-up) |
+| U6 (a) | (ba) | the imported ids stay, a write adds a fifth, and `goTo(2)` finds the imported snapshot | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
 | U7 | (bb) | a diff scenario, unchanged: the 29 (bb) entries record 2.0's side | core-next `l8b-history-rows`: "(bb) the changesets follow the snapshots" (10 cases) |
-| U8 (a) and (b) | (be) | one `goBack` from inside lands on the start; one from outside moves onto the end | none in core-next (follow-up) |
-| U9 | (bc) | the import changes no fact and leaves three snapshots | none in core-next (follow-up) |
+| U8 (a) and (b) | (be) | one `goBack` from inside lands on the start; one from outside moves onto the end | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
+| U9 | (bc) | the import changes no fact and leaves three snapshots | core-next tests in the separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow) |
+
+Those three rows ((ba), (bc), (be)) have no core-next test on main: L8a
+added none. 2.0's side of each is pinned by core-next tests in a separate
+engine PR, branch p8/pin-ba-bc-be (a PR number will follow); this PR adds no
+test there (it may not touch `packages/core-next/src`).
 
 U8 (c), the start rule, passes unchanged on both, as (be) requires. (ay) and
 (az) have no conformance pin to trim: their pins are the diff scenarios U4
@@ -125,8 +130,17 @@ golden round-trips with 1.35.0" and its `v2:dist` twin pass. 2.0 reads
 1.35's `history-export.golden` as 1.35 does (`read-1.35`), and 1.35 reads
 what 2.0 exports, alone and over 1.35's history (`1.35-reads`), as the
 persistence golden does. No `goldenChanges` entry was added. The export is
-unchanged byte for byte: 1.35.0, core-next's source and core-next's build
-each write the golden's 441 bytes exactly.
+unchanged byte for byte, and a committed check holds it:
+`history-export.golden` is in `BYTE_IDENTICAL` (`contracts/lib/golden.ts`),
+so `checkGoldens` fails with "the workspace writes a different
+history-export.golden than 1.35.0" for any change to what 2.0 exports, key
+order and whitespace included. 1.35.0, core-next's source and core-next's
+build each write the golden's 441 bytes exactly, in the `v2` and `v2:dist`
+cases. The golden's own test "an engine whose history export differs only in
+key order or whitespace fails the check (E1: byte for byte)" exports the same
+data with its keys reordered, and with a trailing newline: both pass every
+read, so only the byte check fails them, and it fails with that one message.
+Without `history-export.golden` in the list the test fails.
 
 ## The mutation conversion
 
@@ -270,7 +284,9 @@ census finds no stale entry. No entry was widened or removed.
     the property, and fast-check would shrink the case for hours.
   - Self-tests in `diff/self/stall-after-budget.test.ts`: the case at a
     budget of 100 is judged a runaway with no stall (and fails without the
-    fix), and the cap.
+    fix), the cap, and the converse (run 3): a run that stalls below the
+    budget, with no `ends` stop, is reported as a stall, on 2.0 alone and on
+    every engine. With stall reporting switched off the test fails.
 
 **The nightly's limit.** Under load, seed 24301 took 24 minutes here, in
 parallel for its first 18. The nightly runs one seed alone with
@@ -294,8 +310,9 @@ follow-ups.
 ## Follow-ups
 
 - core-next pins for (ba), (bc) and (be): L8a added no test file, so no test
-  states 2.0's side of U6, U9 and U8 (a) and (b). A core-next test PR (this
-  gate may not touch `packages/core-next/src`).
+  on main states 2.0's side of U6, U9 and U8 (a) and (b). They are in a
+  separate engine PR, branch p8/pin-ba-bc-be (a PR number will follow); this
+  gate may not touch `packages/core-next/src`.
 - `during` and `afterOp` cannot name a history op: the fuzz trace records it
   as a `run` step with the op in its label. Reading the label's op would let
   the new (ay) entry take `afterOp` "pause" and the (az) entries `during`
