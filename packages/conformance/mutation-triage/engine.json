@@ -3685,7 +3685,7 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed by hand (L9-pre-b): an async constraint with no deps whose require reads no fact keeps no constraintDeps entry (mergeDependencies returns early on an empty set, and updateConstraintDeps has no when deps to combine), so the else branch runs. With the mutant applied the test fails at ceiling L9; unmutated it passes on 1.35. Test: l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps'.",
     "endLine": 2024,
     "endCol": 64
   },
@@ -5696,7 +5696,7 @@
     "replacement": ";",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L9-pre-b): after stop(), a subscribe listener that writes during a goBack() made while stopped leaves navigationWrites > 0, ordinaryWrites 0 and a non-empty changed set at start(). Without the reset, the first pass after start() treats that write as a navigation and takes no snapshot. With the mutant applied the test fails at ceiling L8; unmutated it passes on 1.35. Test: l8-history-gate-debt-oracle 'start() forgets a navigation made while stopped > a listener's write during a stopped goBack() is snapshotted by the first pass after start()'.",
     "endLine": 3338,
     "endCol": 31
   },

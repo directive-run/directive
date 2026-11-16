@@ -9729,6 +9729,10 @@
           "layer": "L8",
           "by": ["member .goBack", "member .history", "option history"]
         },
+        "start() forgets a navigation made while stopped > a listener's write during a stopped goBack() is snapshotted by the first pass after start()": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
         "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches synchronously refreshes the snapshot": {
           "layer": "L8",
           "by": ["member .history", "option history"]
@@ -10009,6 +10013,10 @@
           "by": ["member .meta", "member .trace", "option meta", "option trace"]
         },
         "trace entries (L9 gate debt) > a constraint that reads no fact is hit with no deps, before and after disable()": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps": {
           "layer": "L9",
           "by": ["member .meta", "member .trace", "option meta", "option trace"]
         },

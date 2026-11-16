@@ -462,6 +462,29 @@ describe("trace entries (L9 gate debt)", () => {
     system.destroy();
   });
 
+  it("an async constraint with no deps whose require reads no fact is hit with no deps", async () => {
+    // Its async `when` is not tracked and its static `require` reads
+    // nothing, so it keeps no dependency record at all.
+    const system = traced({
+      constraints: {
+        later: {
+          async: true,
+          when: async () => true,
+          require: { type: "ORPHAN" },
+        },
+      },
+    });
+    system.start();
+    await wait(20);
+    const hits = system.trace
+      .flatMap((e: any) => e.constraintsHit)
+      .filter((h: any) => h.id === "later");
+
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.map((h: any) => h.deps)).toEqual(hits.map(() => []));
+    system.destroy();
+  });
+
   it("a canceled resolver settles the entry that started it, and observe hears the cancel", async () => {
     const g = gate();
     const system = traced({
