@@ -4338,7 +4338,7 @@
     "col": 20,
     "mutator": "OptionalChaining",
     "replacement": "(schema[key] as {\n  _meta?: DefinitionMeta;\n})._meta",
-    "reason": "later-layer",
+    "reason": "feature-layer",
     "layer": "L10",
     "note": "feature-layer L10 (was L9): recordFactTags' `?.` guards a nullish schema type. At build, the freeze loop's WeakSet.add (411) throws on one first; the only other caller is onKeysRegistered (1069), from registerKeys (L10, B3 of the L9 RFC). Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 2479,
