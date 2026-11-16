@@ -1,7 +1,6 @@
 /**
- * P3-F3 in development: what 2.0 has not built says so. An option for an
- * unbuilt feature warns once per system, naming the feature and its layer,
- * and the system runs as 1.35 does with the option off; a member 1.35 always
+ * P3-F3 in development: what 2.0 has not built says so. No option is
+ * unbuilt since L9b built the trace; a member 1.35 always
  * provides throws `featureMissing` (code E_FEATURE_MISSING); a `/plugins` or
  * `/testing` export not built yet is a stub that throws when called; a plugin
  * entry that is not a plugin object is a clear error. Codes are asserted,
@@ -50,17 +49,12 @@ const thrown = (fn: () => unknown): any => {
 };
 
 describe.each(["single", "namespaced"])("%s system", (form) => {
-  it("the trace option warns once, naming the feature and its layer; history, built in L8, warns nothing", () => {
+  it("the trace and history options, built in L9b and L8, warn nothing", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = build({ history: { maxSnapshots: 10 }, trace: true }, form);
-    const warnings = optionWarnings(warn);
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/`trace`.*layer 9/);
-    expect(warnings.some((text) => text.includes("`history`"))).toBe(false);
-    // Once per system: running it warns no more.
     system.start();
     system.stop();
-    expect(optionWarnings(warn)).toHaveLength(1);
+    expect(optionWarnings(warn)).toHaveLength(0);
     system.destroy();
   });
 
@@ -71,9 +65,9 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
     expect(optionWarnings(warn)).toHaveLength(0);
   });
 
-  it("with history set, system.history is the manager; with it off, null; trace stays null", () => {
+  it("with history set, system.history is the manager; with it off, null; trace is null without its option", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    for (const options of [{}, { history: false, trace: true }]) {
+    for (const options of [{}, { history: false, trace: false }]) {
       const system = build(options, form);
       // 1.35: history is null and trace is null without the option
       // (engine.ts:2605); onHistoryChange subscribes and never fires.
@@ -104,7 +98,7 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
       ]) {
         expect(typeof system.history[member], member).toBe("function");
       }
-      expect(system.trace).toBeNull();
+      expect(system.trace).toEqual("trace" in options ? [] : null);
       system.destroy();
     }
   });
@@ -118,8 +112,6 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
       [() => system.resolvers.assign("r", {}), "resolvers.assign", 10],
       [() => system.effects.call("e"), "effects.call", 10],
       [() => system.effects.listDynamic(), "effects.listDynamic", 10],
-      [() => system.meta.fact("n"), "meta.fact", 9],
-      [() => system.meta.byTag("pii"), "meta.byTag", 9],
       [() => system.getDistributableSnapshot(), "getDistributableSnapshot", 12],
       [
         () => system.watchDistributableSnapshot({}, () => {}),

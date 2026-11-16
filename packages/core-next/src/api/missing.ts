@@ -1,8 +1,5 @@
 /**
- * What 2.0 has not built yet says so (slice P3-F3). Three cases:
- * - An option for an unbuilt feature (`trace`) warns once per system in
- *   development, and the system runs as 1.35 does with that option off
- *   (system.ts). Production is silent.
+ * What 2.0 has not built yet says so (slice P3-F3). Two cases:
  * - A member 1.35 always provides that 2.0 has not built throws
  *   `featureMissing` when called, in development (`withMissing`). Production
  *   leaves it out: the member names alone cost about 150 B gzip in the
@@ -67,12 +64,6 @@ export const withMissing: SystemPart = ({ system }) => {
         10,
       );
     }
-    stub(
-      s.meta,
-      "meta.",
-      "byTag carriesTag constraint derivation effect event fact module resolver subscribe",
-      9,
-    );
     stub(s, "", "registerModule unregisterModule", 10);
     stub(s, "", "getDistributableSnapshot watchDistributableSnapshot", 12);
   }

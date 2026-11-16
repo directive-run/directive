@@ -254,7 +254,9 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     flush(l) {
       const guard = catcher();
       settling = true;
-      guard(() => hooks.emit("flush", { lane: l }));
+      if (hooks.wants("flush")) {
+        guard(() => hooks.emit("flush", { lane: l }));
+      }
       for (const fn of settlers.slice()) {
         guard(() => fn(l));
       }
@@ -303,7 +305,8 @@ export function createKernel(options: KernelOptions = {}): Kernel {
     },
     emit(at, data) {
       const seq = ++sink.seq;
-      if (sink.listeners.length) {
+      const list = sink.listeners;
+      if (list.length) {
         const event: KernelEvent = {
           ...data,
           t: clock.now(),
@@ -311,11 +314,17 @@ export function createKernel(options: KernelOptions = {}): Kernel {
           sys: id,
           at,
         };
-        const guard = catcher();
-        for (const fn of sink.listeners.slice()) {
-          guard(() => fn(event));
+        // One listener (the usual case) is called as is: what it throws is
+        // what the guard would rethrow.
+        if (!list[1]) {
+          list[0]!(event);
+        } else {
+          const guard = catcher();
+          for (const fn of list.slice()) {
+            guard(() => fn(event));
+          }
+          guard();
         }
-        guard();
       }
     },
     on(fn) {

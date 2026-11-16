@@ -240,6 +240,22 @@ export interface SystemContext {
    * derivation ids (own-write satisfaction follows them to the facts).
    */
   derivationDeps(id: string): ReadonlySet<string> | undefined;
+  /**
+   * Set by the trace part while the trace is on (L9b): effect runs then list
+   * what they read on their `effect.run` record.
+   */
+  trace_?: unknown;
+  /**
+   * The trace's pass hook (L9b), set while the trace is on: called with no
+   * argument where a pass starts and with 1 where it ends, each after its
+   * record, so the trace needs neither record's payload.
+   */
+  pass_?: (end?: 1) => void;
+  /**
+   * inspect()'s counters (S3): the derivations watched by name, and the keys
+   * written since the last pass began.
+   */
+  counts_(): [ReadonlySet<string>, ReadonlySet<string>];
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -820,6 +836,9 @@ export function createSystemCore<const M extends ModuleSchema>(
         emit("derivation.compute", {
           id: d.id_,
           value,
+          // The value before this compute: the graph stores the new one once
+          // this returns, and an error in its place after a throw (L9 seam).
+          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
           deps: Array.from(deps, describeDep),
         });
       }
@@ -1370,6 +1389,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (wants("reconcile.start")) {
         emit("reconcile.start", { snapshot: facts.$snapshot() });
       }
+      context.pass_?.();
       effectsOpen = true;
       navEffects = nav !== null;
       try {
@@ -1412,6 +1432,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           },
         });
       }
+      context.pass_?.(1);
       if (!ready) {
         ready = true;
         readyResolve?.();
@@ -1909,6 +1930,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     factsFor: (writer, allow) =>
       createFactsProxy(store, schema, tracker, writer, allow) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
+    counts_: () => [watched, changedKeys],
   };
   for (const part of parts) {
     part(context);

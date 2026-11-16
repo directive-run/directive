@@ -558,6 +558,23 @@ export const withReconcile: SystemPart = (context) => {
             removed.push(req);
           }
         }
+        // The trace's record of the pass (L9 seam): what it added and
+        // removed, and each constraint with a current requirement, with its
+        // priority and what it read, all read here after the evaluation, as
+        // 1.35 reads them. `flight` is the live in-flight map: the trace reads
+        // each added requirement's resolver from it after the dispatch (L9b).
+        emit("requirement.diff", () => ({
+          added,
+          removed,
+          flight: resolvers.inflight,
+          hit: [...new Set(current.map((req) => req.fromConstraint))].map(
+            (id) => ({
+              id,
+              priority: constraints.state_(id)!.priority,
+              deps: Array.from(constraints.depsOf(id) ?? [], describeDep),
+            }),
+          ),
+        }));
       }
       if (removed.length > 0) {
         retract(removed, passKeys);
@@ -671,6 +688,8 @@ export const withReconcile: SystemPart = (context) => {
           hitCount: state.hitCount,
           lastActiveAt: state.lastActiveAt,
           meta: def.meta,
+          // S6: a data-form `when` is its own spec (filled by L11's compiler).
+          ...(typeof def.when === "object" ? { whenSpec: def.when } : {}),
           ...(abortOn ? { abortOn } : {}),
         };
       }),

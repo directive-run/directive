@@ -92,6 +92,10 @@ const HOOKS: Record<string, string[]> = {
     "count",
     "category",
   ],
+  "clobber.loop.detected": ["onClobberLoopDetected", "event"],
+  "clobber.loop.resolved": ["onClobberLoopResolved", "event"],
+  // L9b: trace.ts.
+  "trace.complete": ["onTraceComplete", "entry"],
   "guardrail.coverage": [
     "onGuardrailCoverage",
     "plugin",
@@ -231,6 +235,17 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
     // with no plugin; a blocked report must name a registered plugin, and its
     // re-entry through the hooks stops at depth 4.
     let depth = 0;
+    /** Re-entry through the hooks stops at depth 4, shared by three members. */
+    const capped = (at: string, data: Record<string, unknown>) => {
+      if (!kernel.disposed && plugins.length > 0 && depth < 4) {
+        depth++;
+        try {
+          kernel.hooks.emit(at, data);
+        } finally {
+          depth--;
+        }
+      }
+    };
     system.notify = {
       guardrailBlocked(
         plugin: string,
@@ -251,19 +266,12 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
 
           return;
         }
-        depth++;
-        try {
-          kernel.hooks.emit("guardrail.blocked", {
-            plugin,
-            key,
-            kind,
-            count,
-            category,
-          });
-        } finally {
-          depth--;
-        }
+        capped("guardrail.blocked", { plugin, key, kind, count, category });
       },
+      clobberLoopDetected: (event: unknown) =>
+        capped("clobber.loop.detected", { event }),
+      clobberLoopResolved: (event: unknown) =>
+        capped("clobber.loop.resolved", { event }),
       guardrailCoverage(
         plugin: string,
         screenedCount: number,

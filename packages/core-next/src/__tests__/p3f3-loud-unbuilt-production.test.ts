@@ -1,7 +1,7 @@
 /**
  * P3-F3 in production: silent for options, codes not text for stubs.
- * - The trace option warns nothing; the system runs as 1.35 does with it off
- *   (trace null). The history option, built in L8, makes `system.history` the
+ * - The trace option, built in L9b, warns nothing and makes `system.trace`
+ *   the trace (null without it). The history option, built in L8, makes `system.history` the
  *   manager; with it off, history is null and onHistoryChange never fires.
  * - The unbuilt system members are left out (their names alone would put the
  *   minimal app past its 28,800 B ceiling): a call is the platform's
@@ -49,13 +49,13 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
       ? createSystem({ module: mod(), ...options } as any)
       : createSystem({ modules: { m: mod() }, ...options } as any);
 
-  it("the trace option warns nothing and changes nothing; history off is null", () => {
+  it("the trace option warns nothing and turns the trace on; history off is null", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const system = build({ history: false, trace: true });
     system.start();
     expect(warn).not.toHaveBeenCalled();
     expect(system.history).toBeNull();
-    expect(system.trace).toBeNull();
+    expect(system.trace).toEqual([]);
     const listener = vi.fn();
     const off = system.onHistoryChange(listener);
     (form === "single" ? system.facts : system.facts.m).n = 1;
@@ -71,7 +71,7 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
     expect(warn).not.toHaveBeenCalled();
     expect(system.history).not.toBeNull();
     expect(typeof system.history.goBack).toBe("function");
-    expect(system.trace).toBeNull();
+    expect(system.trace).toEqual([]);
     system.destroy();
   });
 
@@ -80,7 +80,6 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
     for (const call of [
       () => system.registerModule(mod()),
       () => system.getDistributableSnapshot(),
-      () => system.meta.fact("n"),
       () => system.effects.register("e", {}),
     ]) {
       expect(call).toThrow(TypeError);
