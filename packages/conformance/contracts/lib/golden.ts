@@ -730,10 +730,17 @@ export function same(a: unknown, b: unknown): boolean {
   );
 }
 
-/** Goldens whose exact bytes are signed or hashed: any byte change breaks verification. */
+/**
+ * Goldens whose exact bytes must not change: the signed snapshot and the
+ * audit chain are signed or hashed (any byte change breaks verification), and
+ * the history export is copied byte for byte (L8 RFC E1: (aw) and (ax), the
+ * export's format changes, are deferred, so 1.35.0's JSON stands). A cosmetic
+ * change to the export, such as its whitespace or its key order, fails.
+ */
 export const BYTE_IDENTICAL: readonly GoldenName[] = [
   "signed-snapshot.golden",
   "audit-ledger.golden",
+  "history-export.golden",
 ];
 
 /**
@@ -750,7 +757,9 @@ export type GoldenDirection = "read-1.35" | "1.35-reads";
  * The named golden cases a `goldenChanges` entry may cover: each case's part,
  * the directions it compares, and the engines that run it. Only the history
  * and persistence parts have cases; the signed snapshot and the audit chain
- * must stay byte-identical and readable both ways, with no entry.
+ * must stay byte-identical and readable both ways, with no entry. The history
+ * export's bytes stay identical too (`BYTE_IDENTICAL`), which no entry
+ * changes; an entry covers only how the workspace reads or re-exports.
  */
 export const GOLDEN_CASES = {
   /** checkGoldens: the history export (both directions). */
@@ -1023,9 +1032,9 @@ function readCase(part: GoldenPart): GoldenCase | undefined {
  * Problems with the goldens in `dir`:
  * - each file is still exactly what 1.35.0 writes for the script;
  * - the workspace writes the same bytes for the signed snapshot and the audit
- *   chain (no entry changes this); history and persistence bytes may differ,
- *   but 1.35.0 must read them as it reads its own (case "<part> read",
- *   direction `1.35-reads`);
+ *   chain (no entry changes this), and so does the history export
+ *   (`BYTE_IDENTICAL`); persistence bytes may differ, but 1.35.0 must read
+ *   them as it reads its own (case "<part> read", direction `1.35-reads`);
  * - the workspace reads what 1.35.0 wrote exactly as 1.35.0 does, including
  *   the reads that must fail (tampered, expired) (case "<part> read",
  *   direction `read-1.35`);

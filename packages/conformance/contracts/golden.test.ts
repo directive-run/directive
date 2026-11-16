@@ -126,6 +126,73 @@ describe("golden files", () => {
     );
   });
 
+  it("an engine whose history export differs only in key order or whitespace fails the check (E1: byte for byte)", async () => {
+    // Same data, same reads: only `same()` would call these equal, so the
+    // byte check (`BYTE_IDENTICAL`) is the one that has to catch them.
+    const exportingAs = (
+      reshape: (exported: {
+        version: unknown;
+        snapshots: unknown;
+        currentIndex: unknown;
+      }) => string,
+    ): Engine => ({
+      ...local,
+      core: {
+        ...local.core,
+        createSystem: (options: unknown) => {
+          const system = local.core.createSystem(options);
+          const bind = (o: object, v: unknown) =>
+            typeof v === "function" ? v.bind(o) : v;
+
+          return new Proxy(system, {
+            get(target, prop) {
+              const value = Reflect.get(target, prop, target);
+              if (prop !== "history" || !value) {
+                return bind(target, value);
+              }
+
+              return new Proxy(value, {
+                get(h, p) {
+                  const v = Reflect.get(h, p, h);
+                  if (p === "export") {
+                    return () => reshape(JSON.parse(v.call(h)));
+                  }
+
+                  return bind(h, v);
+                },
+              });
+            },
+            set: (target, prop, value) =>
+              Reflect.set(target, prop, value, target),
+          });
+        },
+      },
+    });
+    const keyOrder = exportingAs((e) =>
+      JSON.stringify({
+        currentIndex: e.currentIndex,
+        snapshots: e.snapshots,
+        version: e.version,
+      }),
+    );
+    const whitespace = exportingAs((e) => `${JSON.stringify(e)}\n`);
+    const BYTES =
+      "the workspace writes a different history-export.golden than 1.35.0";
+    for (const drifted of [keyOrder, whitespace]) {
+      const failures = await checkGoldens(
+        goldenDir,
+        v1,
+        drifted,
+        goldenChanges,
+        ["history"],
+      );
+      expect(failures).toEqual([BYTES]);
+    }
+    expect(
+      await checkGoldens(goldenDir, v1, local, goldenChanges, ["history"]),
+    ).toEqual([]);
+  });
+
   it("an engine that accepts tampered or expired signatures fails the check", async () => {
     const drifted: Engine = {
       ...local,
