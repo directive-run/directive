@@ -1,0 +1,356 @@
+/**
+ * L10a: dynamic definitions, per definition (the L10 RFC's D1 to D10, K1
+ * to K6, I3, and rows (bl) and (bm)). Each test names the code it pins: it
+ * fails when that code is removed.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createModule } from "../api/core.js";
+import { t } from "../api/schema-builders.js";
+import { createSystem } from "../api/system.js";
+
+type Any = any;
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const mod = (extra: Record<string, unknown> = {}) =>
+  createModule("m", {
+    schema: {
+      facts: { n: t.number(), log: t.array<string>() },
+      derivations: { double: t.number() },
+      requirements: { WORK: {} },
+    },
+    init: (facts: Any) => {
+      facts.n = 1;
+      facts.log = [];
+    },
+    derive: { double: (facts: Any) => facts.n * 2 },
+    ...extra,
+  } as never);
+const started = (extra?: Record<string, unknown>, options = {}) => {
+  const system = createSystem({
+    module: mod(extra),
+    ...options,
+  } as never) as Any;
+  system.start();
+
+  return system;
+};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("the registry (dynamic.ts)", () => {
+  it("D1: refuses a blocked id, a namespaced id, an empty id and a reserved derive name", () => {
+    const system = started();
+    expect(() => system.effects.register("__proto__", { run() {} })).toThrow(
+      '[Directive] Security: Definition ID "__proto__" is a blocked property.',
+    );
+    expect(() => system.effects.register("a::b", { run() {} })).toThrow(
+      'cannot contain "::"',
+    );
+    expect(() => system.effects.register("", { run() {} })).toThrow(
+      "non-empty string",
+    );
+    expect(() => system.derive.register("call", () => 0)).toThrow(
+      'Derivation ID "call" conflicts with a reserved derive method name.',
+    );
+    system.destroy();
+  });
+
+  it("D2: a duplicate register and a missing assign are refused with 1.35's texts", () => {
+    const system = started();
+    expect(() => system.derive.register("double", () => 0)).toThrow(
+      '[Directive] Derivation "double" already exists. Use assign() to override.',
+    );
+    expect(() =>
+      system.constraints.assign("ghost", { when: () => false }),
+    ).toThrow(
+      '[Directive] Constraint "ghost" does not exist. Use register() to create it.',
+    );
+    system.destroy();
+  });
+
+  it("D3: unregistering a static id warns and keeps it", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const system = started();
+    system.derive.unregister("double");
+    expect(warn.mock.calls.flat().join(" ")).toContain(
+      'Cannot unregister static derivation "double"',
+    );
+    expect(system.derive.double).toBe(2);
+    system.destroy();
+  });
+
+  it("D4: every call throws on a destroyed system", () => {
+    const system = started();
+    system.destroy();
+    expect(() => system.derive.register("x", () => 0)).toThrow(
+      '[Directive] Cannot register derivation "x" on a destroyed system.',
+    );
+    expect(() => system.effects.call("x")).toThrow(
+      '[Directive] Cannot call effect "x" on a destroyed system.',
+    );
+  });
+
+  it("D5: a registration inside an effect is applied where the pass ends", async () => {
+    let inside: boolean | undefined;
+    const system = started({
+      effects: {
+        late: {
+          deps: ["n"],
+          run: (facts: Any) => {
+            if (facts.n === 2) {
+              system.constraints.register("c", { when: () => false });
+              inside = system.constraints.isDynamic("c");
+            }
+          },
+        },
+      },
+    });
+    await tick();
+    system.facts.n = 2;
+    await tick();
+    await tick();
+    expect(inside).toBe(false);
+    expect(system.constraints.isDynamic("c")).toBe(true);
+    system.destroy();
+  });
+
+  it("D6: plugins and meta.subscribe hear register, assign, unregister and call", async () => {
+    const seen: string[] = [];
+    const plugin = {
+      name: "rec",
+      onDefinitionRegister: (type: string, id: string) =>
+        seen.push(`r:${type}:${id}`),
+      onDefinitionAssign: (type: string, id: string) =>
+        seen.push(`a:${type}:${id}`),
+      onDefinitionUnregister: (type: string, id: string) =>
+        seen.push(`u:${type}:${id}`),
+      onDefinitionCall: (type: string, id: string) =>
+        seen.push(`c:${type}:${id}`),
+    };
+    const system = started({}, { plugins: [plugin] });
+    let told = 0;
+    system.meta.subscribe(() => told++);
+    system.derive.register("z", () => 1);
+    system.derive.assign("z", () => 2);
+    system.derive.call("z");
+    system.derive.unregister("z");
+    expect(seen).toEqual([
+      "r:derivation:z",
+      "a:derivation:z",
+      "c:derivation:z",
+      "u:derivation:z",
+    ]);
+    expect(told).toBe(3);
+    system.destroy();
+  });
+
+  it("D8 and D9: call answers now or says it does not exist; isDynamic only for register", async () => {
+    const system = started();
+    expect(system.derive.call("double")).toBe(2);
+    expect(() => system.derive.call("nope")).toThrow(
+      '[Directive] Cannot call derivation "nope" — it does not exist.',
+    );
+    await expect(system.effects.call("nope")).rejects.toThrow(
+      '[Directive] Cannot call effect "nope" — it does not exist.',
+    );
+    system.derive.register("z", () => 1);
+    expect(system.derive.isDynamic("z")).toBe(true);
+    expect(system.derive.isDynamic("double")).toBe(false);
+    expect(system.derive.listDynamic()).toEqual(["z"]);
+    system.destroy();
+  });
+
+  it("(bl): assign with { compute, meta } keeps the derivation readable, with the new meta", () => {
+    const system = started();
+    system.derive.assign("double", {
+      compute: (f: Any) => f.n * 3,
+      meta: { label: "T" },
+    });
+    expect(system.derive.double).toBe(3);
+    expect(system.meta.derivation("double")?.label).toBe("T");
+    system.destroy();
+  });
+
+  it("a definition another system registers stays out of a system sharing the module", () => {
+    const shared = mod();
+    const a = createSystem({ module: shared } as never) as Any;
+    const b = createSystem({ module: shared } as never) as Any;
+    a.derive.register("z", () => 1);
+    expect(a.derive.z).toBe(1);
+    expect("z" in b.derive).toBe(false);
+    a.destroy();
+    b.destroy();
+  });
+});
+
+describe("the derivation seam (core.ts)", () => {
+  it("replace keeps dependants and subscribers told, remove wakes what read it", () => {
+    const system = started();
+    system.derive.register("plus", (_f: Any, d: Any) => (d.double ?? 0) + 1);
+    expect(system.derive.plus).toBe(3);
+    let told = 0;
+    system.subscribe(["plus"], () => told++);
+    system.derive.assign("double", (f: Any) => f.n * 10);
+    expect(system.derive.plus).toBe(11);
+    expect(told).toBeGreaterThan(0);
+    system.derive.register("reader", (_f: Any, d: Any) => d.plus);
+    expect(system.derive.reader).toBe(11);
+    system.derive.unregister("plus");
+    expect(system.derive.reader).toBeUndefined();
+    expect("plus" in system.derive).toBe(false);
+    system.destroy();
+  });
+
+  it("(bm): a derivation that asked about a name before it existed sees it arrive", () => {
+    const system = started();
+    system.derive.register("asks", (_f: Any, d: Any) =>
+      "later" in d ? "yes" : "no",
+    );
+    system.derive.register("reads", (_f: Any, d: Any) => d.later ?? "none");
+    expect(system.derive.asks).toBe("no");
+    expect(system.derive.reads).toBe("none");
+    system.derive.register("later", () => "here");
+    expect(system.derive.asks).toBe("yes");
+    expect(system.derive.reads).toBe("here");
+    system.destroy();
+  });
+
+  it("(bm): a constraint gated on a later registration fires once it arrives", async () => {
+    const system = started({
+      constraints: {
+        gate: {
+          when: (_f: Any, d: Any) => "later" in d,
+          require: { type: "WORK" },
+        },
+      },
+      resolvers: {
+        work: {
+          requirement: "WORK",
+          resolve: async (_r: Any, ctx: Any) => {
+            ctx.facts.log = ["ran"];
+          },
+        },
+      },
+    });
+    await system.settle();
+    expect(system.facts.log).toEqual([]);
+    system.derive.register("later", () => 1);
+    await system.settle();
+    expect(system.facts.log).toEqual(["ran"]);
+    system.destroy();
+  });
+});
+
+describe("the parts' hooks", () => {
+  it("K3 and I3: a constraint registered, then unregistered while its requirement is current, leaves the trace whole", async () => {
+    const system = started(
+      {
+        resolvers: {
+          work: {
+            requirement: "WORK",
+            resolve: async (_r: Any, ctx: Any) => {
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              ctx.facts.log = ["done"];
+            },
+          },
+        },
+      },
+      { trace: true },
+    );
+    await system.settle();
+    system.constraints.register("c", {
+      when: (f: Any) => f.n > 0,
+      require: { type: "WORK" },
+    });
+    await tick();
+    expect(
+      system.inspect().unmet.length + system.inspect().inflight.length,
+    ).toBeGreaterThan(0);
+    system.constraints.unregister("c");
+    await system.settle();
+    expect(system.constraints.isDynamic("c")).toBe(false);
+    expect(system.inspect().constraints.map((c: Any) => c.id)).not.toContain(
+      "c",
+    );
+    system.destroy();
+  });
+
+  it("the reconcile part is built at the first constraint of a system that had none", async () => {
+    const system = started({
+      resolvers: undefined,
+    });
+    system.resolvers.register("work", {
+      requirement: "WORK",
+      resolve: async (_r: Any, ctx: Any) => {
+        ctx.facts.log = ["late"];
+      },
+    });
+    system.constraints.register("c", {
+      when: (f: Any) => f.n === 1,
+      require: { type: "WORK" },
+    });
+    await system.settle();
+    expect(system.facts.log).toEqual(["late"]);
+    system.destroy();
+  });
+
+  it("K5: a batched resolver registered later batches, and unregistering cancels its queue", async () => {
+    const calls: string[][] = [];
+    const canceled: string[] = [];
+    const system = started(
+      {
+        constraints: {
+          c: {
+            when: (f: Any) => f.n === 2,
+            require: [{ type: "WORK", k: "a" }],
+          },
+        },
+      },
+      {
+        plugins: [
+          {
+            name: "p",
+            onResolverCancel: (_r: string, req: Any) => canceled.push(req.id),
+          },
+        ],
+      },
+    );
+    system.resolvers.register("b", {
+      requirement: "WORK",
+      batch: { enabled: true, windowMs: 50 },
+      resolveBatch: async (reqs: Any[]) => {
+        calls.push(reqs.map((r) => r.k));
+      },
+    });
+    system.facts.n = 2;
+    await tick();
+    system.resolvers.unregister("b");
+    expect(canceled.length).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(calls).toEqual([]);
+    system.destroy();
+  });
+
+  it("K6: an effect's declared name links to a derivation registered after it; assign cleans up first", async () => {
+    const log: string[] = [];
+    const system = started({
+      effects: {
+        watcher: { deps: ["later"], run: () => void log.push("run") },
+      },
+    });
+    await system.settle();
+    log.length = 0;
+    system.derive.register("later", (f: Any) => f.n);
+    expect(system.derive.later).toBe(1);
+    system.facts.n = 5;
+    await system.settle();
+    expect(log).toContain("run");
+    system.effects.register("e", { run: () => () => void log.push("cleanup") });
+    await system.effects.call("e");
+    system.effects.assign("e", { run: () => {} });
+    expect(log).toContain("cleanup");
+    system.destroy();
+  });
+});

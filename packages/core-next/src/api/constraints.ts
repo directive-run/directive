@@ -86,6 +86,14 @@ export interface Constraints {
   isDisabled(id: string): boolean;
   /** 1.35's constraint state, for inspect() and explain(). */
   state_(id: string): ConstraintState | undefined;
+  /** L10: a constraint registered or assigned, and one unregistered. */
+  add_(id: string): void;
+  remove_(id: string): void;
+  /** L10 (D8): the requirements it would add now, with `props` merged in. */
+  call_(
+    id: string,
+    props?: Record<string, unknown>,
+  ): Promise<RequirementWithId[]>;
   /** Every constraint's state, in declaration order. */
   states_(): ConstraintState[];
 }
@@ -118,7 +126,7 @@ const EMPTY: RequirementWithId[] = [];
 export function createConstraints(options: ConstraintsOptions): Constraints {
   const { defs, facts, derived, tracker, keys } = options;
   const ids = Object.keys(defs);
-  for (const id of ids) {
+  const check = (id: string) => {
     const spec = defs[id]?.when;
     // 1.35: `$changed` is effects-only, refused at registration in every
     // build. (The rest of the data form is the L11 compiler.)
@@ -127,18 +135,17 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
-  }
+  };
+  ids.forEach(check);
+  const fresh = (id: string): ConstraintState => ({
+    id,
+    priority: defs[id]!.priority ?? 0,
+    lastResult: null,
+    hitCount: 0,
+    lastActiveAt: null,
+  });
   const states = new Map<string, ConstraintState>(
-    ids.map((id) => [
-      id,
-      {
-        id,
-        priority: defs[id]!.priority ?? 0,
-        lastResult: null,
-        hitCount: 0,
-        lastActiveAt: null,
-      },
-    ]),
+    ids.map((id) => [id, fresh(id)]),
   );
   /** 1.35's recordConstraintResult: the answer, and a hit when active. */
   const onEvaluate = (id: string, active: boolean) => {
@@ -204,12 +211,19 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     visiting.pop();
     topo.set(id, topo.size);
   };
-  ids.forEach(visit);
-  const sorted = [...ids].sort(
-    (a, b) =>
-      (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
-      topo.get(a)! - topo.get(b)!,
-  );
+  let sorted: string[] = [];
+  /** The order again (L10: a definition came, changed or went). */
+  const resort = () => {
+    topo.clear();
+    const all = Object.keys(defs);
+    all.forEach(visit);
+    sorted = all.sort(
+      (a, b) =>
+        (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
+        topo.get(a)! - topo.get(b)!,
+    );
+  };
+  resort();
   const enabled = () =>
     disabled.size ? sorted.filter((id) => !disabled.has(id)) : sorted;
 
@@ -671,6 +685,58 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       }
     },
     isDisabled: (id) => disabled.has(id),
+    // L10: the registry's hooks; it has written `defs` first.
+    add_(id) {
+      check(id);
+      const state = states.get(id);
+      if (state) {
+        state.priority = defs[id]!.priority ?? 0;
+      } else {
+        states.set(id, fresh(id));
+        unanswered.add(id);
+      }
+      defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
+      dirty.add(id);
+      resort();
+    },
+    remove_(id) {
+      // I3: gone from `states` and `last` together.
+      setDeps(id, new Set());
+      for (const set of [
+        states,
+        last,
+        whenDeps,
+        deps,
+        dirty,
+        disabled,
+        held,
+        unanswered,
+        asyncIds,
+      ]) {
+        set.delete(id);
+      }
+      resort();
+    },
+    async call_(id, props) {
+      if (disabled.has(id)) {
+        return [];
+      }
+      const active = await (asyncIds.has(id)
+        ? evaluateAsync(id)
+        : evaluateSync(id));
+
+      return active
+        ? requirementsOf(id).reqs.map((req) => {
+            const requirement = props ? { ...req, ...props } : req;
+
+            return {
+              requirement,
+              id: requirementId(requirement, keys[requirement.type]),
+              fromConstraint: id,
+            };
+          })
+        : [];
+    },
     state_: (id) => states.get(id),
     states_: () => [...states.values()],
   };

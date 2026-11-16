@@ -47,6 +47,12 @@ export interface EffectsManager {
   id_(): string | null;
   runAll(): Promise<void>;
   callOne(id: string): Promise<void>;
+  /** L10: the registry's hooks, and the late link of a declared name (K6). */
+  add_(id: string): void;
+  replace_(id: string): void;
+  remove_(id: string): void;
+  call_(id: string): Promise<void>;
+  link_(name: string): void;
   cleanupAll(): void;
   /**
    * Stops the effect and runs its cleanup at once (x). Its dependencies are
@@ -163,9 +169,11 @@ export function createEffectsManager<S extends Schema>(
   const warnedAsync = new Set<string>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
-  const prevObserved = Object.values(definitions).some(
-    (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
-  );
+  const reads = () =>
+    Object.values(definitions).some(
+      (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
+    );
+  let prevObserved = reads();
 
   const depKey = options.depKey ?? ((name: string) => name);
   /**
@@ -194,7 +202,7 @@ export function createEffectsManager<S extends Schema>(
   };
   /** Declaration order, for selection. */
   const order: EffectState[] = [];
-  for (const id of Object.keys(definitions)) {
+  function make(id: string): EffectState {
     const def = definitions[id];
     const deps = def?.deps as string[] | undefined;
     // As 1.35's initState: a data-form `on` that is no predicate is a user
@@ -218,8 +226,29 @@ export function createEffectsManager<S extends Schema>(
       link(state, key);
     }
     states.set(id, state);
-    order.push(state);
+
+    return state;
   }
+  for (const id of Object.keys(definitions)) {
+    order.push(make(id));
+  }
+  /** L10: an effect leaves, after its cleanup; its index entries go. */
+  const drop = (id: string) => {
+    const state = get(id);
+    runCleanup(state);
+    for (const key of state.deps ?? []) {
+      unlink(state, key);
+    }
+    states.delete(id);
+
+    return order.indexOf(state);
+  };
+  /** L10 (K6): the last reader of `prev` leaving stops the copying; a new one starts it. */
+  const reprev = () => {
+    if (prevObserved !== (prevObserved = reads())) {
+      snapshotPrevious();
+    }
+  };
 
   /**
    * T1: a good auto-tracked run's reads become its dependencies. It tracked
@@ -623,6 +652,34 @@ export function createEffectsManager<S extends Schema>(
     async runAll() {
       await runFast([...states.values()]);
     },
+    // L10: the registry's hooks; it has written `definitions` first.
+    add_(id) {
+      order.push(make(id));
+      reprev();
+    },
+    replace_(id) {
+      // 1.35: the old definition is cleaned up first, and keeps its place.
+      order[drop(id)] = make(id);
+      reprev();
+    },
+    remove_(id) {
+      order.splice(drop(id), 1);
+      reprev();
+    },
+    call_(id) {
+      return this.callOne(id);
+    },
+    link_(name) {
+      // K6, 1.35's refreshDeps: a declared name that is now a derivation.
+      for (const state of order) {
+        if (state.explicit && state.deps!.delete(name)) {
+          unlink(state, name);
+          const key = depKey(name);
+          state.deps!.add(key);
+          link(state, key);
+        }
+      }
+    },
     async callOne(id) {
       const state = states.get(id);
       if (state) {
@@ -750,6 +807,7 @@ export const withEffects: SystemPart = (ctx) => {
     Object.assign(manager, { fresh_: () => retries.clear() }),
   );
   // 1.35's controls (engine.ts:2633–2636); none asks for a pass.
+  ctx.kinds_.effect = manager;
   ctx.system.effects = {
     disable: manager.disable,
     enable: manager.enable,

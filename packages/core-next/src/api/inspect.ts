@@ -5,7 +5,7 @@
  */
 
 import type { EffectsFeature, ReconcileFeature, SystemPart } from "./core.js";
-import { DERIVATION_DEP_PREFIX } from "./facts.js";
+import { DERIVATION_DEP_PREFIX, MEMBER_DEP_PREFIX } from "./facts.js";
 import type { SourcesFeature } from "./sources.js";
 
 type Defs = Record<string, { meta?: unknown; _meta?: unknown } | undefined>;
@@ -21,6 +21,7 @@ export const withInspect: SystemPart = ({
   module,
   system,
   counts_,
+  derived,
 }) => {
   // No constraints and no resolvers: no requirement to explain (1.35).
   system.explain ??= () => null;
@@ -55,10 +56,18 @@ export const withInspect: SystemPart = ({
     for (const id of watched) {
       observed.add(DERIVATION_DEP_PREFIX + id);
     }
+    // L10: a derivation unregistered since a reader last ran is not observed.
+    for (const key of observed) {
+      key.slice(1) in derived || observed.delete(key);
+    }
     // The fact keys only: a watched derivation that moved is listed too.
     let pending = 0;
     for (const key of observed.size ? written : []) {
-      pending += +!key.startsWith(DERIVATION_DEP_PREFIX);
+      // A membership key (L10) is no invalidation either.
+      pending += +!(
+        key.startsWith(DERIVATION_DEP_PREFIX) ||
+        key.startsWith(MEMBER_DEP_PREFIX)
+      );
     }
 
     return {
