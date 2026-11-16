@@ -12,6 +12,7 @@ import {
   createSystemCore,
 } from "../api/core.js";
 import { withEffects } from "../api/effects.js";
+import { withObserve } from "../api/observe.js";
 import { withPlugins } from "../api/plugins.js";
 import { withReconcile } from "../api/reconcile.js";
 import { t } from "../api/schema-builders.js";
@@ -181,6 +182,129 @@ describe("inspect() counters, observe and notify (L9a)", () => {
     expect(calls).toBe(4);
     system.destroy();
   });
+
+  it("a batch stops at an observer whose own write runs away, and does not log it (S2)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const system = createSystem({
+      module: createModule("m", {
+        schema: { facts: { n: t.number(), m1: t.number(), m2: t.number() } },
+        init: (facts) => {
+          facts.n = 0;
+          facts.m1 = 0;
+          facts.m2 = 0;
+        },
+      }),
+    });
+    system.start();
+    let armed = false;
+    system.subscribe(["n"], () => {
+      if (armed) {
+        system.facts.n = (system.facts.n as number) + 1;
+      }
+    });
+    const delivered: string[] = [];
+    system.observe((event) => {
+      if (event.type !== "fact.change") {
+        return;
+      }
+      delivered.push(event.key as string);
+      if (event.key === "m1") {
+        armed = true;
+        system.facts.n = 1000;
+      }
+    });
+    system.batch(() => {
+      system.facts.m1 = 1;
+      system.facts.m2 = 1;
+    });
+    armed = false;
+    // m2 is not delivered after m1's observer ran away, and the per-key
+    // "Observer threw" line is not written for the runtime's own guard.
+    expect(delivered.filter((key) => key !== "n")).toEqual(["m1"]);
+    const lines = error.mock.calls.map((call) => String(call[0]));
+    expect(lines.some((line) => line.includes("Observer threw"))).toBe(false);
+    // An ordinary throw is still logged, and the batch goes on.
+    const plain = vi.fn((event: { type: string; key?: string }) => {
+      if (event.key === "m1") {
+        throw new Error("plain");
+      }
+    });
+    system.observe(plain as never);
+    system.batch(() => {
+      system.facts.m1 = 2;
+      system.facts.m2 = 2;
+    });
+    expect(plain.mock.calls.map((call) => call[0].key)).toContain("m2");
+    expect(
+      error.mock.calls.some((call) =>
+        String(call[0]).includes("Observer threw"),
+      ),
+    ).toBe(true);
+    system.destroy();
+    error.mockRestore();
+  });
+
+  it("whenExplain reaches an observer only when the record explains (S6)", () => {
+    let emit!: (at: string, data: Record<string, unknown>) => void;
+    const grab: SystemPart = ({ kernel }) => {
+      emit = (at, data) => kernel.hooks.emit(at as never, data);
+    };
+    const system = createSystemCore({ module: counter() } as never, [
+      grab,
+      withPlugins([]),
+      withObserve,
+    ]) as any;
+    const heard: Record<string, unknown>[] = [];
+    system.observe((event: Record<string, unknown>) => {
+      if (event.type === "constraint.evaluate") {
+        heard.push(event);
+      }
+    });
+    system.start();
+    const explain = [{ path: "n", pass: true }];
+    emit("constraint.evaluate", { id: "big", active: true, explain });
+    emit("constraint.evaluate", { id: "big", active: false });
+    expect(heard).toStrictEqual([
+      {
+        type: "constraint.evaluate",
+        id: "big",
+        active: true,
+        whenExplain: explain,
+      },
+      { type: "constraint.evaluate", id: "big", active: false },
+    ]);
+    system.destroy();
+  });
+});
+
+describe("inspect() constraints (L9a, S6)", () => {
+  it("whenSpec is the spec of a data-form when, and absent for a function", () => {
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { n: t.number() },
+          derivations: {},
+          requirements: { X: {} },
+        },
+        init: (facts: { n: number }) => {
+          facts.n = 0;
+        },
+        constraints: {
+          data: { when: { n: { $gte: 5 } }, require: { type: "X" } },
+          fn: {
+            when: (facts: { n: number }) => facts.n > 5,
+            require: { type: "X" },
+          },
+        },
+      } as never),
+    });
+    system.start();
+    const rows = system.inspect().constraints;
+    const row = (id: string) => rows.find((c) => c.id === id)!;
+    expect(row("data").whenSpec).toEqual({ n: { $gte: 5 } });
+    expect("whenSpec" in row("fn")).toBe(false);
+    system.destroy();
+  });
 });
 
 describe("meta (L9a)", () => {
@@ -236,6 +360,46 @@ describe("meta (L9a)", () => {
     expect(system.meta.derivation("shown")?.inheritedTags).toEqual(["pii"]);
     expect(system.meta.derivation("cost")).toEqual({ tagBoundary: true });
     expect(system.meta.carriesTag("derivation", "cost", "pii")).toBe(false);
+    system.destroy();
+  });
+
+  it("tagBoundary stops the walk at the derivation itself and at one read through it", () => {
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { email: t.string().meta({ tags: ["pii"] }) },
+          derivations: {
+            masked: t.string(),
+            banner: t.string(),
+            plain: t.string(),
+          },
+        },
+        init: (facts) => {
+          facts.email = "a@b.test";
+        },
+        derive: {
+          // Reads a tagged fact, but cuts the tag off.
+          masked: {
+            compute: (facts) => facts.email.replace(/./g, "*"),
+            meta: { tagBoundary: true },
+          },
+          // Reads only the boundary: nothing passes through it.
+          banner: (_facts, derive) => derive.masked,
+          // The control: reads the tagged fact directly.
+          plain: (facts) => facts.email,
+        },
+      }),
+    });
+    system.start();
+    expect(system.meta.carriesTag("derivation", "plain", "pii")).toBe(true);
+    // The first check: the boundary derivation does not inherit from its reads.
+    expect(system.meta.carriesTag("derivation", "masked", "pii")).toBe(false);
+    // The second check: a reader of the boundary does not walk past it.
+    expect(system.meta.carriesTag("derivation", "banner", "pii")).toBe(false);
+    expect(system.meta.byTag("pii").map((row) => row.id)).toEqual([
+      "email",
+      "plain",
+    ]);
     system.destroy();
   });
 });
