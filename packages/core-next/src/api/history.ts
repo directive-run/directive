@@ -68,6 +68,12 @@ const unwrap = (value: unknown, seen = new WeakSet()): unknown => {
 };
 
 /**
+ * (bd): each copy a restore wrote, to the stored value it was cloned from,
+ * so restoring that value again finds its copy still live (see `restore`).
+ */
+const twins = new WeakMap<object, unknown>();
+
+/**
  * (bd): a stored snapshot and its `facts` record are frozen, shallow: what
  * they hold is not (freezing deep would walk every value). Its `facts` is a
  * record the clone made (or the import parsed), never one the app holds.
@@ -102,8 +108,11 @@ export const withHistory =
 
       return;
     }
-    const { maxSnapshots = 100, redactSnapshot } =
-      option === true ? {} : option;
+    // `true` destructures as an object with neither key.
+    const { maxSnapshots = 100, redactSnapshot } = option as Exclude<
+      typeof option,
+      boolean
+    >;
     const snapshots: Snapshot[] = [];
     let changesets: Changeset[] = [];
     const listeners = new Set<() => void>();
@@ -111,24 +120,15 @@ export const withHistory =
     let nextId = 1;
     let paused = false;
     let restoring = false;
-    // The open changeset's start (its label is never read): NaN when none is
-    // open, so every comparison with it is false and its end records nothing.
-    let pendingStart = Number.NaN;
+    // The open changeset's start (its label is never read): Infinity when
+    // none is open, so no index passes it, its end records nothing, and a
+    // shift or a cut leaves it Infinity.
+    let pendingStart = Number.POSITIVE_INFINITY;
     // 1.35's destroy drops the listeners (engine.ts:3498).
     const notify = () => {
       for (const listener of context.gone_ ? [] : listeners) {
         listener();
       }
-    };
-    /**
-     * 1.35's onHistoryChange option: the hook, then the listeners. The hook
-     * goes through the core's stream, so it still fires after destroy.
-     */
-    const navigated = (from: number, to: number) => {
-      if (wants("history.navigate")) {
-        emit("history.navigate", { from, to });
-      }
-      notify();
     };
 
     /** The four clone tiers, after the redactor (utils/history.ts:206–304). */
@@ -219,7 +219,7 @@ export const withHistory =
           (c.start_ >= 0 || !k),
       );
       if (pendingStart > at || (k && (pendingStart -= k) < 0)) {
-        pendingStart = Number.NaN;
+        pendingStart = Number.POSITIVE_INFINITY;
       }
       if (wants("history.snapshot")) {
         emit("history.snapshot", { snapshot });
@@ -257,13 +257,23 @@ export const withHistory =
           // values that clone, so no copy throws partway. A snapshot the
           // caller built is written as given, as in 1.35 (a class instance
           // keeps its prototype; a value that cannot clone still restores).
-          const copy = snapshots.includes(snapshot);
+          // A live value that is already a copy of this very stored value is
+          // written back as it is, so it is no change: 1.35 writes the stored
+          // object it already holds, and runs no pass. The live values are
+          // read as the snapshot reads them, with no dependency tracked.
+          const stored = snapshots.includes(snapshot);
+          const live = store.toObject();
           context.load_(() => {
             for (const [key, value] of Object.entries(values)) {
-              (facts as Rec)[key] =
-                copy && typeof value === "object" && value
-                  ? structuredClone(value)
-                  : value;
+              let next = value;
+              if (
+                stored &&
+                Object(value) === value &&
+                twins.get((next = live[key]) as object) !== value
+              ) {
+                twins.set((next = structuredClone(value)) as object, value);
+              }
+              (facts as Rec)[key] = next;
             }
           }, "restore");
         });
@@ -273,13 +283,20 @@ export const withHistory =
       }
     };
 
-    /** Restore index `to` and tell the hook and listeners. */
+    /**
+     * Restore index `to` and tell 1.35's onHistoryChange option (the hook,
+     * through the core's stream, so it still fires after destroy), then the
+     * listeners.
+     */
     const move = (from: number, to: number) => {
       index = to;
       const snapshot = snapshots[to];
       if (snapshot) {
         restore(snapshot);
-        navigated(from, to);
+        if (wants("history.navigate")) {
+          emit("history.navigate", { from, to });
+        }
+        notify();
       }
     };
 
@@ -406,7 +423,7 @@ export const withHistory =
           snapshots.splice(0, snapshots.length, ...data.snapshots.map(keep));
           // (bb): the old ranges, and the open changeset, index the old list.
           changesets = [];
-          pendingStart = Number.NaN;
+          pendingStart = Number.POSITIVE_INFINITY;
           // (ba): new ids follow the highest imported one.
           for (const snap of snapshots) {
             nextId = Math.max(nextId, snap.id + 1);
@@ -424,7 +441,7 @@ export const withHistory =
         if (index > pendingStart) {
           changesets.push({ start_: pendingStart, end_: index });
         }
-        pendingStart = Number.NaN;
+        pendingStart = Number.POSITIVE_INFINITY;
       },
       pause() {
         paused = true;

@@ -277,3 +277,114 @@ describe("(bd) a stored snapshot is not shared", () => {
     expect(copy.history.export()).toBe(json);
   });
 });
+
+describe("round 2: a second restore of a stored snapshot is no change, as in 1.35", () => {
+  /** A system counting its fact batches and constraint evaluations. */
+  async function counted() {
+    const seen = { batches: 0, evaluations: 0 };
+    const mod = createModule("m", {
+      schema: {
+        facts: { n: t.number(), obj: t.any() },
+        derivations: {},
+        events: {},
+        requirements: { R: {} },
+      },
+      init: (f: any) => {
+        f.n = 0;
+        f.obj = { v: 0 };
+      },
+      constraints: {
+        c: { when: (f: any) => f.obj.v === 99, require: { type: "R" } },
+      },
+    } as never);
+    const system = createSystem({
+      module: mod,
+      history: true,
+      plugins: [
+        {
+          name: "count",
+          onFactsBatch: () => {
+            seen.batches++;
+          },
+          onConstraintEvaluate: () => {
+            seen.evaluations++;
+          },
+        },
+      ],
+    } as never) as any;
+    system.start();
+    await system.settle();
+    system.facts.obj = { v: 1 };
+    await system.settle();
+
+    return { system, seen };
+  }
+
+  it("restoring one stored snapshot twice gives one change and one pass, not two", async () => {
+    const { system, seen } = await counted();
+    const first = system.history.snapshots[0];
+    system.history.goTo(first.id);
+    await system.settle();
+    const once = { ...seen };
+    const copy = raw(system, "obj");
+    expect(copy).toEqual({ v: 0 });
+    system.history.goTo(first.id);
+    await system.settle();
+    expect(seen).toEqual(once);
+    expect(raw(system, "obj")).toBe(copy);
+  });
+
+  it("an edit made in place on the restored copy stays through a second restore, and the snapshot keeps its value", async () => {
+    const { system } = await counted();
+    const first = system.history.snapshots[0];
+    system.history.goTo(first.id);
+    system.facts.obj.v = 42;
+    system.history.restore(first);
+    expect(raw(system, "obj").v).toBe(42);
+    expect(first.facts.obj.v).toBe(0);
+  });
+
+  it("a copy that was replaced is written again", async () => {
+    const { system, seen } = await counted();
+    const first = system.history.snapshots[0];
+    system.history.goTo(first.id);
+    await system.settle();
+    system.history.pause();
+    system.facts.obj = { v: 7 };
+    await system.settle();
+    system.history.resume();
+    const before = seen.batches;
+    system.history.goTo(first.id);
+    await system.settle();
+    expect(raw(system, "obj")).toEqual({ v: 0 });
+    expect(raw(system, "obj")).not.toBe(first.facts.obj);
+    expect(seen.batches).toBe(before + 1);
+  });
+
+  it("a different stored snapshot is written", async () => {
+    const { system, seen } = await counted();
+    const [first, second] = system.history.snapshots;
+    system.history.goTo(first.id);
+    await system.settle();
+    const before = seen.batches;
+    system.history.goTo(second.id);
+    await system.settle();
+    expect(raw(system, "obj")).toEqual({ v: 1 });
+    expect(raw(system, "obj")).not.toBe(second.facts.obj);
+    expect(seen.batches).toBe(before + 1);
+  });
+
+  it("a caller-built snapshot holding a copy's equal is still written as given", async () => {
+    const { system } = await counted();
+    const first = system.history.snapshots[0];
+    system.history.goTo(first.id);
+    const obj = { v: 0 };
+    system.history.restore({
+      id: 99,
+      timestamp: 0,
+      trigger: "x",
+      facts: { obj },
+    });
+    expect(raw(system, "obj")).toBe(obj);
+  });
+});
