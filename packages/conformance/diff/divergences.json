@@ -42977,6 +42977,7 @@
     "stream": "hook",
     "kind": "onTraceComplete",
     "op": "changed",
+    "path": "args[0].resolversStarted[0]",
     "when": ["traceRing"],
     "group": "row-bi",
     "ends": true,
@@ -43029,6 +43030,7 @@
     "stream": "hook",
     "kind": "onDerivationInvalidate",
     "op": "changed",
+    "path": "args[0]",
     "when": ["changesetMoved"],
     "during": "back",
     "group": "row-bb",
@@ -43058,7 +43060,7 @@
     "kind": "onResolverCancel",
     "op": "missing",
     "when": ["disableRetracts"],
-    "group": "quirk-t",
+    "group": "quirk-t-disable",
     "bound": {
       "match": [
         {
@@ -43097,7 +43099,7 @@
     "kind": "onRequirementCanceled",
     "op": "missing",
     "when": ["disableRetracts"],
-    "group": "quirk-t",
+    "group": "quirk-t-disable",
     "bound": {
       "match": [
         {
@@ -43133,7 +43135,7 @@
     "kind": "requirement.canceled",
     "op": "missing",
     "when": ["disableRetracts"],
-    "group": "quirk-t",
+    "group": "quirk-t-disable",
     "bound": {
       "match": [
         {
@@ -43158,6 +43160,7 @@
     "stream": "hook",
     "kind": "onResolverCancel",
     "op": "changed",
+    "path": "args[0]",
     "when": ["batchWriteRetracts"],
     "group": "quirk-t-batch",
     "ends": true,
