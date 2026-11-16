@@ -4,7 +4,9 @@ Date: 2026-11-16. Jason approved the L8 history RFC (`rfc-l8-history.md`,
 revision 2, "Decisions for the owner") on 2026-11-10, and asked Claude to
 sign the entries for the rows he approved, on his behalf, as at the earlier
 gates (GATE-2.md, rule 1). On 2026-11-15 he wrote "I approve you for to do
-everything". This gate is run 1 of at most 3 (A3).
+everything". This record is of gate run 2 of at most 3 (A3); run 1's
+results are kept where run 2 did not redo them, and "Gate run 2" says what
+changed.
 
 ## What the L8 gate does
 
@@ -28,6 +30,7 @@ export is unchanged byte for byte, and its golden file round-trips both ways.
 listed in `contracts/next-unshipped.json` at L8, and core-next does not ship
 them. At `current` L8 the surface gate fails until core-next exports them or
 Jason signs their removal; an agent never signs an `api-changes.json` entry.
+It is the only thing that fails: every other check passes (Results).
 
 ## The L8 decisions
 
@@ -138,65 +141,143 @@ killer; the other 24 now name it too. No other entry changed.
 ## Results
 
 **Fuzz, pull-request count** (287 cases a seed, 205 across every layer and
-82 up to L8; seeds 1 to 20 and 24301): all 21 exit 0. Over the 21 seeds,
-6,027 cases ran and 5,997 were compared, 3,874 of them on 2.0 too (174 to
-190 a seed), and 892 ended early at an `ends` stop. Eight runaways were
-discarded, one of them after a stop (seed 8).
+82 up to L8, the pinned cases among them; seeds 1 to 20 and 24301): all 21
+exit 0 in run 2. Over the 21 seeds, 6,027 cases ran and 5,998 were
+compared, 3,875 of them on 2.0 too, and 925 ended early at an `ends` stop.
+Eight runaways were discarded, one of them after a stop.
 
 | Census line | Total | Per seed | Cap |
 | --- | --- | --- | --- |
-| Never settles (discarded) | 22 | 0 to 4 | 5 a seed (max(1% of 287, 5)) |
-| of them, both engines live | 4 | seeds 3, 7, 17 and 18 | |
-| Discarded after a stop | 1 | seed 8 | |
+| Never settles (discarded) | 21 | 0 to 4 | 5 a seed (max(1% of 287, 5)) |
+| of them, both engines live | 4 | | |
+| Discarded after a stop | 1 | | |
 | Failed as 2.0-only live | 0 | | |
 
 **The ratchet.** `v2-passing.json` holds 1,879 tests, 115 more than on main
 (1,764), compared by name, with none removed.
 
-**The census** (its own run: seed 24301 at the pull-request count) exits 1
-with 34 problems: the 9 `conformance:checks` failures of the `/internals`
-stop, the harness lock before GATE-7.md was added to it, and 24 stale fuzz
-entries in two groups (Stops).
+**The checks, run 2.** Each exit code, and what fails:
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `pnpm census` | 1 | 10 problems, all the `/internals` stop's: the 9 `conformance:checks` failures and "vitest exited 1". No stale entry or group, and the harness lock passes |
+| `npx vitest run --project conformance:checks` | 1 | the same 9 failures, all in `contracts/api-surface-next.test.ts`, one cause (Stops) |
+| `check:expects` | 0 | 188 files, 7,175 assertions, identical to a fresh port |
+| `oracle:update` | 0 | |
+| `conformance:diff` | 0 | 51 files, 436 tests |
+| `v2`, `v2:dist`, `v2:prod` | 0 | 359 files: 3,493 tests passed, 3,109 skipped by the layer gate |
+| The 21 PR seeds | 0 each | above |
+| Root biome, error level | 0 | 1,450 files |
 
 ## Deep runs: report mode (A2)
 
-Run as the nightly runs them (`DIFF_FUZZ_SEED=<seed> DIFF_FUZZ_RUNS=5000
+Run 2 ran them as the nightly does (`DIFF_FUZZ_SEED=<seed> DIFF_FUZZ_RUNS=5000
 DIFF_FUZZ_BATCH_REPORT=1`, an 8 GB heap), the three seeds in parallel with
-the nightly's `--testTimeout=1200000`; seed 24301 again alone with a 1 h
-timeout.
+the PR seeds and the census, under a 1 h cap so a slow seed would still
+report its time. All three ran to the end.
 
-| Seed | Exit | Compared | On 2.0 too | Ended early | Runaways (after a stop) | Never settles | Reported batched cases | 2.0-only live |
+| Seed | Exit | Time | Compared | On 2.0 too | Ended early | Runaways (after a stop) | Never settles | 2.0-only live |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 0 | 6,951 | 4,426 | 882 | 10 (0) | 39 of at most 70 | 3 | 0 |
-| 2 | 0 | 6,957 | 4,458 | 922 | 10 (2) | 33 of at most 70 | 8 | 0 |
-| 24301 | 1: timed out, at 20 min and again at 1 h alone | | | | | | 4, then 3 | |
+| 1 | 0 | 18 min | 6,951 | 4,426 | 884 | 10 (0) | 39 of at most 70 | 0 |
+| 2 | 0 | 18 min | 6,957 | 4,458 | 924 | 10 (2) | 33 of at most 70 | 0 |
+| 24301 | 0 | 24 min | 6,957 | 4,452 | 914 | 12 (1) | 31 of at most 70 | 0 |
 
-Every reported case has a batched resolver, and each is one L8b's deep run
-listed (`deep-report.md`). None is new, and none is a history shape: the five
-(ay) cases are covered by the new entry and no longer fail.
+19 cases were reported, each with a batched resolver, and each is one L8b's
+deep run listed (`deep-report.md`). The up-to-L8 phase now opens with two
+more pinned cases, so its case numbers are two higher than L8b's and run
+1's (#430 here is #428 there). None is new, and none is a history shape.
 
 | Case | First difference | Triage |
 | --- | --- | --- |
 | 1:all#2195 | external `start`, an item changed on v2 | batched unknown (L7 batch shape), report-mode follow-up |
 | 1:all#4271 | external `start` extra on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 1:up to L8#428 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
+| 1:up to L8#430 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
 | 2:all#2247 | external `start`, the tag changed on v2 | batched unknown (L7 batch shape), report-mode follow-up |
 | 2:all#2625 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
 | 2:all#2890 | `onResolverComplete` extra on v2 | L7 batch-ordering follow-up |
-| 2:up to L8#1078 | `onReconcileStart` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 2:up to L8#1272 | `onResolverComplete` extra on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 2:up to L8#1420 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 2:up to L8#1442 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 2:up to L8#1475 | `onResolverComplete` extra on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 24301:all#422 | `onResolverComplete` extra on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 24301:all#2659 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up |
-| 24301:all#3397 | `onResolverCancel` names `a::rb` on v2, `a::r0` on 1.35 | batched unknown (L7 batch shape), report-mode follow-up |
-| 24301:up to L8#159 | external `start` missing on v2 | batched unknown (L7 batch shape), report-mode follow-up (first run only) |
+| 2:up to L8#1080, #1274, #1422, #1444, #1477 | `onReconcileStart` missing; `onResolverComplete` extra; external `start` missing (two); `onResolverComplete` extra | batched unknowns (L7 batch shape), report-mode follow-ups |
+| 24301:all#422, #2659, #3397 | `onResolverComplete` extra; external `start` missing; `onResolverCancel` names `a::rb`, not `a::r0` | batched unknowns (L7 batch shape), report-mode follow-ups |
+| 24301:up to L8#161, #593, #630, #948, #1917 | external `start` missing; `onError` context; `onError` context; external `wrote` missing; external `start` missing | batched unknowns (L7 batch shape), report-mode follow-ups |
 
-Seed 24301 did not reach the end, so its up-to-L8 cases after #159 were not
-seen here. They include #1097 (hooks lost after `destroy()`, to be fixed by
-p8/hooks-after-destroy), #591, #628, #946 and #1915. L8b's classifying run
-(`deep-report.md`) ran the seed to the end.
+Three of L8b's cases no longer fail:
+
+- 24301:up to L8#1099 (L8b's #1097, hooks lost after `destroy()`): fixed by
+  #388 (p8/hooks-after-destroy), merged into this branch.
+- 24301:all#4845 and up to L8#452 (L8b's #450): covered by the new (ay)
+  entry.
+- 24301:up to L8#510 (L8b's #501, which L8b triaged as the harness): now
+  discarded after its stop, one of seed 24301's 12 runaways. See "Gate run 2".
+
+## Gate run 2
+
+Run 2 merged main at 87c18ba7 (#388) into the branch, rebuilt core and
+core-next (the lockfile did not move), and worked the three stops run 1
+left.
+
+**1. The two `/internals` names: open, the owner's.** Nothing was added or
+built. A draft of the two `removed` `next` entries, in the form of the 13
+`/internals` removals of 2026-11-03, waits for Jason with `approvedBy` and
+`date` empty. They are the only failures: the census's 10 problems are the 9
+`conformance:checks` failures and the "vitest exited 1" that sums them.
+
+**2. The stale groups: pinned.** `quirk-g` has 19 entries (run 1 counted
+21). Neither group is stale at L8; only the census seed's own draws miss
+them. Run over the 21 PR seeds, `quirk-g` covered 16 passing cases on 11
+seeds (2, 3, 5, 7, 8, 10, 12, 16, 17, 18 and 19). `av-moved-nav` covered
+one, seed 13 all#119. One passing case of each is now in
+`diff/fuzz/pinned.json`, as #372 pinned quirk g's aborted-extra entry:
+
+- seed 10 up to L8#79, for `quirk-g` (`l7-fuzz-g-hook-onRequirementCanceled-missing`);
+- seed 13 all#119, for `av-moved-nav` (the moved and changed-items twins).
+
+On the census seed they are up-to-L8 cases 20 and 21. Both pass, and the
+census finds no stale entry. No entry was widened or removed.
+
+**3. Deep seed 24301: the harness.** The run stalled on up-to-L8 case 508
+(510 now). It took 54 minutes and wrote a 536 MB report.
+
+- **What the engines do.** The batch handler ignores its abort
+  (`respectsAbort` false). At step 2, 2.0 makes an extra `onResolverStart`,
+  and the approved (at) stop, `l7-fuzz-at-hook-onResolverStart-extra`, ends
+  the comparison there. From then on the two systems differ.
+  - 1.35 settles after 14 timer callbacks. Its c1 resolver fails once with
+    no retry left, the handler's write leaves f0 at 2, and nothing fires
+    again.
+  - 2.0 livelocks at 35 ms. c0 writes 4, c1 writes -1, the aborted handler
+    still writes 2, and c0 fires again, until the 20,000-callback budget cuts
+    it off: 2,280,368 records.
+- **Why it is not a 2.0 hang.** 2.0 runs away only after an `ends` stop, so
+  by the owner's rule the case is discarded after the stop ("Discard after
+  the stop", 2026-11-02). A standalone run says so: "runaway on v2 after the
+  stop … discarded, not a hang".
+- **What the harness did wrong.** Past the budget the harness clears every
+  timer itself. At step 12 the shared wait then found a batched call live
+  with no timer, and reported "the shared wait at step 12 stalled". The case
+  failed on the harness's own doing, so report mode wrote it out with its
+  whole trace. That pretty-printed file was 536,189,569 characters, within
+  0.2% of the longest string V8 can build.
+- **Where the time goes**, measured on this case alone:
+  - 2.0's run takes 351 s. The fake clock scans every pending timer on each
+    tick, so the cost grows with the square of the callbacks: 0.9 s at 1,000,
+    3 s at 2,000 and 13 s at 4,000.
+  - The comparison takes 23 s, and `explain` 51 s.
+  - The whole `runScenario` takes 369 s.
+- **The fix (harness only).**
+  - The shared wait reports no stall once the run is past its budget, so
+    the run is judged as a runaway.
+  - A case file keeps at most 100,000 records of each trace, and `truncated`
+    gives each cut trace's full length. A longer string would throw inside
+    the property, and fast-check would shrink the case for hours.
+  - Self-tests in `diff/self/stall-after-budget.test.ts`: the case at a
+    budget of 100 is judged a runaway with no stall (and fails without the
+    fix), and the cap.
+
+**The nightly's limit.** Under load, seed 24301 took 24 minutes here, in
+parallel for its first 18. The nightly runs one seed alone with
+`--testTimeout=1200000`, which is 20 minutes, inside a 60-minute job. Run 2
+did not time 24301 alone, and the case above still costs about 6 minutes of
+2.0 runaway. Whether the seed fits in 20 minutes on CI is unproven: see the
+follow-ups.
 
 ## Stops
 
@@ -208,17 +289,7 @@ p8/hooks-after-destroy), #591, #628, #946 and #1915. L8b's classifying run
   `/internals` exports them (an engine PR), or Jason signs two `removed`
   `next` entries in `api-changes.json`, as he signed the 13 `/internals`
   removals at L6; an agent never fills in that `approvedBy`. Until then the
-  census and `conformance:checks` fail.
-- **Two stale fuzz groups in the census's own run.** Seed 24301 at the
-  pull-request count uses no entry of `quirk-g` (L7, 21 entries) or
-  `av-moved-nav` (L8, 3 entries): at L8 its up-to-L8 phase draws other cases.
-  The GATE-6 precedent is a pinned case in `diff/fuzz/pinned.json` for each
-  group: a passing case that uses one of its entries. For `av-moved-nav` that
-  is PR seed 13 case all#119; for `quirk-g` it is still to find. Gate run 2.
-- **Deep seed 24301 does not finish in report mode.** It timed out at the
-  nightly's 20 minutes, and again after 1 hour alone, still in its phase
-  across every layer. The nightly would fail on it. Either the nightly
-  timeout goes up, or the slow case is found (gate run 2).
+  census and `conformance:checks` fail. Nothing else does.
 
 ## Follow-ups
 
@@ -229,4 +300,11 @@ p8/hooks-after-destroy), #591, #628, #946 and #1915. L8b's classifying run
   as a `run` step with the op in its label. Reading the label's op would let
   the new (ay) entry take `afterOp` "pause" and the (az) entries `during`
   "replay" or "roundtrip".
-- The 15 batched deep cases above, which stay report-mode follow-ups.
+- The 19 batched deep cases above, which stay report-mode follow-ups.
+- The nightly's 20-minute test timeout against seed 24301. Time it alone on
+  CI, or raise `--testTimeout` in `.github/workflows/diff-fuzz-nightly.yml`
+  (its job allows 60 minutes). A cheaper runaway would need a new budget
+  rule, which is the owner's call. The pending timers grow with each cycle
+  of the livelock (most likely 2.0's timeouts for calls it aborted, due at a
+  time the stuck clock never reaches); that is what makes the fake clock
+  quadratic.
