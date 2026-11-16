@@ -7,6 +7,10 @@
 export { createFactsProxy } from "./api/facts.js";
 export { createFacts, createFactsStore } from "./api/validate.js";
 export { createEffectsManager } from "./api/effects.js";
+export {
+  createDisabledHistory,
+  createHistoryManager,
+} from "./api/history-manager.js";
 export { stableStringify } from "./api/requirements.js";
 export { isPrototypeSafe } from "./api/utils.js";
 export {
