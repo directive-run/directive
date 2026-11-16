@@ -30,6 +30,19 @@
     "constraints, resolvers, effects and derivations registered, assigned, called, unregistered": "L10",
     "constraints disable and enable at runtime": "L10",
     "a module registered and unregistered at runtime": "L10",
+    "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)": "L10",
+    "a constraint gated on a later-registered name is never evaluated again (U3; row bm)": "L10",
+    "a registration inside an effect is deferred to the end of the pass (U5)": "L10",
+    "unregistering a constraint while its resolver runs aborts the signal, and the write lands (U9a, 0 ms)": "L10",
+    "unregistering a constraint while its resolver runs aborts the signal, and the write lands (U9a, 5 ms)": "L10",
+    "an abortOn binding goes with the definition: its resolver is aborted, not detached (U9b, 0 ms)": "L10",
+    "an abortOn binding goes with the definition: its resolver is aborted, not detached (U9b, 5 ms)": "L10",
+    "a dynamic registration's pass is traced and snapshotted like any other (U14)": "L10",
+    "registerModule takes one history snapshot, and snapshots carry the module's namespaced keys (U17)": "L10",
+    "goBack past a registration leaves the module's facts and restores the older ones (U18)": "L10",
+    "unregisterModule while navigated back drops the forward snapshots and takes its own (U19)": "L10",
+    "unregisterModule with a history changeset open takes its snapshot at once (U20)": "L10",
+    "unregisterModule started inside system.batch runs its teardown (U20)": "L10",
     "predicate tools over a light's recorded history": "L11",
     "predicate validation against a schema's field kinds": "L11",
     "logging and performance plugins on a clobbered charge": "L12",
@@ -720,7 +733,16 @@
       "rule": "L9"
     },
     "tests/core/dynamic-definitions.test.ts": {
-      "rule": "L10"
+      "rule": "L10",
+      "instruments": ["import flushMicrotasks"]
+    },
+    "tests/core/l10-dynamic-pins-oracle.test.ts": {
+      "rule": "L10",
+      "pin": true
+    },
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts": {
+      "rule": "L10",
+      "pin": true
     },
     "tests/core/unregister-module.test.ts": {
       "rule": "L10"
@@ -859,6 +881,6 @@
   "instrumentNotes": {
     "option plugins": "observes resolver outcomes through plugin hooks (onResolverComplete/Cancel/Error); L2 must expose them",
     "member .inspect": "reads requirement state through system.inspect(); L2 must expose it",
-    "import flushMicrotasks": "a one-line microtask flush from /testing; L2 tests need it before the testing subpath (L13) exists. data-forms.test.ts uses it the same way (the L9 RFC's U14): its tests are about data forms, so each is placed by what it exercises (a data-form when, on, patch or compute is L11), not by the flush"
+    "import flushMicrotasks": "a one-line microtask flush from /testing; L2 tests need it before the testing subpath (L13) exists. data-forms.test.ts uses it the same way (the L9 RFC's U14): its tests are about data forms, so each is placed by what it exercises (a data-form when, on, patch or compute is L11), not by the flush. dynamic-definitions.test.ts too (the L10 RFC's B2 and U12): its tests are about register, assign, unregister and call, so each is placed by those members (43 at L10; the one with a data-form when at L11), not by the flush"
   }
 }

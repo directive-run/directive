@@ -1614,14 +1614,18 @@ describe("facts: teardown and dynamic registration", () => {
     const system = createSystem({ module: base }) as Any;
     await system.start();
 
-    expect(() =>
-      system.registerModule(
-        createModule("dup", {
-          schema: { facts: { a: t.string() } },
-          init: () => {},
-        }) as never,
-      ),
-    ).toThrow();
+    expect(
+      () =>
+        system.registerModule(
+          createModule("dup", {
+            schema: { facts: { a: t.string() } },
+            init: () => {},
+          }) as never,
+        ),
+      // The L10 RFC's U11: the message, so the missing member cannot pass.
+    ).toThrow(
+      '[Directive] Schema collision: Fact "a" already exists. Cannot register module "dup".',
+    );
     await system.stop();
   });
 

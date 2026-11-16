@@ -39,7 +39,6 @@
         "a throwing derivation > rethrows to the reader, reports to plugins, and recovers",
         "reading a derivation that does not exist > throws a message that names the problem",
         "registering and replacing derivations at runtime > a function-valued entry and an object-form entry both run",
-        "registering and replacing derivations at runtime > rejects a null or non-object compute",
         "subscribing to derivations > a new listener on a fully unsubscribed derivation is heard",
         "subscribing to derivations > one unsubscribe leaves the other listener of the same derivation",
         "subscribing to derivations > unsubscribing twice is harmless and stays unsubscribed",
@@ -251,7 +250,6 @@
         "facts: schema validation (development) > validates a write made inside a batch before applying it",
         "facts: schema validation (development) > validates writes made through the store directly",
         "facts: teardown and dynamic registration > drops its listeners when the system is destroyed",
-        "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
         "facts: unknown keys (development) > refuses to write a key the schema does not declare",
         "facts: unknown keys (development) > still stores the value, without throwing, when the schema declares no facts",
         "facts: Zod-style schemas > accepts a value the schema parses and rejects one it does not",
@@ -2315,6 +2313,18 @@
       "file": "tests/core/system.test.ts",
       "test": "Config Forwarding > trace config forwarded",
       "reason": "L9-pre (U10): the test passed on v2 only because toBeDefined() accepts null, which is what a system without a trace holds; it now asserts system.trace is an array and that one write adds one run, so it fails until L9b builds the trace."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/blackbox-derivations.test.ts",
+      "test": "registering and replacing derivations at runtime > rejects a null or non-object compute",
+      "reason": "L10-pre (U11): the test passed on v2 only because the missing derive.register throws a TypeError and the test accepted any throw; it now asserts 1.35's message (memoizePredicate's refusal of a non-function compute), so it fails until L10a builds the registry."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/blackbox-facts.test.ts",
+      "test": "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
+      "reason": "L10-pre (U11): the test passed on v2 only because the registerModule stub throws and the test accepted any throw; it now asserts 1.35's \"Schema collision\" message, so it fails until L10b builds registerModule."
     }
   ]
 }

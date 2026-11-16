@@ -9,6 +9,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { engines } from "../engines.js";
 import {
+  DYNAMIC_KINDS,
+  DYNAMIC_OPS,
   FEATURE_LAYERS,
   FUZZ_TAGS,
   type FuzzBatch,
@@ -21,6 +23,7 @@ import {
   specLayer,
   specTriggers,
   toScenario,
+  withoutDynamic,
   withoutHistory,
   withoutIntrospection,
 } from "../fuzz/model.js";
@@ -110,6 +113,9 @@ describe("fuzz generator ceiling", () => {
       trace: specs.some((s) => s.trace),
       meta: steps("meta"),
       batch: specs.some((s) => s.batch != null),
+      dynamic:
+        specs.some((s) => s.dynamic !== undefined) &&
+        steps("define", "inflight", "module"),
     };
 
     expect(Object.keys(used).sort()).toEqual(
@@ -438,6 +444,208 @@ describe("fuzz trace and meta reach (L9-pre; the L9 RFC's reach table, B1)", () 
       expect(carries["derivation d0"]).toBe(true);
       expect(carries["derivation d1"]).toBe(false);
     }
+  });
+});
+
+describe("fuzz dynamic reach (L10-pre; the L10 RFC's reach table, B1)", () => {
+  const specs = () => sample("L10", 1500);
+  const dynamicSteps = (s: FuzzSpec) =>
+    s.steps.filter((x) =>
+      (DYNAMIC_OPS as readonly string[]).includes(x.op),
+    ) as Extract<
+      FuzzSpec["steps"][number],
+      { op: "define" | "inflight" | "module" }
+    >[];
+
+  it("draws every action on every kind, the queue, in-flight unregisters and module steps, in about one case in three", () => {
+    const all = specs();
+    const dynamic = all.filter((s) => s.dynamic !== undefined);
+    expect(dynamic.length).toBeGreaterThan(all.length / 5);
+    expect(dynamic.length).toBeLessThan(all.length / 2);
+    for (const s of dynamic) {
+      expect(dynamicSteps(s).length).toBeGreaterThan(0);
+    }
+    const steps = dynamic.flatMap(dynamicSteps);
+    const defines = new Set(
+      steps.flatMap((x) =>
+        x.op === "define" ? [`${x.action} ${x.kind} ${x.id}`] : [],
+      ),
+    );
+    for (const action of ["register", "assign", "unregister", "call"]) {
+      for (const kind of DYNAMIC_KINDS) {
+        for (const id of [0, 1, 2, 3]) {
+          expect(defines).toContain(`${action} ${kind} ${id}`);
+        }
+      }
+    }
+    expect(steps.some((x) => x.op === "define" && x.deferred)).toBe(true);
+    expect(steps.some((x) => x.op === "define" && !x.deferred)).toBe(true);
+    expect(
+      new Set(
+        steps.flatMap((x) =>
+          x.op === "inflight" ? [`${x.bound} ${x.at}`] : [],
+        ),
+      ),
+    ).toEqual(new Set(["true 1", "true 5", "false 1", "false 5"]));
+    expect(
+      new Set(steps.flatMap((x) => (x.op === "module" ? [x.action] : []))),
+    ).toEqual(new Set(["register", "unregister"]));
+    expect(dynamic.some((s) => s.dynamic?.readers)).toBe(true);
+    expect(dynamic.some((s) => !s.dynamic?.readers)).toBe(true);
+    // Module steps under history, with a navigation before them (H2, H3).
+    expect(
+      dynamic.some(
+        (s) =>
+          s.history &&
+          s.steps.some((x) => x.op === "back") &&
+          s.steps.some((x) => x.op === "module"),
+      ),
+    ).toBe(true);
+  });
+
+  it("draws none of it below L10, and every case below L10 is the one L9-pre drew", () => {
+    expect(
+      sample("L9", 600).filter(
+        (s) => s.dynamic !== undefined || dynamicSteps(s).length > 0,
+      ),
+    ).toEqual([]);
+    for (const s of specs()
+      .filter((x) => x.dynamic !== undefined)
+      .slice(0, 50)) {
+      const plain = withoutDynamic(s);
+      expect(plain.dynamic).toBeUndefined();
+      expect(dynamicSteps(plain)).toEqual([]);
+      expect(layer(plain)).toBeLessThanOrEqual(9);
+    }
+  });
+
+  it("places each addition at L10 on its own", () => {
+    const base: FuzzSpec = {
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: false,
+      steps: [{ op: "settle" }],
+    };
+    expect(specLayer(base)).toBe("L0");
+    expect(specLayer({ ...base, dynamic: { readers: false } })).toBe("L10");
+    for (const step of [
+      {
+        op: "define" as const,
+        action: "call" as const,
+        kind: "derive" as const,
+        id: 0,
+        variant: 0,
+        deferred: false,
+      },
+      { op: "inflight" as const, bound: true, at: 5 as const },
+      { op: "module" as const, action: "register" as const, variant: 0 },
+    ]) {
+      expect(specLayer({ ...base, steps: [step] })).toBe("L10");
+    }
+  });
+
+  it("records each step on 1.35: refusals, the queue, an aborted in-flight resolver and a retired module", async () => {
+    const spec: FuzzSpec = {
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [
+            { facts: [0], derived: [], threshold: null, throwsAt: null },
+          ],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: true,
+      trace: false,
+      dynamic: { readers: true },
+      steps: [
+        { op: "settle" },
+        {
+          op: "define",
+          action: "register",
+          kind: "derive",
+          id: 0,
+          variant: 0,
+          deferred: false,
+        },
+        {
+          op: "define",
+          action: "register",
+          kind: "constraints",
+          id: 2,
+          // Its threshold, 1, is above f0: no DYN of its own, so the
+          // in-flight requirement is zk's alone and its unregister retracts it.
+          variant: 2,
+          deferred: true,
+        },
+        { op: "settle" },
+        { op: "inflight", bound: true, at: 5 },
+        { op: "advance", ms: 60 },
+        { op: "settle" },
+        { op: "module", action: "register", variant: 1 },
+        { op: "settle" },
+        { op: "back" },
+        { op: "module", action: "unregister", variant: 0 },
+        { op: "advance", ms: 30 },
+        { op: "settle" },
+      ],
+    };
+    const [v1] = engines();
+    const result = await runScenario(toScenario(spec), {
+      candidates: [v1 as never],
+      divergences: [],
+    });
+    expect(result.report).toBe("");
+    const externals = result.traces.reference.flatMap((e) =>
+      e.k === "external" && Array.isArray(e.data) ? [e.data as unknown[]] : [],
+    );
+    const text = JSON.stringify(externals);
+    // Rule 1: a static id refused with 1.35's text.
+    expect(text).toContain(
+      '[Directive] Derivation \\"d0\\" already exists. Use assign() to override.',
+    );
+    // D5: queued, then run inside the pass, where it is not dynamic yet.
+    const inside = externals.find(
+      (d) => typeof d[0] === "string" && d[0].endsWith("inside the pass"),
+    );
+    expect(inside?.[2]).toBe(false);
+    // K4 and U9b: the bound in-flight resolver is aborted, and still writes.
+    expect(externals).toContainEqual(["dyn aborted", "zr"]);
+    expect(externals.some((d) => d[0] === "dyn wrote" && d[1] === "zr")).toBe(
+      true,
+    );
+    // M5 to M7: the module registered, then retired.
+    expect(
+      externals.filter(
+        (d) => typeof d[0] === "string" && d[0].includes('"op":"module"'),
+      ).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      result.traces.reference.some(
+        (e) => e.k === "hook" && e.hook === "onModuleUnregistered",
+      ),
+    ).toBe(true);
+    expect(
+      result.traces.reference.some(
+        (e) => e.k === "hook" && e.hook === "onDefinitionRegister",
+      ),
+    ).toBe(true);
   });
 });
 

@@ -20,6 +20,7 @@ import {
   type FuzzSpec,
   specArbitrary,
   toScenario,
+  withoutDynamic,
   withoutHistory,
   withoutIntrospection,
 } from "../fuzz/model.js";
@@ -555,7 +556,10 @@ describe("the fuzzer catches injected faults", () => {
         // the trace and meta at layer 9 (the L9 RFC's B1): the trace option,
         // `maxRuns`, the fact tags and the meta steps are taken out too.
         fc.asyncProperty(
-          specArbitrary().map(withoutHistory).map(withoutIntrospection),
+          specArbitrary()
+            .map(withoutDynamic)
+            .map(withoutHistory)
+            .map(withoutIntrospection),
           async (spec) => {
             const result = await runScenario(toScenario(spec), {
               wrapCandidate: fault,
@@ -846,6 +850,205 @@ describe("the fuzzer catches injected trace and meta faults (L9-pre, rule 2)", (
       }),
     ).toBe(false);
     expect(same(run, { ...run, status: "pending" })).toBe(false);
+  });
+});
+
+/**
+ * The L10 RFC's harness rule 2. Each new step ships with a self-test: a
+ * dropped `onDefinitionRegister`, a deferred registration answered as
+ * applied a pass early, and a resolver detached instead of aborted on an
+ * unregister must each be caught. Each tamper is applied to 1.35 itself, on
+ * cases drawn at L10, so the first difference can only be the tamper's.
+ */
+describe("the fuzzer catches injected dynamic-definition faults (L10-pre, rule 2)", () => {
+  type Step = FuzzSpec["steps"][number];
+  const dynamicCases = (pick: (step: Step) => boolean) =>
+    specArbitrary({ ceiling: "L10" }).filter(
+      (s) => s.dynamic !== undefined && s.steps.some(pick),
+    );
+  const anyDynamic = dynamicCases(
+    (x) => x.op === "define" || x.op === "inflight" || x.op === "module",
+  );
+
+  async function caughtOnV1(
+    cases: fc.Arbitrary<FuzzSpec>,
+    fault: Fault,
+  ): Promise<string> {
+    const [v1] = engines() as [EngineHandle];
+    let caught = "";
+    await expect(
+      fc.assert(
+        fc.asyncProperty(cases, async (spec) => {
+          const result = await runScenario(toScenario(spec), {
+            candidates: [faulty(fault)(v1)],
+            divergences: [],
+          });
+          if (!result.ok) {
+            caught = result.report;
+            throw new Error(result.report);
+          }
+        }),
+        { seed: 0x5eed, numRuns: 200 },
+      ),
+    ).rejects.toThrow(/Property failed/);
+    expect(caught).toMatch(/engines differ/);
+
+    return caught;
+  }
+
+  /** `registry` with its methods wrapped by `over` (the rest as is). */
+  const wrapped = (registry: any, over: Record<string, unknown>) =>
+    new Proxy(registry, {
+      get: (target, prop) =>
+        typeof prop === "string" && prop in over
+          ? over[prop]
+          : Reflect.get(target, prop),
+    });
+
+  it("control: 1.35 against itself passes on the dynamic cases", async () => {
+    const [v1] = engines() as [EngineHandle];
+    let compared = 0;
+    for (const spec of fc.sample(anyDynamic, { seed: 0x5eed, numRuns: 40 })) {
+      const result = await runScenario(toScenario(spec), {
+        candidates: [v1],
+        divergences: [],
+      });
+      if (!result.runaway && !result.neverSettles) {
+        compared += 1;
+        expect(result.report).toBe("");
+      }
+    }
+    expect(compared).toBeGreaterThan(30);
+  });
+
+  it("drops one onDefinitionRegister", async () => {
+    let seen = 0;
+    const caught = await caughtOnV1(
+      dynamicCases(
+        (x) =>
+          (x.op === "define" && x.action === "register" && x.id >= 2) ||
+          x.op === "inflight",
+      ),
+      {
+        onLoad: () => {
+          seen = 0;
+        },
+        config: wrapRecorder((key, fn) => (...args) => {
+          if (key === "onDefinitionRegister" && ++seen === 1) {
+            return;
+          }
+          fn(...args);
+        }),
+      },
+    );
+
+    expect(caught).toMatch(/onDefinitionRegister/);
+  });
+
+  it("answers a deferred registration as applied a pass early", async () => {
+    // A register that returned while the registry still says "not dynamic"
+    // was queued (D5); the tampered registry answers it as registered at
+    // once, as an engine that applied it inside the pass would.
+    const early = (registry: any) => {
+      const pending = new Set<string>();
+
+      return wrapped(registry, {
+        register: (id: string, def: unknown) => {
+          const out = registry.register(id, def);
+          if (!registry.isDynamic(id)) {
+            pending.add(id);
+          }
+
+          return out;
+        },
+        isDynamic: (id: string) => registry.isDynamic(id) || pending.has(id),
+        listDynamic: () => {
+          const listed: string[] = registry.listDynamic();
+
+          return [
+            ...listed,
+            ...[...pending].filter((id) => !listed.includes(id)),
+          ];
+        },
+      });
+    };
+    const caught = await caughtOnV1(
+      dynamicCases(
+        (x) =>
+          x.op === "define" &&
+          x.deferred &&
+          x.action === "register" &&
+          x.id >= 2,
+      ),
+      {
+        system: (system) => ({
+          derive: early(system.derive),
+          constraints: early(system.constraints),
+          resolvers: early(system.resolvers),
+          effects: early(system.effects),
+        }),
+      },
+    );
+
+    expect(caught).toMatch(/inside the pass/);
+  });
+
+  it("detaches a resolver instead of aborting it on an unregister", async () => {
+    // A resolver registered through the tampered registry is handed a
+    // signal that an abort following a constraint's unregister never
+    // reaches: the resolver runs on, detached, as 2.0 does for a binding
+    // whose requirement was retracted (RFC-0003), where 1.35 aborts it (K4).
+    const caught = await caughtOnV1(
+      dynamicCases((x) => x.op === "inflight"),
+      {
+        system: (system) => {
+          let unregisters = 0;
+          const detach =
+            (resolve: (...args: any[]) => unknown) =>
+            (req: unknown, context: any) => {
+              const at = unregisters;
+              const controller = new AbortController();
+              context.signal?.addEventListener?.("abort", () => {
+                if (unregisters === at) {
+                  controller.abort(context.signal.reason);
+                }
+              });
+
+              return resolve(
+                req,
+                new Proxy(context, {
+                  get: (target, prop) =>
+                    prop === "signal"
+                      ? controller.signal
+                      : Reflect.get(target, prop),
+                }),
+              );
+            };
+          const withDetach = (def: any) => ({
+            ...def,
+            resolve: detach(def.resolve),
+          });
+
+          return {
+            constraints: wrapped(system.constraints, {
+              unregister: (id: string) => {
+                unregisters += 1;
+
+                return system.constraints.unregister(id);
+              },
+            }),
+            resolvers: wrapped(system.resolvers, {
+              register: (id: string, def: any) =>
+                system.resolvers.register(id, withDetach(def)),
+              assign: (id: string, def: any) =>
+                system.resolvers.assign(id, withDetach(def)),
+            }),
+          };
+        },
+      },
+    );
+
+    expect(caught).toMatch(/dyn aborted/);
   });
 });
 
