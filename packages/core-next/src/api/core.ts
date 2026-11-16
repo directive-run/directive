@@ -22,7 +22,7 @@
 
 import isDevelopment from "#is-development";
 import { createClock } from "../clock.js";
-import { Flags, Link, type ReactiveNode } from "../graph.js";
+import { Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
   type KernelEvent,
@@ -138,6 +138,16 @@ interface Derivation {
    * + the id, made once rather than on every test.
    */
   member_: string;
+}
+
+// The graph's Flags bits the core reads (graph.ts), as literals: a const enum
+// is inlined at each use, where Flags is an object every bundle would carry.
+// l10b-modules.test.ts pins each value to Flags.
+// biome-ignore lint/suspicious/noConstEnum: internal, never exported.
+const enum F {
+  Dirty = 4,
+  Running = 16,
+  Errored = 512,
 }
 
 /**
@@ -781,7 +791,7 @@ export function createSystemCore<const M extends ModuleSchema>(
             d.stale_ = true;
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
-            node.flags |= Flags.Dirty;
+            node.flags |= F.Dirty;
             if (wants("derivation.invalidate")) {
               emit("derivation.invalidate", { id: d.id_ });
             }
@@ -883,7 +893,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           value,
           // The value before this compute: the graph stores the new one once
           // this returns, and an error in its place after a throw (L9 seam).
-          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
+          oldValue: d.node_.flags & F.Errored ? undefined : d.node_.value,
           deps: Array.from(deps, describeDep),
         });
       }
@@ -893,7 +903,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       d.live_ = true;
       // 1.35 keeps a throwing derivation stale: the next read runs it again,
       // which is also all "retry" asks. Marked first: "throw" leaves here.
-      d.node_.flags |= Flags.Dirty;
+      d.node_.flags |= F.Dirty;
       context.reportError("derivation", d.id_, error);
       throw error;
     }
@@ -990,7 +1000,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       },
       call_(id) {
         const node = derivations.get(id)!.node_;
-        node.flags |= Flags.Dirty;
+        node.flags |= F.Dirty;
 
         return graph.read(node);
       },
@@ -1002,7 +1012,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
-    if (d.node_.flags & Flags.Running) {
+    if (d.node_.flags & F.Running) {
       // 1.35's text (derivations.ts:514–517), not the graph's.
       throw new Error(
         `[Directive] Circular dependency detected in derivation: ${id}`,

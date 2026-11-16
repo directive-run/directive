@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createModule } from "../api/core.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
+import { Flags } from "../graph.js";
 
 type Any = any;
 
@@ -37,6 +38,12 @@ const started = (extra?: Record<string, unknown>, options = {}) => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("the core's copy of the graph's bits (core.ts const enum F)", () => {
+  it("each bit the core inlines is graph.ts's Flags value", () => {
+    expect([Flags.Dirty, Flags.Running, Flags.Errored]).toEqual([4, 16, 512]);
+  });
 });
 
 describe("`after` on a dependency registered later (constraints.ts blocks)", () => {
@@ -183,6 +190,45 @@ describe("registerModule (dynamic.ts modules, M1 to M3)", () => {
     system.destroy();
   });
 
+  it("M2: a derivation that read the one replaced computes again (the kind's replace_, not a second add_)", () => {
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { n: t.number() },
+          derivations: { double: t.number(), quad: t.number() },
+        },
+        init: (facts: Any) => {
+          facts.n = 1;
+        },
+        derive: {
+          double: (facts: Any) => facts.n * 2,
+          quad: (_facts: Any, derived: Any) => derived.double * 2,
+        },
+      } as never),
+    } as never) as Any;
+    system.start();
+    expect(system.derive.quad).toBe(4);
+    system.registerModule({
+      id: "y",
+      schema: { facts: {} },
+      derive: { double: () => -1 },
+    });
+    expect(system.derive.quad).toBe(-2);
+    system.destroy();
+  });
+
+  it("inspect lists each module as { id, meta } only (inspect.ts modules)", () => {
+    const system = started();
+    system.registerModule(extra({}, { meta: { label: "X" } }));
+    const rows = system.inspect().modules;
+    expect(rows.map((row: Any) => Object.keys(row))).toEqual([
+      ["id", "meta"],
+      ["id", "meta"],
+    ]);
+    expect(rows[1]).toEqual({ id: "x", meta: { label: "X" } });
+    system.destroy();
+  });
+
   it("meta.subscribe hears registerModule twice: the store's keys, then the module", () => {
     const system = started();
     let heard = 0;
@@ -220,6 +266,20 @@ describe("unregisterModule (dynamic.ts modules, M5 to M7)", () => {
       '[Directive] Cannot unregister module "x": no such module is registered.',
     );
     system.destroy();
+  });
+
+  it("detaches the module's sources at once (sources.ts remove_)", async () => {
+    const detach = vi.fn();
+    const attach = vi.fn(() => detach);
+    const system = started();
+    system.registerModule(extra({}, { sources: { feed: { attach } } }));
+    await system.settle();
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(detach).not.toHaveBeenCalled();
+    await system.unregisterModule("x");
+    expect(detach).toHaveBeenCalledTimes(1);
+    system.destroy();
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 
   it("a second call joins the first, and onStop's throw is logged, not raised", async () => {
