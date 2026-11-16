@@ -101,13 +101,14 @@ describe("a batch run detached by a re-raise, then retracted", () => {
     expect(log).toEqual(["call 1", "call 2"]);
     facts.b = false; // a write retracts x
     await vi.advanceTimersByTimeAsync(1);
-    // Both runs that own x are aborted and report their cancel.
+    // Both runs that own x are aborted and report their cancel, in the
+    // order they started (1.35).
     expect(log).toEqual([
       "call 1",
       "call 2",
-      "aborted 2",
-      "cancel x",
       "aborted 1",
+      "cancel x",
+      "aborted 2",
       "cancel x",
     ]);
     await vi.advanceTimersByTimeAsync(200);
@@ -189,6 +190,76 @@ describe("a batch run detached by a re-raise, then retracted", () => {
     expect(calls).toBe(2);
     expect(log).toContain("complete x");
     expect(facts.out).toBe(2);
+    system.stop();
+  });
+
+  it("aborts the batches that own it in the order they started (1.35)", async () => {
+    const log: string[] = [];
+    let calls = 0;
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.boolean(), b: t.boolean(), out: t.number() },
+        derivations: {},
+        events: {},
+        requirements: { FETCH: { id: t.string() } },
+      },
+      init: (f: any) => {
+        f.a = false;
+        f.b = false;
+        f.out = 0;
+      },
+      constraints: {
+        bound: {
+          when: (f: any) => f.a,
+          require: () => [{ type: "FETCH", id: "x" }],
+          abortOn: ["out"],
+        },
+        plain: {
+          when: (f: any) => f.b,
+          require: () => [{ type: "FETCH", id: "x" }],
+        },
+      },
+      resolvers: {
+        fetch: {
+          requirement: "FETCH",
+          key: (r: any) => r.id,
+          batch: { enabled: true, windowMs: 10, maxSize: 5 },
+          resolveBatch: async (_reqs: any[], ctx: any) => {
+            const n = ++calls;
+            log.push(`call ${n}`);
+            ctx.signal.addEventListener("abort", () =>
+              log.push(`aborted ${n}`),
+            );
+            await new Promise((r) => setTimeout(r, 30));
+            ctx.signal.aborted || (ctx.facts.out = n);
+          },
+        },
+      },
+    } as never);
+    const system = createSystem({ module: mod, plugins: [recorder(log)] });
+    system.start();
+    const facts = system.facts as any;
+    facts.a = true;
+    await vi.advanceTimersByTimeAsync(11); // call 1 runs x
+    facts.a = false; // bound: call 1 is let go
+    await vi.advanceTimersByTimeAsync(1);
+    facts.b = true; // x raised again, not bound: call 2 runs it
+    await vi.advanceTimersByTimeAsync(11);
+    facts.b = false; // a write retracts x: both calls own it
+    await vi.advanceTimersByTimeAsync(1);
+    // 1.35 gives "aborted 1, aborted 2" (the review's probe A); 2.0 aborted
+    // the run in flight first.
+    expect(log).toEqual([
+      "call 1",
+      "call 2",
+      "aborted 1",
+      "cancel x",
+      "aborted 2",
+      "cancel x",
+    ]);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(log.slice(6)).toEqual([]);
+    expect(facts.out).toBe(0);
     system.stop();
   });
 });
@@ -295,6 +366,68 @@ describe("a let-go batch run (RFC-0003)", () => {
     facts.a = false; // retracted; bound, so the run is let go
     await vi.advanceTimersByTimeAsync(100);
     expect(log).not.toContain("aborted");
+    expect(log).not.toContain("cancel x");
+    expect(log).toContain("complete x");
+    expect(facts.out).toBe(1);
+    system.stop();
+  });
+
+  it("a let-go single run is not touched by an unrelated retraction", async () => {
+    const log: string[] = [];
+    const mod = createModule("m", {
+      schema: {
+        facts: { a: t.boolean(), b: t.boolean(), out: t.number() },
+        derivations: {},
+        events: {},
+        requirements: { FETCH: { id: t.string() } },
+      },
+      init: (f: any) => {
+        f.a = false;
+        f.b = false;
+        f.out = 0;
+      },
+      constraints: {
+        bound: {
+          when: (f: any) => f.a,
+          require: () => [{ type: "FETCH", id: "x" }],
+          abortOn: ["out"],
+        },
+        plain: {
+          when: (f: any) => f.b,
+          require: () => [{ type: "FETCH", id: "y" }],
+        },
+      },
+      resolvers: {
+        // Not batched: each requirement is a single run.
+        fetch: {
+          requirement: "FETCH",
+          key: (r: any) => r.id,
+          resolve: async (req: any, ctx: any) => {
+            log.push(`run ${req.id}`);
+            ctx.signal.addEventListener("abort", () =>
+              log.push(`aborted ${req.id}`),
+            );
+            await new Promise((r) => setTimeout(r, 30));
+            ctx.signal.aborted || req.id !== "x" || (ctx.facts.out = 1);
+          },
+        },
+      },
+    } as never);
+    const system = createSystem({ module: mod, plugins: [recorder(log)] });
+    system.start();
+    const facts = system.facts as any;
+    facts.a = true;
+    facts.b = true;
+    await vi.advanceTimersByTimeAsync(1); // x and y run
+    expect(log).toEqual(["run x", "run y"]);
+    facts.a = false; // x retracted; bound, so its run is let go
+    await vi.advanceTimersByTimeAsync(1);
+    facts.b = false; // y retracted: only y's run is aborted
+    await vi.advanceTimersByTimeAsync(1);
+    expect(log).toEqual(["run x", "run y", "aborted y", "cancel y"]);
+    await vi.advanceTimersByTimeAsync(100);
+    // The let-go run goes on: its write lands and it reports x.
+    expect(log).not.toContain("aborted x");
     expect(log).not.toContain("cancel x");
     expect(log).toContain("complete x");
     expect(facts.out).toBe(1);

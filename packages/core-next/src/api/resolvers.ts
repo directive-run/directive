@@ -317,7 +317,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   /** The last stamp handed out: run ids start at 1 (0 is unattributed). */
   let stamps = 0;
 
-  const find = (req: Requirement): string | null => {
+  /** The id of the first resolver that handles it, if any. */
+  const find = (req: Requirement) => {
     for (const id in defs) {
       const def = defs[id];
       // As 1.35: only an object definition handles requirements.
@@ -329,8 +330,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         return id;
       }
     }
-
-    return null;
   };
 
   /**
@@ -747,6 +746,12 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       detached.add(run);
     }
   };
+  /**
+   * The detached runs and `runs`, in the order they started (1.35's for its
+   * batches). An undefined run sorts last and is not compared.
+   */
+  const started = <R extends Run | undefined>(runs: R[]) =>
+    [...detached, ...runs].sort((a, b) => a!.stamp_ - b!.stamp_);
   // The batch part, given the machinery it shares; nothing without it.
   const batcher = options.batch_?.({
     run_: make,
@@ -813,13 +818,14 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     abort(requirementId) {
       const run = inflight.get(requirementId);
       const ids: string[] = [];
-      // Quirk g: a batch goes on for the rest (1.35 cancels them all).
-      run ? part(run, requirementId) : batcher?.drop_(ids, requirementId);
-      // 1.35 aborts every batch that owns it, so a detached one too (its
-      // detach leaves a batch in flight), unless it was queued (1.35
-      // cancels it there and stops). A detached single run goes on.
+      run ? run.reqs_ || cancel(run) : batcher?.drop_(ids, requirementId);
+      // 1.35 aborts every batch that owns it, in the order they started, so
+      // a detached one too (its detach leaves a batch in flight), unless it
+      // was queued (1.35 cancels it there and stops). A detached single run
+      // goes on. Quirk g: a batch goes on for the rest (1.35 cancels them
+      // all).
       ids[0] ||
-        detached.forEach((old) => old.reqs_ && part(old, requirementId));
+        started([run]).forEach((old) => old?.reqs_ && part(old, requirementId));
     },
     abortAll_() {
       const ids: string[] = [];
@@ -832,9 +838,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         run.reqs_ || cancel(run, ids);
       }
       batcher?.drop_(ids);
-      for (const run of [...detached, ...runs].sort(
-        (a, b) => a.stamp_ - b.stamp_,
-      )) {
+      for (const run of started(runs)) {
         run.reqs_ && cancel(run, runs.includes(run) && ids);
       }
 
