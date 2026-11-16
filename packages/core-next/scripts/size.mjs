@@ -534,7 +534,8 @@ for (const [name, engine] of Object.entries(engines)) {
 // The beta wiring of the minimal fixture: reported, not budgeted (no entry in
 // size-budgets.next.json, and nothing here sets an exit code). `createSystem`
 // wires every part into every app; the beta turns the seven below, and history
-// (wired as a call, `withHistory(option)`), into imports,
+// and the trace (wired as calls, `withHistory(option)`, `withTrace(option)`),
+// into imports,
 // so an app that does not use one does not pay for it. This builds the same
 // fixture against api/system.ts with those parts' imports and `parts` entries
 // removed, as a source edit at bundle time (the inlining of `#is-development`
@@ -550,6 +551,11 @@ const BETA_OMITTED = [
   "withMissing",
   "withMeta",
 ];
+// The parts wired as a call, with the file each is imported from.
+const BETA_CALLED = [
+  ["withHistory", "history"],
+  ["withTrace", "trace"],
+];
 const betaWiringSource = (source) => {
   const names = BETA_OMITTED.join("|");
   const importLine = new RegExp(
@@ -563,20 +569,27 @@ const betaWiringSource = (source) => {
     return undefined;
   }
 
-  // History is wired as a call (`withHistory(option)`, L8), so it is dropped
-  // apart from the seven: its import and its whole call entry.
-  const historyImport = /^import \{ withHistory \} from "\.\/history\.js";\n/m;
-  // One line (`withHistory(history as never),`) or wrapped over several.
-  const historyEntry = /^ {4}withHistory\((?:[^\n]*|[\s\S]*?\n {4})\),\n/m;
-  if (!historyImport.test(source) || !historyEntry.test(source)) {
-    return undefined;
+  let edited = source.replace(importLine, "").replace(partEntry, "");
+  // History (L8) and the trace (L9) are wired as calls (`withHistory(option)`,
+  // `withTrace(option)`), so each is dropped apart from the seven: its import
+  // and its whole call entry.
+  for (const [part, file] of BETA_CALLED) {
+    const callImport = new RegExp(
+      `^import \\{ ${part} \\} from "\\./${file}\\.js";\\n`,
+      "m",
+    );
+    // One line (`withHistory(history as never),`) or wrapped over several.
+    const callEntry = new RegExp(
+      `^ {4}${part}\\((?:[^\\n]*|[\\s\\S]*?\\n {4})\\),\\n`,
+      "m",
+    );
+    if (!callImport.test(edited) || !callEntry.test(edited)) {
+      return undefined;
+    }
+    edited = edited.replace(callImport, "").replace(callEntry, "");
   }
 
-  return source
-    .replace(importLine, "")
-    .replace(partEntry, "")
-    .replace(historyImport, "")
-    .replace(historyEntry, "");
+  return edited;
 };
 let betaApplied = false;
 const betaWiring = {
@@ -606,7 +619,7 @@ if (betaApplied) {
   );
 } else {
   const message =
-    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing and withMeta as one import and one `parts` entry each, and withHistory as one import and one `withHistory(...)` entry; update BETA_OMITTED / betaWiringSource in scripts/size.mjs";
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing and withMeta as one import and one `parts` entry each, and withHistory and withTrace as one import and one call entry each; update BETA_OMITTED / BETA_CALLED / betaWiringSource in scripts/size.mjs";
   // Not a budget, but under --check (CI) a skipped line fails, so it cannot
   // vanish from the report unnoticed.
   if (process.argv.includes("--check")) {
