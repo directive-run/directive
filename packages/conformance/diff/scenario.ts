@@ -38,6 +38,7 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { FUZZ_HISTORY_STEP_OPS } from "../lib/fuzz.js";
 import {
   type Difference,
   compareContract,
@@ -51,6 +52,7 @@ import {
   isPastStop,
   latestPosition,
   straddlesStop,
+  traceIdProblems,
 } from "./compare.js";
 import "./coverage.js";
 import { type CoreApi, type EngineHandle, engines } from "./engines.js";
@@ -1451,11 +1453,33 @@ export function stepOps(trace: TraceEntry[]): Map<number, string> {
   for (const e of trace) {
     const op = e.k === "step" ? (e.step as { op?: unknown })?.op : undefined;
     if (e.k === "step" && typeof op === "string") {
-      out.set(e.i, op);
+      out.set(e.i, op === "run" ? (historyOp(e.step) ?? op) : op);
     }
   }
 
   return out;
+}
+
+/**
+ * A fuzz history step's op: the model runs each one as a `run` step labelled
+ * with the step as JSON (`{"op":"back","steps":1}`), so `during` can name it
+ * (lib/fuzz.ts `FUZZ_HISTORY_STEP_OPS`). Any other run step, a hand
+ * scenario's among them, stays "run".
+ */
+function historyOp(step: unknown): string | undefined {
+  const label = (step as { label?: unknown })?.label;
+  if (typeof label !== "string" || !label.startsWith("{")) {
+    return undefined;
+  }
+  try {
+    const op = (JSON.parse(label) as { op?: unknown })?.op;
+
+    return typeof op === "string" && FUZZ_HISTORY_STEP_OPS.includes(op)
+      ? op
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** A difference an entry covered: by which entry, and which of its excuses. */
@@ -1570,15 +1594,20 @@ export function explain(
   const used = new Set<string>();
   const covered: Covered[] = [];
   const dropped = new Map<string, number>();
-  const unexplained = differences.filter((d) => {
+  const pastCut = (d: Difference) => {
     const cut = cuts.get(d.engine);
-    if (
-      cut &&
+
+    return (
+      cut !== undefined &&
       (isPastSharedPoint(d, cut.at) ||
         isPastStop(d, cut.at) ||
         straddlesStop(d, cut.at) ||
         sameRecord(d, cut.at))
-    ) {
+    );
+  };
+  const twins = shiftedTwins(differences, pastCut);
+  const unexplained = differences.filter((d) => {
+    if (pastCut(d) || twins.has(d)) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
       return false;
@@ -1605,6 +1634,55 @@ export function explain(
       dropped: dropped.get(engine) ?? 0,
     })),
   };
+}
+
+/**
+ * The missing records an `ends` stop drops with their twins: a `missing`
+ * difference the stop does not drop, whose equal record (same engine,
+ * stream, kind, step and phase, the same record as compared) is an `extra`
+ * difference the stop does drop. The record is on both engines, in the
+ * same step and phase; it is unpaired only because the alignment, keyed by
+ * kind, paired the records around it the other way, and the stop drops the
+ * engine's copy as an unmatched record after the shared match point (the
+ * owner's rule, 2026-11-01: "drop every stream's unmatched records after the
+ * last record both engines matched before the stop"). Quirk a's extra
+ * reconcile pass on 2.0 did this (fuzz cases 19:all#25 and 2:all#93: the
+ * pass took the place of 1.35's, and its `onResolverComplete` was left
+ * unpaired on both engines; the stop dropped only 2.0's). Each extra is
+ * twin to one missing record at most. A missing record with no equal extra,
+ * or whose equal extra is still compared, is reported as before, so a
+ * record one engine lacks still fails. Self-test:
+ * diff/self/trace-contract.test.ts.
+ */
+export function shiftedTwins(
+  differences: Difference[],
+  pastCut: (d: Difference) => boolean,
+): Set<Difference> {
+  const key = (d: Difference, record: Json | undefined) =>
+    `${d.engine}\u0000${d.stream}\u0000${d.kind}\u0000${d.step}\u0000${d.phase}\u0000${JSON.stringify(record)}`;
+  const extras = new Map<string, Difference[]>();
+  for (const d of differences) {
+    if (d.op === "extra" && pastCut(d)) {
+      const k = key(d, d.candidate);
+      extras.set(k, [...(extras.get(k) ?? []), d]);
+    }
+  }
+  const out = new Set<Difference>();
+  if (extras.size === 0) {
+    return out;
+  }
+  for (const d of differences) {
+    if (d.op !== "missing" || pastCut(d)) {
+      continue;
+    }
+    const list = extras.get(key(d, d.reference));
+    if (list && list.length > 0) {
+      list.shift();
+      out.add(d);
+    }
+  }
+
+  return out;
 }
 
 /**
@@ -2042,6 +2120,9 @@ export async function runScenario(
     ...Object.entries(theirs),
   ] as [string, TraceEntry[]][]) {
     for (const problem of drawProblems(trace, drawn)) {
+      problems.push(`${engine} in scenario "${def.name}": ${problem}`);
+    }
+    for (const problem of traceIdProblems(trace)) {
       problems.push(`${engine} in scenario "${def.name}": ${problem}`);
     }
   }

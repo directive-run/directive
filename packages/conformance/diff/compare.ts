@@ -726,7 +726,11 @@ export function traceRunContract(run: Json): Json {
         : row,
     );
   }
-  if (Array.isArray(out.anomalies)) {
+  // Only a list that held a duration anomaly and nothing else is left out:
+  // 1.35 writes `anomalies` only when it has one (packages/core/src/core/
+  // engine-trace.ts:345), so an engine's empty list is not 1.35's absent
+  // field, and stays a difference (L9 gate; #392's review).
+  if (Array.isArray(out.anomalies) && out.anomalies.length > 0) {
     const kept = out.anomalies.filter(
       (a) => !(typeof a === "string" && DURATION_ANOMALY.test(a)),
     );
@@ -734,6 +738,58 @@ export function traceRunContract(run: Json): Json {
       out.anomalies = kept;
     } else {
       delete out.anomalies;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Trace ids by order (the L9 RFC's harness rule 1: "Trace ids are compared
+ * by order"). `traceRunContract` masks an id's value, so this checks the
+ * order on every engine, the reference too, as `drawProblems` checks draws:
+ * each `inspect().trace` list holds integer ids in strictly increasing order
+ * (a repeated or a non-monotonic id fails), and no run is reported to
+ * `onTraceComplete` twice. Self-test: diff/self/trace-contract.test.ts.
+ */
+export function traceIdProblems(trace: TraceEntry[]): string[] {
+  const out: string[] = [];
+  const reported = new Map<Json, number>();
+  for (const [index, entry] of trace.entries()) {
+    if (entry.k === "hook" && entry.hook === "onTraceComplete") {
+      const run = entry.args[0];
+      const id = isObject(run) ? run.id : undefined;
+      if (typeof id !== "number" || !Number.isInteger(id)) {
+        out.push(
+          `hook #${index}: onTraceComplete's run id ${JSON.stringify(id ?? null)} is not an integer`,
+        );
+      } else if (reported.has(id)) {
+        out.push(
+          `hook #${index}: onTraceComplete reports run ${id} again (first at #${reported.get(id)})`,
+        );
+      } else {
+        reported.set(id, index);
+      }
+    }
+    if (entry.k === "state" && isObject(entry.inspect)) {
+      const runs = entry.inspect.trace;
+      if (!Array.isArray(runs)) {
+        continue;
+      }
+      let last: number | undefined;
+      for (const [i, run] of runs.entries()) {
+        const id = isObject(run) ? run.id : undefined;
+        if (typeof id !== "number" || !Number.isInteger(id)) {
+          out.push(
+            `state #${index}: inspect().trace[${i}].id ${JSON.stringify(id ?? null)} is not an integer`,
+          );
+        } else if (last !== undefined && id <= last) {
+          out.push(
+            `state #${index}: inspect().trace[${i}].id ${id} is not above the id before it (${last}): run ids must be unique and increasing`,
+          );
+        }
+        last = typeof id === "number" ? id : last;
+      }
     }
   }
 
@@ -908,6 +964,22 @@ const printed = (k: Keyed) =>
   k.entry.k === "console" ? JSON.stringify(k.entry.args) : "";
 
 /**
+ * In the hook stream, an `onTraceComplete` record's run as compared (the
+ * projection's text), and "" for every other hook: `lcs` breaks ties by it,
+ * so of the longest pairings the one that pairs the most identical runs is
+ * taken. Row (bi) makes 2.0 report a run 1.35 dropped from its ring, in the
+ * same step and phase as the runs both report: by keys alone the extra
+ * report took the first run's place and every later report was paired with
+ * the one before it, a `changed` on each field (fuzz cases 8:all#181,
+ * 12:all#149). The pairing is still a longest one, so no record that is
+ * missing or extra by keys pairs. Self-test: diff/self/trace-contract.test.ts.
+ */
+const traceRunText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
+  k.entry.k === "hook" && k.entry.hook === "onTraceComplete"
+    ? JSON.stringify(project(k.entry))
+    : "";
+
+/**
  * Longest common subsequence of keys: pairs of matched indexes.
  *
  * With `text` (the console stream: each record's printed arguments, which
@@ -1057,10 +1129,15 @@ function compareWith(
     const a = left.filter((k) => k.stream === stream);
     const b = right.filter((k) => k.stream === stream);
 
+    const runText = (k: Keyed) => traceRunText(k, project);
     const text =
       stream === "console"
         ? ([a.map(printed), b.map(printed)] as [string[], string[]])
-        : undefined;
+        : stream === "hook" &&
+            a.some((k) => k.kind === "onTraceComplete") &&
+            b.some((k) => k.kind === "onTraceComplete")
+          ? ([a.map(runText), b.map(runText)] as [string[], string[]])
+          : undefined;
 
     return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf), text) };
   });

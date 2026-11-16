@@ -94,6 +94,10 @@ export const FUZZ_TRIGGERS = [
   "importedEmpty",
   "restoredTwice",
   "changesetSteps",
+  "traceRing",
+  "disableRetracts",
+  "batchWriteRetracts",
+  "batchClobbered",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
@@ -116,6 +120,35 @@ export const FUZZ_STEP_OPS: readonly string[] = [
   "start",
   "destroy",
   "snapshot",
+  // The history ops (L8): the trace records each as a `run` step whose label
+  // is the step as JSON, and `stepOps` (diff/scenario.ts) reads the op from it.
+  "back",
+  "forward",
+  "goTo",
+  "replay",
+  "roundtrip",
+  "begin",
+  "end",
+  "pause",
+  "resume",
+];
+
+/**
+ * The history step ops (diff/fuzz/model.ts `HISTORY_OPS`): a fuzz trace
+ * records each as a `run` step labelled with the step as JSON, which
+ * `stepOps` reads, so an entry's `during` can name one (L9 gate; the L8
+ * gate's follow-up).
+ */
+export const FUZZ_HISTORY_STEP_OPS: readonly string[] = [
+  "back",
+  "forward",
+  "goTo",
+  "replay",
+  "roundtrip",
+  "begin",
+  "end",
+  "pause",
+  "resume",
 ];
 
 /**
