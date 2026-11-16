@@ -86,8 +86,11 @@ export interface Constraints {
   isDisabled(id: string): boolean;
   /** 1.35's constraint state, for inspect() and explain(). */
   state_(id: string): ConstraintState | undefined;
-  /** L10: a constraint registered or assigned, and one unregistered. */
-  add_(id: string): void;
+  /**
+   * L10: a constraint registered or assigned, and one unregistered. `full`
+   * rebuilds the `after` order (an assign, or a register that lists `after`).
+   */
+  add_(id: string, full?: unknown): void;
   remove_(id: string): void;
   /** L10 (D8): the requirements it would add now, with `props` merged in. */
   call_(
@@ -212,18 +215,25 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     topo.set(id, topo.size);
   };
   let sorted: string[] = [];
-  /** The order again (L10: a definition came, changed or went). */
-  const resort = () => {
-    topo.clear();
+  /**
+   * The order again (L10: a definition came, changed or went). As 1.35
+   * (constraints.ts registerDefinitions), a register rebuilds the `after`
+   * order only when the new constraint lists `after`; until then it ranks
+   * with the first (1.35's `topologicalIndex.get(id) ?? 0`).
+   */
+  const resort = (full?: unknown) => {
     const all = Object.keys(defs);
-    all.forEach(visit);
+    if (full) {
+      topo.clear();
+      all.forEach(visit);
+    }
     sorted = all.sort(
       (a, b) =>
         (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
-        topo.get(a)! - topo.get(b)!,
+        (topo.get(a) ?? 0) - (topo.get(b) ?? 0),
     );
   };
-  resort();
+  resort(1);
   const enabled = () =>
     disabled.size ? sorted.filter((id) => !disabled.has(id)) : sorted;
 
@@ -686,14 +696,14 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     isDisabled: (id) => disabled.has(id),
     // L10: the registry's hooks; it has written `defs` first.
-    add_(id) {
+    add_(id, full) {
       check(id);
       // 1.35's assign starts the state again too (initState).
       states.set(id, fresh(id));
       unanswered.add(id);
       defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
       dirty.add(id);
-      resort();
+      resort(full);
     },
     remove_(id) {
       // I3: gone from `states` and `last` together.
@@ -711,15 +721,17 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       ]) {
         set.delete(id);
       }
-      resort();
+      resort(1);
     },
     async call_(id, props) {
       if (disabled.has(id)) {
         return [];
       }
-      const active = await (asyncIds.has(id)
-        ? evaluateAsync(id)
-        : evaluateSync(id));
+      // 1.35's callOne awaits only a promise: a sync answer costs no tick.
+      let active = (asyncIds.has(id) ? evaluateAsync : evaluateSync)(id);
+      if (active instanceof Promise) {
+        active = await active;
+      }
 
       return active
         ? requirementsOf(id).reqs.map((req) => {

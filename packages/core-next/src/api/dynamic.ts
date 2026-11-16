@@ -21,8 +21,8 @@
 
 import isDevelopment from "#is-development";
 import { type DefinitionMeta, freezeMeta } from "../types/meta.js";
-import type { SystemPart } from "./core.js";
-import { BLOCKED_PROPS } from "./facts.js";
+import type { SystemContext, SystemPart } from "./core.js";
+import { BLOCKED_PROPS, MEMBER_DEP_PREFIX } from "./facts.js";
 
 /** 1.35's type names, each with its module map (and `system` member). */
 const MAPS: Record<string, string> = {
@@ -61,12 +61,55 @@ const computeOf = (def: any): unknown => {
   return fn;
 };
 
+type Kinds = Record<string, Record<string, unknown>>;
+/** On each kind's object (`system.constraints`, ...): its type and its system's registry. */
+const OWNER = Symbol();
+/**
+ * The six members, one getter each for every system: the registry is built
+ * at the first read of one, so a system that never touches them builds none
+ * (about 3.8 KB a system, measured on startup-10-modules).
+ */
+const members = Object.fromEntries(
+  NAMES.map((name) => [
+    name,
+    {
+      enumerable: true,
+      get(this: { [OWNER]: [string, () => Kinds] }) {
+        const [type, build] = this[OWNER];
+
+        return build()[type]![name];
+      },
+    },
+  ]),
+);
+
 export const withDynamic: SystemPart = (ctx) => {
+  const system = ctx.system as Record<string, any>;
+  let kinds: Kinds | undefined;
+  const build = () => (kinds ??= registry(ctx));
+  for (const type in MAPS) {
+    if (type !== "derivation") {
+      const target = (system[MAPS[type]!] ??= {});
+      target[OWNER] = [type, build];
+      Object.defineProperties(target, members);
+    }
+  }
+  // The six members come first, as 1.35's derive accessor
+  // (engine-accessors.ts:46–55); everything else is the core's view.
+  system.derive = new Proxy(system.derive, {
+    get: (target, id) =>
+      Object.hasOwn(members, id)
+        ? build().derivation![id as string]
+        : target[id],
+  });
+};
+
+const registry = (ctx: SystemContext): Kinds => {
   const system = ctx.system as Record<string, any>;
   const m = ctx.module as Record<string, any>;
   const dynamic: Record<string, Set<string>> = {};
   const queue: [string, string, string, any][] = [];
-  const methods: Record<string, unknown> = {};
+  const kinds: Kinds = {};
   const emit = (at: string, data: Record<string, unknown>) =>
     ctx.wants_(at) && ctx.emit_(at, data);
   const check = (id: unknown) => {
@@ -91,6 +134,9 @@ export const withDynamic: SystemPart = (ctx) => {
     const map = m[MAPS[type]!];
     const ids = dynamic[type]!;
     const hooks = ctx.kinds_[type];
+    const written = ctx.counts_()[1] as Set<string>;
+    const n = written.size;
+    let owed: unknown;
     if (op === "unregister") {
       // D3: a static or unknown id is no error.
       if (!ids.has(id)) {
@@ -106,6 +152,7 @@ export const withDynamic: SystemPart = (ctx) => {
       delete map[id];
       ids.delete(id);
       hooks!.remove_(id, old);
+      owed = owe(op, type, id, written, n);
       emit("definition.unregister", { type, id });
     } else {
       if (type === "derivation" && NAMES.includes(id)) {
@@ -130,6 +177,7 @@ export const withDynamic: SystemPart = (ctx) => {
         // The reconcile part is built at the first constraint or resolver
         // of a system that had none, from the map just written.
         hooks ? hooks.add_(id, arg) : ctx.l2_!();
+        owed = owe(op, type, id, written, n);
         ids.add(id);
         emit("definition.register", { type, id, def });
         // K6: an effect's declared name that is now a derivation links to it.
@@ -138,22 +186,52 @@ export const withDynamic: SystemPart = (ctx) => {
         }
       } else {
         hooks!.replace_(id, arg);
+        owed = owe(op, type, id, written, n);
         emit("definition.assign", { type, id, def, original });
       }
     }
     ctx.metaChanged_?.();
-    // D7: a constraint or resolver change asks for a pass; a derivation or
-    // an effect only when it left work owed (a changed key). An assign owes
-    // none when nothing is watched (1.35's pendingInvalidationCount is 0);
-    // a register or unregister wakes who asked about the name, row (bm).
-    if (
-      type === "constraint" ||
-      type === "resolver" ||
-      (ctx.counts_()[1].size &&
-        (op !== "assign" || system.inspect().observedDerivations))
-    ) {
+    if (owed) {
       ctx.schedule();
     }
+  };
+  /**
+   * D7, 1.35's scheduleIfWorkOwed: a constraint or resolver change asks for
+   * a pass, an effect's never. A derivation's asks only when it left an
+   * announcement owed: an assign, or an unregister that staled a reader,
+   * while something is watched (pendingInvalidationCount); a register only
+   * for who asked about the name before it existed, row (bm). Owed nothing,
+   * the keys the change wrote go (1.35 drops its roots), so no later pass
+   * carries them; an effect that tested the name keeps its membership key,
+   * quirk (c) and (w).
+   */
+  const owe = (
+    op: string,
+    type: string,
+    id: string,
+    written: Set<string>,
+    n: number,
+  ) => {
+    let owed: unknown = type === "constraint" || type === "resolver";
+    if (type === "derivation") {
+      const member = MEMBER_DEP_PREFIX + id;
+      const fresh = [...written].slice(n);
+      owed =
+        op === "register"
+          ? fresh.length
+          : system.inspect().observedDerivations &&
+            (op === "assign" || fresh.some((key) => key !== member));
+      if (!owed) {
+        for (const key of fresh) {
+          key[0]! < " " && written.delete(key);
+        }
+        op !== "assign" &&
+          (ctx.kernel.features as any).effects?.reads_(member) &&
+          written.add(member);
+      }
+    }
+
+    return owed;
   };
   const flush = () => {
     ctx.end_ = undefined;
@@ -213,23 +291,16 @@ export const withDynamic: SystemPart = (ctx) => {
   };
   for (const type in MAPS) {
     const ids = (dynamic[type] = new Set());
-    Object.assign(
-      type === "derivation" ? methods : (system[MAPS[type]!] ??= {}),
-      {
-        register: guarded("register", type),
-        assign: guarded("assign", type),
-        unregister: guarded("unregister", type),
-        call: call(type),
-        // D9: only what `register` added.
-        isDynamic: (id: string) => ids.has(id),
-        listDynamic: () => [...ids],
-      },
-    );
+    kinds[type] = {
+      register: guarded("register", type),
+      assign: guarded("assign", type),
+      unregister: guarded("unregister", type),
+      call: call(type),
+      // D9: only what `register` added.
+      isDynamic: (id: string) => ids.has(id),
+      listDynamic: () => [...ids],
+    };
   }
-  // The six members come first, as 1.35's derive accessor
-  // (engine-accessors.ts:46–55); everything else is the core's view.
-  system.derive = new Proxy(system.derive, {
-    get: (target, id) =>
-      Object.hasOwn(methods, id) ? methods[id as string] : target[id],
-  });
+
+  return kinds;
 };

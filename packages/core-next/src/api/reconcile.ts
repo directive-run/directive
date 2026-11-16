@@ -814,14 +814,14 @@ const build = (context: SystemContext) => {
       keys[def.requirement] = def.key;
     }
   };
-  const constraint = (id: string) => {
+  const constraint = (id: string, full?: unknown) => {
     bindings ||= !!constraintDefs[id]!.abortOn?.length;
-    constraints.add_(id);
+    constraints.add_(id, full);
   };
   const resolver = (id: string) => keyOf(resolverDefs[id]);
   context.kinds_.constraint = {
-    add_: constraint,
-    replace_: constraint,
+    add_: (id) => constraint(id, constraintDefs[id]!.after?.length),
+    replace_: (id) => constraint(id, 1),
     remove_(id) {
       constraints.remove_(id);
       // 1.35 (engine.ts:2612–2631): a constraint registered again may warn again.

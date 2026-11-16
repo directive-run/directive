@@ -934,10 +934,10 @@ export function createSystemCore<const M extends ModuleSchema>(
   const miss = (id: string): undefined => {
     if (tracker.deps && tracker.deps !== tracker.effect_) {
       // A derivation computing links to the name's node; a constraint
-      // depends on its membership key, as an effect's test does.
-      graph.active
-        ? graph.read(asking.get(id) ?? asking.set(id, graph.signal(0)).get(id)!)
-        : tracker.deps.add(`\u001E${id}`);
+      // depends on its membership key, as an effect's test does. Either is
+      // noted as asking, which is what a registration wakes.
+      const node = asking.get(id) ?? asking.set(id, graph.signal(0)).get(id)!;
+      graph.active ? graph.read(node) : tracker.deps.add(`\u001E${id}`);
     }
   };
   /**
@@ -949,8 +949,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       add_(id, fn) {
         deriveDefs[id] = fn as Fn;
         const d = define(id);
-        changedKeys.add(d.member_);
-        asking.delete(id) && invalidate([d.asked_!]);
+        // (bm): only a reader that asked about the name is owed anything; a
+        // name nobody asked about changes nothing (1.35).
+        if (asking.delete(id)) {
+          changedKeys.add(d.member_);
+          invalidate([d.asked_!]);
+        }
       },
       // 1.35 keeps the node and what it read (derivations.ts:418–446): stale
       // with the new compute, and what reads it with it.
@@ -1414,9 +1418,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     if (passKeys.size) {
       if (!follows && (!history.events_ || snapAsked)) {
         if (!chain) {
-          const keys = [...passKeys].filter(
-            (key) => !key.startsWith(DERIVATION_DEP_PREFIX),
-          );
+          // Not the internal keys: a derivation's, or a membership one (L10).
+          const keys = [...passKeys].filter((key) => !(key[0]! < " "));
           history.snap_(
             `facts-changed:${keys.slice(0, 5).join(",")}${keys.length > 5 ? `+${keys.length - 5}more` : ""}`,
           );

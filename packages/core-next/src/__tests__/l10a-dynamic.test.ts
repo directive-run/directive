@@ -40,6 +40,25 @@ afterEach(() => {
 });
 
 describe("the registry (dynamic.ts)", () => {
+  it("the registry is built at the first read of a member: until then each is a getter every system shares", () => {
+    const one = started();
+    const two = started();
+    const getter = (system: Any, kind: string) =>
+      Object.getOwnPropertyDescriptor(system[kind], "register")?.get;
+    for (const kind of ["constraints", "resolvers", "effects"]) {
+      expect(getter(one, kind)).toBeTypeOf("function");
+      expect(getter(one, kind)).toBe(getter(two, kind));
+    }
+    expect(Object.keys(one.effects)).toEqual(
+      expect.arrayContaining(["register", "listDynamic"]),
+    );
+    expect(one.effects.listDynamic()).toEqual([]);
+    expect(one.effects.register).toBe(one.effects.register);
+    expect(one.effects.register).not.toBe(two.effects.register);
+    one.destroy();
+    two.destroy();
+  });
+
   it("D1: refuses a blocked id, a namespaced id, an empty id and a reserved derive name", () => {
     const system = started();
     expect(() => system.effects.register("__proto__", { run() {} })).toThrow(
@@ -436,6 +455,110 @@ describe("parity with 1.35's registry (constraints.ts, dynamic.ts, effects.ts)",
     });
     await Promise.resolve();
     expect(done).toBe(true);
+    system.destroy();
+  });
+});
+
+describe("parity with 1.35, the second finisher (constraints.ts, core.ts, dynamic.ts)", () => {
+  it("D8: calling a sync constraint answers on the next tick, as 1.35's callOne", async () => {
+    const system = started({
+      constraints: { c: { when: () => false, require: { type: "WORK" } } },
+      resolvers: { work: { requirement: "WORK", resolve() {} } },
+    });
+    await system.settle();
+    let done = false;
+    system.constraints.call("c").then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    expect(done).toBe(true);
+    system.destroy();
+  });
+
+  it("D7: a derivation registered that nobody asked about starts no pass", async () => {
+    let passes = 0;
+    const system = started(
+      {},
+      { plugins: [{ name: "p", onReconcileStart: () => void passes++ }] },
+    );
+    await system.settle();
+    passes = 0;
+    system.derive.register("later", (f: Any) => f.n + 1);
+    await system.settle();
+    expect(passes).toBe(0);
+    expect(system.derive.later).toBe(2);
+    system.destroy();
+  });
+
+  it("a history trigger names facts only, never a membership key", async () => {
+    const triggers: string[] = [];
+    const system = started(
+      {
+        effects: {
+          e: {
+            run: (_f: Any, _p: Any, d: Any) => void ("later" in d),
+          },
+        },
+      },
+      {
+        history: true,
+        plugins: [
+          {
+            name: "p",
+            onSnapshot: (s: Any) => void triggers.push(s.trigger),
+          },
+        ],
+      },
+    );
+    await system.settle();
+    system.derive.register("later", (f: Any) => f.n + 1);
+    system.facts.n = 2;
+    await system.settle();
+    expect(triggers.at(-1)).toBe("facts-changed:n");
+    system.destroy();
+  });
+
+  it("(w): an effect that tested a name before it existed re-runs at the next pass, which the registration does not start", async () => {
+    const log: boolean[] = [];
+    const system = started({
+      effects: {
+        e: { run: (_f: Any, _p: Any, d: Any) => void log.push("later" in d) },
+      },
+    });
+    await system.settle();
+    system.derive.register("later", (f: Any) => f.n + 1);
+    await system.settle();
+    expect(log).toEqual([false]);
+    system.facts.log = ["x"];
+    await system.settle();
+    expect(log).toEqual([false, true]);
+    system.destroy();
+  });
+
+  it("a constraint registered without `after` ranks with the first, as 1.35's stale order", async () => {
+    const order: string[] = [];
+    const when = (f: Any) => f.n > 5;
+    const system = started(
+      {
+        constraints: {
+          a: { when, require: { type: "WORK" } },
+          b: { when, require: { type: "WORK" } },
+        },
+        resolvers: { work: { requirement: "WORK", resolve() {} } },
+      },
+      {
+        plugins: [
+          { name: "p", onConstraintEvaluate: (id: string) => order.push(id) },
+        ],
+      },
+    );
+    await system.settle();
+    order.length = 0;
+    // The pass it asks for has no changed key, so it evaluates every one
+    // in order: priority, then 1.35's `topologicalIndex.get(id) ?? 0`.
+    system.constraints.register("z", { when, require: { type: "WORK" } });
+    await system.settle();
+    expect(order).toEqual(["a", "z", "b"]);
     system.destroy();
   });
 });

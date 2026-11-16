@@ -53,6 +53,8 @@ export interface EffectsManager {
   remove_(id: string): void;
   call_(id: string): Promise<void>;
   link_(name: string): void;
+  /** L10: whether an enabled or disabled effect depends on `key`. */
+  reads_(key: string): boolean;
   cleanupAll(): void;
   /**
    * Stops the effect and runs its cleanup at once (x). Its dependencies are
@@ -680,6 +682,7 @@ export function createEffectsManager<S extends Schema>(
         }
       }
     },
+    reads_: (key) => index.has(key),
     callOne(id) {
       // 1.35's callOne awaits only an async run: a sync one answers now.
       const done = runFast([states.get(id)!].filter(Boolean));
