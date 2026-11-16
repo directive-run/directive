@@ -209,8 +209,8 @@ describe("the census", () => {
   });
 
   describe("layer-tagged golden checks", () => {
-    // current is L7 in this repo: the history (L8) and ledger (L12) parts are
-    // gated, persistence (L6) and L0 are not.
+    // current is L8 in this repo: the ledger (L12) part is gated; history
+    // (L8), persistence (L6) and L0 are not.
     const LEDGER = "[L12] v2: the ledger golden round-trips with 1.35.0";
     const HISTORY = "[L8] v2: the history golden round-trips with 1.35.0";
     const PERSISTENCE =
@@ -242,7 +242,7 @@ describe("the census", () => {
       expect(
         inGolden([
           [LEDGER, "skipped"],
-          [HISTORY, "skipped"],
+          [HISTORY, "passed"],
           ["[L0] the script's writes land", "passed"],
         ]),
       ).toBe("");
@@ -252,9 +252,13 @@ describe("the census", () => {
       const out = inGolden([
         ["[L0] the script's writes land", "skipped"],
         [LEDGER, "passed"],
+        [HISTORY, "skipped"],
       ]);
       expect(out).toMatch(
         /"\[L0\] the script's writes land" is skipped but at or below the v2 layer/,
+      );
+      expect(out).toMatch(
+        /"\[L8\] v2: the history golden .*" is skipped but at or below the v2 layer/,
       );
       expect(out).toMatch(
         /"\[L12\] v2: the ledger golden .*" is above the v2 layer but passed/,
