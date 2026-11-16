@@ -1,5 +1,5 @@
 /**
- * History (L8a), as a system part: 1.35's `history:` option, with no import.
+ * History (L8a, L8b), as a system part: 1.35's `history:` option, with no import.
  * `createSystem` wires it on every system (L8 RFC, A1, O1); `createSystemCore`
  * and the floor go without it. With the option off it creates nothing: no
  * buffer, no listener set; `system.history` is null and `onHistoryChange`
@@ -11,7 +11,7 @@
  * writes through the facts in one store batch filed as "restore", inside the
  * core's navigation frame, so its keys wake effects alone.
  *
- * Five owner-approved changes from 1.35 (L8 RFC rev 2, 2026-11-10, "Approve
+ * Six owner-approved changes from 1.35 (L8 RFC rev 2, 2026-11-10, "Approve
  * all as recommended (Recommended)"):
  * - (ay) a navigation puts back the pause it found (1.35 clears it);
  * - (az) `replay()` and `import()` call `onHistoryNavigate` and the
@@ -22,8 +22,14 @@
  * - (be) `goBack` and `goForward` take each step in turn: a step from inside
  *   a changeset lands on its edge, the start rule (an earlier changeset that
  *   ends within the steps left) is one arm, and any other step moves one
- *   snapshot (1.35 takes one jump and drops the steps left).
- * Not here: (bb) and (bd), L8b. T8's aliasing and N10's indexes are 1.35's.
+ *   snapshot (1.35 takes one jump and drops the steps left);
+ * - (bb) the changesets follow the snapshots (see `takeSnapshot`): 1.35 keeps a
+ *   range's indexes when the buffer drops snapshots, when a new snapshot
+ *   cuts off redo, and across an import;
+ * - (bd) a stored snapshot is not shared (see `keep` and `restore`): a
+ *   restore writes copies, and each stored snapshot and its `facts` record
+ *   are frozen (1.35's `snapshots` list and restores hand out the stored
+ *   objects, T8).
  */
 
 import isDevelopment from "#is-development";
@@ -61,10 +67,27 @@ const unwrap = (value: unknown, seen = new WeakSet()): unknown => {
   return out;
 };
 
+/**
+ * (bd): each copy a restore wrote, to the stored value it was cloned from,
+ * so restoring that value again finds its copy still live (see `restore`).
+ */
+const twins = new WeakMap<object, unknown>();
+
+/**
+ * (bd): a stored snapshot and its `facts` record are frozen, shallow: what
+ * they hold is not (freezing deep would walk every value). Its `facts` is a
+ * record the clone made (or the import parsed), never one the app holds.
+ */
+const keep = (snapshot: Snapshot) => {
+  Object.freeze(snapshot.facts);
+
+  return Object.freeze(snapshot);
+};
+
+/** A recorded range (its label is never read, so not kept). */
 interface Changeset {
-  label: string;
-  startIndex: number;
-  endIndex: number;
+  start_: number;
+  end_: number;
 }
 
 export const withHistory =
@@ -85,32 +108,27 @@ export const withHistory =
 
       return;
     }
-    const { maxSnapshots = 100, redactSnapshot } =
-      option === true ? {} : option;
+    // `true` destructures as an object with neither key.
+    const { maxSnapshots = 100, redactSnapshot } = option as Exclude<
+      typeof option,
+      boolean
+    >;
     const snapshots: Snapshot[] = [];
-    const changesets: Changeset[] = [];
+    let changesets: Changeset[] = [];
     const listeners = new Set<() => void>();
     let index = -1;
     let nextId = 1;
     let paused = false;
     let restoring = false;
-    let pendingLabel: string | null = null;
-    let pendingStart = -1;
+    // The open changeset's start (its label is never read): Infinity when
+    // none is open, so no index passes it, its end records nothing, and a
+    // shift or a cut leaves it Infinity.
+    let pendingStart = Number.POSITIVE_INFINITY;
     // 1.35's destroy drops the listeners (engine.ts:3498).
     const notify = () => {
       for (const listener of context.gone_ ? [] : listeners) {
         listener();
       }
-    };
-    /**
-     * 1.35's onHistoryChange option: the hook, then the listeners. The hook
-     * goes through the core's stream, so it still fires after destroy.
-     */
-    const navigated = (from: number, to: number) => {
-      if (wants("history.navigate")) {
-        emit("history.navigate", { from, to });
-      }
-      notify();
     };
 
     /** The four clone tiers, after the redactor (utils/history.ts:206–304). */
@@ -171,18 +189,37 @@ export const withHistory =
       if (paused) {
         return { id: -1, timestamp: Date.now(), facts: {}, trigger };
       }
-      const snapshot: Snapshot = {
+      const snapshot = keep({
         id: nextId++,
         timestamp: Date.now(),
         facts: serialize(),
         trigger,
-      };
+      });
       // A snapshot taken after a goBack cuts off every one ahead of it.
+      const at = index;
       snapshots.splice(index + 1);
       index = snapshots.push(snapshot) - 1;
       while (snapshots.length > maxSnapshots) {
         snapshots.shift();
         index--;
+      }
+      // (bb): the ranges follow the snapshots. The cut above dropped the
+      // ones after `at`: a range that starts past it is dropped, and one that
+      // only ends past it is cut back to it (the RFC drops a range only when
+      // its start goes). The `k` dropped from the front shift every range; a
+      // range whose start fell off is dropped, as is one left with no step.
+      // A range that began before the first snapshot (start -1) is kept until
+      // a drop, as in 1.35. The open changeset (begun, not ended) is dropped
+      // by the same rules, so its end records nothing; otherwise its start
+      // moves with the snapshot it named.
+      const k = at + 1 - index;
+      changesets = changesets.filter(
+        (c) =>
+          (c.start_ -= k) < (c.end_ = Math.min(c.end_, at) - k) &&
+          (c.start_ >= 0 || !k),
+      );
+      if (pendingStart > at || (k && (pendingStart -= k) < 0)) {
+        pendingStart = Number.POSITIVE_INFINITY;
       }
       if (wants("history.snapshot")) {
         emit("history.snapshot", { snapshot });
@@ -195,7 +232,7 @@ export const withHistory =
     /** T3: an effect chain's writes finish the pass that caused them. */
     const refreshLatestSnapshot = () => {
       if (!paused && index >= 0 && index === snapshots.length - 1) {
-        snapshots[index] = { ...snapshots[index]!, facts: serialize() };
+        snapshots[index] = keep({ ...snapshots[index]!, facts: serialize() });
       }
     };
 
@@ -215,9 +252,28 @@ export const withHistory =
           }
           // 1.35 skips a dangerous key here too, with a warning; the check
           // above has refused any such key, so none reaches the writes.
+          // (bd): a stored snapshot's objects reach the facts as copies, never
+          // themselves (a primitive needs none). Capture and import store only
+          // values that clone, so no copy throws partway. A snapshot the
+          // caller built is written as given, as in 1.35 (a class instance
+          // keeps its prototype; a value that cannot clone still restores).
+          // A live value that is already a copy of this very stored value is
+          // written back as it is, so it is no change: 1.35 writes the stored
+          // object it already holds, and runs no pass. The live values are
+          // read as the snapshot reads them, with no dependency tracked.
+          const stored = snapshots.includes(snapshot);
+          const live = store.toObject();
           context.load_(() => {
             for (const [key, value] of Object.entries(values)) {
-              (facts as Rec)[key] = value;
+              let next = value;
+              if (
+                stored &&
+                Object(value) === value &&
+                twins.get((next = live[key]) as object) !== value
+              ) {
+                twins.set((next = structuredClone(value)) as object, value);
+              }
+              (facts as Rec)[key] = next;
             }
           }, "restore");
         });
@@ -227,13 +283,20 @@ export const withHistory =
       }
     };
 
-    /** Restore index `to` and tell the hook and listeners. */
+    /**
+     * Restore index `to` and tell 1.35's onHistoryChange option (the hook,
+     * through the core's stream, so it still fires after destroy), then the
+     * listeners.
+     */
     const move = (from: number, to: number) => {
       index = to;
       const snapshot = snapshots[to];
       if (snapshot) {
         restore(snapshot);
-        navigated(from, to);
+        if (wants("history.navigate")) {
+          emit("history.navigate", { from, to });
+        }
+        notify();
       }
     };
 
@@ -264,17 +327,17 @@ export const withHistory =
         // (be): each step in turn, while there is one to take.
         for (let left = steps; left > 0 && to > 0; left--) {
           const at = to;
-          const inside = find((c) => at > c.startIndex && at <= c.endIndex);
+          const inside = find((c) => at > c.start_ && at <= c.end_);
           if (inside) {
-            to = inside.startIndex;
+            to = inside.start_;
             continue;
           }
           // 1.35's start rule (utils/history.ts:442–453), kept as one arm.
           const earlier =
-            find((c) => at === c.startIndex) &&
-            find((c) => c.endIndex < at && at - c.endIndex <= left);
+            find((c) => at === c.start_) &&
+            find((c) => c.end_ < at && at - c.end_ <= left);
           if (earlier) {
-            to = earlier.startIndex;
+            to = earlier.start_;
             break;
           }
           to--;
@@ -287,9 +350,7 @@ export const withHistory =
         let to = index;
         for (let left = steps; left > 0 && to < snapshots.length - 1; left--) {
           const at = to;
-          to =
-            find((c) => at >= c.startIndex && at < c.endIndex)?.endIndex ??
-            at + 1;
+          to = find((c) => at >= c.start_ && at < c.end_)?.end_ ?? at + 1;
         }
         if (to !== index) {
           move(index, to);
@@ -359,7 +420,10 @@ export const withHistory =
               "[Directive] Invalid history data: currentIndex must be the index of a snapshot",
             );
           }
-          snapshots.splice(0, snapshots.length, ...data.snapshots);
+          snapshots.splice(0, snapshots.length, ...data.snapshots.map(keep));
+          // (bb): the old ranges, and the open changeset, index the old list.
+          changesets = [];
+          pendingStart = Number.POSITIVE_INFINITY;
           // (ba): new ids follow the highest imported one.
           for (const snap of snapshots) {
             nextId = Math.max(nextId, snap.id + 1);
@@ -370,22 +434,14 @@ export const withHistory =
           console.error("[Directive] Failed to import history data:", error);
         }
       },
-      beginChangeset(label: string) {
-        pendingLabel = label;
+      beginChangeset() {
         pendingStart = index;
       },
       endChangeset() {
-        if (pendingLabel !== null) {
-          if (index > pendingStart) {
-            changesets.push({
-              label: pendingLabel,
-              startIndex: pendingStart,
-              endIndex: index,
-            });
-          }
-          pendingLabel = null;
-          pendingStart = -1;
+        if (index > pendingStart) {
+          changesets.push({ start_: pendingStart, end_: index });
         }
+        pendingStart = Number.POSITIVE_INFINITY;
       },
       pause() {
         paused = true;
