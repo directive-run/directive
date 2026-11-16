@@ -635,6 +635,38 @@ describe("parity with 1.35, review round 1 (constraints.ts, dynamic.ts, reconcil
     system.destroy();
   });
 
+  it("`after`: a constraint registered later is asked again when the one it follows resolves", async () => {
+    let open = () => {};
+    const system = started({
+      constraints: {
+        c0: { when: (f: Any) => f.n > 0, require: { type: "WORK" } },
+      },
+      resolvers: {
+        work: {
+          requirement: "WORK",
+          resolve: (r: Any, ctx: Any) =>
+            r.k
+              ? void (ctx.facts.log = [...ctx.facts.log, r.k])
+              : new Promise<void>((resolve) => {
+                  open = resolve;
+                }),
+        },
+      },
+    });
+    await tick();
+    system.constraints.register("dyn", {
+      when: (f: Any) => f.n > 0,
+      require: { type: "WORK", k: "dyn" },
+      after: ["c0"],
+    });
+    await tick();
+    expect(system.facts.log).toEqual([]);
+    open();
+    await system.settle();
+    expect(system.facts.log).toEqual(["dyn"]);
+    system.destroy();
+  });
+
   it("D7: registering a name that only a reader outside the graph asked about starts no pass; the reader sees it at its next read (bm)", async () => {
     let passes = 0;
     const system = started(

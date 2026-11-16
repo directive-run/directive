@@ -642,13 +642,15 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       met.add(req.id);
       resolved.add(req.fromConstraint);
       // As 1.35, the asking constraint's dependents are asked again; so are
-      // those of any other constraint that emits the same requirement.
-      const emitters = ids.filter(
+      // those of any other constraint that emits the same requirement. Every
+      // constraint there is now, one registered later too (dependsOnMe).
+      const all = Object.keys(defs);
+      const emitters = all.filter(
         (id) =>
           id === req.fromConstraint ||
           (last.get(id) ?? EMPTY).some((r) => r.id === req.id),
       );
-      for (const other of ids) {
+      for (const other of all) {
         if (defs[other]!.after?.some((dep) => emitters.includes(dep))) {
           dirty.add(other);
         }
@@ -656,7 +658,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     forget: (id) => met.delete(id),
     markAllDirty() {
-      for (const id of ids) {
+      for (const id in defs) {
         dirty.add(id);
       }
     },
