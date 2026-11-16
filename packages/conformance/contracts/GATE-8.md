@@ -5,7 +5,7 @@ revision 2, "Decisions for the owner") on 2026-11-15 with "I approve you for
 to do everything", under which Claude took each recommended option, and
 asked Claude to sign the entries for the approved rows on his behalf, as at
 the earlier gates (GATE-2.md, rule 1). This record is of gate run 1 of at
-most 3 (A3).
+most 3 (A3), and of run 2.
 
 ## What the L9 gate does
 
@@ -16,12 +16,13 @@ cases on v2, the ring (`maxRuns` 1, 3 and 100) and meta included. The ratchet
 (`v2-passing.json`) gained 99 tests and lost none, tested by name; it holds
 1,977.
 
-**Five stops are open** (below, "Stops"). Five tests of
-`l9-meta-trace-gate-debt-oracle`, which L9-pre-b wrote to kill 1.35 mutants
-after L9a and L9b were built, pin 1.35 behaviour 2.0 does not share, and no
-approved row covers any of them. None is a 2.0 bug a user would call worse,
-so each needs Jason: a row to sign, or an engine fix. The L8 gate's stop (the
-two `./internals` names) carries into this branch unchanged.
+**Run 2: the five stops are fixed, and the gate is not yet green.** #403
+(main 23a79c73) matched 1.35 on all five stops of run 1, and this branch
+merged it: the five `l9-meta-trace-gate-debt-oracle` pins pass on v2 and
+v2:dist. Two problems are open (below, "Stops"). The PR seed CI runs (24301)
+fails at L9 on a 2.0 hang in a batched case, and three other PR seeds pass
+only past CI's 120 s test timeout. The L8 gate's stop (the two `./internals`
+names) carries into this branch unchanged.
 
 ## The L9 decisions
 
@@ -56,16 +57,31 @@ facing they are all approved." (2026-11-01); (ap) and (at) "Approve all
 
 **Width read.** Every entry was read against its row.
 
-- The (bi) `ends` entry is wider than the extra report: 8:all#181 and
-  12:all#149 have as many reports on each engine in the step, 2.0's report of
-  the dropped run where 1.35 reports a later run, so no pairing leaves the
-  extra on its own and each later pair is one run off. It stops at the first
-  pair whose 2.0 run started a resolver and whose 1.35 run started none
-  (`resolversStarted[0]` absent on 1.35), only with `traceRing`.
-- The (bb) entry covers a changed derivation id in any `back` step of a
-  `changesetMoved` case. It cannot name the snapshot the undo lands on, so a
-  2.0 restore bug in such a step would also end there. `during` reads the
-  history op from the run label now (below).
+- **Why the two `ends` entries need `ends`.** After the first record each
+  covers, every later record of the case is paired wrongly or reads other
+  state, so no list of plain entries could name them without being wider
+  than the row. In the (bi) case, 2.0 reports a run that 1.35 dropped, so
+  every later report is paired one run off (8:all#181: 153 later
+  differences; 12:all#149: 151). In the (bb) case, the undo lands on another
+  snapshot, so every later record reads other facts (11:all#175: 116).
+- **Run 2 narrowed both with `requires` (order any).** Each now also needs
+  its row's own mark elsewhere in the case.
+  - The (bi) entry needs an `onTraceComplete` call 2.0 makes and 1.35 does
+    not. 2.0 reports the dropped run, so over the case it reports one more
+    time than 1.35 (8:all#181: extras in steps 8 and 12; 12:all#149: in step 1).
+    A `traceRing` case in which no run was pushed out has as many reports on
+    each engine, so it is outside the entry.
+  - The (bb) entry needs a changed `onHistoryNavigate`: the undo lands on
+    another index (11:all#175, step 8, `args[1]`). A `back` that lands on
+    the same snapshot on both engines is outside it, whatever it
+    invalidates.
+  - All three cases still pass. Seeds 12 and 13 ran after the change and
+    pass. What is left: each entry still covers its first record in any
+    case of its trigger that also has the mark. `traceRing` and
+    `changesetMoved` are the rows' own preconditions, and the spec cannot
+    say more before the run.
+- The (bb) entry cannot name the snapshot the undo lands on. `during`
+  reads the history op from the run label now (below).
 - The (ap) draft used `when` [batched, batchAbortOn] and was wider than the
   row. It is narrowed by `batchClobbered`: a single resolver of module a
   writes the fact the bound requirement's `abortOn` names, the row's own
@@ -114,18 +130,27 @@ gate=L9 run of this branch confirms the kill before merge (follow-ups).
 
 ## Results
 
-**The checks, run 1.**
+**The checks, run 2** (after merging main at 23a79c73 and rebuilding core
+and core-next). Each exit code, and what fails:
 
 | Check | Exit | Result |
 | --- | --- | --- |
-| `v2`, `v2:dist`, `v2:prod` | 1 | 364 files: 3,796 passed, 2,874 skipped by the layer gate; 10 failed, the five stops on v2 and v2:dist. The (bh) pins pass |
-| `conformance:diff`, without the fuzz | 0 | 53 files, 477 tests (after the batch-trigger self-test's fix; run 1 found it) |
-| `check:expects` | 0 | 191 files, 7,324 assertions, identical to a fresh port |
-| `oracle:update` | 0 | rerun after the last entry change |
-| The 21 PR seeds | 0 on 15; 6 timed out | seeds 1-4, 6, 8, 10, 12-17, 19, 20 exit 0 in 37 s or so each. Seeds 5, 7, 9, 11, 18 and 24301 hit the 120 s test timeout while three deep seeds and the census ran beside them; rerun with a longer timeout, 5 and 18 exit 0 (111 s, 137 s); 7, 9, 11 and 24301 were still running at handoff. No seed reported a difference |
-| `pnpm census` | 1 | run 1: 102 problems, from the five stops, the L8 stop, three entry-shape faults since fixed (an `ends` changed entry with no `path`, three row t entries in the `quirk-t` group with another `when`) and 71 stale groups, all because its own fuzz run timed out under load and reported no runs. Not rerun yet |
-| `conformance:checks` | pending | run 1's census saw the L8 stop's failures and two oracle.test.ts failures from the entry-shape faults above |
-| Root biome, error level | pending | the changed files pass `biome check` |
+| `v2`, `v2:dist`, `v2:prod`, `v2:dist:prod` | 0 | 384 file runs: 3,888 passed, 2,876 skipped by the layer gate, 0 failed. The five pins and the (bh) pins pass |
+| `npx vitest run --project conformance:checks` | 1 | 10 failures: the L8 stop's 9 in `contracts/api-surface-next.test.ts`, and `oracle.test.ts` "accepts the committed harness", because the lock was stale after the entry change. `oracle:update` then refreshed the lock (35641eb9) |
+| `oracle:update` | 0 | after the entry change |
+| `pnpm census` | 1 | 86 problems, run on a quiet machine. 10 are the L8 stop's: the 9 `api-surface-next` failures and "conformance:checks: vitest exited 1". 3 are the fuzz stop's: seed 24301 times out (Stops), so `conformance:diff` exits 1 and "the fuzzer reported no runs". 72 stale entries follow from that: with no fuzz runs reported, no fuzz entry covers anything. 1 is the harness lock, staled by this file's edit while the census ran; `oracle:update` refreshed it, and `oracle.test.ts` passes after that |
+| Root biome, error level | 0 | 1,467 files |
+| The 21 PR seeds, at CI's 120 s | 1 on 4 | 17 exit 0 (17 to 89 s each). 24301, 7, 9 and 11 time out (below, "Stops") |
+
+**CI's timeout.** CI runs one fuzz seed, the fixed 24301, inside `pnpm
+census`. The census runs the `conformance:diff` project with no override, so
+it gets that project's `testTimeout: 120_000` (vitest.config.ts). The other
+20 seeds are the gate's own, under the same timeout. Run 2 ran them 3 at a
+time with nothing else heavy beside them.
+
+**Run 1** (for the record): v2 failed only on the five stops, since fixed.
+`conformance:diff` and `check:expects` exited 0. The census failed with 102
+problems, under load.
 
 ## Deep runs: report mode (A2)
 
@@ -134,15 +159,25 @@ Run as the nightly does (`DIFF_FUZZ_RUNS=5000 DIFF_FUZZ_BATCH_REPORT=1`, an
 
 | Seed | Exit | Time | Runaways (after a stop) | Never settles | Reported cases |
 | --- | --- | --- | --- | --- | --- |
-| 1 | running at handoff | | | | so far all:857, all:1028, all:1395, all:2195 |
+| 1 | 0 | 33 min | (in the log) | 34 of at most 70 | all:857, all:1028, all:1395, all:2195, up to L9#224, up to L9#1959 |
 | 2 | 0 | 22 min | 10 (3) | 28 of at most 70 | all:2247, all:2890, all:3992 |
 | 24301 | 0 | 22 min | 13 (2) | 32 of at most 70 | all:175, all:422, all:687, all:2654, all:3053 |
 
 Every reported case is batched and is one L9b's deep triage listed
 (`deep-report.md`): L7 batch shapes, (ap) with no clobbering single
 resolver (2:all#2890, 24301:all#422), and 24301:all#175, 2.0's runaway after
-an `ends` stop. None is new, and the up-to-L9 phase reported none on seeds 2
-and 24301.
+an `ends` stop. Seed 1 finished after run 1's handoff, on the engine before #403.
+Its two up-to-L9 cases were replayed on this branch, and both still fail
+the same way. Neither has a trace trigger.
+
+- **1:up to L9#224** (`disable`, `batchWriteRetracts`): in step 10, 2.0
+  rejects a batch resolver's write to f2, where 1.35 writes it. This is row
+  t's batch path, which is approved. L9b's triage listed it already.
+- **1:up to L9#1959** (`batchWriteRetracts`): in step 8, 2.0 lacks a batch
+  write that 1.35 makes, and then (av)'s `onError` entry ends the case. This
+  is an L7 batch shape: a report-mode follow-up, not a 2.0 bug.
+
+None is L9's, and the up-to-L9 phase reported none on seeds 2 and 24301.
 
 **The four unverified L8 batch cases**, regenerated by index from seed
 24301's up-to-L8 phase (the generator was checked against deep case 1:all#857
@@ -161,37 +196,49 @@ show. #948 needs a replay with both traces to say which row it is.
 
 ## Stops
 
-- **Five L9-pre-b pins differ on 2.0 and match no approved row**
-  (`l9-meta-trace-gate-debt-oracle`, v2 and v2:dist, 10 failures):
-  1. "destroy() forgets module and event meta" and 2. "destroyAsync() forgets
-     module and event meta, and empties the trace": 1.35 clears its module and
-     event meta maps at destroy (engine.ts:3504-3506, 3552-3554); 2.0's meta
-     part keeps them (meta.ts:152-154; no dispose hook). 1.35 keeps the other
-     definitions' meta, so this is a 1.35 quirk, not a leak.
-  3. "freezes t's own types, leaves a Zod-like schema and a function type as
-     given": 2.0 freezes a function that carries `_typeName` (meta.ts:76 has
-     no `typeof` check); 1.35 freezes objects only (engine.ts:253-259). 2.0
-     freezes the caller's object, reachable only through a hand-made branded
-     function.
-  4. "with no plugin configured, an observer hears no reconcile.end; with one
-     it does": 1.35 emits `reconcile.end` only with configured plugins
-     (engine.ts:2180) though `reconcile.start` goes to any observer; 2.0
-     emits both to any listener (core.ts:1425). 2.0 is the symmetric one.
-  5. "explain() of a requirement whose constraint has no dependency record":
-     1.35's `disable()` deletes the dependency record (constraints.ts:777),
-     so explain lists every fact; 2.0 stores an empty set (constraints.ts:648),
-     so explain lists none. Its comment says "As 1.35".
-
-  Each needs Jason: approve a row (then the pin keeps what both share and a
-  core-next test pins 2.0's side), or an engine PR that matches 1.35 (5 and 3
-  look like parity slips; 1, 2 and 4 like 1.35 quirks). The gate may not touch
-  `packages/core-next/src`.
+- **Run 1's five stops are fixed by #403** ("core-next: five L9 gate parity
+  fixes, as in 1.35"). 2.0 now matches 1.35 on all five: meta is forgotten
+  at destroy and at destroyAsync; only t's own types are frozen;
+  `reconcile.end` is sent only with a plugin; and explain works after
+  `disable`. The pins pass on v2 and v2:dist, with no entry and no row.
+- **PR seed 24301 fails at L9, and this is the seed CI runs.** Case
+  24301:all#175 is batched, with `batchFails`, `batchRetry` and
+  `ignoresAbort`. 1.35 settles after 11 timer callbacks. 2.0 makes more than
+  20,000, after `l7-fuzz-b-hook-onError-missing-batchFails` ends the
+  comparison at step 7.
+  - In that step, 2.0 retries the failing batch where 1.35 reports
+    `onError`. Then resolvers r0 and r1, which ignore their aborts, keep
+    rewriting f0 and re-raising each other's constraints: 3,337 writes by r0
+    and 3,319 by r1.
+  - The stop is a record 2.0 lacks, in the same step as the runaway's start.
+    `stopsBefore`'s rule (Jason, 2026-11-02: "Discard after the stop") keeps
+    that a hang. The case fails as `ok: false` with no `runaway` flag. In PR
+    mode it throws, and fast-check shrinks it. Each shrink step replays a
+    trace of about 395,000 records, so the seed runs into the 120 s timeout.
+  - Replayed alone, the case takes 11 s and is the seed's only failure.
+  - L9b's triage put it under "harness". Under the committed rule it is a
+    hang, and it is new at L9 only because trace cases first run on 2.0 now.
+  - It needs Jason: is a 2.0-only livelock after a batch-retry stop a 2.0
+    bug, or should the discard rule cover a missing stop in the runaway's
+    own step? The gate may not touch `packages/core-next/src`.
+- **Three PR seeds need longer than CI's 120 s, though no case fails:**
+  - Seed 7 takes 354 s. Case 7:all#187 (`traceRing`, `batchFallback`,
+    `batchClobbered`) passes, but takes 340 s alone: 81,296 differences, with
+    the (av)+(at) start entry ending the case.
+  - Seed 9 takes 414 s and seed 11 times out at 120 s. In run 1 they passed
+    with a 900 s timeout (601 s and 606 s).
+  - At L8 every seed took about 37 s. The slow cases are trace cases that
+    now run on 2.0. Where the time goes (the comparison of a large trace,
+    or the explain over its differences) is not profiled yet.
 - **The L8 gate's stop, carried:** `./internals` `createHistoryManager` and
   `createDisabledHistory` (`conformance:checks`, 9 failures; the census's
   "vitest exited 1"). Unchanged.
 
 ## Follow-ups
 
+- Run 3: profile 7:all#187, then fix whatever in the harness grows with a
+  trace that large. Rerun seeds 7, 9 and 11 at 120 s.
+- 24301:all#175: Jason's ruling (Stops), then rerun seed 24301 and the census.
 - A gate=L9 mutation run of this branch, to confirm the 135 conversions.
 - A payload tie-break for every record kind, as `traceRunText` does for
   `onTraceComplete`: 24301:up to L8#593 and #630 and L8's 1:all#4271 and
