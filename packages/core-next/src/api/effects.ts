@@ -684,8 +684,8 @@ export function createEffectsManager<S extends Schema>(
  * runs. A system without this part bundles none of the manager.
  */
 export const withEffects: SystemPart = (ctx) => {
-  const { kernel } = ctx;
-  const { hooks } = kernel;
+  // The core's wants and emit, which reach the plugins after destroy().
+  const { kernel, wants_: wants, emit_: emit } = ctx;
   /** Retries in a row per effect under "retry"; an ordinary write resets. */
   const retries = new Map<string, number>();
   const derivations = ctx.module.derive ?? {};
@@ -707,8 +707,8 @@ export const withEffects: SystemPart = (ctx) => {
     derived: ctx.derived,
     tracker: ctx.tracker,
     onRun(id) {
-      if (hooks.wants("effect.run")) {
-        hooks.emit("effect.run", { id });
+      if (wants("effect.run")) {
+        emit("effect.run", { id });
       }
     },
     // The hook reports the id only: no dependency list is built per run.
@@ -717,8 +717,8 @@ export const withEffects: SystemPart = (ctx) => {
       // As in 1.35: the error boundary hears it before the effect hook, and
       // the strategy acts after it.
       const strategy = ctx.reportError("effect", id, error);
-      if (hooks.wants("effect.error")) {
-        hooks.emit("effect.error", { id, error });
+      if (wants("effect.error")) {
+        emit("effect.error", { id, error });
       }
       if (strategy === "disable") {
         manager.disable(id);
@@ -739,8 +739,8 @@ export const withEffects: SystemPart = (ctx) => {
       }
     },
     onWriteBlocked(id, key) {
-      if (hooks.wants("effect.write-blocked")) {
-        hooks.emit("effect.write-blocked", { id, key });
+      if (wants("effect.write-blocked")) {
+        emit("effect.write-blocked", { id, key });
       }
     },
   });

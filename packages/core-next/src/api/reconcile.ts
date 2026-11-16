@@ -63,11 +63,28 @@ export const withReconcile: SystemPart = (context) => {
     return;
   }
   const { hooks, clock, rng } = kernel;
-  const emit = (at: string, data: () => Record<string, unknown>) => {
-    if (hooks.wants(at)) {
-      hooks.emit(at, data());
-    }
-  };
+  /** Builds a record only when `wants(at)` says it has a reader. */
+  const emitter =
+    (
+      wants: (at: string) => boolean,
+      send: (at: string, data: Record<string, unknown>) => void,
+    ) =>
+    (at: string, data: () => Record<string, unknown>) => {
+      if (wants(at)) {
+        send(at, data());
+      }
+    };
+  // The pass's own records (requirement created, the constraint records)
+  // go through the core's wants and emit: a pass still running when
+  // destroy() is called reaches the plugins after it, as in 1.35 (#1097).
+  const emit = emitter(context.wants_, context.emit_);
+  // A resolver run's records (start, complete, error, cancel, retry, write
+  // rejected, requirement met and canceled) go to the kernel's stream, which
+  // destroy() closes: 2.0 reports nothing of a run after destroy(). Owner
+  // rows "Approve 2.0's (Recommended)": row 352 (2026-11-10, an aborted
+  // batch's late write) and the let-go row (2026-11-11, a let-go run that
+  // finishes after destroy()).
+  const emitRun = emitter(hooks.wants, hooks.emit);
   const keys: Record<string, RequirementKeyFn> = {};
   for (const def of Object.values(resolverDefs)) {
     if (def?.key && typeof def.requirement === "string") {
@@ -162,15 +179,15 @@ export const withReconcile: SystemPart = (context) => {
     // The kernel's seeded rng when it has one; else the host's, read at
     // each draw (as 1.35 does).
     random: rng ?? (() => Math.random()),
-    emit,
+    emit: emitRun,
     batch_: context.batch_,
     onComplete(run, req) {
-      emit("resolver.complete", () => ({
+      emitRun("resolver.complete", () => ({
         resolver: run.resolver_,
         req,
         duration: clock.now() - run.startedAt_,
       }));
-      emit("requirement.met", () => ({
+      emitRun("requirement.met", () => ({
         req,
         resolver: run.resolver_,
       }));
@@ -197,7 +214,11 @@ export const withReconcile: SystemPart = (context) => {
         req,
         run.satisfied_,
       );
-      emit("resolver.error", () => ({ resolver: run.resolver_, req, error }));
+      emitRun("resolver.error", () => ({
+        resolver: run.resolver_,
+        req,
+        error,
+      }));
       if (strategy === "disable") {
         constraints.disable(req.fromConstraint);
       }
