@@ -68,7 +68,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "`.meta()` on the base chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
+    "note": "`.meta()` on the base chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet. Killed by hand (L9-pre-b; Stryker ran out of time on it): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'."
   },
   {
     "line": 318,
@@ -117,7 +117,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "`.meta()` on the array chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
+    "note": "`.meta()` on the array chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'."
   },
   {
     "line": 755,
@@ -162,7 +162,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "`.meta()` on the object chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet."
+    "note": "`.meta()` on the object chainable. The method and the `_meta` it sets are the L9 meta feature (lib/layers.ts MEMBER_LAYERS meta); any test calling `.meta` is placed at L9. NoCoverage in the full run too, so no existing test kills it yet. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'."
   },
   {
     "line": 812,
