@@ -462,6 +462,9 @@ export function createNamespacedSystem(
     ?.snapshotModules;
   const snapEvents: string[] | undefined = history ? [] : undefined;
   let filtered = false;
+  /** Each joined key's module: facts apart, one map for every definition. */
+  const factOwners = new Map<string, string>();
+  const definitionOwners = new Map<string, string>();
   for (const ns of ordered) {
     const mod = modules[ns]!;
     for (const [section, obj] of [
@@ -482,6 +485,33 @@ export function createNamespacedSystem(
       }
     }
     const p = (key: string) => ns + SEPARATOR + key;
+    // Neither "a" nor "a:" holds the separator, nor ":x" nor "x", yet both
+    // pairs join to "a:::x". 1.35 refuses two modules meeting on a key, in
+    // both modes (engine.ts:314–349): a fact, or any definition, whatever
+    // its section.
+    for (const [section, obj] of [
+      ["", mod.schema.facts],
+      ["derivation", mod.derive],
+      ["effect", mod.effects],
+      ["source", mod.sources],
+      ["constraint", mod.constraints],
+      ["resolver", mod.resolvers],
+      ["event", mod.events],
+    ] as const) {
+      const taken = section ? definitionOwners : factOwners;
+      for (const key of Object.keys(obj ?? {})) {
+        const id = p(key);
+        const owner = taken.get(id);
+        if (owner && owner !== ns) {
+          throw new Error(
+            section
+              ? `[Directive] Definition collision: ${section} "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing or rename to avoid conflicts.`
+              : `[Directive] Schema collision: Fact "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing (e.g., "${ns}::${id}") or merge into one module.`,
+          );
+        }
+        taken.set(id, ns);
+      }
+    }
     if (snapEvents) {
       const own =
         kept && !kept.includes(ns)
