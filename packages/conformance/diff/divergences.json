@@ -41498,5 +41498,1270 @@
     "reason": "Owner row (L7 follow-ups), approved by Jason, 2026-11-11: \"Approve 2.0's (Recommended)\". After destroy(), a let-go single run that later finishes reports nothing on 2.0, while 1.35 fires onResolverComplete and onRequirementMet (and their resolver.complete and requirement.met events). The run is let go (RFC-0003): its constraint has `abortOn`, so retracting its requirement detaches the run instead of canceling it, and it goes on. 1.35's destroy() aborts only the runs in its in-flight map, which a detached run has left (core 1.35 `detach()` deletes it, `abortAll()` walks the map), so the run finishes and 1.35 reports it; 2.0 reports nothing of a run after destroy(). The run's writes land on both engines and are still compared, and the same run after stop() is reported on both and compares equal (the scenario \"a let-go run that finishes after stop()\", no entry). This covers 1.35's requirement.met event for the run's requirement, once, in this scenario and only in its step after the destroy (step 6); an earlier step's missing completion, or one in any other scenario, is not covered. The fuzz cannot make this shape yet: its pairs have no `abortOn`, and its one let-go single run, a fallback batch run, ends its case at its start (row (at)). Signed 2026-11-11 with that quote, on the owner's instruction.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-11"
+  },
+  {
+    "id": "l8-ay-u4-external-after-the-navigation-changed-step9-data-1-paused",
+    "scenario": "a navigation clears a pause, and the next write takes a snapshot (U4)",
+    "stream": "external",
+    "kind": "after the navigation",
+    "engine": "v2",
+    "step": 9,
+    "op": "changed",
+    "path": "data[1].paused",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].paused",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In this scenario (U4) the history is paused, a navigation runs, and then a fact is written: 1.35 reads the pause cleared after the navigation and snapshots the write; 2.0 is still paused, so it takes no snapshot of the write. This covers the external \"after the navigation\" record in step 9, which differs at data[1].paused: false on 1.35, true on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-ay-u4-hook-onSnapshot-missing-step10",
+    "scenario": "a navigation clears a pause, and the next write takes a snapshot (U4)",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "step": 10,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "facts": {
+                "n": 7
+              },
+              "id": 4,
+              "trigger": "facts-changed:n",
+              "ordered": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In this scenario (U4) the history is paused, a navigation runs, and then a fact is written: 1.35 reads the pause cleared after the navigation and snapshots the write; 2.0 is still paused, so it takes no snapshot of the write. This covers the onSnapshot call of that write in step 10, which 1.35 makes and 2.0 does not (missing on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-ay-u4-external-after-the-next-write-changed-step12-data-1-ids-2",
+    "scenario": "a navigation clears a pause, and the next write takes a snapshot (U4)",
+    "stream": "external",
+    "kind": "after the next write",
+    "engine": "v2",
+    "step": 12,
+    "op": "changed",
+    "path": "data[1].ids[2]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].ids[2]",
+        "from": 4,
+        "to": 3
+      }
+    ],
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In this scenario (U4) the history is paused, a navigation runs, and then a fact is written: 1.35 reads the pause cleared after the navigation and snapshots the write; 2.0 is still paused, so it takes no snapshot of the write. This covers the external \"after the next write\" record in step 12, which differs at data[1].ids[2]: 1.35's list ends with the write's snapshot (id 4, which cut off the redo snapshot), and 2.0's still ends with the redo snapshot (id 3). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-ay-u4-external-after-the-next-write-changed-step12-data-1-index",
+    "scenario": "a navigation clears a pause, and the next write takes a snapshot (U4)",
+    "stream": "external",
+    "kind": "after the next write",
+    "engine": "v2",
+    "step": 12,
+    "op": "changed",
+    "path": "data[1].index",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].index",
+        "from": 2,
+        "to": 1
+      }
+    ],
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In this scenario (U4) the history is paused, a navigation runs, and then a fact is written: 1.35 reads the pause cleared after the navigation and snapshots the write; 2.0 is still paused, so it takes no snapshot of the write. This covers the external \"after the next write\" record in step 12, which differs at data[1].index: 1.35 stands on the write's snapshot (index 2), and 2.0 still on the one the navigation restored (index 1). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-ay-u4-external-after-the-next-write-changed-step12-data-1-paused",
+    "scenario": "a navigation clears a pause, and the next write takes a snapshot (U4)",
+    "stream": "external",
+    "kind": "after the next write",
+    "engine": "v2",
+    "step": 12,
+    "op": "changed",
+    "path": "data[1].paused",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].paused",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In this scenario (U4) the history is paused, a navigation runs, and then a fact is written: 1.35 reads the pause cleared after the navigation and snapshots the write; 2.0 is still paused, so it takes no snapshot of the write. This covers the external \"after the next write\" record in step 12, which differs at data[1].paused: false on 1.35, true on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-goto-replay-hook-onHistoryNavigate-extra-step15",
+    "scenario": "history goTo a snapshot id, then replay",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 15,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [0, 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario a goTo moves to the oldest kept snapshot and replay() then jumps to snapshot 0. This covers the onHistoryNavigate(0, 0) call 2.0 makes at the replay in step 15, which 1.35 does not (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-external-navigate-hook-extra-step6",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "external",
+    "kind": "navigate hook",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["navigate hook", 2, 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 6 runs replay(). This covers the external \"navigate hook\" record the plugin writes in step 6, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-hook-onHistoryNavigate-extra-step6",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [2, 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 6 runs replay(). This covers the onHistoryNavigate call in step 6, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-external-listener-extra-step6",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "external",
+    "kind": "listener",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["listener", 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 6 runs replay(). This covers the external \"listener\" record the onHistoryChange listener writes in step 6, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-external-navigate-hook-extra-step12",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "external",
+    "kind": "navigate hook",
+    "engine": "v2",
+    "step": 12,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["navigate hook", 0, 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 12 runs the import of what export gave. This covers the external \"navigate hook\" record the plugin writes in step 12, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-hook-onHistoryNavigate-extra-step12",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 12,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [0, 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 12 runs the import of what export gave. This covers the onHistoryNavigate call in step 12, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u5-external-listener-extra-step12",
+    "scenario": "replay() and import() tell no listener; goTo the current id does (U5)",
+    "stream": "external",
+    "kind": "listener",
+    "engine": "v2",
+    "step": 12,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["listener", 0]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U5) a plugin's onHistoryNavigate and an onHistoryChange listener each record a call; step 12 runs the import of what export gave. This covers the external \"listener\" record the onHistoryChange listener writes in step 12, which only 2.0 makes (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-u7-import-hook-onHistoryNavigate-extra-step21",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 21,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [4, 5]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario (U7) step 21 imports an export of five snapshots that holds no changeset. This covers the onHistoryNavigate call 2.0 makes at that import, which 1.35 does not (extra on 2.0). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-export-import-external-navigate-extra-step5",
+    "scenario": "history: export, import and changesets",
+    "stream": "external",
+    "kind": "navigate",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["navigate", 1, 2]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario step 5 exports the history, goes back one snapshot, then imports the export, which moves the index from 1 back to 2. This covers the external \"navigate\" record the plugin writes for that import, which only 2.0 makes (extra on 2.0); the goBack's own record is made by both. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-az-export-import-hook-onHistoryNavigate-extra-step5",
+    "scenario": "history: export, import and changesets",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [1, 2]
+        }
+      }
+    ],
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In this scenario step 5 exports the history, goes back one snapshot, then imports the export, which moves the index from 1 back to 2. This covers the onHistoryNavigate call 2.0 makes at the import, which 1.35 does not (extra on 2.0); the goBack's own call is made by both. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-az-hook-onHistoryNavigate-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["replayedOrImported"],
+    "group": "row-az",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onHistoryNavigate",
+          "args": [
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In a fuzz case with a replay step or a roundtrip step (its import; `when` replayedOrImported), this covers the onHistoryNavigate call 2.0 makes at the replay or import and 1.35 does not (extra on 2.0), with two integer indexes (`$like` integer), never another hook and never a call in a case with no replay or import. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-az-external-history-changed-changes",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "history",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1].changes",
+    "when": ["replayedOrImported"],
+    "group": "row-az",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1].changes",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate and the onHistoryChange listeners with the old and new index, as goTo does. 1.35's replay() and import() tell neither, so a panel built on onHistoryChange shows the old index and list after either (the L8 RFC's N3 and E4, probe H6; U5). In a fuzz case with a replay step or a roundtrip step (`when` replayedOrImported), this covers the listener count of a history record (data[1].changes, the fuzz model's count of onHistoryChange calls so far), which differs from the replay or import on by the listener calls 2.0 makes there and 1.35 does not: an integer on each side (`$like` integer), at that path only. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-ay-external-history-changed-paused",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "history",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1].paused",
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1].paused",
+          "from": false,
+          "to": true
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), the first record to differ is the history record after the navigation, at data[1].paused: false on 1.35, true on 2.0. From there the two histories differ by every snapshot the kept pause skips: 1.35's next write snapshots (an onSnapshot call 2.0 lacks), so the ids, index, length and listener count of every later history record differ, and a later navigation can land on another snapshot and restore other facts, differently for each seed. This entry covers only that field, only in a case with navigatedPaused, and only at a paused that is false on 1.35 and true on 2.0. It does not end the case: the navigation's own pass (its resolver, constraint and gate records) is still compared, as is every later history record. The case ends at 1.35's next snapshot, which 2.0 lacks (`l8-fuzz-ay-hook-onSnapshot-missing`). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-ay-hook-onSnapshot-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). This is the row's missing consequence: in a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), 1.35's restore clears the pause in its finally and the next write takes a snapshot, and 2.0 puts the pause back and takes none. This covers that onSnapshot call, which 1.35 makes and 2.0 does not (missing on 2.0), a snapshot of fuzz facts with 1.35's pass label (`$like` snapshot), and only after the paused navigation: it requires the same case's paused difference at or before it (`requires`: a history record's data[1].paused, false on 1.35 and true on 2.0, as `l8-fuzz-ay-external-history-changed-paused` bounds it), so a missing onSnapshot before the paused navigation is not covered. Every later history record and navigation differs as the paused entry of this row says, so this entry ends the fuzz case (`ends`), only in a case with navigatedPaused. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14",
+    "requires": {
+      "stream": "external",
+      "kind": "history",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "data[1].paused",
+            "from": false,
+            "to": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "l8-fuzz-av-nav-external-start-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchMaxSize", "navigated"],
+    "group": "av-moved-nav",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItemsRepeated"
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "external",
+      "kind": "start",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          },
+          {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              [
+                {
+                  "$like": "batchItem"
+                },
+                {
+                  "$like": "batchItem"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a queued batched requirement raised again while 1.35's queue still holds it goes into that queue twice; 2.0 holds a requirement once in the queue (#362). Navigation-made twin of `l7-fuzz-av-external-start-missing` (same row, same approval, L8a): a history navigation (`when` navigated) restores facts, and 2.0 takes the full evaluation's requirements as the pass's baseline (1.35 engine.ts:1966–1990), so a queued batched requirement the restored facts no longer raise leaves the baseline while it is still in the queue; a later write raises it again before the window flushes, and 1.35 queues it a second time (seed 13 case all#119 at forced L8, a source with no `abortOn`, which every L7 (av) entry requires as `batchAbortOn`). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes. This covers 1.35's call start missing on 2.0 in its step, only when 1.35's call holds an item twice (`batchItemsRepeated`, a call 2.0 never makes) in a case with a batched resolver, a `maxSize` and a navigation (`when` batched, batchMaxSize, navigated); a missing start of a call of distinct items is not covered. It requires 2.0's own later call (`requires`: an extra start of the batched resolver, holding one or two items as `maxSize` allows, anywhere in the case), so a 2.0 that never runs the call is not covered. Every later record can differ (the call's outcomes come later), so this entry ends the fuzz case (`ends`). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07), approved Claude signing L8's entries for approved rows (\"Approve all as recommended (Recommended)\", 2026-11-10), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-av-nav-external-start-moved",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "moved",
+    "ends": true,
+    "when": ["batched", "batchMaxSize", "navigated"],
+    "group": "av-moved-nav",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItemsRepeated"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a queued batched requirement raised again while 1.35's queue still holds it goes into that queue twice; 2.0 holds a requirement once in the queue (#362). Navigation-made twin of `l7-fuzz-av-external-start-moved` (same row, same approval, L8a): a history navigation (`when` navigated) restores facts, and 2.0 takes the full evaluation's requirements as the pass's baseline (1.35 engine.ts:1966–1990), so a queued batched requirement the restored facts no longer raise leaves the baseline while it is still in the queue; a later write raises it again before the window flushes, and 1.35 queues it a second time (seed 13 case all#119 at forced L8, a source with no `abortOn`, which every L7 (av) entry requires as `batchAbortOn`). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes. This covers that call's start record arriving one step later on 2.0 (a `moved` difference: the same record in step N + 1, never its absence), only when 1.35's call holds an item twice (`batchItemsRepeated`) in a case with a batched resolver, a `maxSize` and a navigation (`when` batched, batchMaxSize, navigated). Every later record can differ (the call's outcomes come a step later), so this entry ends the fuzz case (`ends`). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07), approved Claude signing L8's entries for approved rows (\"Approve all as recommended (Recommended)\", 2026-11-10), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-av-nav-external-start-changed-items",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[3]",
+    "ends": true,
+    "when": ["batched", "batchMaxSize", "navigated"],
+    "group": "av-moved-nav",
+    "bound": {
+      "match": [
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "batchItem"
+          },
+          "record": {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              {
+                "$like": "batchItemsRepeated"
+              }
+            ]
+          }
+        },
+        {
+          "path": "data[3][*]",
+          "from": {
+            "$like": "batchItem"
+          },
+          "to": {
+            "$like": "absent"
+          },
+          "record": {
+            "k": "external",
+            "data": [
+              "start",
+              {
+                "$like": "batchTag"
+              },
+              {
+                "$like": "integer"
+              },
+              {
+                "$like": "batchItemsRepeated"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row (av) (L7; owner-approved 2026-11-07, \"Approve: once (Recommended)\"): a queued batched requirement raised again while 1.35's queue still holds it goes into the batch call twice on 1.35; 2.0 holds a requirement once in the queue (#362), so it puts it in the call once. Navigation-made twin of `l7-fuzz-av-external-start-changed-items` (same row, same approval, L8a): a history navigation (`when` navigated) restores facts, and 2.0 takes the full evaluation's requirements as the pass's baseline (1.35 engine.ts:1966–1990), so a queued batched requirement the restored facts no longer raise leaves the baseline while it is still in the queue; a later write raises it again before the window flushes, and 1.35 queues it a second time (seed 13 case all#119 at forced L8, a source with no `abortOn`, which every L7 (av) entry requires as `batchAbortOn`). With a `maxSize` (1 or 2) the doubled queue fills it, so 1.35's batch call starts at once, in the step that raised it, while 2.0's call starts when its window timer flushes. This covers the items of that batch call (an external \"start\" record, [kind, tag \"<module>.rb\", call number, the call's items]): 1.35's call holds the requirement a second time, and 2.0's holds each requirement once, in queue order, only in a case with a batched resolver, a `maxSize` and a navigation (`when` batched, batchMaxSize, navigated). Each pattern's `record` requires 1.35's call to hold an item twice (`batchItemsRepeated`), so 2.0 dropping or replacing an item of a call of distinct items is not covered. Every later record can differ, so this entry ends the fuzz case (`ends`). Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve: once (Recommended)\", 2026-11-07), approved Claude signing L8's entries for approved rows (\"Approve all as recommended (Recommended)\", 2026-11-10), and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-hook-onFactsBatch-changed-step26-args-0-0-value",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 26,
+    "op": "changed",
+    "path": "args[0][0].value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[0][0].value",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the hook \"onFactsBatch\" record in step 26, which differs at args[0][0].value: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-observe-fact-change-changed-step26-event-next",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 26,
+    "op": "changed",
+    "path": "event.next",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "event.next",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the observe \"fact.change\" record in step 26, which differs at event.next: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-notify-n-changed-step26-value",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 26,
+    "op": "changed",
+    "path": "value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "value",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the notify \"n\" record in step 26, which differs at value: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-hook-onHistoryNavigate-changed-step26-args-1",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 26,
+    "op": "changed",
+    "path": "args[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[1]",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the hook \"onHistoryNavigate\" record in step 26, which differs at args[1]: 0 on 1.35, 1 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-external-view-changed-step26-data-1",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "external",
+    "kind": "view",
+    "engine": "v2",
+    "step": 26,
+    "op": "changed",
+    "path": "data[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1]",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the external \"view\" record in step 26, which differs at data[1]: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-state-settle-changed-step27-facts-n",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.n",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the state \"settle\" record in step 27, which differs at facts.n: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-external-second-undo-changed-step28-data-1-facts-n",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "external",
+    "kind": "second undo",
+    "engine": "v2",
+    "step": 28,
+    "op": "changed",
+    "path": "data[1].facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].facts.n",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the external \"second undo\" record in step 28, which differs at data[1].facts.n: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-external-second-undo-changed-step28-data-1-index",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "external",
+    "kind": "second undo",
+    "engine": "v2",
+    "step": 28,
+    "op": "changed",
+    "path": "data[1].index",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].index",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the external \"second undo\" record in step 28, which differs at data[1].index: 0 on 1.35, 1 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-hook-onFactsBatch-changed-step29-args-0-0-prev",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "args[0][0].prev",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[0][0].prev",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the hook \"onFactsBatch\" record in step 29, which differs at args[0][0].prev: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-observe-fact-change-changed-step29-event-prev",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "event.prev",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "event.prev",
+        "from": 3,
+        "to": 4
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the observe \"fact.change\" record in step 29, which differs at event.prev: 3 on 1.35, 4 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-drop-hook-onHistoryNavigate-changed-step29-args-0",
+    "scenario": "a changeset keeps its indexes when the buffer drops snapshots (U7)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "args[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[0]",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, buffer drop) a changeset spans snapshots and the buffer (maxSnapshots 4) then drops snapshots from the front: 1.35's range keeps its old indexes, so the first undo lands on a snapshot the range no longer names (n 3); 2.0's range shifted with the snapshots, so the undo lands on its start (n 4), and every later record that reads the position or the facts follows. This covers the hook \"onHistoryNavigate\" record in step 29, which differs at args[0]: 0 on 1.35, 1 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-hook-onFactsBatch-changed-step23-args-0-0-value",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 23,
+    "op": "changed",
+    "path": "args[0][0].value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[0][0].value",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the hook \"onFactsBatch\" record in step 23, which differs at args[0][0].value: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-observe-fact-change-changed-step23-event-next",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 23,
+    "op": "changed",
+    "path": "event.next",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "event.next",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the observe \"fact.change\" record in step 23, which differs at event.next: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-notify-n-changed-step23-value",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 23,
+    "op": "changed",
+    "path": "value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "value",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the notify \"n\" record in step 23, which differs at value: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-hook-onHistoryNavigate-changed-step23-args-1",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 23,
+    "op": "changed",
+    "path": "args[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[1]",
+        "from": 1,
+        "to": 2
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the hook \"onHistoryNavigate\" record in step 23, which differs at args[1]: 1 on 1.35, 2 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-external-view-changed-step23-data-1",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "external",
+    "kind": "view",
+    "engine": "v2",
+    "step": 23,
+    "op": "changed",
+    "path": "data[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1]",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the external \"view\" record in step 23, which differs at data[1]: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-state-settle-changed-step24-facts-n",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 24,
+    "op": "changed",
+    "path": "facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.n",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the state \"settle\" record in step 24, which differs at facts.n: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-external-one-undo-changed-step25-data-1-facts-n",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "external",
+    "kind": "one undo",
+    "engine": "v2",
+    "step": 25,
+    "op": "changed",
+    "path": "data[1].facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].facts.n",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the external \"one undo\" record in step 25, which differs at data[1].facts.n: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-external-one-undo-changed-step25-data-1-index",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "external",
+    "kind": "one undo",
+    "engine": "v2",
+    "step": 25,
+    "op": "changed",
+    "path": "data[1].index",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].index",
+        "from": 1,
+        "to": 2
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the external \"one undo\" record in step 25, which differs at data[1].index: 1 on 1.35, 2 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-cut-state-end-changed-step25-facts-n",
+    "scenario": "a changeset keeps its indexes when a new snapshot cuts off redo (U7)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 25,
+    "op": "changed",
+    "path": "facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.n",
+        "from": 10,
+        "to": 11
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, redo cut) a changeset is recorded, goBack moves inside history, and new snapshots cut off the redo part the range ends in: 1.35's range keeps its old end, so the undo lands at n 10; 2.0 cut the range back to the cut point, so the undo lands at n 11, and every later record that reads the position or the facts follows. This covers the state \"end\" record in step 25, which differs at facts.n: 10 on 1.35, 11 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-hook-onFactsBatch-changed-step27-args-0-0-value",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "args[0][0].value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[0][0].value",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the hook \"onFactsBatch\" record in step 27, which differs at args[0][0].value: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-observe-fact-change-changed-step27-event-next",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "event.next",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "event.next",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the observe \"fact.change\" record in step 27, which differs at event.next: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-notify-n-changed-step27-value",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "value",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "value",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the notify \"n\" record in step 27, which differs at value: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-hook-onHistoryNavigate-changed-step27-args-1",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "hook",
+    "kind": "onHistoryNavigate",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "args[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "args[1]",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the hook \"onHistoryNavigate\" record in step 27, which differs at args[1]: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-external-view-changed-step27-data-1",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "external",
+    "kind": "view",
+    "engine": "v2",
+    "step": 27,
+    "op": "changed",
+    "path": "data[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1]",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the external \"view\" record in step 27, which differs at data[1]: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-state-settle-changed-step28-facts-n",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 28,
+    "op": "changed",
+    "path": "facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.n",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the state \"settle\" record in step 28, which differs at facts.n: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-external-second-undo-changed-step29-data-1-facts-n",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "external",
+    "kind": "second undo",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "data[1].facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].facts.n",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the external \"second undo\" record in step 29, which differs at data[1].facts.n: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-external-second-undo-changed-step29-data-1-index",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "external",
+    "kind": "second undo",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "data[1].index",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1].index",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the external \"second undo\" record in step 29, which differs at data[1].index: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-bb-u7-import-state-end-changed-step29-facts-n",
+    "scenario": "a changeset keeps its indexes across an import (U7)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 29,
+    "op": "changed",
+    "path": "facts.n",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.n",
+        "from": 2,
+        "to": 3
+      }
+    ],
+    "reason": "Row (bb) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): the changesets follow the snapshots. When the ring buffer drops snapshots from the front, every changeset range shifts with them and one whose start fell off is dropped; a new snapshot that cuts off redo drops a range that starts in the cut part and cuts back one that only ends in it; an import clears every range. 1.35 keeps a range's indexes through all three, so after a drop, a cut or an import, goBack and goForward jump by a range that now names other snapshots (the L8 RFC's (bb); U7). In this scenario (U7, import) a changeset is recorded and then a history is imported: 1.35's range keeps the old list's indexes and the second undo jumps by it (n 2); 2.0 cleared every range at the import, so the undo moves one snapshot (n 3), and every later record that reads the position or the facts follows. This covers the state \"end\" record in step 29, which differs at facts.n: 2 on 1.35, 3 on 2.0. Signed 2026-11-14 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-14"
+  },
+  {
+    "id": "l8-fuzz-ay-hook-onSnapshot-missing-unannounced",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before (utils/history.ts:414-426), so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). Twin of l8-fuzz-ay-hook-onSnapshot-missing for the case with no history record between the navigation and the next write: the model records the history listener only at a history step, so when the steps after the navigation are writes, dispatches and settles, the first and only visible difference is the onSnapshot call 1.35 makes for the write and 2.0, still paused, does not (missing on 2.0), and the `requires` of the twin (the history record with data[1].paused false on 1.35 and true on 2.0) is never met. In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), this covers that onSnapshot call, a snapshot of fuzz facts with 1.35's pass label (`$like` snapshot), and nothing else: not a snapshot in a case with no pause before its navigation, and not another hook. PR seeds 14 (up to L8 #48) and 20 (all #53); deep cases 1:all#1817, 24301:all#4845 and 24301:up to L8#450. Signed 2026-11-16 on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
   }
 ]
