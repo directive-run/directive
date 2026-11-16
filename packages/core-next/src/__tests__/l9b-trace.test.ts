@@ -1,12 +1,15 @@
 /**
  * L9b: the trace part. 1.35's behaviour (R1–R9) is pinned by the conformance
  * suite; these pin the two approved rows, which the suite pins on 1.35's
- * side, and that a system without the option subscribes to nothing.
+ * side, and that a system without the option subscribes to nothing. They also
+ * pin, in core-next's own suite, R2's default, each part of R3's causal
+ * chain, R5's two anomalies and the batch run's "unknown" resolver.
  * - (bh): `system.trace` is one frozen array until the next change, and an
  *   entry is frozen when it settles, one level into the lists and rows the
  *   trace made. The program's values and meta are not frozen.
  * - (bi): a pending run pushed out of the ring still reports `onTraceComplete`
- *   once, when its last resolver ends.
+ *   once, when its last resolver ends, also when it was pushed out while its
+ *   resolver waited to retry.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -254,6 +257,65 @@ describe("(bi) every run reports onTraceComplete once", () => {
     system.destroy();
   });
 
+  it("a run pushed out while its resolver waits to retry reports once, after the last attempt", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let attempts = 0;
+    const onTraceComplete = vi.fn();
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { k: t.number() },
+          derivations: {},
+          events: {},
+          requirements: { S1: {}, S2: {} },
+        },
+        init: (facts: any) => {
+          facts.k = 0;
+        },
+        constraints: {
+          c1: { when: (facts: any) => facts.k >= 1, require: { type: "S1" } },
+          c2: { when: (facts: any) => facts.k >= 2, require: { type: "S2" } },
+        },
+        resolvers: {
+          r1: {
+            requirement: "S1",
+            retry: { attempts: 2, backoff: "none", initialDelay: 30 },
+            resolve: async () => {
+              if (++attempts === 1) {
+                throw new Error("once");
+              }
+            },
+          },
+          r2: { requirement: "S2", resolve: () => wait(2) },
+        },
+      } as any),
+      trace: { maxRuns: 1 },
+      plugins: [{ name: "t", onTraceComplete }],
+    } as any) as any;
+    system.start();
+    await system.settle();
+    system.facts.k = 1;
+    await wait(5);
+    // r1's first attempt failed; it waits to retry as its run leaves the ring.
+    const retrying = system.trace.at(-1);
+    expect(retrying.resolversStarted).toMatchObject([{ resolver: "r1" }]);
+    system.facts.k = 2;
+    await wait(0);
+    expect(system.trace).not.toContain(retrying);
+    expect(attempts).toBe(1);
+    await system.settle();
+    expect(attempts).toBe(2);
+    const reported = onTraceComplete.mock.calls.map(([entry]) => entry);
+    expect(reported.filter((entry) => entry === retrying)).toHaveLength(1);
+    expect(retrying).toMatchObject({
+      status: "settled",
+      resolversCompleted: [{ resolver: "r1" }],
+      resolversErrored: [],
+    });
+    vi.restoreAllMocks();
+    system.destroy();
+  });
+
   it("destroy() drops the runs still in flight: they never report", async () => {
     const { system, onTraceComplete } = traced({ maxRuns: 1 });
     system.start();
@@ -265,5 +327,190 @@ describe("(bi) every run reports onTraceComplete once", () => {
     await wait(30);
     // A canceled resolver settles its run during stop(), before the clear.
     expect(onTraceComplete.mock.calls.length).toBeLessThanOrEqual(before + 1);
+  });
+});
+
+describe("the ring's size (R2)", () => {
+  it("maxRuns defaults to 100: 105 runs leave the last 100", async () => {
+    const { system } = traced(true);
+    system.start();
+    await system.settle();
+    for (let n = 1; n < 105; n++) {
+      system.facts.box = { n };
+      await system.settle();
+    }
+    expect(system.trace).toHaveLength(100);
+    expect(system.trace[0].id).toBe(6);
+    expect(system.trace.at(-1).id).toBe(105);
+    system.destroy();
+  });
+});
+
+/** One pass that fills every list of the causal chain (R3, R5). */
+const everything = () =>
+  createModule("m", {
+    schema: {
+      facts: { k: t.number() },
+      derivations: { dbl: t.number() },
+      events: {},
+      requirements: { OK: {}, BAD: {} },
+    },
+    init: (facts: any) => {
+      facts.k = 0;
+    },
+    derive: { dbl: (facts: any) => facts.k * 2 },
+    constraints: {
+      // A constraint reads the derivation, so the pass recomputes it.
+      ok: {
+        when: (_facts: any, d: any) => d.dbl === 2,
+        require: { type: "OK" },
+      },
+      bad: { when: (facts: any) => facts.k === 1, require: { type: "BAD" } },
+    },
+    resolvers: {
+      good: { requirement: "OK", resolve: () => wait(2) },
+      fails: {
+        requirement: "BAD",
+        resolve: async () => {
+          throw new Error("card declined");
+        },
+      },
+    },
+    effects: {
+      watch: {
+        run: (facts: any) => {
+          void facts.k;
+        },
+      },
+    },
+  } as any);
+
+describe("a settled run's causal chain and anomalies (R3, R5)", () => {
+  it("the chain names each row, in 1.35's order, and an error is an anomaly", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const onTraceComplete = vi.fn();
+    const system = createSystem({
+      module: everything(),
+      trace: true,
+      plugins: [{ name: "t", onTraceComplete }],
+    } as any) as any;
+    system.start();
+    await system.settle();
+    system.facts.k = 1;
+    await system.settle();
+    const entry = system.trace[1];
+    expect(entry.status).toBe("settled");
+    expect(entry.causalChain.replace(/\(\d+ms\)/, "(Nms)")).toBe(
+      [
+        "k changed",
+        "dbl recomputed",
+        "ok constraint hit",
+        "bad constraint hit",
+        "OK requirement added",
+        "BAD requirement added",
+        "good resolved (Nms)",
+        "fails errored",
+        "watch effect ran",
+      ].join(" → "),
+    );
+    expect(entry.resolversErrored).toMatchObject([
+      { resolver: "fails", error: "Error: card declined" },
+    ]);
+    expect(entry.anomalies).toEqual(["1 resolver(s) errored"]);
+    expect(onTraceComplete).toHaveBeenCalledWith(entry);
+    vi.restoreAllMocks();
+    system.destroy();
+  });
+
+  it("after three runs, a run 5 times slower than the average is an anomaly", async () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { k: t.number() },
+          derivations: {},
+          events: {},
+          requirements: { SLOW: {} },
+        },
+        init: (facts: any) => {
+          facts.k = 0;
+        },
+        constraints: {
+          slow: {
+            when: (facts: any) => facts.k === 8,
+            require: { type: "SLOW" },
+          },
+        },
+        resolvers: {
+          slow: {
+            requirement: "SLOW",
+            resolve: async () => {
+              now += 100;
+            },
+          },
+        },
+      } as any),
+      trace: true,
+    } as any) as any;
+    system.start();
+    await system.settle();
+    // Runs 2 to 8 take no time; run 9 takes 100 ms, the average 100 / 9.
+    for (let k = 1; k <= 8; k++) {
+      system.facts.k = k;
+      await system.settle();
+    }
+    const slow = system.trace.find(
+      (entry: any) => entry.resolversStarted.length > 0,
+    );
+    expect(slow.id).toBe(9);
+    expect(slow.anomalies).toEqual([
+      "Duration 100ms is 5x+ above average (11ms)",
+    ]);
+    expect(system.trace.filter((entry: any) => entry.anomalies)).toEqual([
+      slow,
+    ]);
+    vi.restoreAllMocks();
+    system.destroy();
+  });
+});
+
+describe("the resolver a run names", () => {
+  it("a batch run in flight is named 'unknown', as 1.35's pass end reads it", async () => {
+    const system = createSystem({
+      module: createModule("m", {
+        schema: {
+          facts: { k: t.number() },
+          derivations: {},
+          events: {},
+          requirements: { B: {} },
+        },
+        init: (facts: any) => {
+          facts.k = 0;
+        },
+        constraints: {
+          b: { when: (facts: any) => facts.k === 1, require: { type: "B" } },
+        },
+        resolvers: {
+          many: {
+            requirement: "B",
+            batch: { enabled: true, maxSize: 1 },
+            resolveBatch: () => wait(5),
+          },
+        },
+      } as any),
+      trace: true,
+    } as any) as any;
+    system.start();
+    await system.settle();
+    system.facts.k = 1;
+    await system.settle();
+    expect(system.trace[1].resolversStarted).toMatchObject([
+      { resolver: "unknown", requirementId: "B:{}" },
+    ]);
+    expect(system.trace[1].resolversCompleted).toMatchObject([
+      { resolver: "many", requirementId: "B:{}" },
+    ]);
+    system.destroy();
   });
 });

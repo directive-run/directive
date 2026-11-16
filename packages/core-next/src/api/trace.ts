@@ -205,12 +205,12 @@ export const withTrace =
           const state = open.get(out);
           if (state) {
             state[0] = 0;
-            for (const { requirementId: id } of out.resolversStarted) {
-              if (owners.get(id) === out) {
-                if (flight?.has(id)) {
+            for (const { requirementId } of out.resolversStarted) {
+              if (owners.get(requirementId) === out) {
+                if (flight?.has(requirementId)) {
                   state[0]++;
                 } else {
-                  owners.delete(id);
+                  owners.delete(requirementId);
                 }
               }
             }
