@@ -252,6 +252,12 @@ export interface SystemContext {
    */
   pass_?: (end?: 1) => void;
   /**
+   * How many plugins the system starts with, set by the plugins part: 1.35
+   * builds the reconcile.end record only with plugins configured
+   * (engine.ts:2180), so with none an observer hears no reconcile.end.
+   */
+  ends_?: number;
+  /**
    * inspect()'s counters (S3): the derivations watched by name, and the keys
    * written since the last pass began.
    */
@@ -486,7 +492,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     }
   }
   if (isDevelopment) {
-    if (Object.keys(module.crossModuleDeps ?? {}).length > 0) {
+    if (Object.keys(module.crossModuleDeps ?? {}).length) {
       console.warn(
         "[Directive] Single module mode ignores crossModuleDeps. Use multiple modules if cross-module access is needed: createSystem({ modules: { ... } })",
       );
@@ -652,7 +658,7 @@ export function createSystemCore<const M extends ModuleSchema>(
 
   /** Tell the subscribers of every derivation that went stale. */
   const notifyPending = () => {
-    if (pending.size === 0) {
+    if (!pending.size) {
       return;
     }
     const ids = [...pending];
@@ -677,7 +683,7 @@ export function createSystemCore<const M extends ModuleSchema>(
    * pass limit, 1.35's 100 iterations).
    */
   const release = () => {
-    if (--holdDepth > 0 || pending.size === 0) {
+    if (--holdDepth > 0 || !pending.size) {
       return;
     }
     if (destroyed) {
@@ -690,7 +696,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     try {
       kernel.request("sync");
     } catch (error) {
-      if (pending.size === 0) {
+      if (!pending.size) {
         throw error;
       }
       const remaining = [...pending];
@@ -715,7 +721,7 @@ export function createSystemCore<const M extends ModuleSchema>(
         for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
           const stack = [l.target];
           seen ??= new Set();
-          while (stack.length > 0) {
+          while (stack.length) {
             const node = stack.pop()!;
             const d = byNode.get(node);
             if (!d || seen.has(node)) {
@@ -756,7 +762,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // A watched derivation that stays stale is behind the frontier the
       // walk stops at, yet a body that named it hears every change to what
       // it reads, through any depth (1.35's closure). Only watched ones pay.
-      if (watched.size > 0) {
+      if (watched.size) {
         for (const id of watched) {
           const d = derivations.get(id);
           if (d?.stale_) {
@@ -781,7 +787,7 @@ export function createSystemCore<const M extends ModuleSchema>(
    */
   function tell(asked: ReactiveNode, told: Set<ReactiveNode>): void {
     const stack = [asked];
-    while (stack.length > 0) {
+    while (stack.length) {
       for (let s = stack.pop()!.subs; s; s = s.nextSub) {
         const d = byNode.get(s.target);
         if (d && !told.has(s.target)) {
@@ -808,7 +814,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       closures.set(d.id_, (reads = new Set()));
       const seen = new Set<ReactiveNode>();
       const stack: ReactiveNode[] = [d.node_];
-      while (stack.length > 0) {
+      while (stack.length) {
         for (let l = stack.pop()!.deps; l; l = l.nextDep) {
           const source = l.source;
           if (!seen.has(source)) {
@@ -822,7 +828,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     return reads;
   }
   function compute(d: Derivation): unknown {
-    if (closures.size > 0) {
+    if (closures.size) {
       closures = new Map();
     }
     try {
@@ -1120,7 +1126,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       // A batch with a navigation's write takes the L8 path (navBatch);
       // every other batch, and every batch without history, main's.
-      if (backWrites > 0) {
+      if (backWrites) {
         navBatch(changes);
 
         return;
@@ -1171,13 +1177,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       changedKeys = kept;
     }
     releaseHold();
-    if (back.length > 0) {
+    if (back.length) {
       for (const key of back) {
         restored.add(key);
       }
       scheduleReconcile();
     }
-    if (keys.length > 0) {
+    if (keys.length) {
       noteWrites(keys.length);
       changed(keys);
     }
@@ -1243,7 +1249,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   // unless the kernel options say otherwise): one host callback per tick
   // for every system sharing the scheduler.
   kernel.onSettle((lane) => {
-    if (holdDepth === 0) {
+    if (!holdDepth) {
       notifyPending();
     }
     if (lane !== kernel.lane || !scheduled) {
@@ -1275,14 +1281,14 @@ export function createSystemCore<const M extends ModuleSchema>(
   function navOf(passKeys: Set<string>): Set<string> | null {
     follows = !plainWrites;
     navWrites = plainWrites = 0;
-    if (restored.size === 0) {
+    if (!restored.size) {
       return null;
     }
     const nav = restored;
     restored = new Set();
     // With ordinary keys in the pass, the derivations the navigation moved
     // are changes for constraints too, as 1.35 drains them (engine.ts:1907–1911).
-    if (passKeys.size > 0) {
+    if (passKeys.size) {
       for (const key of nav) {
         if (key.startsWith(DERIVATION_DEP_PREFIX)) {
           passKeys.add(key);
@@ -1306,9 +1312,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     passKeys: Set<string>,
   ): void {
     snapping = false;
-    if (passKeys.size > 0) {
+    if (passKeys.size) {
       if (!follows && (!history.events_ || snapAsked)) {
-        if (chain === 0) {
+        if (!chain) {
           const keys = [...passKeys].filter(
             (key) => !key.startsWith(DERIVATION_DEP_PREFIX),
           );
@@ -1354,7 +1360,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       chain = 0;
       chainKeys = null;
       navWrites = plainWrites = 0;
-      if (kept.length > 0) {
+      if (kept.length) {
         for (const key of kept) {
           changedKeys.add(key);
         }
@@ -1370,10 +1376,10 @@ export function createSystemCore<const M extends ModuleSchema>(
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
-    chainKeys = chain > 0 ? passKeys : null;
+    chainKeys = chain ? passKeys : null;
     // Only a pass with a navigation's writes asks more (navOf).
     let nav: Set<string> | null = null;
-    if (navWrites > 0 || restored.size > 0) {
+    if (navWrites || restored.size) {
       nav = navOf(passKeys);
     } else {
       follows = false;
@@ -1422,7 +1428,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         // 1.35 awaits its (empty) full evaluation after a navigation.
         await 0;
       }
-      if (wants("reconcile.end")) {
+      // Only with plugins configured, as 1.35 (`ends_`).
+      if (context.ends_ && wants("reconcile.end")) {
         emit("reconcile.end", {
           result: result ?? {
             unmet: [],
@@ -1446,7 +1453,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // pass has finished, so the watched set keeps only what one still
       // reads. A derivation asked about once stops costing every later
       // write a scan. Removal only; nothing to do when nothing is watched.
-      if (watched.size > 0) {
+      if (watched.size) {
         const live = new Set<string>();
         features.reconcile?.observed_(live);
         features.effects?.observed_(live);
@@ -1457,8 +1464,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         }
       }
       if (
-        changedKeys.size > 0 ||
-        restored.size > 0 ||
+        changedKeys.size ||
+        restored.size ||
         again ||
         features.effects?.reruns_()
       ) {
@@ -1639,7 +1646,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (initialized) {
         return;
       }
-      if (isDevelopment && loading > 0) {
+      if (isDevelopment && loading) {
         // (ah): 1.35 drops a loader still pending here, silently (H3).
         console.warn(
           "[Directive] initialize() ran while a hydrate() loader was still pending, so its facts will never be applied. Await hydrate() before initialize() or start().",
@@ -1829,8 +1836,8 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         });
         const ms = opts?.timeout;
-        if (ms !== undefined && ms > 0) {
-          cancel = after(ms, () => {
+        if (ms! > 0) {
+          cancel = after(ms!, () => {
             off();
             reject(new Error(`[Directive] when: timed out after ${ms}ms`));
           });
@@ -1943,8 +1950,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     // 1.35's never-started warning (system.ts:1040–1056), on the kernel
     // clock. Owned by the system, so destroy() clears it (candidate r,
     // approved; 1.35 warns even after destroy()).
-    const env = typeof process === "undefined" ? undefined : process.env;
-    if (env === undefined || env.NODE_ENV !== "test") {
+    if (typeof process === "undefined" || process.env?.NODE_ENV !== "test") {
       clock.setTimeout(
         () => {
           if (!running && !initialized) {

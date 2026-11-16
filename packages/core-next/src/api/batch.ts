@@ -169,7 +169,7 @@ export const withBatch: SystemPart = (context) => {
   };
 
   function flush(id: string) {
-    if (queues.get(id)!.reqs_.size === 0) {
+    if (!queues.get(id)!.reqs_.size) {
       return;
     }
     const queued = [...take(id).reqs_.values()];
@@ -251,7 +251,7 @@ export const withBatch: SystemPart = (context) => {
           }
         }
         // An empty queue keeps no timer: the next add opens a window.
-        if (reqs.size === 0) {
+        if (!reqs.size) {
           take(id);
         }
       }

@@ -57,7 +57,7 @@ export const withInspect: SystemPart = ({
     }
     // The fact keys only: a watched derivation that moved is listed too.
     let pending = 0;
-    for (const key of observed.size > 0 ? written : []) {
+    for (const key of observed.size ? written : []) {
       pending += +!key.startsWith(DERIVATION_DEP_PREFIX);
     }
 

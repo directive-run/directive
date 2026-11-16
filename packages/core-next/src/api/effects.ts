@@ -188,7 +188,7 @@ export function createEffectsManager<S extends Schema>(
   const unlink = (state: EffectState, key: string) => {
     const at = index.get(key)!;
     at.splice(at.indexOf(state), 1);
-    if (at.length === 0) {
+    if (!at.length) {
       index.delete(key);
     }
   };
@@ -372,7 +372,7 @@ export function createEffectsManager<S extends Schema>(
    */
   function warnAsyncAutoTracked(id: string, deps: Set<unknown>): void {
     if (isDevelopment) {
-      if (deps.size > 0 || warnedAsync.has(id)) {
+      if (deps.size || warnedAsync.has(id)) {
         return;
       }
       warnedAsync.add(id);
@@ -548,7 +548,7 @@ export function createEffectsManager<S extends Schema>(
     // reads as a real change (1.35 effects.ts:1300–1337).
     const back = nav ? ++pass : 0;
     const now = ++pass;
-    if (index.size > 0) {
+    if (index.size) {
       if (nav) {
         reach(nav, back);
       }
@@ -605,7 +605,7 @@ export function createEffectsManager<S extends Schema>(
     for (const [state, error] of thrown) {
       report(state, error);
     }
-    if (pending.length === 0) {
+    if (!pending.length) {
       snapshotPrevious();
 
       return undefined;

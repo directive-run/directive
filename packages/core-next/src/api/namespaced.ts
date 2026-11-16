@@ -158,7 +158,7 @@ export function createNamespacedSystem(
   let ordered: string[];
   if (Array.isArray(initOrder)) {
     const missing = names().filter((ns) => !initOrder.includes(ns));
-    if (missing.length > 0) {
+    if (missing.length) {
       throw new Error(
         `[Directive] initOrder is missing modules: ${missing.join(", ")}. All modules must be included in the explicit order.`,
       );
@@ -276,7 +276,7 @@ export function createNamespacedSystem(
       }),
     );
   const scopedFacts = (src: Rec, ns: string, deps: string[], role: string) =>
-    deps.length > 0 ? crossOf(src, ns, deps, role) : factsOf(src, ns);
+    deps.length ? crossOf(src, ns, deps, role) : factsOf(src, ns);
   const deriveOf = (src: Rec, ns: string): Rec => {
     if (src == null) {
       throw new Error(
@@ -568,7 +568,7 @@ export function createNamespacedSystem(
     // own facts, other modules only through `context.deps`. The wrappers
     // keep 1.35's async shape, so a run ends on the same microtask.
     const wrap = (context: Rec): Rec =>
-      deps.length > 0
+      deps.length
         ? {
             ...context,
             facts: resolverFactsOf(context.facts, ns),
@@ -580,7 +580,7 @@ export function createNamespacedSystem(
       call: (wrapped: Rec) => Promise<unknown>,
     ) => {
       const wrapped = wrap(context);
-      if (isDevelopment && deps.length > 0) {
+      if (isDevelopment && deps.length) {
         // A value handed out through context.deps changed in place is
         // reported once the run settles, naming the path (1.35).
         const checks = deps.map((dep) =>
@@ -754,7 +754,7 @@ export function createNamespacedSystem(
           const owners = Object.keys(core.derive)
             .filter((k) => k.endsWith(suffix))
             .map((k) => k.slice(0, -suffix.length));
-          if (owners.length > 0) {
+          if (owners.length) {
             warnedReads.add(ns);
             const owner = owners[0];
             const where =
@@ -813,7 +813,7 @@ export function createNamespacedSystem(
     },
     subscribeModule(ns: string, listener: () => void) {
       const keys = namespaceKeys.get(ns);
-      if (!keys || keys.length === 0) {
+      if (!keys?.length) {
         if (isDevelopment) {
           console.warn(
             `[Directive] subscribeModule("${ns}") — namespace not found. Available: ${[...namespaceKeys.keys()].join(", ")}`,

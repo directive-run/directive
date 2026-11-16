@@ -129,7 +129,7 @@ export const withTrace =
       if (errored > 0) {
         anomalies.push(`${errored} resolver(s) errored`);
       }
-      if (anomalies.length > 0) {
+      if (anomalies.length) {
         entry.anomalies = anomalies;
       }
     };
