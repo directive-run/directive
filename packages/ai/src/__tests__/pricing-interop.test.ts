@@ -333,7 +333,10 @@ describe("the Anthropic table keys real model IDs", () => {
   const EXPECTED: Record<string, { input: number; output: number }> = {
     // Current generation. These IDs carry no date suffix, with Haiku 4.5 the
     // exception — it has both forms, so the table carries both.
+    "claude-fable-5-2": { input: 8, output: 40 },
+    "claude-fable-5-1": { input: 10, output: 50 },
     "claude-fable-5": { input: 10, output: 50 },
+    "claude-opus-5-5": { input: 4, output: 20 },
     "claude-opus-5": { input: 5, output: 25 },
     "claude-opus-4-8": { input: 5, output: 25 },
     "claude-opus-4-7": { input: 5, output: 25 },
@@ -342,25 +345,29 @@ describe("the Anthropic table keys real model IDs", () => {
     // since become the standard price; the scheduled rise to $3/$15 was
     // cancelled. This pin read $3/$15 on the reasoning that the promotion would
     // lapse — a forecast, held as though it were a published figure, and wrong.
+    "claude-sonnet-5-5": { input: 2, output: 10 },
     "claude-sonnet-5": { input: 2, output: 10 },
     "claude-sonnet-4-6": { input: 3, output: 15 },
+    // Haiku 5.5 is tiered by prompt size; the pin is the up-to-100,000-token
+    // figure, the one the table holds.
+    "claude-haiku-5-5": { input: 0.1, output: 0.5 },
     "claude-haiku-4-5": { input: 1, output: 5 },
     "claude-haiku-4-5-20251001": { input: 1, output: 5 },
     // Previous generation, still served, dated ID and alias alike.
     "claude-sonnet-4-5": { input: 3, output: 15 },
     "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
-    "claude-sonnet-4-0": { input: 3, output: 15 },
-    "claude-sonnet-4-20250514": { input: 3, output: 15 },
     "claude-opus-4-5": { input: 5, output: 25 },
     "claude-opus-4-5-20251101": { input: 5, output: 25 },
-    // Deprecated with a retirement date set, and kept for the same reason the
-    // retired row below is: reconciling an invoice needs the rates the invoice
-    // was billed at, and those do not become irrelevant on the retirement date.
+    // Retired from the Claude API (the pricing page marks Opus 4.1, Opus 4 and
+    // Sonnet 4 "retired, except on" other clouds), and kept because
+    // reconciling an invoice needs the rates the invoice was billed at, and
+    // those do not become irrelevant on the retirement date.
     "claude-opus-4-1": { input: 15, output: 75 },
     "claude-opus-4-1-20250805": { input: 15, output: 75 },
     "claude-opus-4-0": { input: 15, output: 75 },
     "claude-opus-4-20250514": { input: 15, output: 75 },
-    // Retired, kept for reconciling historical spend.
+    "claude-sonnet-4-0": { input: 3, output: 15 },
+    "claude-sonnet-4-20250514": { input: 3, output: 15 },
     "claude-3-5-haiku-20241022": { input: 0.8, output: 4 },
   };
 
@@ -383,10 +390,22 @@ describe("the Anthropic table keys real model IDs", () => {
   it("derives cache rates from the published multipliers", () => {
     // Cache read is 0.1x input, cache write 1.25x — the 5-minute TTL. Derived
     // from the wrong base rate they are wrong throughout, and nothing in the
-    // ledger flags a rate that is merely too low.
-    for (const entry of Object.values(ANTHROPIC_PRICING)) {
-      expect(entry.cacheRead).toBeCloseTo(entry.input * 0.1, 10);
-      expect(entry.cacheWrite).toBeCloseTo(entry.input * 1.25, 10);
+    // ledger flags a rate that is merely too low. The pricing page names the
+    // exceptions to the read multiplier: 0.025x on Fable 5.2 and 5.1, and 0.05x
+    // on Opus 5.5 and Sonnet 5.5.
+    const READ_MULTIPLIER: Record<string, number> = {
+      "claude-fable-5-2": 0.025,
+      "claude-fable-5-1": 0.025,
+      "claude-opus-5-5": 0.05,
+      "claude-sonnet-5-5": 0.05,
+    };
+
+    for (const [model, entry] of Object.entries(ANTHROPIC_PRICING)) {
+      expect(entry.cacheRead, model).toBeCloseTo(
+        entry.input * (READ_MULTIPLIER[model] ?? 0.1),
+        10,
+      );
+      expect(entry.cacheWrite, model).toBeCloseTo(entry.input * 1.25, 10);
     }
   });
 

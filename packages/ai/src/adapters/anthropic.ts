@@ -80,11 +80,38 @@ import {
  */
 const ANTHROPIC_RATES = {
   // ---- Current generation ----
+  // Re-checked 2026-11-15. Cache reads are 0.1x the input rate, except 0.025x
+  // on Fable 5.2 and 5.1 and 0.05x on Opus 5.5 and Sonnet 5.5. Haiku 5.5 is
+  // priced in two tiers by prompt size; its row holds the up-to-100,000-token
+  // figures, as the OpenAI and Gemini rows hold their short-context figures,
+  // because a per-token table cannot express a tier. Above 100,000 tokens the
+  // page charges $0.50 / $2.50 with cache read $0.05 and cache write $0.625.
+  //
+  // Claude Mythos 5.2, 5.1 and 5 are on the pricing page but are limited
+  // availability (verified organizations only), so they have no row.
+  "claude-fable-5-2": {
+    input: 8,
+    output: 40,
+    cacheRead: 0.2,
+    cacheWrite: 10,
+  },
+  "claude-fable-5-1": {
+    input: 10,
+    output: 50,
+    cacheRead: 0.25,
+    cacheWrite: 12.5,
+  },
   "claude-fable-5": {
     input: 10,
     output: 50,
     cacheRead: 1,
     cacheWrite: 12.5,
+  },
+  "claude-opus-5-5": {
+    input: 4,
+    output: 20,
+    cacheRead: 0.2,
+    cacheWrite: 5,
   },
   "claude-opus-5": {
     input: 5,
@@ -110,6 +137,12 @@ const ANTHROPIC_RATES = {
     cacheRead: 0.5,
     cacheWrite: 6.25,
   },
+  "claude-sonnet-5-5": {
+    input: 2,
+    output: 10,
+    cacheRead: 0.1,
+    cacheWrite: 2.5,
+  },
   // List price. Sonnet 5 carries promotional introductory rates ($2/$10 per
   // million) that expire; a budget priced at the promotion under-reads the
   // moment it lapses, and a spend guard that reads low is a spend guard that
@@ -128,6 +161,12 @@ const ANTHROPIC_RATES = {
     output: 15,
     cacheRead: 0.3,
     cacheWrite: 3.75,
+  },
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    cacheRead: 0.01,
+    cacheWrite: 0.125,
   },
   "claude-haiku-4-5": {
     input: 1,
@@ -156,18 +195,6 @@ const ANTHROPIC_RATES = {
     cacheRead: 0.3,
     cacheWrite: 3.75,
   },
-  "claude-sonnet-4-0": {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75,
-  },
-  "claude-sonnet-4-20250514": {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75,
-  },
   "claude-opus-4-5": {
     input: 5,
     output: 25,
@@ -180,10 +207,13 @@ const ANTHROPIC_RATES = {
     cacheRead: 0.5,
     cacheWrite: 6.25,
   },
-  // Deprecated, with a retirement date already set. Kept for the same reason
-  // the retired row below is: a caller reconciling last month's invoice needs
-  // rates the month was billed at, and a row that disappears on the retirement
-  // date takes that ability with it.
+
+  // ---- Retired; kept for reconciling historical spend ----
+  // Opus 4.1, Opus 4 and Sonnet 4 are marked retired on the pricing page
+  // (still served on Google Cloud (Google managed) and, for Opus 4.1 and
+  // Sonnet 4, Bedrock), with the same rates re-checked on 2026-11-15. They are
+  // kept so a caller reconciling last month's invoice still has the rates the
+  // month was billed at.
   "claude-opus-4-1": {
     input: 15,
     output: 75,
@@ -208,10 +238,20 @@ const ANTHROPIC_RATES = {
     cacheRead: 1.5,
     cacheWrite: 18.75,
   },
-
-  // ---- Retired; kept for reconciling historical spend ----
+  "claude-sonnet-4-0": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-sonnet-4-20250514": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
   // Retired 2026-02-19 and absent from the pricing page, so this row was NOT
-  // re-verified on 2026-11-12; the rates are carried from the earlier check.
+  // re-verified on 2026-11-15; the rates are carried from the earlier check.
   "claude-3-5-haiku-20241022": {
     input: 0.8,
     output: 4,
@@ -261,7 +301,10 @@ const ANTHROPIC_RATES = {
  */
 /**
  * The date the rates in {@link ANTHROPIC_PRICING} were last checked against
- * https://platform.claude.com/docs/en/about-claude/pricing.
+ * https://platform.claude.com/docs/en/about-claude/pricing. The model IDs of
+ * the 5.x rows were read from https://platform.claude.com/docs/en/models/overview
+ * and, for the legacy Fable 5.1,
+ * https://platform.claude.com/docs/en/models/fable-5-1/overview.
  *
  * A published table is a snapshot, and a stale one is not an error anywhere: a
  * rate that moved produces a uniform arithmetic drift in every cost this
@@ -272,7 +315,7 @@ const ANTHROPIC_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const ANTHROPIC_PRICING_AS_OF = "2026-11-12";
+export const ANTHROPIC_PRICING_AS_OF = "2026-11-15";
 
 export const ANTHROPIC_PRICING: Record<string, ModelPricing> =
   toTokenPricingTable(ANTHROPIC_RATES, "ANTHROPIC_PRICING");
