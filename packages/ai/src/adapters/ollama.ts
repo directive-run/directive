@@ -49,6 +49,14 @@ import {
 
 /** The single source of Ollama rates. Widened below; never exported raw. */
 const OLLAMA_RATES = {
+  // Re-checked 2026-11-15: the page still says models run on your own hardware
+  // are "always unlimited", so these local rows stay at 0.
+  //
+  // The page also prices Ollama's cloud models per token (for example
+  // gpt-oss:120b at $0.15 / $0.60). They are not rows here: a cloud model
+  // answers to the same name as its local twin, so a priced row would charge
+  // the local run for tokens it does not pay for, and this table's contract is
+  // that every rate is 0.
   llama3: { input: 0, output: 0 },
   "llama3.1": { input: 0, output: 0 },
   "llama3.2": { input: 0, output: 0 },
@@ -115,7 +123,7 @@ const OLLAMA_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OLLAMA_PRICING_AS_OF = "2026-11-12";
+export const OLLAMA_PRICING_AS_OF = "2026-11-15";
 
 export const OLLAMA_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OLLAMA_RATES,

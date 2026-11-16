@@ -56,18 +56,29 @@ const OPENAI_RATES = {
   // caching is automatic and storing a prefix costs nothing, so `cacheWrite` is
   // deliberately absent rather than defaulted to the input rate.
   //
-  // Re-checked 2026-11-12. Rates for the flagship rows are the short-context
+  // Re-checked 2026-11-15. Rates for the flagship rows are the short-context
   // (<=272k input tokens) figures; the page doubles input and raises output
   // above that, which a per-token table cannot express.
   //
-  // gpt-5.6-sol: the page shows $4 / $20 (cached $0.40) as promotional pricing
-  // through 2026-11-30 and does not state the price after it. This row keeps
-  // the earlier $5 / $30 / $0.50 so a budget cannot under-read once the
-  // promotion lapses.
+  // gpt-5.6-sol: the page lists $4 / $20 (cached $0.40) and says "promotional
+  // pricing is available until November 30, 2026"; it does not state the price
+  // after it. This row keeps the earlier $5 / $30 / $0.50 so a budget cannot
+  // under-read once the promotion lapses.
   //
-  // Not on the pricing page any more (shut down 2026-10-23 per the deprecations
-  // page): gpt-4.1-nano, gpt-4-turbo, o1, o1-pro, o3-mini, o4-mini. Their rates
-  // were NOT re-verified on 2026-11-12; they stay for reconciling past spend.
+  // Not on the pricing page (shut down 2026-10-23 per the deprecations page):
+  // gpt-4.1-nano, gpt-4-turbo, o1, o1-pro, o3-mini, o4-mini. Their rates were
+  // NOT re-verified on 2026-11-15; they stay for reconciling past spend.
+  //
+  // Left out on purpose: the Trusted Access models (gpt-6-cyber, gpt-5.6-cyber,
+  // gpt-5.5-cyber-preview, gpt-6-rosalind, gpt-rosalind-research,
+  // gpt-rosalind-discovery), gpt-6-astra-law (promotional through at least
+  // 2026-12-31, price after not stated), chat-latest (a moving alias), and the
+  // embedding and moderation models (no output rate).
+  "gpt-6-astra": { input: 10, output: 50, cacheRead: 1 },
+  "gpt-6.1-sol": { input: 2, output: 10, cacheRead: 0.1 },
+  "gpt-6.1-terra": { input: 1, output: 5, cacheRead: 0.05 },
+  "gpt-6-sol": { input: 2, output: 10, cacheRead: 0.2 },
+  "gpt-6-luna": { input: 0.1, output: 0.5, cacheRead: 0.01 },
   "gpt-5.6-sol": { input: 5, output: 30, cacheRead: 0.5 },
   "gpt-5.6-terra": { input: 2, output: 12, cacheRead: 0.2 },
   "gpt-5.6-luna": { input: 0.2, output: 1.2, cacheRead: 0.02 },
@@ -77,11 +88,15 @@ const OPENAI_RATES = {
   "gpt-5.4-mini": { input: 0.75, output: 4.5, cacheRead: 0.075 },
   "gpt-5.4-nano": { input: 0.2, output: 1.25, cacheRead: 0.02 },
   "gpt-5.4-pro": { input: 30, output: 180 },
+  "gpt-5.3-codex": { input: 1.75, output: 14, cacheRead: 0.175 },
   "gpt-5.2": { input: 1.75, output: 14, cacheRead: 0.175 },
+  "gpt-5.2-pro": { input: 21, output: 168 },
   "gpt-5.1": { input: 1.25, output: 10, cacheRead: 0.125 },
   "gpt-5": { input: 1.25, output: 10, cacheRead: 0.125 },
+  "gpt-5-pro": { input: 15, output: 120 },
   "gpt-5-mini": { input: 0.25, output: 2, cacheRead: 0.025 },
   "gpt-5-nano": { input: 0.05, output: 0.4, cacheRead: 0.005 },
+  "gpt-5-search-api": { input: 1.25, output: 10, cacheRead: 0.125 },
   "gpt-4.1": { input: 2, output: 8, cacheRead: 0.5 },
   "gpt-4.1-mini": { input: 0.4, output: 1.6, cacheRead: 0.1 },
   "gpt-4.1-nano": { input: 0.1, output: 0.4, cacheRead: 0.025 },
@@ -146,7 +161,7 @@ const OPENAI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const OPENAI_PRICING_AS_OF = "2026-11-12";
+export const OPENAI_PRICING_AS_OF = "2026-11-15";
 
 export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   OPENAI_RATES,

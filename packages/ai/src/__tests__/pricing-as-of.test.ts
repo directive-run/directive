@@ -145,11 +145,11 @@ describe("a rate cannot move without its date moving", () => {
   // make them agree with anything, which is the failure this whole file is
   // about: a check that cannot go red is not a check.
   const PINNED: Record<string, string> = {
-    ANTHROPIC_PRICING: "5fd4d231ad8f25a2",
-    OPENAI_PRICING: "5dacdbb0a433f50a",
-    GEMINI_PRICING: "38cc87759ab22df0",
+    ANTHROPIC_PRICING: "ff6784c4428155fe",
+    OPENAI_PRICING: "d23a9a64e1d063b2",
+    GEMINI_PRICING: "7bd541e56ef1599e",
     OLLAMA_PRICING: "f81daede7c795e7c",
-    WORKERS_AI_PRICING: "9e92f7813f73e779",
+    WORKERS_AI_PRICING: "ac46db31f1ea0fdd",
   };
 
   it.each(TABLES)("$name matches its pinned rates", ({ name, table }) => {

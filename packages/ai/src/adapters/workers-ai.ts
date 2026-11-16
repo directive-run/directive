@@ -62,6 +62,62 @@ const WORKERS_AI_RATES = {
     input: 0.351,
     output: 0.555,
   },
+  // Re-checked 2026-11-15. Every row of the page's LLM pricing table is here.
+  // `cacheRead` is the page's cached-input rate, present only on the models
+  // that list one.
+  "@cf/meta/llama-3.2-11b-vision-instruct": { input: 0.049, output: 0.676 },
+  "@cf/meta/llama-3.1-70b-instruct-fp8-fast": { input: 0.293, output: 2.253 },
+  "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b": {
+    input: 0.497,
+    output: 4.881,
+  },
+  "@cf/deepseek-ai/deepseek-v4-flash-0731": {
+    input: 0.44,
+    output: 1.32,
+    cacheRead: 0.014,
+  },
+  "@cf/deepseek-ai/deepseek-v4.1-flash-1017": {
+    input: 0.3,
+    output: 1.2,
+    cacheRead: 0.006,
+  },
+  "@cf/deepseek-ai/deepseek-v4-pro-0813": {
+    input: 1.32,
+    output: 3.96,
+    cacheRead: 0.044,
+  },
+  "@cf/mistral/mistral-7b-instruct-v0.1": { input: 0.11, output: 0.19 },
+  "@cf/meta/llama-3.1-8b-instruct-fp8": { input: 0.152, output: 0.287 },
+  "@cf/meta/llama-3.1-8b-instruct-awq": { input: 0.123, output: 0.266 },
+  "@cf/meta/llama-3-8b-instruct": { input: 0.282, output: 0.827 },
+  "@cf/meta/llama-3-8b-instruct-awq": { input: 0.123, output: 0.266 },
+  "@cf/meta/llama-2-7b-chat-fp16": { input: 0.556, output: 6.667 },
+  "@cf/meta/llama-guard-3-8b": { input: 0.484, output: 0.03 },
+  "@cf/meta/llama-4-scout-17b-16e-instruct": { input: 0.27, output: 0.85 },
+  "@cf/google/gemma-3-12b-it": { input: 0.345, output: 0.556 },
+  "@cf/qwen/qwq-32b": { input: 0.66, output: 1 },
+  "@cf/qwen/qwen2.5-coder-32b-instruct": { input: 0.66, output: 1 },
+  "@cf/qwen/qwen3-30b-a3b-fp8": { input: 0.051, output: 0.335 },
+  "@cf/qwen/qwen3.8-27b": { input: 0.45, output: 3.2 },
+  "@cf/openai/gpt-oss-120b": { input: 0.35, output: 0.75 },
+  "@cf/openai/gpt-oss-20b": { input: 0.2, output: 0.3 },
+  "@cf/aisingapore/gemma-sea-lion-v4-27b-it": { input: 0.351, output: 0.555 },
+  "@cf/ibm-granite/granite-4.0-h-micro": { input: 0.017, output: 0.112 },
+  "@cf/zai-org/glm-4.7-flash": { input: 0.06, output: 0.4 },
+  "@cf/zai-org/glm-5.2": { input: 1.4, output: 4.4, cacheRead: 0.26 },
+  "@cf/zai-org/glm-5.3": { input: 1.4, output: 4.4, cacheRead: 0.26 },
+  "@cf/zai-org/glm-5.3-flash": { input: 0.15, output: 0.5, cacheRead: 0.03 },
+  "@cf/nvidia/nemotron-3-120b-a12b": { input: 0.5, output: 1.5 },
+  "@cf/moonshotai/kimi-k2.5": { input: 0.6, output: 3, cacheRead: 0.1 },
+  "@cf/moonshotai/kimi-k2.6": { input: 0.95, output: 4, cacheRead: 0.16 },
+  "@cf/moonshotai/kimi-k2.7-code": { input: 0.95, output: 4, cacheRead: 0.19 },
+  "@cf/google/gemma-4-26b-a4b-it": { input: 0.1, output: 0.3 },
+  "@cf/daily-co/phonellm-mini-alpha-2": { input: 0.06, output: 0.24 },
+  "@cf/thinkingmachines/inkling-2-small": {
+    input: 0.3,
+    output: 1,
+    cacheRead: 0.1,
+  },
 };
 
 /**
@@ -72,7 +128,7 @@ const WORKERS_AI_RATES = {
  * per-million-token equivalents used here. Never inferred from the clock. It
  * records when a person last looked.
  */
-export const WORKERS_AI_PRICING_AS_OF = "2026-10-30";
+export const WORKERS_AI_PRICING_AS_OF = "2026-11-15";
 
 /**
  * Workers AI model pricing (USD per million tokens), keyed by the exact model

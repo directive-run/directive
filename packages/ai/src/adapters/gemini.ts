@@ -74,21 +74,43 @@ const GEMINI_RATES = {
   //
   // Rates for models with a tier above 200k tokens are the ≤200k figures.
   //
-  // Re-checked 2026-11-12. gemini-3.6-flash is priced $0.75 / $3.75 (cached
-  // $0.075) through 2026-12-31 and $1.50 / $7.50 (cached $0.15) from
-  // 2027-01-01; the row holds today's rate.
+  // Re-checked 2026-11-15. Each row holds the rate the page lists today, and
+  // the page schedules these rises, which this table does not follow:
+  // - gemini-3.8-flash and gemini-3.6-flash: $0.75 / $3.75 (cached $0.075)
+  //   through 2026-12-31, then $1.50 / $7.50 (cached $0.15) from 2027-01-01.
+  // - gemini-4-carbon and gemini-4-argon: $2 / $10 (cached $0.10) through
+  //   2026-11-30, then $4 / $20 (cached $0.20) from 2026-12-01.
+  // gemini-4-hydrogen lists no change date. gemini-4-argon also has an
+  // invite-only preview tier ($1 / $5 / $0.05), which is not represented.
   //
   // gemini-3.7-flash and gemini-3.5-flash are no longer priced on the page: the
   // API routes them to gemini-3.8-flash and gemini-3.6-flash. Their rows were
-  // NOT re-verified on 2026-11-12 and are kept so a caller naming them is still
+  // NOT re-verified on 2026-11-15 and are kept so a caller naming them is still
   // priced. gemini-2.5-pro and gemini-2.5-flash are deprecated and route to
   // other models from 2026-12-01; their rates still match the page.
+  //
+  // Left out on purpose, because their price is not a text-token rate: the
+  // live, native-audio, transcribe, translate and TTS models (audio, per
+  // minute or per audio token), the image models (per image), the
+  // gemini-omni-* models (video output priced apart from text),
+  // gemini-decision-1 (no output), the embedding models, lyria-* (per song),
+  // gemini-robotics-er-2-preview and its streaming variant (specialised, and
+  // the price doubles on 2027-01-01), and gemma-4 (free tier only).
+  "gemini-4-carbon": { input: 2, output: 10, cacheRead: 0.1 },
+  "gemini-4-argon": { input: 2, output: 10, cacheRead: 0.1 },
+  "gemini-4-hydrogen": { input: 1.5, output: 7.5, cacheRead: 0.075 },
+  "gemini-3.8-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
   "gemini-3.7-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
   "gemini-3.6-flash": { input: 0.75, output: 3.75, cacheRead: 0.075 },
   "gemini-3.5-flash": { input: 1.5, output: 9, cacheRead: 0.15 },
   "gemini-3.5-flash-lite": { input: 0.3, output: 2.5, cacheRead: 0.03 },
   "gemini-3.1-flash-lite": { input: 0.25, output: 1.5, cacheRead: 0.025 },
   "gemini-3.1-pro-preview": { input: 2, output: 12, cacheRead: 0.2 },
+  "gemini-3.1-pro-preview-customtools": {
+    input: 2,
+    output: 12,
+    cacheRead: 0.2,
+  },
   "gemini-3-flash-preview": { input: 0.5, output: 3, cacheRead: 0.05 },
   "gemini-2.5-pro": { input: 1.25, output: 10, cacheRead: 0.125 },
   // Was carried at $0.15/$0.60 — half the published input rate and a sixth of
@@ -149,7 +171,7 @@ const GEMINI_RATES = {
  *
  * Never inferred from the clock. It records when a person last looked.
  */
-export const GEMINI_PRICING_AS_OF = "2026-11-12";
+export const GEMINI_PRICING_AS_OF = "2026-11-15";
 
 export const GEMINI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
   GEMINI_RATES,
