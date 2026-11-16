@@ -321,7 +321,8 @@ const registry = (ctx: SystemContext): Kinds => {
     ctx.end_ = undefined;
     for (const [op, type, id, def] of queue.splice(0)) {
       try {
-        apply(op, type, id, def);
+        // 1.35's destroy empties its queue (engine-definitions.ts:633).
+        ctx.gone_ || apply(op, type, id, def);
       } catch (error) {
         if (isDevelopment) {
           console.error(
@@ -380,9 +381,10 @@ const registry = (ctx: SystemContext): Kinds => {
       assign: guarded("assign", type),
       unregister: guarded("unregister", type),
       call: call(type),
-      // D9: only what `register` added.
-      isDynamic: (id: string) => ids.has(id),
-      listDynamic: () => [...ids],
+      // D9: only what `register` added, and nothing once destroyed: 1.35's
+      // destroy clears its four sets (engine-definitions.ts:634-637).
+      isDynamic: (id: string) => !ctx.gone_ && ids.has(id),
+      listDynamic: () => (ctx.gone_ ? [] : [...ids]),
     };
   }
 

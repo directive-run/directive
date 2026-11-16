@@ -1,6 +1,6 @@
 /**
- * L10b's second finish: four 1.35 behaviours the fuzz met at forced L10
- * once module registration ran. Each test names the code it pins: it fails
+ * L10b's second and third finishes: 1.35 behaviours the fuzz met at forced
+ * L10 once module registration ran. Each test names the code it pins: it fails
  * when that code is removed.
  */
 import { describe, expect, it } from "vitest";
@@ -133,5 +133,53 @@ describe("a derivation whose dependencies change (dynamic.ts relink, 1.35's upda
     order.length = 0;
     system.facts.n = 2;
     expect(order).toEqual(["d0", "d2", "d1"]);
+  });
+});
+
+describe("dynamic definitions after destroy() (dynamic.ts isDynamic, listDynamic and flush)", () => {
+  it("lists none and knows none, as 1.35's destroy clears its four sets", () => {
+    const system = started({
+      derive: { d0: () => 0, d1: () => 0, d2: () => 0 },
+    });
+    system.resolvers.register("zr", { requirement: "DYN", resolve: () => {} });
+    system.constraints.register("zk", {
+      when: () => false,
+      require: { type: "DYN" },
+    });
+    system.effects.register("ze", { run: () => {} });
+    system.derive.register("zd", () => 1);
+    system.destroy();
+    for (const kind of ["resolvers", "constraints", "effects", "derive"]) {
+      expect(system[kind].listDynamic()).toEqual([]);
+    }
+    expect(system.resolvers.isDynamic("zr")).toBe(false);
+    expect(system.constraints.isDynamic("zk")).toBe(false);
+    expect(system.effects.isDynamic("ze")).toBe(false);
+    expect(system.derive.isDynamic("zd")).toBe(false);
+  });
+
+  it("drops a change queued in the pass that destroyed the system, as 1.35's destroy empties its queue", async () => {
+    const registered: string[] = [];
+    const ref: { system?: Any } = {};
+    const system = (ref.system = started(
+      {
+        derive: { d0: () => 0, d1: () => 0, d2: () => 0 },
+        effects: {
+          e: {
+            run: () => {
+              ref.system?.constraints.register("late", {
+                when: () => false,
+                require: { type: "DYN" },
+              });
+              ref.system?.destroy();
+            },
+          },
+        },
+      },
+      { onDefinitionRegister: (_t: string, id: string) => registered.push(id) },
+    ));
+    system.facts.n = 2;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(registered).toEqual([]);
   });
 });
