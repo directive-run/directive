@@ -40,7 +40,7 @@
  *   requirements' `abortOn` keys (resolvers.ts; 1.35 binds it to none).
  */
 
-import type { SystemPart } from "./core.js";
+import type { SystemContext, SystemPart } from "./core.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { BatchHost, Batcher, ResolverDef, Run } from "./resolvers.js";
 import { withTimeout } from "./timeout.js";
@@ -58,11 +58,30 @@ interface Queue {
 }
 
 export const withBatch: SystemPart = (context) => {
-  const { module, kernel, store } = context;
-  const defs = (module.resolvers ?? {}) as Record<string, ResolverDef>;
-  if (!Object.values(defs).some((def) => def?.batch?.enabled)) {
+  const defs = (context.module.resolvers ?? {}) as Record<string, ResolverDef>;
+  if (Object.values(defs).some((def) => def?.batch?.enabled)) {
+    context.batch_ = build(context, defs);
+
     return;
   }
+  // L10: a batched resolver registered later builds the window at its first
+  // requirement; until then nothing runs.
+  context.batch_ = (host) => {
+    let real: Batcher | undefined;
+
+    return {
+      add_: (...args) => (real ??= build(context, defs)(host)).add_(...args),
+      drop_: (...args) => real?.drop_(...args),
+      queued_: (busy) => !!real?.queued_(busy),
+    };
+  };
+};
+
+const build = (
+  context: SystemContext,
+  defs: Record<string, ResolverDef>,
+): ((host: BatchHost) => Batcher) => {
+  const { kernel, store } = context;
   const { clock } = kernel;
   const queues = new Map<string, Queue>();
   /**
@@ -241,10 +260,10 @@ export const withBatch: SystemPart = (context) => {
         });
       }
     },
-    drop_(ids, only) {
+    drop_(ids, only, resolver) {
       for (const [id, { reqs_: reqs }] of queues) {
         for (const [key, [req]] of reqs) {
-          if (!only || key === only) {
+          if ((!only || key === only) && (!resolver || id === resolver)) {
             reqs.delete(key);
             ids.push(key);
             host.canceled_(id, req);
@@ -260,7 +279,7 @@ export const withBatch: SystemPart = (context) => {
       (busy && ending > 0) ||
       [...queues.values()].some((queue) => queue.reqs_.size > 0),
   };
-  context.batch_ = (given) => {
+  return (given) => {
     host = given;
 
     return batcher;

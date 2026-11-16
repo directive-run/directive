@@ -37,14 +37,19 @@ interface Row {
  */
 const prepared = new WeakSet<object>();
 
-export const withMeta: SystemPart = ({
-  kernel,
-  module,
-  system,
-  tracker,
-  derived,
-  derivationDeps,
-}) => {
+export const withMeta: SystemPart = (context) => {
+  const { kernel, module, system, tracker, derived, derivationDeps } = context;
+  /** meta.subscribe's listeners, told of each definition change (L10, D6). */
+  const listeners = new Set<() => void>();
+  context.metaChanged_ = () => {
+    for (const fn of [...listeners]) {
+      try {
+        fn();
+      } catch (error) {
+        console.error("[Directive] Metadata subscriber error:", { error });
+      }
+    }
+  };
   // The namespaced form lists its modules; a single module is its own row.
   let mods = ((module as Record<string, any>).modules_ ?? [module]) as {
     id: string;
@@ -223,8 +228,11 @@ export const withMeta: SystemPart = ({
       if (((fn === tags ? listener : options) as typeof options)?.immediate) {
         fn();
       }
+      listeners.add(fn);
 
-      return () => {};
+      return () => {
+        listeners.delete(fn);
+      };
     },
   });
 };

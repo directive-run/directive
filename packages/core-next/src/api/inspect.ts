@@ -5,7 +5,7 @@
  */
 
 import type { EffectsFeature, ReconcileFeature, SystemPart } from "./core.js";
-import { DERIVATION_DEP_PREFIX } from "./facts.js";
+import { DERIVATION_DEP_PREFIX, MEMBER_DEP_PREFIX } from "./facts.js";
 import type { SourcesFeature } from "./sources.js";
 
 type Defs = Record<string, { meta?: unknown; _meta?: unknown } | undefined>;
@@ -21,20 +21,11 @@ export const withInspect: SystemPart = ({
   module,
   system,
   counts_,
+  derived,
+  derivationDeps,
 }) => {
   // No constraints and no resolvers: no requirement to explain (1.35).
   system.explain ??= () => null;
-  const resolverDefs = Object.entries(
-    (module.resolvers ?? {}) as Record<
-      string,
-      { requirement?: unknown; meta?: unknown }
-    >,
-  ).map(([id, def]) => ({
-    id,
-    requirement:
-      typeof def.requirement === "string" ? def.requirement : "(predicate)",
-    meta: def.meta,
-  }));
   system.inspect = () => {
     const l2 = (
       kernel.features as { reconcile?: ReconcileFeature }
@@ -55,10 +46,26 @@ export const withInspect: SystemPart = ({
     for (const id of watched) {
       observed.add(DERIVATION_DEP_PREFIX + id);
     }
-    // The fact keys only: a watched derivation that moved is listed too.
+    // L10: a derivation unregistered since a reader last ran is not observed.
+    for (const key of observed) {
+      key.slice(1) in derived || observed.delete(key);
+    }
+    // 1.35 counts invalidation roots (derivations.ts invalidateMany): each
+    // derivation that read a written fact, or that asked about or read a
+    // name registered or unregistered since (L10). A removed one is no root.
     let pending = 0;
-    for (const key of observed.size ? written : []) {
-      pending += +!key.startsWith(DERIVATION_DEP_PREFIX);
+    for (const id of observed.size ? Object.keys(module.derive ?? {}) : []) {
+      for (const dep of derivationDeps(id) ?? []) {
+        if (
+          dep[0] === DERIVATION_DEP_PREFIX
+            ? written.has(MEMBER_DEP_PREFIX + dep.slice(1)) &&
+              !(dep.slice(1) in derived)
+            : written.has(dep)
+        ) {
+          pending++;
+          break;
+        }
+      }
     }
 
     return {
@@ -73,7 +80,18 @@ export const withInspect: SystemPart = ({
       events: metas(module.events).map(({ id, meta }) => ({ name: id, meta })),
       constraints: l2?.constraints ?? [],
       resolvers: l2?.resolvers ?? {},
-      resolverDefs,
+      // Read live: a resolver registered at runtime is listed (1.35).
+      resolverDefs: Object.entries(
+        (module.resolvers ?? {}) as Record<
+          string,
+          { requirement?: unknown; meta?: unknown }
+        >,
+      ).map(([id, def]) => ({
+        id,
+        requirement:
+          typeof def.requirement === "string" ? def.requirement : "(predicate)",
+        meta: def.meta,
+      })),
       effects: metas(module.effects),
       sources: sources?.rows_() ?? [],
       attachedSourceCount: sources?.count_() ?? 0,

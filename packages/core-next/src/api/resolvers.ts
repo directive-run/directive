@@ -212,7 +212,7 @@ export interface Batcher {
    * Cancel the queued requirement `only`, or with none every queued one
    * (stop()), adding each id to `ids`.
    */
-  drop_(ids: string[], only?: string): void;
+  drop_(ids: string[], only?: string, resolver?: string): void;
   /** Some requirement waits in a queue; `busy`: or a batch's end is due. */
   queued_(busy?: boolean): boolean;
 }
@@ -243,6 +243,8 @@ export interface Resolvers {
   inflight: ReadonlyMap<string, Run>;
   /** A batched requirement waits in a queue (see Batcher). */
   queued_(busy?: boolean): boolean;
+  /** L10 (K5): an unregistered resolver's runs are canceled, its queue too. */
+  drop_(resolver: string): void;
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -826,6 +828,12 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       // all).
       ids[0] ||
         started([run]).forEach((old) => old?.reqs_ && part(old, requirementId));
+    },
+    drop_(resolver) {
+      for (const run of new Set(started([...inflight.values()]))) {
+        run!.resolver_ === resolver && cancel(run!);
+      }
+      batcher?.drop_([], undefined, resolver);
     },
     abortAll_() {
       const ids: string[] = [];

@@ -108,10 +108,6 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
     const cases: [() => unknown, string, number][] = [
       [() => system.registerModule(mod()), "registerModule", 10],
       [() => system.unregisterModule("m"), "unregisterModule", 10],
-      [() => system.constraints.register("c", {}), "constraints.register", 10],
-      [() => system.resolvers.assign("r", {}), "resolvers.assign", 10],
-      [() => system.effects.call("e"), "effects.call", 10],
-      [() => system.effects.listDynamic(), "effects.listDynamic", 10],
       [() => system.getDistributableSnapshot(), "getDistributableSnapshot", 12],
       [
         () => system.watchDistributableSnapshot({}, () => {}),
@@ -151,10 +147,8 @@ describe("built members are left alone", () => {
     expect(system.explain("nothing")).toBeNull();
     expect(typeof system.restore).toBe("function");
     expect(optionWarnings(warn)).toHaveLength(0);
-    // The dynamic controls sit beside the built ones.
-    expect(thrown(() => system.constraints.register("x", {})).code).toBe(
-      FEATURE_MISSING,
-    );
+    // The dynamic controls (built at L10a) sit beside the built ones.
+    expect(system.constraints.isDynamic("c")).toBe(false);
     system.destroy();
   });
 });

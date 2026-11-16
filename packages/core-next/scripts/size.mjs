@@ -106,7 +106,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 140;
+const DEV_STRINGS_MIN = 142;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -533,7 +533,7 @@ for (const [name, engine] of Object.entries(engines)) {
 }
 // The beta wiring of the minimal fixture: reported, not budgeted (no entry in
 // size-budgets.next.json, and nothing here sets an exit code). `createSystem`
-// wires every part into every app; the beta turns the seven below, and history
+// wires every part into every app; the beta turns the eight below, and history
 // and the trace (wired as calls, `withHistory(option)`, `withTrace(option)`),
 // into imports,
 // so an app that does not use one does not pay for it. This builds the same
@@ -550,6 +550,8 @@ const BETA_OMITTED = [
   "withObserve",
   "withMissing",
   "withMeta",
+  // L10a: register, assign, unregister and call (at the beta, as an import).
+  "withDynamic",
 ];
 // The parts wired as a call, with the file each is imported from.
 const BETA_CALLED = [
@@ -619,7 +621,7 @@ if (betaApplied) {
   );
 } else {
   const message =
-    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing and withMeta as one import and one `parts` entry each, and withHistory and withTrace as one import and one call entry each; update BETA_OMITTED / BETA_CALLED / betaWiringSource in scripts/size.mjs";
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing, withMeta and withDynamic as one import and one `parts` entry each, and withHistory and withTrace as one import and one call entry each; update BETA_OMITTED / BETA_CALLED / betaWiringSource in scripts/size.mjs";
   // Not a budget, but under --check (CI) a skipped line fails, so it cannot
   // vanish from the report unnoticed.
   if (process.argv.includes("--check")) {

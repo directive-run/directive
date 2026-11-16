@@ -86,6 +86,17 @@ export interface Constraints {
   isDisabled(id: string): boolean;
   /** 1.35's constraint state, for inspect() and explain(). */
   state_(id: string): ConstraintState | undefined;
+  /**
+   * L10: a constraint registered or assigned, and one unregistered. `full`
+   * rebuilds the `after` order (an assign, or a register that lists `after`).
+   */
+  add_(id: string, full?: unknown): void;
+  remove_(id: string): void;
+  /** L10 (D8): the requirements it would add now, with `props` merged in. */
+  call_(
+    id: string,
+    props?: Record<string, unknown>,
+  ): Promise<RequirementWithId[]>;
   /** Every constraint's state, in declaration order. */
   states_(): ConstraintState[];
 }
@@ -118,7 +129,7 @@ const EMPTY: RequirementWithId[] = [];
 export function createConstraints(options: ConstraintsOptions): Constraints {
   const { defs, facts, derived, tracker, keys } = options;
   const ids = Object.keys(defs);
-  for (const id of ids) {
+  const check = (id: string) => {
     const spec = defs[id]?.when;
     // 1.35: `$changed` is effects-only, refused at registration in every
     // build. (The rest of the data form is the L11 compiler.)
@@ -127,18 +138,17 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
-  }
+  };
+  ids.forEach(check);
+  const fresh = (id: string): ConstraintState => ({
+    id,
+    priority: defs[id]!.priority ?? 0,
+    lastResult: null,
+    hitCount: 0,
+    lastActiveAt: null,
+  });
   const states = new Map<string, ConstraintState>(
-    ids.map((id) => [
-      id,
-      {
-        id,
-        priority: defs[id]!.priority ?? 0,
-        lastResult: null,
-        hitCount: 0,
-        lastActiveAt: null,
-      },
-    ]),
+    ids.map((id) => [id, fresh(id)]),
   );
   /** 1.35's recordConstraintResult: the answer, and a hit when active. */
   const onEvaluate = (id: string, active: boolean) => {
@@ -168,6 +178,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   const unanswered = new Set(ids);
   /** Held back by an `after` dependency when last asked. */
   const held = new Set<string>();
+  /** 1.35's resolvedConstraints: a requirement of theirs once resolved. */
+  const resolved = new Set<string>();
   const asyncIds = new Set(ids.filter((id) => defs[id]!.async));
   let evaluated = false;
   if (isDevelopment) {
@@ -204,12 +216,26 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     visiting.pop();
     topo.set(id, topo.size);
   };
-  ids.forEach(visit);
-  const sorted = [...ids].sort(
-    (a, b) =>
-      (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
-      topo.get(a)! - topo.get(b)!,
-  );
+  let sorted: string[] = [];
+  /**
+   * The order again (L10: a definition came, changed or went). As 1.35
+   * (constraints.ts registerDefinitions), a register rebuilds the `after`
+   * order only when the new constraint lists `after`; until then it ranks
+   * with the first (1.35's `topologicalIndex.get(id) ?? 0`).
+   */
+  const resort = (full?: unknown) => {
+    const all = Object.keys(defs);
+    if (full) {
+      topo.clear();
+      all.forEach(visit);
+    }
+    sorted = all.sort(
+      (a, b) =>
+        (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
+        (topo.get(a) ?? 0) - (topo.get(b) ?? 0),
+    );
+  };
+  resort(1);
   const enabled = () =>
     disabled.size ? sorted.filter((id) => !disabled.has(id)) : sorted;
 
@@ -470,21 +496,28 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       answer(id, active, into);
     }
   }
+  /**
+   * 1.35 sorts a pass into blocked and ready before it asks any, and a
+   * dependency that ever resolved blocks nothing (isAfterDepSatisfied). Quirk
+   * e still holds a dependent while its dependency may act, checked at the
+   * dependent's turn: one asked earlier in the pass has answered by then, so
+   * with nothing unmet the dependent is asked in 1.35's place.
+   */
   async function batch(
     todo: string[],
     into: Map<string, RequirementWithId>,
   ): Promise<string[]> {
     const blocked: string[] = [];
     const ready: string[] = [];
+    const hold = (id: string) => {
+      held.add(id);
+      blocked.push(id);
+      add(into, last.get(id) ?? EMPTY);
+    };
     for (const id of todo) {
-      if (afterReady(id)) {
-        held.delete(id);
-        ready.push(id);
-      } else {
-        held.add(id);
-        blocked.push(id);
-        add(into, last.get(id) ?? EMPTY);
-      }
+      (defs[id]!.after ?? []).some((dep) => !resolved.has(dep) && blocks(dep))
+        ? hold(id)
+        : ready.push(id);
     }
     if (!ready.length) {
       return blocked;
@@ -492,6 +525,11 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     const late: [string, Promise<boolean>][] = [];
     const asyncReady: string[] = [];
     for (const id of ready) {
+      if (!afterReady(id)) {
+        hold(id);
+        continue;
+      }
+      held.delete(id);
       if (asyncIds.has(id)) {
         asyncReady.push(id);
         continue;
@@ -602,14 +640,17 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     isAsync: (id) => asyncIds.has(id),
     markResolved(req) {
       met.add(req.id);
+      resolved.add(req.fromConstraint);
       // As 1.35, the asking constraint's dependents are asked again; so are
-      // those of any other constraint that emits the same requirement.
-      const emitters = ids.filter(
+      // those of any other constraint that emits the same requirement. Every
+      // constraint there is now, one registered later too (dependsOnMe).
+      const all = Object.keys(defs);
+      const emitters = all.filter(
         (id) =>
           id === req.fromConstraint ||
           (last.get(id) ?? EMPTY).some((r) => r.id === req.id),
       );
-      for (const other of ids) {
+      for (const other of all) {
         if (defs[other]!.after?.some((dep) => emitters.includes(dep))) {
           dirty.add(other);
         }
@@ -617,7 +658,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     forget: (id) => met.delete(id),
     markAllDirty() {
-      for (const id of ids) {
+      for (const id in defs) {
         dirty.add(id);
       }
     },
@@ -671,6 +712,57 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       }
     },
     isDisabled: (id) => disabled.has(id),
+    // L10: the registry's hooks; it has written `defs` first.
+    add_(id, full) {
+      check(id);
+      // 1.35's assign starts the state again too (initState).
+      states.set(id, fresh(id));
+      unanswered.add(id);
+      defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
+      dirty.add(id);
+      resort(full);
+    },
+    remove_(id) {
+      // I3: gone from `states` and `last` together.
+      setDeps(id, new Set());
+      for (const set of [
+        states,
+        last,
+        whenDeps,
+        deps,
+        dirty,
+        disabled,
+        held,
+        unanswered,
+        asyncIds,
+        resolved,
+      ]) {
+        set.delete(id);
+      }
+      resort(1);
+    },
+    async call_(id, props) {
+      if (disabled.has(id)) {
+        return [];
+      }
+      // 1.35's callOne awaits only a promise: a sync answer costs no tick.
+      let active = (asyncIds.has(id) ? evaluateAsync : evaluateSync)(id);
+      if (active instanceof Promise) {
+        active = await active;
+      }
+
+      return active
+        ? requirementsOf(id).reqs.map((req) => {
+            const requirement = props ? { ...req, ...props } : req;
+
+            return {
+              requirement,
+              id: requirementId(requirement, keys[requirement.type]),
+              fromConstraint: id,
+            };
+          })
+        : [];
+    },
     state_: (id) => states.get(id),
     states_: () => [...states.values()],
   };

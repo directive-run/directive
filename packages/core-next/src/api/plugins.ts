@@ -47,6 +47,11 @@ const HOOKS: Record<string, string[]> = {
   "system.stop": ["onStop", "system"],
   "system.destroy": ["onDestroy", "system"],
   "fact.set": ["onFactSet", "key", "value", "prev"],
+  // L10: the registry's (D6).
+  "definition.register": ["onDefinitionRegister", "type", "id", "def"],
+  "definition.assign": ["onDefinitionAssign", "type", "id", "def", "original"],
+  "definition.unregister": ["onDefinitionUnregister", "type", "id"],
+  "definition.call": ["onDefinitionCall", "type", "id", "props"],
   "fact.batch": ["onFactsBatch", "changes"],
   "derivation.invalidate": ["onDerivationInvalidate", "id"],
   "derivation.compute": ["onDerivationCompute", "id", "value", "deps"],

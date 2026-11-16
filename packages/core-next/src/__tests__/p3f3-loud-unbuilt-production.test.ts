@@ -80,7 +80,6 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
     for (const call of [
       () => system.registerModule(mod()),
       () => system.getDistributableSnapshot(),
-      () => system.effects.register("e", {}),
     ]) {
       expect(call).toThrow(TypeError);
     }
