@@ -2282,5 +2282,336 @@
         "value": 3
       }
     }
+  },
+  {
+    "group": "quirk-g",
+    "why": "Fuzz seed 10, case 79 of its up-to-L8 phase (L8 gate): quirk g, retracting one requirement of a running batch while its handler ignores the abort (l7-fuzz-g-hook-onRequirementCanceled-missing). At L8 the census seed draws no quirk-g case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": 3,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 2,
+              "throwsAt": 8
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 3,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": 2,
+              "delay": 0,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 3
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": "retry",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "advance",
+          "ms": 25
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 673206208,
+          "value": 1
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1664646584,
+          "value": 6
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "advance",
+          "ms": 5
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "stop"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 316813827,
+          "value": -2
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1733322004, 6], [1416939713, 4], [846442875, -1]]
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 3,
+            "items": 3,
+            "abortOn": false
+          },
+          {
+            "fact": 1,
+            "atLeast": 0,
+            "items": 3,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 1,
+        "maxSize": 2,
+        "delay": 0,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 1,
+        "value": -2
+      }
+    }
+  },
+  {
+    "group": "av-moved-nav",
+    "why": "Fuzz seed 13, case 119 across every layer (L8 gate): row (av), a navigation raises a queued batched requirement again (l8-fuzz-av-nav-external-start-moved, l8-fuzz-av-nav-external-start-changed-items). At L8 the census seed draws no navigation-made (av) case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 3,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [2, 0, 1],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 8
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 4,
+              "throwsAt": 7
+            },
+            {
+              "facts": [0, 1],
+              "derived": [0, 1],
+              "threshold": 6,
+              "throwsAt": 8
+            }
+          ],
+          "events": [
+            {
+              "target": 2,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 2,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 3,
+              "delay": 20,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": 0,
+              "delay": 1,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0, 1],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 8
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 2,
+              "throwsAt": 8
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": 1,
+              "priority": 1,
+              "writes": 0,
+              "value": -2,
+              "delay": 5,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": 2,
+              "priority": 3,
+              "writes": 0,
+              "value": 6,
+              "delay": 20,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 50
+            }
+          ],
+          "effects": [],
+          "source": {
+            "gated": false
+          }
+        }
+      ],
+      "boundary": "retry",
+      "history": true,
+      "trace": false,
+      "steps": [
+        {
+          "op": "goTo",
+          "position": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 430320342,
+          "value": 3
+        },
+        {
+          "op": "replay"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 22,
+          "value": 0
+        },
+        {
+          "op": "snapshot"
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 146765754,
+          "value": 0
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 727837413,
+          "value": 2
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 0,
+        "fails": 0,
+        "retry": 2,
+        "timeout": 10,
+        "writes": 1,
+        "value": -2
+      },
+      "maxSnapshots": 20,
+      "respectsAbort": false
+    }
   }
 ]
