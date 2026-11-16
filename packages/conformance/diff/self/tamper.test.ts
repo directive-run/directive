@@ -8,7 +8,7 @@
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { compareContract } from "../compare.js";
+import { compareContract, contract } from "../compare.js";
 import {
   type CoreApi,
   type EngineHandle,
@@ -16,7 +16,13 @@ import {
   engines,
   v2Status,
 } from "../engines.js";
-import { specArbitrary, toScenario, withoutHistory } from "../fuzz/model.js";
+import {
+  type FuzzSpec,
+  specArbitrary,
+  toScenario,
+  withoutHistory,
+  withoutIntrospection,
+} from "../fuzz/model.js";
 import { createRecorder } from "../record.js";
 import {
   type BuildContext,
@@ -545,17 +551,22 @@ describe("the fuzzer catches injected faults", () => {
         // layer 8: once v2 is compared at L8, a drawn history option differs
         // from 1.35 for a reason of its own, and the first failure could stop
         // being the dropped event. The same draws are kept, with the history
-        // option and the back and forward steps taken out.
-        fc.asyncProperty(specArbitrary().map(withoutHistory), async (spec) => {
-          const result = await runScenario(toScenario(spec), {
-            wrapCandidate: fault,
-            divergences: [],
-          });
-          if (!result.ok) {
-            caught = result.report;
-            throw new Error(result.report);
-          }
-        }),
+        // option and the back and forward steps taken out. The same holds for
+        // the trace and meta at layer 9 (the L9 RFC's B1): the trace option,
+        // `maxRuns`, the fact tags and the meta steps are taken out too.
+        fc.asyncProperty(
+          specArbitrary().map(withoutHistory).map(withoutIntrospection),
+          async (spec) => {
+            const result = await runScenario(toScenario(spec), {
+              wrapCandidate: fault,
+              divergences: [],
+            });
+            if (!result.ok) {
+              caught = result.report;
+              throw new Error(result.report);
+            }
+          },
+        ),
         { seed: 0x5eed, numRuns: 200 },
       ),
     ).rejects.toThrow(/Property failed/);
@@ -647,6 +658,194 @@ describe("the fuzzer catches injected history faults (L8-pre, rule 6)", () => {
 
     // Caught at a back step (its label, `{"op":"back",...}`, in the report).
     expect(caught).toMatch(/op\W+back/);
+  });
+});
+
+/**
+ * The L9 RFC's harness rules 1 and 2. A trace fault and a meta fault must be
+ * caught: each tamper is applied to 1.35 itself (the reference, loaded again
+ * as the one engine under test), on cases drawn at L9, so the first
+ * difference can only be the tamper's. And rule 1's projection must neither
+ * hide a real difference nor leave a timing one: 1.35 against itself with a
+ * skewed clock must pass, and the projection masks a run's timing only.
+ */
+describe("the fuzzer catches injected trace and meta faults (L9-pre, rule 2)", () => {
+  const traceCases = specArbitrary({ ceiling: "L9" }).filter((s) => s.trace);
+  const metaCases = specArbitrary({ ceiling: "L9" }).filter((s) =>
+    s.steps.some((step) => step.op === "meta"),
+  );
+
+  async function caughtOnV1(
+    cases: fc.Arbitrary<FuzzSpec>,
+    fault: Fault,
+  ): Promise<string> {
+    const [v1] = engines() as [EngineHandle];
+    let caught = "";
+    await expect(
+      fc.assert(
+        fc.asyncProperty(cases, async (spec) => {
+          const result = await runScenario(toScenario(spec), {
+            candidates: [faulty(fault)(v1)],
+            divergences: [],
+          });
+          if (!result.ok) {
+            caught = result.report;
+            throw new Error(result.report);
+          }
+        }),
+        { seed: 0x5eed, numRuns: 200 },
+      ),
+    ).rejects.toThrow(/Property failed/);
+    expect(caught).toMatch(/engines differ/);
+
+    return caught;
+  }
+
+  /** 1.35 against `candidate` on 40 cases: every compared one passes. */
+  async function passesOn(
+    cases: fc.Arbitrary<FuzzSpec>,
+    candidate: EngineHandle,
+  ): Promise<number> {
+    let compared = 0;
+    for (const spec of fc.sample(cases, { seed: 0x5eed, numRuns: 40 })) {
+      const result = await runScenario(toScenario(spec), {
+        candidates: [candidate],
+        divergences: [],
+      });
+      if (!result.runaway && !result.neverSettles) {
+        compared += 1;
+        expect(result.report).toBe("");
+      }
+    }
+
+    return compared;
+  }
+
+  it("control: 1.35 against itself passes on the same cases", async () => {
+    const [v1] = engines() as [EngineHandle];
+    expect(await passesOn(traceCases, v1)).toBeGreaterThan(30);
+    expect(await passesOn(metaCases, v1)).toBeGreaterThan(30);
+  });
+
+  it("drops one onTraceComplete", async () => {
+    // The second run's report: the first is the start's, in every case.
+    let seen = 0;
+    const caught = await caughtOnV1(traceCases, {
+      onLoad: () => {
+        seen = 0;
+      },
+      config: wrapRecorder((key, fn) => (...args) => {
+        if (key === "onTraceComplete" && ++seen === 2) {
+          return;
+        }
+        fn(...args);
+      }),
+    });
+
+    expect(caught).toMatch(/onTraceComplete/);
+  });
+
+  it("answers carriesTag wrong", async () => {
+    const caught = await caughtOnV1(metaCases, {
+      system: (system) => ({
+        meta: new Proxy(system.meta, {
+          get: (target, prop) =>
+            prop === "carriesTag"
+              ? (...args: unknown[]) => {
+                  const answer = target.carriesTag(...args);
+
+                  return typeof answer === "boolean" ? !answer : answer;
+                }
+              : Reflect.get(target, prop),
+        }),
+      }),
+    });
+
+    // Caught at a meta step (its label, `{"op":"meta"}`, in the report).
+    expect(caught).toMatch(/op\W+meta/);
+  });
+
+  it("a clock skewed by a few milliseconds is not a difference (rule 1)", async () => {
+    // `performance.now`, which 1.35 times a run with, drifts by up to 6 ms
+    // over the run, so every trace duration and causal-chain "(Nms)" can
+    // move; nothing else may. `Date.now`, the run's timestamp, is not skewed
+    // here: resolver start times are compared exactly and read it too (an
+    // `onReconcileEnd` row's `startedAt`), so a skew there is a difference
+    // the trace's rule does not cover. The timestamp's projection is pinned
+    // by the next test.
+    const [v1] = engines() as [EngineHandle];
+    const skewed = faulty({
+      onLoad: () => {
+        const now = performance.now.bind(performance);
+        let calls = 0;
+        performance.now = () => now() + Math.min(calls++, 6);
+      },
+    })(v1);
+
+    expect(await passesOn(traceCases, skewed)).toBeGreaterThan(30);
+  });
+
+  it("the projection masks a run's timing and nothing else", () => {
+    const run = {
+      id: 4,
+      timestamp: 10,
+      duration: 5,
+      status: "settled",
+      factChanges: [{ key: "f0", oldValue: 0, newValue: 1 }],
+      derivationsRecomputed: [
+        { id: "d0", deps: ["f0"], oldValue: 0, newValue: 1 },
+        { id: "d1", deps: ["d0"], oldValue: 0, newValue: 1 },
+      ],
+      resolversCompleted: [{ resolver: "r", requirementId: "x", duration: 5 }],
+      causalChain: "f0 changed → r resolved (5ms)",
+      anomalies: ["Duration 5ms is 5x+ above average (1ms)"],
+    };
+    const { anomalies: _anomalies, ...withoutAnomalies } = run;
+    const asHook = (r: unknown) =>
+      contract({ k: "hook", hook: "onTraceComplete", args: [r] } as never);
+    const asState = (r: unknown) =>
+      contract({
+        k: "state",
+        label: "settle",
+        facts: {},
+        derived: {},
+        inspect: { trace: [r] },
+      } as never);
+    const same = (a: unknown, b: unknown) =>
+      JSON.stringify(asHook(a)) === JSON.stringify(asHook(b)) &&
+      JSON.stringify(asState(a)) === JSON.stringify(asState(b));
+
+    // Timing: masked.
+    expect(
+      same(run, {
+        ...withoutAnomalies,
+        id: 9,
+        timestamp: 99,
+        duration: 0,
+        resolversCompleted: [
+          { resolver: "r", requirementId: "x", duration: 7 },
+        ],
+        causalChain: "f0 changed → r resolved (7ms)",
+      }),
+    ).toBe(true);
+    // A time that is not a finite number at or above 0: compared.
+    expect(same(run, { ...run, duration: -1 })).toBe(false);
+    expect(same(run, { ...run, timestamp: "10" })).toBe(false);
+    // The order of a list, the chain's words, another anomaly: compared.
+    expect(
+      same(run, {
+        ...run,
+        derivationsRecomputed: [...run.derivationsRecomputed].reverse(),
+      }),
+    ).toBe(false);
+    expect(same(run, { ...run, causalChain: "f0 changed" })).toBe(false);
+    expect(
+      same(run, {
+        ...run,
+        anomalies: [...run.anomalies, "1 resolver(s) errored"],
+      }),
+    ).toBe(false);
+    expect(same(run, { ...run, status: "pending" })).toBe(false);
   });
 });
 

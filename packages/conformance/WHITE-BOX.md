@@ -178,6 +178,35 @@ must be filled before that layer's gate.
   restore", and the two `redactSnapshot` cases for a throwing redactor and
   for an export that holds the redacted form. Filled so far at L8-pre, with
   the L8 RFC's U1 to U18; the fuzz additions (B1) are L8-pre-c.
+- **L9 sources, seen through inspect, observe and meta.** `sources.test.ts`
+  is internals (v2 skips it by category, `helpers/layer-gate.ts`), and 11 of
+  its cases sit at L9 because of the surface they read, not the sources
+  behaviour under it. Seven read the `inspect().sources` row: "system.inspect().sources
+  surfaces the declared sources with attachedSourceCount + per-source
+  telemetry", "the same source id in two modules is two sources, prefixed by
+  namespace", "per-source counters bump on publish and surface via
+  inspect()", "rejected publishes bump dropCount + lastDropReason on
+  inspect()", and the three RFC 0012 cases "gated source in a system
+  attaches/detaches as a fact drives the gate", "a gate that opens onto a
+  throwing attach retries on a later reconcile" and "a key that moves while
+  an attach is failing drops the old retry". Three hear the `source.*`
+  events through `system.observe()`: "emits source.attach + source.publish
+  + source.detach events with correct attribution", "emits source.drop on
+  system.observe() when the engine rejects a publish" and "emits
+  source.error for sources that throw on attach (without firing
+  source.attach)". One, "createSourcesManager > listDefinitions surfaces all
+  registered sources with their moduleId and per-source telemetry", drives
+  the manager and reads a source's `meta`. The behaviour under all 11
+  (attach, publish, detach, the drop reasons, attach errors, gates and keys)
+  is covered at L5 by the `l5-sources-oracle*` files (the table below),
+  through plugin hooks; at L9 only `nested-mutation-checks` reads the
+  `inspect().sources` row, for a gate error. **Unfilled, for L9a before its
+  gate:** a black-box pin of the `inspect().sources` row (its counters,
+  `dropCount`, `lastDropReason`, `attachedSourceCount` and the namespaced
+  id) and of the five `source.*` observe events with their attribution.
+  `listDefinitions` has no public counterpart: its telemetry is the
+  `inspect().sources` row. L9-pre's pins (the L9 RFC's U1 to U16) are the
+  trace's, meta's, observe's and notify's, so none of the 11 is filled yet.
 
 ### `sources.test.ts`: the 68 L5 cases (L5-pre)
 

@@ -91,7 +91,22 @@ export interface FuzzModule {
    * (the RFC's T2). Absent, every event does.
    */
   snapshotEvents?: number[];
+  /**
+   * L9, meta cases only (the L9 RFC's B1): each fact's `meta.tags`, by fact
+   * index, drawn from `FUZZ_TAGS`; an empty list or a missing index is a
+   * fact without meta. Absent, no fact has meta.
+   */
+  factTags?: FuzzTag[][];
+  /**
+   * L9, meta cases only: the derivations, by index, whose meta says
+   * `tagBoundary: true`, so a tag stops there instead of being inherited.
+   */
+  boundaries?: number[];
 }
+
+/** The tags a meta case may put on a fact (L9). */
+export const FUZZ_TAGS = ["pii", "billing"] as const;
+export type FuzzTag = (typeof FUZZ_TAGS)[number];
 
 export type FuzzStep =
   | { op: "dispatch"; module: number; event: number; value: number }
@@ -108,7 +123,13 @@ export type FuzzStep =
   | { op: "snapshot" }
   | { op: "restore" }
   | HistoryStep
-  | { op: "twin" };
+  | { op: "twin" }
+  /**
+   * L9: a `meta` record (`metaRecord`): `byTag` for each tag the case's
+   * facts carry, and `carriesTag` for every id those rows name and every
+   * fact and derivation of the first module.
+   */
+  | { op: "meta" };
 
 /**
  * The history steps (L8; the RFC's "The fuzz, designed in up front"). Each
@@ -233,6 +254,12 @@ export interface FuzzSpec {
    * false there, so no other part of a case moves.
    */
   respectsAbort?: boolean;
+  /**
+   * L9, trace cases only (the L9 RFC's B1): the trace option's `maxRuns`,
+   * drawn from 1, 3 and 100 so the ring drops runs, a pending one too (R2,
+   * R6). Absent (a spec written before L9-pre), the option is `true`.
+   */
+  maxRuns?: 1 | 3 | 100;
 }
 
 /**
@@ -273,8 +300,10 @@ export const FEATURE_LAYERS = {
    * `snapshotEvents` and an effect's `onNavigate: "skip"`.
    */
   history: 8,
-  /** The trace option. */
+  /** The trace option, and `maxRuns`, drawn only with it. */
   trace: 9,
+  /** Fact tags, `tagBoundary` derivations and the `meta` step. */
+  meta: 9,
 } as const;
 
 type Feature = keyof typeof FEATURE_LAYERS;
@@ -296,6 +325,7 @@ const STEP_FEATURES = {
   pause: "history",
   resume: "history",
   twin: "twin",
+  meta: "meta",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
@@ -535,12 +565,92 @@ export function specArbitrary(
   // Below L8 nothing is chained, so a case is drawn exactly as before
   // L8-pre. At L8 a case with history draws its history additions after
   // everything else (`historyDraws`), so the rest of it is drawn as before
-  // too, and a case without history is the same case.
-  return allows("history")
+  // too, and a case without history is the same case. At L9 the trace and
+  // meta additions are drawn after those, the same way (`traceDraws`,
+  // `metaDraws`): below L9 a case is the one L8-pre drew.
+  const withHistory = allows("history")
     ? drawn.chain((spec) =>
         spec.history ? historyDraws(spec) : fc.constant(spec),
       )
     : drawn;
+  const withTrace = allows("trace")
+    ? withHistory.chain((spec) =>
+        spec.trace ? traceDraws(spec) : fc.constant(spec),
+      )
+    : withHistory;
+
+  return allows("meta") ? withTrace.chain(metaDraws) : withTrace;
+}
+
+/** What a trace case adds (L9-pre; the RFC's reach table): `maxRuns`. */
+function traceDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
+  return fc
+    .constantFrom(1 as const, 3 as const, 100 as const)
+    .map((maxRuns) => ({ ...spec, maxRuns }));
+}
+
+/**
+ * What a meta case adds (L9-pre; the RFC's reach table): one case in three
+ * tags its facts (each fact none, one or both of `FUZZ_TAGS`), marks some
+ * derivations `tagBoundary`, and puts one to three `meta` steps in among its
+ * steps. The other two in three are the case as drawn without meta.
+ */
+function metaDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
+  const tagged = fc.record({
+    factTags: fc.tuple(
+      ...spec.modules.map((m) =>
+        fc.array(fc.subarray([...FUZZ_TAGS]), {
+          minLength: m.facts,
+          maxLength: m.facts,
+        }),
+      ),
+    ),
+    boundaries: fc.tuple(
+      ...spec.modules.map((m) => fc.subarray(m.derivations.map((_, i) => i))),
+    ),
+    inserts: fc.array(fc.nat(), { minLength: 1, maxLength: 3 }),
+  });
+
+  return fc.oneof(
+    { weight: 2, arbitrary: fc.constant(spec) },
+    {
+      weight: 1,
+      arbitrary: tagged.map((d) => {
+        const steps: FuzzStep[] = [...spec.steps];
+        for (const at of d.inserts) {
+          steps.splice(at % (steps.length + 1), 0, { op: "meta" });
+        }
+
+        return {
+          ...spec,
+          modules: spec.modules.map((m, i) => ({
+            ...m,
+            factTags: d.factTags[i] as FuzzTag[][],
+            boundaries: d.boundaries[i] as number[],
+          })),
+          steps,
+        };
+      }),
+    },
+  );
+}
+
+/**
+ * A drawn spec with no trace and no meta: the options, the steps and the
+ * module fields drawn only with them taken out, so what is left is the case
+ * as drawn before L9-pre (diff/self/tamper.test.ts).
+ */
+export function withoutIntrospection(spec: FuzzSpec): FuzzSpec {
+  const { maxRuns: _runs, ...rest } = spec;
+
+  return {
+    ...rest,
+    trace: false,
+    modules: spec.modules.map(
+      ({ factTags: _tags, boundaries: _bounds, ...m }) => m,
+    ),
+    steps: spec.steps.filter((s) => s.op !== "meta"),
+  };
 }
 
 const navSteps = fc.integer({ min: 1, max: 3 });
@@ -720,11 +830,14 @@ export function specLayer(spec: FuzzSpec): string {
     ) {
       use("history");
     }
+    if (m.factTags !== undefined || m.boundaries !== undefined) {
+      use("meta");
+    }
   }
   if (spec.boundary) {
     use("boundary");
   }
-  if (spec.trace) {
+  if (spec.trace || spec.maxRuns !== undefined) {
     use("trace");
   }
   if (
@@ -776,7 +889,8 @@ function moduleDef(
   const own = (fs: any) => (cross ? fs.self : fs);
   const facts: Record<string, unknown> = {};
   for (let i = 0; i < m.facts; i++) {
-    facts[f(i)] = t.number();
+    const tags = m.factTags?.[i] ?? [];
+    facts[f(i)] = tags.length > 0 ? t.number().meta({ tags }) : t.number();
   }
   if (m.date) {
     facts.when = t.date();
@@ -801,6 +915,16 @@ function moduleDef(
       return d.threshold === null ? sum : sum > d.threshold;
     };
   });
+  // L9: a `tagBoundary` derivation is the same compute, given as an object
+  // with meta, so a tag it reads stops there.
+  for (const i of m.boundaries ?? []) {
+    if (derive[`d${i}`]) {
+      derive[`d${i}`] = {
+        compute: derive[`d${i}`],
+        meta: { tagBoundary: true },
+      };
+    }
+  }
   const eventSchema: Record<string, unknown> = {};
   const events: Record<string, unknown> = {};
   m.events.forEach((e, i) => {
@@ -1772,7 +1896,9 @@ function options(spec: FuzzSpec) {
     ...(spec.history
       ? { history: { maxSnapshots: spec.maxSnapshots ?? 20 } }
       : {}),
-    ...(spec.trace ? { trace: true } : {}),
+    ...(spec.trace
+      ? { trace: spec.maxRuns === undefined ? true : { maxRuns: spec.maxRuns } }
+      : {}),
   };
 }
 
@@ -1939,6 +2065,13 @@ function steps(spec: FuzzSpec): Step[] {
           },
         });
         break;
+      case "meta":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => metaRecord(system, spec, ctx),
+        });
+        break;
       case "twin":
         // A second system from the same definitions, in the same engine
         // instance: per-process state (warning dedupe) shows here. Its
@@ -2032,6 +2165,58 @@ function historyRecord(history: any, ctx: BuildContext): void {
       ),
     },
   ]);
+}
+
+/**
+ * The `meta` step's record (L9): for each tag some fact of the case carries,
+ * `byTag(tag)` as kind, id and `tagOrigin` (authored or inherited; the
+ * row's own meta is the definition's, compared through `meta.fact` and
+ * `meta.derivation` instead), then `carriesTag` for each id those rows name
+ * and for every fact and derivation of the first module, by kind. A query
+ * that throws is recorded as the throw.
+ */
+function metaRecord(system: any, spec: FuzzSpec, ctx: BuildContext): void {
+  const tags = FUZZ_TAGS.filter((tag) =>
+    spec.modules.some((m) => (m.factTags ?? []).some((t) => t.includes(tag))),
+  );
+  const ask = (fn: () => unknown): unknown => {
+    try {
+      return fn();
+    } catch (error) {
+      return { threw: String((error as Error)?.message ?? error) };
+    }
+  };
+  const first = spec.modules[0] as FuzzModule;
+  for (const tag of tags) {
+    const rows = ask(() =>
+      (system.meta.byTag(tag) as any[]).map((r) => [
+        r.kind,
+        r.id,
+        r.tagOrigin ?? null,
+      ]),
+    );
+    const ids: [string, string][] = Array.isArray(rows)
+      ? rows.map((r) => [r[0], r[1]])
+      : [];
+    for (let i = 0; i < first.facts; i++) {
+      ids.push(["fact", f(i)]);
+    }
+    first.derivations.forEach((_, i) => {
+      ids.push(["derivation", `d${i}`]);
+    });
+    ctx.external([
+      "meta",
+      tag,
+      {
+        byTag: rows,
+        carries: ids.map(([kind, id]) => [
+          kind,
+          id,
+          ask(() => system.meta.carriesTag(kind, id, tag)) ?? null,
+        ]),
+      },
+    ]);
+  }
 }
 
 export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {

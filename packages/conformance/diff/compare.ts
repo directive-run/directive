@@ -672,6 +672,81 @@ export function drawnResolvers(trace: TraceEntry[]): Set<string> {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Trace timing (L9; the L9 RFC's harness rule 1)
+
+/** A duration anomaly's text, `Duration 12ms is 5x+ above average (2ms)`. */
+const DURATION_ANOMALY = /^Duration .*above average/;
+
+/** The milliseconds a causal chain prints, as in `charge resolved (5ms)`. */
+const CHAIN_MS = /\(\d+(?:\.\d+)?ms\)/g;
+
+/**
+ * A time a trace run reports, by contract: a finite number at or above 0 on
+ * each engine, never compared for equality. Anything else keeps its value,
+ * so a NaN, a negative or a missing time is still a difference.
+ */
+function traceTime(value: Json | undefined): Json {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? { $time: "finite, at or above 0" }
+    : { $time: value === undefined ? "absent" : value };
+}
+
+/**
+ * One trace run (an `onTraceComplete` entry, or a row of `inspect().trace`)
+ * with its timing projected (rule 1): `timestamp`, `duration` and each
+ * `resolversCompleted` row's `duration` by contract (`traceTime`); the
+ * causal chain's "(Nms)" replaced by a placeholder; a duration anomaly
+ * dropped, so its presence is not compared (it depends on time, the RFC's
+ * U13), and `anomalies` left out when nothing else is in it, as 1.35 leaves
+ * it out; the run's `id` by its place in the list and the stream, not its
+ * value. Every other field is compared exactly, the order of every list too,
+ * so an order difference is a case and not a silent mask.
+ */
+export function traceRunContract(run: Json): Json {
+  if (!isObject(run)) {
+    return run;
+  }
+  const out: Record<string, Json> = { ...run };
+  if ("id" in out) {
+    out.id = tag(out.id);
+  }
+  for (const key of ["timestamp", "duration"]) {
+    if (key in out) {
+      out[key] = traceTime(out[key]);
+    }
+  }
+  if (typeof out.causalChain === "string") {
+    out.causalChain = out.causalChain.replace(CHAIN_MS, "(Nms)");
+  }
+  if (Array.isArray(out.resolversCompleted)) {
+    out.resolversCompleted = out.resolversCompleted.map((row) =>
+      isObject(row) && "duration" in row
+        ? { ...row, duration: traceTime(row.duration) }
+        : row,
+    );
+  }
+  if (Array.isArray(out.anomalies)) {
+    const kept = out.anomalies.filter(
+      (a) => !(typeof a === "string" && DURATION_ANOMALY.test(a)),
+    );
+    if (kept.length > 0) {
+      out.anomalies = kept;
+    } else {
+      delete out.anomalies;
+    }
+  }
+
+  return out;
+}
+
+/** `inspect()` with each `trace` row projected (`traceRunContract`). */
+function inspectContract(inspect: Json): Json {
+  return isObject(inspect) && Array.isArray(inspect.trace)
+    ? { ...inspect, trace: inspect.trace.map(traceRunContract) }
+    : inspect;
+}
+
 /** The part of an entry that is a contract. */
 export function contract(
   entry: TraceEntry,
@@ -696,6 +771,16 @@ export function contract(
     }
     case "hook":
     case "observe": {
+      if (entry.k === "hook" && entry.hook === "onTraceComplete") {
+        return mask(
+          {
+            k: "hook",
+            hook: entry.hook,
+            args: entry.args.map((a, i) => (i === 0 ? traceRunContract(a) : a)),
+          },
+          NONE,
+        );
+      }
       // How long a drawn resolver took is the sum of its drawn waits.
       const done = completion(entry);
       if (!done || !drawn.has(done.resolver)) {
@@ -726,7 +811,7 @@ export function contract(
           label: entry.label,
           facts: entry.facts,
           derived: entry.derived,
-          inspect: mask(entry.inspect, INSPECT_FIELDS),
+          inspect: mask(inspectContract(entry.inspect), INSPECT_FIELDS),
         },
         NONE,
       );

@@ -16,6 +16,8 @@
     "tests/core/l8-history-gate-debt-oracle.test.ts",
     "tests/core/l8-history-pins-oracle-production.test.ts",
     "tests/core/l8-history-pins-oracle.test.ts",
+    "tests/core/l9-trace-pins-oracle-production.test.ts",
+    "tests/core/l9-trace-pins-oracle.test.ts",
     "tests/core/reconcile-timing-rules.test.ts",
     "tests/core/requeue-after-resolver-finishes.test.ts",
     "tests/core/requeue.test.ts",
@@ -49,6 +51,8 @@
     "tests/core/l8-history-gate-debt-oracle.test.ts": [],
     "tests/core/l8-history-pins-oracle-production.test.ts": [],
     "tests/core/l8-history-pins-oracle.test.ts": [],
+    "tests/core/l9-trace-pins-oracle-production.test.ts": [],
+    "tests/core/l9-trace-pins-oracle.test.ts": [],
     "tests/core/reconcile-timing-rules.test.ts": ["option plugins"],
     "tests/core/requeue-after-resolver-finishes.test.ts": [],
     "tests/core/requeue.test.ts": ["import flushMicrotasks"],
@@ -78,6 +82,8 @@
     "tests/core/l8-history-gate-debt-oracle.test.ts": [],
     "tests/core/l8-history-pins-oracle-production.test.ts": [],
     "tests/core/l8-history-pins-oracle.test.ts": [],
+    "tests/core/l9-trace-pins-oracle-production.test.ts": [],
+    "tests/core/l9-trace-pins-oracle.test.ts": [],
     "tests/core/reconcile-timing-rules.test.ts": [
       "member .history",
       "option batch resolver",
@@ -407,6 +413,27 @@
       "the members of system.history (U12) > is null when history is not asked for": "L8",
       "pause() inside a changeset (U18) > records no range when the only write was paused, so goBack moves one snapshot": "L8",
       "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start": "L8"
+    },
+    "tests/core/l9-trace-pins-oracle-production.test.ts": {
+      "the 101st observer in production (U7; row bj, declined) > hears nothing and nothing is printed; a freed place takes a new observer": "L9",
+      "a function-form when in production (U15, U16) > has no whenSpec key, no whenExplain key and no Predicate clauses section": "L9"
+    },
+    "tests/core/l9-trace-pins-oracle.test.ts": {
+      "system.trace hands every reader the same array and the live entries (U1; row bh) > two reads are one array, and an item pushed onto one read is in the next": "L9",
+      "system.trace hands every reader the same array and the live entries (U1; row bh) > an edit to an entry shows in system.trace and in inspect().trace": "L9",
+      "system.trace hands every reader the same array and the live entries (U1; row bh) > inspect().trace is a copy: an edit to it changes nothing": "L9",
+      "carriesTag answers undefined where it has no answer (U5) > for an unknown kind, __proto__, an unknown id and a derivation whose body throws": "L9",
+      "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer": "L9",
+      "the 101st observer hears nothing (U7; row bj, declined) > gets a function back and no event, development warns, and a freed place takes a new observer": "L9",
+      "destroy() leaves the trace empty, not null (U9) > system.trace reads [] after destroy()": "L9",
+      "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > lists clobberLoopDetected, clobberLoopResolved, guardrailBlocked and guardrailCoverage": "L9",
+      "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > a plugin that re-emits from its own hook is called four times, for either member": "L9",
+      "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > guardrailBlocked and clobberLoopDetected share one cap": "L9",
+      "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > after destroy(), a clobber-loop call reaches no plugin": "L9",
+      "a plugin that edits the entry onTraceComplete hands it changes the trace (U12; row bh) > the edit shows in system.trace and in inspect().trace": "L9",
+      "a function-form when has no data-form introspection (U15) > inspect() gives the constraint no whenSpec key": "L9",
+      "a function-form when has no data-form introspection (U15) > explain() of its unmet requirement has no Predicate clauses section": "L9",
+      "the observer's constraint.evaluate event has no whenExplain key (U16) > absent, not undefined, on every evaluation of a function-form when": "L9"
     },
     "tests/core/reconcile-timing-rules.test.ts": {
       "a resolver whose own write retracts its requirement > `completes, never canceled (wait ${waitAfterWrite} microtasks${batched ? \", batched\" : \"\"}${viaDerivation ? \", via a derivation\" : \"\"})`": "L7",

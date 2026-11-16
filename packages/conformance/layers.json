@@ -2691,36 +2691,44 @@
       "rule": "L1",
       "tests": {
         "constraint when — data form > fires when the predicate holds and produces requirements": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "effect on — data trigger > runs only when the predicate currently holds for a referenced fact": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "resolver key — KeySelector > dedups equivalent requirements by selected fields": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option resolver key data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "event patch — data form > sets facts from literals, $ref payload copies, and $template strings": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option derive data form", "option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option derive data form", "option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "data-form introspection > inspect() exposes the predicate spec on constraints with a data `when`": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "data-form introspection > observe() emits whenExplain for a data-form constraint evaluation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "data-form introspection > explain(requirementId) renders the predicate clause tree with ✓/✗": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint `when` — $changed rejected unconditionally > throws at createSystem time when $changed appears in a constraint `when`": {
           "layer": "L11",
@@ -2735,8 +2743,9 @@
           "by": ["option predicate data form"]
         },
         "event handler + patch conflict > dev-warns and uses handler (patch is ignored) when both are provided": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         }
       }
     },
@@ -4509,8 +4518,8 @@
       "rule": "L9",
       "tests": {
         "a fact's tags cannot be taken back > refuses a re-registration of a key that already exists": {
-          "layer": "L9",
-          "by": ["member .meta"]
+          "layer": "L10",
+          "by": ["member .registerKeys"]
         },
         "a fact's tags cannot be taken back > refuses a _meta reassignment on the live schema type": {
           "layer": "L9",
@@ -4539,8 +4548,8 @@
           "by": ["member .registerModule"]
         },
         "a fact's tags are recorded before the fact is reachable > records a key registered through the store, rather than leaving it unanswerable-as-untagged": {
-          "layer": "L9",
-          "by": ["member .meta"]
+          "layer": "L10",
+          "by": ["member .registerKeys"]
         }
       }
     },
@@ -4642,12 +4651,12 @@
           "by": ["import createFactsStore", "import t"]
         },
         "createFactsStore > registerKeys > adds new schema keys to the store": {
-          "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "layer": "L10",
+          "by": ["member .registerKeys"]
         },
         "createFactsStore > registerKeys > blocks prototype pollution keys": {
-          "layer": "L0",
-          "by": ["import createFactsStore", "import t"]
+          "layer": "L10",
+          "by": ["member .registerKeys"]
         },
         "createFactsStore > onChange callback > fires onChange for each non-batched set": {
           "layer": "L0",
@@ -9939,6 +9948,107 @@
         "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
           "layer": "L9",
           "by": ["member .inspect"]
+        }
+      }
+    },
+    "tests/core/l9-trace-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "pin": true,
+      "tests": {
+        "the 101st observer in production (U7; row bj, declined) > hears nothing and nothing is printed; a freed place takes a new observer": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "a function-form when in production (U15, U16) > has no whenSpec key, no whenExplain key and no Predicate clauses section": {
+          "layer": "L9",
+          "by": ["member .explain", "member .inspect", "member .observe"]
+        }
+      }
+    },
+    "tests/core/l9-trace-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "pin": true,
+      "tests": {
+        "system.trace hands every reader the same array and the live entries (U1; row bh) > two reads are one array, and an item pushed onto one read is in the next": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option trace"]
+        },
+        "system.trace hands every reader the same array and the live entries (U1; row bh) > an edit to an entry shows in system.trace and in inspect().trace": {
+          "layer": "L9",
+          "by": [
+            "member .inspect",
+            "member .meta",
+            "member .trace",
+            "option trace"
+          ]
+        },
+        "system.trace hands every reader the same array and the live entries (U1; row bh) > inspect().trace is a copy: an edit to it changes nothing": {
+          "layer": "L9",
+          "by": [
+            "member .inspect",
+            "member .meta",
+            "member .trace",
+            "option trace"
+          ]
+        },
+        "carriesTag answers undefined where it has no answer (U5) > for an unknown kind, __proto__, an unknown id and a derivation whose body throws": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "the 101st observer hears nothing (U7; row bj, declined) > gets a function back and no event, development warns, and a freed place takes a new observer": {
+          "layer": "L9",
+          "by": ["member .meta", "member .observe"]
+        },
+        "destroy() leaves the trace empty, not null (U9) > system.trace reads [] after destroy()": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option trace"]
+        },
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > lists clobberLoopDetected, clobberLoopResolved, guardrailBlocked and guardrailCoverage": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > a plugin that re-emits from its own hook is called four times, for either member": {
+          "layer": "L9",
+          "by": [
+            "member .clobberLoopDetected",
+            "member .clobberLoopResolved",
+            "member .meta"
+          ]
+        },
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > guardrailBlocked and clobberLoopDetected share one cap": {
+          "layer": "L9",
+          "by": ["member .clobberLoopDetected", "member .meta"]
+        },
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > after destroy(), a clobber-loop call reaches no plugin": {
+          "layer": "L9",
+          "by": ["member .clobberLoopDetected", "member .meta"]
+        },
+        "a plugin that edits the entry onTraceComplete hands it changes the trace (U12; row bh) > the edit shows in system.trace and in inspect().trace": {
+          "layer": "L9",
+          "by": [
+            "member .inspect",
+            "member .meta",
+            "member .trace",
+            "option trace"
+          ]
+        },
+        "a function-form when has no data-form introspection (U15) > inspect() gives the constraint no whenSpec key": {
+          "layer": "L9",
+          "by": ["member .inspect", "member .observe"]
+        },
+        "a function-form when has no data-form introspection (U15) > explain() of its unmet requirement has no Predicate clauses section": {
+          "layer": "L9",
+          "by": ["member .explain", "member .inspect", "member .observe"]
+        },
+        "the observer's constraint.evaluate event has no whenExplain key (U16) > absent, not undefined, on every evaluation of a function-form when": {
+          "layer": "L9",
+          "by": ["member .observe"]
         }
       }
     },

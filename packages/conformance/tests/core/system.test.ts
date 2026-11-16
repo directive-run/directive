@@ -977,14 +977,24 @@ describe("Config Forwarding", () => {
     system.destroy();
   });
 
-  it("trace config forwarded", () => {
+  it("trace config forwarded", async () => {
     const system = createSystem({
       modules: { auth: authModule },
       trace: true,
     });
     system.start();
+    await system.settle();
 
+    // Trace API should be available. `toBeDefined()` alone passes for null,
+    // which is what a system without a trace holds, so the member is also
+    // exercised: it is an array, and one write is one more run in it.
     expect(system.trace).toBeDefined();
+    expect(Array.isArray(system.trace)).toBe(true);
+    const before = system.trace!.length;
+    system.facts.auth.token = "abc";
+    await system.settle();
+    expect(system.trace!.length).toBe(before + 1);
+    expect(system.trace![before]!.factChanges).toHaveLength(1);
 
     system.destroy();
   });
