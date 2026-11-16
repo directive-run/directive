@@ -558,6 +558,21 @@ export const withReconcile: SystemPart = (context) => {
             removed.push(req);
           }
         }
+        // The trace's record of the pass (L9 seam): what it added and
+        // removed, and each constraint with a current requirement, with its
+        // priority and what it read, all read here after the evaluation, as
+        // 1.35 reads them.
+        emit("requirement.diff", () => ({
+          added,
+          removed,
+          hit: [...new Set(current.map((req) => req.fromConstraint))].map(
+            (id) => ({
+              id,
+              priority: constraints.state_(id)!.priority,
+              deps: Array.from(constraints.depsOf(id) ?? [], describeDep),
+            }),
+          ),
+        }));
       }
       if (removed.length > 0) {
         retract(removed, passKeys);

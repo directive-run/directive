@@ -240,6 +240,11 @@ export interface SystemContext {
    * derivation ids (own-write satisfaction follows them to the facts).
    */
   derivationDeps(id: string): ReadonlySet<string> | undefined;
+  /**
+   * Set by the trace part while the trace is on (L9b): effect runs then list
+   * what they read on their `effect.run` record.
+   */
+  trace_?: unknown;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -820,6 +825,9 @@ export function createSystemCore<const M extends ModuleSchema>(
         emit("derivation.compute", {
           id: d.id_,
           value,
+          // The value before this compute: the graph stores the new one once
+          // this returns, and an error in its place after a throw (L9 seam).
+          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
           deps: Array.from(deps, describeDep),
         });
       }
