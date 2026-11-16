@@ -1006,7 +1006,7 @@
   {
     "file": "src/core/__tests__/l8-history-pins-oracle.test.ts",
     "category": "black-box",
-    "cases": 23,
+    "cases": 24,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

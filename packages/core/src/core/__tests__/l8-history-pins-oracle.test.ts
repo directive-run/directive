@@ -3,9 +3,10 @@ import { createModule, createSystem, t } from "../../index.js";
 
 // Black-box pins of 1.35's history behaviour that no other test states (the L8
 // RFC, "Untested behaviours" U1 to U3, U6, U8 to U12 and U18). Each pins what
-// 1.35 does today. Where a candidate row of the RFC would change it (aw, ax,
-// ba, bb, bc, bd, be, bf), the case keeps 1.35's side and names the row; the
-// signed entry that shows the difference is added with the row. Public API
+// 1.35 does today. Where an approved row changes it (ba, bc, bd, be), the case
+// keeps only what both engines share and names the row (the L8 gate, as #339
+// did at L6); where a deferred or declined row would (aw, ax, bf), the case
+// keeps 1.35's side and names the row. Public API
 // only. A fact write is one snapshot once the pass settles, so every write
 // below is followed by `settle()`.
 
@@ -172,36 +173,35 @@ describe("what a snapshot keeps of a Date, a function and a class instance (U2)"
   });
 });
 
-describe("a stored snapshot is the same object the caller holds (U3)", () => {
-  it("a value changed through the snapshots list is what the next goTo restores", async () => {
+describe("a stored snapshot and a restored fact (U3)", () => {
+  // Row (bd): 1.35 restores a value changed through `snapshots` (99), and 2.0
+  // freezes the stored snapshot, so the change throws; this keeps what both share.
+  it("a snapshot in the snapshots list holds its pass's value, and goTo restores it", async () => {
     const system = await begin();
     await count(system, 2);
     const target = system.history.snapshots[1];
-    target.facts.n = 99;
+    expect(target.facts.n).toBe(1);
 
-    expect(system.history.snapshots[1].facts.n).toBe(99);
     system.history.goTo(target.id);
     await system.settle();
-    expect(system.facts.n).toBe(99);
-    expect(system.history.snapshots[1].facts.n).toBe(99);
+    expect(system.facts.n).toBe(1);
+    expect(system.history.snapshots[1].facts.n).toBe(1);
     system.destroy();
   });
 
-  it("a nested value edited in place on a restored fact edits the stored snapshot too", async () => {
+  // Row (bd): an in-place edit of the restored fact edits 1.35's stored
+  // snapshot too (42), and leaves 2.0's at 1; this keeps what both share.
+  it("a nested value edited in place on a restored fact changes the live fact", async () => {
     const system = await begin();
     await write(system, "obj", { v: 1 });
     await write(system, "obj", { v: 2 });
     await go(system, "goBack");
-    const index = system.history.currentIndex;
     expect(system.facts.obj.v).toBe(1);
-    const stored = system.history.snapshots[index];
 
     system.facts.obj.v = 42;
     await system.settle();
 
     expect(system.facts.obj.v).toBe(42);
-    expect(stored.facts.obj.v).toBe(42);
-    expect(system.history.snapshots[index].facts.obj.v).toBe(42);
     system.destroy();
   });
 });
@@ -219,7 +219,9 @@ describe("snapshot ids after an import (U6)", () => {
 
   const ids = (system: any) => system.history.snapshots.map((s: any) => s.id);
 
-  it("repeat when the system's counter is behind the imported ids, and goTo finds the first", async () => {
+  // Row (ba): the next id repeats an imported one on 1.35 ([1, 2, 3, 4, 2])
+  // and follows the highest on 2.0 ([1, 2, 3, 4, 5]); this keeps what both share.
+  it("an import into a system whose counter is behind keeps the imported ids, and goTo finds the imported snapshot", async () => {
     const json = await fourSnapshots();
     const b = await begin();
     b.history.import(json);
@@ -227,7 +229,8 @@ describe("snapshot ids after an import (U6)", () => {
     expect(ids(b)).toEqual([1, 2, 3, 4]);
 
     await write(b, "n", 9);
-    expect(ids(b)).toEqual([1, 2, 3, 4, 2]);
+    expect(ids(b).slice(0, 4)).toEqual([1, 2, 3, 4]);
+    expect(ids(b)).toHaveLength(5);
 
     b.history.goTo(2);
     await b.settle();
@@ -269,23 +272,29 @@ describe("a changeset and goBack(steps) (U8)", () => {
     return system;
   }
 
-  it("(a) goBack(2) from inside a changeset lands on its start: the second step is dropped", async () => {
+  // Row (be): goBack(2) from inside lands on the start on 1.35 (index 2, the
+  // second step dropped) and one snapshot before it on 2.0 (index 1); this
+  // keeps what both share, one step.
+  it("(a) goBack from inside a changeset lands on its start", async () => {
     const system = await withChangeset(false);
     expect(at(system)).toEqual({ index: 4, n: 4 });
 
-    await go(system, "goBack", 2);
+    await go(system, "goBack");
 
     expect(at(system)).toEqual({ index: 2, n: 2 });
     system.destroy();
   });
 
-  it("(b) goBack(2) from outside, into a changeset, stops inside it", async () => {
+  // Row (be): goBack(2) from index 5 stops inside the changeset on 1.35
+  // (index 3) and crosses it to its start on 2.0 (index 2); this keeps what
+  // both share, one step.
+  it("(b) goBack from outside a changeset moves one snapshot, onto its end", async () => {
     const system = await withChangeset(true);
     expect(at(system)).toEqual({ index: 5, n: 5 });
 
-    await go(system, "goBack", 2);
+    await go(system, "goBack");
 
-    expect(at(system)).toEqual({ index: 3, n: 3 });
+    expect(at(system)).toEqual({ index: 4, n: 4 });
     system.destroy();
   });
 
@@ -332,24 +341,20 @@ describe("a changeset and goBack(steps) (U8)", () => {
 });
 
 describe("an import with a currentIndex outside the list (U9)", () => {
-  it("is accepted, changes no fact, and goBack from it restores nothing", async () => {
+  // Row (bc): 1.35 accepts the import (index 99, and a goBack to 98 restores
+  // nothing), and 2.0 fails it ("Failed to import history data", index 2);
+  // this keeps what both share.
+  it("changes no fact and leaves three snapshots", async () => {
     const system = await begin();
     await count(system, 2);
     const data = JSON.parse(system.history.export());
     data.currentIndex = 99;
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
 
     system.history.import(JSON.stringify(data));
     await system.settle();
 
-    expect(error).not.toHaveBeenCalled();
-    expect(system.history.currentIndex).toBe(99);
     expect(system.history.snapshots.length).toBe(3);
-    expect(system.facts.n).toBe(2);
-
-    await go(system, "goBack");
-
-    expect(system.history.currentIndex).toBe(98);
     expect(system.facts.n).toBe(2);
     system.destroy();
   });

@@ -139,36 +139,38 @@ describe("a Date, a Map and a Set in production (U1, U2)", () => {
   });
 });
 
-describe("a stored snapshot is the same object the caller holds, in production (U3)", () => {
-  it("a value changed through the snapshots list is what the next goTo restores", async () => {
+describe("a stored snapshot and a restored fact, in production (U3)", () => {
+  // Row (bd): 1.35 restores a value changed through `snapshots` (99), and 2.0
+  // freezes the stored snapshot, so the change throws; this keeps what both share.
+  it("a snapshot in the snapshots list holds its pass's value, and goTo restores it", async () => {
     const system = await begin();
     await write(system, "n", 1);
     await write(system, "n", 2);
     const target = system.history.snapshots[1];
-    target.facts.n = 99;
+    expect(target.facts.n).toBe(1);
 
     system.history.goTo(target.id);
     await system.settle();
 
-    expect(system.facts.n).toBe(99);
-    expect(system.history.snapshots[1].facts.n).toBe(99);
+    expect(system.facts.n).toBe(1);
+    expect(system.history.snapshots[1].facts.n).toBe(1);
     system.destroy();
   });
 
-  it("a nested value edited in place on a restored fact edits the stored snapshot too", async () => {
+  // Row (bd): an in-place edit of the restored fact edits 1.35's stored
+  // snapshot too (42), and leaves 2.0's at 1; this keeps what both share.
+  it("a nested value edited in place on a restored fact changes the live fact", async () => {
     const system = await begin();
     await write(system, "obj", { v: 1 });
     await write(system, "obj", { v: 2 });
     system.history.goBack();
     await system.settle();
-    const index = system.history.currentIndex;
-    const stored = system.history.snapshots[index];
+    expect(system.facts.obj.v).toBe(1);
 
     system.facts.obj.v = 42;
     await system.settle();
 
     expect(system.facts.obj.v).toBe(42);
-    expect(stored.facts.obj.v).toBe(42);
     system.destroy();
   });
 });
