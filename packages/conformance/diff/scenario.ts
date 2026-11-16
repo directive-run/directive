@@ -284,6 +284,13 @@ interface DrainRun {
   cuts: ReadonlyMap<number, number>;
   /** A wait that stalled (a call live and no timer left). */
   problem?: string;
+  /**
+   * Whether the run has passed its timer budget (`installBudget`): the
+   * harness has then cleared every timer and drops every callback itself,
+   * so a call left live with no timer is its doing, not the engine's, and
+   * the run is judged as a runaway instead (`runScenario`).
+   */
+  pastBudget: () => boolean;
 }
 
 /**
@@ -358,7 +365,7 @@ async function waitOutBatches(
     }
     if (vi.getTimerCount() === 0) {
       // Nothing left can move the system: done, unless a call still runs.
-      if (why !== false && why.startsWith("a call ")) {
+      if (why !== false && why.startsWith("a call ") && !drain.pastBudget()) {
         drain.problem ??= `the shared wait at step ${step} stalled: ${why}, and no timer left`;
       }
       break;
@@ -1108,6 +1115,7 @@ export async function runBudgeted(
           v2: drainsDetached(engine),
           mark: () => rec.trace.length,
           cuts,
+          pastBudget: () => budget.state.exceeded,
         }
       : undefined;
   const random = vi

@@ -169,6 +169,16 @@ export function onFailingCase(
 /** A trace as the harness records it (diff/record.ts `TraceEntry`). */
 type Trace = readonly unknown[];
 
+/**
+ * The most records of each trace a case file keeps. A runaway's trace can run
+ * to millions of records: deep seed 24301's up-to-L8 case 508 left 2,280,368
+ * on v2, a 536 MB file within 0.2% of the longest string V8 can build. A
+ * longer one makes the write throw inside the property, where fast-check
+ * shrinks the case for hours. The head kept holds the first difference and
+ * the start of the runaway. Self-test: diff/self/stall-after-budget.test.ts.
+ */
+export const CASE_TRACE_LIMIT = 100_000;
+
 /** What `caseFile` reads of a case's result (diff/scenario.ts `ScenarioResult`). */
 export interface CaseResult {
   report: string;
@@ -185,6 +195,9 @@ export interface CaseResult {
  * Before the L7 follow-ups the file held `traces.candidate`, the workspace
  * 1.x engine's, which nearly always matches 1.35's, so a triage read no
  * 2.0 record from it. Self-test: diff/self/batch-report.test.ts.
+ *
+ * Each trace keeps at most CASE_TRACE_LIMIT records; `truncated` gives the
+ * full length of each trace cut.
  */
 export function caseFile(
   meta: Record<string, unknown>,
@@ -197,16 +210,30 @@ export function caseFile(
       : (result.unexplained.find((d) => d.engine in engines)?.engine ??
         Object.keys(engines)[0]);
 
+  const reference = result.traces.reference;
+  const candidate =
+    engine === undefined
+      ? result.traces.candidate
+      : (engines[engine] ?? result.traces.candidate);
+  const head = (trace: Trace) =>
+    trace.length > CASE_TRACE_LIMIT ? trace.slice(0, CASE_TRACE_LIMIT) : trace;
+  const truncated = Object.fromEntries(
+    (
+      [
+        ["reference", reference.length],
+        ["candidate", candidate.length],
+      ] as const
+    ).filter(([, length]) => length > CASE_TRACE_LIMIT),
+  );
+
   return {
     ...meta,
     report: result.report,
     traces: {
-      reference: result.traces.reference,
-      candidate:
-        engine === undefined
-          ? result.traces.candidate
-          : (engines[engine] ?? result.traces.candidate),
+      reference: head(reference),
+      candidate: head(candidate),
       candidateEngine: engine ?? null,
     },
+    ...(Object.keys(truncated).length > 0 ? { truncated } : {}),
   };
 }
