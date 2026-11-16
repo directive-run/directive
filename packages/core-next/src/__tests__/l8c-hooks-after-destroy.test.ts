@@ -66,8 +66,9 @@ describe("hooks after destroy() (1.35 parity)", () => {
             name: "p",
             onRequirementCreated: (req: { id: string }) =>
               seen.push(`created ${req.id}`),
-            // 1.35 dispatches R's resolver here and core-next leaves it for
-            // start() (reconcile.ts); only the hooks' order is compared.
+            // 1.35 also dispatches R's resolver here; core-next leaves it for
+            // start() (reconcile.ts). No row signs that difference yet (a
+            // follow-up), so this test compares only the hooks it lists.
             onReconcileEnd: () => seen.push("end"),
           } as never,
         ]),
