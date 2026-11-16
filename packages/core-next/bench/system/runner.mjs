@@ -292,6 +292,9 @@ async function heapProbe(engine, api) {
   // One trace-100 step (100 traced runs, then a read of the ring) in bytes,
   // by the same method (L9b, the L9 RFC's B2).
   const traceBytesPerOp = await frameBytes("trace-100", 20);
+  // One module-churn step (100 register/unregister pairs, a resolver in
+  // flight) in bytes, by the same method (L10b, the L10 RFC's B5).
+  const moduleChurnBytesPerOp = await frameBytes("module-churn", 5);
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
@@ -320,6 +323,7 @@ async function heapProbe(engine, api) {
           batchFlushBytesPerOp,
           historyUndoBytesPerOp,
           traceBytesPerOp,
+          moduleChurnBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },
