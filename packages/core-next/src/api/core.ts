@@ -46,6 +46,7 @@ import {
   view,
   withTracking,
 } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { BatchHost, Batcher } from "./resolvers.js";
 import type { SourcesFeature } from "./sources.js";
@@ -304,7 +305,20 @@ export interface SystemContext {
   end_?: () => void;
   /** L10: tells meta.subscribe's listeners (set by withMeta). */
   metaChanged_?: () => void;
+  /** L11: the data-form slot (FormOf), filled by withPredicates. */
+  form_?: FormOf;
+  /** L11: a data form as its function, made at its first call (the seam). */
+  lazy_: FormOf;
+  /** L11: the predicates part's registration hooks. */
+  pred_?: Predicates;
 }
+
+/**
+ * L11 (the seam): turns a data form, an object `compute` or a `patch`
+ * event, into its function. Set by withPredicates; the core reads it at the
+ * form's first call, when every part has run.
+ */
+export type FormOf = (raw: any, key: string, id: string) => Fn;
 
 /** L10: one kind's definition hooks (the registry has written the map first). */
 export interface DefHooks {
@@ -460,6 +474,7 @@ export const checkTick = (ms: number | undefined): void => {
 const defsOf = (
   src: Record<string, unknown> | undefined,
   key: string,
+  lazy: FormOf,
 ): Record<string, Fn> => {
   const out: Record<string, Fn> = {};
   for (const [id, raw] of Object.entries(src ?? {})) {
@@ -476,7 +491,22 @@ const defsOf = (
         `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof fn}`,
       );
     }
-    out[id] = fn as Fn;
+    if (
+      isDevelopment &&
+      key === "handler" &&
+      fn !== undefined &&
+      typeof raw === "object" &&
+      Object.hasOwn(raw as object, "patch")
+    ) {
+      console.warn(
+        `[Directive] event "${id}": both \`handler\` and \`patch\` provided — using \`handler\` (patch is ignored).`,
+      );
+    }
+    // L11: a data form (an object compute, or a patch event).
+    out[id] =
+      typeof fn === "object" || (fn === undefined && (raw as any)?.patch)
+        ? lazy(raw, key, id)
+        : (fn as Fn);
   }
 
   return out;
@@ -578,8 +608,17 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     }
   }
-  const deriveDefs = defsOf(module.derive, "compute");
-  const eventDefs = defsOf(module.events, "handler");
+  /** L11, the seam: read at the first call, when withPredicates has run. */
+  const lazy: FormOf = (raw, key, id) => {
+    let fn: Fn | undefined;
+
+    return (...args) =>
+      (fn ??= context.form_!(raw, key, id))(
+        ...(raw.scope_ ? raw.scope_(...args) : args),
+      );
+  };
+  const deriveDefs = defsOf(module.derive, "compute", lazy);
+  const eventDefs = defsOf(module.events, "handler", lazy);
   // The event `tickMs` dispatches: the first module's with a `tick` event.
   // (`load_` marks the namespaced form; a quoted "tick_" would not be mangled.)
   const tickKey = module.load_
@@ -1012,7 +1051,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   const kinds: Record<string, DefHooks> = {
     derivation: {
       add_(id, fn) {
-        deriveDefs[id] = fn as Fn;
+        deriveDefs[id] = typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
         const d = define(id);
         // (bm): only a reader that asked about the name is owed anything; a
         // name nobody asked about changes nothing (1.35).
@@ -1024,7 +1063,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // 1.35 keeps the node and what it read (derivations.ts:418–446): stale
       // with the new compute, and what reads it with it.
       replace_(id, fn) {
-        deriveDefs[id] = fn as Fn;
+        deriveDefs[id] = typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
         // Announced again even when it was stale already (1.35).
         pending.add(id);
         const node = derivations.get(id)!.node_;
@@ -2111,6 +2150,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     kinds_: kinds,
     // L10b: a module's events, and a pass now (unregisterModule).
     events_: eventDefs,
+    lazy_: lazy,
     reconcile_: reconcile,
     get inPass_() {
       return reconciling;
