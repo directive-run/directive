@@ -514,3 +514,81 @@ describe("the resolver a run names", () => {
     system.destroy();
   });
 });
+
+describe("a recompute's old value after a throw (L10 gate, deep seed 2)", () => {
+  /**
+   * 1.35's old value is its cachedValue, which only a compute that returns
+   * writes (derivations.ts:524, 574): after a throw it is still the last
+   * value computed. `d0` computes 11, throws at 8, is stale at 6, and a pass
+   * runs it again: through `derive.call` (D8, the fuzz's case) or a read.
+   */
+  const throwsThenRecomputes = async (how: "call" | "read") => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const rows: unknown[] = [];
+    const mod = createModule("a", {
+      schema: {
+        facts: { f0: t.number(), go: t.number() },
+        derivations: { d0: t.number() },
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.f0 = 11;
+        facts.go = 0;
+      },
+      derive: {
+        d0: (facts) => {
+          if (facts.f0 === 8) {
+            throw new Error("d0 throws at 8");
+          }
+
+          return facts.f0;
+        },
+      },
+      effects: {
+        caller: {
+          run: (facts) => {
+            if (facts.go) {
+              how === "call" ? system.derive.call("d0") : system.read("d0");
+            }
+          },
+        },
+      },
+    });
+    // The effect reads `system` only once it runs, after this line.
+    const system: any = createSystem({
+      module: mod,
+      trace: true,
+      errorBoundary: { onDerivationError: "skip" },
+      plugins: [
+        {
+          name: "rows",
+          onTraceComplete: (entry) => rows.push(...entry.derivationsRecomputed),
+        },
+      ],
+    });
+    system.start();
+    expect(system.read("d0")).toBe(11);
+    system.facts.f0 = 8;
+    expect(() => system.read("d0")).toThrow("d0 throws at 8");
+    system.facts.f0 = 6;
+    system.facts.go = 1;
+    await wait(20);
+    const last = system.inspect().trace.at(-1).derivationsRecomputed;
+    system.destroy();
+    vi.restoreAllMocks();
+
+    return { rows, last };
+  };
+
+  it("a derive.call inside a pass reports the last value computed, not undefined", async () => {
+    const { rows, last } = await throwsThenRecomputes("call");
+    expect(rows).toMatchObject([{ id: "d0", oldValue: 11, newValue: 6 }]);
+    expect(last).toMatchObject([{ id: "d0", oldValue: 11, newValue: 6 }]);
+  });
+
+  it("so does a read inside a pass", async () => {
+    const { rows } = await throwsThenRecomputes("read");
+    expect(rows).toMatchObject([{ id: "d0", oldValue: 11, newValue: 6 }]);
+  });
+});
