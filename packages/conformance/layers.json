@@ -2625,64 +2625,79 @@
       "rule": "L1",
       "tests": {
         "namespaced constraint when — data form > fires when the predicate holds and produces requirements": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced constraint when — data form > inspect exposes the data-form whenSpec with namespaced keys": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced effect on — data trigger > runs only when the predicate currently holds for its own module's fact": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced resolver key — KeySelector via dynamic register > dedups equivalent requirements by selected fields": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option resolver key data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced event patch — data form > sets facts from literals, $ref payload copies, and $template strings": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option derive data form", "option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option derive data form", "option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "dynamic constraint register — data-form when > register accepts a data `when` and evaluates it correctly": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "dynamic constraint register — data-form when > assign swaps a function-form constraint to a data-form `when`": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced effect `$changed` operator > fires when the watched fact transitions between values; not on first run": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespace-pivot `self` and dep-namespace forms > constraint when: { self: { phase } } evaluates and fires": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespace-pivot `self` and dep-namespace forms > constraint with crossModuleDeps fires for `self` + dep pivots together": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespace-pivot `self` and dep-namespace forms > already-prefixed keys in `$all` pass through unchanged": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced event handler + patch — dev warn > dev-warns when both `handler` and `patch` are provided, keeps the handler": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced constraint abortOn — clobber detection > prefixes abortOn keys so clobber detection fires in a multi-module system": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "namespaced constraint abortOn — clobber detection > each module's abortOn is scoped to its own namespace": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         }
       }
     },
@@ -7076,6 +7091,986 @@
         "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": {
           "layer": "L10",
           "by": ["member .registerModule"]
+        }
+      }
+    },
+    "tests/core/l11-predicate-describe-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "describePredicate — empty / trivial > renders an empty predicate as 'always true'": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — empty / trivial > renders empty $all as 'always true'": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — empty / trivial > renders empty $any as 'never'": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — empty / trivial > renders $not {} as 'never'": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — empty / trivial > renders empty array-form as 'always true'": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — empty / trivial > returns invalid-predicate sentinel for non-object input": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — empty / trivial > returns cycle sentinel for a cyclic spec": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — natural style operators > bare equality": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — natural style operators > $eq": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $ne": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $gt": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $gte": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $lt": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $lte": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $in": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $nin": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $exists true / false": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $between": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $startsWith / $endsWith / $contains quote the operand": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $matches renders the RegExp literal": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — natural style operators > $changed": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders relational operators with symbols": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders equality with =, inequality with ≠": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders $in with ∈ and braces": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders $exists with ∃ / ∄": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders $between as low ≤ name ≤ high": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders $matches with ~": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — formal style operators > renders $changed with Δ": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > implicit AND on object-form siblings (no parens at top level)": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > $all with > 1 child parenthesizes each": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > $any with > 1 child parenthesizes each": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > $not wraps in parens with NOT": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > nested $any of $all and bare": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > formal style combinators use ∧ / ∨ / ¬": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > single-element $all renders without parens": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — combinators > parenthesize: false drops combinator parens": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — factName > remaps fact paths in natural style": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — factName > formal style ignores factName (preserves raw path)": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — value formatting > renders bigint values": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — value formatting > renders Date values as ISO 8601": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — value formatting > renders null values with 'is null' / 'is not null'": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — value formatting > renders array values via JSON": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — value formatting > quotes strings with spaces / commas in natural style": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — value formatting > always quotes strings in formal style": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — locale formatting > formats numbers with en-US thousands separator by default": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — locale formatting > formats numbers with de-DE thousands separator": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — locale formatting > falls back to en-US for invalid locale tags": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — array form > renders an array-form predicate equivalently to the object form": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — array form > renders multiple array clauses joined by AND": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — fallthrough > renders an unknown operator with generic '<path> <op> <value>'": {
+          "layer": "L11",
+          "by": ["import describePredicate"]
+        },
+        "describePredicate — nested fact paths > renders nested object as dotted path": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        },
+        "describePredicate — nested fact paths > renders deeply nested with AND on siblings": {
+          "layer": "L11",
+          "by": ["import describePredicate", "option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-predicate-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "evaluatePredicate — operators > bare value is equality": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "evaluatePredicate — operators > $eq / $ne": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $gt / $gte / $lt / $lte": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $between": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $in / $nin": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $exists": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $matches": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > $contains on string and array": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > multiple keys are AND-ed": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — operators > Date facts compare by time": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — combinators & array form > $all": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — combinators & array form > $any": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — combinators & array form > $not": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — combinators & array form > $all of empty is true, $any of empty is false": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — combinators & array form > empty object predicate is true": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "evaluatePredicate — combinators & array form > array clause form": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — nested > recurses into namespaced facts": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — $changed > true when the fact differs from prev": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — $changed > true on first run (no prev)": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — edge cases > NaN equals NaN, relational with NaN is false": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — edge cases > undefined / null distinct": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "evaluatePredicate — edge cases > relational on a missing fact never throws": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — edge cases > bigint is orderable": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — edge cases > circular object facts do not stack-overflow": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicate — edge cases > mixed operator + fact keys fail closed": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > two empty Sets compare equal": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > Sets with different elements are unequal": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > Sets with same elements in any order are equal": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > $ne against Sets is symmetric": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > two empty Maps compare equal; same-content Maps compare equal": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > Maps with different values are unequal": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "deepEqual handles Set and Map > $contains on a Set uses .has()": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluatePredicateExplained > returns a per-clause breakdown matching evaluatePredicate": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import evaluatePredicateExplained",
+            "option predicate data form"
+          ]
+        },
+        "evaluatePredicateExplained > nested clauses use dotted paths": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicateExplained",
+            "option predicate data form"
+          ]
+        },
+        "extractDeps > collects object-form keys": {
+          "layer": "L11",
+          "by": ["import extractDeps", "option predicate data form"]
+        },
+        "extractDeps > collects array-clause facts": {
+          "layer": "L11",
+          "by": ["import extractDeps", "option predicate data form"]
+        },
+        "extractDeps > walks combinators and nested predicates with dotted keys": {
+          "layer": "L11",
+          "by": ["import extractDeps", "option predicate data form"]
+        },
+        "evaluateTemplate > interpolates placeholders": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate > $${ escapes a literal ${": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate > unknown key yields empty string": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate > unterminated ${ is emitted literally": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate > extractTemplateKeys collects placeholders": {
+          "layer": "L11",
+          "by": ["import extractTemplateKeys", "option derive data form"]
+        },
+        "evaluateKeySelector > builds a stable key from selected fields": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector > distinct values never collide": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "applyPatch > sets literals, $ref payload copies, and $template interpolations": {
+          "layer": "L11",
+          "by": [
+            "import applyPatch",
+            "option derive data form",
+            "option predicate data form"
+          ]
+        },
+        "discriminators > isPredicate is false for functions, true for plain objects/clause arrays": {
+          "layer": "L11",
+          "by": ["import isPredicate", "option predicate data form"]
+        },
+        "discriminators > isPredicate rejects class instances and built-ins (DX-M8)": {
+          "layer": "L11",
+          "by": ["import isPredicate"]
+        },
+        "discriminators > isTemplate detects { $template }": {
+          "layer": "L11",
+          "by": ["import isTemplate", "option derive data form"]
+        },
+        "discriminators > memoizePredicate returns a cached closure": {
+          "layer": "L11",
+          "by": ["import memoizePredicate"]
+        },
+        "discriminators > memoizePredicate throws on non-object predicates (S-m5)": {
+          "layer": "L11",
+          "by": ["import memoizePredicate"]
+        },
+        "AE-fix: typo'd $-prefixed operator (DX-C1, DX-C2) > returns false and dev-warns for typo'd op (e.g. $eqq)": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "AE-fix: typo'd $-prefixed operator (DX-C1, DX-C2) > extractDeps does NOT synthesize phantom 'phase.$eqq' dep": {
+          "layer": "L11",
+          "by": ["import extractDeps"]
+        },
+        "AE-fix: deepEqual asymmetric cycle guard (S-M3) > does not short-circuit when only one side is cyclic": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "AE-fix: deepEqual asymmetric cycle guard (S-M3) > identical cyclic pair still equals itself via $eq": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "AE-fix: evaluateKeySelector uses stableStringify (DM-C1) > payloads with same fields in different orders produce IDENTICAL keys": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "AE-fix: evaluateKeySelector uses stableStringify (DM-C1) > preserves distinct-value-never-collide property": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "AE-fix: $between reversed pair dev-warn (DM-C3) > returns false and dev-warns when [min, max] is reversed": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "AE-fix: $between reversed pair dev-warn (DM-C3) > does NOT warn on a well-formed pair": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$matches operand must be RegExp (ReDoS hardening) > throws when operand is a string (no longer back-compat compiled)": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$matches operand must be RegExp (ReDoS hardening) > throws for numeric / object / null operands too": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$matches operand must be RegExp (ReDoS hardening) > RegExp operand still works": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "AE-fix: evaluatePredicateExplained preserves combinator tree (DM-M12) > $any produces a single combinator entry with nested children": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicateExplained",
+            "option predicate data form"
+          ]
+        },
+        "AE-fix: evaluatePredicateExplained preserves combinator tree (DM-M12) > $all reports pass count": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicateExplained",
+            "option predicate data form"
+          ]
+        },
+        "AE-fix: evaluatePredicateExplained preserves combinator tree (DM-M12) > $not wraps its single child": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicateExplained",
+            "option predicate data form"
+          ]
+        },
+        "AE-fix: applyPatch missing $ref dev-warn (DX-M14) > dev-warns when $ref'd key is absent from payload": {
+          "layer": "L11",
+          "by": ["import applyPatch", "option predicate data form"]
+        },
+        "AE-fix: applyPatch missing $ref dev-warn (DX-M14) > does NOT warn when $ref'd key is present": {
+          "layer": "L11",
+          "by": ["import applyPatch", "option predicate data form"]
+        },
+        "AE-fix: evaluateTemplate null vs undefined warns (DM-C2) > dev-warns when an interpolated key is null": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "AE-fix: evaluateTemplate null vs undefined warns (DM-C2) > dev-warns when an interpolated key is explicitly undefined (present)": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "$startsWith / $endsWith operators > $startsWith returns true when the actual string starts with operand": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$startsWith / $endsWith operators > $endsWith returns true when the actual string ends with operand": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$startsWith / $endsWith operators > $startsWith / $endsWith return false on non-string actuals": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$startsWith / $endsWith operators > extractDeps walks $startsWith / $endsWith just like other operators": {
+          "layer": "L11",
+          "by": ["import extractDeps", "option predicate data form"]
+        },
+        "$startsWith / $endsWith operators > empty operand string is a valid prefix/suffix (always true)": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$matches: string operand rejected at evaluation > RegExp operand evaluates without throwing": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "$matches: string operand rejected at evaluation > string operand throws (no longer back-compat)": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "one-operator-per-object runtime dev-warn (DX-M4) > warns when an operator object has >1 operator, still ANDs them": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "one-operator-per-object runtime dev-warn (DX-M4) > does NOT warn for a single-operator object": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "one-operator-per-object runtime dev-warn (DX-M4) > evaluates falsy when ANDed operators conflict": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "evaluateTemplate distinct warns for unknown-key / null / undefined > unknown key (not in scope) emits its own message": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate distinct warns for unknown-key / null / undefined > present-but-null key emits a distinct null message": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate distinct warns for unknown-key / null / undefined > present-but-undefined key emits a distinct undefined message": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate distinct warns for unknown-key / null / undefined > the three diagnostics use three distinct message strings": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "predicate registration deep-freezes nested operand objects > nested operand inside a memoized predicate is frozen and evaluation still uses the original value": {
+          "layer": "L11",
+          "by": ["import memoizePredicate", "option predicate data form"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes distinct BigInts": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes distinct Dates": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes RegExps with different flags": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes RegExps with different source": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes Sets with different members": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > distinguishes Maps with different entries": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateKeySelector typed-value handling > typed-value prefixes don't collide with string values": {
+          "layer": "L11",
+          "by": ["import evaluateKeySelector"]
+        },
+        "evaluateTemplate prototype walk hardening > does NOT interpolate inherited Object.prototype keys (toString)": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate prototype walk hardening > does NOT interpolate constructor": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "evaluateTemplate prototype walk hardening > own properties still interpolate": {
+          "layer": "L11",
+          "by": ["import evaluateTemplate", "option derive data form"]
+        },
+        "validatePredicate > throws on a $matches operand that is not a RegExp (empty object)": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a $matches operand that is a string": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a bigint operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a Set operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a Map operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate"]
+        },
+        "validatePredicate > accepts a JSON-clean predicate": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > accepts a real RegExp $matches operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > walks combinators and array forms": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a Set nested inside an $eq object operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a bigint nested inside an $in array operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a Map nested deep inside an $eq object operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > throws on a RegExp nested inside an $eq object operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > does not throw on a JSON-safe nested $eq object operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > does not throw on a JSON-safe nested $in array operand": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "validatePredicate > does not stack-overflow on a cyclic operand object": {
+          "layer": "L11",
+          "by": ["import validatePredicate", "option predicate data form"]
+        },
+        "predicate spec cycle/depth guards > containsChangedOperator: cyclic constraint when does not stack-overflow": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "predicate spec cycle/depth guards > containsChangedOperator: pathologically deep spec does not stack-overflow": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "predicate spec cycle/depth guards > evaluatePredicate: cyclic spec evaluates to false instead of stack-overflowing": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "predicate spec cycle/depth guards > evaluatePredicate: deep nested spec evaluates to false past the depth cap": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate"]
+        },
+        "predicate spec cycle/depth guards > evaluatePredicate: cyclic $not spec does not stack-overflow": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "predicate spec cycle/depth guards > a cyclic spec passes registration but evaluates to false": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength > rejects a $in operand longer than maxArrayOperandLength (1001-element)": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength > rejects a $nin operand over the cap": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength > accepts a $in operand at exactly the cap": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength > with no cap, even huge $in operands pass": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $matches ReDoS rejection > rejects a RegExp operand with nested quantifiers": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $matches ReDoS rejection > rejects a string-form pattern with nested quantifiers": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "validatePredicateAgainstSchema — $matches ReDoS rejection > accepts a benign RegExp": {
+          "layer": "L11",
+          "by": [
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "L11-pre: relational operators never mix kinds (U6) > compares two numbers, two strings, two bigints or two Dates only; a Date counts as its time": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "L11-pre: operand edges (U11) > $exists: true passes for null, not for undefined; $in with a non-array never passes; $startsWith: undefined matches 'undefined…'": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "L11-pre: template escape and unknown keys (U16) > $${ is a literal ${, and an unknown key interpolates empty with a development warning": {
+          "layer": "L11",
+          "by": [
+            "import evaluateTemplate",
+            "import extractTemplateKeys",
+            "option derive data form"
+          ]
+        }
+      }
+    },
+    "tests/core/l11-predicate-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "L11 probe pins (production) > U1: a global regex in a constraint's $matches never fires; called directly it alternates": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "L11 probe pins (production) > U3: a data form that names a derivation never matches, silently": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "L11 probe pins (production) > U4: an unknown operator never matches, and production is silent": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "import validatePredicateAgainstSchema"
+          ]
+        },
+        "L11 probe pins (production) > U8: past depth 64 the cut part reads false and the $nots above it read true, with no warning": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        },
+        "L11 probe pins (production) > U12: validatePredicateAgainstSchema given a schema instead of the kind map throws a TypeError": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "import validatePredicateAgainstSchema",
+            "option predicate data form"
+          ]
+        }
+      }
+    },
+    "tests/core/l11-predicate-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches throws on its frozen lastIndex, so the rule never fires (shows (bp))": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U1: called directly, a global regex alternates: evaluatePredicate and memoizePredicate keep 1.35's answer": {
+          "layer": "L11",
+          "by": [
+            "import evaluatePredicate",
+            "import memoizePredicate",
+            "option predicate data form"
+          ]
+        },
+        "L11 probe pins (development) > U2: a combinator beside a fact key ignores the fact key at run time and in describePredicate; the compilers refuse it; validatePredicate accepts it (shows (bq))": {
+          "layer": "L11",
+          "by": [
+            "import describePredicate",
+            "import evaluatePredicate",
+            "import predicateToMongo",
+            "import predicateToPostgrest",
+            "import predicateToSQL",
+            "import validatePredicate",
+            "option predicate data form"
+          ]
+        },
+        "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches, with no warning (shows (br))": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U4: an unknown operator never matches and warns on every evaluation in development; validatePredicate and isPredicate accept it": {
+          "layer": "L11",
+          "by": ["import isPredicate", "import validatePredicate"]
+        },
+        "L11 probe pins (development) > U5: registration deep-freezes the caller's spec, and inspect()'s whenSpec is that same object": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U7: two operators in one object are ANDed, with a development warning per evaluation": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "L11 probe pins (development) > U8: past depth 64 the cut part reads false, and a $not above it reads true, directly and as a constraint": {
+          "layer": "L11",
+          "by": ["import evaluatePredicate", "option predicate data form"]
+        },
+        "L11 probe pins (development) > U9: a data-form when with deps and async still fires, with the two development warnings": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U10: $changed in an effect's on fires on the first run, then on a change": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U17: with a plugin installed a data form is evaluated a second time per pass, so the unknown-operator warning prints twice; with none, once": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U17: the tracked evaluation short-circuits, so only what it read is a dependency; whenExplain visits every clause": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U18: unregister leaves a data-form constraint's whenSpec behind, and a function-form register under the same id reports it": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U19: a constraint registered or assigned at run time is normalized as at creation: data over function sets whenSpec, function over data removes it (R1, R2)": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U19: an effect registered with an on gate runs only while it holds, and stops once unregistered (R4)": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        },
+        "L11 probe pins (development) > U19: a derivation registered with a data-form compute is unwrapped, a predicate to a boolean and a template to a string; assign keeps the object and reading it throws (R5)": {
+          "layer": "L11",
+          "by": ["option derive data form", "option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-sweep-under-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "sweepUnder — single hole > sweeps a threshold and ranks by matched-count": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — single hole > includes a baseline point that replays the original against itself": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — custom objective > ranks by an arbitrary score function": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — custom objective > threads entityKey into each replay": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — multi-hole grid > walks the cartesian product in declared key order": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — multi-hole grid > ranks the grid by default objective": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — error paths > throws when sweep is empty": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — error paths > throws when a hole in the template has no sweep values": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — error paths > throws when a hole has an empty value array": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — error paths > throws when the grid exceeds MAX_SWEEP_POINTS": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — AE-round regression coverage > substitutes shared sub-tree references on every occurrence (no WeakSet aliasing)": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — AE-round regression coverage > throws on a cyclic template": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — AE-round regression coverage > isolates a throwing objective": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — AE-round regression coverage > isolates a non-finite objective return": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — template substitution > does not mutate the input template": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — template substitution > handles holes nested inside arrays": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — template substitution > treats non-hole `$`-keyed objects as predicate operators": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — API shape > exposes the expected SweepReport shape": {
+          "layer": "L11",
+          "by": ["import sweepUnder", "option predicate data form"]
+        },
+        "sweepUnder — API shape > exports MAX_SWEEP_POINTS as a public constant": {
+          "layer": "L11",
+          "by": ["import MAX_SWEEP_POINTS"]
         }
       }
     },
