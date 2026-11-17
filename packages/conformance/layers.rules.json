@@ -748,6 +748,14 @@
       "rule": "L10",
       "pin": true
     },
+    "tests/core/l10-gate-pins-oracle.test.ts": {
+      "rule": "L10",
+      "pin": true
+    },
+    "tests/core/l10-gate-pins-oracle-production.test.ts": {
+      "rule": "L10",
+      "pin": true
+    },
     "tests/core/unregister-module.test.ts": {
       "rule": "L10"
     },

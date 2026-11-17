@@ -6952,7 +6952,7 @@
       "rule": "L10",
       "pin": true,
       "tests": {
-        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a registered derivation: the assign returns, then every read, call and meta.derivation throws until a function is assigned": {
+        "derive.assign with { compute, meta } (U1; row bl) > on a registered derivation: the assign returns, and a function assigned after it is read": {
           "layer": "L10",
           "by": [
             "member .derive.assign",
@@ -6960,11 +6960,11 @@
             "member .derive.register"
           ]
         },
-        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a static derivation: the same": {
+        "derive.assign with { compute, meta } (U1; row bl) > on a static derivation: the same": {
           "layer": "L10",
           "by": ["member .derive.assign"]
         },
-        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works": {
+        "derive.assign with { compute, meta } (U1; row bl) > register with the same object form works": {
           "layer": "L10",
           "by": ["member .derive.register"]
         },
@@ -7022,6 +7022,60 @@
         "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member": {
           "layer": "L1",
           "by": ["option modules"]
+        }
+      }
+    },
+    "tests/core/l10-gate-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        }
+      }
+    },
+    "tests/core/l10-gate-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
         }
       }
     },
