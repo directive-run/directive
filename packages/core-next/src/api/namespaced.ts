@@ -15,7 +15,7 @@
 
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
-import { createSystemCore } from "./core.js";
+import { createSystemCore, validateKeys } from "./core.js";
 import { PREV_READ, declaresPrev } from "./effects.js";
 import { BLOCKED_PROPS, isPrototypeSafe } from "./facts.js";
 import { createCheckedReadView } from "./readonly.js";
@@ -135,7 +135,8 @@ export function createNamespacedSystem(
   /** History is on (system.ts): only then are the snapshot events listed. */
   history = false,
 ): System {
-  const modules = options.modules as Record<string, ModuleDefinition>;
+  // L10b: its own copy, which registerModule and unregisterModule change.
+  const modules = { ...options.modules } as Record<string, ModuleDefinition>;
   const names = () => Object.keys(modules);
   const known = (ns: string) => Object.hasOwn(modules, ns);
 
@@ -462,65 +463,32 @@ export function createNamespacedSystem(
     ?.snapshotModules;
   const snapEvents: string[] | undefined = history ? [] : undefined;
   let filtered = false;
-  /** Each joined key's module: facts apart, one map for every definition. */
-  const factOwners = new Map<string, string>();
-  const definitionOwners = new Map<string, string>();
-  for (const ns of ordered) {
-    const mod = modules[ns]!;
-    for (const [section, obj] of [
-      ["schema", mod.schema?.facts],
-      ["events", mod.events],
-      ["derive", mod.derive],
-      ["effects", mod.effects],
-      ["sources", mod.sources],
-      ["constraints", mod.constraints],
-      ["resolvers", mod.resolvers],
-    ] as const) {
-      for (const key of Object.keys(obj ?? {})) {
-        if (BLOCKED_PROPS.has(key)) {
-          throw new Error(
-            `[Directive] Security: Module "${ns}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-          );
-        }
-      }
-    }
+  /** Each namespace's flattened module, which unregisterModule takes out. */
+  const flats = new Map<string, Rec>();
+  /**
+   * L10b: one module's definitions with `ns::` ids and wrapped readers (1.35's
+   * prefixModuleDefinition), for createSystem and registerModule alike.
+   */
+  const flattenModule = (ns: string, mod: ModuleDefinition, live?: 1): Rec => {
+    const facts: Rec = {};
+    const derive: Rec = {};
+    const events: Rec = {};
+    const effects: Rec = {};
+    const sources: Rec = {};
+    const constraints: Rec = {};
+    const resolvers: Rec = {};
+    validateKeys(ns, mod, mod.schema?.facts);
+    // `live` (registerModule) writes neither outer map, so a refused module
+    // leaves no owner behind, as 1.35 records one only after its checks
+    // (engine.ts:4598): the engine records the owners once it takes the
+    // module (dynamic.ts register), and the joined schema's derivations are
+    // read only at createSystem.
     const p = (key: string) => ns + SEPARATOR + key;
-    // Neither "a" nor "a:" holds the separator, nor ":x" nor "x", yet both
-    // pairs join to "a:::x". 1.35 refuses two modules meeting on a key, in
-    // both modes (engine.ts:314–349): a fact, or any definition, whatever
-    // its section.
-    for (const [section, obj] of [
-      ["", mod.schema.facts],
-      ["derivation", mod.derive],
-      ["effect", mod.effects],
-      ["source", mod.sources],
-      ["constraint", mod.constraints],
-      ["resolver", mod.resolvers],
-      ["event", mod.events],
-    ] as const) {
-      const taken = section ? definitionOwners : factOwners;
-      for (const key of Object.keys(obj ?? {})) {
-        const id = p(key);
-        const owner = taken.get(id);
-        if (owner && owner !== ns) {
-          throw new Error(
-            section
-              ? `[Directive] Definition collision: ${section} "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing or rename to avoid conflicts.`
-              : `[Directive] Schema collision: Fact "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing (e.g., "${ns}::${id}") or merge into one module.`,
-          );
-        }
-        taken.set(id, ns);
-      }
-    }
-    if (snapEvents) {
-      const own =
-        kept && !kept.includes(ns)
-          ? []
-          : (mod.history as { snapshotEvents?: string[] } | undefined)
-              ?.snapshotEvents;
-      filtered ||= !!own;
-      snapEvents.push(...(own ?? Object.keys(mod.events ?? {})).map(p));
-    }
+    const own =
+      kept && !kept.includes(ns)
+        ? []
+        : (mod.history as { snapshotEvents?: string[] } | undefined)
+            ?.snapshotEvents;
     const deps = Object.keys(mod.crossModuleDeps ?? {});
     const keys: string[] = [];
     for (const [key, type] of Object.entries(mod.schema.facts)) {
@@ -528,10 +496,9 @@ export function createNamespacedSystem(
       keys.push(p(key));
     }
     for (const [key, type] of Object.entries(mod.schema.derivations ?? {})) {
-      derivations[p(key)] = type;
+      live || (derivations[p(key)] = type);
       keys.push(p(key));
     }
-    namespaceKeys.set(ns, keys);
     for (const [key, raw] of Object.entries(mod.derive ?? {})) {
       const meta = typeof raw === "function" ? undefined : (raw as Rec)?.meta;
       const fn = typeof raw === "function" ? raw : (raw as Rec)?.compute;
@@ -651,7 +618,7 @@ export function createNamespacedSystem(
       string,
       Rec,
     ][]) {
-      owners[p(key)] = mod;
+      live || (owners[p(key)] = mod);
       resolvers[p(key)] = {
         ...def,
         ...(def.resolve && {
@@ -673,8 +640,68 @@ export function createNamespacedSystem(
         }),
       };
     }
-    if (mod.init) {
-      inits.push((src) => mod.init!(factsOf(src, ns)));
+
+    return {
+      id: ns,
+      meta: mod.meta,
+      hooks: mod.hooks,
+      history: own && { snapshotEvents: own.map(p) },
+      init: mod.init && ((src: Rec) => mod.init!(factsOf(src, ns))),
+      keys_: keys,
+      schema: { facts },
+      derive,
+      events,
+      effects,
+      sources,
+      constraints,
+      resolvers,
+    };
+  };
+  const keep = (ns: string, flat: Rec) => {
+    namespaceKeys.set(ns, flat.keys_);
+    flats.set(ns, flat);
+  };
+  const drop = (ns: string) => {
+    delete modules[ns];
+    namespaceKeys.delete(ns);
+    flats.delete(ns);
+  };
+  /** Each joined key's module: a definition's, then a fact's. */
+  const keyOwners = [new Map<string, string>(), new Map<string, string>()];
+  for (const ns of ordered) {
+    const flat = flattenModule(ns, modules[ns]!);
+    keep(ns, flat);
+    // Neither "a" nor "a:" holds the separator, nor ":x" nor "x", yet both
+    // pairs join to "a:::x". 1.35 refuses two modules meeting on a key, in
+    // both modes (engine.ts:314–349): a fact, or any definition, whatever
+    // its section. The flat module's keys are already joined; each map is
+    // then merged into the system's.
+    for (const [section, obj, into] of [
+      ["", flat.schema.facts, facts],
+      ["derivation", flat.derive, derive],
+      ["effect", flat.effects, effects],
+      ["source", flat.sources, sources],
+      ["constraint", flat.constraints, constraints],
+      ["resolver", flat.resolvers, resolvers],
+      ["event", flat.events, events],
+    ] as const) {
+      const taken = keyOwners[+!section]!;
+      for (const id in obj) {
+        const owner = taken.get(id);
+        if (owner && owner !== ns) {
+          throw new Error(
+            `[Directive] ${section ? `Definition collision: ${section}` : "Schema collision: Fact"} "${id}" is defined in both module "${owner}" and "${ns}". Use namespacing${section ? " or rename to avoid conflicts." : ` (e.g., "${ns}::${id}") or merge into one module.`}`,
+          );
+        }
+        taken.set(id, ns);
+        (into as Rec)[id] = obj[id];
+      }
+    }
+    flat.init && inits.push(flat.init);
+    if (snapEvents) {
+      const own = flat.history?.snapshotEvents;
+      filtered ||= !!own;
+      snapEvents.push(...(own ?? Object.keys(flat.events)));
     }
   }
   const flat = {
@@ -716,7 +743,7 @@ export function createNamespacedSystem(
         }
       }
     },
-    modules_: ordered.map((ns) => ({ id: ns, meta: modules[ns]!.meta })),
+    modules_: [...flats.values()],
     owners_: owners,
     // A source gate of module `ns` reads `src` as the module's constraints
     // do: its own facts by bare name, or `self` and its dependencies. The
@@ -757,6 +784,9 @@ export function createNamespacedSystem(
     watch: system.watch as (...args: any[]) => () => void,
     when: system.when as (...args: any[]) => Promise<void>,
   };
+
+  /** The engine's registerModule and unregisterModule (dynamic.ts). */
+  const engine = [system.registerModule, system.unregisterModule] as Fn[];
 
   // --- the namespaced surface ----------------------------------------------
   const warnedReads = new Set<string>();
@@ -859,6 +889,48 @@ export function createNamespacedSystem(
       core.watch(toInternalKey(id), ...rest),
     when: (predicate: (facts: Rec) => boolean, opts?: unknown) =>
       core.when(() => predicate(nsFacts), opts),
+    // L10b: 1.35's namespaced registerModule and unregisterModule
+    // (system.ts:786–899), over the engine's.
+    registerModule(ns: string, mod: ModuleDefinition) {
+      const fail = (text: string) => {
+        throw new Error(`[Directive] ${text}`);
+      };
+      known(ns) &&
+        fail(
+          `Module namespace "${ns}" already exists. Cannot register a duplicate namespace.`,
+        );
+      ns.includes(SEPARATOR) &&
+        fail(
+          `Module name "${ns}" contains the reserved separator "${SEPARATOR}".`,
+        );
+      BLOCKED_PROPS.has(ns) &&
+        fail(`Module name "${ns}" is a blocked property.`);
+      for (const key of Object.keys(mod.schema.facts)) {
+        key.includes(SEPARATOR) &&
+          fail(
+            `Schema key "${key}" in module "${ns}" contains the reserved separator "${SEPARATOR}".`,
+          );
+      }
+      const flat = flattenModule(ns, mod, 1);
+      modules[ns] = mod;
+      keep(ns, flat);
+      try {
+        engine[0]!(flat);
+      } catch (error) {
+        drop(ns);
+        throw error;
+      }
+    },
+    async unregisterModule(ns: string) {
+      const flat = flats.get(ns);
+      if (!flat) {
+        throw new Error(
+          `[Directive] Cannot unregister module "${ns}": no such module namespace.`,
+        );
+      }
+      await engine[1]!(flat);
+      drop(ns);
+    },
   });
 
   return system as System;

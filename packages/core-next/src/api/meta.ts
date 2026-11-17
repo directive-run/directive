@@ -51,11 +51,12 @@ export const withMeta: SystemPart = (context) => {
     }
   };
   // The namespaced form lists its modules; a single module is its own row.
-  let mods = ((module as Record<string, any>).modules_ ?? [module]) as {
+  // L10b: one list, which registerModule and unregisterModule change.
+  const m = module as Record<string, any>;
+  let mods = (m.modules_ ??= [module]) as {
     id: string;
     meta?: Meta;
   }[];
-  const m = module as Record<string, any>;
   const schema = (m.schema?.facts ?? {}) as Record<string, { _meta?: Meta }>;
   const derive = (m.derive ?? {}) as Defs;
   // 1.35's byTag order: modules, facts, then these, then derivations.
@@ -73,8 +74,11 @@ export const withMeta: SystemPart = (context) => {
     }
   }
   const tagSets = new Map<string, ReadonlySet<string>>();
-  for (const key in schema) {
-    const type = schema[key]!;
+  /** One fact's tags; untyped, its row goes (L10b: unregisterModule). */
+  const note = (key: string, type?: { _meta?: Meta }) => {
+    if (!type) {
+      return tagSets.delete(key);
+    }
     if (type && !prepared.has(type)) {
       prepared.add(type);
       if (type._meta) {
@@ -86,8 +90,16 @@ export const withMeta: SystemPart = (context) => {
         Object.freeze(type);
       }
     }
-    tagSets.set(key, new Set(type?._meta?.tags));
+    tagSets.set(key, new Set(type._meta?.tags));
+  };
+  for (const key in schema) {
+    note(key, schema[key]);
   }
+  context.keys_ = (entries) => {
+    for (const [key, type] of entries) {
+      note(key, type as never);
+    }
+  };
   const fenced = <T>(fn: () => T): T =>
     kernel.graph.untracked(() => withoutTracking(tracker, fn));
   const has = Object.hasOwn as (o: object, id: string) => boolean;

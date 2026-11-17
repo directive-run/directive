@@ -56,7 +56,6 @@ export const withMissing: SystemPart = ({ system }) => {
         target[name] ??= () => featureMissing(prefix + name, layer);
       }
     };
-    stub(s, "", "registerModule unregisterModule", 10);
     stub(s, "", "getDistributableSnapshot watchDistributableSnapshot", 12);
   }
 };

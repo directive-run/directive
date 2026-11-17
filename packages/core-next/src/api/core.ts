@@ -22,7 +22,7 @@
 
 import isDevelopment from "#is-development";
 import { createClock } from "../clock.js";
-import { Flags, Link, type ReactiveNode } from "../graph.js";
+import { Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
   type KernelEvent,
@@ -138,6 +138,16 @@ interface Derivation {
    * + the id, made once rather than on every test.
    */
   member_: string;
+}
+
+// The graph's Flags bits the core reads (graph.ts), as literals: a const enum
+// is inlined at each use, where Flags is an object every bundle would carry.
+// l10b-modules.test.ts pins each value to Flags.
+// biome-ignore lint/suspicious/noConstEnum: internal, never exported.
+const enum F {
+  Dirty = 4,
+  Running = 16,
+  Errored = 512,
 }
 
 /**
@@ -268,6 +278,18 @@ export interface SystemContext {
    * withDynamic's registry drives them, after it writes the module's map.
    */
   kinds_: Record<string, DefHooks>;
+  /** L10, dynamic.ts relink: set by the first dynamic call. */
+  relink_?: (
+    node: ReactiveNode,
+    old: Set<string> | undefined,
+    deps: Set<string>,
+  ) => void;
+  /** L10b: the event handlers, unwrapped. */
+  events_: Record<string, Fn>;
+  /** L10b: a pass now (1.35's unregisterModule awaits one, engine.ts:4870). */
+  reconcile_(): Promise<void>;
+  /** L10b: the meta part's tags for keys the store registers (or drops, untyped). */
+  keys_?: (entries: [string, unknown?][]) => void;
   /** L10: builds the reconcile part late, on a system that had no constraint or resolver. */
   l2_?: () => void;
   /** L10: true while a pass runs (1.35's isReconciling). */
@@ -284,6 +306,8 @@ export interface DefHooks {
   replace_(id: string, def?: unknown): void;
   remove_(id: string, def?: unknown): void;
   call_(id: string, props?: any): unknown;
+  /** L10b, resolvers: what an unregister waits for. */
+  waits_?(ids: string[]): unknown[];
   /** L10 (D7): whether one of the kind's definitions depends on `key`. */
   reads_?(key: string): boolean;
 }
@@ -463,6 +487,46 @@ const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
  * events, subscriptions and the reconcile pass; each part adds a feature.
  * The 1.35 `createSystem` (system.ts) passes them all.
  */
+/**
+ * 1.35's validateKeys, a security boundary that runs in every environment:
+ * a blocked key in any section, and (`dollar`) a schema key starting with
+ * "$". createSystem, the namespaced layer (no "$" check) and registerModule
+ * (1.35's shorter text, `tail` "") share it.
+ */
+/** The sections 1.35's validateKeys walks, in its order. */
+const SECTIONS = [
+  "schema",
+  "events",
+  "derive",
+  "effects",
+  "sources",
+  "constraints",
+  "resolvers",
+];
+export function validateKeys(
+  id: string,
+  mod: Record<string, any>,
+  facts: object | undefined,
+  dollar?: unknown,
+  tail = " This could indicate a prototype pollution attempt.",
+): void {
+  for (const section of SECTIONS) {
+    const obj = section === "schema" ? facts : mod[section];
+    for (const key of obj ? Object.keys(obj) : []) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${id}" has dangerous key "${key}" in ${section}.${tail}`,
+        );
+      }
+      if (dollar && section === "schema" && key[0] === "$") {
+        throw new Error(
+          `[Directive] Module "${id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
+        );
+      }
+    }
+  }
+}
+
 export function createSystemCore<const M extends ModuleSchema>(
   options: SystemOptions<M>,
   parts: readonly SystemPart[] = [],
@@ -492,29 +556,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   const hooks_ = module.hooks_ ?? (module.hooks ? [module.hooks as Hooks] : []);
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  // A security boundary (1.35): runs in every environment.
-  for (const [section, obj] of [
-    ["schema", schema],
-    ["events", module.events],
-    ["derive", module.derive],
-    ["effects", module.effects],
-    ["sources", module.sources],
-    ["constraints", module.constraints],
-    ["resolvers", module.resolvers],
-  ] as const) {
-    for (const key of Object.keys(obj ?? {})) {
-      if (BLOCKED_PROPS.has(key)) {
-        throw new Error(
-          `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-        );
-      }
-      if (section === "schema" && key.startsWith("$")) {
-        throw new Error(
-          `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
-        );
-      }
-    }
-  }
+  validateKeys(module.id, module, schema, 1);
   if (isDevelopment) {
     if (Object.keys(module.crossModuleDeps ?? {}).length) {
       console.warn(
@@ -736,7 +778,10 @@ export function createSystemCore<const M extends ModuleSchema>(
    * fact's subscriber in link order, depth first. A fact nothing in the graph
    * reads allocates nothing here.
    */
-  function invalidate(keys: readonly (string | object)[]): void {
+  function invalidate(
+    keys: readonly (string | object)[],
+    root?: ReactiveNode,
+  ): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
     let told: Set<ReactiveNode> | undefined;
@@ -773,14 +818,16 @@ export function createSystemCore<const M extends ModuleSchema>(
             d.stale_ = true;
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
-            node.flags |= Flags.Dirty;
+            node.flags |= F.Dirty;
             if (wants("derivation.invalidate")) {
               emit("derivation.invalidate", { id: d.id_ });
             }
             pending.add(d.id_);
             // Wakes an effect that read this derivation (and maybe no fact).
             changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
-            for (let s = node.subs; s; s = s.nextSub) {
+            // A replaced root's readers are walked one by one after it, in
+            // order (1.35's invalidateReplacedDefinition), by `keys`.
+            for (let s = node === root ? null : node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
             // As in 1.35, whoever asked whether it exists goes stale with it.
@@ -868,14 +915,21 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      const old = d.deps_;
       d.deps_ = deps;
+      // 1.35's updateDependencies: a new dependency set unlinks the old one
+      // and links the new one, so this derivation's readers' lists end with
+      // it, and the next write's walk meets it last.
+      // 1.35 moves a derivation whose dependencies changed to the end of
+      // what it reads; L10's definitions change them (dynamic.ts relink).
+      context.relink_?.(d.node_, old, deps);
       if (wants("derivation.compute")) {
         emit("derivation.compute", {
           id: d.id_,
           value,
           // The value before this compute: the graph stores the new one once
           // this returns, and an error in its place after a throw (L9 seam).
-          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
+          oldValue: d.node_.flags & F.Errored ? undefined : d.node_.value,
           deps: Array.from(deps, describeDep),
         });
       }
@@ -885,7 +939,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       d.live_ = true;
       // 1.35 keeps a throwing derivation stale: the next read runs it again,
       // which is also all "retry" asks. Marked first: "throw" leaves here.
-      d.node_.flags |= Flags.Dirty;
+      d.node_.flags |= F.Dirty;
       context.reportError("derivation", d.id_, error);
       throw error;
     }
@@ -900,7 +954,9 @@ export function createSystemCore<const M extends ModuleSchema>(
    * something else (a branch) or by throwing before it gets there.
    *
    * So every derivation keeps one reader that never runs: the edge a read
-   * would leave, without the read.
+   * would leave, without the read. The edge is only on the derivation's
+   * side: `keep` never runs, so nothing walks its own list, and a list there
+   * would hold every derivation ever removed.
    */
   const keep = graph.computed(() => 0);
   /**
@@ -921,8 +977,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
     }));
-    const link = new Link(node, keep, keep.deps, node.subsTail);
-    keep.deps = link;
+    const link = new Link(node, keep, null, node.subsTail);
     node.subsTail ? (node.subsTail.nextSub = link) : (node.subs = link);
     node.subsTail = link;
     derivations.set(id, d);
@@ -964,7 +1019,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         deriveDefs[id] = fn as Fn;
         // Announced again even when it was stale already (1.35).
         pending.add(id);
-        invalidate([{ subs: { target: derivations.get(id)!.node_ } }]);
+        const node = derivations.get(id)!.node_;
+        invalidate([{ subs: { target: node } }, node], node);
       },
       remove_(id) {
         const d = derivations.get(id)!;
@@ -982,7 +1038,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       },
       call_(id) {
         const node = derivations.get(id)!.node_;
-        node.flags |= Flags.Dirty;
+        node.flags |= F.Dirty;
 
         return graph.read(node);
       },
@@ -994,7 +1050,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
-    if (d.node_.flags & Flags.Running) {
+    if (d.node_.flags & F.Running) {
       // 1.35's text (derivations.ts:514–517), not the graph's.
       throw new Error(
         `[Directive] Circular dependency detected in derivation: ${id}`,
@@ -2045,6 +2101,9 @@ export function createSystemCore<const M extends ModuleSchema>(
     derivationDeps: (id) => derivations.get(id)?.deps_,
     counts_: () => [watched, changedKeys],
     kinds_: kinds,
+    // L10b: a module's events, and a pass now (unregisterModule).
+    events_: eventDefs,
+    reconcile_: reconcile,
     get inPass_() {
       return reconciling;
     },
