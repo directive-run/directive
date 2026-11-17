@@ -233,24 +233,19 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     );
   },
   /**
-   * One history snapshot of a dynamic case with no registered module's
-   * facts: `snapshot`'s shape with module a's `zf` and `zw` added (at least
-   * one there), and no `g0` or `g1`. Only the L10 unannounced (ay) twin names
-   * it, so a missing snapshot that carries module z's facts (the RFC's H1)
-   * still needs the paused record `snapshotDynamic`'s entry requires.
-   * Hand-named.
+   * One history snapshot of an L10 case taken for a write that is not module
+   * z's: `snapshotDynamic` whose label names neither `g0` nor `g1`. The
+   * facts may hold module z's (a module registered before the write), but
+   * registerModule's own snapshot (`facts-changed:z::g0,z::g1`, its init)
+   * and a write of module z are outside. Only the L10 unannounced (ay) twin
+   * names it, so a missing registerModule snapshot (the RFC's H1) still needs
+   * the paused record `snapshotDynamic`'s entry requires. Hand-named.
    */
-  snapshotDynamicFacts: (v) => {
-    if (!LIKE.snapshotDynamic?.(v)) {
-      return false;
-    }
-    const { facts, trigger } = v as { facts: object; trigger: string };
-
-    return (
-      !Object.keys(facts).some((k) => /^([a-z]::)?g[01]$/.test(k)) &&
-      !/(^facts-changed:|,)([a-z]::)?g[01](,|\+|$)/.test(trigger)
-    );
-  },
+  snapshotDynamicWrite: (v) =>
+    LIKE.snapshotDynamic?.(v) === true &&
+    !/(^facts-changed:|,)([a-z]::)?g[01](,|\+|$)/.test(
+      (v as { trigger: string }).trigger,
+    ),
   /**
    * A derivation id that can compute an `assign`ed object form (row (bl)):
    * a static one (`d0`, `a::d1`), the define pool's dynamic `z0` and `z1`

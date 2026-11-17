@@ -4,9 +4,9 @@
 // `extraModule`). `snapshot` names only the seed's facts, so a dynamic case's
 // missing onSnapshot under row (ay) matched no entry. The widening is two
 // classes of their own: `snapshotDynamic`, named only by the L10 twin of
-// (ay)'s `requires` entry, and `snapshotDynamicFacts` (no registered
-// module's facts), named only by the L10 unannounced twin; the L8 entries
-// keep `snapshot`. These pin that a seed's
+// (ay)'s `requires` entry, and `snapshotDynamicWrite` (a label that names
+// none of module z's facts), named only by the L10 unannounced twin; the L8
+// entries keep `snapshot`. These pin that a seed's
 // value or any other name still fails the class, and that a missing
 // registerModule snapshot in a navigatedPaused case with no paused record
 // (the RFC's H1: a snapshot carries a registered module's facts) is covered
@@ -110,22 +110,30 @@ describe("snapshotDynamic: the L10 fuzz's fact names, and no others", () => {
     );
   });
 
-  it("snapshotDynamicFacts: a dynamic case's facts, never a registered module's", () => {
-    expect(LIKE.snapshotDynamicFacts?.(DYNAMIC)).toBe(true);
-    expect(LIKE.snapshotDynamicFacts?.(MODULE)).toBe(false);
+  it("snapshotDynamicWrite: a write's snapshot, never registerModule's own or module z's write", () => {
+    expect(LIKE.snapshotDynamicWrite?.(DYNAMIC)).toBe(true);
+    // Module z registered before the write: its facts are in the snapshot,
+    // and the label names another fact (deep seed 1's case).
     expect(
-      LIKE.snapshotDynamicFacts?.(
-        with_(DYNAMIC, { facts: { "a::zf": 0, "z::g1": 0 } }),
+      LIKE.snapshotDynamicWrite?.(
+        with_(MODULE, { trigger: "facts-changed:b::when" }),
+      ),
+    ).toBe(true);
+    // registerModule's own snapshot, and a write of module z, are outside.
+    expect(LIKE.snapshotDynamicWrite?.(MODULE)).toBe(false);
+    expect(
+      LIKE.snapshotDynamicWrite?.(
+        with_(MODULE, { trigger: "facts-changed:z::g1" }),
       ),
     ).toBe(false);
     expect(
-      LIKE.snapshotDynamicFacts?.(
-        with_(DYNAMIC, { trigger: "facts-changed:a::zf,z::g0" }),
+      LIKE.snapshotDynamicWrite?.(
+        with_(DYNAMIC, { trigger: "facts-changed:a::zf,g0" }),
       ),
     ).toBe(false);
-    expect(LIKE.snapshotDynamicFacts?.(SEED)).toBe(false);
+    expect(LIKE.snapshotDynamicWrite?.(SEED)).toBe(false);
     expect(
-      LIKE.snapshotDynamicFacts?.(
+      LIKE.snapshotDynamicWrite?.(
         with_(DYNAMIC, { facts: { "a::zf": 0, "a::zq": 0 } }),
       ),
     ).toBe(false);
@@ -173,9 +181,9 @@ describe("only the L10 (ay) twin names snapshotDynamic", () => {
     expect(twin.reason).toContain("on the owner's instruction");
   });
 
-  it("the unannounced twin is the L8 one with snapshotDynamicFacts, and alone names it", () => {
+  it("the unannounced twin is the L8 one with snapshotDynamicWrite, and alone names it", () => {
     const naming = all.filter((e) =>
-      JSON.stringify(e.bound ?? {}).includes('"snapshotDynamicFacts"'),
+      JSON.stringify(e.bound ?? {}).includes('"snapshotDynamicWrite"'),
     );
     expect(naming.map((e) => e.id)).toEqual([UNANNOUNCED]);
     const l8 = all.find(
@@ -252,10 +260,15 @@ describe("only the L10 (ay) twin names snapshotDynamic", () => {
 
   it("with no paused record, a missing registerModule snapshot in a navigatedPaused case still fails", () => {
     // The unannounced twins have no `requires`. The L8 one keeps
-    // `snapshot` and the L10 one `snapshotDynamicFacts`, so a snapshot that
-    // carries module z's facts is outside both.
+    // `snapshot` and the L10 one `snapshotDynamicWrite`, so registerModule's
+    // own snapshot (its label names z::g0 and z::g1) is outside both.
     expect(coveredBy(MODULE, false)).toEqual([]);
     expect(coveredBy(DYNAMIC, false)).toEqual([UNANNOUNCED]);
+    // A later write's snapshot, with module z registered before it, is (ay)'s
+    // unannounced shape.
+    expect(
+      coveredBy(with_(MODULE, { trigger: "facts-changed:b::when" }), false),
+    ).toEqual([UNANNOUNCED]);
     // A seed-facts-only snapshot is still the unannounced twin's.
     expect(coveredBy(SEED, false)).toEqual([
       "l8-fuzz-ay-hook-onSnapshot-missing-unannounced",
