@@ -45379,5 +45379,53 @@
     "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In a one-module fuzz case where an odd-variant module z replaced module a's `d0` (M2), unregistering module z takes `d0` away, and a static derivation that reads `d0` recomputes with no dependency on it on 1.35 and a membership key for it on 2.0 (`when` readerNameReturns). When `d0` is registered again, 2.0 invalidates that reader and computes its new answer, and 1.35 does not until a fact it reads changes. This covers that first extra onDerivationInvalidate on 2.0, of a static derivation (`$like` derivation), and ends the case there: what follows (the reader's values, its readers, the later compute 1.35 makes) is the same row's consequence. Deep seed 24301 (up to L10). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-16"
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-17",
+    "id": "l10-fuzz-be-hook-onFactsBatch-changed-back",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "op": "changed",
+    "path": "args[0]",
+    "when": ["changesetSteps"],
+    "during": "back",
+    "group": "row-be",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "path": "args[0][1].key",
+          "from": {
+            "$like": "historyFactKey"
+          },
+          "to": {
+            "$like": "historyFactKey"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onHistoryNavigate",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[1]",
+            "from": {
+              "$like": "integer"
+            },
+            "to": {
+              "$lt": "from"
+            }
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (be) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a changeset counts as one of the steps, and each step is taken in turn with the steps left counted down; 1.35 drops the steps left after the one that lands on the changeset's start (GATE-7.md, the correction to the L8 RFC's (be) row; core-next pin l8-history-rows-ba-bc-be, #391). In a fuzz case that closes a changeset and then goes `back` more than one step (trigger `changesetSteps`), the engines land on different snapshots (deep seed 2, up to L10#1551: a changeset over indexes 1 to 2, `back 3` from 2; 1.35 lands on 1, 2.0 on 0). The restore's batch then writes other facts, so its records differ from their second key on (1.35 b::when, 2.0 a::zf). This covers that changed key of the restore's onFactsBatch in a `back` step (`during` \"back\") and ends the comparison there (`ends`): every later record reads the other snapshot. It requires a changed onHistoryNavigate call in the case (`requires`, order any) whose index on 2.0 is below 1.35's (`args[1]`, `$lt`): (be) takes the steps 1.35 drops, so a `back` lands earlier on 2.0, never later. A `back` that lands on the same snapshot on both engines, or later on 2.0, is outside it. Signed 2026-11-17 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L10 gate runs under \"I approve you for to do everything\" (2026-11-15)."
   }
 ]

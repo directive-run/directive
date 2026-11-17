@@ -27,6 +27,13 @@ for a name a module takes away. Also open: the two carried stops (L8's
 `./internals`, L9's seed d) and B5, the module-churn bench, at 1.04 times
 1.35's time, which is the owner's call.
 
+**Run 2 is not green either, but only on owner stops.** #414 fixed run 1's
+`call` trace stop. Run 2 found one more approved-row shape, (be), and
+signed one entry for it; every other difference it showed matches an
+approved row. What remains is the owner's: B5 at 1.04, the two carried
+stops (L8's `./internals`, L9's seed d), and three owner row candidates
+(below).
+
 ## The L10 decisions
 
 | Row | What it decides | Outcome |
@@ -323,6 +330,104 @@ read the entries per case, so its later cases saw it; the entry only adds
 coverage for its trigger, and the run ended with no failure. Seed 2 stopped
 on the `call` case, so the rest of its up to L10 phase did not run.
 
+## Run 2: run 1's five batched follow-ups, replayed
+
+Each was replayed from its deep case's spec on this branch after the merge
+of #414, with both traces read at the first difference. All five are
+batched (A2), so they are reported, not failed.
+
+| Case | Unexplained | First difference, from the traces | Row or cause |
+| --- | --- | --- | --- |
+| 1:all#2816 | 12 | Step 15: a single resolver `r0` writes `f0`; the nested pass retracts both constraints and cancels `A0` and three queued batch items; then `r0`, which ignores its abort, completes. 1.35 then runs one more empty pass (`onReconcileStart`, and `onReconcileEnd` with nothing in it); 2.0 does not. Quirk g's entry ends the case at step 18 | Cause: the pass that 1.35's completion of a retracted run asks for, in row t's third path (`writeRetracts`: the run's own write retracted its constraint), with a batch beside it. No fact, requirement or resolver outcome differs. Which row is not proven; a follow-up |
+| 1:up to L10#224 | 13 | Step 10: 2.0 rejects the batch resolver's write to `f2` as clobbered (`onResolverWriteRejected` per item), where 1.35 writes it | Row t, its batch path (`disable`, `batchWriteRetracts`): GATE-8's 1:up to L9#224, unchanged |
+| 1:up to L10#1295 | 96 | Step 17, a `settle` while `unregisterModule("z")` waits on its drain. Both engines time out `r2` (row n's `timeout` record, covered), complete batch `rb`'s three items, and tear module z down in the same order (M6). They differ in where the pass that `rb`'s completion asks for runs: on 1.35 before the teardown resumes, so that pass still raises module z's `ZW`; on 2.0 after it. The 95 later differences follow from that one pass | Cause: pass timing between a batch's completion and an awaited unregister drain. No row names it. Both engines end with module z gone and the same requirements. Probed (below): it needs the batch. The batch path of row (as), as far as the traces show |
+| 1:up to L10#1959 | 1 | Step 8: 1.35 starts and writes a batch call and reports two attempt errors; 2.0 lacks the external `wrote`, and (av)'s `onError` entry ends the case in the same step | An L7 batch shape: GATE-8's 1:up to L9#1959, unchanged |
+| 24301:up to L10#1056 | 2 | Step 7: 2.0 times batch `rb` out (row n's `timeout` record, covered) and reports its `onReconcileEnd` before the batch's retry, where 1.35 starts the retry first. Quirk a's entry ends the case in the same step (`resolverRetry`) | Row n's batch path, with quirk a: the pass's end moves with row n's earlier abort |
+
+As far as the first differences show, none is a 2.0 bug a user would see
+as worse. 1:up to L10#1295 is the only one with an L10 operation in it, and
+the one that needs a probe.
+
+**1:up to L10#1295, probed.** Its spec was recovered by running deep seed
+1 again (report mode, the same harness) and replayed twice. With the batch
+(`spec.batch`, resolver `rb`), 96 unexplained differences, as reported.
+With only the batch taken out, the same steps still unregister module z
+while single runs are in its drain (step 17 on 1.35: three
+`onResolverComplete`, an `onResolverError`, an `onResolverRetry`, module
+z's four `onDefinitionUnregister`), and the engines match: no unexplained
+difference. So the pass timing shows only with a running batch in the
+drain, and it is not a 2.0 bug in the drain itself. The approved row it
+fits is (as) (L7: `settle()`, the settled notification and `inspect()`
+count a running batch, so 2.0 waits for a batch's end where 1.35 goes on):
+the drain is a wait of the same kind. That fit is reasoned from the traces,
+not proven by a pin; a follow-up, with no entry, since the case is batched
+and reported (A2).
+
+## Run 2: the slow seeds and CI
+
+No CI workflow runs the numbered seeds 1 to 20. CI's `conformance` job
+(`.github/workflows/ci.yml:127`, with a 30-minute job limit at line 129)
+runs `pnpm census` (line 157). The census runs `conformance:diff` once, at
+the default seed `0x5eed`, which is 24301 (`diff/fuzz/fuzz.test.ts:117`),
+with `testTimeout: 120_000` (`vitest.config.ts:243`, and the census's own
+config at `lib/census.ts:411`). The nightly (`diff-fuzz-nightly.yml:83`)
+runs one random seed at 5,000 runs with `--testTimeout=1200000`. So seeds 7,
+9 and 11 would not pass in CI's 120 s, but CI never runs them. Only seed d's
+time counts in CI, and seed d is the carried L9 stop. The harness was not
+changed for speed in this run. A follow-up: either CI runs the numbered
+seeds at a limit they pass in, or the record stops calling them CI's.
+
+## Run 2: the results
+
+Run 2 is this branch after the merge of #414, which fixed run 1's stop
+(the `call` trace case): core-next keeps a derivation's last returned
+value for the trace's old value.
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `v2`, `v2:prod`, `v2:dist`, `v2:dist:prod` | 0 each | no failure |
+| `v1`, `v1:prod` | 0 each | no failure |
+| `check:expects` | 0 | |
+| Root biome, error level | 0 | |
+| `ratchet --update` | 0 | added 0, lost none: `v2-passing.json` is byte for byte as it was, 2,200 tests passing on source and dist |
+| `npx vitest run --project conformance:checks` | 1 | the L8 stop's 9 `api-surface-next` failures only |
+| `npx vitest run --project conformance:diff` | 1 | the default-seed fuzz only: seed d times out at 120 s |
+| `pnpm census` | 1 | 89 problems, all from the two known stops: 10 the L8 stop's, 3 seed d's (the fuzz times out, `conformance:diff` exits 1, "the fuzzer reported no runs") and 76 stale entries that follow from no fuzz run being reported. Run 1 had 74; the two more are this run's (be) entry and its group's |
+| PR seeds 1 to 20 at 120 s | 0 on 17, 1 on 3 | 7, 9 and 11 time out with no failing case, twice each (the PR pass and the final pass) |
+| Seeds 7, 9 and 11 at 1,800 s | 0 each | 413 s, 509 s and 697 s |
+| Seed d (24301) at 120 s | 1 | times out, the carried L9 stop |
+| Deep seed 2, first | 1 | stopped on the (be) case below; it also reported up to L10#1551 |
+| Deep seed 2, with the (be) entry | 0 | 7,000 cases to the end; reported all:2247, all:2890, all:3992 and up to L10#1601, all batched |
+
+**Row (be), one new entry.** Deep seed 2's first run stopped in the up to
+L10 phase on a case that closes a changeset over indexes 1 to 2 and then
+goes `back 3` from 2: 1.35 lands on 1 and 2.0 on 0 (`onHistoryNavigate`
+`[2, 1]` against `[2, 0]`). That is (be) as GATE-7 corrects it: 2.0 takes
+the changeset as one step and then the steps left, where 1.35 drops them.
+The restore's batch then writes other facts (1.35 `b::when`, 2.0 `a::zf`).
+`l10-fuzz-be-hook-onFactsBatch-changed-back` covers that changed key in a
+`back` step and ends the case there, in the shape of (bb)'s L9 entry: the
+`changesetSteps` trigger, `during` "back", and a required changed
+`onHistoryNavigate`. Its key class, `historyFactKey`, takes only fact names
+(a seed's `f\d+`, `when`, `zf`, `zw`, module z's `g\d+`, bare or under one
+namespace), and `diff/self/l10-be-class.test.ts` pins it and its one user.
+As first drafted, the requirement took any changed navigation, which is
+wider than (be): a `back` that landed later on 2.0 would have passed. It
+now requires 2.0's index below 1.35's (`args[1]`, `$lt` "from"), the only
+way (be) moves a `back`. The case replays with no unexplained difference
+with the narrowed entry, and 28 without it.
+
+**Up to L10#1551 (deep seed 2, first run), triaged.** Batched (`throw`
+boundary, a failing batch `rb`). Replayed: both engines run the same
+steps, make the same `onError` and `onErrorRecovery` for `a.rb attempt 1`
+in step 4's settle, and leave the same single unobserved rejection. Node
+reports it inside step 4 on 2.0 and after the teardown in step 6 on 1.35;
+the two differences are that one `unhandled` record, extra in step 4 and
+missing in step 6. That is row (as) (2.0's settle() waits for the batch's
+end, 1.35's does not), two steps apart instead of one, so its entry
+(`moved`, `by` -1) does not pair it. No L10 operation is in the case. Not a
+2.0 bug; a follow-up, since widening (as)'s entry is outside this gate.
+
 ## Corrections to the L10 RFC
 
 - **M7 says a retired resolver's write "cannot reach a replacement".** On
@@ -336,7 +441,18 @@ on the `call` case, so the rest of its up to L10 phase did not run.
 - **M5's "joins a second concurrent call for the same module" is a text
   error:** on a namespaced system the second call rejects on both engines.
 
-## An owner row candidate
+## Owner row candidates
+
+Three, none with a row, none pinned, none blocking on its own:
+
+- **engine.ts 2261:9 (L10-pre-b, #409).** Below.
+- **M7's late write past the 10 s drain.** A retired resolver's write
+  after `unregisterModule` gives up at 10 s lands on a same-key
+  replacement, on both engines (Corrections). Parity, but M7 says it
+  cannot; Jason decides whether the RFC's text or the engines change.
+- **`onStop` twice.** A `destroy()` during a pending unregister drain
+  fires it twice, on both engines (Corrections). Parity; Jason decides
+  whether 2.0 should fire it once.
 
 engine.ts 2261:9 is triaged `v1-bug` in L10-pre-b (#409). 1.35's error
 boundary derivation retry hands the failing derivation's id to
@@ -349,7 +465,10 @@ either side.
 
 ## Stops
 
-- **A difference that matches no row: a deferred `derive.call` of a stale
+What remains after run 2: B5, seed d and the L8 `./internals` names (each
+below), all the owner's. Run 1's `call` trace stop is fixed (#414).
+
+- **Fixed in #414, run 1's stop: a deferred `derive.call` of a stale
   derivation, in the trace.** Deep seed 2, up to L10 (spec in the gate's
   scratch, `specs/deep2c.json`). `d0` was invalidated and not read again,
   so its last value, 11, is stale. Inside a pass, the queued
@@ -380,6 +499,15 @@ Apart from the `call` trace case, every difference the fuzz showed matches
 an approved row.
 
 ## Follow-ups
+
+- **The slow seeds (run 2).** CI never runs seeds 1 to 20: ci.yml:157 runs
+  only seed 24301 at 120 s. Seeds 7, 9 and 11 need 413 to 697 s.
+- **1:up to L10#1295 (run 2).** The (as) fit is reasoned; a pin of a
+  running batch in an unregister drain would prove it.
+- **2:up to L10#1551 (run 2).** Row (as)'s unhandled rejection two steps
+  apart; its entry pairs only one step (`by` -1).
+- **Run 1's batched follow-ups (run 2's table).** 1:all#2816's pass is
+  unproven against row t.
 
 - **The fuzz's reach.** No generated module has `sources`
   (`extraModule`, `diff/fuzz/model.ts:2815–2866`), so a module's source
