@@ -1051,7 +1051,8 @@ export function createSystemCore<const M extends ModuleSchema>(
   const kinds: Record<string, DefHooks> = {
     derivation: {
       add_(id, fn) {
-        deriveDefs[id] = typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
+        deriveDefs[id] =
+          typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
         const d = define(id);
         // (bm): only a reader that asked about the name is owed anything; a
         // name nobody asked about changes nothing (1.35).
@@ -1063,7 +1064,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       // 1.35 keeps the node and what it read (derivations.ts:418–446): stale
       // with the new compute, and what reads it with it.
       replace_(id, fn) {
-        deriveDefs[id] = typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
+        // An assigned data form stays an object, and reading it throws
+        // (1.35, U19): only creation and register unwrap one.
+        deriveDefs[id] = (fn as any)?.compute ?? fn;
         // Announced again even when it was stale already (1.35).
         pending.add(id);
         const node = derivations.get(id)!.node_;
