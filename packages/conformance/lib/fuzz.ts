@@ -101,6 +101,15 @@ export const FUZZ_TRIGGERS = [
   "dynamicReaders",
   "assignObject",
   "readerNameReturns",
+  // L11 (the L11 RFC's B1): the data forms a case draws (diff/fuzz/model.ts
+  // `FuzzPredicates`) and its `tools` step.
+  "dataWhen",
+  "onGate",
+  "changedRestore",
+  "dataCompute",
+  "eventPatch",
+  "resolverKey",
+  "predicateTools",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

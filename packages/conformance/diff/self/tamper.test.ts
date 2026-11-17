@@ -23,6 +23,7 @@ import {
   withoutDynamic,
   withoutHistory,
   withoutIntrospection,
+  withoutPredicates,
 } from "../fuzz/model.js";
 import { createRecorder } from "../record.js";
 import {
@@ -557,6 +558,7 @@ describe("the fuzzer catches injected faults", () => {
         // `maxRuns`, the fact tags and the meta steps are taken out too.
         fc.asyncProperty(
           specArbitrary()
+            .map(withoutPredicates)
             .map(withoutDynamic)
             .map(withoutHistory)
             .map(withoutIntrospection),
