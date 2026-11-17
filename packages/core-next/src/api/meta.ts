@@ -74,32 +74,38 @@ export const withMeta: SystemPart = (context) => {
     }
   }
   const tagSets = new Map<string, ReadonlySet<string>>();
-  /** One fact's tags; untyped, its row goes (L10b: unregisterModule). */
-  const note = (key: string, type?: { _meta?: Meta }) => {
-    if (!type) {
-      return tagSets.delete(key);
+  /**
+   * Facts that join, or (an entry with no type slot, L10b: unregisterModule)
+   * leave. As 1.35 (recordFactTags, engine.ts:2477–2491; registerModule,
+   * 4509–4527): every joining key's tags first, untagged keys too, then each
+   * type is prepared once, where a missing type throws (the WeakSet refuses
+   * it) after the keys joined.
+   */
+  const note = (entries: [string, unknown?][]) => {
+    for (const entry of entries) {
+      const tags = (entry[1] as { _meta?: Meta })?._meta?.tags;
+      1 in entry
+        ? tagSets.set(entry[0], new Set(tags?.length ? tags : []))
+        : tagSets.delete(entry[0]);
     }
-    if (type && !prepared.has(type)) {
-      prepared.add(type);
-      if (type._meta) {
-        type._meta = freezeMeta(type._meta);
+    for (const entry of entries) {
+      const type = entry[1] as { _meta?: Meta };
+      if (1 in entry && !prepared.has(type)) {
+        prepared.add(type);
+        if (type._meta) {
+          type._meta = freezeMeta(type._meta);
+        }
+        // Only the types this package builds, which are objects (1.35's
+        // isOwnSchemaType, engine.ts:253–259): a Zod schema caches onto
+        // itself.
+        if (typeof type === "object" && "_typeName" in type) {
+          Object.freeze(type);
+        }
       }
-      // Only the types this package builds, which are objects (1.35's
-      // isOwnSchemaType, engine.ts:253–259): a Zod schema caches onto itself.
-      if (typeof type === "object" && "_typeName" in type) {
-        Object.freeze(type);
-      }
-    }
-    tagSets.set(key, new Set(type._meta?.tags));
-  };
-  for (const key in schema) {
-    note(key, schema[key]);
-  }
-  context.keys_ = (entries) => {
-    for (const [key, type] of entries) {
-      note(key, type as never);
     }
   };
+  note(Object.entries(schema));
+  context.keys_ = note;
   const fenced = <T>(fn: () => T): T =>
     kernel.graph.untracked(() => withoutTracking(tracker, fn));
   const has = Object.hasOwn as (o: object, id: string) => boolean;
@@ -170,11 +176,13 @@ export const withMeta: SystemPart = (context) => {
   };
   const metaOf = (kind: string) => (id: string) => kinds.get(kind)![id]?.meta;
   const modMeta = (id: string) => mods.find((mod) => mod.id === id)?.meta;
-  // 1.35's destroy clears its module and event meta maps (engine.ts:3504–3506,
-  // 3552–3554) and keeps every other definition's.
+  // 1.35's destroy clears its module and event meta maps and its meta
+  // subscribers (engine.ts:3504–3506, 3552–3554) and keeps every other
+  // definition's: a module teardown that finishes later tells no one.
   kernel.onDispose(() => {
     mods = [];
     kinds.set("event", {});
+    listeners.clear();
   });
   Object.assign(system.meta as object, {
     module: modMeta,
