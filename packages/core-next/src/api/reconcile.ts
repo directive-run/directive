@@ -845,18 +845,7 @@ const build = (context: SystemContext) => {
       resolvers.drop_(id);
     },
     waits_: resolvers.waits_,
-    // 1.35's resolversManager.callOne: the resolve, now, in a batch.
-    async call_(id, req) {
-      const def = resolverDefs[id]!;
-      let done: unknown;
-      context.store.batch(() => {
-        done = def.resolve?.(req, {
-          facts: context.facts,
-          signal: new AbortController().signal,
-        } as never);
-      });
-      await done;
-    },
+    // `call` on a resolver is dynamic.ts's own (it needs only the map).
   };
   system.constraints ??= {};
   Object.assign(system.constraints as object, {

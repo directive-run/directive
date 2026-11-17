@@ -305,7 +305,8 @@ export interface DefHooks {
   add_(id: string, def?: unknown): void;
   replace_(id: string, def?: unknown): void;
   remove_(id: string, def?: unknown): void;
-  call_(id: string, props?: any): unknown;
+  /** Absent on the resolver's: dynamic.ts calls the resolve itself. */
+  call_?(id: string, props?: any): unknown;
   /** L10b, resolvers: what an unregister waits for. */
   waits_?(ids: string[]): unknown[];
   /** L10 (D7): whether one of the kind's definitions depends on `key`. */
