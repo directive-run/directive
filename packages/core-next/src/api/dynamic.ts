@@ -23,6 +23,8 @@ import isDevelopment from "#is-development";
 import { type DefinitionMeta, freezeMeta } from "../types/meta.js";
 import { type SystemContext, type SystemPart, validateKeys } from "./core.js";
 import { BLOCKED_PROPS, MEMBER_DEP_PREFIX } from "./facts.js";
+import { SEPARATOR } from "./namespaced.js";
+import { HOOKS } from "./plugins.js";
 
 type Fn = (...args: any[]) => any;
 
@@ -74,10 +76,19 @@ const alive = (ctx: SystemContext, op: string, type: string, id: string) => {
     );
   }
 };
-/** The plugins' and observers' event, built only when one listens. */
+/**
+ * The plugins' and observers' event, built only when one listens. Its plugin
+ * hook is added at the first (plugins.ts HOOKS): `module.registered` is
+ * `onModuleRegistered`, with the record's fields in order as its arguments.
+ */
 const emitter =
-  (ctx: SystemContext) => (at: string, data: Record<string, unknown>) =>
+  (ctx: SystemContext) => (at: string, data: Record<string, unknown>) => {
+    HOOKS[at] ??= [
+      `on${at.replace(/(?:^|\.)(.)/g, (_, c: string) => c.toUpperCase())}`,
+      ...Object.keys(data),
+    ];
     ctx.wants_(at) && ctx.emit_(at, data);
+  };
 
 /**
  * 1.35's updateDependencies: a derivation whose dependency set changed
@@ -181,12 +192,16 @@ export const withDynamic: SystemPart = (ctx) => {
       }
     });
   };
-  // L10b: registerModule and unregisterModule, built at the first call.
+  // L10b: registerModule and unregisterModule, built at the first call; a
+  // namespaced system's take a namespace (namespaced.ts hands its pieces in).
   let calls: Fn[] | undefined;
-  for (const i of [0, 1]) {
-    system[i ? "unregisterModule" : "registerModule"] = (target: any) =>
-      (calls ??= modules(ctx))[i]!(target);
-  }
+  const engine = [0, 1].map(
+    (i) => (target: any) => (calls ??= modules(ctx))[i]!(target),
+  );
+  const ns = (ctx.module as Record<string, any>).ns_;
+  [system.registerModule, system.unregisterModule] = ns
+    ? namespaced(ns, engine)
+    : engine;
   // The six members come first, as 1.35's derive accessor
   // (engine-accessors.ts:46–55); everything else is the core's view.
   system.derive = new Proxy(system.derive, {
@@ -368,7 +383,8 @@ const registry = (ctx: SystemContext): Kinds => {
   const call = (type: string) => (id: string, props?: unknown) => {
     check("call", type, id);
     emit("definition.call", { type, id, props });
-    if (!m[MAPS[type]!][id]) {
+    const def = m[MAPS[type]!][id];
+    if (!def) {
       const error = new Error(
         `[Directive] Cannot call ${type} "${id}" — it does not exist.`,
       );
@@ -379,7 +395,20 @@ const registry = (ctx: SystemContext): Kinds => {
       return Promise.reject(error);
     }
 
-    return ctx.kinds_[type]!.call_(id, props);
+    return type === "resolver"
+      ? resolve(def, props)
+      : ctx.kinds_[type]!.call_!(id, props);
+  };
+  /** 1.35's resolversManager.callOne: the resolve, now, in a batch. */
+  const resolve = async (def: any, req: unknown) => {
+    let done: unknown;
+    ctx.store.batch(() => {
+      done = def.resolve?.(req, {
+        facts: ctx.facts,
+        signal: new AbortController().signal,
+      });
+    });
+    await done;
   };
   for (const type in MAPS) {
     const ids = (dynamic[type] = new Set());
@@ -396,6 +425,71 @@ const registry = (ctx: SystemContext): Kinds => {
   }
 
   return kinds;
+};
+
+/**
+ * L10b: 1.35's namespaced registerModule and unregisterModule (system.ts:
+ * 786–899), over the engine's: namespaced.ts's flattenModule, its modules,
+ * its keep, and the two maps keep writes.
+ */
+const namespaced = (
+  [flatten, mods, keep, keys, flats]: [
+    (ns: string, mod: unknown, live: 1) => Record<string, any>,
+    Record<string, unknown>,
+    (ns: string, flat: Record<string, any>) => void,
+    Map<string, unknown>,
+    Map<string, Record<string, any>>,
+  ],
+  engine: Fn[],
+): Fn[] => {
+  const drop = (ns: string) => {
+    delete mods[ns];
+    keys.delete(ns);
+    flats.delete(ns);
+  };
+
+  return [
+    (ns: string, mod: Record<string, any>) => {
+      const fail = (text: string) => {
+        throw new Error(`[Directive] ${text}`);
+      };
+      Object.hasOwn(mods, ns) &&
+        fail(
+          `Module namespace "${ns}" already exists. Cannot register a duplicate namespace.`,
+        );
+      ns.includes(SEPARATOR) &&
+        fail(
+          `Module name "${ns}" contains the reserved separator "${SEPARATOR}".`,
+        );
+      BLOCKED_PROPS.has(ns) &&
+        fail(`Module name "${ns}" is a blocked property.`);
+      for (const key of Object.keys(mod.schema.facts)) {
+        key.includes(SEPARATOR) &&
+          fail(
+            `Schema key "${key}" in module "${ns}" contains the reserved separator "${SEPARATOR}".`,
+          );
+      }
+      const flat = flatten(ns, mod, 1);
+      mods[ns] = mod;
+      keep(ns, flat);
+      try {
+        engine[0]!(flat);
+      } catch (error) {
+        drop(ns);
+        throw error;
+      }
+    },
+    async (ns: string) => {
+      const flat = flats.get(ns);
+      if (!flat) {
+        throw new Error(
+          `[Directive] Cannot unregister module "${ns}": no such module namespace.`,
+        );
+      }
+      await engine[1]!(flat);
+      drop(ns);
+    },
+  ];
 };
 
 /** Each kind's type, its module map, and whether 1.35 tears it down first. */

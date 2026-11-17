@@ -661,11 +661,6 @@ export function createNamespacedSystem(
     namespaceKeys.set(ns, flat.keys_);
     flats.set(ns, flat);
   };
-  const drop = (ns: string) => {
-    delete modules[ns];
-    namespaceKeys.delete(ns);
-    flats.delete(ns);
-  };
   /** Each joined key's module: a definition's, then a fact's. */
   const keyOwners = [new Map<string, string>(), new Map<string, string>()];
   for (const ns of ordered) {
@@ -745,6 +740,9 @@ export function createNamespacedSystem(
     },
     modules_: [...flats.values()],
     owners_: owners,
+    // L10b: what withDynamic's namespaced registerModule and
+    // unregisterModule use (dynamic.ts nsModules).
+    ns_: [flattenModule, modules, keep, namespaceKeys, flats],
     // A source gate of module `ns` reads `src` as the module's constraints
     // do: its own facts by bare name, or `self` and its dependencies. The
     // views write through to `src` as `dep::key`, so a write is refused
@@ -784,9 +782,6 @@ export function createNamespacedSystem(
     watch: system.watch as (...args: any[]) => () => void,
     when: system.when as (...args: any[]) => Promise<void>,
   };
-
-  /** The engine's registerModule and unregisterModule (dynamic.ts). */
-  const engine = [system.registerModule, system.unregisterModule] as Fn[];
 
   // --- the namespaced surface ----------------------------------------------
   const warnedReads = new Set<string>();
@@ -889,48 +884,6 @@ export function createNamespacedSystem(
       core.watch(toInternalKey(id), ...rest),
     when: (predicate: (facts: Rec) => boolean, opts?: unknown) =>
       core.when(() => predicate(nsFacts), opts),
-    // L10b: 1.35's namespaced registerModule and unregisterModule
-    // (system.ts:786–899), over the engine's.
-    registerModule(ns: string, mod: ModuleDefinition) {
-      const fail = (text: string) => {
-        throw new Error(`[Directive] ${text}`);
-      };
-      known(ns) &&
-        fail(
-          `Module namespace "${ns}" already exists. Cannot register a duplicate namespace.`,
-        );
-      ns.includes(SEPARATOR) &&
-        fail(
-          `Module name "${ns}" contains the reserved separator "${SEPARATOR}".`,
-        );
-      BLOCKED_PROPS.has(ns) &&
-        fail(`Module name "${ns}" is a blocked property.`);
-      for (const key of Object.keys(mod.schema.facts)) {
-        key.includes(SEPARATOR) &&
-          fail(
-            `Schema key "${key}" in module "${ns}" contains the reserved separator "${SEPARATOR}".`,
-          );
-      }
-      const flat = flattenModule(ns, mod, 1);
-      modules[ns] = mod;
-      keep(ns, flat);
-      try {
-        engine[0]!(flat);
-      } catch (error) {
-        drop(ns);
-        throw error;
-      }
-    },
-    async unregisterModule(ns: string) {
-      const flat = flats.get(ns);
-      if (!flat) {
-        throw new Error(
-          `[Directive] Cannot unregister module "${ns}": no such module namespace.`,
-        );
-      }
-      await engine[1]!(flat);
-      drop(ns);
-    },
   });
 
   return system as System;

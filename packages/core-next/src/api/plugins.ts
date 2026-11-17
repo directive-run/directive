@@ -41,20 +41,15 @@ declare module "../kernel.js" {
   }
 }
 
-/** Record kind → the 1.35 hook and the record fields passed as its arguments. */
-const HOOKS: Record<string, string[]> = {
+/**
+ * Record kind → the 1.35 hook and the record fields passed as its arguments.
+ * withDynamic adds its own kinds (dynamic.ts).
+ */
+export const HOOKS: Record<string, string[]> = {
   "system.start": ["onStart", "system"],
   "system.stop": ["onStop", "system"],
   "system.destroy": ["onDestroy", "system"],
   "fact.set": ["onFactSet", "key", "value", "prev"],
-  // L10: the registry's (D6).
-  "definition.register": ["onDefinitionRegister", "type", "id", "def"],
-  "definition.assign": ["onDefinitionAssign", "type", "id", "def", "original"],
-  "definition.unregister": ["onDefinitionUnregister", "type", "id"],
-  "definition.call": ["onDefinitionCall", "type", "id", "props"],
-  // L10b: dynamic.ts.
-  "module.registered": ["onModuleRegistered", "id"],
-  "module.unregistered": ["onModuleUnregistered", "id"],
   "fact.batch": ["onFactsBatch", "changes"],
   "derivation.invalidate": ["onDerivationInvalidate", "id"],
   "derivation.compute": ["onDerivationCompute", "id", "value", "deps"],
