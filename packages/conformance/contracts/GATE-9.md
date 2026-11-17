@@ -1,0 +1,397 @@
+# Phase 3 gate decisions: the L10 gate
+
+Date: 2026-11-16. Jason approved the L10 dynamic-definitions RFC
+(`rfc-l10-dynamic.md`, revision 2, "Decisions for the owner") on 2026-11-15
+with "I approve you for to do everything", under which Claude took each
+recommended option, and asked Claude to sign the entries for the approved
+rows on his behalf, as at the earlier gates (GATE-2.md, rule 1). This record
+is of gate run 1 of at most 3 (A3).
+
+## What the L10 gate does
+
+`layers.rules.json` `current` is `"L10"`: core-next runs every test and
+every differential scenario placed at L10 or below (`derive`, `effects`,
+`constraints` and `resolvers` registered, assigned, unregistered and called
+at runtime; `registerModule` and `unregisterModule`), and the fuzz compares
+its dynamic and module cases on v2. The ratchet (`v2-passing.json`) gained
+66 tests and lost none, tested by name; it holds 2,200.
+
+**Run 1 is not green.** v2, v2:prod and v2:dist have no L10 failure, and
+every numbered PR seed passes (7, 9 and 11 only past CI's 120 s, as at L9).
+The deep runs found one difference that matches no row (Stops): a deferred
+`derive.call` of a stale derivation, whose trace entry carries `oldValue`
+`undefined` on 2.0 and the last value on 1.35. Every other difference
+matches an approved row: (ay) needed two twin entries for the L10 fuzz's
+facts, (bl) and (bm)'s L10b entries needed a `when`, and (bm) a third entry
+for a name a module takes away. Also open: the two carried stops (L8's
+`./internals`, L9's seed d) and B5, the module-churn bench, at 1.04 times
+1.35's time, which is the owner's call.
+
+## The L10 decisions
+
+| Row | What it decides | Outcome |
+| --- | --- | --- |
+| A1, size | Dynamic definitions live in `withDynamic` plus a seam in the core; a 4.1 KB target under a +5.0 KB ceiling, `floor` at most +250 B | Taken under "I approve you for to do everything", 2026-11-15 |
+| A2 and A3 | Deep runs report while the 21 short seeds gate; a real 2.0 bug still blocks; 3 gate runs at most | Taken, as at L7 to L9 |
+| (bl) | `derive.assign(id, { compute, meta })` replaces the derivation and keeps it readable | Taken; built in L10a |
+| (bm) | A derivation or constraint that asked for a name before it existed recomputes when the name is registered or unregistered | Taken; built in L10a |
+| (bn) | A subscriber to a name registered later is told | Declined; 1.35's pin U4 stands; no entry |
+| (bo) | `getOriginal` and `restoreOriginal` are removed | Moot: a 1.35 system has neither member (U22), so there is nothing to remove; no entry |
+| B1 to B5 | The fuzz steps and harness rules; re-placing `dynamic-definitions`; `registerKeys` at L10; Claude signs; the `module-churn` workload | Taken |
+
+The rest stand as GATE-8.md records them: (ay) to (be), "Approve all as
+recommended (Recommended)" (2026-11-10), and the rows before them.
+
+## The signed entries
+
+Every entry carries `approvedBy: "Jason Comes"`, and each reason names its
+row and ends with the signing sentence "on the owner's instruction" (GATE-2
+rule 1), quoting that row's approval: (bl) and (bm) "I approve you for to do
+everything" (2026-11-15); (ay) "Approve all as recommended (Recommended)"
+(2026-11-10).
+
+| Row | Hand entries (records) | Fuzz entries |
+| --- | --- | --- |
+| (bm) | 76 (76): U2, a derivation that asked for a name before it was registered, 27; U3, a constraint gated on a later-registered name, 49 | 2: the first extra `onDerivationInvalidate("zin")`, `ends`, `when` dynamicReaders (L10b; `when` added here); and `l10-fuzz-bm-hook-onDerivationInvalidate-extra-name-returns`, the first extra invalidation of a static derivation once a `d0` a module took away is registered again, `ends`, `when` readerNameReturns (deep seed 24301) |
+| (bl) | 0 | 1: the first missing `onError` "def is not a function", source "derivation", `ends`, `when` assignObject (L10b; `when` and the `sourceId` class changed here) |
+| (ay), L10 twins | 0 | 2: `l10-fuzz-ay-hook-onSnapshot-missing` and `l10-fuzz-ay-hook-onSnapshot-missing-unannounced` (below, "The (ay) widening") |
+| **Total** | **76** (76 records) | **5** |
+
+**Width read.** Every entry was read against its row.
+
+- The 76 hand entries are exact: each names its scenario, step, stream,
+  kind and record, with counts, and none uses a `$like` class.
+- **The two L10b `ends` entries had no `when`**, which the census rejects
+  (an `ends` entry for every fuzz case would stop cases that cannot show
+  the quirk; `checkDivergences`, and `oracle.test`'s "accepts the committed
+  scenario layers, divergences and hook list"). Two new triggers name each
+  row's spec feature, each with a self-test against the nearest spec that
+  lacks it (`diff/self/l10-triggers.test.ts`):
+  - `dynamicReaders` (row (bm)): the case has `dynamic.readers`, so module
+    a has `zin` and `zgate`. (bm)'s entry bounds one record, an
+    invalidation of `zin`, which asks only `"z0" in derived` and has no
+    dependency at all on 1.35, so an extra invalidation of it can only be
+    (bm)'s. The define pool (`d0`, `d1`, `z0`, `z1`) never names `zin`.
+  - `assignObject` (row (bl)): a `define` step assigns a derivation in the
+    object form (`variant` 3). `register` with the same object works on
+    both engines, so it is outside.
+  - `readerNameReturns` (row (bm), through modules): in a one-module case,
+    an odd module z variant replaces `d0` (M2), an unregister takes it away,
+    and a later step registers `d0` again. A static reader of `d0` then
+    asked for a name that was not there, which is (bm)'s shape.
+- (bl)'s entry bounds 1.35's TypeError text, "def is not a function", which
+  only the object form of `assign` produces (K2). Its `sourceId` named only
+  static derivations (`$like` derivation, `d\d+`); deep seed 2 assigned the
+  pool's `z1`. The new class `dynamicDerivation` names a static id, `z0`,
+  `z1` and `zin` (which reads `z0`), and only this entry uses it.
+- The (ay) twins are (ay)'s two L8 entries with the class swapped; each is
+  as wide as its L8 entry, no wider, and the unannounced one leaves out a
+  registered module's facts (below).
+
+## The (ay) widening
+
+**The finding.** Fifteen PR seeds (1, 2, 4, 5, 7, 9, 10 to 14, 17 to 20)
+failed at L10 only on an `onSnapshot` 1.35 makes and 2.0 does not. The
+`snapshot` class (`diff/fingerprint.ts`) accepts only the seed's fact names,
+`([a-z]::)?(f\d+|when)`. The L10 fuzz adds four, read from the generator
+(`diff/fuzz/model.ts`): `zf` and `zw`, which a dynamic case gives module a,
+and `g0` and `g1`, the facts of module `z`, which a `module` step registers
+(`extraModule`). No other fact name is added: the `define` steps register
+derivations, effects, constraints and resolvers, not facts.
+
+**The change.** Two classes of their own, each named by one entry. The L8
+entries keep `snapshot`, so `l8-fuzz-ay-hook-onSnapshot-missing-unannounced`,
+which has no `requires`, still covers only a snapshot of the seed's facts.
+
+| Class | Names | Its one entry |
+| --- | --- | --- |
+| `snapshotDynamic` | `snapshot`'s shape with `zf`, `zw`, `g0` and `g1` added, at least one of them present | `l10-fuzz-ay-hook-onSnapshot-missing`: the twin of `l8-fuzz-ay-hook-onSnapshot-missing`, with its `ends`, its `when` (navigatedPaused) and its `requires` (a history record whose `data[1].paused` is false on 1.35 and true on 2.0, (ay)'s own mark) |
+| `snapshotDynamicWrite` | `snapshotDynamic` whose label names neither `g0` nor `g1`: the facts may hold module z's, but registerModule's own snapshot (`facts-changed:z::g0,z::g1`, its init) and a write of module z are outside | `l10-fuzz-ay-hook-onSnapshot-missing-unannounced`: the twin of the L8 unannounced entry, `when` navigatedPaused and no `requires`, for a case with no history record between the navigation and the write. Deep seed 1 found it twice (below) |
+
+So a missing registerModule snapshot (the RFC's H1) is covered only with the
+paused record in the same case, never without. A first draft of the second
+class left out every snapshot whose facts held `g0` or `g1`; deep seed 1's
+rerun then stopped on a case where module z was registered before the
+pause, and the missing snapshot was a later write of `b::when`. The label,
+not the facts, is what tells registerModule's snapshot apart.
+
+**Self-test** (`diff/self/l10-snapshot-class.test.ts`):
+
+- a seed's value in a name's place, in the facts or in the label, fails the
+  class, and so does every other name (`z::g2`, `z::h0`, `a::zin`, `a::zq`,
+  a stranger, two namespaces);
+- a snapshot of the seed's facts only fails the new class and passes
+  `snapshot`, and an L10 name still fails `snapshot`;
+- `snapshotDynamicWrite` takes a write's snapshot with module z's facts in
+  it (deep seed 1's), and rejects registerModule's own snapshot and a write
+  of module z;
+- each class is named by one entry, which equals its L8 entry but for its
+  id, reason, date and bound;
+- a missing registerModule snapshot (module z's facts) after a paused
+  navigation is covered by the requires twin; with no paused record, in a
+  navigatedPaused case, it is covered by no entry. A later write's
+  snapshot without the paused record is the L10 unannounced twin's, with or
+  without module z's facts, and a seed-facts-only one is still the L8
+  unannounced twin's.
+
+**Seed by seed.** Each case was replayed from the seed's shrunk
+counterexample (the baseline run, before the twin) and both traces were
+read. In every case the comparison now ends at the case's first missing
+snapshot, by the twin, and the paused mark is in an earlier step of the
+same trace.
+
+| Seed | Missing snapshot | Paused mark (1.35 false, 2.0 true) | L10 facts in the snapshot | registerModule's own snapshot |
+| --- | --- | --- | --- | --- |
+| 1 | step 16 | step 12 | `a::zf`, `a::zw` | no module step |
+| 2 | step 8 | step 7 (and 9) | `zf`, `zw` | no module step |
+| 4 | step 7 | step 5 (and 6) | `zf`, `zw` | no module step |
+| 5 | step 11 | step 10 (and 14) | `a::zf`, `a::zw`, `z::g0`, `z::g1` | step 3 on both engines |
+| 7 | step 7 | step 6 | `a::zf`, `a::zw` | no module step |
+| 9 | step 11 | step 6 | `zf`, `zw` | no module step |
+| 10 | step 11 | step 10 | `a::zf`, `a::zw` | no module step |
+| 11 | step 7 | step 6 | `zf`, `zw` | no module step |
+| 12 | step 12 | step 11 | `zf`, `zw` | no module step |
+| 13 | step 7 | step 6 | `a::zf`, `a::zw`, `z::g0`, `z::g1` | step 3 on both engines |
+| 14 | step 10 | step 8 | `zf`, `zw` | no module step |
+| 17 | step 10 | step 8 | `a::zf`, `a::zw` | no module step |
+| 18 | step 8 | step 6 | `a::zf`, `a::zw`, `z::g0`, `z::g1` | step 3 on both engines |
+| 19 | step 10 | step 8 (and 9, 12) | `a::zf`, `a::zw`, `z::g0`, `z::g1` | step 3 on both engines |
+| 20 | step 12 | step 7 (and 11) | `a::zf`, `a::zw`, `z::g0`, `z::g1` | step 3 on both engines |
+
+In the five cases with module z (5, 13, 18, 19, 20), 2.0 took
+`registerModule`'s own snapshot (`facts-changed:z::g0,z::g1`) in the same
+step as 1.35, before the pause. The missing snapshot is a later write's,
+after a navigation that put the pause back: (ay)'s shape, present in the
+trace. None is a missing registerModule snapshot (the RFC's H1 holds on
+2.0 in all five).
+
+## The pins
+
+**(bl), U1.** Row (bl) changes U1's two `derive.assign` cases, so they keep
+only what both engines share, with a comment naming the row (#339's
+mechanism, as at L6 to L9): the assign returns, and a function assigned
+after it is read. 1.35's side (every read, `call` and `meta.derivation`
+throws "is not a function" until a function is assigned) is 1.35's only.
+Edited in `packages/core`'s original and re-ported. "register with the same
+object form works" passes unchanged on both.
+
+| Pin | Row | What still runs on both | 2.0's side pinned by |
+| --- | --- | --- | --- |
+| U1, "on a registered derivation: the assign returns, and a function assigned after it is read" | (bl) | the assign returns; `facts.a = 2`, then a function assigned reads 12, by `read` and `call` | core-next `l10a-dynamic` "(bl): assign with { compute, meta } keeps the derivation readable, with the new meta" (`l10a-dynamic.test.ts:184`) |
+| U1, "on a static derivation: the same" | (bl) | the same on `double` | the same test |
+
+**(bm).** Its pins are the diff scenarios U2 and U3; the 76 signed entries
+record 2.0's side. A reader that never sees the name arrive equals 1.35, so
+on the 2.0 side only core-next's pins catch a (bm) that stops working:
+
+- `l10a-dynamic.test.ts:226` "(bm): a derivation that asked about a name
+  before it existed sees it arrive";
+- `l10a-dynamic.test.ts:240` "(bm): a constraint gated on a later
+  registration fires once it arrives";
+- `l10a-dynamic.test.ts:670` "D7: registering a name that only a reader
+  outside the graph asked about starts no pass; the reader sees it at its
+  next read (bm)".
+
+**New pins** (`l10-gate-pins-oracle` and `l10-gate-pins-oracle-production`,
+at L10, 5 cases each). The principal review found these paths unguarded.
+Each passes on 1.35 and on 2.0, in development and production, on source
+and dist.
+
+| Pin | What it holds | Why |
+| --- | --- | --- |
+| restore() after unregisterModule, single and namespaced | a snapshot taken before the unregister restores the live keys and drops the retired one, with no throw and no log | 1.35's `facts.ts:521`: a write to a retired key is dropped before validation. 2.0 threw in development until #411 |
+| a retired resolver's write after the 10 s drain | with fake timers: `unregisterModule` gives up at 10 s, a same-key replacement is registered, and the old resolver's write at 15 s lands on it (`written` 1) | M7 as built, on both engines (corrections, below). Only a 30 ms write was covered (`unregister-module`) |
+| a snapshot taken after registerModule | `registerModule`'s init takes one snapshot, `{ "m::n": 1, "x::c": 10 }`, a write another with `x::c` 11, and `goTo` the first puts `x.c` back to 10 | The RFC's H1. A planted bug here failed no v2 test; only the fuzz caught it |
+
+## The mutation conversion
+
+`current` is L10, so the 41 `feature-layer` L10 entries (all in
+`engine.json`; the RFC estimated 46) become `later-layer`. The gate=L10
+mutation run 43995979367 (mutation-nightly.yml on p10/l10-pre-b at
+3f1d9c2a, concluded success) names their killers: 40 are Killed, and each
+note now names its killing test from that run; 1, 2479:20 (recordFactTags'
+`?.`), is a Timeout, for which Stryker records no killedBy, so its note says
+the layer is the feature's. `packages/core/src` is unchanged since 3f1d9c2a,
+so the triaged lines hold. For 1679:27 the run names a different killer
+than the note's L10-pre-b one (U8 in `l10-dynamic-pins-oracle`); the note
+keeps both.
+
+## B5, the module-churn bench
+
+`node bench/system/run.mjs --only module-churn --rounds 6`, three runs
+alternating which engine goes first, CPU median, before any fuzz run. No
+header said NOISY (load average 4.1 to 5.2 on 14 cores).
+
+| Run | 1.35 (ns per op) | 2.0 (ns per op) | 2.0 against 1.35 | Bytes per step, 1.35 | Bytes per step, 2.0 |
+| --- | --- | --- | --- | --- | --- |
+| 1 (1.35 first) | 723,556 | 741,962 | 1.02 times (1.00 to 1.06) | 3,306,669 | 3,203,968 |
+| 2 (2.0 first) | 721,696 | 753,962 | 1.04 times (1.00 to 1.13) | 3,285,060 | 3,214,076 |
+| 3 (1.35 first) | 842,639 | 984,293 | 1.13 times (0.85 to 1.27) | 3,307,548 | 3,208,712 |
+
+**The median run: 2.0 is 4% slower than 1.35 (1.04 times its time), and
+allocates 2.2 to 3.1% fewer bytes.** #408 measured 1.03 times on a noisy
+machine, with 2.6% fewer bytes. B5 asks for 1.0 or better, so this is an
+owner stop (below).
+
+## Results
+
+**The checks** (after merging main at 7ef4abc7 and building core and
+core-next). Each exit code is the command's own, read from its file, and
+what fails:
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `v2`, `v2:prod`, `v2:dist`, `v2:dist:prod` | 0 each | 2,060, 101, 2,060 and 101 passed, 0 failed; 1,282 skipped by the layer gate on `v2` and `v2:dist`. No L10 test fails, U1's trimmed cases and the new pins included |
+| `v1`, `v1:prod` | 0 each | 3,343 and 102 passed |
+| `ratchet --update` | 0 | +66, none lost by name; 2,200 pass on source and dist |
+| `check:expects` | 0 | 196 files, 7,485 assertions, identical to a fresh port |
+| `oracle:update` | 0 | the harness lock and the oracle baseline, after the last oracle change |
+| `npx vitest run --project conformance:checks` | 1 | 9 failures, all the L8 stop's (`contracts/api-surface-next.test.ts`). The harness lock and the divergence checks pass |
+| `npx vitest run --project conformance:diff` | 1 | 510 passed, 1 failed: the default-seed fuzz, seed d (Stops) |
+| `pnpm census` | 1 | 87 problems, all from the two known stops. 10 are the L8 stop's: the 9 `api-surface-next` failures and "conformance:checks: vitest exited 1". 3 are seed d's: it times out at 120 s, so `conformance:diff` exits 1, the fuzz test fails, and "the fuzzer reported no runs". 74 stale entries follow from that: with no fuzz runs reported, no fuzz entry covers anything |
+| Root biome, error level | 0 | 1,487 files |
+| The 21 PR seeds at CI's 120 s | 1 on 4 | 17 exit 0 (20 to 75 s each). Seed d times out (Stops). Seeds 7, 9 and 11 time out with no failing case, as at L9 (below) |
+| Seeds 7, 9 and 11, longer timeouts | 0 each | 7 in 320 s and 9 in 406 s at 900 s; 11 in 720 s at 1,800 s (it timed out at 900 s while the census and three deep runs shared the machine) |
+
+**The PR seeds, case by case.** On this branch's first run (before the
+(ay) twins), fifteen seeds failed on (ay)'s snapshot (above). On the final
+harness every numbered seed passes but for time: 7, 9 and 11 take longer
+than CI's 120 s, as at the L9 gate (GATE-8.md, "Three PR seeds need longer
+than CI's 120 s"). The 21 seeds ran 4 at a time with nothing else heavy
+beside them.
+
+**`conformance:typecheck`** (`pnpm typecheck` in packages/conformance) exits
+2 on three errors in `tests/core/l10-dynamic-gate-debt-oracle.test.ts`
+(L10-pre-b's file, ported as it is; implicit `any` and an index on `{}`). No
+file this gate adds or edits has a type error. A follow-up.
+
+## Deep runs: report mode (A2)
+
+Run as the nightly does (`DIFF_FUZZ_RUNS=5000 DIFF_FUZZ_BATCH_REPORT=1`, an
+8 GB heap), each seed to the end of its run or to its first unreported
+failure. Each stop on an L10 shape was triaged, given an entry for its row,
+replayed clean, and the seed run again on the new harness. Batched cases
+are reported, not failed (A2).
+
+**What the deep runs found, in order** (each fixed in an oracle commit,
+except the last):
+
+| Run | Case | What it was | Row | Done |
+| --- | --- | --- | --- | --- |
+| seed 2, first | all, `assign("z1", { compute, meta })` | (bl) on a dynamic derivation; the entry named only `d\d+` | (bl) | `dynamicDerivation` |
+| seed 1, first | all, a pause, a replay, a write | (ay) unannounced, in a dynamic case | (ay) | the unannounced L10 twin |
+| seed 24301, first | all, `assign("d0", { compute, meta })`, then `call` | (bl), and an artifact of this gate: the run read the entries from the working tree per case, so it saw the new `when` assignObject but not the new trigger, which its process had not loaded. Seed 9's 900 s run failed the same way | (bl) | replays clean on the final harness |
+| seed 1, second | all, module z registered, a pause, a replay, a write of `b::when` | (ay) unannounced, with module z's facts | (ay) | the twin's class reads the label |
+| seed 24301, second | up to L10, odd module z replaces `d0`, unregister, then `define` registers `d0` | (bm): `d1` and `d2` asked for `d0` while it was gone | (bm) | `readerNameReturns` and its entry |
+| seed 2, final | up to L10, a deferred `derive.call("d0")` of a stale `d0` | **no row** (Stops) | none | open |
+
+**The final runs.**
+
+| Seed | Exit | Time | Reported cases (batched) | Stopped on |
+| --- | --- | --- | --- | --- |
+| 1 | 0 | 32 min, 7,000 cases; 17 runaways, 33 never settle | all:857, all:1028, all:1395, all:2195, all:2816, up to L10#224, up to L10#1295, up to L10#1959 | ran to the end |
+| 2 | 1 | 24 min, 6,369 cases; 9 runaways, 25 never settle | all:2247, all:2890, all:3992 | up to L10: the `call` trace case (Stops) |
+| 24301 | 0 | 16 min, 7,000 cases; 13 runaways, 31 never settle | all:175, all:422, all:687, all:2654, all:3053, up to L10#1056 | ran to the end |
+
+**Triage of every reported case.** Each is batched.
+
+- all:857, all:1028, all:1395, all:2195 (seed 1), all:2247, all:2890,
+  all:3992 (seed 2), all:175, all:422, all:687, all:2654, all:3053 (seed
+  24301): the cases GATE-8 lists at L9, with the same first differences: L7
+  batch shapes, (ap) with no clobbering single resolver (2:all#2890,
+  24301:all#422), and 24301:all#175, the L9 stop. Report-mode follow-ups, as
+  at L9.
+- 1:all#2816: an `onReconcileStart` 1.35 makes and 2.0 does not, in step
+  15 of a batched case: an L7 batch shape (pass timing), not proven either
+  way; a follow-up.
+- 1:up to L10#224: an `onFactSet` missing on 2.0 in step 10; the same case
+  number as GATE-8's 1:up to L9#224 (row t's batch path), now in the up to
+  L10 phase. Not replayed; a follow-up.
+- 1:up to L10#1295: in step 17, 2.0 runs module z's teardown
+  (`onDefinitionUnregister` for `zm` and `zme`) before a batch's
+  requirements are created, where 1.35 creates them first: a teardown met
+  by a batch in flight. Batched, so reported; not replayed, and not proven
+  either way. A follow-up for the next gate run.
+- 1:up to L10#1959: a batch write missing on 2.0 in step 8, GATE-8's
+  1:up to L9#1959 (an L7 batch shape), now in the up to L10 phase.
+- 24301:up to L10#1056: an `onReconcileEnd` 2.0 makes and 1.35 does not, in
+  step 7 of a batched case: pass timing with a batch, an L7 batch shape as
+  far as the first difference shows; a follow-up.
+
+Seed 1's final run started before the `readerNameReturns` entry landed and
+read the entries per case, so its later cases saw it; the entry only adds
+coverage for its trigger, and the run ended with no failure. Seed 2 stopped
+on the `call` case, so the rest of its up to L10 phase did not run.
+
+## Corrections to the L10 RFC
+
+- **M7 says a retired resolver's write "cannot reach a replacement".** On
+  both engines it lands on a same-key replacement once the 10 s drain has
+  given up (#408's correctness review; pinned above). M7 holds only for a
+  write made inside the drain.
+- **A `destroy()` during a pending unregister drain fires `onStop` twice,
+  on both engines.** This is parity and needs no row.
+- **M1's `$`-prefixed key check is a text error:** both engines accept a
+  schema key `$a`.
+- **M5's "joins a second concurrent call for the same module" is a text
+  error:** on a namespaced system the second call rejects on both engines.
+
+## An owner row candidate
+
+engine.ts 2261:9 is triaged `v1-bug` in L10-pre-b (#409). 1.35's error
+boundary derivation retry hands the failing derivation's id to
+`derivationsManager.invalidate` (engine.ts:1107), whose argument is a fact
+key (derivations.ts:932), so it invalidates the readers of a fact with the
+derivation's name, not the derivation that threw. 2.0 does not. No row
+covers it yet, and no test pins it: a public test of it kills the mutant on
+1.35 and fails on 2.0. It needs a row, (bp) or later, before a test can pin
+either side.
+
+## Stops
+
+- **A difference that matches no row: a deferred `derive.call` of a stale
+  derivation, in the trace.** Deep seed 2, up to L10 (spec in the gate's
+  scratch, `specs/deep2c.json`). `d0` was invalidated and not read again,
+  so its last value, 11, is stale. Inside a pass, the queued
+  `derive.call("d0")` (D5, D8) recomputes it to 6. The trace run that
+  follows lists `d0` in `derivationsRecomputed` with `oldValue` 11 on 1.35
+  and `undefined` on 2.0 (`onTraceComplete`, and `inspect().trace` after
+  it). Everything else in the case matches. This is a 2.0 parity
+  difference in the trace's old value for a recompute through `call`, and
+  no approved row covers it. It needs either a core-next fix that keeps the
+  last value of a stale derivation for the trace, as 1.35 does, or a row
+  from Jason. The gate may not touch `packages/core-next/src`.
+- **B5 is over 1.0: an owner stop.** module-churn runs at 1.04 times
+  1.35's time (CPU median of three; 1.02, 1.04 and 1.13), with 2.2 to 3.1%
+  fewer bytes. B5 asks for 1.0 or better. #408 measured 1.03. Jason decides
+  whether 4% on 100 module register and unregister pairs holds the gate.
+- **The L9 stop, carried: seed 24301, "seed d".** It times out at 120 s,
+  in the PR run and in `conformance:diff` and the census. Its deep run
+  reports case all#175 (batched, the L9 stop's case) with the others GATE-8
+  lists. It waits on Jason's ruling on the "Discard after the stop"
+  wording (GATE-8.md, Stops).
+- **The L8 stop, carried:** `./internals` `createHistoryManager` and
+  `createDisabledHistory` (`conformance:checks`, 9 failures; the census's
+  "vitest exited 1"). Unchanged.
+- **CI's 120 s, carried from L9:** seeds 7, 9 and 11 pass only past it
+  (above). Not a difference; the L9 follow-up to profile 7:all#187 stands.
+
+Apart from the `call` trace case, every difference the fuzz showed matches
+an approved row.
+
+## Follow-ups
+
+- **The fuzz's reach.** No generated module has `sources`
+  (`extraModule`, `diff/fuzz/model.ts:2815–2866`), so a module's source
+  teardown (M6, a pending linger timer) is never fuzzed; and no case draws
+  colliding joined keys (#407's namespaced key collisions).
+- The owner row candidate above.
+- `conformance:typecheck`'s three errors in L10-pre-b's
+  `l10-dynamic-gate-debt-oracle` (above).
+- `ends` entries are read per case from the working tree
+  (`readDivergences` in `runScenario`), so an edit during a run changes
+  the run's own entries. This gate killed and reran each run that an edit
+  overlapped.
+- GATE-8's follow-ups that this gate did not touch stand: profile
+  7:all#187, the payload tie-break, 24301:up to L8#948's replay, (ap)'s two
+  deep cases.
