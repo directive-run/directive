@@ -12,17 +12,25 @@
  * and path to replay it; the error also carries the shrunk spec and the
  * first divergence.
  *
- * A run has two phases of exact size (so the count is a guarantee, not a
- * probability) and the same replay: the seed and run count reproduce both.
+ * A run has three phases of exact size (so the count is a guarantee, not a
+ * probability) and the same replay: the seed and run count reproduce all
+ * three.
  *
- * - RUNS cases are generated across every layer, the cases a run always
- *   had: v1 and the workspace engine are compared on all of them, v2 on those
- *   that happen to fit. Adding the v2 share never takes one of them away.
+ * - RUNS cases are generated across every layer up to model.ts
+ *   `BASE_CEILING` (L10), the cases a run always had: v1 and the workspace
+ *   engine are compared on all of them, v2 on those that happen to fit.
+ *   Adding the v2 share never takes one of them away.
  * - On top of those, v2Cases(RUNS) more cases (FUZZ_V2_PERCENT of RUNS,
  *   lib/fuzz.ts) are generated with a ceiling at `current` in
  *   layers.rules.json, the highest layer core-next has built (model.ts
  *   `FEATURE_LAYERS`), so v2 takes part in them. Left to chance, nearly every
  *   case uses a feature above `current` and v2 sits out of it.
+ * - Then dataFormCases(RUNS) cases (a third of RUNS, rounded up) that each
+ *   write some definitions as data (L11, model.ts `dataFormArbitrary`), from
+ *   their own seed. Drawn in a phase of their own, the data forms change no
+ *   case the first two phases draw, so the quirks those cases reach (and the
+ *   census's stale check over them) stay as they were before L11-pre
+ *   (diff/self/fuzz-streams.test.ts).
  *
  * Every engine run has a timer-callback budget (diff/scenario.ts
  * RUN_BUDGET). A case whose reference run passes it never settles on 1.35
@@ -96,6 +104,8 @@ import {
 } from "../scenario.js";
 import {
   type FuzzSpec,
+  baseArbitrary,
+  dataFormArbitrary,
   specArbitrary,
   specTriggers,
   toScenario,
@@ -122,6 +132,12 @@ const RUNS = Number(process.env.DIFF_FUZZ_RUNS ?? FUZZ_DEFAULT_RUNS);
  * and the two phases do not draw the same numbers into similar arbitraries.
  */
 const CEILING_SEED = (SEED ^ 0x7a3c91d5) | 0;
+
+/** The data-form phase's seed, derived from the first the same way. */
+const DATA_FORM_SEED = (SEED ^ 0x1d4b2e67) | 0;
+
+/** How many data-form cases a run of `runs` adds: a third, rounded up. */
+const dataFormCases = (runs: number) => Math.ceil(runs / 3);
 
 /** Report mode: the nightly's deep runs only (lib/fuzz.ts `batchReportMode`). */
 const REPORT_MODE = batchReportMode();
@@ -206,7 +222,7 @@ describe("differential fuzz", () => {
         label: "across every layer",
         runs: RUNS,
         seed: SEED,
-        arbitrary: specArbitrary(),
+        arbitrary: baseArbitrary(),
         examples: [] as [FuzzSpec][],
       },
       ...(current === null
@@ -220,9 +236,16 @@ describe("differential fuzz", () => {
               examples: PINNED,
             },
           ]),
+      {
+        label: "with data forms (L11), on their own seed",
+        runs: dataFormCases(RUNS),
+        seed: DATA_FORM_SEED,
+        arbitrary: dataFormArbitrary(),
+        examples: [] as [FuzzSpec][],
+      },
     ];
     console.info(
-      `[diff fuzz] seed ${SEED}, ${RUNS + upToCurrent} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
+      `[diff fuzz] seed ${SEED}, ${phases.reduce((n, p) => n + p.runs, 0)} cases: ${phases.map((p) => `${p.runs} ${p.label}`).join(" + ")}`,
     );
     const tally: FuzzTally = newFuzzTally();
     const reported: Reported[] = [];
@@ -265,7 +288,7 @@ describe("differential fuzz", () => {
           );
         } catch (error) {
           if (error instanceof Error) {
-            error.message = `[diff fuzz] failed in the phase ${phase.label}; replay both phases with DIFF_FUZZ_SEED=${SEED} DIFF_FUZZ_RUNS=${RUNS}\n${error.message}`;
+            error.message = `[diff fuzz] failed in the phase ${phase.label}; replay every phase with DIFF_FUZZ_SEED=${SEED} DIFF_FUZZ_RUNS=${RUNS}\n${error.message}`;
           }
           throw error;
         }

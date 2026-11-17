@@ -796,7 +796,32 @@ export function specArbitrary(
   // At L11 the data forms are drawn last (`predicateDraws`), so below L11 a
   // case is the one L10-pre drew, digest for digest
   // (diff/self/abort-draw.test.ts).
-  return allows("predicates") ? withDynamic.chain(predicateDraws) : withDynamic;
+  return allows("predicates")
+    ? withDynamic.chain((spec) => predicateDraws(spec))
+    : withDynamic;
+}
+
+/**
+ * The highest layer the fuzz drew before L11-pre's data forms. The fuzz's
+ * "across every layer" phase draws at this ceiling (`baseArbitrary`), and
+ * the data forms come from their own phase and seed (`dataFormArbitrary`),
+ * so adding them changes no case a seed drew at L10 or below: those cases,
+ * and the quirks they reach, stay as they were, byte for byte
+ * (diff/self/fuzz-streams.test.ts).
+ */
+export const BASE_CEILING = "L10";
+
+/** Every feature up to `BASE_CEILING`: the case L10-pre drew, unchanged. */
+export function baseArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return specArbitrary({ ceiling: BASE_CEILING });
+}
+
+/**
+ * A base case (`baseArbitrary`) that always draws data forms
+ * (`predicateDraws`), so every case it draws sits at L11.
+ */
+export function dataFormArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return baseArbitrary().chain((spec) => predicateDraws(spec, true));
 }
 
 const gateArbitrary: fc.Arbitrary<FuzzGate> = fc.record({
@@ -841,9 +866,12 @@ const orFunction = <T>(arbitrary: fc.Arbitrary<T>) =>
  * up to two `tools` steps in among its steps, and, when it drew a
  * `$changed` gate, three times in four a snapshot and a later restore, so
  * the gate sees a restore. The other two in three are the case as drawn
- * without them.
+ * without them. With `always` (`dataFormArbitrary`), every case draws them.
  */
-function predicateDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
+function predicateDraws(
+  spec: FuzzSpec,
+  always = false,
+): fc.Arbitrary<FuzzSpec> {
   const drawn = fc.record({
     modules: fc.tuple(
       ...spec.modules.map((m) =>
@@ -882,45 +910,44 @@ function predicateDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
     rewind: fc.option(fc.tuple(fc.nat(), fc.nat()), { nil: null, freq: 4 }),
   });
 
-  return fc.oneof(
-    { weight: 2, arbitrary: fc.constant(spec) },
-    {
-      weight: 1,
-      arbitrary: drawn.map((d) => {
-        const modules = d.modules as FuzzModulePredicates[];
-        const steps: FuzzStep[] = [...spec.steps];
-        const added = new Set<FuzzStep>();
-        const put = (at: number, step: FuzzStep) => {
-          steps.splice(at % (steps.length + 1), 0, step);
-          added.add(step);
-        };
-        for (const at of d.tools) {
-          put(at, { op: "tools" });
-        }
-        const changed = modules.some((m) =>
-          m.on.some((g) => g?.op === "$changed"),
-        );
-        if (changed && d.rewind !== null) {
-          const [at, gap] = d.rewind;
-          const snapshot: FuzzStep = { op: "snapshot" };
-          put(at, snapshot);
-          const from = steps.indexOf(snapshot) + 1;
-          const restore: FuzzStep = { op: "restore" };
-          steps.splice(from + (gap % (steps.length - from + 1)), 0, restore);
-          added.add(restore);
-        }
+  const withForms = drawn.map((d): FuzzSpec => {
+    const modules = d.modules as FuzzModulePredicates[];
+    const steps: FuzzStep[] = [...spec.steps];
+    const added = new Set<FuzzStep>();
+    const put = (at: number, step: FuzzStep) => {
+      steps.splice(at % (steps.length + 1), 0, step);
+      added.add(step);
+    };
+    for (const at of d.tools) {
+      put(at, { op: "tools" });
+    }
+    const changed = modules.some((m) => m.on.some((g) => g?.op === "$changed"));
+    if (changed && d.rewind !== null) {
+      const [at, gap] = d.rewind;
+      const snapshot: FuzzStep = { op: "snapshot" };
+      put(at, snapshot);
+      const from = steps.indexOf(snapshot) + 1;
+      const restore: FuzzStep = { op: "restore" };
+      steps.splice(from + (gap % (steps.length - from + 1)), 0, restore);
+      added.add(restore);
+    }
 
-        return {
-          ...spec,
-          steps,
-          predicates: {
-            modules,
-            inserted: steps.flatMap((s, i) => (added.has(s) ? [i] : [])),
-          },
-        };
-      }),
-    },
-  );
+    return {
+      ...spec,
+      steps,
+      predicates: {
+        modules,
+        inserted: steps.flatMap((s, i) => (added.has(s) ? [i] : [])),
+      },
+    };
+  });
+
+  return always
+    ? withForms
+    : fc.oneof(
+        { weight: 2, arbitrary: fc.constant(spec) },
+        { weight: 1, arbitrary: withForms },
+      );
 }
 
 /**
