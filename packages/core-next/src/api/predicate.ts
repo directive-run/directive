@@ -1460,116 +1460,138 @@ function render(
   );
 }
 
+/** E2, (bq), (br), (bp): the shared registration step. */
+const reg = (
+  module: Rec | undefined,
+  kind: string,
+  id: string,
+  spec: object,
+  field: string,
+  raw: unknown = spec,
+) => {
+  freeze(spec);
+  // Before the namespace prefix, which keeps a combinator alone (1.35).
+  lone(kind, id, raw);
+  if (isDevelopment) {
+    const derive = module!.derive ?? {};
+    const facts = module!.schema?.facts ?? {};
+    for (const key of names(spec, new Set())) {
+      if (Object.hasOwn(derive, key) && !Object.hasOwn(facts, key)) {
+        console.warn(
+          `[Directive] ${kind} "${id}": data-form \`${field}\` names "${key}", a derivation. A data form reads facts only, so "${key}" is undefined there and the clause never matches. Use a function-form \`${field}\`, or test the facts the derivation reads.`,
+        );
+      }
+    }
+  }
+
+  return stateless(spec) as object;
+};
+
+/** The seam's slot (FormOf); `module` is read in development only, for (br). */
+const formOf = (raw: any, key: string, id: string, module?: Rec): Fn => {
+  if (key === "handler") {
+    const patch = freeze(raw.patch);
+
+    return (facts: Rec, event?: Rec) => applyPatch(patch, facts, event ?? {});
+  }
+  const c = raw.compute;
+  if (isTemplate(c)) {
+    freeze(c);
+
+    return (facts: Rec) => evaluateTemplate(c, facts);
+  }
+  const memoized = memoizePredicate(
+    reg(module, "derivation", id, c, "compute"),
+  );
+
+  return attribute("derivation", id, (facts: Rec) => memoized(facts));
+};
+
+/**
+ * The registration hooks, one object for every system. `mod_`, the module
+ * (br) reads, is set on a per-system copy in development only.
+ */
+const PRED: Predicates & { mod_?: Rec } = {
+  when_(id, def) {
+    if (isDevelopment) {
+      if (def.async) {
+        console.warn(
+          `[Directive] constraint "${id}": data \`when\` is always sync; \`async: true\` will be ignored`,
+        );
+      }
+      if (def.deps) {
+        console.warn(
+          `[Directive] constraint "${id}": data \`when\` cannot be combined with explicit \`deps\` — deps are tracked automatically`,
+        );
+      }
+    }
+    def.deps &&= undefined;
+    const spec = def.ns_
+      ? prefix(def.when, ...(def.ns_ as [string, string[]]))
+      : def.when;
+    if (isDevelopment) {
+      // 1.35's containsChangedOperator walk (the refusal itself is in
+      // constraints.ts): its development warnings, once at registration.
+      walkPredicate(spec, {});
+    }
+    if (spec === null || typeof spec !== "object") {
+      throw new Error(
+        `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof spec}`,
+      );
+    }
+    if (isDevelopment && isEmptyOrConfigPredicate(spec)) {
+      console.warn(
+        `[Directive] constraint '${id}': data spec has no operators, combinators, or clauses — looks like a config object passed by mistake. Either pass a predicate like { phase: 'red' } or a function.`,
+      );
+    }
+    const run = reg(this.mod_, "constraint", id, spec, "when", def.when);
+    const memoized = memoizePredicate(run);
+    def.when = attribute("constraint", id, (facts: Rec) => memoized(facts));
+    def.async &&= false;
+
+    return [spec, run];
+  },
+  on_(id, def) {
+    const spec = (
+      def.ns_ ? prefix(def.on, ...(def.ns_ as [string, string[]])) : def.on
+    ) as object;
+    const memoized = memoizePredicate(
+      reg(this.mod_, "effect", id, spec, "on", def.on),
+    );
+
+    return [
+      attribute("effect", id, (facts: Rec, prev?: Rec) =>
+        memoized(facts, prev),
+      ),
+      extractDeps(spec),
+    ];
+  },
+  explain_: evaluatePredicateExplained,
+  print_(lines, clauses) {
+    if (clauses?.length) {
+      lines.push("├─ Predicate clauses:");
+      clauses.forEach((c, i) =>
+        render(lines, c, "│  ", i === clauses.length - 1),
+      );
+    }
+  },
+};
+
 /**
  * The predicates part (O1): fills the core's data-form slot (the seam, read
  * at a derivation's first compute or a patch event's first dispatch) and
  * the hooks the constraints and effects parts read at registration. Wired
- * first, so every part after it sees them.
+ * first, so every part after it sees them. Production allocates nothing per
+ * system: the slot and the hooks are shared.
  */
 export const withPredicates: SystemPart = (ctx: SystemContext) => {
-  const module = ctx.module as Rec;
-  /** E2, (bq), (br), (bp): the shared registration step. */
-  const reg = (
-    kind: string,
-    id: string,
-    spec: object,
-    field: string,
-    raw: unknown = spec,
-  ) => {
-    freeze(spec);
-    // Before the namespace prefix, which keeps a combinator alone (1.35).
-    lone(kind, id, raw);
-    if (isDevelopment) {
-      const derive = module.derive ?? {};
-      const facts = module.schema?.facts ?? {};
-      for (const key of names(spec, new Set())) {
-        if (Object.hasOwn(derive, key) && !Object.hasOwn(facts, key)) {
-          console.warn(
-            `[Directive] ${kind} "${id}": data-form \`${field}\` names "${key}", a derivation. A data form reads facts only, so "${key}" is undefined there and the clause never matches. Use a function-form \`${field}\`, or test the facts the derivation reads.`,
-          );
-        }
-      }
-    }
-
-    return stateless(spec) as object;
-  };
-  ctx.form_ = (raw, key, id) => {
-    if (key === "handler") {
-      const patch = freeze(raw.patch);
-
-      return (facts: Rec, event?: Rec) => applyPatch(patch, facts, event ?? {});
-    }
-    const c = raw.compute;
-    if (isTemplate(c)) {
-      freeze(c);
-
-      return (facts: Rec) => evaluateTemplate(c, facts);
-    }
-    const memoized = memoizePredicate(reg("derivation", id, c, "compute"));
-
-    return attribute("derivation", id, (facts: Rec) => memoized(facts));
-  };
-  ctx.pred_ = {
-    when_(id, def) {
-      if (isDevelopment) {
-        if (def.async) {
-          console.warn(
-            `[Directive] constraint "${id}": data \`when\` is always sync; \`async: true\` will be ignored`,
-          );
-        }
-        if (def.deps) {
-          console.warn(
-            `[Directive] constraint "${id}": data \`when\` cannot be combined with explicit \`deps\` — deps are tracked automatically`,
-          );
-        }
-      }
-      def.deps &&= undefined;
-      const spec = def.ns_
-        ? prefix(def.when, ...(def.ns_ as [string, string[]]))
-        : def.when;
-      if (isDevelopment) {
-        // 1.35's containsChangedOperator walk (the refusal itself is in
-        // constraints.ts): its development warnings, once at registration.
-        walkPredicate(spec, {});
-      }
-      if (spec === null || typeof spec !== "object") {
-        throw new Error(
-          `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof spec}`,
-        );
-      }
-      if (isDevelopment && isEmptyOrConfigPredicate(spec)) {
-        console.warn(
-          `[Directive] constraint '${id}': data spec has no operators, combinators, or clauses — looks like a config object passed by mistake. Either pass a predicate like { phase: 'red' } or a function.`,
-        );
-      }
-      const run = reg("constraint", id, spec, "when", def.when);
-      const memoized = memoizePredicate(run);
-      def.when = attribute("constraint", id, (facts: Rec) => memoized(facts));
-      def.async &&= false;
-
-      return [spec, run];
-    },
-    on_(id, def) {
-      const spec = (
-        def.ns_ ? prefix(def.on, ...(def.ns_ as [string, string[]])) : def.on
-      ) as object;
-      const memoized = memoizePredicate(reg("effect", id, spec, "on", def.on));
-
-      return [
-        attribute("effect", id, (facts: Rec, prev?: Rec) =>
-          memoized(facts, prev),
-        ),
-        extractDeps(spec),
-      ];
-    },
-    explain_: evaluatePredicateExplained,
-    print_(lines, clauses) {
-      if (clauses?.length) {
-        lines.push("├─ Predicate clauses:");
-        clauses.forEach((c, i) =>
-          render(lines, c, "│  ", i === clauses.length - 1),
-        );
-      }
-    },
-  };
+  if (isDevelopment) {
+    const module = ctx.module as Rec;
+    ctx.form_ = (raw, key, id) => formOf(raw, key, id, module);
+    const own: typeof PRED = { ...PRED, mod_: module };
+    ctx.pred_ = own;
+  } else {
+    ctx.form_ = formOf;
+    ctx.pred_ = PRED;
+  }
 };

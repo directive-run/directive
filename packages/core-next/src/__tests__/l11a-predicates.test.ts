@@ -186,6 +186,53 @@ describe("approved rows at registration", () => {
     expect(text).toContain('constraint "c": data-form `when` names "dbl"');
     expect(text).toContain('effect "e": data-form `on` names "dbl"');
   });
+
+  it("(br) reads each system's own module: the hooks are shared, the module is not", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const text = () => warn.mock.calls.map((c) => String(c[0])).join("\n");
+    // `dbl` is a derivation here: the constraint and the compute warn.
+    const a: Any = createSystem({
+      module: light({
+        derive: {
+          dbl: (facts: Any) => facts.n * 2,
+          hit: { compute: { dbl: 1 } },
+        },
+        constraints: {
+          c: { when: { dbl: { $gte: 4 } }, require: { type: "GO" } },
+        },
+      }),
+    });
+    a.start();
+    void a.derive.hit;
+    expect(text()).toContain('constraint "c": data-form `when` names "dbl"');
+    expect(text()).toContain(
+      'derivation "hit": data-form `compute` names "dbl"',
+    );
+    warn.mockClear();
+    // `dbl` is a fact here: the same forms name no derivation.
+    const b: Any = createSystem({
+      module: createModule("f", {
+        schema: {
+          facts: { dbl: t.number() },
+          derivations: { hit: t.boolean() },
+          requirements: { GO: {} },
+        },
+        init: (facts: Any) => {
+          facts.dbl = 0;
+        },
+        derive: { hit: { compute: { dbl: 1 } } } as Any,
+        constraints: {
+          c: { when: { dbl: { $gte: 4 } }, require: { type: "GO" } },
+        },
+        resolvers: { go: { requirement: "GO", resolve: async () => {} } },
+      }),
+    });
+    b.start();
+    void b.derive.hit;
+    expect(text()).not.toContain("a derivation");
+    b.destroy();
+    a.destroy();
+  });
 });
 
 describe("the other data forms (D1–D4)", () => {

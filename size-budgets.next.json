@@ -6,20 +6,20 @@
       "reason": "Phase 2 gate, owner-approved 2026-11-01: measured + about 2%"
     },
     "minimal": {
-      "gzBudget": 44122,
-      "reason": "L11a, the engine side of predicates: the seam (+99 B) and withPredicates, +3866 B over the post-L10 main (40246 B); measured + 10 B. A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
+      "gzBudget": 44143,
+      "reason": "L11a, the engine side of predicates: the seam (+99 B) and withPredicates, +3887 B over the post-L10 main (40246 B); measured + 10 B. Includes +21 B for the shared hooks (the create-destroy-1000 bench fix). A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
     },
     "two-module": {
-      "gzBudget": 44211,
-      "reason": "L11a, the engine side of predicates: the seam (+94 B) and withPredicates, +3862 B over the post-L10 main (40339 B); measured + 10 B. A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
+      "gzBudget": 44233,
+      "reason": "L11a, the engine side of predicates: the seam (+94 B) and withPredicates, +3884 B over the post-L10 main (40339 B); measured + 10 B. Includes +21 B for the shared hooks (the create-destroy-1000 bench fix). A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
     },
     "floor": {
       "gzBudget": 11329,
       "reason": "L11a, the engine side of predicates: the lazy seam alone (+89 B; the part is not wired here), +89 B over the post-L10 main (11230 B); measured + 10 B. A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+150 B)."
     },
     "aperture": {
-      "gzBudget": 49038,
-      "reason": "L11a, the engine side of predicates: the seam (+93 B) and withPredicates, +3859 B over the post-L10 main (45169 B); measured + 10 B. A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
+      "gzBudget": 49059,
+      "reason": "L11a, the engine side of predicates: the seam (+93 B) and withPredicates, +3880 B over the post-L10 main (45169 B); measured + 10 B. Includes +21 B for the shared hooks (the create-destroy-1000 bench fix). A1 approved on the owner's instruction, \"I approve you for to do everything\" (2026-11-15): O1, caps +4.8 KB (target 4.2 KB) on minimal, two-module and aperture, +16.0 KB on full-entry, +150 B on floor, over the post-L10 size; this is within its cap (+4.8 KB)."
     },
     "full-entry": {
       "gzBudget": 46358,
