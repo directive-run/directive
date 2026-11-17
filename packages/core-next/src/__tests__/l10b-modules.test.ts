@@ -581,3 +581,65 @@ describe("namespaced registerModule and unregisterModule (namespaced.ts)", () =>
     system.destroy();
   });
 });
+
+describe("restore() of a snapshot holding an unregistered module's keys (restore.ts, dynamic.ts gone_)", () => {
+  // 1.35's store drops a write to a retired key before validating it
+  // (core/facts.ts:521), so a development restore writes the live keys and
+  // drops the retired ones silently, as production does. A key that was
+  // never known still throws (row ag).
+  const quiet = () => [
+    vi.spyOn(console, "warn").mockImplementation(() => undefined),
+    vi.spyOn(console, "error").mockImplementation(() => undefined),
+  ];
+
+  it("single module: the retired key is dropped, the live one is written, with no log", async () => {
+    const system = started();
+    system.registerModule(
+      createModule("c", {
+        schema: { facts: { k: t.number() } },
+        init: (facts: Any) => {
+          facts.k = 2;
+        },
+      } as never),
+    );
+    const snapshot = system.getSnapshot();
+    expect(snapshot.facts.k).toBe(2);
+    await system.unregisterModule("c");
+    const logs = quiet();
+    system.restore(snapshot);
+    system.restore({ facts: { n: 9, k: 1 } });
+    expect(system.facts.n).toBe(9);
+    expect("k" in system.getSnapshot().facts).toBe(false);
+    for (const log of logs) {
+      expect(log).not.toHaveBeenCalled();
+    }
+    expect(() => system.restore({ facts: { n: 3, zz: 1 } })).toThrow(
+      '[Directive] Unknown fact key: "zz". Key not defined in schema.',
+    );
+    expect(system.facts.n).toBe(9);
+    system.destroy();
+  });
+
+  it("namespaced: `x::c` is dropped after unregisterModule('x'), `m::n` is written, with no log", async () => {
+    const system = createSystem({ modules: { m: mod() } } as never) as Any;
+    system.start();
+    system.registerModule("x", extra());
+    const snapshot = system.getSnapshot();
+    expect(snapshot.facts["x::c"]).toBe(10);
+    await system.unregisterModule("x");
+    const logs = quiet();
+    system.restore(snapshot);
+    system.restore({ facts: { "m::n": 9, "x::c": 1 } });
+    expect(system.facts.m.n).toBe(9);
+    expect(system.facts.x).toBeUndefined();
+    expect("x::c" in system.getSnapshot().facts).toBe(false);
+    for (const log of logs) {
+      expect(log).not.toHaveBeenCalled();
+    }
+    expect(() => system.restore({ facts: { "m::n": 3, "y::q": 1 } })).toThrow(
+      '[Directive] Unknown fact key: "y::q". Key not defined in schema.',
+    );
+    expect(system.facts.m.n).toBe(9);
+    system.destroy();
+  });
+});

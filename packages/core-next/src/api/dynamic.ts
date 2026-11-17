@@ -168,6 +168,10 @@ export const withDynamic: SystemPart = (ctx) => {
       const out = (gone = new Set());
       store.set = (key: string, ...rest: unknown[]) =>
         out.has(key) || set(key, ...rest);
+      // restore()'s (ag) check skips these keys (restore.ts).
+      if (isDevelopment) {
+        store.gone_ = out;
+      }
     }
     store.batch(() => {
       for (const key of keys) {
