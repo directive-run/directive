@@ -7,6 +7,8 @@
     "tests/core/l10-dynamic-gate-debt-oracle.test.ts",
     "tests/core/l10-dynamic-pins-oracle-production.test.ts",
     "tests/core/l10-dynamic-pins-oracle.test.ts",
+    "tests/core/l10-gate-pins-oracle-production.test.ts",
+    "tests/core/l10-gate-pins-oracle.test.ts",
     "tests/core/l2-constraints-oracle-state.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l2-resolvers-oracle.test.ts",
@@ -40,6 +42,8 @@
     "tests/core/l10-dynamic-gate-debt-oracle.test.ts": [],
     "tests/core/l10-dynamic-pins-oracle-production.test.ts": [],
     "tests/core/l10-dynamic-pins-oracle.test.ts": [],
+    "tests/core/l10-gate-pins-oracle-production.test.ts": [],
+    "tests/core/l10-gate-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [
       "member .inspect",
       "option plugins"
@@ -81,6 +85,8 @@
     "tests/core/l10-dynamic-gate-debt-oracle.test.ts": [],
     "tests/core/l10-dynamic-pins-oracle-production.test.ts": [],
     "tests/core/l10-dynamic-pins-oracle.test.ts": [],
+    "tests/core/l10-gate-pins-oracle-production.test.ts": [],
+    "tests/core/l10-gate-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l2-resolvers-oracle.test.ts": [],
@@ -210,9 +216,9 @@
       "production: getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": "L10"
     },
     "tests/core/l10-dynamic-pins-oracle.test.ts": {
-      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a registered derivation: the assign returns, then every read, call and meta.derivation throws until a function is assigned": "L10",
-      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a static derivation: the same": "L10",
-      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works": "L10",
+      "derive.assign with { compute, meta } (U1; row bl) > on a registered derivation: the assign returns, and a function assigned after it is read": "L10",
+      "derive.assign with { compute, meta } (U1; row bl) > on a static derivation: the same": "L10",
+      "derive.assign with { compute, meta } (U1; row bl) > register with the same object form works": "L10",
       "a subscriber to a name not registered yet is never called (U4; row bn, declined) > development warns at the call; the later registration and its changes reach no subscriber": "L10",
       "a module's definitions are not dynamic (U6) > isDynamic is false and listDynamic is empty for every kind": "L10",
       "registerModule over a live derivation replaces it (U7) > the module's compute wins, and development says nothing": "L10",
@@ -221,6 +227,20 @@
       "the trace's hit rows after a constraint is unregistered mid-flight (U13) > name only constraints that exist: the unregister's pass hits nothing": "L10",
       "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": "L10",
       "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member": "L1"
+    },
+    "tests/core/l10-gate-pins-oracle-production.test.ts": {
+      "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written": "L10",
+      "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written": "L10",
+      "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": "L10",
+      "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another": "L10",
+      "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": "L10"
+    },
+    "tests/core/l10-gate-pins-oracle.test.ts": {
+      "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written": "L10",
+      "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written": "L10",
+      "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": "L10",
+      "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another": "L10",
+      "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": "L10"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
