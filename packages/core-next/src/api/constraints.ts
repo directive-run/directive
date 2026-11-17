@@ -178,7 +178,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
   /** 1.35's recordConstraintError: a `when` that threw is not active. */
   const onWhenError = (id: string, error: unknown) => {
-    states.get(id)!.lastResult = false;
+    // 1.35's lazy getState: a refused registration has none yet.
+    (states.get(id) ?? states.set(id, fresh(id)).get(id)!).lastResult = false;
     options.onError(id, error);
   };
   const onError = options.onError;
@@ -303,7 +304,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     [...asyncIds].filter((id) => !defs[id]!.deps && !disabled.has(id));
 
   // --- evaluating one constraint -------------------------------------------
-  const call = (fn: Fn) => fn(facts, derived);
+  // Named as 1.35's, for the TypeError of a refused data form's `when`.
+  const call = (whenFn: Fn) => whenFn(facts, derived);
   /** `fn`, tracked; a throw is caught and kept with what it read before it. */
   function tracked(fn: Fn) {
     let threw = false;
@@ -735,13 +737,15 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     isDisabled: (id) => disabled.has(id),
     // L10: the registry's hooks; it has written `defs` first.
     add_(id, full) {
-      check(id);
-      // 1.35's assign starts the state again too (initState).
-      states.set(id, fresh(id));
       unanswered.add(id);
       defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
       dirty.add(id);
       resort(full);
+      // As 1.35 (constraints.ts:1677–1679): a refused definition stays,
+      // without a state until its next evaluation fails (onWhenError).
+      check(id);
+      // 1.35's assign starts the state again too (initState).
+      states.set(id, fresh(id));
     },
     remove_(id) {
       // I3: gone from `states` and `last` together.

@@ -159,12 +159,22 @@ const build = (context: SystemContext) => {
     clock,
     // I2: `explain` only when the record is built (something listens), and
     // only for a data form: a second, untracked walk (E11, as 1.35).
-    onEvaluate: (id, active) =>
+    onEvaluate: (id, active) => {
       emit("constraint.evaluate", () => {
         const explain = constraints.explain_(id);
 
         return explain ? { id, active, explain } : { id, active };
-      }),
+      });
+      // 1.35 walks whenever a plugin is installed (engine.ts:1248); only
+      // development can tell, by its warnings.
+      if (
+        isDevelopment &&
+        !context.wants_("constraint.evaluate") &&
+        (kernel.features as any).plugins?.list.length
+      ) {
+        constraints.explain_(id);
+      }
+    },
     pred: context.pred_,
     onError(id, error) {
       const strategy = reportError("constraint", id, error);

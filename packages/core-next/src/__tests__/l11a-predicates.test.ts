@@ -371,3 +371,88 @@ describe("namespaced data forms (D5)", () => {
     system.destroy();
   });
 });
+
+describe("review round 1", () => {
+  it("a refused register skips only that constraint, with 1.35's trace", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const system: Any = createSystem({ module: light() });
+    system.start();
+    await wait();
+    const has = (id: string) =>
+      system.inspect().constraints.some((c: Any) => c.id === id);
+    for (const [id, when] of [
+      ["c2", { n: { $changed: true } }],
+      ["c3", { $any: [{ n: 3 }], phase: "green" }],
+    ] as const) {
+      expect(() =>
+        system.constraints.register(id, { when, require: { type: "GO" } }),
+      ).toThrow(`constraint "${id}"`);
+      // In the registry, without a state until its next evaluation (1.35).
+      expect(has(id)).toBe(false);
+    }
+    system.constraints.register("d", {
+      when: { n: { $gte: 4 } },
+      require: { type: "GO" },
+    });
+    await wait();
+    expect(error).not.toHaveBeenCalled();
+    const threw = () =>
+      warn.mock.calls.filter((c) =>
+        String(c[0]).includes("whenFn is not a function"),
+      ).length;
+    expect(threw()).toBe(2);
+    expect(activeOf(system, "c2")).toBe(false);
+    expect(has("c3")).toBe(true);
+    system.facts.n = 4;
+    await wait();
+    expect(activeOf(system, "d")).toBe(true);
+    expect(threw()).toBe(2);
+    expect(() =>
+      system.constraints.register("c2", {
+        when: () => true,
+        require: { type: "GO" },
+      }),
+    ).toThrow("already exists");
+    system.destroy();
+  });
+
+  it("E11: any plugin walks every clause a second time in development", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const typos = () =>
+      warn.mock.calls.filter((c) => String(c[0]).includes('"$gtee"')).length;
+    const run = async (plugins: Any[]) => {
+      warn.mockClear();
+      const system: Any = createSystem({
+        module: light({
+          constraints: {
+            c: { when: { n: { $gtee: 1 } }, require: { type: "GO" } },
+          },
+        }),
+        plugins,
+      });
+      system.start();
+      await wait();
+      system.destroy();
+
+      return typos();
+    };
+    // One more per pass than with no plugin, whatever the plugin reads.
+    const none = await run([]);
+    expect(await run([{ name: "bare" }])).toBe(none + 1);
+    expect(await run([{ name: "other", onFactSet() {} }])).toBe(none + 1);
+    expect(await run([{ name: "hook", onConstraintEvaluate() {} }])).toBe(
+      none + 1,
+    );
+  });
+
+  it("U19: an assigned object compute stays an object, and reading it throws", () => {
+    const system: Any = createSystem({ module: light() });
+    system.start();
+    const def = { compute: { n: { $gt: 0 } } };
+    system.derive.assign("dbl", def);
+    expect(typeof def.compute).toBe("object");
+    expect(() => system.read("dbl")).toThrow("is not a function");
+    system.destroy();
+  });
+});
