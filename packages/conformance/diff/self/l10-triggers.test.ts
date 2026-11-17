@@ -67,6 +67,53 @@ describe("the L10 triggers", () => {
     ).toBe(false);
   });
 
+  it("(bm) readerNameReturns: module z's d0 replaces a's, leaves, and is registered again", () => {
+    const reg = (variant: number) =>
+      ({
+        op: "module",
+        action: "register",
+        variant,
+      }) as FuzzSpec["steps"][number];
+    const unreg = {
+      op: "module",
+      action: "unregister",
+      variant: 0,
+    } as FuzzSpec["steps"][number];
+    // The define pool's id 0 is module a's static `d0`.
+    const again = {
+      ...define("register", "derive", 0),
+      id: 0,
+    } as FuzzSpec["steps"][number];
+    expect(has("readerNameReturns", { steps: [reg(3), unreg, again] })).toBe(
+      true,
+    );
+    expect(has("readerNameReturns", { steps: [reg(1), unreg, reg(3)] })).toBe(
+      true,
+    );
+    // An even variant has no d0; no unregister leaves d0 in place; nothing
+    // registers it again; another id; a two-module case has no M2 d0.
+    expect(has("readerNameReturns", { steps: [reg(2), unreg, again] })).toBe(
+      false,
+    );
+    expect(has("readerNameReturns", { steps: [reg(3), again] })).toBe(false);
+    expect(has("readerNameReturns", { steps: [reg(3), unreg] })).toBe(false);
+    expect(
+      has("readerNameReturns", {
+        steps: [
+          reg(3),
+          unreg,
+          { ...again, id: 2 } as FuzzSpec["steps"][number],
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      has("readerNameReturns", {
+        steps: [reg(3), unreg, again],
+        modules: [...BASE.modules, ...BASE.modules],
+      }),
+    ).toBe(false);
+  });
+
   it("each L10b `ends` entry names its row's trigger", () => {
     const when = (id: string) =>
       readDivergences().find((e) => e.id === id)?.when;
@@ -76,5 +123,8 @@ describe("the L10 triggers", () => {
     expect(
       when("l10b-fuzz-bl-hook-onError-missing-def-is-not-a-function"),
     ).toEqual(["assignObject"]);
+    expect(
+      when("l10-fuzz-bm-hook-onDerivationInvalidate-extra-name-returns"),
+    ).toEqual(["readerNameReturns"]);
   });
 });

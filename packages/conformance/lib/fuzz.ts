@@ -100,6 +100,7 @@ export const FUZZ_TRIGGERS = [
   "batchClobbered",
   "dynamicReaders",
   "assignObject",
+  "readerNameReturns",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];
