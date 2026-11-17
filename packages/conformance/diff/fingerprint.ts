@@ -255,6 +255,16 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   dynamicDerivation: (v) =>
     typeof v === "string" && /^([a-z]::)?(d\d+|z[01]|zin)$/.test(v),
   /**
+   * A fact key a history restore writes in a fuzz case: a seed's fact
+   * (`f0`, `b::f2`), the Date fact `when`, an L10 dynamic case's `zf` and
+   * `zw`, or module z's `g0` and `g1`, bare or under one namespace. Row (be):
+   * a `back` of more than one step after a closed changeset lands on another
+   * snapshot, so the restore's batch names another key first. Hand-named:
+   * only the (be) entry names it.
+   */
+  historyFactKey: (v) =>
+    typeof v === "string" && /^([a-z]::)?(f\d+|when|z[fw]|g\d+)$/.test(v),
+  /**
    * A settled trace run that started a resolver: what row (bi) makes 2.0
    * report when 1.35 pushed the run out of its ring while that resolver ran
    * (L9). Hand-named, as `snapshot` is, because a run has 15 keys and lists

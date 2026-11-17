@@ -128,6 +128,12 @@ interface Derivation {
   /** What it read when it last computed (the tracker's set, kept). */
   deps_?: Set<string>;
   /**
+   * 1.35's cachedValue: the last value a compute returned. A throw writes
+   * none, so after one it is still the value before it (the graph's node
+   * holds the error).
+   */
+  value_?: unknown;
+  /**
    * What a membership test (`"id" in derived`) reads: made on the first test,
    * never written. It is the edge a read would leave, without the read that
    * runs the derivation. See `invalidate`.
@@ -928,12 +934,13 @@ export function createSystemCore<const M extends ModuleSchema>(
         emit("derivation.compute", {
           id: d.id_,
           value,
-          // The value before this compute: the graph stores the new one once
-          // this returns, and an error in its place after a throw (L9 seam).
-          oldValue: d.node_.flags & F.Errored ? undefined : d.node_.value,
+          // The last value computed, also after a throw (derivations.ts:524,
+          // 574): the trace's old value (L9 seam).
+          oldValue: d.value_,
           deps: Array.from(deps, describeDep),
         });
       }
+      d.value_ = value;
 
       return value;
     } catch (error) {
