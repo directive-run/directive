@@ -127,6 +127,17 @@ export class Link {
   declare nextDep: Link | null;
   declare prevSub: Link | null;
   declare nextSub: Link | null;
+  /**
+   * One edge for the life of the module, linked to nothing. V8 keeps a
+   * class's field layout only while an instance holds it: at a full GC with
+   * no edge left anywhere (a system whose last derivation was just removed)
+   * the layout goes, and every compiled function that used it is thrown out
+   * and compiled again from cold. Module churn paid that after every full GC.
+   */
+  private declare static shape_: Link;
+  static {
+    Link.shape_ = new (Link as any)();
+  }
 
   constructor(
     source: ReactiveNode,

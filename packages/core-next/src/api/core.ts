@@ -22,7 +22,7 @@
 
 import isDevelopment from "#is-development";
 import { createClock } from "../clock.js";
-import { Flags, Link, type ReactiveNode } from "../graph.js";
+import { Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
   type KernelEvent,
@@ -138,6 +138,16 @@ interface Derivation {
    * + the id, made once rather than on every test.
    */
   member_: string;
+}
+
+// The graph's Flags bits the core reads (graph.ts), as literals: a const enum
+// is inlined at each use, where Flags is an object every bundle would carry.
+// l10b-modules.test.ts pins each value to Flags.
+// biome-ignore lint/suspicious/noConstEnum: internal, never exported.
+const enum F {
+  Dirty = 4,
+  Running = 16,
+  Errored = 512,
 }
 
 /**
@@ -262,6 +272,45 @@ export interface SystemContext {
    * written since the last pass began.
    */
   counts_(): [ReadonlySet<string>, ReadonlySet<string>];
+  /**
+   * L10: each kind's definition hooks, by 1.35's type name: the core's
+   * derivation seam here, the parts' (effects, reconcile) as they are built.
+   * withDynamic's registry drives them, after it writes the module's map.
+   */
+  kinds_: Record<string, DefHooks>;
+  /** L10, dynamic.ts relink: set by the first dynamic call. */
+  relink_?: (
+    node: ReactiveNode,
+    old: Set<string> | undefined,
+    deps: Set<string>,
+  ) => void;
+  /** L10b: the event handlers, unwrapped. */
+  events_: Record<string, Fn>;
+  /** L10b: a pass now (1.35's unregisterModule awaits one, engine.ts:4870). */
+  reconcile_(): Promise<void>;
+  /** L10b: the meta part's tags for keys the store registers (or drops, untyped). */
+  keys_?: (entries: [string, unknown?][]) => void;
+  /** L10: builds the reconcile part late, on a system that had no constraint or resolver. */
+  l2_?: () => void;
+  /** L10: true while a pass runs (1.35's isReconciling). */
+  readonly inPass_: boolean;
+  /** L10: called once where a pass ends (withDynamic's queue sets it). */
+  end_?: () => void;
+  /** L10: tells meta.subscribe's listeners (set by withMeta). */
+  metaChanged_?: () => void;
+}
+
+/** L10: one kind's definition hooks (the registry has written the map first). */
+export interface DefHooks {
+  add_(id: string, def?: unknown): void;
+  replace_(id: string, def?: unknown): void;
+  remove_(id: string, def?: unknown): void;
+  /** Absent on the resolver's: dynamic.ts calls the resolve itself. */
+  call_?(id: string, props?: any): unknown;
+  /** L10b, resolvers: what an unregister waits for. */
+  waits_?(ids: string[]): unknown[];
+  /** L10 (D7): whether one of the kind's definitions depends on `key`. */
+  reads_?(key: string): boolean;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -439,6 +488,46 @@ const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
  * events, subscriptions and the reconcile pass; each part adds a feature.
  * The 1.35 `createSystem` (system.ts) passes them all.
  */
+/**
+ * 1.35's validateKeys, a security boundary that runs in every environment:
+ * a blocked key in any section, and (`dollar`) a schema key starting with
+ * "$". createSystem, the namespaced layer (no "$" check) and registerModule
+ * (1.35's shorter text, `tail` "") share it.
+ */
+/** The sections 1.35's validateKeys walks, in its order. */
+const SECTIONS = [
+  "schema",
+  "events",
+  "derive",
+  "effects",
+  "sources",
+  "constraints",
+  "resolvers",
+];
+export function validateKeys(
+  id: string,
+  mod: Record<string, any>,
+  facts: object | undefined,
+  dollar?: unknown,
+  tail = " This could indicate a prototype pollution attempt.",
+): void {
+  for (const section of SECTIONS) {
+    const obj = section === "schema" ? facts : mod[section];
+    for (const key of obj ? Object.keys(obj) : []) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${id}" has dangerous key "${key}" in ${section}.${tail}`,
+        );
+      }
+      if (dollar && section === "schema" && key[0] === "$") {
+        throw new Error(
+          `[Directive] Module "${id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
+        );
+      }
+    }
+  }
+}
+
 export function createSystemCore<const M extends ModuleSchema>(
   options: SystemOptions<M>,
   parts: readonly SystemPart[] = [],
@@ -468,29 +557,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   const hooks_ = module.hooks_ ?? (module.hooks ? [module.hooks as Hooks] : []);
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  // A security boundary (1.35): runs in every environment.
-  for (const [section, obj] of [
-    ["schema", schema],
-    ["events", module.events],
-    ["derive", module.derive],
-    ["effects", module.effects],
-    ["sources", module.sources],
-    ["constraints", module.constraints],
-    ["resolvers", module.resolvers],
-  ] as const) {
-    for (const key of Object.keys(obj ?? {})) {
-      if (BLOCKED_PROPS.has(key)) {
-        throw new Error(
-          `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-        );
-      }
-      if (section === "schema" && key.startsWith("$")) {
-        throw new Error(
-          `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
-        );
-      }
-    }
-  }
+  validateKeys(module.id, module, schema, 1);
   if (isDevelopment) {
     if (Object.keys(module.crossModuleDeps ?? {}).length) {
       console.warn(
@@ -712,13 +779,23 @@ export function createSystemCore<const M extends ModuleSchema>(
    * fact's subscriber in link order, depth first. A fact nothing in the graph
    * reads allocates nothing here.
    */
-  function invalidate(keys: readonly string[]): void {
+  function invalidate(
+    keys: readonly (string | object)[],
+    root?: ReactiveNode,
+  ): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
     let told: Set<ReactiveNode> | undefined;
     try {
       for (const key of keys) {
-        for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
+        // A node (L10): its readers are walked as a fact's are.
+        for (
+          let l = (
+            typeof key === "string" ? factNodes.get(key) : (key as ReactiveNode)
+          )?.subs;
+          l;
+          l = l.nextSub
+        ) {
           const stack = [l.target];
           seen ??= new Set();
           while (stack.length) {
@@ -742,14 +819,16 @@ export function createSystemCore<const M extends ModuleSchema>(
             d.stale_ = true;
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
-            node.flags |= Flags.Dirty;
+            node.flags |= F.Dirty;
             if (wants("derivation.invalidate")) {
               emit("derivation.invalidate", { id: d.id_ });
             }
             pending.add(d.id_);
             // Wakes an effect that read this derivation (and maybe no fact).
             changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
-            for (let s = node.subs; s; s = s.nextSub) {
+            // A replaced root's readers are walked one by one after it, in
+            // order (1.35's invalidateReplacedDefinition), by `keys`.
+            for (let s = node === root ? null : node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
             // As in 1.35, whoever asked whether it exists goes stale with it.
@@ -767,7 +846,7 @@ export function createSystemCore<const M extends ModuleSchema>(
           const d = derivations.get(id);
           if (d?.stale_) {
             const reads = closureOf(d);
-            if (keys.some((key) => reads.has(factNodes.get(key)!))) {
+            if (keys.some((key) => reads.has(factNodes.get(key as string)!))) {
               changedKeys.add(DERIVATION_DEP_PREFIX + id);
             }
           }
@@ -837,14 +916,21 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      const old = d.deps_;
       d.deps_ = deps;
+      // 1.35's updateDependencies: a new dependency set unlinks the old one
+      // and links the new one, so this derivation's readers' lists end with
+      // it, and the next write's walk meets it last.
+      // 1.35 moves a derivation whose dependencies changed to the end of
+      // what it reads; L10's definitions change them (dynamic.ts relink).
+      context.relink_?.(d.node_, old, deps);
       if (wants("derivation.compute")) {
         emit("derivation.compute", {
           id: d.id_,
           value,
           // The value before this compute: the graph stores the new one once
           // this returns, and an error in its place after a throw (L9 seam).
-          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
+          oldValue: d.node_.flags & F.Errored ? undefined : d.node_.value,
           deps: Array.from(deps, describeDep),
         });
       }
@@ -854,7 +940,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       d.live_ = true;
       // 1.35 keeps a throwing derivation stale: the next read runs it again,
       // which is also all "retry" asks. Marked first: "throw" leaves here.
-      d.node_.flags |= Flags.Dirty;
+      d.node_.flags |= F.Dirty;
       context.reportError("derivation", d.id_, error);
       throw error;
     }
@@ -869,15 +955,22 @@ export function createSystemCore<const M extends ModuleSchema>(
    * something else (a branch) or by throwing before it gets there.
    *
    * So every derivation keeps one reader that never runs: the edge a read
-   * would leave, without the read.
+   * would leave, without the read. The edge is only on the derivation's
+   * side: `keep` never runs, so nothing walks its own list, and a list there
+   * would hold every derivation ever removed.
    */
   const keep = graph.computed(() => 0);
-  for (const id in deriveDefs) {
+  /**
+   * (bm), L10: a name asked about before it existed, and the node its asker
+   * linked to; registering the name hands the node to it and wakes them.
+   */
+  const asking = new Map<string, ReactiveNode>();
+  function define(id: string): Derivation {
     const d = {
       id_: id,
       stale_: true,
       live_: false,
-      asked_: null,
+      asked_: asking.get(id) ?? null,
       // MEMBER_DEP_PREFIX written out: importing it costs the floor bytes (a
       // test pins that the two agree).
       member_: `\u001E${id}`,
@@ -885,20 +978,80 @@ export function createSystemCore<const M extends ModuleSchema>(
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
     }));
-    const link = new Link(node, keep, keep.deps, node.subsTail);
-    keep.deps = link;
+    const link = new Link(node, keep, null, node.subsTail);
     node.subsTail ? (node.subsTail.nextSub = link) : (node.subs = link);
     node.subsTail = link;
     derivations.set(id, d);
     byNode.set(node, d);
+
+    return d;
   }
+  for (const id in deriveDefs) {
+    define(id);
+  }
+  const miss = (id: string): undefined => {
+    if (tracker.deps && tracker.deps !== tracker.effect_) {
+      // A derivation computing links to the name's node; a constraint
+      // depends on its membership key, as an effect's test does. Either is
+      // noted as asking, which is what a registration wakes.
+      const node = asking.get(id) ?? asking.set(id, graph.signal(0)).get(id)!;
+      graph.active ? graph.read(node) : tracker.deps.add(`\u001E${id}`);
+    }
+  };
+  /**
+   * The derivation seam (L10). The registry has written `module.derive` and
+   * hands each hook the compute, unwrapped.
+   */
+  const kinds: Record<string, DefHooks> = {
+    derivation: {
+      add_(id, fn) {
+        deriveDefs[id] = fn as Fn;
+        const d = define(id);
+        // (bm): only a reader that asked about the name is owed anything; a
+        // name nobody asked about changes nothing (1.35).
+        if (asking.delete(id)) {
+          changedKeys.add(d.member_);
+          invalidate([d.asked_!]);
+        }
+      },
+      // 1.35 keeps the node and what it read (derivations.ts:418–446): stale
+      // with the new compute, and what reads it with it.
+      replace_(id, fn) {
+        deriveDefs[id] = fn as Fn;
+        // Announced again even when it was stale already (1.35).
+        pending.add(id);
+        const node = derivations.get(id)!.node_;
+        invalidate([{ subs: { target: node } }, node], node);
+      },
+      remove_(id) {
+        const d = derivations.get(id)!;
+        derivations.delete(id);
+        byNode.delete(d.node_);
+        watched.delete(id);
+        listeners.delete(id);
+        pending.delete(id);
+        delete deriveDefs[id];
+        changedKeys.add(d.member_);
+        d.asked_ && asking.set(id, d.asked_);
+        invalidate([d.node_, d.asked_ ?? {}]);
+        // What it read no longer reaches it.
+        graph.dispose(d.node_);
+      },
+      call_(id) {
+        const node = derivations.get(id)!.node_;
+        node.flags |= F.Dirty;
+
+        return graph.read(node);
+      },
+    },
+  };
   function read(id: string): unknown {
     const d = derivations.get(id);
     if (!d) {
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
-    if (d.node_.flags & Flags.Running) {
+    if (d.node_.flags & F.Running) {
       // 1.35's text (derivations.ts:514–517), not the graph's.
       throw new Error(
         `[Directive] Circular dependency detected in derivation: ${id}`,
@@ -911,11 +1064,18 @@ export function createSystemCore<const M extends ModuleSchema>(
   const derive = view(
     (id) => derivations.has(id),
     () => [...derivations.keys()],
-    (id) => (BLOCKED_PROPS.has(id) ? undefined : read(id)),
+    no,
     {
       ...LOCKED,
       set: no,
       deleteProperty: no,
+      // A name that is not there is a miss ((bm), L10).
+      get: (_, id) =>
+        typeof id !== "string" || BLOCKED_PROPS.has(id)
+          ? undefined
+          : derivations.has(id)
+            ? read(id)
+            : miss(id),
       // As in 1.35, a membership test is a read that only follows its target:
       // the asker is tracked and goes stale with it, and the target is left
       // for whoever reads its value (a read would run it, and report its
@@ -935,6 +1095,8 @@ export function createSystemCore<const M extends ModuleSchema>(
           return !!d;
         }
         if (!d) {
+          typeof id === "string" && miss(id);
+
           return false;
         }
         tracker.deps?.add(DERIVATION_DEP_PREFIX + d.id_);
@@ -1315,9 +1477,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     if (passKeys.size) {
       if (!follows && (!history.events_ || snapAsked)) {
         if (!chain) {
-          const keys = [...passKeys].filter(
-            (key) => !key.startsWith(DERIVATION_DEP_PREFIX),
-          );
+          // Not the internal keys: a derivation's, or a membership one (L10).
+          const keys = [...passKeys].filter((key) => !(key[0]! < " "));
           history.snap_(
             `facts-changed:${keys.slice(0, 5).join(",")}${keys.length > 5 ? `+${keys.length - 5}more` : ""}`,
           );
@@ -1449,6 +1610,8 @@ export function createSystemCore<const M extends ModuleSchema>(
       reconciling = false;
       // As 1.35 (engine.ts:2216), at the pass's end, after a stop's reset.
       snapped = snapping;
+      // L10: definitions asked for during the pass (1.35 engine.ts:2220).
+      context.end_?.();
       // As 1.35 (engine.ts:2244-2250): every constraint and effect of this
       // pass has finished, so the watched set keeps only what one still
       // reads. A derivation asked about once stops costing every later
@@ -1938,6 +2101,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       createFactsProxy(store, schema, tracker, writer, allow) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
     counts_: () => [watched, changedKeys],
+    kinds_: kinds,
+    // L10b: a module's events, and a pass now (unregisterModule).
+    events_: eventDefs,
+    reconcile_: reconcile,
+    get inPass_() {
+      return reconciling;
+    },
   };
   for (const part of parts) {
     part(context);

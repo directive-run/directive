@@ -141,6 +141,9 @@ function printHeap(r) {
     `  100 traced runs and a read of the ring (trace-100 workload, bytes per step): v1 ${bytes(h.v1TraceBytesPerOp)}, v2 ${bytes(h.v2TraceBytesPerOp)}`,
   );
   console.log(
+    `  100 module register/unregister pairs (module-churn workload, bytes per step): v1 ${bytes(h.v1ModuleChurnBytesPerOp)}, v2 ${bytes(h.v2ModuleChurnBytesPerOp)}`,
+  );
+  console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
   );
   if (sizes("v1") !== sizes("v2")) {
@@ -546,6 +549,8 @@ const result = {
     v2HistoryUndoBytesPerOp: heapOf("v2", "historyUndoBytesPerOp"),
     v1TraceBytesPerOp: heapOf("v1", "traceBytesPerOp"),
     v2TraceBytesPerOp: heapOf("v2", "traceBytesPerOp"),
+    v1ModuleChurnBytesPerOp: heapOf("v1", "moduleChurnBytesPerOp"),
+    v2ModuleChurnBytesPerOp: heapOf("v2", "moduleChurnBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),
