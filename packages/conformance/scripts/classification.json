@@ -610,7 +610,7 @@
   {
     "file": "src/core/__tests__/l10-dynamic-gate-debt-oracle.test.ts",
     "category": "black-box",
-    "cases": 22,
+    "cases": 23,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],

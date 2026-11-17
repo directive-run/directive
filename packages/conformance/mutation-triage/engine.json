@@ -745,7 +745,7 @@
     "replacement": "() => undefined",
     "reason": "feature-layer",
     "layer": "L10",
-    "note": "isFactKeyName: lets a dependency resolver tell a declared fact from a name not declared yet, which only registerModule (L10) changes after the engine exists"
+    "note": "isFactKeyName: lets a dependency resolver tell a declared fact from a name not declared yet, which only registerModule (L10) changes after the engine exists. Killed (L10-pre-b): l10-dynamic-gate-debt-oracle 'an effect's deps across a fact that leaves (L10 gate debt) > keeps a name that meant a fact when registered, after the fact leaves and a derivation of that name joins', placed at L10. With the mutant every fact name stays unresolved, so once the fact leaves and a derivation of that name joins, refreshDeps (effects.ts:813) rebuilds the effect onto the derivation and it runs."
   },
   {
     "line": 568,
@@ -3899,9 +3899,8 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "false",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "rescheduling a pass for a derivation invalidated without a fact change: only a definition replaced at runtime (derive.assign / register, L10) does that, as the comment says"
+    "reason": "v1-bug",
+    "note": "v1-bug: the only path found that invalidates a derivation with no fact change and no pass of its own is the error boundary's derivation retry, and that path is a 1.35 bug: engine.ts:1107 hands the failing derivation's id to derivationsManager.invalidate, whose argument is a fact key (derivations.ts:932), so it invalidates the derivations that read a fact of the same name, not the one that threw. A public test of it (derivation x sharing fact x's name, read and retried in the effects phase, with an effect watching y = f.x * 10) kills the mutant on 1.35, where the dropped pass leaves the effect unrun and settle() hanging, but fails on core-next (conformance:v2), which does not reproduce the bug, so it is not kept. A definition replaced during reconciliation is deferred and schedules its own pass. Applied by hand (L10-pre-b): the whole suite at ceiling L10 (MUTATION_LAYER=L10, vitest.stryker.config.ts) passes, 2151 tests. Relabelled from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 2308,
@@ -6260,9 +6259,8 @@
     "col": 7,
     "mutator": "CallExpression",
     "replacement": ";",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "evict(deadline): evict is the plan's L10 (layers.ts MEMBER_LAYERS evict); no test passes a deadline yet"
+    "reason": "equivalent",
+    "note": "equivalent: Promise.race (engine.ts:3619) subscribes to evictWork in the same synchronous step, so a late rejection of evictWork is already handled and never reaches unhandledRejection, and an early one rejects the race, and so evict(), either way. buildEvictWork's parts (evictAll, destroyAsync; engine.ts:3592) also route their own errors. evict(deadline) is L5's (lib/layers.ts maps evict to L5), not L10 as this note said. Applied by hand (L10-pre-b): the whole suite at ceiling L10 (MUTATION_LAYER=L10, vitest.stryker.config.ts) passes, 2152 tests. Relabelled from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 3619,
@@ -6448,9 +6446,8 @@
     "col": 13,
     "mutator": "OptionalChaining",
     "replacement": "def.abortOn",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "inspect() reads a constraint's def through `def?.`: every declared constraint has a def; only a runtime-registered one (L10) could be missing from mergedConstraints. inspect is L9"
+    "reason": "equivalent",
+    "note": "equivalent: inspect() reads each constraint state's def through `def?.`, and every state has one. constraints.ts:700 initState throws without a definition, the manager's definitions object is mergedConstraints itself (engine.ts:1243), and the only removals (constraints.unregister, unregisterModule at engine.ts:4785) go through unregisterDefinition (constraints.ts:1720), which deletes the definition and the state together. Applied by hand (L10-pre-b): the whole suite at ceiling L10 (MUTATION_LAYER=L10, vitest.stryker.config.ts) passes, 2152 tests. Relabelled from feature-layer L10 at L10-pre-b."
   },
   {
     "line": 3796,
@@ -6486,9 +6483,8 @@
     "col": 19,
     "mutator": "OptionalChaining",
     "replacement": "def.meta",
-    "reason": "feature-layer",
-    "layer": "L10",
-    "note": "feature-layer L10 (was L9): inspect()'s `def?.meta`: every constraint state is created from mergedConstraints, so at L9 each has its definition; only dynamic definitions (constraints.unregister/assign, L10) can part a state from its definition. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
+    "reason": "equivalent",
+    "note": "equivalent: inspect()'s `def?.meta`, the same def as 3794:13's: constraints.ts:700 initState throws without a definition, the manager's definitions object is mergedConstraints itself (engine.ts:1243), and unregisterDefinition (constraints.ts:1720) deletes the definition and the state together, so no state outlives its definition. Applied by hand (L10-pre-b): the whole suite at ceiling L10 (MUTATION_LAYER=L10, vitest.stryker.config.ts) passes, 2152 tests. Relabelled from feature-layer L10 (L9-pre-b's move) at L10-pre-b.",
     "endLine": 3803,
     "endCol": 28
   },

@@ -607,6 +607,46 @@ describe("runtime definitions (L10 gate debt)", () => {
   });
 });
 
+describe("an effect's deps across a fact that leaves (L10 gate debt)", () => {
+  it("keeps a name that meant a fact when registered, after the fact leaves and a derivation of that name joins", async () => {
+    const system = await single();
+    system.registerModule(
+      mod("extra", {
+        schema: { facts: { e: t.number() } },
+        init: (f: any) => {
+          f.e = 0;
+        },
+      }),
+    );
+    let runs = 0;
+    system.effects.register("watch", {
+      deps: ["e"],
+      run: () => {
+        runs++;
+      },
+    });
+    system.facts.n = 1;
+    await system.settle();
+    await system.unregisterModule("extra");
+    system.registerModule(
+      mod("extra2", {
+        schema: { derivations: { e: t.number() } },
+        derive: { e: (f: any) => f.n * 2 },
+      }),
+    );
+    const before = runs;
+    for (const n of [2, 3, 4]) {
+      system.read("e");
+      system.facts.n = n;
+      await system.settle();
+    }
+
+    // `e` was settled as a fact when the effect was registered, so it is not
+    // asked again: the effect never comes to watch the derivation.
+    expect(runs - before).toBe(0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // evict(deadline): evict is L5's
 // ---------------------------------------------------------------------------

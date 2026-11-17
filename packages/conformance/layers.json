@@ -6861,6 +6861,14 @@
           "layer": "L10",
           "by": ["member .constraints.assign"]
         },
+        "an effect's deps across a fact that leaves (L10 gate debt) > keeps a name that meant a fact when registered, after the fact leaves and a derivation of that name joins": {
+          "layer": "L10",
+          "by": [
+            "member .effects.register",
+            "member .registerModule",
+            "member .unregisterModule"
+          ]
+        },
         "evict(deadline) (L10 gate debt; evict is L5) > waits for an eviction that finishes before the deadline": {
           "layer": "L5",
           "by": ["member .evict", "option sources"]
