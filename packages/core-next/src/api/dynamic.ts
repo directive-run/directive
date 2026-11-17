@@ -606,14 +606,21 @@ const modules = (ctx: SystemContext): Fn[] => {
     // one a write asked for still follows.
     system.isRunning && (await ctx.reconcile_());
   };
-  /** M5: by id or by the module itself; a second call joins the first. */
+  /**
+   * M5: by id or by the module itself; a second call joins the first. Only
+   * the namespaced layer's own flattened module matches as an object: 1.35's
+   * single-module wrapper registers a copy (system.ts:1338–1352), so the
+   * caller's object is never in the engine's list (engine.ts:4686–4694).
+   */
   const unregister = async (target: any) => {
     const label =
       typeof target === "string" ? target : (target?.id ?? "<module>");
     alive(ctx, "unregister", "module", label);
     busy("unregister", label);
     const found = list.find((mod) =>
-      typeof target === "string" ? mod.id === target : mod === target,
+      typeof target === "string"
+        ? mod.id === target
+        : m.owners_ && mod === target,
     );
     if (!found) {
       throw new Error(

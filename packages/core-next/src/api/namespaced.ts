@@ -469,7 +469,7 @@ export function createNamespacedSystem(
    * L10b: one module's definitions with `ns::` ids and wrapped readers (1.35's
    * prefixModuleDefinition), for createSystem and registerModule alike.
    */
-  const flattenModule = (ns: string, mod: ModuleDefinition): Rec => {
+  const flattenModule = (ns: string, mod: ModuleDefinition, live?: 1): Rec => {
     const facts: Rec = {};
     const derive: Rec = {};
     const events: Rec = {};
@@ -478,6 +478,11 @@ export function createNamespacedSystem(
     const constraints: Rec = {};
     const resolvers: Rec = {};
     validateKeys(ns, mod, mod.schema?.facts);
+    // `live` (registerModule) writes neither outer map, so a refused module
+    // leaves no owner behind, as 1.35 records one only after its checks
+    // (engine.ts:4598): the engine records the owners once it takes the
+    // module (dynamic.ts register), and the joined schema's derivations are
+    // read only at createSystem.
     const p = (key: string) => ns + SEPARATOR + key;
     const own =
       kept && !kept.includes(ns)
@@ -491,7 +496,7 @@ export function createNamespacedSystem(
       keys.push(p(key));
     }
     for (const [key, type] of Object.entries(mod.schema.derivations ?? {})) {
-      derivations[p(key)] = type;
+      live || (derivations[p(key)] = type);
       keys.push(p(key));
     }
     for (const [key, raw] of Object.entries(mod.derive ?? {})) {
@@ -613,7 +618,7 @@ export function createNamespacedSystem(
       string,
       Rec,
     ][]) {
-      owners[p(key)] = mod;
+      live || (owners[p(key)] = mod);
       resolvers[p(key)] = {
         ...def,
         ...(def.resolve && {
@@ -906,7 +911,7 @@ export function createNamespacedSystem(
             `Schema key "${key}" in module "${ns}" contains the reserved separator "${SEPARATOR}".`,
           );
       }
-      const flat = flattenModule(ns, mod);
+      const flat = flattenModule(ns, mod, 1);
       modules[ns] = mod;
       keep(ns, flat);
       try {

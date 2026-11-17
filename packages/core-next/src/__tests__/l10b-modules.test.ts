@@ -132,18 +132,32 @@ describe("registerModule (dynamic.ts modules, M1 to M3)", () => {
     const seen: string[] = [];
     const hooks = { onInit: vi.fn(), onStart: vi.fn() };
     const system = watched(seen);
+    // Each notification of `n`: two writes in one batch are heard once,
+    // with the last value, as 1.35's store.batch around init (engine.ts:4627–4632).
     const batches: number[] = [];
-    system.registerModule(extra(hooks));
+    system.subscribe(["n"], () => void batches.push(system.facts.n));
+    system.registerModule(
+      extra(hooks, {
+        init: (facts: Any) => {
+          facts.n = 7;
+          facts.n = 8;
+          facts.c = 10;
+        },
+      }),
+    );
     expect(system.facts.c).toBe(10);
     expect(system.derive.twice).toBe(20);
     system.events.bump();
     expect(system.facts.c).toBe(11);
-    expect(Object.keys(system.inspect().resolverDefs ?? {})).toBeDefined();
-    expect(system.inspect().modules.map((m: Any) => m.id)).toEqual(["m", "x"]);
+    const seenBy = system.inspect();
+    expect(seenBy.resolverDefs).toEqual([{ id: "go", requirement: "GO" }]);
+    expect(seenBy.constraints.map((c: Any) => c.id)).toEqual(["go"]);
+    expect(seenBy.effects).toEqual([{ id: "see" }]);
+    expect(seenBy.modules.map((m: Any) => m.id)).toEqual(["m", "x"]);
     expect(seen).toEqual(["+source:feed", "+module x"]);
     expect(hooks.onInit).toHaveBeenCalledTimes(1);
     expect(hooks.onStart).toHaveBeenCalledTimes(1);
-    expect(batches).toEqual([]);
+    expect(batches).toEqual([8]);
     system.facts.c = 200;
     await system.settle();
     expect(system.inspect().sources.map((s: Any) => s.id)).toEqual(["feed"]);
@@ -240,6 +254,37 @@ describe("registerModule (dynamic.ts modules, M1 to M3)", () => {
 });
 
 describe("unregisterModule (dynamic.ts modules, M5 to M7)", () => {
+  it("refuses the caller's module object, as 1.35 registers a copy (system.ts:1338–1352, engine.ts:4686–4694)", async () => {
+    const initial = mod();
+    const system = createSystem({ module: initial } as never) as Any;
+    system.start();
+    const z = createModule("z", {
+      schema: { facts: { q: t.number() } },
+    } as never);
+    system.registerModule(z);
+    const missing = (label: string) =>
+      `[Directive] Cannot unregister module "${label}": no such module is registered.`;
+    await expect(system.unregisterModule(z)).rejects.toThrow(missing("z"));
+    await expect(system.unregisterModule(initial)).rejects.toThrow(
+      missing("m"),
+    );
+    await expect(system.unregisterModule({})).rejects.toThrow(
+      missing("<module>"),
+    );
+    expect(Object.keys(system.facts)).toContain("q");
+    await system.unregisterModule("z");
+    expect(Object.keys(system.facts)).not.toContain("q");
+    system.destroy();
+    // Namespaced: 1.35's namespace lookup (system.ts:857–862) finds no object.
+    const ns = createSystem({ modules: { m: mod() } } as never) as Any;
+    ns.start();
+    await expect(ns.unregisterModule(mod())).rejects.toThrow(
+      '[Directive] Cannot unregister module "[object Object]": no such module namespace.',
+    );
+    expect(ns.facts.m.n).toBe(1);
+    ns.destroy();
+  });
+
   it("tears down in 1.35's order, drops the facts, and refuses a second call", async () => {
     const seen: string[] = [];
     const onStop = vi.fn();
@@ -448,6 +493,20 @@ describe("namespaced registerModule and unregisterModule (namespaced.ts)", () =>
     expect(() => system.registerModule("constructor", mod())).toThrow(
       '[Directive] Module name "constructor" is a blocked property.',
     );
+    // The engine refuses "a:" (its `a:::x` is taken), and "a:" is free again,
+    // as 1.35's rollback (system.ts:837–854).
+    const key = (id: string) =>
+      createModule(id, { schema: { facts: { [id]: t.number() } } } as never);
+    system.registerModule("a", key(":x"));
+    expect(() => system.registerModule("a:", key("x"))).toThrow(
+      '[Directive] Schema collision: Fact "a:::x" already exists. Cannot register module "a:".',
+    );
+    expect(Object.keys(system.facts)).not.toContain("a:");
+    system.registerModule("a:", key("y"));
+    system.facts["a:"].y = 3;
+    expect(system.facts["a:"].y).toBe(3);
+    await system.unregisterModule("a:");
+    expect(Object.keys(system.facts)).not.toContain("a:");
     system.registerModule("bad", extra());
     expect(system.facts.bad.c).toBe(10);
     await system.unregisterModule("bad");
@@ -461,6 +520,52 @@ describe("namespaced registerModule and unregisterModule (namespaced.ts)", () =>
       "on a destroyed system",
     );
     expect(Object.keys(system.facts)).not.toContain("late");
+  });
+
+  it("a refused registration leaves a resolver's owner as it was (1.35's engine.ts:4598, after its checks)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const hits: string[] = [];
+    const a = createModule("a", {
+      schema: {
+        facts: { ":x": t.number() },
+        events: { go: {} },
+        requirements: { R: {} },
+      },
+      init: (facts: Any) => {
+        facts[":x"] = 0;
+      },
+      events: {
+        go: (facts: Any) => {
+          facts[":x"] = 1;
+        },
+      },
+      constraints: {
+        c: { when: (facts: Any) => facts[":x"] === 1, require: { type: "R" } },
+      },
+      resolvers: {
+        ":r": {
+          requirement: "R",
+          resolve() {
+            throw new Error("boom");
+          },
+        },
+      },
+      hooks: { onResolverError: () => void hits.push("a") },
+    } as never);
+    // Its resolver `r` is `a:::r` too, and its fact `x` is taken.
+    const refused = createModule("refused", {
+      schema: { facts: { x: t.number() }, requirements: { R: {} } },
+      resolvers: { r: { requirement: "R", resolve() {} } },
+      hooks: { onResolverError: () => void hits.push("refused") },
+    } as never);
+    const system = createSystem({ modules: { a } } as never) as Any;
+    system.start();
+    expect(() => system.registerModule("a:", refused)).toThrow(
+      "Schema collision",
+    );
+    system.events.a.go();
+    await vi.waitFor(() => expect(hits).toEqual(["a"]));
+    system.destroy();
   });
 
   it("a module registered later reads and writes its own namespaced facts", async () => {
