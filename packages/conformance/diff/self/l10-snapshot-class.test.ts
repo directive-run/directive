@@ -2,9 +2,11 @@
 // seed's facts never had: `zf` and `zw` in a dynamic case's module a, and
 // `g0` and `g1` in the module a `module` step registers (diff/fuzz/model.ts,
 // `extraModule`). `snapshot` names only the seed's facts, so a dynamic case's
-// missing onSnapshot under row (ay) matched no entry. The widening is a class
-// of its own, `snapshotDynamic`, named only by the L10 twin of (ay)'s
-// `requires` entry; the L8 entries keep `snapshot`. These pin that a seed's
+// missing onSnapshot under row (ay) matched no entry. The widening is two
+// classes of their own: `snapshotDynamic`, named only by the L10 twin of
+// (ay)'s `requires` entry, and `snapshotDynamicFacts` (no registered
+// module's facts), named only by the L10 unannounced twin; the L8 entries
+// keep `snapshot`. These pin that a seed's
 // value or any other name still fails the class, and that a missing
 // registerModule snapshot in a navigatedPaused case with no paused record
 // (the RFC's H1: a snapshot carries a registered module's facts) is covered
@@ -108,6 +110,36 @@ describe("snapshotDynamic: the L10 fuzz's fact names, and no others", () => {
     );
   });
 
+  it("snapshotDynamicFacts: a dynamic case's facts, never a registered module's", () => {
+    expect(LIKE.snapshotDynamicFacts?.(DYNAMIC)).toBe(true);
+    expect(LIKE.snapshotDynamicFacts?.(MODULE)).toBe(false);
+    expect(
+      LIKE.snapshotDynamicFacts?.(
+        with_(DYNAMIC, { facts: { "a::zf": 0, "z::g1": 0 } }),
+      ),
+    ).toBe(false);
+    expect(
+      LIKE.snapshotDynamicFacts?.(
+        with_(DYNAMIC, { trigger: "facts-changed:a::zf,z::g0" }),
+      ),
+    ).toBe(false);
+    expect(LIKE.snapshotDynamicFacts?.(SEED)).toBe(false);
+    expect(
+      LIKE.snapshotDynamicFacts?.(
+        with_(DYNAMIC, { facts: { "a::zf": 0, "a::zq": 0 } }),
+      ),
+    ).toBe(false);
+  });
+
+  it("dynamicDerivation: a static id, the pool's z0 and z1, and zin", () => {
+    for (const id of ["d0", "a::d1", "z0", "z1", "a::zin", "zin"]) {
+      expect(LIKE.dynamicDerivation?.(id)).toBe(true);
+    }
+    for (const id of ["z2", "h0", "z::h0", "zq", "r0", "c0", "d", "7"]) {
+      expect(LIKE.dynamicDerivation?.(id)).toBe(false);
+    }
+  });
+
   it("leaves `snapshot` as it was: an L10 name fails it", () => {
     expect(LIKE.snapshot?.(DYNAMIC)).toBe(false);
     expect(LIKE.snapshot?.(MODULE)).toBe(false);
@@ -117,6 +149,7 @@ describe("snapshotDynamic: the L10 fuzz's fact names, and no others", () => {
 describe("only the L10 (ay) twin names snapshotDynamic", () => {
   const all = readDivergences();
   const TWIN = "l10-fuzz-ay-hook-onSnapshot-missing";
+  const UNANNOUNCED = "l10-fuzz-ay-hook-onSnapshot-missing-unannounced";
   const L8 = "l8-fuzz-ay-hook-onSnapshot-missing";
 
   it("is the L8 requires entry's twin, with the class swapped", () => {
@@ -138,6 +171,22 @@ describe("only the L10 (ay) twin names snapshotDynamic", () => {
       '"Approve all as recommended (Recommended)", 2026-11-10',
     );
     expect(twin.reason).toContain("on the owner's instruction");
+  });
+
+  it("the unannounced twin is the L8 one with snapshotDynamicFacts, and alone names it", () => {
+    const naming = all.filter((e) =>
+      JSON.stringify(e.bound ?? {}).includes('"snapshotDynamicFacts"'),
+    );
+    expect(naming.map((e) => e.id)).toEqual([UNANNOUNCED]);
+    const l8 = all.find(
+      (e) => e.id === "l8-fuzz-ay-hook-onSnapshot-missing-unannounced",
+    ) as Divergence;
+    const strip = (e: Divergence) => {
+      const { id, reason, date, bound, ...rest } = e;
+      return rest;
+    };
+    expect(strip(naming[0] as Divergence)).toEqual(strip(l8));
+    expect((naming[0] as Divergence).requires).toBeUndefined();
   });
 
   /**
@@ -198,14 +247,15 @@ describe("only the L10 (ay) twin names snapshotDynamic", () => {
 
   it("a missing registerModule snapshot after a paused navigation is (ay)'s, by the twin", () => {
     expect(coveredBy(MODULE, true)).toEqual([TWIN]);
-    expect(coveredBy(DYNAMIC, true)).toEqual([TWIN]);
+    expect(coveredBy(DYNAMIC, true)).toEqual([TWIN, UNANNOUNCED]);
   });
 
   it("with no paused record, a missing registerModule snapshot in a navigatedPaused case still fails", () => {
-    // The unannounced L8 twin has no `requires`; it keeps `snapshot`, so a
-    // snapshot that carries module z's facts is outside it.
+    // The unannounced twins have no `requires`. The L8 one keeps
+    // `snapshot` and the L10 one `snapshotDynamicFacts`, so a snapshot that
+    // carries module z's facts is outside both.
     expect(coveredBy(MODULE, false)).toEqual([]);
-    expect(coveredBy(DYNAMIC, false)).toEqual([]);
+    expect(coveredBy(DYNAMIC, false)).toEqual([UNANNOUNCED]);
     // A seed-facts-only snapshot is still the unannounced twin's.
     expect(coveredBy(SEED, false)).toEqual([
       "l8-fuzz-ay-hook-onSnapshot-missing-unannounced",

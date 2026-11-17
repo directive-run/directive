@@ -45274,7 +45274,7 @@
                 "recoverable": true,
                 "source": "derivation",
                 "sourceId": {
-                  "$like": "derivation"
+                  "$like": "dynamicDerivation"
                 }
               }
             }
@@ -45282,7 +45282,7 @@
         }
       ]
     },
-    "reason": "Row (bl) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): `derive.assign` with `{ compute, meta }` works on 2.0, where 1.35 stores the object as the definition and every compute of it throws \"def is not a function\". In a fuzz case whose `define` step assigns a derivation in that form, 1.35 reports the TypeError through onError (source \"derivation\") at the derivation's next compute, and so does each derivation that reads it; 2.0 computes the new definition. This covers that first onError on 1.35 (missing on 2.0) and ends the case there: what follows (the values, their readers, the recovery) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bl) among them.",
+    "reason": "Row (bl) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): `derive.assign` with `{ compute, meta }` works on 2.0, where 1.35 stores the object as the definition and every compute of it throws \"def is not a function\". In a fuzz case whose `define` step assigns a derivation in that form, 1.35 reports the TypeError through onError (source \"derivation\") at the derivation's next compute, and so does each derivation that reads it; 2.0 computes the new definition. The derivation is a static one, the define pool's `z0` or `z1`, or `zin`, which reads `z0` (`$like` dynamicDerivation; deep seed 2 found a `z1`). This covers that first onError on 1.35 (missing on 2.0) and ends the case there: what follows (the values, their readers, the recovery) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bl) among them.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-16",
     "when": ["assignObject"]
@@ -45327,5 +45327,31 @@
         ]
       }
     }
+  },
+  {
+    "id": "l10-fuzz-ay-hook-onSnapshot-missing-unannounced",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshotDynamicFacts"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before (utils/history.ts:414-426), so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). L10 twin of l8-fuzz-ay-hook-onSnapshot-missing-unannounced, for a dynamic fuzz case with no history record between the navigation and the next write: the same missing onSnapshot, whose snapshot also holds module a's dynamic facts `zf` and `zw` (`$like` snapshotDynamicFacts), and no fact of a registered module (`g0`, `g1`): a snapshot that carries one still needs the paused record l10-fuzz-ay-hook-onSnapshot-missing requires, so a missing registerModule snapshot (the RFC's H1) is never covered here. In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), this covers that onSnapshot call, which 1.35 makes for the write and 2.0, still paused, does not (missing on 2.0), and nothing else. Deep seed 1 (all, a pause, a replay with no history record after it, then a write). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
   }
 ]

@@ -233,6 +233,33 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     );
   },
   /**
+   * One history snapshot of a dynamic case with no registered module's
+   * facts: `snapshot`'s shape with module a's `zf` and `zw` added (at least
+   * one there), and no `g0` or `g1`. Only the L10 unannounced (ay) twin names
+   * it, so a missing snapshot that carries module z's facts (the RFC's H1)
+   * still needs the paused record `snapshotDynamic`'s entry requires.
+   * Hand-named.
+   */
+  snapshotDynamicFacts: (v) => {
+    if (!LIKE.snapshotDynamic?.(v)) {
+      return false;
+    }
+    const { facts, trigger } = v as { facts: object; trigger: string };
+
+    return (
+      !Object.keys(facts).some((k) => /^([a-z]::)?g[01]$/.test(k)) &&
+      !/(^facts-changed:|,)([a-z]::)?g[01](,|\+|$)/.test(trigger)
+    );
+  },
+  /**
+   * A derivation id that can compute an `assign`ed object form (row (bl)):
+   * a static one (`d0`, `a::d1`), the define pool's dynamic `z0` and `z1`
+   * (`dynamicId`), or module a's reader `zin`, which reads `z0`. Hand-named:
+   * only the (bl) entry names it.
+   */
+  dynamicDerivation: (v) =>
+    typeof v === "string" && /^([a-z]::)?(d\d+|z[01]|zin)$/.test(v),
+  /**
    * A settled trace run that started a resolver: what row (bi) makes 2.0
    * report when 1.35 pushed the run out of its ring while that resolver ran
    * (L9). Hand-named, as `snapshot` is, because a run has 15 keys and lists
