@@ -45247,7 +45247,8 @@
     },
     "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In a fuzz case with readers (`dynamic.readers`), module a's derivation `zin` asks `\"z0\" in derived` before `z0` exists, so 1.35 computes it once with no dependencies and never invalidates it; 2.0 invalidates it when `z0` is registered and computes the new answer. This covers that first extra onDerivationInvalidate(\"zin\") on 2.0 and ends the case there: what follows (zin's new value, its readers, `zgate`'s evaluation) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-16"
+    "date": "2026-11-16",
+    "when": ["dynamicReaders"]
   },
   {
     "id": "l10b-fuzz-bl-hook-onError-missing-def-is-not-a-function",
@@ -45283,7 +45284,8 @@
     },
     "reason": "Row (bl) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): `derive.assign` with `{ compute, meta }` works on 2.0, where 1.35 stores the object as the definition and every compute of it throws \"def is not a function\". In a fuzz case whose `define` step assigns a derivation in that form, 1.35 reports the TypeError through onError (source \"derivation\") at the derivation's next compute, and so does each derivation that reads it; 2.0 computes the new definition. This covers that first onError on 1.35 (missing on 2.0) and ends the case there: what follows (the values, their readers, the recovery) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bl) among them.",
     "approvedBy": "Jason Comes",
-    "date": "2026-11-16"
+    "date": "2026-11-16",
+    "when": ["assignObject"]
   },
   {
     "id": "l10-fuzz-ay-hook-onSnapshot-missing",

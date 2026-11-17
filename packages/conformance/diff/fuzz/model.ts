@@ -2045,6 +2045,27 @@ const TRIGGERS = {
       .some(
         (s) => (s.op === "back" || s.op === "forward") && (s.steps ?? 1) > 1,
       ),
+  /**
+   * Row (bm), a reader sees a name registered after it asked (L10): the
+   * case has `dynamic.readers`, so module a has `zin` and `zgate`, which ask
+   * `"z0" in derived` before `z0` exists (I1). Without it no static reader
+   * asks about a name before it is registered.
+   */
+  dynamicReaders: (spec) => spec.dynamic?.readers === true,
+  /**
+   * Row (bl), `assign` with `{ compute, meta }` keeps a derivation readable
+   * (L10): a `define` step assigns a derivation in the object form
+   * (`variant` 3, `dynamicDef`), the call 1.35 breaks (K2). `register` with
+   * the same object works on both engines, so it is outside.
+   */
+  assignObject: (spec) =>
+    spec.steps.some(
+      (s) =>
+        s.op === "define" &&
+        s.action === "assign" &&
+        s.kind === "derive" &&
+        s.variant === 3,
+    ),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
