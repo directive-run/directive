@@ -188,6 +188,51 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     );
   },
   /**
+   * One history snapshot of an L10 case: `snapshot`'s shape, with the fact
+   * keys the L10 fuzz adds besides the seed's facts (diff/fuzz/model.ts):
+   * `zf` and `zw`, which a dynamic case gives module a, and `g0` and `g1`,
+   * the facts of the module a `module` step registers (`extraModule`), each
+   * bare or under one namespace (`a::zf`, `z::g0`). At least one of the four
+   * must be there, so a snapshot `snapshot` already names is outside it.
+   * Only the L10 (ay) entry names it: an L8 entry keeps `snapshot`, so a
+   * snapshot that carries a registered module's facts (the RFC's H1) is
+   * never covered by an entry written before modules were drawn. Hand-named,
+   * as `snapshot` is.
+   */
+  snapshotDynamic: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const name = "(f\\d+|when|zf|zw|g0|g1)";
+    const key = new RegExp(`^([a-z]::)?${name}$`);
+    const added = /^([a-z]::)?(zf|zw|g0|g1)$/;
+    const keys = Object.keys(v).sort();
+    const { facts, id, ordered, trigger } = v as Record<string, Json>;
+    if (
+      facts === null ||
+      typeof facts !== "object" ||
+      Array.isArray(facts) ||
+      typeof trigger !== "string"
+    ) {
+      return false;
+    }
+    const factKeys = Object.keys(facts);
+    const changed = `([a-z]::)?${name}`;
+
+    return (
+      keys.join() === "facts,id,ordered,trigger" &&
+      factKeys.every((k) => key.test(k)) &&
+      factKeys.some((k) => added.test(k)) &&
+      typeof id === "number" &&
+      Number.isInteger(id) &&
+      id > 0 &&
+      ordered === true &&
+      new RegExp(
+        `^facts-changed:${changed}(,${changed}){0,4}(\\+\\d+more)?$`,
+      ).test(trigger)
+    );
+  },
+  /**
    * A settled trace run that started a resolver: what row (bi) makes 2.0
    * report when 1.35 pushed the run out of its ring while that resolver ran
    * (L9). Hand-named, as `snapshot` is, because a run has 15 keys and lists
