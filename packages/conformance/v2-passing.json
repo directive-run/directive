@@ -945,6 +945,17 @@
         "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles",
         "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves"
       ],
+      "tests/core/l10-dynamic-pins-oracle.test.ts": [
+        "a module's definitions are not dynamic (U6) > isDynamic is false and listDynamic is empty for every kind",
+        "a subscriber to a name not registered yet is never called (U4; row bn, declined) > development warns at the call; the later registration and its changes reach no subscriber",
+        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works",
+        "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member",
+        "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member",
+        "meta.subscribe hears each definition change once, registerModule twice (U8) > 2 for registerModule, then 1 each for register, assign and unregister, and 0 for a write",
+        "registerModule over a live derivation replaces it (U7) > the module's compute wins, and development says nothing",
+        "the trace's hit rows after a constraint is unregistered mid-flight (U13) > name only constraints that exist: the unregister's pass hits nothing",
+        "unregistering a static or unknown id is not an error (U10) > each returns, and development warns 'Cannot unregister static …', for an unknown id too"
+      ],
       "tests/core/l2-constraints-oracle-state.test.ts": [
         "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished",
         "a disabled constraint is not asked while it is waiting on another > asks it, once, after it is enabled again",
@@ -2405,6 +2416,20 @@
         "createModule in production, for a module built from facts, derivations and events > does not warn about a badly formed module",
         "createModule in production, for a module built from facts, derivations and events > still refuses what is structurally wrong, and still hands back the module"
       ],
+      "tests/core/l10-dynamic-pins-oracle-production.test.ts": [
+        "production keeps 1.35's refusal texts (U16) > for a duplicate or a missing id (D2), and an unknown call",
+        "production keeps 1.35's refusal texts (U16) > for an id (D1)",
+        "production keeps 1.35's refusal texts (U16) > on a destroyed system (D4)",
+        "production: a subscriber to a name not registered yet (U4; row bn, declined) > is never called, and nothing is printed",
+        "production: getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member",
+        "production: unregistering a constraint while its resolver runs (U9a, U9b) > aborts the resolver's signal, and its write still lands (0 ms, bound with abortOn)",
+        "production: unregistering a constraint while its resolver runs (U9a, U9b) > aborts the resolver's signal, and its write still lands (0 ms)",
+        "production: unregistering a constraint while its resolver runs (U9a, U9b) > aborts the resolver's signal, and its write still lands (5 ms, bound with abortOn)",
+        "production: unregistering a constraint while its resolver runs (U9a, U9b) > aborts the resolver's signal, and its write still lands (5 ms)",
+        "production: unregistering a static or unknown id (U10) > returns and prints nothing",
+        "production: unregisterModule with a history window open (U20) > inside a changeset: one snapshot at once, none at endChangeset",
+        "production: unregisterModule with a history window open (U20) > started inside system.batch: the teardown runs, with one snapshot"
+      ],
       "tests/core/l2-constraints-oracle-production.test.ts": [
         "constraints in production > does not warn about a when that returns a promise, and honours its answer",
         "constraints in production > does not warn about an async constraint without deps",
@@ -2519,6 +2544,18 @@
       "file": "tests/core/system.test.ts",
       "test": "Config Forwarding > trace config forwarded",
       "reason": "L9-pre (U10): the test passed on v2 only because toBeDefined() accepts null, which is what a system without a trace holds; it now asserts system.trace is an array and that one write adds one run, so it fails until L9b builds the trace."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/blackbox-derivations.test.ts",
+      "test": "registering and replacing derivations at runtime > rejects a null or non-object compute",
+      "reason": "L10-pre (U11): the test passed on v2 only because the missing derive.register throws a TypeError and the test accepted any throw; it now asserts 1.35's message (memoizePredicate's refusal of a non-function compute), so it fails until L10a builds the registry."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/blackbox-facts.test.ts",
+      "test": "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
+      "reason": "L10-pre (U11): the test passed on v2 only because the registerModule stub throws and the test accepted any throw; it now asserts 1.35's \"Schema collision\" message, so it fails until L10b builds registerModule."
     }
   ]
 }

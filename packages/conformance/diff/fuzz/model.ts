@@ -129,7 +129,49 @@ export type FuzzStep =
    * facts carry, and `carriesTag` for every id those rows name and every
    * fact and derivation of the first module.
    */
-  | { op: "meta" };
+  | { op: "meta" }
+  | DynamicStep;
+
+/** The four registries a `define` step reaches (L10). */
+export const DYNAMIC_KINDS = [
+  "derive",
+  "constraints",
+  "resolvers",
+  "effects",
+] as const;
+export type DynamicKind = (typeof DYNAMIC_KINDS)[number];
+
+/**
+ * The dynamic-definition steps (L10; the L10 RFC's "The fuzz, designed in
+ * up front", B1 and harness rules 1 to 3).
+ *
+ * - `define`: `register`, `assign`, `unregister` or `call` on one registry,
+ *   with the id drawn from a pool of four per kind (`dynamicId`): module
+ *   a's two static ids and two dynamic ones (rule 1), so refusals (D2, D3)
+ *   happen as often as success. `variant` picks the definition
+ *   (`dynamicDef`). `deferred` makes the call from inside a pass instead,
+ *   through module a's `zq` effect (D5, the queue).
+ * - `inflight`: register a constraint and a 30 ms resolver, let the
+ *   resolver start, and unregister the constraint `at` ms later (K4, U9a);
+ *   `bound` gives the constraint an `abortOn` (U9b).
+ * - `module`: `registerModule` or `unregisterModule` of a second module
+ *   `z` (M1 to M7), single-module or namespaced as the case is, with a
+ *   resolver that runs while it is retired.
+ */
+export type DynamicStep =
+  | {
+      op: "define";
+      action: "register" | "assign" | "unregister" | "call";
+      kind: DynamicKind;
+      id: number;
+      variant: number;
+      deferred: boolean;
+    }
+  | { op: "inflight"; bound: boolean; at: 1 | 5 }
+  | { op: "module"; action: "register" | "unregister"; variant: number };
+
+/** The L10 step ops, for `withoutDynamic` and the reach tests. */
+export const DYNAMIC_OPS = ["define", "inflight", "module"] as const;
 
 /**
  * The history steps (L8; the RFC's "The fuzz, designed in up front"). Each
@@ -260,6 +302,16 @@ export interface FuzzSpec {
    * R6). Absent (a spec written before L9-pre), the option is `true`.
    */
   maxRuns?: 1 | 3 | 100;
+  /**
+   * L10, dynamic cases only (the L10 RFC's B1): present when the case
+   * draws dynamic-definition steps. Module a then gains the facts `zf` (the
+   * deferred queue's trigger) and `zw` (what dynamic resolvers write), the
+   * requirement DYN, and the effect `zq` that runs queued `define` steps
+   * inside a pass. With `readers`, module a also gains the derivation `zin`
+   * and the constraint `zgate`, which ask `"z0" in derived` before `z0` is
+   * registered (I1). Absent (a spec written before L10-pre), none of it.
+   */
+  dynamic?: { readers: boolean };
 }
 
 /**
@@ -304,6 +356,13 @@ export const FEATURE_LAYERS = {
   trace: 9,
   /** Fact tags, `tagBoundary` derivations and the `meta` step. */
   meta: 9,
+  /**
+   * Dynamic definitions (L10): the `define`, `inflight` and `module` steps
+   * and the `dynamic` spec field. Drawn after everything else
+   * (`dynamicDraws`), so a case below L10 is the one L9-pre drew. L11's
+   * draws, when they come, chain after these the same way.
+   */
+  dynamic: 10,
 } as const;
 
 type Feature = keyof typeof FEATURE_LAYERS;
@@ -326,6 +385,9 @@ const STEP_FEATURES = {
   resume: "history",
   twin: "twin",
   meta: "meta",
+  define: "dynamic",
+  inflight: "dynamic",
+  module: "dynamic",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
@@ -579,7 +641,99 @@ export function specArbitrary(
       )
     : withHistory;
 
-  return allows("meta") ? withTrace.chain(metaDraws) : withTrace;
+  const withMeta = allows("meta") ? withTrace.chain(metaDraws) : withTrace;
+
+  // At L10 the dynamic additions are drawn last (`dynamicDraws`), so below
+  // L10 a case is the one L9-pre drew, digest for digest
+  // (diff/self/abort-draw.test.ts).
+  return allows("dynamic") ? withMeta.chain(dynamicDraws) : withMeta;
+}
+
+/** One dynamic step (L10-pre; the RFC's reach table). */
+const dynamicStep: fc.Arbitrary<DynamicStep> = fc.oneof(
+  {
+    weight: 6,
+    arbitrary: fc.record({
+      op: fc.constant("define" as const),
+      action: fc.constantFrom(
+        "register" as const,
+        "assign" as const,
+        "unregister" as const,
+        "call" as const,
+      ),
+      kind: fc.constantFrom(...DYNAMIC_KINDS),
+      id: fc.integer({ min: 0, max: 3 }),
+      variant: fc.integer({ min: 0, max: 3 }),
+      // One in four from inside a pass (D5).
+      deferred: fc.oneof(
+        { weight: 3, arbitrary: fc.constant(false) },
+        { weight: 1, arbitrary: fc.constant(true) },
+      ),
+    }),
+  },
+  {
+    weight: 2,
+    arbitrary: fc.record({
+      op: fc.constant("inflight" as const),
+      bound: fc.boolean(),
+      at: fc.constantFrom(1 as const, 5 as const),
+    }),
+  },
+  {
+    weight: 2,
+    arbitrary: fc.record({
+      op: fc.constant("module" as const),
+      action: fc.constantFrom("register" as const, "unregister" as const),
+      variant: fc.integer({ min: 0, max: 3 }),
+    }),
+  },
+);
+
+/**
+ * What a dynamic case adds (L10-pre): one case in three draws one to six
+ * dynamic steps, put in among its steps, and whether module a asks about
+ * `z0` before it exists (`readers`). The other two in three are the case as
+ * drawn without them.
+ */
+function dynamicDraws(spec: FuzzSpec): fc.Arbitrary<FuzzSpec> {
+  const drawn = fc.record({
+    readers: fc.boolean(),
+    inserts: fc.array(fc.tuple(fc.nat(), dynamicStep), {
+      minLength: 1,
+      maxLength: 6,
+    }),
+  });
+
+  return fc.oneof(
+    { weight: 2, arbitrary: fc.constant(spec) },
+    {
+      weight: 1,
+      arbitrary: drawn.map((d) => {
+        const steps: FuzzStep[] = [...spec.steps];
+        for (const [at, step] of d.inserts) {
+          steps.splice(at % (steps.length + 1), 0, step);
+        }
+
+        return { ...spec, dynamic: { readers: d.readers }, steps };
+      }),
+    },
+  );
+}
+
+/**
+ * A drawn spec with no dynamic definitions: the `dynamic` field and the
+ * dynamic steps taken out, so what is left is the case as drawn before
+ * L10-pre (diff/self/abort-draw.test.ts).
+ */
+export function withoutDynamic(spec: FuzzSpec): FuzzSpec {
+  const { dynamic: _dynamic, ...rest } = spec;
+
+  return {
+    ...rest,
+    steps: spec.steps.filter(
+      (s) => !(DYNAMIC_OPS as readonly string[]).includes(s.op),
+    ),
+  };
 }
 
 /** What a trace case adds (L9-pre; the RFC's reach table): `maxRuns`. */
@@ -855,6 +1009,9 @@ export function specLayer(spec: FuzzSpec): string {
   if (spec.batch) {
     use("batch");
   }
+  if (spec.dynamic !== undefined) {
+    use("dynamic");
+  }
 
   return `L${n}`;
 }
@@ -881,6 +1038,7 @@ function moduleDef(
   schemas: Record<string, unknown>[],
   batch: FuzzBatch | null = null,
   respectsAbort = false,
+  dynamic: FuzzSpec["dynamic"] = undefined,
 ) {
   const id = NAMES[index] as string;
   const cross = index === 1;
@@ -1047,6 +1205,44 @@ function moduleDef(
       },
     };
   }
+  // L10, dynamic cases, module a only: the queue's trigger `zf`, what
+  // dynamic resolvers write (`zw`), DYN, the `zq` effect that runs queued
+  // `define` steps inside a pass (D5), and with `readers` the two readers
+  // that ask about `z0` before it exists (I1).
+  if (dynamic !== undefined) {
+    facts.zf = t.number();
+    facts.zw = t.number();
+    requirements.DYN = {};
+    effects.zq = {
+      run: (fs: any) => {
+        void own(fs).zf;
+        const queue = handles.queue as QueuedDefine[] | undefined;
+        if (!queue || queue.length === 0 || !handles.system) {
+          return undefined;
+        }
+        for (const q of queue.splice(0)) {
+          runDefine(
+            handles.system,
+            q.step,
+            { external, handles },
+            q.multi,
+            `${q.label} inside the pass`,
+          );
+        }
+
+        return undefined;
+      },
+    };
+    if (dynamic.readers) {
+      derivations.zin = t.number();
+      derive.zin = (_fs: any, derived: any) =>
+        "z0" in derived ? Number(derived.z0) : -1;
+      constraints.zgate = {
+        when: (_fs: any, derived: any) => "z0" in derived,
+        require: { type: "DYN" },
+      };
+    }
+  }
   const schema = {
     facts,
     derivations,
@@ -1067,6 +1263,10 @@ function moduleDef(
       }
       if (m.date) {
         fs.when = new Date(0);
+      }
+      if (dynamic !== undefined) {
+        fs.zf = 0;
+        fs.zw = 0;
       }
     },
     derive,
@@ -1978,12 +2178,28 @@ function build(spec: FuzzSpec) {
     const batch = spec.batch ?? null;
     const respects = spec.respectsAbort === true;
     const defs = spec.modules.map((m, i) =>
-      moduleDef(ctx, m, i, schemas, i === 0 ? batch : null, respects),
+      moduleDef(
+        ctx,
+        m,
+        i,
+        schemas,
+        i === 0 ? batch : null,
+        respects,
+        i === 0 ? spec.dynamic : undefined,
+      ),
     );
     ctx.handles.rebuild = () => {
       const again: Record<string, unknown>[] = [];
       const more = spec.modules.map((m, i) =>
-        moduleDef(ctx, m, i, again, i === 0 ? batch : null, respects),
+        moduleDef(
+          ctx,
+          m,
+          i,
+          again,
+          i === 0 ? batch : null,
+          respects,
+          i === 0 ? spec.dynamic : undefined,
+        ),
       );
 
       return more.length === 1
@@ -2022,6 +2238,17 @@ function steps(spec: FuzzSpec): Step[] {
         { op: "start" },
       ]
     : [{ op: "start" }];
+  // A dynamic case hands its system to module a's `zq` effect first, for
+  // the deferred `define` steps.
+  if (spec.dynamic !== undefined) {
+    out.unshift({
+      op: "run",
+      label: "hand the dynamic steps the system",
+      fn: (system, ctx) => {
+        ctx.handles.system = system;
+      },
+    });
+  }
   for (const s of spec.steps) {
     const label = JSON.stringify(s);
     switch (s.op) {
@@ -2140,6 +2367,64 @@ function steps(spec: FuzzSpec): Step[] {
           op: "run",
           label,
           fn: (system, ctx) => metaRecord(system, spec, ctx),
+        });
+        break;
+      case "define":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => {
+            if (!s.deferred) {
+              runDefine(system, s, ctx, multi, label);
+
+              return;
+            }
+            // D5: queued for module a's `zq` effect, which a write to `zf`
+            // runs inside the next pass.
+            ((ctx.handles.queue ??= []) as QueuedDefine[]).push({
+              step: s,
+              multi,
+              label,
+            });
+            ctx.external([
+              label,
+              "queued",
+              attempt(() => {
+                const fs = facts(system, 0);
+                fs.zf = fs.zf + 1;
+              }),
+            ]);
+          },
+        });
+        break;
+      case "inflight":
+        out.push(
+          {
+            op: "run",
+            label,
+            fn: (system, ctx) => inflightStart(system, s, ctx, multi, label),
+          },
+          { op: "advance", ms: s.at },
+          {
+            op: "run",
+            label: `${label} unregister`,
+            fn: (system, ctx) =>
+              ctx.external([
+                `${label} unregister`,
+                attempt(() => {
+                  system.constraints.unregister("zk");
+
+                  return system.constraints.isDynamic("zk");
+                }),
+              ]),
+          },
+        );
+        break;
+      case "module":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => moduleStep(system, s, ctx, multi, label),
         });
         break;
       case "twin":
@@ -2287,6 +2572,318 @@ function metaRecord(system: any, spec: FuzzSpec, ctx: BuildContext): void {
       },
     ]);
   }
+}
+
+/** A `define` step queued for module a's `zq` effect (L10, D5). */
+interface QueuedDefine {
+  step: Extract<FuzzStep, { op: "define" }>;
+  multi: boolean;
+  label: string;
+}
+
+type DynamicIo = Pick<BuildContext, "external" | "handles">;
+
+const messageOf = (error: unknown) =>
+  String((error as Error)?.message ?? error);
+
+/** `fn`'s answer, or what it throws as `{ threw }` (L10 records). */
+function attempt(fn: () => unknown): unknown {
+  try {
+    return fn() ?? null;
+  } catch (error) {
+    return { threw: messageOf(error) };
+  }
+}
+
+/**
+ * A promise is recorded when it settles, under `label`, and stands as
+ * "pending" in the step's own record; anything else is itself. The promise
+ * is never awaited: a teardown or a resolver waits on the fake clock, which
+ * only later steps move.
+ */
+function later(io: DynamicIo, label: string, value: unknown): unknown {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as Promise<unknown>).then === "function"
+  ) {
+    (value as Promise<unknown>).then(
+      (v) => io.external([label, "resolved", v ?? null]),
+      (e) => io.external([label, "rejected", messageOf(e)]),
+    );
+
+    return "pending";
+  }
+
+  return value ?? null;
+}
+
+/** The static name each kind's pool draws from in module a (rule 1). */
+const POOL_STATIC = {
+  derive: "d",
+  constraints: "c",
+  resolvers: "r",
+  effects: "x",
+} as const;
+
+/**
+ * Pool id `id` of `kind` (the RFC's rule 1): 0 and 1 are module a's static
+ * ids (namespaced as `a::` in a two-module case, where 1.35 refuses `::`),
+ * 2 and 3 the dynamic `z0` and `z1`.
+ */
+export function dynamicId(
+  kind: DynamicKind,
+  id: number,
+  multi: boolean,
+): string {
+  if (id >= 2) {
+    return `z${id - 2}`;
+  }
+  const name = `${POOL_STATIC[kind]}${id}`;
+
+  return multi ? `a::${name}` : name;
+}
+
+/** Module a's fact `key` as a dynamic definition reads it (0 if absent). */
+const factOf = (fs: any, key: string, multi: boolean): number => {
+  const v = multi ? (fs?.a?.[key] ?? fs?.[key]) : fs?.[key];
+
+  return typeof v === "number" ? v : 0;
+};
+
+/**
+ * A dynamic resolver for DYN: records its start, its abort and its write
+ * (to `zw`), after `delay` ms on the model's own clock. It ignores its
+ * signal, as 1.35 lets an aborted write land (K4).
+ */
+function dynamicResolve(
+  io: DynamicIo,
+  tag: string,
+  delay: number,
+  value: number,
+  multi: boolean,
+) {
+  return async (_req: unknown, context: any) => {
+    io.external(["dyn start", tag]);
+    context.signal?.addEventListener?.("abort", () =>
+      io.external(["dyn aborted", tag]),
+    );
+    if (delay > 0) {
+      await ownDelay(ledgerOf(io.handles), delay);
+    }
+    io.external([
+      "dyn wrote",
+      tag,
+      attempt(() => {
+        const fs = context.facts;
+        if (multi && fs.a && typeof fs.a === "object") {
+          fs.a.zw = value;
+        } else {
+          fs.zw = value;
+        }
+      }),
+    ]);
+  };
+}
+
+/**
+ * The definition a `define` step registers or assigns (L10): `variant`
+ * scales a derivation (3 is the object form, K2's row (bl)), sets a
+ * constraint's threshold (odd, or the pool's `z1`, binds it with `abortOn`
+ * in a one-module case, U9b), a resolver's delay and value, and an effect's
+ * tag.
+ */
+export function dynamicDef(
+  kind: DynamicKind,
+  tag: string,
+  variant: number,
+  io: DynamicIo,
+  multi: boolean,
+): unknown {
+  switch (kind) {
+    case "derive": {
+      const compute = (fs: any) => factOf(fs, "f0", multi) * (variant + 2);
+
+      return variant === 3 ? { compute, meta: { label: tag } } : compute;
+    }
+    case "constraints":
+      return {
+        when: (fs: any) => factOf(fs, "f0", multi) >= variant - 1,
+        require: { type: "DYN" },
+        ...(!multi && (tag === "z1" || variant % 2 === 1)
+          ? { abortOn: ["f0"] }
+          : {}),
+      };
+    case "resolvers":
+      return {
+        requirement: "DYN",
+        resolve: dynamicResolve(io, tag, variant * 5, variant, multi),
+      };
+    case "effects":
+      return {
+        run: (fs: any) => {
+          io.external(["dyn effect", tag, variant, factOf(fs, "f0", multi)]);
+        },
+      };
+  }
+}
+
+/**
+ * One `define` step (L10): the call, then the answer (or the refusal, its
+ * text compared exactly), `isDynamic` and `listDynamic`.
+ */
+function runDefine(
+  system: any,
+  s: Extract<FuzzStep, { op: "define" }>,
+  io: DynamicIo,
+  multi: boolean,
+  label: string,
+): void {
+  const tag = dynamicId(s.kind, s.id, multi);
+  const registry = system[s.kind];
+  const answer = attempt(() => {
+    switch (s.action) {
+      case "register":
+        return later(
+          io,
+          label,
+          registry.register(tag, dynamicDef(s.kind, tag, s.variant, io, multi)),
+        );
+      case "assign":
+        return later(
+          io,
+          label,
+          registry.assign(tag, dynamicDef(s.kind, tag, s.variant, io, multi)),
+        );
+      case "unregister":
+        return later(io, label, registry.unregister(tag));
+      case "call":
+        return later(
+          io,
+          label,
+          s.kind === "resolvers"
+            ? registry.call(tag, { type: "DYN" })
+            : registry.call(tag),
+        );
+    }
+  });
+  io.external([
+    label,
+    answer,
+    attempt(() => registry.isDynamic(tag)),
+    attempt(() => registry.listDynamic()),
+  ]);
+}
+
+/**
+ * The `inflight` step's first half (K4, U9a, U9b): the resolver `zr` (30
+ * ms) and the constraint `zk`, always true, for DYN; `bound`, in a
+ * one-module case, gives `zk` an `abortOn`. The step's second half
+ * unregisters `zk` once its resolver runs.
+ */
+function inflightStart(
+  system: any,
+  s: Extract<FuzzStep, { op: "inflight" }>,
+  io: DynamicIo,
+  multi: boolean,
+  label: string,
+): void {
+  io.external([
+    label,
+    attempt(() =>
+      system.resolvers.register("zr", {
+        requirement: "DYN",
+        resolve: dynamicResolve(io, "zr", 30, 7, multi),
+      }),
+    ),
+    attempt(() =>
+      system.constraints.register("zk", {
+        when: () => true,
+        require: { type: "DYN" },
+        ...(s.bound && !multi ? { abortOn: ["zf"] } : {}),
+      }),
+    ),
+  ]);
+}
+
+/**
+ * The second module a `module` step registers (M1 to M7): facts `g0`
+ * (`variant`) and `g1`, a derivation `h0`, an odd variant in a one-module
+ * case also a `d0` over module a's (M2), and a constraint, a 10 ms
+ * resolver and an effect, so a teardown meets work in flight.
+ */
+function extraModule(io: BuildContext, variant: number, multi: boolean) {
+  const { createModule, t } = io.core;
+  const over = variant % 2 === 1 && !multi;
+
+  return createModule("z", {
+    schema: {
+      facts: { g0: t.number(), g1: t.number() },
+      derivations: { h0: t.number(), ...(over ? { d0: t.number() } : {}) },
+      events: {},
+      requirements: { ZW: {} },
+    },
+    init: (fs: any) => {
+      fs.g0 = variant;
+      fs.g1 = 0;
+    },
+    derive: {
+      h0: (fs: any) => fs.g0 * 2,
+      ...(over ? { d0: () => -1 } : {}),
+    },
+    constraints: {
+      zm: { when: (fs: any) => fs.g0 >= 1, require: { type: "ZW" } },
+    },
+    resolvers: {
+      zmr: {
+        requirement: "ZW",
+        resolve: async (_req: unknown, context: any) => {
+          io.external(["module start"]);
+          context.signal?.addEventListener?.("abort", () =>
+            io.external(["module aborted"]),
+          );
+          await ownDelay(ledgerOf(io.handles), 10);
+          io.external([
+            "module wrote",
+            attempt(() => {
+              context.facts.g1 = 1;
+            }),
+          ]);
+        },
+      },
+    },
+    effects: {
+      zme: {
+        run: (fs: any) => {
+          io.external(["module effect", fs.g0]);
+        },
+      },
+    },
+  } as any);
+}
+
+/** One `module` step (L10): register or retire module `z`. */
+function moduleStep(
+  system: any,
+  s: Extract<FuzzStep, { op: "module" }>,
+  io: BuildContext,
+  multi: boolean,
+  label: string,
+): void {
+  io.external([
+    label,
+    attempt(() =>
+      s.action === "register"
+        ? later(
+            io,
+            label,
+            multi
+              ? system.registerModule("z", extraModule(io, s.variant, multi))
+              : system.registerModule(extraModule(io, s.variant, multi)),
+          )
+        : later(io, label, system.unregisterModule("z")),
+    ),
+  ]);
 }
 
 export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {

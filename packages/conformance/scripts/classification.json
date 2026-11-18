@@ -608,6 +608,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l10-dynamic-pins-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l10-dynamic-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 12,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-constraints-oracle-production.test.ts",
     "category": "black-box",
     "cases": 5,

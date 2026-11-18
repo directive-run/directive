@@ -480,7 +480,9 @@ describe("Dynamic definitions safety", () => {
         when: () => true,
         require: { type: "INCREMENT" },
       });
-    }).toThrow("blocked property");
+    }).toThrow(
+      '[Directive] Security: Definition ID "__proto__" is a blocked property.',
+    );
 
     system.destroy();
   });
@@ -494,7 +496,9 @@ describe("Dynamic definitions safety", () => {
         requirement: "INCREMENT",
         resolve: async () => {},
       });
-    }).toThrow("blocked property");
+    }).toThrow(
+      '[Directive] Security: Definition ID "constructor" is a blocked property.',
+    );
 
     system.destroy();
   });
@@ -507,7 +511,9 @@ describe("Dynamic definitions safety", () => {
       system.effects.register("my::effect", {
         run: () => {},
       });
-    }).toThrow('cannot contain "::"');
+    }).toThrow(
+      '[Directive] Definition ID "my::effect" cannot contain "::". This separator is reserved for namespacing.',
+    );
 
     system.destroy();
   });
@@ -521,7 +527,9 @@ describe("Dynamic definitions safety", () => {
         when: () => true,
         require: { type: "INCREMENT" },
       });
-    }).toThrow("non-empty string");
+    }).toThrow(
+      "[Directive] Definition ID must be a non-empty string. Received: ",
+    );
 
     system.destroy();
   });
@@ -537,37 +545,49 @@ describe("Dynamic definitions safety", () => {
         when: () => true,
         require: { type: "INCREMENT" },
       });
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot register constraint "x" on a destroyed system.',
+    );
 
     expect(() => {
       system.constraints.assign("autoIncrement", {
         when: () => true,
         require: { type: "INCREMENT" },
       });
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot assign constraint "autoIncrement" on a destroyed system.',
+    );
 
     expect(() => {
       system.constraints.unregister("autoIncrement");
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot unregister constraint "autoIncrement" on a destroyed system.',
+    );
 
     expect(() => {
       system.constraints.call("autoIncrement");
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot call constraint "autoIncrement" on a destroyed system.',
+    );
 
     expect(() => {
       system.resolvers.register("x", {
         requirement: "INCREMENT",
         resolve: async () => {},
       });
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot register resolver "x" on a destroyed system.',
+    );
 
     expect(() => {
       system.effects.register("x", { run: () => {} });
-    }).toThrow("destroyed");
+    }).toThrow('[Directive] Cannot register effect "x" on a destroyed system.');
 
     expect(() => {
       system.derive.register("x", () => 0);
-    }).toThrow("destroyed");
+    }).toThrow(
+      '[Directive] Cannot register derivation "x" on a destroyed system.',
+    );
 
     system.destroy();
   });
@@ -588,7 +608,9 @@ describe("Dynamic definitions safety", () => {
     for (const name of reservedNames) {
       expect(() => {
         system.derive.register(name, () => 0);
-      }).toThrow("reserved derive method name");
+      }).toThrow(
+        `[Directive] Derivation ID "${name}" conflicts with a reserved derive method name.`,
+      );
     }
 
     system.destroy();
@@ -610,7 +632,9 @@ describe("Dynamic definitions safety", () => {
     for (const name of reservedNames) {
       expect(() => {
         system.derive.assign(name, () => 0);
-      }).toThrow("reserved derive method name");
+      }).toThrow(
+        `[Directive] Derivation ID "${name}" conflicts with a reserved derive method name.`,
+      );
     }
 
     system.destroy();
@@ -620,15 +644,25 @@ describe("Dynamic definitions safety", () => {
     const system = createStartedSystem();
     await flushMicrotasks();
 
-    await expect(system.constraints.call("nope")).rejects.toThrow();
+    // The L10 RFC's U21: the full 1.35 text, so a missing member's
+    // TypeError cannot pass for the refusal.
+    await expect(system.constraints.call("nope")).rejects.toThrow(
+      '[Directive] Cannot call constraint "nope" — it does not exist.',
+    );
 
     await expect(
       system.resolvers.call("nope", { type: "NOPE" }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(
+      '[Directive] Cannot call resolver "nope" — it does not exist.',
+    );
 
-    expect(() => system.derive.call("nope")).toThrow();
+    expect(() => system.derive.call("nope")).toThrow(
+      '[Directive] Cannot call derivation "nope" — it does not exist.',
+    );
 
-    await expect(system.effects.call("nope")).rejects.toThrow();
+    await expect(system.effects.call("nope")).rejects.toThrow(
+      '[Directive] Cannot call effect "nope" — it does not exist.',
+    );
 
     system.destroy();
   });

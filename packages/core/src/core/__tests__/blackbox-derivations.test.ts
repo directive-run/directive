@@ -326,8 +326,15 @@ describe("registering and replacing derivations at runtime", () => {
   it("rejects a null or non-object compute", () => {
     const system = sys(counterModule({ d: (f: Any) => f.n }));
 
-    expect(() => system.derive.register("bad", { compute: null })).toThrow();
-    expect(() => system.derive.register("bad2", { compute: 42 })).toThrow();
+    // The L10 RFC's U11: the message, so a missing derive.register (a
+    // TypeError) cannot pass for the refusal. 1.35 sends a non-function
+    // compute down the data-form path, and its predicate check refuses it.
+    expect(() => system.derive.register("bad", { compute: null })).toThrow(
+      "[Directive] memoizePredicate: predicate must be a plain object or array; got object",
+    );
+    expect(() => system.derive.register("bad2", { compute: 42 })).toThrow(
+      "[Directive] memoizePredicate: predicate must be a plain object or array; got number",
+    );
     system.stop();
   });
 

@@ -3393,180 +3393,336 @@
       "rule": "L10",
       "tests": {
         "Constraints dynamic definitions > register adds a new constraint, isDynamic returns true, listDynamic includes it": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .constraints.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > register throws if ID already exists": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > assign overrides an existing constraint": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.assign", "member .constraints.call"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > assign throws if ID does not exist": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.assign"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > unregister removes a dynamic constraint, isDynamic returns false": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > unregister on static constraint warns and no-ops": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.call", "member .constraints.unregister"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Constraints dynamic definitions > call evaluates constraint and returns requirements array": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.call", "member .constraints.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolvers dynamic definitions > register adds a new resolver": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .resolvers.isDynamic",
+            "member .resolvers.listDynamic",
+            "member .resolvers.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolvers dynamic definitions > register throws if ID already exists": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .resolvers.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolvers dynamic definitions > assign overrides an existing resolver": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .resolvers.assign", "member .resolvers.call"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolvers dynamic definitions > unregister removes a dynamic resolver": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .resolvers.isDynamic",
+            "member .resolvers.listDynamic",
+            "member .resolvers.register",
+            "member .resolvers.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolvers dynamic definitions > call executes resolver with a requirement object": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .resolvers.call"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Derivations dynamic definitions > register adds a new derivation, accessible via system.derive": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .derive.isDynamic",
+            "member .derive.listDynamic",
+            "member .derive.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Derivations dynamic definitions > register throws if ID already exists": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Derivations dynamic definitions > assign overrides an existing derivation (value changes)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.assign"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Derivations dynamic definitions > unregister removes a dynamic derivation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .derive.isDynamic",
+            "member .derive.listDynamic",
+            "member .derive.register",
+            "member .derive.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Derivations dynamic definitions > call recomputes and returns the value": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.call"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Effects dynamic definitions > register adds a new effect": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .effects.isDynamic",
+            "member .effects.listDynamic",
+            "member .effects.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Effects dynamic definitions > register throws if ID already exists": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .effects.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Effects dynamic definitions > assign overrides an existing effect (new run function executes)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .effects.assign", "member .effects.call"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Effects dynamic definitions > unregister removes a dynamic effect and runs cleanup": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .effects.call",
+            "member .effects.isDynamic",
+            "member .effects.register",
+            "member .effects.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Effects dynamic definitions > call executes effect immediately": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .effects.call", "member .effects.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > register with __proto__ throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > register with constructor throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .resolvers.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > register with ID containing :: throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .effects.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > register with empty string throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > all operations throw on destroyed system": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.assign",
+            "member .constraints.call",
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .derive.register",
+            "member .effects.register",
+            "member .resolvers.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > derivation register with reserved name throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > derivation assign with reserved name throws": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.assign"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Dynamic definitions safety > call on non-existent ID throws for all types": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.call",
+            "member .derive.call",
+            "member .effects.call",
+            "member .resolvers.call"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "isDynamic / listDynamic > isDynamic returns false for static definitions": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .derive.isDynamic",
+            "member .effects.isDynamic",
+            "member .resolvers.isDynamic"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "isDynamic / listDynamic > isDynamic returns true after register, false after unregister": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .derive.isDynamic",
+            "member .derive.register",
+            "member .derive.unregister",
+            "member .effects.isDynamic",
+            "member .effects.register",
+            "member .effects.unregister",
+            "member .resolvers.isDynamic",
+            "member .resolvers.register",
+            "member .resolvers.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "isDynamic / listDynamic > listDynamic returns only dynamic IDs": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.listDynamic",
+            "member .constraints.register",
+            "member .derive.listDynamic",
+            "member .derive.register",
+            "member .effects.listDynamic",
+            "member .effects.register",
+            "member .resolvers.listDynamic",
+            "member .resolvers.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Deferred operations during reconciliation > register from within an effect is deferred and applied after reconciliation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .derive.isDynamic", "member .derive.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Disabled interactions with call > constraints.call respects disabled state (returns empty array)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .constraints.call", "member .constraints.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Disabled interactions with call > effects.call respects disabled state (does not run)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .effects.call", "member .effects.register"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Lifecycle: assign → unregister > register → assign → unregister preserves dynamic tracking through assign": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.assign",
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Lifecycle: assign → unregister > resolver assign → unregister lifecycle": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .resolvers.assign",
+            "member .resolvers.call",
+            "member .resolvers.isDynamic",
+            "member .resolvers.register",
+            "member .resolvers.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Lifecycle: register → unregister → re-register > constraint ID can be reused after unregister": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.call",
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Lifecycle: register → unregister → re-register > effect ID can be reused after unregister": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .effects.call",
+            "member .effects.register",
+            "member .effects.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Namespaced system dynamic registration > dynamic constraint registration works in multi-module system": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .resolvers.call",
+            "member .resolvers.isDynamic",
+            "member .resolvers.register",
+            "member .resolvers.unregister"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Concurrent deferred operations > multiple effects defer different operations in a single reconciliation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.register",
+            "member .effects.isDynamic",
+            "member .effects.register"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Resolver assign triggers reconciliation > assigning a resolver schedules reconciliation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L10",
+          "by": ["member .resolvers.assign"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "regression: constraints.assign chain swaps whenSpec correctly > function-form → data-form → function-form correctly adds/removes whenSpec": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         }
       }
     },
@@ -6610,6 +6766,152 @@
         "assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands": {
           "layer": "L10",
           "by": ["member .constraints.assign"]
+        }
+      }
+    },
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "production: a subscriber to a name not registered yet (U4; row bn, declined) > is never called, and nothing is printed": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "production: unregistering a constraint while its resolver runs (U9a, U9b) > `aborts the resolver's signal, and its write still lands (${delay} ms${bound ? \", bound with abortOn\" : \"\"})`": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .resolvers.register"
+          ],
+          "dynamic": true
+        },
+        "production: unregistering a static or unknown id (U10) > returns and prints nothing": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.unregister",
+            "member .derive.unregister",
+            "member .effects.unregister"
+          ]
+        },
+        "production keeps 1.35's refusal texts (U16) > for an id (D1)": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.register",
+            "member .derive.register",
+            "member .effects.register"
+          ]
+        },
+        "production keeps 1.35's refusal texts (U16) > for a duplicate or a missing id (D2), and an unknown call": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.call",
+            "member .derive.assign",
+            "member .derive.call",
+            "member .derive.register",
+            "member .effects.assign"
+          ]
+        },
+        "production keeps 1.35's refusal texts (U16) > on a destroyed system (D4)": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.assign",
+            "member .constraints.unregister",
+            "member .derive.call",
+            "member .derive.register"
+          ]
+        },
+        "production: unregisterModule with a history window open (U20) > inside a changeset: one snapshot at once, none at endChangeset": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "production: unregisterModule with a history window open (U20) > started inside system.batch: the teardown runs, with one snapshot": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "production: getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": {
+          "layer": "L10",
+          "by": ["member .derive.assign"]
+        }
+      }
+    },
+    "tests/core/l10-dynamic-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a registered derivation: the assign returns, then every read, call and meta.derivation throws until a function is assigned": {
+          "layer": "L10",
+          "by": [
+            "member .derive.assign",
+            "member .derive.call",
+            "member .derive.register"
+          ]
+        },
+        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a static derivation: the same": {
+          "layer": "L10",
+          "by": ["member .derive.assign"]
+        },
+        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "a subscriber to a name not registered yet is never called (U4; row bn, declined) > development warns at the call; the later registration and its changes reach no subscriber": {
+          "layer": "L10",
+          "by": ["member .derive.register"]
+        },
+        "a module's definitions are not dynamic (U6) > isDynamic is false and listDynamic is empty for every kind": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.isDynamic",
+            "member .constraints.listDynamic",
+            "member .derive.isDynamic",
+            "member .derive.listDynamic",
+            "member .effects.isDynamic",
+            "member .effects.listDynamic",
+            "member .registerModule",
+            "member .resolvers.isDynamic",
+            "member .resolvers.listDynamic"
+          ]
+        },
+        "registerModule over a live derivation replaces it (U7) > the module's compute wins, and development says nothing": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "meta.subscribe hears each definition change once, registerModule twice (U8) > 2 for registerModule, then 1 each for register, assign and unregister, and 0 for a write": {
+          "layer": "L10",
+          "by": [
+            "member .derive.assign",
+            "member .derive.register",
+            "member .derive.unregister",
+            "member .registerModule"
+          ]
+        },
+        "unregistering a static or unknown id is not an error (U10) > each returns, and development warns 'Cannot unregister static …', for an unknown id too": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.unregister",
+            "member .derive.unregister",
+            "member .effects.unregister"
+          ]
+        },
+        "the trace's hit rows after a constraint is unregistered mid-flight (U13) > name only constraints that exist: the unregister's pass hits nothing": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .resolvers.register"
+          ]
+        },
+        "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": {
+          "layer": "L10",
+          "by": ["member .derive.assign"]
+        },
+        "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member": {
+          "layer": "L1",
+          "by": ["option modules"]
         }
       }
     },

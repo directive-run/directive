@@ -24,6 +24,7 @@ import {
   abortsAgree,
   specArbitrary,
   specTriggers,
+  withoutDynamic,
 } from "../fuzz/model.js";
 
 const sample = (ceiling?: string, numRuns = 2000): FuzzSpec[] =>
@@ -174,10 +175,19 @@ describe("the drawn respectsAbort (the L8 RFC's rule 9)", () => {
         steps: s.steps.filter((x) => x.op !== "meta"),
       };
     };
-    expect(streamDigest(sample(undefined, 600).map(withoutL9Draws))).toBe(
-      "897d2f9752054a7c",
+    expect(
+      streamDigest(
+        sample(undefined, 600).map(withoutDynamic).map(withoutL9Draws),
+      ),
+    ).toBe("897d2f9752054a7c");
+    // L10-pre (the L10 RFC's B1) draws the dynamic steps after everything
+    // else: up to L9 the cases are the ones drawn before, and with the
+    // dynamic draws taken out, so are the cases with no ceiling.
+    expect(streamDigest(sample("L9", 600))).toBe("5213d2c0f87f1598");
+    expect(streamDigest(sample(undefined, 600).map(withoutDynamic))).toBe(
+      "5213d2c0f87f1598",
     );
-    expect(streamDigest(sample(undefined, 600))).toBe("5213d2c0f87f1598");
+    expect(streamDigest(sample(undefined, 600))).toBe("cb00fa241f09b1d7");
   });
 
   it("never draws it below L8 or without history, as before", () => {

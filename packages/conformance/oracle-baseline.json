@@ -4,6 +4,8 @@
     "tests/core/constraints.test.ts",
     "tests/core/l1-derivations-effects.test.ts",
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts",
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts",
+    "tests/core/l10-dynamic-pins-oracle.test.ts",
     "tests/core/l2-constraints-oracle-state.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l2-resolvers-oracle.test.ts",
@@ -34,6 +36,8 @@
     "tests/core/constraints.test.ts": [],
     "tests/core/l1-derivations-effects.test.ts": ["option effect prev"],
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": [],
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts": [],
+    "tests/core/l10-dynamic-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [
       "member .inspect",
       "option plugins"
@@ -72,6 +76,8 @@
     "tests/core/constraints.test.ts": ["option predicate data form"],
     "tests/core/l1-derivations-effects.test.ts": ["option derive data form"],
     "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": [],
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts": [],
+    "tests/core/l10-dynamic-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l2-resolvers-oracle.test.ts": [],
@@ -164,6 +170,30 @@
       "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves": "L10",
       "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles": "L10",
       "assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands": "L10"
+    },
+    "tests/core/l10-dynamic-pins-oracle-production.test.ts": {
+      "production: a subscriber to a name not registered yet (U4; row bn, declined) > is never called, and nothing is printed": "L10",
+      "production: unregistering a constraint while its resolver runs (U9a, U9b) > `aborts the resolver's signal, and its write still lands (${delay} ms${bound ? \", bound with abortOn\" : \"\"})`": "L10",
+      "production: unregistering a static or unknown id (U10) > returns and prints nothing": "L10",
+      "production keeps 1.35's refusal texts (U16) > for an id (D1)": "L10",
+      "production keeps 1.35's refusal texts (U16) > for a duplicate or a missing id (D2), and an unknown call": "L10",
+      "production keeps 1.35's refusal texts (U16) > on a destroyed system (D4)": "L10",
+      "production: unregisterModule with a history window open (U20) > inside a changeset: one snapshot at once, none at endChangeset": "L10",
+      "production: unregisterModule with a history window open (U20) > started inside system.batch: the teardown runs, with one snapshot": "L10",
+      "production: getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": "L10"
+    },
+    "tests/core/l10-dynamic-pins-oracle.test.ts": {
+      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a registered derivation: the assign returns, then every read, call and meta.derivation throws until a function is assigned": "L10",
+      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > on a static derivation: the same": "L10",
+      "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works": "L10",
+      "a subscriber to a name not registered yet is never called (U4; row bn, declined) > development warns at the call; the later registration and its changes reach no subscriber": "L10",
+      "a module's definitions are not dynamic (U6) > isDynamic is false and listDynamic is empty for every kind": "L10",
+      "registerModule over a live derivation replaces it (U7) > the module's compute wins, and development says nothing": "L10",
+      "meta.subscribe hears each definition change once, registerModule twice (U8) > 2 for registerModule, then 1 each for register, assign and unregister, and 0 for a write": "L10",
+      "unregistering a static or unknown id is not an error (U10) > each returns, and development warns 'Cannot unregister static …', for an unknown id too": "L10",
+      "the trace's hit rows after a constraint is unregistered mid-flight (U13) > name only constraints that exist: the unregister's pass hits nothing": "L10",
+      "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member": "L10",
+      "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member": "L1"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
