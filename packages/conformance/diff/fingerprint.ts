@@ -188,6 +188,83 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     );
   },
   /**
+   * One history snapshot of an L10 case: `snapshot`'s shape, with the fact
+   * keys the L10 fuzz adds besides the seed's facts (diff/fuzz/model.ts):
+   * `zf` and `zw`, which a dynamic case gives module a, and `g0` and `g1`,
+   * the facts of the module a `module` step registers (`extraModule`), each
+   * bare or under one namespace (`a::zf`, `z::g0`). At least one of the four
+   * must be there, so a snapshot `snapshot` already names is outside it.
+   * Only the L10 (ay) entry names it: an L8 entry keeps `snapshot`, so a
+   * snapshot that carries a registered module's facts (the RFC's H1) is
+   * never covered by an entry written before modules were drawn. Hand-named,
+   * as `snapshot` is.
+   */
+  snapshotDynamic: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const name = "(f\\d+|when|zf|zw|g0|g1)";
+    const key = new RegExp(`^([a-z]::)?${name}$`);
+    const added = /^([a-z]::)?(zf|zw|g0|g1)$/;
+    const keys = Object.keys(v).sort();
+    const { facts, id, ordered, trigger } = v as Record<string, Json>;
+    if (
+      facts === null ||
+      typeof facts !== "object" ||
+      Array.isArray(facts) ||
+      typeof trigger !== "string"
+    ) {
+      return false;
+    }
+    const factKeys = Object.keys(facts);
+    const changed = `([a-z]::)?${name}`;
+
+    return (
+      keys.join() === "facts,id,ordered,trigger" &&
+      factKeys.every((k) => key.test(k)) &&
+      factKeys.some((k) => added.test(k)) &&
+      typeof id === "number" &&
+      Number.isInteger(id) &&
+      id > 0 &&
+      ordered === true &&
+      new RegExp(
+        `^facts-changed:${changed}(,${changed}){0,4}(\\+\\d+more)?$`,
+      ).test(trigger)
+    );
+  },
+  /**
+   * One history snapshot of an L10 case taken for a write that is not module
+   * z's: `snapshotDynamic` whose label names neither `g0` nor `g1`. The
+   * facts may hold module z's (a module registered before the write), but
+   * registerModule's own snapshot (`facts-changed:z::g0,z::g1`, its init)
+   * and a write of module z are outside. Only the L10 unannounced (ay) twin
+   * names it, so a missing registerModule snapshot (the RFC's H1) still needs
+   * the paused record `snapshotDynamic`'s entry requires. Hand-named.
+   */
+  snapshotDynamicWrite: (v) =>
+    LIKE.snapshotDynamic?.(v) === true &&
+    !/(^facts-changed:|,)([a-z]::)?g[01](,|\+|$)/.test(
+      (v as { trigger: string }).trigger,
+    ),
+  /**
+   * A derivation id that can compute an `assign`ed object form (row (bl)):
+   * a static one (`d0`, `a::d1`), the define pool's dynamic `z0` and `z1`
+   * (`dynamicId`), or module a's reader `zin`, which reads `z0`. Hand-named:
+   * only the (bl) entry names it.
+   */
+  dynamicDerivation: (v) =>
+    typeof v === "string" && /^([a-z]::)?(d\d+|z[01]|zin)$/.test(v),
+  /**
+   * A fact key a history restore writes in a fuzz case: a seed's fact
+   * (`f0`, `b::f2`), the Date fact `when`, an L10 dynamic case's `zf` and
+   * `zw`, or module z's `g0` and `g1`, bare or under one namespace. Row (be):
+   * a `back` of more than one step after a closed changeset lands on another
+   * snapshot, so the restore's batch names another key first. Hand-named:
+   * only the (be) entry names it.
+   */
+  historyFactKey: (v) =>
+    typeof v === "string" && /^([a-z]::)?(f\d+|when|z[fw]|g\d+)$/.test(v),
+  /**
    * A settled trace run that started a resolver: what row (bi) makes 2.0
    * report when 1.35 pushed the run out of its ring while that resolver ran
    * (L9). Hand-named, as `snapshot` is, because a run has 15 keys and lists

@@ -978,13 +978,22 @@
       "tests/core/l10-dynamic-pins-oracle.test.ts": [
         "a module's definitions are not dynamic (U6) > isDynamic is false and listDynamic is empty for every kind",
         "a subscriber to a name not registered yet is never called (U4; row bn, declined) > development warns at the call; the later registration and its changes reach no subscriber",
-        "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works",
+        "derive.assign with { compute, meta } (U1; row bl) > on a registered derivation: the assign returns, and a function assigned after it is read",
+        "derive.assign with { compute, meta } (U1; row bl) > on a static derivation: the same",
+        "derive.assign with { compute, meta } (U1; row bl) > register with the same object form works",
         "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a namespaced system has neither member",
         "getOriginal and restoreOriginal are not on a 1.35 system (U22; row bo, declined) > a single-module system has neither member",
         "meta.subscribe hears each definition change once, registerModule twice (U8) > 2 for registerModule, then 1 each for register, assign and unregister, and 0 for a write",
         "registerModule over a live derivation replaces it (U7) > the module's compute wins, and development says nothing",
         "the trace's hit rows after a constraint is unregistered mid-flight (U13) > name only constraints that exist: the unregister's pass hits nothing",
         "unregistering a static or unknown id is not an error (U10) > each returns, and development warns 'Cannot unregister static …', for an unknown id too"
+      ],
+      "tests/core/l10-gate-pins-oracle.test.ts": [
+        "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back",
+        "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another",
+        "a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
+        "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
+        "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
       "tests/core/l2-constraints-oracle-state.test.ts": [
         "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished",
@@ -2460,6 +2469,13 @@
         "production: unregisterModule with a history window open (U20) > inside a changeset: one snapshot at once, none at endChangeset",
         "production: unregisterModule with a history window open (U20) > started inside system.batch: the teardown runs, with one snapshot"
       ],
+      "tests/core/l10-gate-pins-oracle-production.test.ts": [
+        "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back",
+        "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another",
+        "production: a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
+        "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
+        "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
+      ],
       "tests/core/l2-constraints-oracle-production.test.ts": [
         "constraints in production > does not warn about a when that returns a promise, and honours its answer",
         "constraints in production > does not warn about an async constraint without deps",
@@ -2586,6 +2602,24 @@
       "file": "tests/core/blackbox-facts.test.ts",
       "test": "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
       "reason": "L10-pre (U11): the test passed on v2 only because the registerModule stub throws and the test accepted any throw; it now asserts 1.35's \"Schema collision\" message, so it fails until L10b builds registerModule."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/l10-gate-pins-oracle.test.ts",
+      "test": "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+      "reason": "L10 gate, row (cd) (owner, \"Approve all as recommended (Recommended)\", 2026-11-17): renamed to \"the drain gives up at 10 s and a same-key replacement starts from its own init\" under the row (cd) describe; the case keeps what both engines share (1.35 lands the late write, 2.0 drops it). 2.0's side is pinned in core-next l10-m7-late-write."
+    },
+    {
+      "project": "conformance:v2:prod",
+      "file": "tests/core/l10-gate-pins-oracle-production.test.ts",
+      "test": "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+      "reason": "L10 gate, row (cd) (owner, \"Approve all as recommended (Recommended)\", 2026-11-17): renamed to \"the drain gives up at 10 s and a same-key replacement starts from its own init\" under the row (cd) describe; the case keeps what both engines share (1.35 lands the late write, 2.0 drops it). 2.0's side is pinned in core-next l10-m7-late-write."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/l10-dynamic-pins-oracle.test.ts",
+      "test": "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works",
+      "reason": "L10 gate, row (bl): the U1 describe was retitled \"derive.assign with { compute, meta } (U1; row bl)\" when U1 was trimmed to what both engines share (GATE-9.md, The pins). The same case, unchanged, is listed under its new name, \"derive.assign with { compute, meta } (U1; row bl) > register with the same object form works\", and passes."
     }
   ]
 }

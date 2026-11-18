@@ -43258,5 +43258,2174 @@
       ]
     },
     "reason": "Row (ap) (L7): a batch window starts at the first add to an empty queue and is not moved; 1.35 restarts it on every add (core resolvers.ts 1898-1902, clearBatchTimer and setTimeout). A bound requirement (`abortOn`) whose fact another single resolver writes (trigger `batchClobbered`) is clobbered while it waits and raised again by each reconcile pass, and each re-add pushes 1.35's window out; 2.0's window holds, so its call starts at an earlier pass (fuzz case 18:all#156, step 12: 2.0 starts call 3 at the tick r0's retry starts, 1.35 one pass later). This covers that start, extra on 2.0 where 1.35 has not started the call yet, and ends the comparison there (`ends`): the pass 1.35 runs for the re-add, its trace run and the call's later start follow from the moved window. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved row (ap) (\"Approve all (Recommended)\", 2026-11-05) and asked Claude to sign for him; the L9 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "id": "l10-bm-u2-hook-onDefinitionRegister-missing-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDefinitionRegister",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDefinitionRegister",
+          "args": [
+            "derivation",
+            "later",
+            {
+              "$fn": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDefinitionRegister\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationInvalidate-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["reader"]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["direct"]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationInvalidate\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationCompute-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["reader", "has 10", ["derive.later"]]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["direct", "v 10", ["derive.later"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationCompute\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-observe-derivation-compute-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "reader",
+            "type": "derivation.compute",
+            "value": "has 10"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "direct",
+            "type": "derivation.compute",
+            "value": "v 10"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the observe \"derivation.compute\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-reader-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "reader",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "reader",
+          "value": "has 10"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"reader\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-state-settle-changed-step4-derived-direct",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 4,
+    "op": "changed",
+    "path": "derived.direct",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "derived.direct",
+        "from": "v undefined",
+        "to": "v 10"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the state \"settle\" record in step 4, which differs at derived.direct. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-state-settle-changed-step4-derived-reader",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 4,
+    "op": "changed",
+    "path": "derived.reader",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "derived.reader",
+        "from": "none",
+        "to": "has 10"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the state \"settle\" record in step 4, which differs at derived.reader. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-direct-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "direct",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "direct",
+          "value": "v 10"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"direct\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-external-after-the-registration-changed-step5-data-1-0",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "external",
+    "kind": "after the registration",
+    "engine": "v2",
+    "step": 5,
+    "op": "changed",
+    "path": "data[1][0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1][0]",
+        "from": "none",
+        "to": "has 10"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the external \"after the registration\" record in step 5, which differs at data[1][0]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-external-after-the-registration-changed-step5-data-1-1",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "external",
+    "kind": "after the registration",
+    "engine": "v2",
+    "step": 5,
+    "op": "changed",
+    "path": "data[1][1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1][1]",
+        "from": "v undefined",
+        "to": "v 10"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the external \"after the registration\" record in step 5, which differs at data[1][1]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDefinitionRegister-extra-step3",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDefinitionRegister",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDefinitionRegister",
+          "args": [
+            "derivation",
+            "later",
+            {
+              "$fn": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDefinitionRegister\" record in step 3, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationInvalidate-extra-step6",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["reader"]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["direct"]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationInvalidate\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationCompute-missing-step7",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 7,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 50, ["a"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationCompute\" record in step 7, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-observe-derivation-compute-missing-step7",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 7,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 50
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the observe \"derivation.compute\" record in step 7, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationCompute-extra-step6",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 50, ["a"]]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["reader", "has 50", ["derive.later"]]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["direct", "v 50", ["derive.later"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationCompute\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-state-settle-changed-step7-derived-direct",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "derived.direct",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "derived.direct",
+        "from": "v undefined",
+        "to": "v 50"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the state \"settle\" record in step 7, which differs at derived.direct. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-state-settle-changed-step7-derived-reader",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "derived.reader",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "derived.reader",
+        "from": "none",
+        "to": "has 50"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the state \"settle\" record in step 7, which differs at derived.reader. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-observe-derivation-compute-extra-step6",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 50
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "reader",
+            "type": "derivation.compute",
+            "value": "has 50"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "direct",
+            "type": "derivation.compute",
+            "value": "v 50"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the observe \"derivation.compute\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-external-after-a-write-later-reads-changed-step8-data-1-0",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "external",
+    "kind": "after a write later reads",
+    "engine": "v2",
+    "step": 8,
+    "op": "changed",
+    "path": "data[1][0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1][0]",
+        "from": "none",
+        "to": "has 50"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the external \"after a write later reads\" record in step 8, which differs at data[1][0]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-external-after-a-write-later-reads-changed-step8-data-1-1",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "external",
+    "kind": "after a write later reads",
+    "engine": "v2",
+    "step": 8,
+    "op": "changed",
+    "path": "data[1][1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1][1]",
+        "from": "v undefined",
+        "to": "v 50"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the external \"after a write later reads\" record in step 8, which differs at data[1][1]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-reader-extra-step6",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "reader",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "reader",
+          "value": "has 50"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"reader\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-direct-extra-step6",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "direct",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "direct",
+          "value": "v 50"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"direct\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationInvalidate-extra-step9",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "step": 9,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["reader"]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["direct"]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationInvalidate\" record in step 9, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-hook-onDerivationCompute-extra-step9",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 9,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["reader", "none", []]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["direct", "v undefined", []]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the hook \"onDerivationCompute\" record in step 9, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-observe-derivation-compute-extra-step9",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 9,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "reader",
+            "type": "derivation.compute",
+            "value": "none"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "direct",
+            "type": "derivation.compute",
+            "value": "v undefined"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the observe \"derivation.compute\" record in step 9, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-reader-extra-step9",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "reader",
+    "engine": "v2",
+    "step": 9,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "reader",
+          "value": "none"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"reader\" record in step 9, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u2-notify-direct-extra-step9",
+    "scenario": "a derivation that asked for a name before it was registered keeps its answer (U2; row bm)",
+    "stream": "notify",
+    "kind": "direct",
+    "engine": "v2",
+    "step": 9,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "direct",
+          "value": "v undefined"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U2) two derivations ask about `later` (`\"later\" in derived`, and a read of `derived.later`) before it is registered: 1.35 keeps their answers (\"none\", \"v undefined\") after the registration, after a write `later` reads and after the unregister; 2.0 recomputes them when the name arrives and when it goes. This covers the notify \"direct\" record in step 9, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onReconcileStart-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 3,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onReconcileStart\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-reconcile-start-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 3,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"reconcile.start\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onDerivationCompute-missing-step3",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 10, ["a"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onDerivationCompute\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-external-gate-evaluated-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "external",
+    "kind": "gate evaluated",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["gate evaluated"]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the external \"gate evaluated\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onDerivationCompute-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 10, ["a"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onDerivationCompute\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-derivation-compute-missing-step3",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 10
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"derivation.compute\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-derivation-compute-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 10
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"derivation.compute\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step3-facts-log",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 3,
+    "op": "changed",
+    "path": "facts.log",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.log",
+        "from": "",
+        "to": "worked"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 3, which differs at facts.log. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step3-inspect-constraints-0-active",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 3,
+    "op": "changed",
+    "path": "inspect.constraints[0].active",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].active",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 3, which differs at inspect.constraints[0].active. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step3-inspect-constraints-0-lastActiveAt-incidental",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 3,
+    "op": "changed",
+    "path": "inspect.constraints[0].lastActiveAt.$incidental",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].lastActiveAt.$incidental",
+        "from": "null",
+        "to": "number"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 3, which differs at inspect.constraints[0].lastActiveAt.$incidental. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step3-inspect-unmet-0",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 3,
+    "op": "changed",
+    "path": "inspect.unmet[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.unmet[0]",
+        "to": {
+          "fromConstraint": "gate",
+          "id": "WORK:{}",
+          "requirement": {
+            "type": "WORK"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 3, which differs at inspect.unmet[0]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onConstraintEvaluate-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "gate",
+            true,
+            {
+              "$undefined": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onConstraintEvaluate\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-constraint-evaluate-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": true,
+            "id": "gate",
+            "type": "constraint.evaluate"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"constraint.evaluate\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-external-after-the-registration-changed-step4-data-1",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "external",
+    "kind": "after the registration",
+    "engine": "v2",
+    "step": 4,
+    "op": "changed",
+    "path": "data[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1]",
+        "from": "",
+        "to": "worked"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the external \"after the registration\" record in step 4, which differs at data[1]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onRequirementCreated-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onRequirementCreated",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 3,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementCreated",
+          "args": [
+            {
+              "fromConstraint": "gate",
+              "id": "WORK:{}",
+              "requirement": {
+                "type": "WORK"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onRequirementCreated\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-requirement-created-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "requirement.created",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 3,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "WORK:{}",
+            "requirementType": "WORK",
+            "type": "requirement.created"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"requirement.created\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onResolverStart-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverStart",
+          "args": [
+            "work",
+            {
+              "fromConstraint": "gate",
+              "id": "WORK:{}",
+              "requirement": {
+                "type": "WORK"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onResolverStart\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-resolver-start-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "resolver.start",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "requirementId": "WORK:{}",
+            "resolver": "work",
+            "type": "resolver.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"resolver.start\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onFactsBatch-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactsBatch",
+          "args": [
+            [
+              {
+                "key": "log",
+                "origin": "authored",
+                "prev": "",
+                "type": "set",
+                "value": "worked"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onFactsBatch\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-fact-change-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "log",
+            "next": "worked",
+            "origin": "authored",
+            "prev": "",
+            "type": "fact.change"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"fact.change\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-notify-log-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "notify",
+    "kind": "log",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "log",
+          "value": "worked"
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the notify \"log\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onReconcileEnd-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 2,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [
+                {
+                  "id": "WORK:{}",
+                  "resolverId": "work",
+                  "startedAt": 0
+                }
+              ],
+              "unmet": []
+            }
+          ]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": "gate",
+                  "id": "WORK:{}",
+                  "requirement": {
+                    "type": "WORK"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onReconcileEnd\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-reconcile-end-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 3,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 0,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"reconcile.end\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onReconcileEnd-missing-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": []
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onReconcileEnd\" record in step 5, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-reconcile-end-missing-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 5,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 0,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"reconcile.end\" record in step 5, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onResolverComplete-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onResolverComplete",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverComplete",
+          "args": [
+            "work",
+            {
+              "fromConstraint": "gate",
+              "id": "WORK:{}",
+              "requirement": {
+                "type": "WORK"
+              }
+            },
+            0
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onResolverComplete\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-resolver-complete-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "resolver.complete",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "duration": 0,
+            "requirementId": "WORK:{}",
+            "resolver": "work",
+            "type": "resolver.complete"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"resolver.complete\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onDerivationCompute-missing-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 50, ["a"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onDerivationCompute\" record in step 6, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onRequirementMet-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onRequirementMet",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementMet",
+          "args": [
+            {
+              "fromConstraint": "gate",
+              "id": "WORK:{}",
+              "requirement": {
+                "type": "WORK"
+              }
+            },
+            "work"
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onRequirementMet\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-derivation-compute-missing-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 6,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 50
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"derivation.compute\" record in step 6, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-requirement-met-extra-step2",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "requirement.met",
+    "engine": "v2",
+    "step": 2,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "byResolver": "work",
+            "id": "WORK:{}",
+            "type": "requirement.met"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"requirement.met\" record in step 2, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step6-facts-log",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "facts.log",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.log",
+        "from": "",
+        "to": "worked"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 6, which differs at facts.log. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step6-inspect-constraints-0-active",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.constraints[0].active",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].active",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 6, which differs at inspect.constraints[0].active. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step6-inspect-constraints-0-lastActiveAt-incidental",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.constraints[0].lastActiveAt.$incidental",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].lastActiveAt.$incidental",
+        "from": "null",
+        "to": "number"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 6, which differs at inspect.constraints[0].lastActiveAt.$incidental. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-settle-changed-step6-inspect-unmet-0",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 6,
+    "op": "changed",
+    "path": "inspect.unmet[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.unmet[0]",
+        "to": {
+          "fromConstraint": "gate",
+          "id": "WORK:{}",
+          "requirement": {
+            "type": "WORK"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"settle\" record in step 6, which differs at inspect.unmet[0]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-external-after-a-write-later-reads-changed-step7-data-1",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "external",
+    "kind": "after a write later reads",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "data[1]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "data[1]",
+        "from": "",
+        "to": "worked"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the external \"after a write later reads\" record in step 7, which differs at data[1]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-end-changed-step7-facts-log",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "facts.log",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "facts.log",
+        "from": "",
+        "to": "worked"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"end\" record in step 7, which differs at facts.log. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-end-changed-step7-inspect-constraints-0-active",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "inspect.constraints[0].active",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].active",
+        "from": false,
+        "to": true
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"end\" record in step 7, which differs at inspect.constraints[0].active. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-end-changed-step7-inspect-constraints-0-lastActiveAt-incidental",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "inspect.constraints[0].lastActiveAt.$incidental",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.constraints[0].lastActiveAt.$incidental",
+        "from": "null",
+        "to": "number"
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"end\" record in step 7, which differs at inspect.constraints[0].lastActiveAt.$incidental. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-state-end-changed-step7-inspect-unmet-0",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 7,
+    "op": "changed",
+    "path": "inspect.unmet[0]",
+    "excuses": [
+      {
+        "count": 1,
+        "path": "inspect.unmet[0]",
+        "to": {
+          "fromConstraint": "gate",
+          "id": "WORK:{}",
+          "requirement": {
+            "type": "WORK"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the state \"end\" record in step 7, which differs at inspect.unmet[0]. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-external-gate-evaluated-extra-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "external",
+    "kind": "gate evaluated",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["gate evaluated"]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the external \"gate evaluated\" record in step 5, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onDerivationCompute-extra-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": ["later", 50, ["a"]]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onDerivationCompute\" record in step 5, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-derivation-compute-extra-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "later",
+            "type": "derivation.compute",
+            "value": 50
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"derivation.compute\" record in step 5, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onConstraintEvaluate-extra-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "gate",
+            true,
+            {
+              "$undefined": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onConstraintEvaluate\" record in step 5, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-constraint-evaluate-extra-step5",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 5,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": true,
+            "id": "gate",
+            "type": "constraint.evaluate"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"constraint.evaluate\" record in step 5, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onRequirementCreated-extra-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onRequirementCreated",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementCreated",
+          "args": [
+            {
+              "fromConstraint": "gate",
+              "id": "WORK:{}",
+              "requirement": {
+                "type": "WORK"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onRequirementCreated\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-requirement-created-extra-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "requirement.created",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "WORK:{}",
+            "requirementType": "WORK",
+            "type": "requirement.created"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"requirement.created\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-hook-onReconcileEnd-extra-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": [
+                {
+                  "fromConstraint": "gate",
+                  "id": "WORK:{}",
+                  "requirement": {
+                    "type": "WORK"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the hook \"onReconcileEnd\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-bm-u3-observe-reconcile-end-extra-step6",
+    "scenario": "a constraint gated on a later-registered name is never evaluated again (U3; row bm)",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 6,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 0,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In this scenario (U3) a constraint's `when` asks `\"later\" in derived` before `later` is registered: 1.35 never evaluates it again, so its resolver never runs; 2.0 evaluates it in the pass the registration starts, it fires and its resolver writes `log`. This covers the observe \"reconcile.end\" record in step 6, which only 2.0 has (extra on 2.0). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10b-fuzz-bm-hook-onDerivationInvalidate-extra-zin",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": ["zin"]
+        }
+      ]
+    },
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In a fuzz case with readers (`dynamic.readers`), module a's derivation `zin` asks `\"z0\" in derived` before `z0` exists, so 1.35 computes it once with no dependencies and never invalidates it; 2.0 invalidates it when `z0` is registered and computes the new answer. This covers that first extra onDerivationInvalidate(\"zin\") on 2.0 and ends the case there: what follows (zin's new value, its readers, `zgate`'s evaluation) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "when": ["dynamicReaders"]
+  },
+  {
+    "id": "l10b-fuzz-bl-hook-onError-missing-def-is-not-a-function",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onError",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": "def is not a function",
+                "context": {
+                  "$undefined": true
+                },
+                "recoverable": true,
+                "source": "derivation",
+                "sourceId": {
+                  "$like": "dynamicDerivation"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bl) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): `derive.assign` with `{ compute, meta }` works on 2.0, where 1.35 stores the object as the definition and every compute of it throws \"def is not a function\". In a fuzz case whose `define` step assigns a derivation in that form, 1.35 reports the TypeError through onError (source \"derivation\") at the derivation's next compute, and so does each derivation that reads it; 2.0 computes the new definition. The derivation is a static one, the define pool's `z0` or `z1`, or `zin`, which reads `z0` (`$like` dynamicDerivation; deep seed 2 found a `z1`). This covers that first onError on 1.35 (missing on 2.0) and ends the case there: what follows (the values, their readers, the recovery) is the same row's consequence. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bl) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "when": ["assignObject"]
+  },
+  {
+    "id": "l10-fuzz-ay-hook-onSnapshot-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshotDynamic"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before, so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). L10 twin of l8-fuzz-ay-hook-onSnapshot-missing, for an L10 fuzz case: the same missing onSnapshot, whose snapshot also holds the facts the L10 fuzz adds (`$like` snapshotDynamic: `zf` and `zw` of a dynamic case's module a, `g0` and `g1` of the module a `module` step registers, and at least one of them), which `snapshot` does not name. In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), 1.35's restore clears the pause in its finally and the next write takes a snapshot, and 2.0 puts the pause back and takes none. This covers that onSnapshot call, which 1.35 makes and 2.0 does not (missing on 2.0), and only after the paused navigation: it requires the same case's paused difference at or before it (`requires`: a history record's data[1].paused, false on 1.35 and true on 2.0, as `l8-fuzz-ay-external-history-changed-paused` bounds it). Every later history record and navigation differs as the paused entry of this row says, so this entry ends the fuzz case (`ends`). It has no unannounced twin: a missing snapshot of these facts with no paused record, a registered module's among them (the RFC's H1), is covered by no entry. Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16",
+    "requires": {
+      "stream": "external",
+      "kind": "history",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "data[1].paused",
+            "from": false,
+            "to": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "l10-fuzz-ay-hook-onSnapshot-missing-unannounced",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onSnapshot",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["navigatedPaused"],
+    "group": "row-ay",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onSnapshot",
+          "args": [
+            {
+              "$like": "snapshotDynamicWrite"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goBack, goForward, goTo or replay leaves the history paused, and the next write takes no snapshot until resume(). 1.35's restore sets the pause for the restore and clears it in its finally, whatever it was before (utils/history.ts:414-426), so after a navigation isPaused reads false and the next write takes a snapshot (the L8 RFC's N5, probe H5; U4). L10 twin of l8-fuzz-ay-hook-onSnapshot-missing-unannounced, for a dynamic fuzz case with no history record between the navigation and the next write: the same missing onSnapshot, whose snapshot also holds module a's dynamic facts `zf` and `zw` (`$like` snapshotDynamicWrite), and whose label names no fact of module z (`g0`, `g1`): registerModule's own snapshot and a write of module z still need the paused record l10-fuzz-ay-hook-onSnapshot-missing requires, so a missing registerModule snapshot (the RFC's H1) is never covered here. The facts may hold module z's, registered before the write. In a fuzz case with a navigation while a pause step's pause is set (`when` navigatedPaused), this covers that onSnapshot call, which 1.35 makes for the write and 2.0, still paused, does not (missing on 2.0), and nothing else. Deep seed 1 (all: a pause, a replay with no history record after it, then a write; and a case with module z registered before the pause, a replay, then a write of `b::when`). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "id": "l10-fuzz-bm-hook-onDerivationInvalidate-extra-name-returns",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["readerNameReturns"],
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": [
+            {
+              "$like": "derivation"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bm) (L10; owner-approved 2026-11-15, \"I approve you for to do everything\"): a derivation or constraint that asked about a name before it was registered is woken when the name is registered or unregistered. 1.35 records no dependency on a name that is not there, so the reader keeps its old answer (the L10 RFC's I1, probe P2). In a one-module fuzz case where an odd-variant module z replaced module a's `d0` (M2), unregistering module z takes `d0` away, and a static derivation that reads `d0` recomputes with no dependency on it on 1.35 and a membership key for it on 2.0 (`when` readerNameReturns). When `d0` is registered again, 2.0 invalidates that reader and computes its new answer, and 1.35 does not until a fact it reads changes. This covers that first extra onDerivationInvalidate on 2.0, of a static derivation (`$like` derivation), and ends the case there: what follows (the reader's values, its readers, the later compute 1.35 makes) is the same row's consequence. Deep seed 24301 (up to L10). Signed 2026-11-16 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L10 RFC rev 2, row (bm) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-16"
+  },
+  {
+    "scenario": "fuzz",
+    "engine": "v2",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-17",
+    "id": "l10-fuzz-be-hook-onFactsBatch-changed-back",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "op": "changed",
+    "path": "args[0]",
+    "when": ["changesetSteps"],
+    "during": "back",
+    "group": "row-be",
+    "ends": true,
+    "bound": {
+      "match": [
+        {
+          "path": "args[0][1].key",
+          "from": {
+            "$like": "historyFactKey"
+          },
+          "to": {
+            "$like": "historyFactKey"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onHistoryNavigate",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[1]",
+            "from": {
+              "$like": "integer"
+            },
+            "to": {
+              "$lt": "from"
+            }
+          }
+        ]
+      },
+      "order": "any"
+    },
+    "reason": "Row (be) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a changeset counts as one of the steps, and each step is taken in turn with the steps left counted down; 1.35 drops the steps left after the one that lands on the changeset's start (GATE-7.md, the correction to the L8 RFC's (be) row; core-next pin l8-history-rows-ba-bc-be, #391). In a fuzz case that closes a changeset and then goes `back` more than one step (trigger `changesetSteps`), the engines land on different snapshots (deep seed 2, up to L10#1551: a changeset over indexes 1 to 2, `back 3` from 2; 1.35 lands on 1, 2.0 on 0). The restore's batch then writes other facts, so its records differ from their second key on (1.35 b::when, 2.0 a::zf). This covers that changed key of the restore's onFactsBatch in a `back` step (`during` \"back\") and ends the comparison there (`ends`): every later record reads the other snapshot. It requires a changed onHistoryNavigate call in the case (`requires`, order any) whose index on 2.0 is below 1.35's (`args[1]`, `$lt`): (be) takes the steps 1.35 drops, so a `back` lands earlier on 2.0, never later. A `back` that lands on the same snapshot on both engines, or later on 2.0, is outside it. Signed 2026-11-17 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L10 gate runs under \"I approve you for to do everything\" (2026-11-15)."
   }
 ]

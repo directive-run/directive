@@ -2045,6 +2045,64 @@ const TRIGGERS = {
       .some(
         (s) => (s.op === "back" || s.op === "forward") && (s.steps ?? 1) > 1,
       ),
+  /**
+   * Row (bm), a reader sees a name registered after it asked (L10): the
+   * case has `dynamic.readers`, so module a has `zin` and `zgate`, which ask
+   * `"z0" in derived` before `z0` exists (I1). Without it no static reader
+   * asks about a name before it is registered.
+   */
+  dynamicReaders: (spec) => spec.dynamic?.readers === true,
+  /**
+   * Row (bl), `assign` with `{ compute, meta }` keeps a derivation readable
+   * (L10): a `define` step assigns a derivation in the object form
+   * (`variant` 3, `dynamicDef`), the call 1.35 breaks (K2). `register` with
+   * the same object works on both engines, so it is outside.
+   */
+  assignObject: (spec) =>
+    spec.steps.some(
+      (s) =>
+        s.op === "define" &&
+        s.action === "assign" &&
+        s.kind === "derive" &&
+        s.variant === 3,
+    ),
+  /**
+   * Row (bm), through modules (L10): in a one-module case a `module` step
+   * registers an odd variant, whose `d0` replaces module a's (M2); a later
+   * unregister takes `d0` away, so a static derivation that reads it
+   * recomputes asking for a name that is not there; and a later step
+   * registers `d0` again (a `define` register of derive id 0, or another
+   * odd-variant module). 2.0 wakes the reader then, 1.35 does not.
+   */
+  readerNameReturns: (spec) => {
+    if (spec.modules.length !== 1) {
+      return false;
+    }
+    let replaced = false;
+    let dropped = false;
+    for (const s of spec.steps) {
+      if (s.op === "module" && s.action === "register") {
+        if (s.variant % 2 === 1) {
+          if (dropped) {
+            return true;
+          }
+          replaced = true;
+        }
+      } else if (s.op === "module" && s.action === "unregister") {
+        dropped = dropped || replaced;
+      } else if (
+        dropped &&
+        s.op === "define" &&
+        s.action === "register" &&
+        s.kind === "derive" &&
+        s.id === 0
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  },
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
