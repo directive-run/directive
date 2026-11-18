@@ -135,6 +135,8 @@ export interface Run extends Writer {
   attempt_: number;
   /** Its one outcome has been reported. */
   done_: boolean;
+  /** L10b: the run's execution, which an unregisterModule waits for. */
+  p_?: Promise<unknown>;
   /** A with-results batch's item errors, from its latest attempt. */
   errors_?: Map<RequirementWithId, Error>;
 }
@@ -212,7 +214,7 @@ export interface Batcher {
    * Cancel the queued requirement `only`, or with none every queued one
    * (stop()), adding each id to `ids`.
    */
-  drop_(ids: string[], only?: string): void;
+  drop_(ids: string[], only?: string, resolver?: string): void;
   /** Some requirement waits in a queue; `busy`: or a batch's end is due. */
   queued_(busy?: boolean): boolean;
 }
@@ -243,6 +245,9 @@ export interface Resolvers {
   inflight: ReadonlyMap<string, Run>;
   /** A batched requirement waits in a queue (see Batcher). */
   queued_(busy?: boolean): boolean;
+  /** L10 (K5): an unregistered resolver's runs are canceled, its queue too. */
+  drop_(resolver: string): void;
+  waits_(ids: string[]): unknown[];
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -317,7 +322,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   /** The last stamp handed out: run ids start at 1 (0 is unattributed). */
   let stamps = 0;
 
-  const find = (req: Requirement): string | null => {
+  /** The id of the first resolver that handles it, if any. */
+  const find = (req: Requirement) => {
     for (const id in defs) {
       const def = defs[id];
       // As 1.35: only an object definition handles requirements.
@@ -329,8 +335,6 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         return id;
       }
     }
-
-    return null;
   };
 
   /**
@@ -373,18 +377,19 @@ export function createResolvers(options: ResolversOptions): Resolvers {
    * Retracted (quirk g) or superseded (au): a batch that owns others goes on
    * without it, and its cancel is its outcome unless the batch reported
    * already (a new list, so the handler's own stays aligned with its
-   * results). Any other run is canceled.
+   * results). Any other run is canceled. A batch that does not own it (a
+   * detached one, abort()'s walk) is left alone.
    */
   const part = (run: Run, id: string) => {
-    if (!run.reqs_?.[1]) {
+    let req: RequirementWithId | undefined;
+    const rest = run.reqs_?.filter((r) => r.id !== id || !(req = r));
+    if (!rest?.[0]) {
       cancel(run);
-
-      return;
+    } else if (req) {
+      inflight.delete(id);
+      run.reqs_ = rest;
+      run.done_ || canceled(run.resolver_, req);
     }
-    let req: RequirementWithId;
-    inflight.delete(id);
-    run.reqs_ = run.reqs_.filter((r) => r.id !== id || !(req = r));
-    run.done_ || canceled(run.resolver_, req!);
   };
 
   const tell = (run: Run, req: RequirementWithId, error?: Error) => {
@@ -729,7 +734,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   ) => {
     const run = make(resolverId, req);
     emit("resolver.start", () => ({ resolver: resolverId, req }));
-    execute(def, run, baseline).finally(() => {
+    (run.p_ = execute(def, run, baseline)).finally(() => {
       // 1.35 leaves flight here, a microtask after the outcome: a run
       // canceled or detached meanwhile has left already and asks for no
       // pass.
@@ -738,6 +743,20 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       }
     });
   };
+  /** Out of flight, still running: its outcome is still told. */
+  const detach = (requirementId: string) => {
+    const run = inflight.get(requirementId);
+    if (run) {
+      inflight.delete(requirementId);
+      detached.add(run);
+    }
+  };
+  /**
+   * The detached runs and `runs`, in the order they started (1.35's for its
+   * batches). An undefined run sorts last and is not compared.
+   */
+  const started = <R extends Run | undefined>(runs: R[]) =>
+    [...detached, ...runs].sort((a, b) => a!.stamp_ - b!.stamp_);
   // The batch part, given the machinery it shares; nothing without it.
   const batcher = options.batch_?.({
     run_: make,
@@ -779,8 +798,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         // only single runs, so it is queued again and the batch goes on
         // detached, its outcome still told, its writes still bound;
         // settle() waits only for what stays attached (fuzz case 1967).
-        inflight.delete(req.id);
-        detached.add(current);
+        detach(req.id);
       }
       const resolverId = find(req.requirement);
       if (!resolverId) {
@@ -801,21 +819,29 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         start(def, resolverId, req, baseline);
       }
     },
-    detach_(requirementId) {
-      const run = inflight.get(requirementId);
-      if (run) {
-        inflight.delete(requirementId);
-        detached.add(run);
-      }
-    },
+    detach_: detach,
     abort(requirementId) {
       const run = inflight.get(requirementId);
-      if (run) {
-        // Quirk g: a batch goes on for the rest (1.35 cancels them all).
-        part(run, requirementId);
-      } else {
-        batcher?.drop_([], requirementId);
+      const ids: string[] = [];
+      run ? run.reqs_ || cancel(run) : batcher?.drop_(ids, requirementId);
+      // 1.35 aborts every batch that owns it, in the order they started, so
+      // a detached one too (its detach leaves a batch in flight), unless it
+      // was queued (1.35 cancels it there and stops). A detached single run
+      // goes on. Quirk g: a batch goes on for the rest (1.35 cancels them
+      // all).
+      ids[0] ||
+        started([run]).forEach((old) => old?.reqs_ && part(old, requirementId));
+    },
+    // L10b: 1.35's drainResolvers waits on these (resolvers.ts:2051).
+    waits_: (ids) =>
+      [...inflight.values(), ...detached]
+        .filter((run) => ids.includes(run.resolver_))
+        .map((run) => run.p_),
+    drop_(resolver) {
+      for (const run of new Set(started([...inflight.values()]))) {
+        run!.resolver_ === resolver && cancel(run!);
       }
+      batcher?.drop_([], undefined, resolver);
     },
     abortAll_() {
       const ids: string[] = [];
@@ -828,9 +854,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
         run.reqs_ || cancel(run, ids);
       }
       batcher?.drop_(ids);
-      for (const run of [...detached, ...runs].sort(
-        (a, b) => a.stamp_ - b.stamp_,
-      )) {
+      for (const run of started(runs)) {
         run.reqs_ && cancel(run, runs.includes(run) && ids);
       }
 

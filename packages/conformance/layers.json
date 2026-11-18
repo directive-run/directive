@@ -2885,8 +2885,18 @@
           ]
         },
         "invalidation cost > does not pay for the size of a graph nothing is watching": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "invalidation cost > carries a reassigned derivation through to what composes it": {
           "layer": "L10",
@@ -3877,16 +3887,19 @@
           "by": ["option module hooks"]
         },
         "Engine — Lifecycle > fires onResolverError hook when a resolver throws after retries": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["option module hooks"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Lifecycle > does not fire onResolverError when resolver succeeds": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["option module hooks"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Lifecycle > isolates errors thrown from inside onResolverError": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["option module hooks"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Facts > facts proxy reads and writes values": {
           "layer": "L0",
@@ -3913,12 +3926,33 @@
           ]
         },
         "Engine — Facts > facts.$store.batch() batches multiple changes to the same key": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Facts > fact changes trigger reconciliation": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Derivations > derive functions auto-track dependencies": {
           "layer": "L0",
@@ -4024,44 +4058,108 @@
           ]
         },
         "Engine — Constraints & Resolvers > constraint when returning true creates requirement": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Constraints & Resolvers > constraint when returning false creates no requirement": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .inspect"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Constraints & Resolvers > end-to-end: constraint -> requirement -> resolver pipeline": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Constraints & Resolvers > resolver retry works": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > subscribe fires on any listed fact change": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > subscribe fires on derivation change": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > subscribe returns unsubscribe function": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > watch fires on specific fact key changes with old/new values": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > watch fires on derivation key changes": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Subscribe / Watch > watch does not fire when value unchanged (Object.is)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "member .watch",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Read > system.read(key) returns current derivation value": {
           "layer": "L0",
@@ -4109,16 +4207,26 @@
           "by": ["option constraints", "option resolvers"]
         },
         "Engine — Settle > isSettled is true when no resolvers are running": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Inspect > inspect returns constraints info": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .inspect"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Inspect > inspect returns resolverDefs info": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .inspect"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Inspect > inspect shows inflight resolvers when running": {
           "layer": "L9",
@@ -4171,16 +4279,29 @@
           "by": ["option modules"]
         },
         "Engine — Error Boundary > system catches resolver errors and does not crash": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Error Boundary > error boundary onError callback is invoked": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["option error boundary"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Batch > system.batch() coalesces fact mutations": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .batch",
+            "member .facts",
+            "member .subscribe",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Snapshot > getSnapshot returns current facts": {
           "layer": "L6",
@@ -4238,8 +4359,9 @@
           ]
         },
         "Engine — onSettledChange > onSettledChange fires when settlement status changes": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["member .onSettledChange"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Dev Warnings > warns when fact and derivation share the same name": {
           "layer": "L0",
@@ -4256,68 +4378,91 @@
           "by": ["option initial facts"]
         },
         "Engine — Effects > effects run when their tracked facts change": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option effects",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine — Effects > effects can be disabled and enabled": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L4",
+          "by": ["member .effects.disable", "member .effects.enable"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > the binding prevents tail-clobber end-to-end through createSystem": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > no `abortOn` (default) preserves the clobber behavior": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > a resolver's data write survives an owned-fact clobber (win-at-the-buzzer)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > a bound resolver is NOT cancelled when its requirement is removed": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > an unbound resolver is still cancelled when its requirement is removed": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > a detached bound resolver does not block re-dispatch when the constraint returns": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > `abortOn` on an async constraint is ignored — the clobber lands": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > emits `constraint.binding.disabled` (reason: async-declared) when `abortOn` lands on a declared-async constraint": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > emits `constraint.binding.disabled` (reason: async-promoted) when `when()` returns a Promise but async wasn't declared": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "constraint-binding (RFC-0003) — engine integration > dedupes `constraint.binding.disabled` across many dispatches": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "effects and the reconcile boundary > gives a fact written during the effects phase to the constraints and to the effects": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L4",
+          "by": ["option effect deps"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "effects and the reconcile boundary > delivers a synchronous effect-phase write, with no async effect and no resolver in sight": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L4",
+          "by": ["option effect deps"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "effects and the reconcile boundary > delivers a write arriving from outside the system while the phase is open": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L4",
+          "by": ["option effect deps"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "effects and the reconcile boundary > delivers it to an effect gated on a derivation the write invalidates": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L4",
+          "by": ["option effect deps"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         }
       }
     },
@@ -13404,16 +13549,19 @@
           ]
         },
         "factsBaseline lazy perf > clobber-binding still works with sparse baseline (only owned keys snapshotted)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "factsBaseline lazy perf > no bound constraints in a tick → resolver still runs (no baseline overhead)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobber observability via system.observe > emits resolver.write.rejected on a dropped abort-bound write": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L9",
+          "by": ["member .observe"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobber-event rate-limit > caps per-instance clobber events at 10 + one suppressed summary": {
           "layer": "L2",
@@ -13430,8 +13578,9 @@
           ]
         },
         "batch baseline freshness > batched bound resolver uses the latest non-undefined baseline": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L7",
+          "by": ["option batch resolver"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "batch resolver in-flight cancellation > cancel(reqId) aborts an in-flight batch via the shared controller": {
           "layer": "L7",
@@ -14996,8 +15145,9 @@
           "by": ["member .getDistributableSnapshot"]
         },
         "Distributable Snapshot > watchDistributableSnapshot fires on changes": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["member .watchDistributableSnapshot"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Config Forwarding > plugins array forwarded to engine": {
           "layer": "L3",
@@ -15052,12 +15202,21 @@
           "by": ["option modules"]
         },
         "Engine Passthrough Methods > isSettled reflects engine state": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option derivations",
+            "option events",
+            "option init"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Engine Passthrough Methods > onSettledChange fires on settlement changes": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L3",
+          "by": ["member .onSettledChange"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "Cross-Module Dependencies > derivation can read facts from another module via crossModuleDeps": {
           "layer": "L1",

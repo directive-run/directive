@@ -138,6 +138,13 @@ function printHeap(r) {
     `  100 writes and 100 undos (history-undo-100 workload, bytes per step): v1 ${bytes(h.v1HistoryUndoBytesPerOp)}, v2 ${bytes(h.v2HistoryUndoBytesPerOp)}`,
   );
   console.log(
+    `  100 traced runs and a read of the ring (trace-100 workload, bytes per step): v1 ${bytes(h.v1TraceBytesPerOp)}, v2 ${bytes(h.v2TraceBytesPerOp)}`,
+  );
+  console.log(
+    `  100 module register/unregister pairs (module-churn workload, bytes per step): v1 ${bytes(h.v1ModuleChurnBytesPerOp)}, v2 ${bytes(h.v2ModuleChurnBytesPerOp)}`,
+    `  same, module-churn-leak (report-only): v1 ${bytes(h.v1ModuleChurnLeakBytesPerOp)}, v2 ${bytes(h.v2ModuleChurnLeakBytesPerOp)}`,
+  );
+  console.log(
     "  (clean trials = write-loop+with-settle trials that saw no GC, per heap round; the probe tries 200000, then 50000, then 12000 writes per trial until it has enough clean ones)",
   );
   if (sizes("v1") !== sizes("v2")) {
@@ -182,6 +189,11 @@ function printTables(r, stat) {
     console.log(`  ${pad(row.workload, 22)}${cells.join("")}`);
   });
   printHeap(r);
+  for (const [name, v] of Object.entries(r.retained ?? {})) {
+    console.log(
+      `  retained heap after full gc, ${name} (bytes per step of 100 pairs): v1 ${f(v.v1, 1)}, v2 ${f(v.v2, 1)}`,
+    );
+  }
   console.log(
     `development checks on: v1 ${r.devChecks.v1}, v2 ${r.devChecks.v2} (NODE_ENV ${r.env})`,
   );
@@ -541,12 +553,33 @@ const result = {
     v2BatchFlushBytesPerOp: heapOf("v2", "batchFlushBytesPerOp"),
     v1HistoryUndoBytesPerOp: heapOf("v1", "historyUndoBytesPerOp"),
     v2HistoryUndoBytesPerOp: heapOf("v2", "historyUndoBytesPerOp"),
+    v1TraceBytesPerOp: heapOf("v1", "traceBytesPerOp"),
+    v2TraceBytesPerOp: heapOf("v2", "traceBytesPerOp"),
+    v1ModuleChurnBytesPerOp: heapOf("v1", "moduleChurnBytesPerOp"),
+    v2ModuleChurnBytesPerOp: heapOf("v2", "moduleChurnBytesPerOp"),
+    v1ModuleChurnLeakBytesPerOp: heapOf("v1", "moduleChurnLeakBytesPerOp"),
+    v2ModuleChurnLeakBytesPerOp: heapOf("v2", "moduleChurnLeakBytesPerOp"),
     calibration: {
       expected: 176,
       v1: calibrated("v1"),
       v2: calibrated("v2"),
     },
   },
+  retained: Object.fromEntries(
+    names
+      .filter((n) => workloads[n].retainedHeap)
+      .map((n) => [
+        n,
+        Object.fromEntries(
+          ["v1", "v2"].map((e) => [
+            e,
+            samples[e][n].length
+              ? median(samples[e][n].map((x) => x.retainedBytesPerStep))
+              : null,
+          ]),
+        ),
+      ]),
+  ),
   notes,
   skipped,
 };

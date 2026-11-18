@@ -27,6 +27,13 @@
  *    entry that covers no real difference,
  *    and rule 2's label still applies. Both ends of divergences.json are read
  *    as data; anything the guard cannot parse fails closed.
+ *    A second exception (Jason, 2026-11-17: "Route B: approve the rule
+ *    (Recommended)"): an engine PR may remove a name from
+ *    contracts/next-unshipped.json once it ships it, again with or without
+ *    harness.lock.json. The change must be pure removal: names deleted, none
+ *    added, no layer changed, `$comment` unchanged. The guard does not check
+ *    that core-next really ships a removed name; the surface gate does (a
+ *    missing 1.35 name that is not listed fails at any layer).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -39,6 +46,7 @@ export const BASELINE_FILE = "oracle-baseline.json";
 export const LABEL = "oracle-change";
 const PREFIX = "packages/conformance/";
 export const DIVERGENCES_FILE = "diff/divergences.json";
+export const UNSHIPPED_FILE = "contracts/next-unshipped.json";
 
 interface Rules {
   rules: Record<
@@ -161,8 +169,9 @@ function isConformanceHarness(path: string): boolean {
 
 /**
  * Pull-request rules over the changed paths (repo-relative), the labels, and
- * the text at the base and head of pnpm-lock.yaml, v2-passing.json and
- * diff/divergences.json when the PR changes them (null: absent at that end).
+ * the text at the base and head of pnpm-lock.yaml, v2-passing.json,
+ * diff/divergences.json and contracts/next-unshipped.json when the PR changes
+ * them (null: absent at that end).
  */
 export function checkPullRequest(
   changedFiles: string[],
@@ -170,6 +179,7 @@ export function checkPullRequest(
   lockfile?: { base: string; head: string },
   ratchet?: { base: string | null; head: string },
   divergences?: { base: string | null; head: string | null },
+  unshipped?: { base: string | null; head: string | null },
 ): string[] {
   const failures: string[] = [];
   // The v2 ratchet only grows: a removal needs a reason and the label.
@@ -198,7 +208,7 @@ export function checkPullRequest(
     f.startsWith("packages/core-next/"),
   );
   if (engine.length > 0 && conformance.length > 0) {
-    failures.push(...checkEngineHarness(conformance, divergences));
+    failures.push(...checkEngineHarness(conformance, divergences, unshipped));
   }
 
   const harness = [...conformance, ...changedFiles.filter(isOutsideHarness)];
@@ -224,28 +234,103 @@ export function checkPullRequest(
 
 /**
  * Rule 3 for a PR that changes packages/core-next and the harness files
- * `conformance` (repo-relative): only signed divergences may ride along.
+ * `conformance` (repo-relative): only signed divergences and pure removals
+ * from next-unshipped.json may ride along.
  */
 function checkEngineHarness(
   conformance: string[],
   divergences?: { base: string | null; head: string | null },
+  unshipped?: { base: string | null; head: string | null },
 ): string[] {
   const signedFile = `${PREFIX}${DIVERGENCES_FILE}`;
+  const unshippedFile = `${PREFIX}${UNSHIPPED_FILE}`;
   const others = conformance.filter(
-    (f) => f !== signedFile && f !== `${PREFIX}${LOCK_FILE}`,
+    (f) =>
+      f !== signedFile && f !== unshippedFile && f !== `${PREFIX}${LOCK_FILE}`,
   );
   if (others.length > 0) {
     return [
-      `this PR changes packages/core-next and the conformance harness (${others.join(", ")}); land oracle changes in their own PR (only signed ${DIVERGENCES_FILE} entries, with ${LOCK_FILE}, may change alongside the engine)`,
+      `this PR changes packages/core-next and the conformance harness (${others.join(", ")}); land oracle changes in their own PR (only signed ${DIVERGENCES_FILE} entries, or names removed from ${UNSHIPPED_FILE}, with ${LOCK_FILE}, may change alongside the engine)`,
     ];
   }
-  if (!conformance.includes(signedFile)) {
+  const hasSigned = conformance.includes(signedFile);
+  const hasUnshipped = conformance.includes(unshippedFile);
+  if (!hasSigned && !hasUnshipped) {
     return [
-      `this PR changes packages/core-next and ${LOCK_FILE} without ${DIVERGENCES_FILE}; alongside the engine the lock may change only for a signed divergence`,
+      `this PR changes packages/core-next and ${LOCK_FILE} without ${DIVERGENCES_FILE} or ${UNSHIPPED_FILE}; alongside the engine the lock may change only for a signed divergence or a removed unshipped name`,
     ];
   }
 
-  return checkSignedDivergences(divergences);
+  return [
+    ...(hasSigned ? checkSignedDivergences(divergences) : []),
+    ...(hasUnshipped ? checkUnshippedRemoval(unshipped) : []),
+  ];
+}
+
+/** A JSON object's entries, or why the guard cannot trust the text. */
+function unshippedEntries(
+  text: string,
+  end: string,
+): Map<string, unknown> | string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return `${UNSHIPPED_FILE} is not valid JSON at the ${end}`;
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return `${UNSHIPPED_FILE} must be an object at the ${end}`;
+  }
+
+  return new Map(Object.entries(parsed as Record<string, unknown>));
+}
+
+/**
+ * Alongside packages/core-next, next-unshipped.json may only lose names
+ * (Jason, 2026-11-17): none added, no layer changed, `$comment` unchanged.
+ * Fails closed on anything it cannot read.
+ */
+function checkUnshippedRemoval(unshipped?: {
+  base: string | null;
+  head: string | null;
+}): string[] {
+  const why = `alongside packages/core-next, ${UNSHIPPED_FILE} may only remove names (none added, no layer changed, $comment unchanged); land any other change in its own PR`;
+  if (!unshipped) {
+    return [
+      `${UNSHIPPED_FILE} changed but its base and head were not provided`,
+    ];
+  }
+  if (unshipped.head === null) {
+    return [`${UNSHIPPED_FILE} is deleted at the head; ${why}`];
+  }
+  if (unshipped.base === null) {
+    return [`${UNSHIPPED_FILE} is new at the head; ${why}`];
+  }
+  const head = unshippedEntries(unshipped.head, "head");
+  const base = unshippedEntries(unshipped.base, "base");
+  if (typeof head === "string" || typeof base === "string") {
+    return [
+      `${[head, base].filter((x) => typeof x === "string").join("; ")}; the guard cannot check it is a pure removal`,
+    ];
+  }
+  const failures: string[] = [];
+  if (canonical(base.get("$comment")) !== canonical(head.get("$comment"))) {
+    failures.push(`${UNSHIPPED_FILE} changes its $comment; ${why}`);
+  }
+  for (const [key, value] of head) {
+    if (key === "$comment") {
+      continue;
+    }
+    if (!base.has(key)) {
+      failures.push(`${UNSHIPPED_FILE} adds ${key}; ${why}`);
+    } else if (canonical(base.get(key)) !== canonical(value)) {
+      failures.push(
+        `${UNSHIPPED_FILE} changes the layer of ${key} from ${canonical(base.get(key))} to ${canonical(value)}; ${why}`,
+      );
+    }
+  }
+
+  return failures;
 }
 
 type ById = Map<string, Record<string, unknown>>;
