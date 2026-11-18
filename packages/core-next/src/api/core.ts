@@ -285,7 +285,7 @@ export interface SystemContext {
    * withDynamic's registry drives them, after it writes the module's map.
    */
   kinds_: Record<string, DefHooks>;
-  /** L10, dynamic.ts relink: set by the first dynamic call. */
+  /** dynamic.ts relink (1.35's updateDependencies): set by withDynamic. */
   relink_?: (
     node: ReactiveNode,
     old: Set<string> | undefined,
@@ -972,7 +972,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // and links the new one, so this derivation's readers' lists end with
       // it, and the next write's walk meets it last.
       // 1.35 moves a derivation whose dependencies changed to the end of
-      // what it reads; L10's definitions change them (dynamic.ts relink).
+      // what it reads, whatever changed them (dynamic.ts relink).
       context.relink_?.(d.node_, old, deps);
       if (wants("derivation.compute")) {
         emit("derivation.compute", {

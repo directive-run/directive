@@ -94,11 +94,24 @@ const emitter =
 /**
  * 1.35's updateDependencies: a derivation whose dependency set changed
  * unlinks the old set and links the new one, so it ends each list of what
- * it reads, and the next write's walk meets it last. Installed by the first
- * dynamic call (a replaced definition is what changes the set here).
+ * it reads, and the next write's walk meets it last. A replaced definition
+ * (L10) changes the set, and so does any compute whose reads depend on the
+ * facts: `$all` stops at its first false clause, `&&` skips its right side
+ * (L11). Installed with the part, so every createSystem system has it; the
+ * bare createSystemCore (no 1.35 counterpart) goes without.
  */
+/** Whether `deps` holds a key `old` lacks (sizes already equal); no allocation per compute. */
+const changed = (old: Set<string>, deps: Set<string>) => {
+  for (const k of deps) {
+    if (!old.has(k)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 const relink = (node: any, old: Set<string> | undefined, deps: Set<string>) => {
-  if (old?.size !== deps.size || [...deps].some((k) => !old!.has(k))) {
+  if (old?.size !== deps.size || changed(old!, deps)) {
     const end = node.cursor;
     for (let l = end && node.deps; l; l = l === end ? null : l.nextDep) {
       const source = l.source;
@@ -138,6 +151,7 @@ const members = Object.fromEntries(
 );
 
 export const withDynamic: SystemPart = (ctx) => {
+  ctx.relink_ = relink;
   const system = ctx.system as Record<string, any>;
   let kinds: Kinds | undefined;
   const build = () => (kinds ??= registry(ctx));
@@ -214,7 +228,6 @@ export const withDynamic: SystemPart = (ctx) => {
 };
 
 const registry = (ctx: SystemContext): Kinds => {
-  ctx.relink_ = relink;
   const system = ctx.system as Record<string, any>;
   const m = ctx.module as Record<string, any>;
   const dynamic: Record<string, Set<string>> = {};
@@ -507,7 +520,6 @@ const ORDER: [string, string][] = [
  * flattened one (namespaced.ts flattenModule).
  */
 const modules = (ctx: SystemContext): Fn[] => {
-  ctx.relink_ = relink;
   const system = ctx.system as Record<string, any>;
   const m = ctx.module as Record<string, any>;
   const schema = m.schema.facts as Record<string, unknown>;
