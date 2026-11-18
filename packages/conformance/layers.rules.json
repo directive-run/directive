@@ -712,6 +712,10 @@
       "rule": "L9",
       "pin": true
     },
+    "tests/core/l9-meta-trace-gate-debt-oracle.test.ts": {
+      "rule": "L9",
+      "pin": true
+    },
     "tests/core/l9-trace-pins-oracle-production.test.ts": {
       "rule": "L9",
       "pin": true

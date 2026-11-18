@@ -268,6 +268,40 @@ describe("a navigation leaves no snapshot request behind", () => {
   });
 });
 
+describe("start() forgets a navigation made while stopped", () => {
+  it("a listener's write during a stopped goBack() is snapshotted by the first pass after start()", async () => {
+    const system = await started();
+    system.facts.a = 1;
+    await system.settle();
+    system.facts.a = 2;
+    await system.settle();
+    system.stop();
+    let armed = false;
+    system.subscribe(["a"], () => {
+      if (armed) {
+        system.facts.m = system.facts.a + 10;
+      }
+    });
+    // While stopped, the rewind's listener write is recorded as a navigation
+    // write and waits in the changed set; no pass runs to consume either.
+    armed = true;
+    system.history.goBack();
+    armed = false;
+    const before = system.history.snapshots.length;
+    expect(system.history.currentIndex).toBe(before - 2);
+    system.start();
+    await system.settle();
+
+    // start() drops the navigation record, so its first pass treats the
+    // waiting write as ordinary work: a snapshot that splices away redo.
+    expect(system.facts.m).toBe(11);
+    expect(system.history.snapshots.length).toBe(before);
+    expect(system.history.currentIndex).toBe(before - 1);
+    expect(latest(system).trigger).toBe("facts-changed:m");
+    system.destroy();
+  });
+});
+
 describe("an effect's writes fold into the snapshot of the pass that ran it", () => {
   it("an unlisted event an effect dispatches synchronously refreshes the snapshot", async () => {
     // The effect's dispatch is flushed after its handler's depth is down, so

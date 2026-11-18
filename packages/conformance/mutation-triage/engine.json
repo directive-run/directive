@@ -99,7 +99,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 142,
     "endCol": 8
   },
@@ -108,9 +108,8 @@
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: freezeMeta (types/meta.ts 96-128) returns a frozen object for any truthy meta, or throws, and this guard runs only when meta is truthy, so `if (frozen)` is always true. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 141,
     "endCol": 19
   },
@@ -121,7 +120,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 141,
     "endCol": 19
   },
@@ -132,7 +131,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 141,
     "endCol": 48
   },
@@ -143,7 +142,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 168,
     "endCol": 8
   },
@@ -152,9 +151,8 @@
     "col": 13,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: freezeMeta (types/meta.ts 96-128) returns a frozen object for any truthy meta, or throws, and this guard runs only when meta is truthy, so `if (frozen)` is always true. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 167,
     "endCol": 19
   },
@@ -165,7 +163,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 167,
     "endCol": 19
   },
@@ -176,7 +174,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 167,
     "endCol": 48
   },
@@ -222,7 +220,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given'.",
     "endLine": 256,
     "endCol": 19
   },
@@ -233,7 +231,7 @@
     "replacement": "typeof value === \"object\" || value !== null",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed by hand (L9-pre-b; Stryker ran out of time on it): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given'.",
     "endLine": 256,
     "endCol": 19
   },
@@ -244,7 +242,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given'.",
     "endLine": 255,
     "endCol": 30
   },
@@ -271,9 +269,8 @@
     "col": 5,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: isOwnSchemaType runs (417) only after preparedSchemaTypes.add(st) (411), and WeakSet.add throws on null, so value is never null here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 256,
     "endCol": 19
   },
@@ -521,9 +518,8 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "equivalent",
+    "note": "equivalent: freezeMeta(undefined) returns undefined (types/meta.ts 99-101), so with no module meta the inner `if (frozen)` skips the set, as the original skip does. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 380,
     "endCol": 20
   },
@@ -534,7 +530,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 380,
     "endCol": 20
   },
@@ -545,7 +541,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 383,
     "endCol": 6
   },
@@ -554,9 +550,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: freezeMeta (types/meta.ts 96-128) returns a frozen object for any truthy meta, or throws, and this guard runs only when meta is truthy, so `if (frozen)` is always true. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 382,
     "endCol": 17
   },
@@ -567,7 +562,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 382,
     "endCol": 17
   },
@@ -578,7 +573,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 382,
     "endCol": 53
   },
@@ -589,7 +584,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 389,
     "endCol": 4
   },
@@ -600,7 +595,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > adds no meta key to a definition authored without one'.",
     "endLine": 388,
     "endCol": 17
   },
@@ -611,7 +606,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 388,
     "endCol": 17
   },
@@ -622,7 +617,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 392,
     "endCol": 4
   },
@@ -633,7 +628,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > adds no meta key to a definition authored without one'.",
     "endLine": 391,
     "endCol": 17
   },
@@ -644,7 +639,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 391,
     "endCol": 17
   },
@@ -655,7 +650,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 396,
     "endCol": 4
   },
@@ -666,7 +661,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > adds no meta key to a definition authored without one'.",
     "endLine": 395,
     "endCol": 15
   },
@@ -677,7 +672,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 395,
     "endCol": 15
   },
@@ -706,7 +701,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > a module whose fact type carries meta builds a second system'.",
     "endLine": 410,
     "endCol": 36
   },
@@ -717,7 +712,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > a module whose fact type carries meta builds a second system'.",
     "endLine": 411,
     "endCol": 33
   },
@@ -737,7 +732,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given'.",
     "endLine": 412,
     "endCol": 17
   },
@@ -1347,7 +1342,7 @@
     "replacement": "() => undefined",
     "reason": "later-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a resolver's completion and its error carry the resolver's meta'.",
     "endLine": 926,
     "endCol": 58
   },
@@ -1525,9 +1520,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "equivalent",
+    "note": "equivalent: traceEnabled is false only when createTraceManager returned the disabled manager (engine-trace.ts 165-184), whose recordFactChange is a no-op. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 998,
     "endCol": 23
   },
@@ -1538,7 +1532,7 @@
     "replacement": "false",
     "reason": "later-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a batched write's changes are in the entry, with each fact's schema meta'.",
     "endLine": 998,
     "endCol": 23
   },
@@ -1764,9 +1758,8 @@
     "col": 36,
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "reason": "equivalent",
+    "note": "equivalent: derivations.ts calls onCompute in one place (584) and passes Array.from(deps, describeDep), so deps is never undefined. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Relabelled at L9-pre-b.",
     "endLine": 1093,
     "endCol": 38
   },
@@ -2388,9 +2381,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "reason": "equivalent",
+    "note": "equivalent: traceEnabled is false only for the disabled trace manager (engine-trace.ts 165-184), whose recordResolverError and decrementInflight are no-ops. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 1509,
     "endCol": 23
   },
@@ -2428,7 +2420,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel'.",
     "endLine": 1542,
     "endCol": 23
   },
@@ -2439,7 +2431,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel'.",
     "endLine": 1544,
     "endCol": 8
   },
@@ -2450,7 +2442,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel'.",
     "endLine": 1543,
     "endCol": 48
   },
@@ -2860,7 +2852,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a batched write's changes are in the entry, with each fact's schema meta'.",
     "endLine": 1787,
     "endCol": 21
   },
@@ -3693,7 +3685,7 @@
     "replacement": "[\"Stryker was here\"]",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed by hand (L9-pre-b): an async constraint with no deps whose require reads no fact keeps no constraintDeps entry (mergeDependencies returns early on an empty set, and updateConstraintDeps has no when deps to combine), so the else branch runs. With the mutant applied the test fails at ceiling L9; unmutated it passes on 1.35. Test: l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps'.",
     "endLine": 2024,
     "endCol": 64
   },
@@ -3790,7 +3782,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a requirement no resolver takes is started by \"unknown\"'.",
     "endLine": 2132,
     "endCol": 59
   },
@@ -3817,7 +3809,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere"
+    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does'."
   },
   {
     "line": 2180,
@@ -3826,7 +3818,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere"
+    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does'."
   },
   {
     "line": 2180,
@@ -3835,7 +3827,7 @@
     "replacement": "config.plugins.length >= 0",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere"
+    "note": "the reconcile-end result built when no plugin is configured: only a plugin registered at runtime by observe() (L9) could hear it; with none it goes nowhere Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does'."
   },
   {
     "line": 2184,
@@ -3915,9 +3907,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "reason": "equivalent",
+    "note": "equivalent: traceEnabled is false only for the disabled trace manager (engine-trace.ts 165-184), whose finalizeCurrentRun is a no-op. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2211,
     "endCol": 23
   },
@@ -4321,9 +4312,8 @@
     "col": 30,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "inheritedTagsFor: derivation tag inheritance for meta.byTag (meta is L9)"
+    "reason": "equivalent",
+    "note": "equivalent: inheritedTagsFor collects into a Set. Without the `continue`, a node seen twice adds only tags already present and re-queues upstreams that add the same tags again. Derivation dependencies form a DAG (derivations.ts 513-516 throws on a cycle at compute), so the walk still ends with the same set. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Relabelled at L9-pre-b."
   },
   {
     "line": 2477,
@@ -4348,9 +4338,9 @@
     "col": 20,
     "mutator": "OptionalChaining",
     "replacement": "(schema[key] as {\n  _meta?: DefinitionMeta;\n})._meta",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "feature-layer",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): recordFactTags' `?.` guards a nullish schema type. At build, the freeze loop's WeakSet.add (411) throws on one first; the only other caller is onKeysRegistered (1069), from registerKeys (L10, B3 of the L9 RFC). Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 2479,
     "endCol": 70
   },
@@ -4368,9 +4358,8 @@
     "col": 9,
     "mutator": "ConditionalExpression",
     "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "equivalent",
+    "note": "equivalent: new Set(undefined) and new Set([]) are empty like EMPTY_TAGS, and factTagSets is read only at 2738-2740 (an undefined check and .has), so no answer changes. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2489,
     "endCol": 32
   },
@@ -4389,8 +4378,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
     "endLine": 2521,
     "endCol": 8
   },
@@ -4400,8 +4389,8 @@
     "mutator": "ObjectLiteral",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): the subscriber-error catch in notifyMetaSubscribers. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. No L9 test can make it run. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
     "endLine": 2520,
     "endCol": 74
   },
@@ -4412,7 +4401,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2545,
     "endCol": 6
   },
@@ -4423,7 +4412,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2544,
     "endCol": 71
   },
@@ -4434,7 +4423,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2544,
     "endCol": 36
   },
@@ -4445,7 +4434,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2544,
     "endCol": 69
   },
@@ -4456,7 +4445,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2554,
     "endCol": 6
   },
@@ -4467,7 +4456,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2553,
     "endCol": 76
   },
@@ -4478,7 +4467,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2553,
     "endCol": 35
   },
@@ -4489,7 +4478,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2553,
     "endCol": 74
   },
@@ -4500,7 +4489,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2563,
     "endCol": 6
   },
@@ -4511,7 +4500,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2556,
     "endCol": 19
   },
@@ -4522,7 +4511,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2556,
     "endCol": 19
   },
@@ -4533,7 +4522,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2562,
     "endCol": 10
   },
@@ -4544,7 +4533,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2558,
     "endCol": 29
   },
@@ -4555,7 +4544,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2561,
     "endCol": 32
   },
@@ -4566,7 +4555,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2572,
     "endCol": 6
   },
@@ -4577,7 +4566,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2565,
     "endCol": 19
   },
@@ -4588,7 +4577,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2565,
     "endCol": 19
   },
@@ -4599,7 +4588,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2571,
     "endCol": 10
   },
@@ -4610,7 +4599,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2567,
     "endCol": 27
   },
@@ -4621,7 +4610,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2570,
     "endCol": 32
   },
@@ -4632,7 +4621,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2577,
     "endCol": 6
   },
@@ -4643,7 +4632,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2575,
     "endCol": 15
   },
@@ -4654,7 +4643,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2575,
     "endCol": 15
   },
@@ -4665,7 +4654,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2576,
     "endCol": 73
   },
@@ -4676,7 +4665,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2576,
     "endCol": 38
   },
@@ -4687,7 +4676,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2576,
     "endCol": 71
   },
@@ -4833,7 +4822,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 2682,
     "endCol": 8
   },
@@ -4844,7 +4833,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition'.",
     "endLine": 2689,
     "endCol": 8
   },
@@ -4855,7 +4844,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2720,
     "endCol": 55
   },
@@ -4866,7 +4855,7 @@
     "replacement": "m.kind !== wanted",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind'.",
     "endLine": 2720,
     "endCol": 55
   },
@@ -4877,7 +4866,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2750,
     "endCol": 44
   },
@@ -4888,7 +4877,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2750,
     "endCol": 44
   },
@@ -4899,7 +4888,7 @@
     "replacement": "authored?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2750,
     "endCol": 39
   },
@@ -4910,7 +4899,7 @@
     "replacement": "authored.tags",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-trace-pins-oracle 'carriesTag answers undefined where it has no answer (U5) > for an unknown kind, __proto__, an unknown id and a derivation whose body throws'.",
     "endLine": 2750,
     "endCol": 29
   },
@@ -4921,7 +4910,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2752,
     "endCol": 12
   },
@@ -4932,7 +4921,7 @@
     "replacement": "false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2751,
     "endCol": 24
   },
@@ -4943,7 +4932,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2758,
     "endCol": 12
   },
@@ -4954,7 +4943,7 @@
     "replacement": "() => undefined",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2757,
     "endCol": 76
   },
@@ -4963,9 +4952,8 @@
     "col": 19,
     "mutator": "BlockStatement",
     "replacement": "{}",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: an emptied catch falls out of the derivation branch into the switch, whose default returns undefined: the same answer as `return undefined` (U5's throwing derivation still answers undefined). Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2760,
     "endCol": 12
   },
@@ -4976,7 +4964,7 @@
     "replacement": "case \"module\":",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2769,
     "endCol": 27
   },
@@ -4987,7 +4975,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2766,
     "endCol": 24
   },
@@ -4998,7 +4986,7 @@
     "replacement": "moduleMeta.get(id)?.tags?.includes(tag) && false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2768,
     "endCol": 66
   },
@@ -5009,7 +4997,7 @@
     "replacement": "moduleMeta.get(id)?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag on a module whose meta has no tags answers false'.",
     "endLine": 2768,
     "endCol": 52
   },
@@ -5018,9 +5006,8 @@
     "col": 18,
     "mutator": "OptionalChaining",
     "replacement": "moduleMeta.get(id).tags",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: get(id) follows has(id) true, and moduleMeta holds only frozen meta objects (382 sets a truthy `frozen` only), so get(id) is never undefined here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2768,
     "endCol": 42
   },
@@ -5031,7 +5018,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag on a module whose meta has no tags answers false'.",
     "endLine": 2768,
     "endCol": 66
   },
@@ -5042,7 +5029,7 @@
     "replacement": "case \"event\":",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2773,
     "endCol": 27
   },
@@ -5053,7 +5040,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2770,
     "endCol": 23
   },
@@ -5064,7 +5051,7 @@
     "replacement": "eventMeta.get(id)?.tags?.includes(tag) && false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2772,
     "endCol": 65
   },
@@ -5075,7 +5062,7 @@
     "replacement": "eventMeta.get(id)?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2772,
     "endCol": 51
   },
@@ -5084,9 +5071,8 @@
     "col": 18,
     "mutator": "OptionalChaining",
     "replacement": "eventMeta.get(id).tags",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: get(id) follows has(id) true, and eventMeta holds only frozen meta objects (141/167 set a truthy `frozen` only), so get(id) is never undefined here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2772,
     "endCol": 41
   },
@@ -5097,7 +5083,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2772,
     "endCol": 65
   },
@@ -5108,7 +5094,7 @@
     "replacement": "case \"constraint\":",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2777,
     "endCol": 27
   },
@@ -5119,7 +5105,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2774,
     "endCol": 28
   },
@@ -5130,7 +5116,7 @@
     "replacement": "mergedConstraints[id]?.meta?.tags?.includes(tag) && false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2776,
     "endCol": 75
   },
@@ -5141,7 +5127,7 @@
     "replacement": "mergedConstraints[id]?.meta?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2776,
     "endCol": 61
   },
@@ -5152,7 +5138,7 @@
     "replacement": "mergedConstraints[id]?.meta.tags",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2776,
     "endCol": 51
   },
@@ -5161,9 +5147,8 @@
     "col": 18,
     "mutator": "OptionalChaining",
     "replacement": "mergedConstraints[id].meta",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: mergedConstraints[id] follows Object.hasOwn(mergedConstraints, id), and a nullish constraint definition throws at build in the meta-freeze loop (388 reads def.meta), so it is never nullish here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2776,
     "endCol": 45
   },
@@ -5174,7 +5159,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2776,
     "endCol": 75
   },
@@ -5185,7 +5170,7 @@
     "replacement": "case \"resolver\":",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2781,
     "endCol": 27
   },
@@ -5196,7 +5181,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2778,
     "endCol": 26
   },
@@ -5207,7 +5192,7 @@
     "replacement": "mergedResolvers[id]?.meta?.tags?.includes(tag) && false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2780,
     "endCol": 73
   },
@@ -5218,7 +5203,7 @@
     "replacement": "mergedResolvers[id]?.meta?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2780,
     "endCol": 59
   },
@@ -5229,7 +5214,7 @@
     "replacement": "mergedResolvers[id]?.meta.tags",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2780,
     "endCol": 49
   },
@@ -5238,9 +5223,8 @@
     "col": 18,
     "mutator": "OptionalChaining",
     "replacement": "mergedResolvers[id].meta",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: mergedResolvers[id] follows Object.hasOwn(mergedResolvers, id), and a nullish resolver definition throws at build in the meta-freeze loop (391 reads def.meta), so it is never nullish here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2780,
     "endCol": 43
   },
@@ -5251,7 +5235,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2780,
     "endCol": 73
   },
@@ -5262,7 +5246,7 @@
     "replacement": "case \"effect\":",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2787,
     "endCol": 27
   },
@@ -5273,7 +5257,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2782,
     "endCol": 24
   },
@@ -5284,7 +5268,7 @@
     "replacement": "(mergedEffects[id] as {\n  meta?: DefinitionMeta;\n} | undefined)?.meta?.tags?.includes(tag) && false",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2786,
     "endCol": 54
   },
@@ -5295,7 +5279,7 @@
     "replacement": "(mergedEffects[id] as {\n  meta?: DefinitionMeta;\n} | undefined)?.meta?.tags.includes",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2786,
     "endCol": 40
   },
@@ -5306,7 +5290,7 @@
     "replacement": "(mergedEffects[id] as {\n  meta?: DefinitionMeta;\n} | undefined)?.meta.tags",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2786,
     "endCol": 30
   },
@@ -5315,9 +5299,8 @@
     "col": 18,
     "mutator": "OptionalChaining",
     "replacement": "(mergedEffects[id] as {\n  meta?: DefinitionMeta;\n} | undefined).meta",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: mergedEffects[id] follows Object.hasOwn(mergedEffects, id), and a nullish effect definition throws at build in the meta-freeze loop (395 reads d.meta), so it is never nullish here. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2786,
     "endCol": 24
   },
@@ -5328,7 +5311,7 @@
     "replacement": "true",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind'.",
     "endLine": 2786,
     "endCol": 54
   },
@@ -5337,9 +5320,8 @@
     "col": 11,
     "mutator": "ConditionalExpression",
     "replacement": "default:",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "reason": "equivalent",
+    "note": "equivalent: without `return undefined` the switch falls off the end of carriesTag, which then returns undefined. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 2789,
     "endCol": 30
   },
@@ -5350,7 +5332,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > subscribe with immediate calls the listener at once, in either form'.",
     "endLine": 2815,
     "endCol": 10
   },
@@ -5361,7 +5343,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > subscribe with immediate calls the listener at once, in either form'.",
     "endLine": 2814,
     "endCol": 22
   },
@@ -5371,8 +5353,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
     "endLine": 2819,
     "endCol": 10
   },
@@ -5382,8 +5364,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): the unsubscribe meta.subscribe returns: observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b.",
     "endLine": 2818,
     "endCol": 44
   },
@@ -5418,7 +5400,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails'.",
     "endLine": 3055,
     "endCol": 59
   },
@@ -5429,7 +5411,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails'.",
     "endLine": 3055,
     "endCol": 46
   },
@@ -5440,7 +5422,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel'.",
     "endLine": 3072,
     "endCol": 64
   },
@@ -5451,7 +5433,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel'.",
     "endLine": 3072,
     "endCol": 50
   },
@@ -5462,7 +5444,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails'.",
     "endLine": 3096,
     "endCol": 12
   },
@@ -5473,7 +5455,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails'.",
     "endLine": 3092,
     "endCol": 35
   },
@@ -5484,7 +5466,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest'.",
     "endLine": 3127,
     "endCol": 12
   },
@@ -5495,7 +5477,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest'.",
     "endLine": 3124,
     "endCol": 14
   },
@@ -5506,7 +5488,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest'.",
     "endLine": 3118,
     "endCol": 46
   },
@@ -5517,7 +5499,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest'.",
     "endLine": 3119,
     "endCol": 30
   },
@@ -5528,7 +5510,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3155,
     "endCol": 12
   },
@@ -5539,7 +5521,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3151,
     "endCol": 34
   },
@@ -5550,7 +5532,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3163,
     "endCol": 12
   },
@@ -5561,7 +5543,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3158,
     "endCol": 35
   },
@@ -5572,7 +5554,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3177,
     "endCol": 12
   },
@@ -5583,7 +5565,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3171,
     "endCol": 32
   },
@@ -5594,7 +5576,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3184,
     "endCol": 12
   },
@@ -5605,7 +5587,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3180,
     "endCol": 34
   },
@@ -5616,7 +5598,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3198,
     "endCol": 12
   },
@@ -5627,7 +5609,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error'.",
     "endLine": 3192,
     "endCol": 33
   },
@@ -5638,7 +5620,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > notify.guardrailCoverage reaches the observer as guardrail.coverage'.",
     "endLine": 3226,
     "endCol": 12
   },
@@ -5649,7 +5631,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them",
+    "note": "observe(): the observer event records (constraint.error, requirement.canceled, resolver.*, source.*, guardrail.coverage); only observe() receives them Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'observe() event records (L9 gate debt) > notify.guardrailCoverage reaches the observer as guardrail.coverage'.",
     "endLine": 3221,
     "endCol": 39
   },
@@ -5714,7 +5696,7 @@
     "replacement": ";",
     "reason": "later-layer",
     "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer. Killed by hand (L9-pre-b): after stop(), a subscribe listener that writes during a goBack() made while stopped leaves navigationWrites > 0, ordinaryWrites 0 and a non-empty changed set at start(). Without the reset, the first pass after start() treats that write as a navigation and takes no snapshot. With the mutant applied the test fails at ceiling L8; unmutated it passes on 1.35. Test: l8-history-gate-debt-oracle 'start() forgets a navigation made while stopped > a listener's write during a stopped goBack() is snapshotted by the first pass after start()'.",
     "endLine": 3338,
     "endCol": 31
   },
@@ -5744,9 +5726,8 @@
     "col": 29,
     "mutator": "BooleanLiteral",
     "replacement": "true",
-    "reason": "later-layer",
-    "layer": "L8",
-    "note": "history: snapshot-per-pass bookkeeping, navigation (goTo/back/forward) write records, history change listeners; observable only through history. Timeout in the full run (mutreports r5 f-l3-engine): Stryker records no killedBy for a timeout, so no single test is named; the layer is the feature's layer.",
+    "reason": "equivalent",
+    "note": "equivalent: lastPassSnapshotted is read only at 1857, inside a pass with passFromEffects (1732: effectPhaseWrites > 0 && otherPhaseWrites === 0). start() zeroes effectPhaseWrites (3340), effect-phase writes happen only inside a pass, and every pass sets lastPassSnapshotted in its finally (2216) before a later pass can read it, so start()'s value is never read. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Relabelled at L9-pre-b.",
     "endLine": 3345,
     "endCol": 34
   },
@@ -6153,7 +6134,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "traceManager.destroy() on destroy: only a running trace (L9) holds state to drop"
+    "note": "traceManager.destroy() on destroy: only a running trace (L9) holds state to drop Killed by hand (L9-pre-b; Stryker ran out of time on it): l9-trace-pins-oracle 'destroy() leaves the trace empty, not null (U9) > system.trace reads [] after destroy()'."
   },
   {
     "line": 3502,
@@ -6171,7 +6152,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed by hand (L9-pre-b; Stryker ran out of time on it): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > destroy() forgets module and event meta'.",
     "endLine": 3504,
     "endCol": 26
   },
@@ -6181,8 +6162,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroy(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 3505,
     "endCol": 31
   },
@@ -6193,7 +6174,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > destroy() forgets module and event meta'.",
     "endLine": 3506,
     "endCol": 25
   },
@@ -6303,7 +6284,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "traceManager.destroy() on destroy: only a running trace (L9) holds state to drop"
+    "note": "traceManager.destroy() on destroy: only a running trace (L9) holds state to drop Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > destroyAsync() forgets module and event meta, and empties the trace'."
   },
   {
     "line": 3551,
@@ -6321,7 +6302,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > destroyAsync() forgets module and event meta, and empties the trace'.",
     "endLine": 3552,
     "endCol": 26
   },
@@ -6331,8 +6312,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): metaSubscribers.clear() in destroyAsync(): observable only through a later notification. notifyMetaSubscribers has four callers: 1070 (onKeysRegistered, from registerKeys), 1679 (onDefinitionsChanged, from register/assign/unregister), 4625 (registerModule) and 4844 (unregisterModule). All are L10 (lib/layers.ts MEMBER_LAYERS registerModule, unregisterModule, registerKeys; engine-definitions.ts is the L10 row). subscribe's immediate call (2814) is not routed through it. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 3553,
     "endCol": 31
   },
@@ -6343,7 +6324,7 @@
     "replacement": ";",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'system.meta reads back each definition's authored meta (L9 gate debt) > destroyAsync() forgets module and event meta, and empties the trace'.",
     "endLine": 3554,
     "endCol": 25
   },
@@ -6507,8 +6488,8 @@
     "mutator": "OptionalChaining",
     "replacement": "(mergedSchema[key as keyof S] as {\n  _meta?: DefinitionMeta;\n} | undefined)._meta",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): inspect()'s `?._meta` on a schema type: a nullish schema type cannot survive build (WeakSet.add at 411 throws); only registerKeys (L10) adds schema types afterwards. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 3781,
     "endCol": 19
   },
@@ -6596,8 +6577,8 @@
     "mutator": "OptionalChaining",
     "replacement": "def.meta",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): inspect()'s `def?.meta`: every constraint state is created from mergedConstraints, so at L9 each has its definition; only dynamic definitions (constraints.unregister/assign, L10) can part a state from its definition. Applied by hand (L9-pre-b): the whole suite at ceiling L9 (MUTATION_LAYER=L9, vitest.stryker.config.ts) passes, 1943 tests. Moved at L9-pre-b.",
     "endLine": 3803,
     "endCol": 28
   },
@@ -6732,9 +6713,8 @@
     "col": 67,
     "mutator": "ArrayDeclaration",
     "replacement": "[\"Stryker was here\"]",
-    "reason": "feature-layer",
-    "layer": "L9",
-    "note": "trace(): per-run changelog bookkeeping (fact changes, constraint deps, resolver starts, inflight counts) that only trace entries expose",
+    "reason": "equivalent",
+    "note": "equivalent: with trace on, traceManager is the enabled manager, whose getEntries (engine-trace.ts 408-415) always returns an array, so `?? []` never applies. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Relabelled at L9-pre-b.",
     "endLine": 3852,
     "endCol": 69
   },
@@ -6745,7 +6725,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts)"
+    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts) Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description'."
   },
   {
     "line": 3888,
@@ -6754,7 +6734,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts)"
+    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts) Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description'."
   },
   {
     "line": 3900,
@@ -6762,8 +6742,8 @@
     "mutator": "StringLiteral",
     "replacement": "\"\"",
     "reason": "feature-layer",
-    "layer": "L9",
-    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts)"
+    "layer": "L10",
+    "note": "feature-layer L10 (was L9): explain()'s `lastResult ?? \"unknown\"`: a constraint state starts with lastResult null (constraints.ts 716) and every evaluation sets it (855, 871, 967, 977). A requirement exists only after its constraint evaluated, so at L9 it is never null; only dynamic definitions (constraints.unregister/assign, L10) can leave a requirement whose constraint has no state or a fresh one. NoCoverage at gate=L9 (run 43815165003 and the L9-pre-b local run). Moved at L9-pre-b."
   },
   {
     "line": 3904,
@@ -6772,7 +6752,7 @@
     "replacement": "{}",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta",
+    "note": "meta and tags: authored-meta freezing, tag inheritance, meta search/query/subscribe, meta in inspect()/explain(); no test at or below L3 reads meta Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description'.",
     "endLine": 3906,
     "endCol": 8
   },
@@ -6937,7 +6917,7 @@
     "replacement": "\"\"",
     "reason": "feature-layer",
     "layer": "L9",
-    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts)"
+    "note": "explain(): the requirement explanation text (explain is L9 in layers.ts) Killed (L9-pre-b): l9-meta-trace-gate-debt-oracle 'explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description'."
   },
   {
     "line": 3994,

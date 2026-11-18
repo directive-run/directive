@@ -9874,6 +9874,10 @@
           "layer": "L8",
           "by": ["member .goBack", "member .history", "option history"]
         },
+        "start() forgets a navigation made while stopped > a listener's write during a stopped goBack() is snapshotted by the first pass after start()": {
+          "layer": "L8",
+          "by": ["member .goBack", "member .history", "option history"]
+        },
         "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches synchronously refreshes the snapshot": {
           "layer": "L8",
           "by": ["member .history", "option history"]
@@ -10093,6 +10097,112 @@
         "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled": {
           "layer": "L9",
           "by": ["member .inspect"]
+        }
+      }
+    },
+    "tests/core/l9-meta-trace-gate-debt-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "pin": true,
+      "tests": {
+        "system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > adds no meta key to a definition authored without one": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag on a module whose meta has no tags answers false": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > subscribe with immediate calls the listener at once, in either form": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > destroy() forgets module and event meta": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "system.meta reads back each definition's authored meta (L9 gate debt) > destroyAsync() forgets module and event meta, and empties the trace": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "the schema-type freeze at build (L9 gate debt) > a module whose fact type carries meta builds a second system": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
+        },
+        "the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given": {
+          "layer": "L9",
+          "by": ["member .meta"]
+        },
+        "trace entries (L9 gate debt) > a batched write's changes are in the entry, with each fact's schema meta": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > a resolver's completion and its error carry the resolver's meta": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > a requirement no resolver takes is started by \"unknown\"": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > a constraint that reads no fact is hit with no deps, before and after disable()": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps": {
+          "layer": "L9",
+          "by": ["member .meta", "member .trace", "option meta", "option trace"]
+        },
+        "trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel": {
+          "layer": "L9",
+          "by": [
+            "member .meta",
+            "member .observe",
+            "member .trace",
+            "option meta",
+            "option trace"
+          ]
+        },
+        "trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does": {
+          "layer": "L9",
+          "by": [
+            "member .meta",
+            "member .observe",
+            "option meta",
+            "option trace"
+          ]
+        },
+        "observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "observe() event records (L9 gate debt) > notify.guardrailCoverage reaches the observer as guardrail.coverage": {
+          "layer": "L9",
+          "by": ["member .observe"]
+        },
+        "explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description": {
+          "layer": "L9",
+          "by": ["member .explain", "member .inspect", "option meta"]
         }
       }
     },

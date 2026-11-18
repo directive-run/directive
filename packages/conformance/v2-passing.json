@@ -1634,7 +1634,8 @@
         "onHistoryChange > a write it makes while a snapshot is taken gets a snapshot of its own",
         "onHistoryChange > is not told of a navigation after destroy()",
         "onHistoryChange > is not told of a navigation after destroyAsync()",
-        "onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes"
+        "onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes",
+        "start() forgets a navigation made while stopped > a listener's write during a stopped goBack() is snapshotted by the first pass after start()"
       ],
       "tests/core/l8-history-pins-oracle.test.ts": [
         "a changeset and goBack(steps) (U8) > (a) goBack from inside a changeset lands on its start",
@@ -1668,6 +1669,30 @@
       ],
       "tests/core/l9-constraints-observed-derivations.test.ts": [
         "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled"
+      ],
+      "tests/core/l9-meta-trace-gate-debt-oracle.test.ts": [
+        "explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description",
+        "observe() event records (L9 gate debt) > a constraint that throws and a resolver that fails",
+        "observe() event records (L9 gate debt) > a source's attach, publish, drop, detach and attach error",
+        "observe() event records (L9 gate debt) > notify.guardrailCoverage reaches the observer as guardrail.coverage",
+        "observe() event records (L9 gate debt) > ten clobbered writes, then one summary of the rest",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > adds no meta key to a definition authored without one",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > byTag lists every tagged definition, in kind order, and filters by kind",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag answers true, false or undefined for each kind",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > carriesTag on a module whose meta has no tags answers false",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > destroy() forgets module and event meta",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > destroyAsync() forgets module and event meta, and empties the trace",
+        "system.meta reads back each definition's authored meta (L9 gate debt) > subscribe with immediate calls the listener at once, in either form",
+        "the schema-type freeze at build (L9 gate debt) > a module whose fact type carries meta builds a second system",
+        "the schema-type freeze at build (L9 gate debt) > freezes t's own types, leaves a Zod-like schema and a function type as given",
+        "trace entries (L9 gate debt) > a batched write's changes are in the entry, with each fact's schema meta",
+        "trace entries (L9 gate debt) > a canceled resolver settles the entry that started it, and observe hears the cancel",
+        "trace entries (L9 gate debt) > a constraint that reads no fact is hit with no deps, before and after disable()",
+        "trace entries (L9 gate debt) > a requirement no resolver takes is started by \"unknown\"",
+        "trace entries (L9 gate debt) > a resolver's completion and its error carry the resolver's meta",
+        "trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps",
+        "trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does"
       ],
       "tests/core/l9-trace-pins-oracle.test.ts": [
         "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer",
