@@ -24,7 +24,9 @@
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
+import type { ClauseResult } from "../types/predicate.js";
 import { DERIVATION_DEP_PREFIX, type Tracker, withTracking } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import {
   type Requirement,
   type RequirementKeyFn,
@@ -59,6 +61,8 @@ export interface ConstraintsOptions {
   clock: Clock;
   onEvaluate: (id: string, active: boolean) => void;
   onError: (id: string, error: unknown) => void;
+  /** L11: the predicates part's hooks (a data-form `when`). */
+  pred?: Predicates;
 }
 
 export interface Constraints {
@@ -99,6 +103,13 @@ export interface Constraints {
   ): Promise<RequirementWithId[]>;
   /** Every constraint's state, in declaration order. */
   states_(): ConstraintState[];
+  /**
+   * L11: each data-form `when`'s spec and what evaluation reads ((bp)).
+   * An assign drops it first (R2); unregister leaves it (R3, as 1.35).
+   */
+  specs_: Map<string, [object, object]>;
+  /** L11 (I2): the clause rows of a data-form `when`, now. */
+  explain_(id: string): ClauseResult[] | undefined;
 }
 
 /** What inspect() reports of a constraint (1.35's ConstraintState subset). */
@@ -138,7 +149,12 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
+    // L11 (E1): the data form becomes its function, the spec kept.
+    if (spec !== undefined && typeof spec !== "function" && options.pred) {
+      specs.set(id, options.pred.when_(id, defs[id] as never));
+    }
   };
+  const specs = new Map<string, [object, object]>();
   ids.forEach(check);
   const fresh = (id: string): ConstraintState => ({
     id,
@@ -162,7 +178,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
   /** 1.35's recordConstraintError: a `when` that threw is not active. */
   const onWhenError = (id: string, error: unknown) => {
-    states.get(id)!.lastResult = false;
+    // 1.35's lazy getState: a refused registration has none yet.
+    (states.get(id) ?? states.set(id, fresh(id)).get(id)!).lastResult = false;
     options.onError(id, error);
   };
   const onError = options.onError;
@@ -287,7 +304,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     [...asyncIds].filter((id) => !defs[id]!.deps && !disabled.has(id));
 
   // --- evaluating one constraint -------------------------------------------
-  const call = (fn: Fn) => fn(facts, derived);
+  // Named as 1.35's, for the TypeError of a refused data form's `when`.
+  const call = (whenFn: Fn) => whenFn(facts, derived);
   /** `fn`, tracked; a throw is caught and kept with what it read before it. */
   function tracked(fn: Fn) {
     let threw = false;
@@ -719,13 +737,15 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     isDisabled: (id) => disabled.has(id),
     // L10: the registry's hooks; it has written `defs` first.
     add_(id, full) {
-      check(id);
-      // 1.35's assign starts the state again too (initState).
-      states.set(id, fresh(id));
       unanswered.add(id);
       defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
       dirty.add(id);
       resort(full);
+      // As 1.35 (constraints.ts:1677–1679): a refused definition stays,
+      // without a state until its next evaluation fails (onWhenError).
+      check(id);
+      // 1.35's assign starts the state again too (initState).
+      states.set(id, fresh(id));
     },
     remove_(id) {
       // I3: gone from `states` and `last` together.
@@ -770,6 +790,12 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     state_: (id) => states.get(id),
     states_: () => [...states.values()],
+    specs_: specs,
+    explain_(id) {
+      const spec = specs.get(id);
+
+      return spec && options.pred!.explain_(spec[1], facts as never);
+    },
   };
 }
 

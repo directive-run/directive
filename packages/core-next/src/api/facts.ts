@@ -110,6 +110,17 @@ export interface Writer {
   readonly stamp_: Stamp;
   /** Superseded: a newer run owns the requirement, its writes are dropped. */
   readonly dropped_: boolean;
+  /**
+   * Row (cd): its resolver's life. An unregisterModule retires it with the
+   * module's fact keys (`k_`), and the module's id (`w_`) until a warning.
+   */
+  readonly life_?: Life;
+}
+
+/** Row (cd): one registration of a resolver, retired by unregisterModule. */
+export interface Life {
+  k_?: ReadonlySet<string>;
+  w_?: string;
 }
 
 export const DERIVATION_DEP_PREFIX = "\u001F";
@@ -591,6 +602,25 @@ export function createFactsProxy<S extends Schema>(
     prop === "$store" || prop === "$snapshot";
   const reserved = (prop: string | symbol): prop is symbol =>
     typeof prop === "symbol" || special(prop) || BLOCKED_PROPS.has(prop);
+  /**
+   * Row (cd): a write from a retired module's resolver to one of that
+   * module's keys is dropped, so it never reaches a module registered later
+   * with the same key. 1.35 lets it land once the key is declared again.
+   */
+  const late = (prop: string | symbol) => {
+    const life = writer?.life_;
+    if (!life?.k_?.has(prop as string)) {
+      return false;
+    }
+    if (isDevelopment && life.w_ && Object.hasOwn(schema, prop)) {
+      console.warn(
+        `[Directive] Dropped a write to "${String(prop)}" from a resolver of unregistered module "${life.w_}": a module registered later declares that fact.`,
+      );
+      life.w_ = undefined;
+    }
+
+    return true;
+  };
 
   return new Proxy({} as Facts<S>, {
     get(_, prop) {
@@ -616,7 +646,7 @@ export function createFactsProxy<S extends Schema>(
       return value;
     },
     set(_, prop, value) {
-      if (writer?.dropped_) {
+      if (writer?.dropped_ || late(prop)) {
         return true;
       }
       if (reserved(prop)) {
@@ -638,7 +668,7 @@ export function createFactsProxy<S extends Schema>(
       return true;
     },
     deleteProperty(_, prop) {
-      if (writer?.dropped_) {
+      if (writer?.dropped_ || late(prop)) {
         return true;
       }
       if (reserved(prop)) {

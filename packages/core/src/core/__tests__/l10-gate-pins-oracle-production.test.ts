@@ -9,7 +9,8 @@ const { createModule, createSystem, t } = await import("../../index.js");
 // unguarded: a restore after unregisterModule, a retired resolver's write
 // after the 10 s drain, and a history snapshot taken after registerModule.
 // Each is what 1.35 does and what 2.0 does as built, so each passes on both
-// engines. Public API only.
+// engines; the late-write case keeps only what both share (row cd). Public
+// API only.
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -107,13 +108,14 @@ describe("production: restore() after unregisterModule drops the retired keys si
   });
 });
 
-describe("production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built)", () => {
+describe("production: a retired resolver's write after the 10 s drain (L10 gate; row cd)", () => {
   // unregisterModule waits at most 10 s for its resolvers (1.35's
   // DRAIN_TIMEOUT_MS). A resolver that ignores its abort and finishes after
   // that writes into a replacement module registered under the same name:
-  // the key is declared again, so the write is not a retired one. Both
-  // engines do this. The RFC's M7 says such a write "cannot reach a
-  // replacement"; that holds only for a write made inside the drain
+  // the key is declared again, so the write is not a retired one. 1.35
+  // does this; 2.0 drops the write (row cd). The RFC's M7 says such a
+  // write "cannot reach a replacement"; on 1.35 that holds only for a
+  // write made inside the drain
   // (unregister-module "does not let a retired module's late write reach its
   // replacement", 30 ms).
   const leaky = (marker: number) =>
@@ -146,7 +148,7 @@ describe("production: a retired resolver's write after the 10 s drain (L10 gate;
       },
     } as never);
 
-  it("lands on a same-key replacement registered after the drain gave up", async () => {
+  it("the drain gives up at 10 s and a same-key replacement starts from its own init", async () => {
     vi.useFakeTimers();
     const system = createSystem({
       modules: { leaky: leaky(1) },
@@ -169,8 +171,13 @@ describe("production: a retired resolver's write after the 10 s drain (L10 gate;
     await vi.advanceTimersByTimeAsync(0);
     expect(system.facts.leaky.written).toBe(0);
 
+    // Row (cd), approved on the owner's instruction "Approve all as
+    // recommended (Recommended)", 2026-11-17: 1.35 lets the old resolver's
+    // write land on the replacement (written becomes 1); 2.0 drops it. That is
+    // 1.35's side only, so this case keeps what both engines share; 2.0's side
+    // is pinned by core-next's l10-m7-late-write "row (cd): a retired
+    // resolver's write never reaches a same-key replacement".
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(system.facts.leaky.written).toBe(1);
     system.destroy();
   });
 });
