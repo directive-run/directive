@@ -10,11 +10,14 @@
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { DERIVATION_DEP_PREFIX, type Tracker, describeDep } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
 export interface CreateEffectsOptions<S extends Schema> {
   definitions: Record<string, any>;
+  /** L11: the predicates part's hooks (a data-form `on`). */
+  pred?: Predicates;
   facts: Facts<S>;
   store: FactsStore<S>;
   derived?: Record<string, unknown>;
@@ -47,6 +50,14 @@ export interface EffectsManager {
   id_(): string | null;
   runAll(): Promise<void>;
   callOne(id: string): Promise<void>;
+  /** L10: the registry's hooks, and the late link of a declared name (K6). */
+  add_(id: string): void;
+  replace_(id: string): void;
+  remove_(id: string): void;
+  call_(id: string): Promise<void>;
+  link_(name: string): void;
+  /** L10: whether an enabled or disabled effect depends on `key`. */
+  reads_(key: string): boolean;
   cleanupAll(): void;
   /**
    * Stops the effect and runs its cleanup at once (x). Its dependencies are
@@ -75,6 +86,10 @@ interface EffectState {
   deps: Set<string> | null;
   /** T1: the cleared set the next auto-tracked run tracks into. */
   spare_: Set<string> | undefined;
+  /** Its definition reads prevFacts (counted in `readers`). */
+  prev_: boolean;
+  /** L11 (D1): a data-form `on`, run over the facts and the previous ones. */
+  gate_?: (facts: object, prev?: object) => boolean;
   /** The pass whose changed keys reached it (T2). */
   hit_: number;
   cleanup: (() => void) | null;
@@ -163,9 +178,15 @@ export function createEffectsManager<S extends Schema>(
   const warnedAsync = new Set<string>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
-  const prevObserved = Object.values(definitions).some(
-    (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
-  );
+  // A data-form `on` gate is handed prevFacts, so it reads them (D1, R4).
+  // Asked once per definition, when its state is made: `readers` counts the
+  // states whose definition reads them, so a register or unregister does not
+  // walk every definition (B5).
+  const reads = (d: any): boolean =>
+    (!d?.deps && d?.on !== undefined) ||
+    (d?.run?.[PREV_READ] ?? declaresPrev(d?.run));
+  let readers = 0;
+  let prevObserved = false;
 
   const depKey = options.depKey ?? ((name: string) => name);
   /**
@@ -194,7 +215,7 @@ export function createEffectsManager<S extends Schema>(
   };
   /** Declaration order, for selection. */
   const order: EffectState[] = [];
-  for (const id of Object.keys(definitions)) {
+  function make(id: string): EffectState {
     const def = definitions[id];
     const deps = def?.deps as string[] | undefined;
     // As 1.35's initState: a data-form `on` that is no predicate is a user
@@ -204,11 +225,21 @@ export function createEffectsManager<S extends Schema>(
         `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
       );
     }
+    // L11 (D1): a data-form `on` is the gate, and the facts it names are
+    // the dependencies (not resolved against derivations, as 1.35).
+    const gate =
+      !deps && def?.on !== undefined ? options.pred?.on_(id, def) : undefined;
     const state: EffectState = {
       id,
       enabled: true,
-      explicit: Array.isArray(deps),
-      deps: Array.isArray(deps) ? new Set(deps.map(depKey)) : null,
+      explicit: Array.isArray(deps) || !!gate,
+      deps: gate
+        ? gate[1]
+        : Array.isArray(deps)
+          ? new Set(deps.map(depKey))
+          : null,
+      gate_: gate?.[0],
+      prev_: reads(def),
       // From the start, as selection reads them: one shape for every state.
       spare_: undefined,
       hit_: 0,
@@ -218,8 +249,32 @@ export function createEffectsManager<S extends Schema>(
       link(state, key);
     }
     states.set(id, state);
-    order.push(state);
+    state.prev_ && readers++;
+
+    return state;
   }
+  for (const id of Object.keys(definitions)) {
+    order.push(make(id));
+  }
+  prevObserved = readers > 0;
+  /** L10: an effect leaves, after its cleanup; its index entries go. */
+  const drop = (id: string) => {
+    const state = get(id);
+    runCleanup(state);
+    for (const key of state.deps ?? []) {
+      unlink(state, key);
+    }
+    states.delete(id);
+    state.prev_ && readers--;
+
+    return order.indexOf(state);
+  };
+  /** L10 (K6): the last reader of `prev` leaving stops the copying; a new one starts it. */
+  const reprev = () => {
+    if (prevObserved !== (prevObserved = readers > 0)) {
+      snapshotPrevious();
+    }
+  };
 
   /**
    * T1: a good auto-tracked run's reads become its dependencies. It tracked
@@ -429,6 +484,7 @@ export function createEffectsManager<S extends Schema>(
   function run(
     state: EffectState,
     thrown: Array<[EffectState, unknown]>,
+    bare?: unknown,
   ): Promise<void> | undefined {
     const def = definitions[state.id];
     if (!state.enabled || !def) {
@@ -447,7 +503,7 @@ export function createEffectsManager<S extends Schema>(
     try {
       running = state;
       runningDef = def;
-      if (state.explicit) {
+      if (state.explicit || bare) {
         store.batch(body);
       } else {
         // withTracking's frame, without its result object, into the spare
@@ -562,7 +618,9 @@ export function createEffectsManager<S extends Schema>(
           reruns.has(state.id) ||
           (nav
             ? navWakes(state, back, changed)
-            : !state.explicit && !state.deps?.size))
+            : !state.explicit && !state.deps?.size)) &&
+        // D1: after the dependency pre-filter, the gate over a snapshot.
+        (!state.gate_ || state.gate_(store.toObject(), previous ?? undefined))
       ) {
         out.push(state);
       }
@@ -623,11 +681,48 @@ export function createEffectsManager<S extends Schema>(
     async runAll() {
       await runFast([...states.values()]);
     },
-    async callOne(id) {
-      const state = states.get(id);
-      if (state) {
-        await runFast([state]);
+    // L10: the registry's hooks; it has written `definitions` first.
+    add_(id) {
+      order.push(make(id));
+      reprev();
+    },
+    replace_(id) {
+      // 1.35: the old definition is cleaned up first, and keeps its place.
+      order[drop(id)] = make(id);
+      reprev();
+    },
+    remove_(id) {
+      order.splice(drop(id), 1);
+      reprev();
+    },
+    call_(id) {
+      return this.callOne(id);
+    },
+    link_(name) {
+      // K6, 1.35's refreshDeps: a declared name that is now a derivation.
+      for (const state of order) {
+        if (state.explicit && state.deps!.delete(name)) {
+          unlink(state, name);
+          const key = depKey(name);
+          state.deps!.add(key);
+          link(state, key);
+        }
       }
+    },
+    reads_: (key) => index.has(key),
+    callOne(id) {
+      // 1.35's callOne: no tracking frame of its own, so what the body reads
+      // goes to whoever called it (an effect calling it depends on those
+      // reads too), its dependencies stay, and the pass's previous facts
+      // too. It awaits only an async run: a sync one answers now.
+      const thrown: Array<[EffectState, unknown]> = [];
+      const state = states.get(id);
+      const done = state && run(state, thrown, 1);
+      for (const [s, error] of thrown) {
+        report(s, error);
+      }
+
+      return done ? done.then(() => {}) : Promise.resolve();
     },
     cleanupAll() {
       stopped = true;
@@ -702,6 +797,7 @@ export const withEffects: SystemPart = (ctx) => {
     },
     watch: ctx.watch,
     definitions: (ctx.module.effects ?? {}) as Record<string, any>,
+    pred: ctx.pred_,
     facts: ctx.facts,
     store: ctx.store,
     derived: ctx.derived,
@@ -750,6 +846,7 @@ export const withEffects: SystemPart = (ctx) => {
     Object.assign(manager, { fresh_: () => retries.clear() }),
   );
   // 1.35's controls (engine.ts:2633–2636); none asks for a pass.
+  ctx.kinds_.effect = manager;
   ctx.system.effects = {
     disable: manager.disable,
     enable: manager.enable,

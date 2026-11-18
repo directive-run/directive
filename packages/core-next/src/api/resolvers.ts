@@ -135,6 +135,8 @@ export interface Run extends Writer {
   attempt_: number;
   /** Its one outcome has been reported. */
   done_: boolean;
+  /** L10b: the run's execution, which an unregisterModule waits for. */
+  p_?: Promise<unknown>;
   /** A with-results batch's item errors, from its latest attempt. */
   errors_?: Map<RequirementWithId, Error>;
 }
@@ -212,7 +214,7 @@ export interface Batcher {
    * Cancel the queued requirement `only`, or with none every queued one
    * (stop()), adding each id to `ids`.
    */
-  drop_(ids: string[], only?: string): void;
+  drop_(ids: string[], only?: string, resolver?: string): void;
   /** Some requirement waits in a queue; `busy`: or a batch's end is due. */
   queued_(busy?: boolean): boolean;
 }
@@ -243,6 +245,9 @@ export interface Resolvers {
   inflight: ReadonlyMap<string, Run>;
   /** A batched requirement waits in a queue (see Batcher). */
   queued_(busy?: boolean): boolean;
+  /** L10 (K5): an unregistered resolver's runs are canceled, its queue too. */
+  drop_(resolver: string): void;
+  waits_(ids: string[]): unknown[];
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -729,7 +734,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   ) => {
     const run = make(resolverId, req);
     emit("resolver.start", () => ({ resolver: resolverId, req }));
-    execute(def, run, baseline).finally(() => {
+    (run.p_ = execute(def, run, baseline)).finally(() => {
       // 1.35 leaves flight here, a microtask after the outcome: a run
       // canceled or detached meanwhile has left already and asks for no
       // pass.
@@ -826,6 +831,17 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       // all).
       ids[0] ||
         started([run]).forEach((old) => old?.reqs_ && part(old, requirementId));
+    },
+    // L10b: 1.35's drainResolvers waits on these (resolvers.ts:2051).
+    waits_: (ids) =>
+      [...inflight.values(), ...detached]
+        .filter((run) => ids.includes(run.resolver_))
+        .map((run) => run.p_),
+    drop_(resolver) {
+      for (const run of new Set(started([...inflight.values()]))) {
+        run!.resolver_ === resolver && cancel(run!);
+      }
+      batcher?.drop_([], undefined, resolver);
     },
     abortAll_() {
       const ids: string[] = [];

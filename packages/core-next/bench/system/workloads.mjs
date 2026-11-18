@@ -199,6 +199,95 @@ function checkFrame(workload, steps, runs, base, last, sys) {
   expect(workload, "d9 read", sys.derive.d9, 2 * steps + 37);
 }
 
+// B5 (L10 RFC): a module registered and unregistered 100 times while the
+// host's resolver runs. One step is 100 register/unregister pairs, each with
+// a read of the module's derivation in between; the host's resolver stays in
+// flight the whole time, so no unregister finds it settled.
+async function buildModuleChurn({ createModule, createSystem, t }) {
+  let release = () => {};
+  let started = 0;
+  let finished = 0;
+  const sys = createSystem({
+    module: createModule("host", {
+      schema: {
+        facts: { go: t.boolean() },
+        requirements: { HOLD: {} },
+      },
+      init: (f) => {
+        f.go = true;
+      },
+      constraints: {
+        hold: { when: (f) => f.go, require: { type: "HOLD" } },
+      },
+      resolvers: {
+        hold: {
+          requirement: "HOLD",
+          resolve: () => {
+            started++;
+
+            return new Promise((resolve) => {
+              release = () => {
+                finished++;
+                resolve();
+              };
+            });
+          },
+        },
+      },
+    }),
+  });
+  sys.start();
+  await tick();
+  const churn = createModule("churn", {
+    schema: {
+      facts: { c: t.number() },
+      derivations: { twice: t.number() },
+      events: { bump: {} },
+      requirements: { NEVER: {} },
+    },
+    init: (f) => {
+      f.c = 1;
+    },
+    derive: { twice: (f) => f.c * 2 },
+    events: {
+      bump: (f) => {
+        f.c += 1;
+      },
+    },
+    effects: { see: { run: () => undefined } },
+    constraints: {
+      never: { when: (f) => f.c > 1e9, require: { type: "NEVER" } },
+    },
+    resolvers: { never: { requirement: "NEVER", resolve() {} } },
+  });
+  let sum = 0;
+  let pairs = 0;
+
+  return {
+    async step() {
+      for (let k = 0; k < 100; k++) {
+        sys.registerModule(churn);
+        sum += sys.derive.twice;
+        await sys.unregisterModule("churn");
+        pairs++;
+      }
+    },
+    check(steps) {
+      expect("module-churn", "pairs", pairs, 100 * steps);
+      expect("module-churn", "sum of reads", sum, 200 * steps);
+      expect("module-churn", "the module gone", "c" in sys.facts, false);
+      expect("module-churn", "the host resolver started", started, 1);
+      expect("module-churn", "the host resolver in flight", finished, 0);
+
+      return null;
+    },
+    done() {
+      release();
+      sys.destroy();
+    },
+  };
+}
+
 export const workloads = {
   // 1,000 writes to one number fact (one basic effect reads it), then settle.
   "scalar-writes": {
@@ -1026,5 +1115,23 @@ export const workloads = {
         },
       };
     },
+  },
+  // B5 (L10 RFC): the same body measured two ways. `module-churn` is the B5
+  // bar: time per pair at steady state, no forced gc before a timed block.
+  // `module-churn-leak` is the old forced-gc run, kept as a report-only leak check.
+  "module-churn": {
+    op: "one registerModule + unregisterModule pair, a resolver in flight (steady state, no forced gc)",
+    ops: 100,
+    steady: true,
+    retainedHeap: true,
+    async: true,
+    build: buildModuleChurn,
+  },
+  "module-churn-leak": {
+    op: "one registerModule + unregisterModule pair, forced gc before each block (REPORT-ONLY leak check)",
+    ops: 100,
+    retainedHeap: true,
+    async: true,
+    build: buildModuleChurn,
   },
 };

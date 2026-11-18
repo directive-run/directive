@@ -159,6 +159,9 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
       return [{ type, plugin, screenedCount, screenedDigest, reason }];
     }
     // L5: sources.ts, with 1.35's localId; the rest in the order emitted.
+    case "module.registered":
+    case "module.unregistered":
+      return [{ type, id: event.id }];
     case "source.attach":
     case "source.publish":
     case "source.drop":

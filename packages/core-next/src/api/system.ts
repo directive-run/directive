@@ -22,6 +22,7 @@ import {
   createSystemCore,
 } from "./core.js";
 import { withDefaults } from "./defaults.js";
+import { withDynamic } from "./dynamic.js";
 import { withEffects } from "./effects.js";
 import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withHistory } from "./history.js";
@@ -31,6 +32,7 @@ import { withMissing } from "./missing.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
 import { withPlugins } from "./plugins.js";
+import { withPredicates } from "./predicate.js";
 import { withReconcile } from "./reconcile.js";
 import { withRestore } from "./restore.js";
 import { withSources } from "./sources.js";
@@ -77,6 +79,8 @@ export function createSystem<
     ? (options.history ?? isDevelopment)
     : options.history;
   const parts: SystemPart[] = [
+    // L11: first, so the parts after it read its hooks at registration.
+    withPredicates,
     // L9a: every 1.35 system has `meta`; it freezes the definitions' meta.
     withMeta,
     withEffects,
@@ -95,6 +99,9 @@ export function createSystem<
     withDefaults,
     // L8: the `history:` option needs no import (A1, O1).
     withHistory(history as never),
+    // L10a: register, assign, unregister and call on the four kinds; every
+    // 1.35 system has them.
+    withDynamic,
     // 1.35 members 2.0 has not built: they throw featureMissing (P3-F3).
     withMissing,
     // Its onInit pass starts once the system is complete.
@@ -140,7 +147,26 @@ export function createSystem<
   }
 
   if ("module" in options) {
-    return createSystemCore(options, parts);
+    const m = options.module as Record<string, any>;
+    // L10: what a running system registers goes in its own maps, not the
+    // module's, which another system may share.
+    return createSystemCore(
+      {
+        ...options,
+        module: m && {
+          ...m,
+          schema: { ...m.schema, facts: { ...m.schema?.facts } },
+          hooks_: m.hooks ? [m.hooks] : [],
+          derive: { ...m.derive },
+          events: { ...m.events },
+          effects: { ...m.effects },
+          sources: { ...m.sources },
+          constraints: { ...m.constraints },
+          resolvers: { ...m.resolvers },
+        },
+      } as never,
+      parts,
+    );
   }
   const modules = options.modules as Record<string, unknown>;
   if (Array.isArray(modules)) {
