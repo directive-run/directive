@@ -177,6 +177,39 @@ describe("the history rows' triggers", () => {
         ...moveBack,
       ]),
     ).toBe(true);
+    // A goTo can raise the index with no write, as a forward can; a back
+    // alone cannot, so that changeset records no range (#383's follow-up).
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        { op: "goTo", position: 1 },
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(true);
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        { op: "back" },
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(false);
+    // An end with no open changeset records nothing (#383's follow-up):
+    // with no begin at all, and as a second end after a changeset that
+    // recorded none.
+    expect(has("changesetMoved", [set, { op: "end" }, ...moveBack])).toBe(
+      false,
+    );
+    expect(
+      has("changesetMoved", [
+        { op: "begin" },
+        { op: "end" },
+        set,
+        { op: "end" },
+        ...moveBack,
+      ]),
+    ).toBe(false);
     // An empty first changeset, then a recorded one: the write inside the
     // second is part of its range, not a move of it.
     expect(
@@ -245,6 +278,19 @@ describe("the history rows' triggers", () => {
         { op: "resume" },
         { op: "back", steps: 2 },
       ]),
+    ).toBe(false);
+    // A goTo inside the changeset records a range; an end with no open
+    // changeset records none (#383's follow-ups).
+    expect(
+      has("changesetSteps", [
+        { op: "begin" },
+        { op: "goTo", position: 2 },
+        { op: "end" },
+        { op: "back", steps: 2 },
+      ]),
+    ).toBe(true);
+    expect(
+      has("changesetSteps", [set, { op: "end" }, { op: "back", steps: 2 }]),
     ).toBe(false);
   });
 });

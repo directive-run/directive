@@ -9932,11 +9932,11 @@
           "layer": "L8",
           "by": ["member .goBack", "member .history", "option history"]
         },
-        "a stored snapshot is the same object the caller holds, in production (U3) > a value changed through the snapshots list is what the next goTo restores": {
+        "a stored snapshot and a restored fact, in production (U3) > a snapshot in the snapshots list holds its pass's value, and goTo restores it": {
           "layer": "L8",
           "by": ["member .goTo", "member .history", "option history"]
         },
-        "a stored snapshot is the same object the caller holds, in production (U3) > a nested value edited in place on a restored fact edits the stored snapshot too": {
+        "a stored snapshot and a restored fact, in production (U3) > a nested value edited in place on a restored fact changes the live fact": {
           "layer": "L8",
           "by": ["member .goBack", "member .history", "option history"]
         },
@@ -9971,15 +9971,15 @@
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
-        "a stored snapshot is the same object the caller holds (U3) > a value changed through the snapshots list is what the next goTo restores": {
+        "a stored snapshot and a restored fact (U3) > a snapshot in the snapshots list holds its pass's value, and goTo restores it": {
           "layer": "L8",
           "by": ["member .goTo", "member .history", "option history"]
         },
-        "a stored snapshot is the same object the caller holds (U3) > a nested value edited in place on a restored fact edits the stored snapshot too": {
+        "a stored snapshot and a restored fact (U3) > a nested value edited in place on a restored fact changes the live fact": {
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
-        "snapshot ids after an import (U6) > repeat when the system's counter is behind the imported ids, and goTo finds the first": {
+        "snapshot ids after an import (U6) > an import into a system whose counter is behind keeps the imported ids, and goTo finds the imported snapshot": {
           "layer": "L8",
           "by": ["member .goTo", "member .history", "option history"]
         },
@@ -9987,11 +9987,11 @@
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
-        "a changeset and goBack(steps) (U8) > (a) goBack(2) from inside a changeset lands on its start: the second step is dropped": {
+        "a changeset and goBack(steps) (U8) > (a) goBack from inside a changeset lands on its start": {
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
-        "a changeset and goBack(steps) (U8) > (b) goBack(2) from outside, into a changeset, stops inside it": {
+        "a changeset and goBack(steps) (U8) > (b) goBack from outside a changeset moves one snapshot, onto its end": {
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
@@ -10003,7 +10003,7 @@
           "layer": "L8",
           "by": ["member .history", "option history"]
         },
-        "an import with a currentIndex outside the list (U9) > is accepted, changes no fact, and goBack from it restores nothing": {
+        "an import with a currentIndex outside the list (U9) > changes no fact and leaves three snapshots": {
           "layer": "L8",
           "by": ["member .history", "option history"]
         },

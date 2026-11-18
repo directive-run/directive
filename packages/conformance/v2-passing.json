@@ -1637,8 +1637,13 @@
         "onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes"
       ],
       "tests/core/l8-history-pins-oracle.test.ts": [
+        "a changeset and goBack(steps) (U8) > (a) goBack from inside a changeset lands on its start",
+        "a changeset and goBack(steps) (U8) > (b) goBack from outside a changeset moves one snapshot, onto its end",
         "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) jumps to the start of an earlier changeset whose end is within steps",
         "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) moves steps snapshots when no earlier changeset ends within them",
+        "a stored snapshot and a restored fact (U3) > a nested value edited in place on a restored fact changes the live fact",
+        "a stored snapshot and a restored fact (U3) > a snapshot in the snapshots list holds its pass's value, and goTo restores it",
+        "an import with a currentIndex outside the list (U9) > changes no fact and leaves three snapshots",
         "export and import of a Date, a Map and a Set (U1) > export writes a Date as an ISO string and a Map and a Set as {}",
         "export and import of a Date, a Map and a Set (U1) > import writes that string and those empty objects into the facts",
         "going back over a fact the snapshot did not hold (U10) > goForward does not delete a fact again: delete n, goBack gives 1, goForward is still 1",
@@ -1646,6 +1651,7 @@
         "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start",
         "pause() inside a changeset (U18) > records no range when the only write was paused, so goBack moves one snapshot",
         "redactSnapshot and a navigation (U11) > a navigation writes the redacted value into the live fact",
+        "snapshot ids after an import (U6) > an import into a system whose counter is behind keeps the imported ids, and goTo finds the imported snapshot",
         "snapshot ids after an import (U6) > do not repeat when the system is already past the imported ids",
         "the members of system.history (U12) > carries takeSnapshot, restore, refreshLatestSnapshot, isEnabled and isRestoring",
         "the members of system.history (U12) > is null when history is not asked for",
@@ -2400,6 +2406,8 @@
         "a Date, a Map and a Set in production (U1, U2) > a fact mixing a Date with a function falls to JSON: its Date is a string, while a Date in a fact that clones stays a Date",
         "a Date, a Map and a Set in production (U1, U2) > come back as themselves through goBack when the whole record clones",
         "a Date, a Map and a Set in production (U1, U2) > leave an export as an ISO string and two empty objects, and import writes those",
+        "a stored snapshot and a restored fact, in production (U3) > a nested value edited in place on a restored fact changes the live fact",
+        "a stored snapshot and a restored fact, in production (U3) > a snapshot in the snapshots list holds its pass's value, and goTo restores it",
         "redactSnapshot and a navigation, in production (U11) > a navigation writes the redacted value into the live fact"
       ],
       "tests/core/l8-system-oracle-production.test.ts": [
