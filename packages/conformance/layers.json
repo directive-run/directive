@@ -7038,7 +7038,7 @@
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         },
-        "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": {
+        "production: a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init": {
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         },
@@ -7065,7 +7065,7 @@
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         },
-        "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up": {
+        "a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init": {
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
         },

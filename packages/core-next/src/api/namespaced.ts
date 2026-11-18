@@ -499,12 +499,24 @@ export function createNamespacedSystem(
       live || (derivations[p(key)] = type);
       keys.push(p(key));
     }
+    /** L11 (D5): the namespace and its pivots, for a data form's prefix. */
+    const pivot = [ns, deps];
     for (const [key, raw] of Object.entries(mod.derive ?? {})) {
       const meta = typeof raw === "function" ? undefined : (raw as Rec)?.meta;
       const fn = typeof raw === "function" ? raw : (raw as Rec)?.compute;
       const wrapper = (src: Rec, d: Rec) =>
         fn(scopedFacts(src, ns, deps, "derive"), deriveOf(d, ns));
-      derive[p(key)] = meta ? { compute: wrapper, meta } : wrapper;
+      derive[p(key)] =
+        typeof fn === "object" && fn
+          ? // L11 (D5): a data form, over the module's facts (the seam's scope).
+            {
+              compute: fn,
+              meta,
+              scope_: (src: Rec) => [scopedFacts(src, ns, deps, "derive")],
+            }
+          : meta
+            ? { compute: wrapper, meta }
+            : wrapper;
     }
     for (const [key, raw] of Object.entries(mod.events ?? {})) {
       const handler =
@@ -512,6 +524,24 @@ export function createNamespacedSystem(
           ? (raw as Rec).handler
           : raw;
       const meta = handler === raw ? undefined : (raw as Rec).meta;
+      if (
+        isDevelopment &&
+        handler !== raw &&
+        Object.hasOwn(raw as object, "patch")
+      ) {
+        console.warn(
+          `[Directive] event "${key}": both \`handler\` and \`patch\` provided — using \`handler\` (patch is ignored).`,
+        );
+      }
+      if (typeof handler === "object" && handler?.patch) {
+        // L11 (D3): a patch writes the module's facts (the seam's scope).
+        events[p(key)] = {
+          patch: handler.patch,
+          meta: handler.meta,
+          scope_: (src: Rec, event: unknown) => [factsOf(src, ns), event],
+        };
+        continue;
+      }
       const wrapper = (src: Rec, event: unknown) =>
         handler(factsOf(src, ns), event);
       events[p(key)] = meta ? { handler: wrapper, meta } : wrapper;
@@ -529,7 +559,8 @@ export function createNamespacedSystem(
       (run as unknown as Record<symbol, boolean>)[PREV_READ] = declaresPrev(
         def.run,
       );
-      effects[p(key)] = { ...def, run, deps: def.deps?.map(p) };
+      // L11 (D5): a data-form `on` is prefixed by the predicates part.
+      effects[p(key)] = { ...def, run, deps: def.deps?.map(p), ns_: pivot };
     }
     // 1.35's prefixSources: ids become `ns::id`; a key or active gate reads
     // the module's facts through `gate_` below (G6), so the definition is
@@ -557,6 +588,8 @@ export function createNamespacedSystem(
         after: def.after?.map(inNs),
         abortOn: def.abortOn?.map(inNs),
         when: typeof def.when === "function" ? scoped(def.when) : def.when,
+        // L11 (D5): a data-form `when` is prefixed by the predicates part.
+        ns_: pivot,
         require:
           typeof def.require === "function" ? scoped(def.require) : def.require,
       };

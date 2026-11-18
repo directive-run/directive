@@ -38,6 +38,7 @@ import type {
   SystemPart,
 } from "./core.js";
 import { DERIVATION_DEP_PREFIX, describeDep } from "./facts.js";
+import { evaluateKeySelector } from "./predicate.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
 import type { ModuleDefinition } from "./types.js";
@@ -99,9 +100,12 @@ const build = (context: SystemContext) => {
   // finishes after destroy()).
   const emitRun = emitter(hooks.wants, hooks.emit);
   const keys: Record<string, RequirementKeyFn> = {};
+  /** D4: a `key` given as field names (1.35's normalizeResolverKey). */
+  const keyFn = (key: any): RequirementKeyFn =>
+    Array.isArray(key) ? (req) => evaluateKeySelector(key, req as never) : key;
   for (const def of Object.values(resolverDefs)) {
     if (def?.key && typeof def.requirement === "string") {
-      keys[def.requirement] = def.key;
+      keys[def.requirement] = keyFn(def.key);
     }
   }
   /** Some constraint lists `abortOn` keys: only then is a baseline read. */
@@ -153,8 +157,25 @@ const build = (context: SystemContext) => {
       !!module.derive && Object.hasOwn(module.derive, name),
     watch: context.watch,
     clock,
-    onEvaluate: (id, active) =>
-      emit("constraint.evaluate", () => ({ id, active })),
+    // I2: `explain` only when the record is built (something listens), and
+    // only for a data form: a second, untracked walk (E11, as 1.35).
+    onEvaluate: (id, active) => {
+      emit("constraint.evaluate", () => {
+        const explain = constraints.explain_(id);
+
+        return explain ? { id, active, explain } : { id, active };
+      });
+      // 1.35 walks whenever a plugin is installed (engine.ts:1248); only
+      // development can tell, by its warnings.
+      if (
+        isDevelopment &&
+        !context.wants_("constraint.evaluate") &&
+        (kernel.features as any).plugins?.list.length
+      ) {
+        constraints.explain_(id);
+      }
+    },
+    pred: context.pred_,
     onError(id, error) {
       const strategy = reportError("constraint", id, error);
       emit("constraint.error", () => ({ id, error }));
@@ -640,7 +661,9 @@ const build = (context: SystemContext) => {
         // A constraint held back by `after` was released (quirk e).
         schedule();
       }
-      const result = {
+      // Built only when `reconcile.end` is wanted: core calls it straight
+      // after this returns, with nothing run in between (B5).
+      return () => ({
         // As 1.35: a batch run is in neither list ((as) is for settle()
         // and inspect() only).
         unmet: current.filter((r) => !solo(r.id)),
@@ -652,9 +675,7 @@ const build = (context: SystemContext) => {
           id: r.id,
           resolverId: solo(r.id)?.resolver_ ?? "unknown",
         })),
-      };
-
-      return result;
+      });
     },
     // (as): a running batch is in flight, and one whose end is due; a
     // queued one is pending (1.35).
@@ -704,7 +725,9 @@ const build = (context: SystemContext) => {
           lastActiveAt: state.lastActiveAt,
           meta: def.meta,
           // S6: a data-form `when` is its own spec (filled by L11's compiler).
-          ...(typeof def.when === "object" ? { whenSpec: def.when } : {}),
+          ...(constraints.specs_.has(state.id)
+            ? { whenSpec: constraints.specs_.get(state.id)![0] }
+            : {}),
           ...(abortOn ? { abortOn } : {}),
         };
       }),
@@ -788,6 +811,8 @@ const build = (context: SystemContext) => {
     if (meta?.description) {
       lines.push(`├─ Description: ${meta.description}`);
     }
+    // I3: a data-form `when`'s clauses.
+    context.pred_?.print_(lines, constraints.explain_(from));
     const payload = Object.entries(req.requirement)
       .filter(([k]) => k !== "type")
       .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
@@ -811,7 +836,7 @@ const build = (context: SystemContext) => {
   // L10: the hooks withDynamic's registry calls, after it writes the maps.
   const keyOf = (def: ResolverDef | undefined) => {
     if (def?.key && typeof def.requirement === "string") {
-      keys[def.requirement] = def.key;
+      keys[def.requirement] = keyFn(def.key);
     }
   };
   const constraint = (id: string, full?: unknown) => {
@@ -821,7 +846,11 @@ const build = (context: SystemContext) => {
   const resolver = (id: string) => keyOf(resolverDefs[id]);
   context.kinds_.constraint = {
     add_: (id) => constraint(id, constraintDefs[id]!.after?.length),
-    replace_: (id) => constraint(id, 1),
+    // R2: an assign drops the old spec before the new one is normalized.
+    replace_(id) {
+      constraints.specs_.delete(id);
+      constraint(id, 1);
+    },
     remove_(id) {
       constraints.remove_(id);
       // 1.35 (engine.ts:2612–2631): a constraint registered again may warn again.
@@ -845,6 +874,7 @@ const build = (context: SystemContext) => {
       resolvers.drop_(id);
     },
     waits_: resolvers.waits_,
+    retire_: resolvers.retire_,
     // `call` on a resolver is dynamic.ts's own (it needs only the map).
   };
   system.constraints ??= {};

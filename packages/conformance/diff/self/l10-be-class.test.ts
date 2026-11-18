@@ -5,7 +5,7 @@ import { LIKE } from "../fingerprint.js";
 // Row (be) at L10 (GATE-9.md, run 2): the class of the restore key the
 // (be) fuzz entry bounds, and that one entry is its only user.
 describe("historyFactKey, row (be)'s restore key", () => {
-  const like = LIKE.historyFactKey;
+  const like = LIKE.historyFactKey as NonNullable<(typeof LIKE)[string]>;
 
   it("takes a seed's facts, when, the L10 dynamic facts and module z's", () => {
     for (const k of [

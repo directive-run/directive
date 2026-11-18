@@ -62,7 +62,8 @@ const computeOf = (def: any): unknown => {
     );
   }
 
-  return fn;
+  // L11: a data form goes to the core as its definition (the seam).
+  return typeof fn === "object" ? def : fn;
 };
 
 /** Object-form derivations given to `assign`: 1.35 keeps those as given. */
@@ -571,7 +572,8 @@ const modules = (ctx: SystemContext): Fn[] => {
     };
     for (const key of keys(mod.events)) {
       const def = (m.events[key] = mod.events[key]);
-      ctx.events_[key] = def?.handler ?? def;
+      ctx.events_[key] =
+        def?.handler ?? (def?.patch ? ctx.lazy_(def, "handler", key) : def);
     }
     freeze(mod.derive);
     // M2: a derivation that exists is replaced, with no word.
@@ -662,9 +664,13 @@ const modules = (ctx: SystemContext): Fn[] => {
       delete m.resolvers[key];
       delete m.owners_?.[key];
       // A key function another resolver declares for the type stays.
-      const kept = Object.values(m.resolvers).some(
-        (other: any) => other?.key && other.requirement === def?.requirement,
-      );
+      // Only a keyed definition's key function can go (reconcile's remove_
+      // reads nothing else), so only then is another one looked for (B5).
+      const kept =
+        !def?.key ||
+        Object.values(m.resolvers).some(
+          (other: any) => other?.key && other.requirement === def.requirement,
+        );
       hooks?.remove_(key, kept ? undefined : def);
       gone("resolver", key);
     }
@@ -685,6 +691,8 @@ const modules = (ctx: SystemContext): Fn[] => {
     }
     const facts = keys(mod.schema?.facts);
     store.unregisterKeys(facts);
+    // Row (cd): its resolvers' late writes never reach a replacement.
+    hooks?.retire_?.(resolvers, new Set(facts), id);
     ctx.keys_?.(facts.map((key) => [key]));
     list.splice(list.indexOf(mod), 1);
     const at = m.hooks_.indexOf(mod.hooks);

@@ -165,7 +165,7 @@ describe("registerModule's refusals (L10 gate debt)", () => {
               );
               seen.push("registered");
             } catch (error) {
-              seen.push(String(error.message));
+              seen.push(String((error as Error).message));
             }
           },
         },
@@ -339,7 +339,7 @@ describe("registerModule merges history.snapshotEvents (L10 gate debt)", () => {
     system.registerModule(evented("g", ["g1", "g2"], ["g1"]));
     system.registerModule(evented("h", ["h1"]));
 
-    const counts = {};
+    const counts: Record<string, unknown> = {};
     for (const type of ["e1", "f1", "f2", "g1", "g2", "h1"]) {
       counts[type] = await snapshots(system, type);
     }
@@ -563,7 +563,9 @@ describe("runtime definitions (L10 gate debt)", () => {
     const snapshot = system.inspect();
 
     expect(snapshot.facts).toContainEqual({ key: "z", meta: undefined });
-    expect(snapshot.constraints.find((c) => c.id === "dyn")).toEqual({
+    expect(
+      snapshot.constraints.find((c: { id: string }) => c.id === "dyn"),
+    ).toEqual({
       id: "dyn",
       active: false,
       disabled: false,

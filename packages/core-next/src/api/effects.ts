@@ -10,11 +10,14 @@
 import isDevelopment from "#is-development";
 import type { SystemPart } from "./core.js";
 import { DERIVATION_DEP_PREFIX, type Tracker, describeDep } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import { type CheckedReadView, createCheckedReadView } from "./readonly.js";
 import type { Facts, FactsStore, Schema } from "./types.js";
 
 export interface CreateEffectsOptions<S extends Schema> {
   definitions: Record<string, any>;
+  /** L11: the predicates part's hooks (a data-form `on`). */
+  pred?: Predicates;
   facts: Facts<S>;
   store: FactsStore<S>;
   derived?: Record<string, unknown>;
@@ -83,6 +86,10 @@ interface EffectState {
   deps: Set<string> | null;
   /** T1: the cleared set the next auto-tracked run tracks into. */
   spare_: Set<string> | undefined;
+  /** Its definition reads prevFacts (counted in `readers`). */
+  prev_: boolean;
+  /** L11 (D1): a data-form `on`, run over the facts and the previous ones. */
+  gate_?: (facts: object, prev?: object) => boolean;
   /** The pass whose changed keys reached it (T2). */
   hit_: number;
   cleanup: (() => void) | null;
@@ -171,11 +178,15 @@ export function createEffectsManager<S extends Schema>(
   const warnedAsync = new Set<string>();
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
-  const reads = () =>
-    Object.values(definitions).some(
-      (d) => d?.run?.[PREV_READ] ?? declaresPrev(d?.run),
-    );
-  let prevObserved = reads();
+  // A data-form `on` gate is handed prevFacts, so it reads them (D1, R4).
+  // Asked once per definition, when its state is made: `readers` counts the
+  // states whose definition reads them, so a register or unregister does not
+  // walk every definition (B5).
+  const reads = (d: any): boolean =>
+    (!d?.deps && d?.on !== undefined) ||
+    (d?.run?.[PREV_READ] ?? declaresPrev(d?.run));
+  let readers = 0;
+  let prevObserved = false;
 
   const depKey = options.depKey ?? ((name: string) => name);
   /**
@@ -214,11 +225,21 @@ export function createEffectsManager<S extends Schema>(
         `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
       );
     }
+    // L11 (D1): a data-form `on` is the gate, and the facts it names are
+    // the dependencies (not resolved against derivations, as 1.35).
+    const gate =
+      !deps && def?.on !== undefined ? options.pred?.on_(id, def) : undefined;
     const state: EffectState = {
       id,
       enabled: true,
-      explicit: Array.isArray(deps),
-      deps: Array.isArray(deps) ? new Set(deps.map(depKey)) : null,
+      explicit: Array.isArray(deps) || !!gate,
+      deps: gate
+        ? gate[1]
+        : Array.isArray(deps)
+          ? new Set(deps.map(depKey))
+          : null,
+      gate_: gate?.[0],
+      prev_: reads(def),
       // From the start, as selection reads them: one shape for every state.
       spare_: undefined,
       hit_: 0,
@@ -228,12 +249,14 @@ export function createEffectsManager<S extends Schema>(
       link(state, key);
     }
     states.set(id, state);
+    state.prev_ && readers++;
 
     return state;
   }
   for (const id of Object.keys(definitions)) {
     order.push(make(id));
   }
+  prevObserved = readers > 0;
   /** L10: an effect leaves, after its cleanup; its index entries go. */
   const drop = (id: string) => {
     const state = get(id);
@@ -242,12 +265,13 @@ export function createEffectsManager<S extends Schema>(
       unlink(state, key);
     }
     states.delete(id);
+    state.prev_ && readers--;
 
     return order.indexOf(state);
   };
   /** L10 (K6): the last reader of `prev` leaving stops the copying; a new one starts it. */
   const reprev = () => {
-    if (prevObserved !== (prevObserved = reads())) {
+    if (prevObserved !== (prevObserved = readers > 0)) {
       snapshotPrevious();
     }
   };
@@ -594,7 +618,9 @@ export function createEffectsManager<S extends Schema>(
           reruns.has(state.id) ||
           (nav
             ? navWakes(state, back, changed)
-            : !state.explicit && !state.deps?.size))
+            : !state.explicit && !state.deps?.size)) &&
+        // D1: after the dependency pre-filter, the gate over a snapshot.
+        (!state.gate_ || state.gate_(store.toObject(), previous ?? undefined))
       ) {
         out.push(state);
       }
@@ -771,6 +797,7 @@ export const withEffects: SystemPart = (ctx) => {
     },
     watch: ctx.watch,
     definitions: (ctx.module.effects ?? {}) as Record<string, any>,
+    pred: ctx.pred_,
     facts: ctx.facts,
     store: ctx.store,
     derived: ctx.derived,

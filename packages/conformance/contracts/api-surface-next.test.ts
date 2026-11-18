@@ -117,6 +117,16 @@ describe("core-next public API surface", () => {
     );
   });
 
+  // The guard lets an engine PR remove names from next-unshipped.json
+  // (Jason, 2026-11-17); this gate is what catches a false removal.
+  it("a name removed from next-unshipped.json that core-next does not ship fails", () => {
+    expect(next["."]?.doctor).toBeUndefined();
+    const { ". doctor": _, ...removed } = unshipped;
+    expect(gate(next, { unshipped: removed }).failures).toEqual([
+      dropped(". doctor"),
+    ]);
+  });
+
   it("a missing export the layer tables do not place fails", () => {
     const tampered = copy(next);
     delete tampered["."]?.createSystem;
@@ -202,7 +212,13 @@ describe("core-next public API surface", () => {
     for (const layer of Object.values(unshipped)) {
       perLayer[layer] = (perLayer[layer] ?? 0) + 1;
     }
-    expect(perLayer).toEqual({ L8: 2, L11: 33, L12: 11, L13: 1 });
+    // Tighten-only: an engine PR removes a name when it ships it (owner,
+    // 2026-11-17: "Route B: approve the rule (Recommended)"), so each
+    // layer's count may fall, never rise past the list as it stood then.
+    const ceiling: Record<string, number> = { L8: 2, L11: 33, L12: 11, L13: 1 };
+    for (const [layer, count] of Object.entries(perLayer)) {
+      expect(count, layer).toBeLessThanOrEqual(ceiling[layer] ?? 0);
+    }
     expect(harnessFiles(conformanceRoot)).toContain(
       "contracts/next-unshipped.json",
     );

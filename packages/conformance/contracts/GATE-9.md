@@ -34,6 +34,14 @@ approved row. What remains is the owner's: B5 at 1.04, the two carried
 stops (L8's `./internals`, L9's seed d), and three owner row candidates
 (below).
 
+**Run 3 is green.** It merges main at 5ec3388e (the L8 gate #390, the L9
+gate #404, L10-pre-a #405, L10-pre-b #409, and #420, #422 and #424) and
+takes Jason's rulings of 2026-11-17 (below). Every check exits 0 but one
+local typecheck that needs a package CI builds and this machine could not
+(Run 3). B5 is met at steady state, row (cd) is signed, and the two carried
+stops are gone: seed d passes in 37 s, and `./internals` ships
+`createHistoryManager` and `createDisabledHistory` (#402).
+
 ## The L10 decisions
 
 | Row | What it decides | Outcome |
@@ -45,6 +53,13 @@ stops (L8's `./internals`, L9's seed d), and three owner row candidates
 | (bn) | A subscriber to a name registered later is told | Declined; 1.35's pin U4 stands; no entry |
 | (bo) | `getOriginal` and `restoreOriginal` are removed | Moot: a 1.35 system has neither member (U22), so there is nothing to remove; no entry |
 | B1 to B5 | The fuzz steps and harness rules; re-placing `dynamic-definitions`; `registerKeys` at L10; Claude signs; the `module-churn` workload | Taken |
+
+| B5, the bar | `module-churn` is measured at steady state | "Measure at steady state (Recommended)", 2026-11-17. Met: 0.92 times 1.35's time (B5, below) |
+| (cd) | A retired module's resolver write never lands in a replacement module's fact | "Approve all as recommended (Recommended)", 2026-11-17. Built in #424; one signed pin change (The pins) |
+| (bk) | No new resolver run after `destroy()` | 2.0's behaviour approved, "Approve all as recommended (Recommended)", 2026-11-17. No oracle test reaches the difference (Run 3) |
+| engine.ts 2261:9 | 1.35's error-boundary retry invalidates the readers of a same-named fact; 2.0 does not | 2.0's behaviour approved, the same words, 2026-11-17. No oracle test reaches it (Run 3) |
+| `onStop` twice | A `destroy()` during a pending unregister drain fires `onStop` twice | Kept as 1.35, which is parity, the same words, 2026-11-17 |
+| U18's letter | A new letter for L11's U18 candidate | Not this gate's concern |
 
 The rest stand as GATE-8.md records them: (ay) to (be), "Approve all as
 recommended (Recommended)" (2026-11-10), and the rows before them.
@@ -207,7 +222,7 @@ and dist.
 | Pin | What it holds | Why |
 | --- | --- | --- |
 | restore() after unregisterModule, single and namespaced | a snapshot taken before the unregister restores the live keys and drops the retired one, with no throw and no log | 1.35's `facts.ts:521`: a write to a retired key is dropped before validation. 2.0 threw in development until #411 |
-| a retired resolver's write after the 10 s drain | with fake timers: `unregisterModule` gives up at 10 s, a same-key replacement is registered, and the old resolver's write at 15 s lands on it (`written` 1) | M7 as built, on both engines (corrections, below). Only a 30 ms write was covered (`unregister-module`) |
+| a retired resolver's write after the 10 s drain | with fake timers: `unregisterModule` gives up at 10 s and a same-key replacement is registered with `written` 0. Both engines share that much | 1.35 lands it on the replacement (1.35's side only: the case keeps what both share and names the row, as U1 does for (bl); 2.0's side is pinned in core-next's `l10-m7-late-write` and `l10-m7-late-write-production`); 2.0 drops it, inside and after the drain, warning once in development (row cd, signed on the owner's instruction, "Approve all as recommended (Recommended)", 2026-11-17). Only a 30 ms write was covered (`unregister-module`) |
 | a snapshot taken after registerModule | `registerModule`'s init takes one snapshot, `{ "m::n": 1, "x::c": 10 }`, a write another with `x::c` 11, and `goTo` the first puts `x.c` back to 10 | The RFC's H1. A planted bug here failed no v2 test; only the fuzz caught it |
 
 ## The mutation conversion
@@ -237,8 +252,32 @@ header said NOISY (load average 4.1 to 5.2 on 14 cores).
 
 **The median run: 2.0 is 4% slower than 1.35 (1.04 times its time), and
 allocates 2.2 to 3.1% fewer bytes.** #408 measured 1.03 times on a noisy
-machine, with 2.6% fewer bytes. B5 asks for 1.0 or better, so this is an
-owner stop (below).
+machine, with 2.6% fewer bytes. B5 asks for 1.0 or better, so this was an
+owner stop.
+
+**Run 3, at steady state: B5 is met.** Jason's ruling on 2026-11-17 was
+"Measure at steady state (Recommended)". Since #420 the bench's
+`module-churn` runs at steady state with no forced gc (the forced-gc run is
+kept, report-only, as `module-churn-leak`), and #422 made `registerModule`
+and `unregisterModule` cheaper. The same command (`node
+bench/system/run.mjs --only module-churn --rounds 6`, from
+packages/core-next, after merging main at 5ec3388e and building both
+engines), three runs, `--first` v1, v2, v1, CPU median:
+
+| Run | 1.35 (ns per op) | 2.0 (ns per op) | 2.0 against 1.35 | Bytes per step, 1.35 | Bytes per step, 2.0 |
+| --- | --- | --- | --- | --- | --- |
+| 1 (1.35 first) | 7,822 | 7,247 | 0.94 times (0.92 to 0.96) | 3,266,618 | 2,984,374 |
+| 2 (2.0 first) | 7,580 | 7,008 | 0.91 times (0.89 to 0.96) | 3,286,292 | 2,971,863 |
+| 3 (1.35 first) | 10,447 | 9,766 | 0.92 times (0.88 to 0.98) | 3,260,854 | 2,961,851 |
+
+**The median run: 2.0 takes 0.92 times 1.35's time (8% faster) and
+allocates 8.6 to 9.6% fewer bytes.** Every round of every run is under
+1.0. The machine was not quiet: each header said NOISY (load average 10 to
+15 on 14 cores, from other work on the machine). CPU time ignores the time
+a process sits descheduled, and all three runs agree, so the result stands;
+a quiet re-run is a follow-up. B5's owner stop is closed. Retained heap
+after a full gc is 62 to 72 bytes per step on 2.0 against 117 to 239 on
+1.35.
 
 ## Results
 
@@ -428,12 +467,80 @@ end, 1.35's does not), two steps apart instead of one, so its entry
 (`moved`, `by` -1) does not pair it. No L10 operation is in the case. Not a
 2.0 bug; a follow-up, since widening (as)'s entry is outside this gate.
 
+## Run 3: after main at 5ec3388e and the owner's rulings
+
+**The merge.** `git merge origin/main` conflicted in 18 files, because
+this branch carried the L8 gate, the L9 gate and L10-pre-a and pre-b as
+their branches, and main has them squashed. The merge takes main and
+re-applies this gate's own commits (32a5ff3c to 9e01ab5c, the run 2 merge
+left out) on top: they applied with no conflict but `v2-passing.json`,
+unioned by name (13 names main lacked), and `harness.lock.json`,
+regenerated. GATE-7.md and GATE-8.md are main's. `divergences.json` has
+all 1,046 of main's entries and all 1,128 of the branch's, each byte for
+byte, with no duplicate id. No conflict marker remains (`git diff
+--check`, and a grep for `<<<<<<<`).
+
+**Row (cd).** #424 built it in core-next. The pin of the late write in
+`l10-gate-pins-oracle` and its production twin now keeps what both engines
+share (the drain gives up at 10 s, and the replacement starts from its own
+init, `written` 0) and names the row. The final `written` 1 is 1.35's side
+only; 2.0's is core-next's `l10-m7-late-write` and
+`l10-m7-late-write-production`. Edited in `packages/core`'s originals and
+re-ported. The two retitled cases have `removed` entries in
+`v2-passing.json` giving the reason, and the ratchet adds their new names.
+A host-key write from a retired resolver is unchanged on both engines (#424
+pins 2.0's side). The drafted entries (m7/entries.json) said "skipped on
+2.0"; the gate's mechanism is the trim, which is no wider than the row.
+
+**(bk) and engine.ts 2261:9: no oracle test reaches either.** Both
+approvals are 2.0's behaviour. No conformance test, diff scenario or
+divergences entry names (bk), and none exercises the 2261:9 retry (GATE-9
+already notes that a public test of it fails on 2.0). Every v2 project
+passes with no entry for either, so no test reaches the difference today.
+No pin or 2.0-side note is added; each is a follow-up.
+
+**Stale entries, pinned.** With seed d now finishing, the census found
+four signed L10 fuzz entries that its seed no longer reaches, since main's
+L11 and L13 draws moved seed 24301's later cases. As the L8 and L9 gates
+did, one real case for each is added to `diff/fuzz/pinned.json`, found by
+logging the cases that use the entry and replayed alone with no
+unexplained difference:
+
+| Entry | Case pinned |
+| --- | --- |
+| `l10b-fuzz-bl-hook-onError-missing-def-is-not-a-function` | seed 10, case 75, up to L10 |
+| `l10b-fuzz-bm-hook-onDerivationInvalidate-extra-zin` | seed 14, case 44, up to L10 |
+| `l10-fuzz-bm-hook-onDerivationInvalidate-extra-name-returns` | deep seed 24301, case 483, up to L10 (5,000 runs, report mode, exit 0) |
+| `l10-fuzz-be-hook-onFactsBatch-changed-back` (group row-be) | deep seed 2's run 2 case (the (be) case above) |
+
+No entry was deleted, loosened or re-signed.
+
+**A type fix.** `diff/self/l10-be-class.test.ts` (run 2's) failed
+`conformance:typecheck` on `LIKE.historyFactKey` being possibly undefined;
+it now casts as `l9-triggers.test.ts` does.
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `pnpm census` | 0 | no problems: 10 projects, 14,544 tests, every port in every engine; the fuzz compared 286 cases of seed 24301, all on v2 |
+| `check:expects` | 0 | 196 files, 7,483 assertions, identical to a fresh port |
+| `oracle:update` | 0 | after the last oracle change |
+| `npx vitest run --project conformance:checks` | 0 | 246 passed, 4 skipped; the harness lock and `api-surface-next` included |
+| Diff self-tests (`conformance:diff diff/self`) | 0 | 22 files, 341 tests |
+| `ratchet --update` | 0 | added 2 (the retitled (cd) cases), none lost but the three renames with `removed` entries (the two (cd) cases, and U1's "register with the same object form works", retitled by run 1 under "(U1; row bl)"); 2,232 pass on source and dist |
+| core-next `test` | 0 | 74 files, 685 passed, 2 todo |
+| core-next `typecheck` | 0 | |
+| `pnpm -r --filter './packages/*' typecheck` | 2 | only `packages/cli`, which cannot find `@directive-run/knowledge`: its build needs the website's generated `api-reference.json`, absent on this machine. Conformance, core and core-next pass. CI's build-and-test builds it first |
+| Root biome, error level | 0 | |
+| The 21 PR seeds at 120 s | 0 on 18 | seed d in 37 s; 1 to 20 in 20 to 92 s |
+| Seeds 7, 9 and 11 at 1,800 s | 0 each | 398 s, 500 s and 668 s |
+
 ## Corrections to the L10 RFC
 
 - **M7 says a retired resolver's write "cannot reach a replacement".** On
-  both engines it lands on a same-key replacement once the 10 s drain has
-  given up (#408's correctness review; pinned above). M7 holds only for a
-  write made inside the drain.
+  1.35 it lands on a same-key replacement once the 10 s drain has given
+  up (#408's correctness review). M7 held only for a write made inside the
+  drain; since #424 (row cd) 2.0 drops the write inside and after the
+  drain, so M7's text now holds for 2.0.
 - **A `destroy()` during a pending unregister drain fires `onStop` twice,
   on both engines.** This is parity and needs no row.
 - **M1's `$`-prefixed key check is a text error:** both engines accept a
@@ -443,16 +550,15 @@ end, 1.35's does not), two steps apart instead of one, so its entry
 
 ## Owner row candidates
 
-Three, none with a row, none pinned, none blocking on its own:
+All decided on 2026-11-17 by "Approve all as recommended (Recommended)"
+(the run 3 section has the detail):
 
-- **engine.ts 2261:9 (L10-pre-b, #409).** Below.
-- **M7's late write past the 10 s drain.** A retired resolver's write
-  after `unregisterModule` gives up at 10 s lands on a same-key
-  replacement, on both engines (Corrections). Parity, but M7 says it
-  cannot; Jason decides whether the RFC's text or the engines change.
+- **engine.ts 2261:9 (L10-pre-b, #409).** 2.0's behaviour is approved.
+  Below.
+- "M7's late write past the 10 s drain" is decided: row (cd).
 - **`onStop` twice.** A `destroy()` during a pending unregister drain
-  fires it twice, on both engines (Corrections). Parity; Jason decides
-  whether 2.0 should fire it once.
+  fires it twice, on both engines (Corrections). Kept as 1.35, which is
+  parity.
 
 engine.ts 2261:9 is triaged `v1-bug` in L10-pre-b (#409). 1.35's error
 boundary derivation retry hands the failing derivation's id to
@@ -465,8 +571,9 @@ either side.
 
 ## Stops
 
-What remains after run 2: B5, seed d and the L8 `./internals` names (each
-below), all the owner's. Run 1's `call` trace stop is fixed (#414).
+None remain after run 3. Run 1's `call` trace stop is fixed (#414); B5
+is met at steady state; seed d passes and the L8 `./internals` names ship
+(#402). The record of each:
 
 - **Fixed in #414, run 1's stop: a deferred `derive.call` of a stale
   derivation, in the trace.** Deep seed 2, up to L10 (spec in the gate's
@@ -480,16 +587,16 @@ below), all the owner's. Run 1's `call` trace stop is fixed (#414).
   no approved row covers it. It needs either a core-next fix that keeps the
   last value of a stale derivation for the trace, as 1.35 does, or a row
   from Jason. The gate may not touch `packages/core-next/src`.
-- **B5 is over 1.0: an owner stop.** module-churn runs at 1.04 times
-  1.35's time (CPU median of three; 1.02, 1.04 and 1.13), with 2.2 to 3.1%
-  fewer bytes. B5 asks for 1.0 or better. #408 measured 1.03. Jason decides
-  whether 4% on 100 module register and unregister pairs holds the gate.
-- **The L9 stop, carried: seed 24301, "seed d".** It times out at 120 s,
+- **Closed in run 3: B5.** Run 2 measured 1.04 times 1.35's time with a
+  forced gc. At steady state ("Measure at steady state (Recommended)",
+  2026-11-17), after #420 and #422, it is 0.92 times, with 8.6 to 9.6% fewer
+  bytes (B5, above).
+- **Closed in run 3: seed d.** It passes in 37 s. Before: It times out at 120 s,
   in the PR run and in `conformance:diff` and the census. Its deep run
   reports case all#175 (batched, the L9 stop's case) with the others GATE-8
   lists. It waits on Jason's ruling on the "Discard after the stop"
   wording (GATE-8.md, Stops).
-- **The L8 stop, carried:** `./internals` `createHistoryManager` and
+- **Closed in run 3, the L8 stop** (#402 ships them): `createHistoryManager` and
   `createDisabledHistory` (`conformance:checks`, 9 failures; the census's
   "vitest exited 1"). Unchanged.
 - **CI's 120 s, carried from L9:** seeds 7, 9 and 11 pass only past it
@@ -513,7 +620,12 @@ an approved row.
   (`extraModule`, `diff/fuzz/model.ts:2815–2866`), so a module's source
   teardown (M6, a pending linger timer) is never fuzzed; and no case draws
   colliding joined keys (#407's namespaced key collisions).
-- The owner row candidate above.
+- **(bk) and engine.ts 2261:9 (run 3):** no oracle test reaches either
+  difference; a 1.35-only pin and a 2.0-side note wait for one.
+- **B5 (run 3):** re-run on a quiet machine; run 3's headers said NOISY.
+- **`packages/cli` typecheck (run 3):** a local run needs
+  `@directive-run/knowledge` built, which needs the website's generated
+  API reference.
 - `conformance:typecheck`'s three errors in L10-pre-b's
   `l10-dynamic-gate-debt-oracle` (above).
 - `ends` entries are read per case from the working tree

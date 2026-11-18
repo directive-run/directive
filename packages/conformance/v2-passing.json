@@ -112,6 +112,7 @@
         "an effect that can read prevFacts is handed them > with explicit deps, when it has only a rest parameter",
         "an effect that can read prevFacts is handed them > with explicit deps, when it has the arguments object",
         "an effect that can read prevFacts is handed them > with explicit deps, when it has two named parameters",
+        "an effect that cannot read prevFacts costs no snapshot > a data gate makes the snapshot even though the body ignores it",
         "an effect that cannot read prevFacts costs no snapshot > a module registered later brings its effects, and a reader is backfilled",
         "an effect that cannot read prevFacts costs no snapshot > a reader assigned over a non-reader is backfilled",
         "an effect that cannot read prevFacts costs no snapshot > assigning a non-reader over the last reader stops the copying",
@@ -155,7 +156,11 @@
         "cleanup > stop() runs every pending cleanup, once",
         "cleanup > unregistering an unknown effect is a no-op",
         "cleanup > unregistering cleans up, and the effect no longer runs",
+        "data-form on > fires only when the gate holds, and only for changes to its facts",
+        "data-form on > freezes the spec it was given",
+        "data-form on > keeps the predicate's facts as its deps whatever the body reads",
         "data-form on > rejects a value that is not a predicate, by what it is",
+        "data-form on > swapping a function-form effect for a gated one installs the gate",
         "data-form on > swapping to a function-form effect drops the old gate",
         "data-form on > unregistering a gated effect drops its gate",
         "declared dependencies > a derivation name runs the effect when the derivation changes",
@@ -167,12 +172,14 @@
         "effects after a history navigation > a real change right after a navigation wakes both",
         "effects after a history navigation > an onNavigate skip effect still runs for a real change",
         "effects after a history navigation > re-runs a mirroring effect and sits out an onNavigate skip one",
+        "more behaviour of the run loop > a data gate with $changed ignores a write that left that fact alone",
         "more behaviour of the run loop > an effect that fails after being unregistered is not run again",
         "more behaviour of the run loop > an effect that reads nothing and opts out of navigation sits a rewind out",
         "more behaviour of the run loop > call on an unknown effect says it does not exist",
         "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw",
         "more behaviour of the run loop > settle waits for every async effect, whichever finishes last",
         "prevFacts values > a data gate on $changed works although the body reads no prev",
+        "prevFacts values > a data gate registered later fires only for a real change",
         "prevFacts values > a reader registered after the last one left is backfilled",
         "prevFacts values > an effect registered later sees the facts as they were at registration",
         "prevFacts values > is null on the first run and the previous pass's facts after",
@@ -470,15 +477,35 @@
         "constraint re-evaluation > start() re-evaluates every constraint"
       ],
       "tests/core/data-forms-namespaced.test.ts": [
+        "dynamic constraint register — data-form when > assign swaps a function-form constraint to a data-form `when`",
+        "dynamic constraint register — data-form when > register accepts a data `when` and evaluates it correctly",
+        "namespace-pivot `self` and dep-namespace forms > already-prefixed keys in `$all` pass through unchanged",
+        "namespace-pivot `self` and dep-namespace forms > constraint when: { self: { phase } } evaluates and fires",
+        "namespace-pivot `self` and dep-namespace forms > constraint with crossModuleDeps fires for `self` + dep pivots together",
         "namespaced constraint abortOn — clobber detection > each module's abortOn is scoped to its own namespace",
         "namespaced constraint abortOn — clobber detection > prefixes abortOn keys so clobber detection fires in a multi-module system",
-        "namespaced effect `$changed` operator > fires when the watched fact transitions between values; not on first run"
+        "namespaced constraint when — data form > fires when the predicate holds and produces requirements",
+        "namespaced constraint when — data form > inspect exposes the data-form whenSpec with namespaced keys",
+        "namespaced derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template",
+        "namespaced effect `$changed` operator > fires when the watched fact transitions between values; not on first run",
+        "namespaced effect on — data trigger > runs only when the predicate currently holds for its own module's fact",
+        "namespaced event handler + patch — dev warn > dev-warns when both `handler` and `patch` are provided, keeps the handler",
+        "namespaced event patch — data form > sets facts from literals, $ref payload copies, and $template strings",
+        "namespaced resolver key — KeySelector via dynamic register > dedups equivalent requirements by selected fields"
       ],
       "tests/core/data-forms.test.ts": [
         "constraint `when` — $changed rejected unconditionally > throw message mentions the fix (move to effect or boolean derivation)",
         "constraint `when` — $changed rejected unconditionally > throws at createSystem time when $changed appears in a constraint `when`",
         "constraint `when` — $changed rejected unconditionally > throws for $changed nested inside a combinator",
-        "data-form introspection > inspect() exposes the predicate spec on constraints with a data `when`"
+        "constraint when — data form > fires when the predicate holds and produces requirements",
+        "data-form introspection > explain(requirementId) renders the predicate clause tree with ✓/✗",
+        "data-form introspection > inspect() exposes the predicate spec on constraints with a data `when`",
+        "data-form introspection > observe() emits whenExplain for a data-form constraint evaluation",
+        "derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template",
+        "effect on — data trigger > runs only when the predicate currently holds for a referenced fact",
+        "event handler + patch conflict > dev-warns and uses handler (patch is ignored) when both are provided",
+        "event patch — data form > sets facts from literals, $ref payload copies, and $template strings",
+        "resolver key — KeySelector > dedups equivalent requirements by selected fields"
       ],
       "tests/core/dep-namespace-injective.test.ts": [
         "the derivation dependency namespace > leaves an ordinary fact-and-derivation name pair alone",
@@ -964,7 +991,7 @@
       "tests/core/l10-gate-pins-oracle.test.ts": [
         "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back",
         "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another",
-        "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+        "a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
@@ -1309,6 +1336,9 @@
         "constraints and resolvers in a composed system > hands a resolver its own facts, and ctx.deps only when the module declares dependencies",
         "constraints and resolvers in a composed system > holds a constraint back until the constraints it follows have resolved",
         "constraints and resolvers in a composed system > re-evaluates a constraint with explicit deps only when those facts change",
+        "data-form constraint `when` in a composed system > does not read another module's fact of the same name",
+        "data-form constraint `when` in a composed system > evaluates every form against the module's own facts",
+        "data-form constraint `when` in a composed system > re-evaluates when the facts it reads change",
         "derivations, effects and flat access in a composed system > computes a derivation given as an object with a compute function",
         "derivations, effects and flat access in a composed system > reads a module's own facts by bare name when crossModuleDeps is empty",
         "derivations, effects and flat access in a composed system > runs a module's effect against its own facts and reruns it on change",
@@ -1797,6 +1827,8 @@
         "derivations: meta for unknown names > a name that is not a derivation carries no tags and does not throw",
         "derivations: object-form definitions > assign on a missing derivation throws",
         "derivations: object-form definitions > assign swaps the function and drops the old meta",
+        "derivations: object-form definitions > freezes a predicate spec and a template spec at registration",
+        "derivations: object-form definitions > registers object-form derivations at runtime with their meta",
         "derivations: object-form definitions > rejects a compute that is neither function, template nor predicate",
         "derivations: odd definitions > an object-form entry with no compute is tolerated at registration",
         "derivations: only outside readers make a derivation watched > a derivation read only by another derivation is not watched",
@@ -2440,7 +2472,7 @@
       "tests/core/l10-gate-pins-oracle-production.test.ts": [
         "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back",
         "production: a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another",
-        "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+        "production: a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
@@ -2570,6 +2602,24 @@
       "file": "tests/core/blackbox-facts.test.ts",
       "test": "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
       "reason": "L10-pre (U11): the test passed on v2 only because the registerModule stub throws and the test accepted any throw; it now asserts 1.35's \"Schema collision\" message, so it fails until L10b builds registerModule."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/l10-gate-pins-oracle.test.ts",
+      "test": "a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+      "reason": "L10 gate, row (cd) (owner, \"Approve all as recommended (Recommended)\", 2026-11-17): renamed to \"the drain gives up at 10 s and a same-key replacement starts from its own init\" under the row (cd) describe; the case keeps what both engines share (1.35 lands the late write, 2.0 drops it). 2.0's side is pinned in core-next l10-m7-late-write."
+    },
+    {
+      "project": "conformance:v2:prod",
+      "file": "tests/core/l10-gate-pins-oracle-production.test.ts",
+      "test": "production: a retired resolver's write after the 10 s drain (L10 gate; M7 as built) > lands on a same-key replacement registered after the drain gave up",
+      "reason": "L10 gate, row (cd) (owner, \"Approve all as recommended (Recommended)\", 2026-11-17): renamed to \"the drain gives up at 10 s and a same-key replacement starts from its own init\" under the row (cd) describe; the case keeps what both engines share (1.35 lands the late write, 2.0 drops it). 2.0's side is pinned in core-next l10-m7-late-write."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/l10-dynamic-pins-oracle.test.ts",
+      "test": "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works",
+      "reason": "L10 gate, row (bl): the U1 describe was retitled \"derive.assign with { compute, meta } (U1; row bl)\" when U1 was trimmed to what both engines share (GATE-9.md, The pins). The same case, unchanged, is listed under its new name, \"derive.assign with { compute, meta } (U1; row bl) > register with the same object form works\", and passes."
     }
   ]
 }

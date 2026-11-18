@@ -32,6 +32,7 @@ import { withMissing } from "./missing.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
 import { withPlugins } from "./plugins.js";
+import { withPredicates } from "./predicate.js";
 import { withReconcile } from "./reconcile.js";
 import { withRestore } from "./restore.js";
 import { withSources } from "./sources.js";
@@ -78,6 +79,8 @@ export function createSystem<
     ? (options.history ?? isDevelopment)
     : options.history;
   const parts: SystemPart[] = [
+    // L11: first, so the parts after it read its hooks at registration.
+    withPredicates,
     // L9a: every 1.35 system has `meta`; it freezes the definitions' meta.
     withMeta,
     withEffects,
