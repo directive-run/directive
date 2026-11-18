@@ -691,6 +691,8 @@ const modules = (ctx: SystemContext): Fn[] => {
     }
     const facts = keys(mod.schema?.facts);
     store.unregisterKeys(facts);
+    // Row (cd): its resolvers' late writes never reach a replacement.
+    hooks?.retire_?.(resolvers, new Set(facts), id);
     ctx.keys_?.(facts.map((key) => [key]));
     list.splice(list.indexOf(mod), 1);
     const at = m.hooks_.indexOf(mod.hooks);

@@ -329,6 +329,8 @@ export interface DefHooks {
   call_?(id: string, props?: any): unknown;
   /** L10b, resolvers: what an unregister waits for. */
   waits_?(ids: string[]): unknown[];
+  /** Row (cd), resolvers: the module's runs may not write its keys again. */
+  retire_?(ids: string[], keys: ReadonlySet<string>, id: string): void;
   /** L10 (D7): whether one of the kind's definitions depends on `key`. */
   reads_?(key: string): boolean;
 }

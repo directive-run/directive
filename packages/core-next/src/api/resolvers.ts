@@ -76,7 +76,7 @@
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
-import type { Allow, Writer } from "./facts.js";
+import type { Allow, Life, Writer } from "./facts.js";
 import type { Requirement, RequirementWithId } from "./requirements.js";
 import { isTimeout, withTimeout } from "./timeout.js";
 import type { Facts } from "./types.js";
@@ -248,6 +248,8 @@ export interface Resolvers {
   /** L10 (K5): an unregistered resolver's runs are canceled, its queue too. */
   drop_(resolver: string): void;
   waits_(ids: string[]): unknown[];
+  /** Row (cd): retire the resolvers' runs from the module's keys. */
+  retire_(ids: string[], keys: ReadonlySet<string>, id: string): void;
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -702,6 +704,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     report(run, last);
   }
 
+  /** Row (cd): each resolver's current life, which its runs share. */
+  const lives: Record<string, Life> = {};
   /** A fresh run, stamped and in flight; `reqs` makes it a batch run. */
   const make = (
     resolverId: string,
@@ -713,6 +717,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       req_: req,
       reqs_: reqs,
       resolver_: resolverId,
+      life_: (lives[resolverId] ??= {}),
       controller_: new AbortController(),
       startedAt_: clock.now(),
       satisfied_: false,
@@ -837,6 +842,17 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       [...inflight.values(), ...detached]
         .filter((run) => ids.includes(run.resolver_))
         .map((run) => run.p_),
+    // Row (cd): the module's runs, ended or not, may not write its keys.
+    retire_(ids, keys, id) {
+      for (const resolver of ids) {
+        const life = lives[resolver];
+        if (life) {
+          life.k_ = keys;
+          life.w_ = id;
+          delete lives[resolver];
+        }
+      }
+    },
     drop_(resolver) {
       for (const run of new Set(started([...inflight.values()]))) {
         run!.resolver_ === resolver && cancel(run!);
