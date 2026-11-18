@@ -398,16 +398,47 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
    */
   historyImportFailed: (v) =>
     typeof v === "string" && v === "[Directive] Failed to import history data:",
+  /**
+   * The error object that follows `historyImportFailed` when 2.0 rejects an
+   * import by row (bc) (core-next api/history.ts), as the recorder keeps it
+   * (`{ $error: { name, message } }`), its message word for word: "[Directive]
+   * Invalid history data: currentIndex must be the index of a snapshot". The
+   * contract masks the whole object (`{ "$incidental": "object" }`); this
+   * class reads the record before the mask, so the (bc) console entry excuses
+   * only (bc)'s own failure, and any other import failure (a bad snapshot
+   * list, a non-number index) stays unexplained.
+   */
+  historyIndexNotASnapshot: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const e = (v as Record<string, Json>).$error;
+    if (e === null || typeof e !== "object" || Array.isArray(e)) {
+      return false;
+    }
+    const o = e as Record<string, Json>;
+
+    return (
+      Object.keys(v).length === 1 &&
+      Object.keys(o).length === 2 &&
+      o.name === "Error" &&
+      o.message ===
+        "[Directive] Invalid history data: currentIndex must be the index of a snapshot"
+    );
+  },
 };
 
-/** The masked form of a string the contract hides (diff/compare.ts `tag`). */
+/**
+ * The masked form of a string or an object the contract hides
+ * (diff/compare.ts `tag`): where a `$text` pattern may stand.
+ */
 function isMaskedString(v: Json | undefined): boolean {
   return (
     v !== null &&
     typeof v === "object" &&
     !Array.isArray(v) &&
     Object.keys(v).length === 1 &&
-    v.$incidental === "string"
+    (v.$incidental === "string" || v.$incidental === "object")
   );
 }
 

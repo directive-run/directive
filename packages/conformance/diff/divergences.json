@@ -47758,13 +47758,13 @@
               "$text": "historyImportFailed"
             },
             {
-              "$incidental": "object"
+              "$text": "historyIndexNotASnapshot"
             }
           ]
         }
       ]
     },
-    "reason": "Row (bc) (L8; the L8 RFC, \"an import with a bad index fails\"): 2.0 rejects a history import whose `currentIndex` is outside its snapshot list, and logs 1.35's own import failure, \"[Directive] Failed to import history data:\", with the reason \"currentIndex must be the index of a snapshot\"; 1.35 imports it. The fuzz reaches it when a `roundtrip` exports a history that holds no snapshot (`currentIndex` -1). The `importedEmpty` trigger names one way to get there (a module with `snapshotEvents`); the L11 data-form phase found another (fuzz seed 5 at L11: a module with a template compute and no `snapshotEvents`, whose history is still empty at the roundtrip on both engines). So `when` is `imported` (history on and a roundtrip), and the bound names only this record: an error whose first argument is the import-failure text word for word (`historyImportFailed`) and whose second is the error object (the contract masks its message, so (bc)'s own reason, \"currentIndex must be the index of a snapshot\", cannot be named). The case runs the same after it (the import changes nothing on either engine), so the entry does not end it. Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"Approve all as recommended (Recommended)\" (2026-11-10), which approved row (bc).",
+    "reason": "Row (bc) (L8; the L8 RFC, \"an import with a bad index fails\"): 2.0 rejects a history import whose `currentIndex` is outside its snapshot list, and logs 1.35's own import failure, \"[Directive] Failed to import history data:\", with the reason \"currentIndex must be the index of a snapshot\"; 1.35 imports it. The fuzz reaches it when a `roundtrip` exports a history that holds no snapshot (`currentIndex` -1). The `importedEmpty` trigger names one way to get there (a module with `snapshotEvents`); the L11 data-form phase found another (fuzz seed 5 at L11: a module with a template compute and no `snapshotEvents`, whose history is still empty at the roundtrip on both engines). So `when` is `imported` (history on and a roundtrip), and the bound names only this record: an error whose first argument is the import-failure text word for word (`historyImportFailed`) and whose second is the error object with (bc)'s own reason word for word, \"[Directive] Invalid history data: currentIndex must be the index of a snapshot\" (`historyIndexNotASnapshot`, read before the contract's mask), so any other import failure stays unexplained. The case runs the same after it (the import changes nothing on either engine), so the entry does not end it. Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"Approve all as recommended (Recommended)\" (2026-11-10), which approved row (bc).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
   }
