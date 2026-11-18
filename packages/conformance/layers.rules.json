@@ -45,6 +45,8 @@
     "unregisterModule started inside system.batch runs its teardown (U20)": "L10",
     "predicate tools over a light's recorded history": "L11",
     "predicate validation against a schema's field kinds": "L11",
+    "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)": "L11",
+    "`$changed` in an effect's on fires on the first run, then on each change (U10)": "L11",
     "logging and performance plugins on a clobbered charge": "L12",
     "clobber alert and clobber loop plugins": "L12",
     "the audit ledger chains entries and verifies": "L12",
@@ -369,7 +371,8 @@
       "instruments": ["import flushMicrotasks"]
     },
     "tests/core/data-forms-namespaced.test.ts": {
-      "rule": "L1"
+      "rule": "L1",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/constraints.test.ts": {
       "rule": "L2",
@@ -764,6 +767,26 @@
     },
     "tests/core/predicate-hash.test.ts": {
       "rule": "L11"
+    },
+    "tests/core/l11-predicate-oracle.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
+    "tests/core/l11-predicate-describe-oracle.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
+    "tests/core/l11-sweep-under-oracle.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
+    "tests/core/l11-predicate-pins-oracle.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
+    "tests/core/l11-predicate-pins-oracle-production.test.ts": {
+      "rule": "L11",
+      "pin": true
     },
     "tests/core/predict.test.ts": {
       "rule": "L11"

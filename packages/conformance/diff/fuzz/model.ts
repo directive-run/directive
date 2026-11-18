@@ -18,7 +18,11 @@
  * replay, an export and import round trip, changesets, pause and resume),
  * `maxSnapshots`, `respectsAbort`, a module's `snapshotEvents` and an
  * effect's `onNavigate: "skip"`, and records the history's state after each
- * history step (`historyRecord`).
+ * history step (`historyRecord`). A case at L11 also draws, after
+ * everything else, data forms (`FuzzPredicates`): a constraint `when`, an
+ * effect `on` gate, a derivation `compute`, an event `patch` and a resolver
+ * `key` written as data, the `tools` step (`toolsRecord`), and a `$changed`
+ * gate's snapshot and restore.
  *
  * Every feature carries the layer that builds it (the plan's ladder,
  * `FEATURE_LAYERS`); `specLayer()` is the highest one a case uses, so a v2
@@ -130,7 +134,131 @@ export type FuzzStep =
    * fact and derivation of the first module.
    */
   | { op: "meta" }
-  | DynamicStep;
+  | DynamicStep
+  /**
+   * L11 (the L11 RFC's B1): a `tools` record (`toolsRecord`):
+   * `describePredicate`, `predicateHash`, `predict` and
+   * `doctor.checkAgainst` over the case's own data forms and facts.
+   */
+  | { op: "tools" };
+
+/**
+ * The data forms an L11 case draws (the L11 RFC's "The fuzz, designed in up
+ * front", B1), one list per module, each entry by the index of the
+ * definition it rewrites; `null` keeps that definition as a function, as
+ * drawn before L11-pre. `inserted` lists, by index into `steps`, the steps
+ * the L11 draws put in (`tools`, and a `$changed` case's snapshot and
+ * restore), so `withoutPredicates` can take them out again.
+ *
+ * Never drawn (hand pins, the RFC's U1, U2, U4): a combinator beside a fact
+ * key, an unknown operator, a global or sticky regex.
+ */
+export interface FuzzPredicates {
+  modules: FuzzModulePredicates[];
+  inserted: number[];
+}
+
+export interface FuzzModulePredicates {
+  /** Per constraint: its `when` written as data, by shape (`whenShape`). */
+  when: (number | null)[];
+  /** Per effect: an `on` gate (never on an effect with explicit deps). */
+  on: (FuzzGate | null)[];
+  /** Per derivation: `compute` as a predicate or a `$template`. */
+  compute: (FuzzCompute | null)[];
+  /** Per event: a `patch` in place of the handler. */
+  patch: (FuzzPatch | null)[];
+  /**
+   * Per constraint: its resolver's `key`, as a function or as the same
+   * field written as a list; the constraint's requirement then carries
+   * `at`, its fact's value, which the key leaves out (D4).
+   */
+  key: ("fn" | "list" | null)[];
+}
+
+/** An effect's `on` gate over one of its module's facts (D1). */
+export interface FuzzGate {
+  fact: number;
+  op: "$gte" | "$lt" | "$eq" | "$ne" | "$changed";
+  value: number;
+}
+
+/** A derivation's data-form `compute` (D2). */
+export type FuzzCompute =
+  | { kind: "predicate"; op: "$gte" | "$gt" | "$lte" | "$in"; value: number }
+  | { kind: "template" };
+
+/** An event's `patch` (D3): a `$ref` copy, a literal, or a `$template`. */
+export type FuzzPatch =
+  | { kind: "ref" }
+  | { kind: "literal"; value: number }
+  | { kind: "template" };
+
+/** How many shapes `whenShape` writes a constraint's test in. */
+export const WHEN_SHAPES = 6;
+
+/**
+ * A constraint's "fact `key` is at least `n`" written as data, in one of
+ * `WHEN_SHAPES` equivalent shapes (the facts are integers): an operator,
+ * the strict one below it, `$not` of the opposite, `$any` and `$all`
+ * combinators, and the clause-list form.
+ */
+export function whenShape(key: string, n: number, shape: number): unknown {
+  switch (shape % WHEN_SHAPES) {
+    case 0:
+      return { [key]: { $gte: n } };
+    case 1:
+      return { [key]: { $gt: n - 1 } };
+    case 2:
+      return { $not: { [key]: { $lt: n } } };
+    case 3:
+      return { $any: [{ [key]: { $gt: n } }, { [key]: n }] };
+    case 4:
+      return { $all: [{ [key]: { $gte: n } }, { [key]: { $exists: true } }] };
+    default:
+      return [{ fact: key, op: "$gte", value: n }];
+  }
+}
+
+/**
+ * A constraint's data-form `when`. In module b (crossModuleDeps) a test of
+ * module a's fact goes through the pivots 1.35 prefixes (`self` and the
+ * dependency's namespace, system-module-transform.ts:164–230).
+ */
+export function whenSpecOf(
+  c: FuzzConstraint,
+  shape: number,
+  cross: boolean,
+): unknown {
+  const own = whenShape(f(c.fact), c.atLeast, shape);
+  if (!cross || c.crossAtLeast === null) {
+    return own;
+  }
+
+  return { self: own, a: { f0: { $gte: c.crossAtLeast } } };
+}
+
+/** An effect's `on` gate as data. */
+export function gateSpecOf(gate: FuzzGate, facts: number): unknown {
+  const key = f(gate.fact % facts);
+
+  return gate.op === "$changed"
+    ? { [key]: { $changed: true } }
+    : { [key]: { [gate.op]: gate.value } };
+}
+
+/**
+ * A derivation's data-form `compute` over its facts: the value of the
+ * definition's `compute` key (1.35's derivations.ts:250–280 reads a data
+ * form only there).
+ */
+export function computeSpecOf(d: FuzzDerivation, c: FuzzCompute): unknown {
+  if (c.kind === "template") {
+    return { $template: d.facts.map((k) => `\${${f(k)}}`).join("+") };
+  }
+  const operand = c.op === "$in" ? [c.value, c.value + 1] : c.value;
+
+  return { $all: d.facts.map((k) => ({ [f(k)]: { [c.op]: operand } })) };
+}
 
 /** The four registries a `define` step reaches (L10). */
 export const DYNAMIC_KINDS = [
@@ -312,6 +440,12 @@ export interface FuzzSpec {
    * registered (I1). Absent (a spec written before L10-pre), none of it.
    */
   dynamic?: { readers: boolean };
+  /**
+   * L11, predicate cases only (the L11 RFC's B1): the data forms drawn
+   * (`predicateDraws`). Absent (a spec written before L11-pre), every
+   * definition is a function.
+   */
+  predicates?: FuzzPredicates;
 }
 
 /**
@@ -360,9 +494,17 @@ export const FEATURE_LAYERS = {
    * Dynamic definitions (L10): the `define`, `inflight` and `module` steps
    * and the `dynamic` spec field. Drawn after everything else
    * (`dynamicDraws`), so a case below L10 is the one L9-pre drew. L11's
-   * draws, when they come, chain after these the same way.
+   * draws chain after these the same way (`predicates`).
    */
   dynamic: 10,
+  /**
+   * Data forms (L11): a constraint `when`, an effect `on` gate, a
+   * derivation `compute`, an event `patch` and a resolver `key` written as
+   * data, the `tools` step, and a `$changed` case's snapshot and restore.
+   * Drawn after everything else (`predicateDraws`), so a case below L11 is
+   * the one L10-pre drew.
+   */
+  predicates: 11,
 } as const;
 
 type Feature = keyof typeof FEATURE_LAYERS;
@@ -388,6 +530,7 @@ const STEP_FEATURES = {
   define: "dynamic",
   inflight: "dynamic",
   module: "dynamic",
+  tools: "predicates",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
@@ -646,7 +789,180 @@ export function specArbitrary(
   // At L10 the dynamic additions are drawn last (`dynamicDraws`), so below
   // L10 a case is the one L9-pre drew, digest for digest
   // (diff/self/abort-draw.test.ts).
-  return allows("dynamic") ? withMeta.chain(dynamicDraws) : withMeta;
+  const withDynamic = allows("dynamic")
+    ? withMeta.chain(dynamicDraws)
+    : withMeta;
+
+  // At L11 the data forms are drawn last (`predicateDraws`), so below L11 a
+  // case is the one L10-pre drew, digest for digest
+  // (diff/self/abort-draw.test.ts).
+  return allows("predicates")
+    ? withDynamic.chain((spec) => predicateDraws(spec))
+    : withDynamic;
+}
+
+/**
+ * The highest layer the fuzz drew before L11-pre's data forms. The fuzz's
+ * "across every layer" phase draws at this ceiling (`baseArbitrary`), and
+ * the data forms come from their own phase and seed (`dataFormArbitrary`),
+ * so adding them changes no case a seed drew at L10 or below: those cases,
+ * and the quirks they reach, stay as they were, byte for byte
+ * (diff/self/fuzz-streams.test.ts).
+ */
+export const BASE_CEILING = "L10";
+
+/** Every feature up to `BASE_CEILING`: the case L10-pre drew, unchanged. */
+export function baseArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return specArbitrary({ ceiling: BASE_CEILING });
+}
+
+/**
+ * A base case (`baseArbitrary`) that always draws data forms
+ * (`predicateDraws`), so every case it draws sits at L11.
+ */
+export function dataFormArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return baseArbitrary().chain((spec) => predicateDraws(spec, true));
+}
+
+const gateArbitrary: fc.Arbitrary<FuzzGate> = fc.record({
+  fact: fc.nat({ max: 2 }),
+  op: fc.constantFrom(
+    "$gte" as const,
+    "$lt" as const,
+    "$eq" as const,
+    "$ne" as const,
+    "$changed" as const,
+  ),
+  value,
+});
+
+const computeArbitrary: fc.Arbitrary<FuzzCompute> = fc.oneof(
+  fc.record({
+    kind: fc.constant("predicate" as const),
+    op: fc.constantFrom(
+      "$gte" as const,
+      "$gt" as const,
+      "$lte" as const,
+      "$in" as const,
+    ),
+    value,
+  }),
+  fc.record({ kind: fc.constant("template" as const) }),
+);
+
+const patchArbitrary: fc.Arbitrary<FuzzPatch> = fc.oneof(
+  fc.record({ kind: fc.constant("ref" as const) }),
+  fc.record({ kind: fc.constant("literal" as const), value }),
+  fc.record({ kind: fc.constant("template" as const) }),
+);
+
+/** Half the time `null`: the definition stays a function. */
+const orFunction = <T>(arbitrary: fc.Arbitrary<T>) =>
+  fc.option(arbitrary, { nil: null, freq: 2 });
+
+/**
+ * What a predicate case adds (L11-pre; the L11 RFC's reach table): one case
+ * in three writes some of its definitions as data (`FuzzPredicates`), puts
+ * up to two `tools` steps in among its steps, and, when it drew a
+ * `$changed` gate, three times in four a snapshot and a later restore, so
+ * the gate sees a restore. The other two in three are the case as drawn
+ * without them. With `always` (`dataFormArbitrary`), every case draws them.
+ */
+function predicateDraws(
+  spec: FuzzSpec,
+  always = false,
+): fc.Arbitrary<FuzzSpec> {
+  const drawn = fc.record({
+    modules: fc.tuple(
+      ...spec.modules.map((m) =>
+        fc.record({
+          when: fc.tuple(
+            ...m.constraints.map(() =>
+              orFunction(fc.integer({ min: 0, max: WHEN_SHAPES - 1 })),
+            ),
+          ),
+          on: fc.tuple(
+            ...m.effects.map((e) =>
+              e.explicitDeps
+                ? fc.constant<FuzzGate | null>(null)
+                : orFunction(gateArbitrary),
+            ),
+          ),
+          // A `tagBoundary` derivation (L9) keeps its function: its object
+          // form already holds `compute` and `meta`.
+          compute: fc.tuple(
+            ...m.derivations.map((_, i) =>
+              (m.boundaries ?? []).includes(i)
+                ? fc.constant<FuzzCompute | null>(null)
+                : orFunction(computeArbitrary),
+            ),
+          ),
+          patch: fc.tuple(...m.events.map(() => orFunction(patchArbitrary))),
+          key: fc.tuple(
+            ...m.constraints.map(() =>
+              orFunction(fc.constantFrom("fn" as const, "list" as const)),
+            ),
+          ),
+        }),
+      ),
+    ),
+    tools: fc.array(fc.nat(), { maxLength: 2 }),
+    rewind: fc.option(fc.tuple(fc.nat(), fc.nat()), { nil: null, freq: 4 }),
+  });
+
+  const withForms = drawn.map((d): FuzzSpec => {
+    const modules = d.modules as FuzzModulePredicates[];
+    const steps: FuzzStep[] = [...spec.steps];
+    const added = new Set<FuzzStep>();
+    const put = (at: number, step: FuzzStep) => {
+      steps.splice(at % (steps.length + 1), 0, step);
+      added.add(step);
+    };
+    for (const at of d.tools) {
+      put(at, { op: "tools" });
+    }
+    const changed = modules.some((m) => m.on.some((g) => g?.op === "$changed"));
+    if (changed && d.rewind !== null) {
+      const [at, gap] = d.rewind;
+      const snapshot: FuzzStep = { op: "snapshot" };
+      put(at, snapshot);
+      const from = steps.indexOf(snapshot) + 1;
+      const restore: FuzzStep = { op: "restore" };
+      steps.splice(from + (gap % (steps.length - from + 1)), 0, restore);
+      added.add(restore);
+    }
+
+    return {
+      ...spec,
+      steps,
+      predicates: {
+        modules,
+        inserted: steps.flatMap((s, i) => (added.has(s) ? [i] : [])),
+      },
+    };
+  });
+
+  return always
+    ? withForms
+    : fc.oneof(
+        { weight: 2, arbitrary: fc.constant(spec) },
+        { weight: 1, arbitrary: withForms },
+      );
+}
+
+/**
+ * A drawn spec with no data forms: the `predicates` field and the steps it
+ * put in taken out, so what is left is the case as drawn before L11-pre
+ * (diff/self/abort-draw.test.ts).
+ */
+export function withoutPredicates(spec: FuzzSpec): FuzzSpec {
+  const { predicates, ...rest } = spec;
+  if (predicates === undefined) {
+    return spec;
+  }
+  const inserted = new Set(predicates.inserted);
+
+  return { ...rest, steps: spec.steps.filter((_, i) => !inserted.has(i)) };
 }
 
 /** One dynamic step (L10-pre; the RFC's reach table). */
@@ -1012,6 +1328,9 @@ export function specLayer(spec: FuzzSpec): string {
   if (spec.dynamic !== undefined) {
     use("dynamic");
   }
+  if (spec.predicates !== undefined) {
+    use("predicates");
+  }
 
   return `L${n}`;
 }
@@ -1039,6 +1358,7 @@ function moduleDef(
   batch: FuzzBatch | null = null,
   respectsAbort = false,
   dynamic: FuzzSpec["dynamic"] = undefined,
+  preds: FuzzModulePredicates | undefined = undefined,
 ) {
   const id = NAMES[index] as string;
   const cross = index === 1;
@@ -1064,7 +1384,13 @@ function moduleDef(
       }
       for (const k of d.derived) {
         const v = derived[`d${k}`];
-        sum += typeof v === "boolean" ? Number(v) : v;
+        // A `$template` derivation (L11) is a string: it adds its length.
+        sum +=
+          typeof v === "boolean"
+            ? Number(v)
+            : typeof v === "string"
+              ? v.length
+              : v;
       }
       if (d.throwsAt !== null && sum === d.throwsAt) {
         throw new Error(`${id}.d${i} throws at ${sum}`);
@@ -1072,6 +1398,14 @@ function moduleDef(
 
       return d.threshold === null ? sum : sum > d.threshold;
     };
+    // L11: the same derivation's `compute` written as data (D2): a
+    // predicate over its facts is a boolean, a `$template` a string.
+    const data = preds?.compute[i] ?? null;
+    if (data !== null) {
+      derivations[`d${i}`] =
+        data.kind === "template" ? t.string() : t.boolean();
+      derive[`d${i}`] = { compute: computeSpecOf(d, data) };
+    }
   });
   // L9: a `tagBoundary` derivation is the same compute, given as an object
   // with meta, so a tag it reads stops there.
@@ -1090,7 +1424,26 @@ function moduleDef(
     events[`e${i}`] = (fs: any, payload: any) => {
       fs[f(e.target)] = e.add ? fs[f(e.target)] + payload.v : payload.v;
     };
+    // L11: the event written as a `patch` (D3) instead.
+    const patch = preds?.patch[i] ?? null;
+    if (patch !== null) {
+      events[`e${i}`] = {
+        patch: {
+          $set:
+            patch.kind === "template"
+              ? { tx: { $template: "v=${v}" } }
+              : {
+                  [f(e.target)]:
+                    patch.kind === "ref" ? { $ref: "v" } : patch.value,
+                },
+        },
+      };
+    }
   });
+  const templated = (preds?.patch ?? []).some((p) => p?.kind === "template");
+  if (templated) {
+    facts.tx = t.string();
+  }
   const requirements: Record<string, unknown> = {};
   const constraints: Record<string, unknown> = {};
   const resolvers: Record<string, unknown> = {};
@@ -1098,15 +1451,32 @@ function moduleDef(
     let attempt = 0;
     const type = `${id.toUpperCase()}${i}`;
     requirements[type] = {};
+    const shape = preds?.when[i] ?? null;
+    const key = preds?.key[i] ?? null;
     constraints[`c${i}`] = {
       priority: c.priority,
-      when: (fs: any) =>
-        own(fs)[f(c.fact)] >= c.atLeast &&
-        (c.crossAtLeast === null || fs.a.f0 >= c.crossAtLeast),
-      require: { type },
+      // L11: the same test written as data (E1 to E4), or the function.
+      when:
+        shape === null
+          ? (fs: any) =>
+              own(fs)[f(c.fact)] >= c.atLeast &&
+              (c.crossAtLeast === null || fs.a.f0 >= c.crossAtLeast)
+          : whenSpecOf(c, shape, cross),
+      // L11, keyed: the requirement carries its fact's value, which the
+      // resolver's key leaves out, so a new value is the same requirement.
+      require:
+        key === null
+          ? { type }
+          : (fs: any) => ({
+              type,
+              at: (cross ? (fs?.self ?? fs) : fs)?.[f(c.fact)] ?? null,
+            }),
     };
     resolvers[`r${i}`] = {
       requirement: type,
+      ...(key === null
+        ? {}
+        : { key: key === "list" ? ["type"] : (req: any) => `${req.type}` }),
       ...(c.retry > 0
         ? {
             retry: {
@@ -1171,8 +1541,11 @@ function moduleDef(
   }
   const effects: Record<string, unknown> = {};
   m.effects.forEach((e, i) => {
+    const gate = preds?.on[i] ?? null;
     effects[`x${i}`] = {
       ...(e.explicitDeps ? { deps: e.reads.map(f) } : {}),
+      // L11: an `on` gate (D1).
+      ...(gate === null ? {} : { on: gateSpecOf(gate, m.facts) }),
       ...(e.onNavigate === undefined ? {} : { onNavigate: e.onNavigate }),
       run: (fs: any) => {
         const seen = e.reads.map((k) => own(fs)[f(k)]);
@@ -1267,6 +1640,9 @@ function moduleDef(
       if (dynamic !== undefined) {
         fs.zf = 0;
         fs.zw = 0;
+      }
+      if (templated) {
+        fs.tx = "";
       }
     },
     derive,
@@ -2103,6 +2479,43 @@ const TRIGGERS = {
 
     return false;
   },
+  /** L11: some constraint's `when` is written as data. */
+  dataWhen: (spec) =>
+    (spec.predicates?.modules ?? []).some((m) =>
+      m.when.some((w) => w !== null),
+    ),
+  /** L11: some effect has an `on` gate. */
+  onGate: (spec) =>
+    (spec.predicates?.modules ?? []).some((m) => m.on.some((g) => g !== null)),
+  /** L11: a `$changed` gate, and a restore step after a snapshot step. */
+  changedRestore: (spec) => {
+    const changed = (spec.predicates?.modules ?? []).some((m) =>
+      m.on.some((g) => g?.op === "$changed"),
+    );
+    const snapshot = spec.steps.findIndex((s) => s.op === "snapshot");
+
+    return (
+      changed &&
+      snapshot >= 0 &&
+      spec.steps.slice(snapshot + 1).some((s) => s.op === "restore")
+    );
+  },
+  /** L11: some derivation's `compute` is a predicate or a `$template`. */
+  dataCompute: (spec) =>
+    (spec.predicates?.modules ?? []).some((m) =>
+      m.compute.some((c) => c !== null),
+    ),
+  /** L11: some event is a `patch`. */
+  eventPatch: (spec) =>
+    (spec.predicates?.modules ?? []).some((m) =>
+      m.patch.some((p) => p !== null),
+    ),
+  /** L11: some resolver has a `key` (a function, or a list of fields). */
+  resolverKey: (spec) =>
+    (spec.predicates?.modules ?? []).some((m) => m.key.some((k) => k !== null)),
+  /** L11: a `tools` step. */
+  predicateTools: (spec) =>
+    spec.predicates !== undefined && spec.steps.some((s) => s.op === "tools"),
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -2244,6 +2657,7 @@ function build(spec: FuzzSpec) {
         i === 0 ? batch : null,
         respects,
         i === 0 ? spec.dynamic : undefined,
+        spec.predicates?.modules[i],
       ),
     );
     ctx.handles.rebuild = () => {
@@ -2257,6 +2671,7 @@ function build(spec: FuzzSpec) {
           i === 0 ? batch : null,
           respects,
           i === 0 ? spec.dynamic : undefined,
+          spec.predicates?.modules[i],
         ),
       );
 
@@ -2386,6 +2801,13 @@ function steps(spec: FuzzSpec): Step[] {
           fn: (system, ctx) => {
             ctx.handles.snapshot = system.getSnapshot();
           },
+        });
+        break;
+      case "tools":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => toolsRecord(system, spec, ctx),
         });
         break;
       case "restore":
@@ -2630,6 +3052,67 @@ function metaRecord(system: any, spec: FuzzSpec, ctx: BuildContext): void {
       },
     ]);
   }
+}
+
+/**
+ * L11: the `tools` record. For each data form the case wrote (a constraint
+ * `when`, an effect `on`), in module order: `describePredicate`,
+ * `predicateHash`, `predict` over the module's facts (module b's with its
+ * `self` and `a` pivots), and `doctor.checkAgainst` against
+ * `inspect().constraints`. Each answer, or what it throws, is recorded.
+ */
+function toolsRecord(system: any, spec: FuzzSpec, ctx: BuildContext): void {
+  const multi = spec.modules.length > 1;
+  const preds = spec.predicates;
+  if (preds === undefined) {
+    return;
+  }
+  const core = ctx.core as any;
+  const view = (i: number) => {
+    const m = spec.modules[i] as FuzzModule;
+    const fs = multi ? system.facts[NAMES[i] as string] : system.facts;
+    const out: Record<string, unknown> = {};
+    for (let k = 0; k < m.facts; k++) {
+      out[f(k)] = fs?.[f(k)];
+    }
+
+    return out;
+  };
+  spec.modules.forEach((m, i) => {
+    const p = preds.modules[i];
+    if (!p) {
+      return;
+    }
+    const own = view(i);
+    const facts = i === 1 ? { ...own, self: own, a: view(0) } : own;
+    const forms: [string, unknown][] = [];
+    m.constraints.forEach((c, j) => {
+      const shape = p.when[j] ?? null;
+      if (shape !== null) {
+        forms.push([`c${j}`, whenSpecOf(c, shape, i === 1)]);
+      }
+    });
+    m.effects.forEach((_, j) => {
+      const gate = p.on[j] ?? null;
+      if (gate !== null) {
+        forms.push([`x${j}`, gateSpecOf(gate, m.facts)]);
+      }
+    });
+    for (const [name, form] of forms) {
+      ctx.external([
+        "tools",
+        `${NAMES[i]}.${name}`,
+        {
+          describe: attempt(() => core.describePredicate(form)),
+          hash: attempt(() => core.predicateHash(form)),
+          predict: attempt(() => core.predict(form, facts)),
+          doctor: attempt(() =>
+            core.doctor.checkAgainst(form, system.inspect().constraints),
+          ),
+        },
+      ]);
+    }
+  });
 }
 
 /** A `define` step queued for module a's `zq` effect (L10, D5). */
