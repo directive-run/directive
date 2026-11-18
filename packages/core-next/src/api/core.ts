@@ -380,11 +380,14 @@ export interface ReconcileFeature {
     restored: RequirementWithId[],
     passKeys: Set<string>,
   ): RequirementWithId[] | Promise<RequirementWithId[]>;
-  /** Diff, cancel, dispatch; answers the `onReconcileEnd` result. */
+  /**
+   * Diff, cancel, dispatch; answers what builds the `onReconcileEnd`
+   * result, called at once and only when that event is wanted.
+   */
   commit_(
     current: RequirementWithId[],
     passKeys: Set<string>,
-  ): Record<string, unknown>;
+  ): () => Record<string, unknown>;
   /** A run is in flight: not settled. */
   busy_(): boolean;
   start_(): void;
@@ -1621,7 +1624,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (!follows) {
         features.sources?.gate_();
       }
-      let result: Record<string, unknown> | undefined;
+      let result: (() => Record<string, unknown>) | undefined;
       if (l2) {
         // 1.35 awaits constraint evaluation only when it must; the diff,
         // the dispatch and the pass end then share one continuation.
@@ -1641,7 +1644,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       // Only with plugins configured, as 1.35 (`ends_`).
       if (context.ends_ && wants("reconcile.end")) {
         emit("reconcile.end", {
-          result: result ?? {
+          result: result?.() ?? {
             unmet: [],
             inflight: [],
             completed: [],
