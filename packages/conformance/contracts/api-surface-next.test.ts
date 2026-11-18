@@ -117,6 +117,16 @@ describe("core-next public API surface", () => {
     );
   });
 
+  // The guard lets an engine PR remove names from next-unshipped.json
+  // (Jason, 2026-11-17); this gate is what catches a false removal.
+  it("a name removed from next-unshipped.json that core-next does not ship fails", () => {
+    expect(next["."]?.doctor).toBeUndefined();
+    const { ". doctor": _, ...removed } = unshipped;
+    expect(gate(next, { unshipped: removed }).failures).toEqual([
+      dropped(". doctor"),
+    ]);
+  });
+
   it("a missing export the layer tables do not place fails", () => {
     const tampered = copy(next);
     delete tampered["."]?.createSystem;
