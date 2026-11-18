@@ -76,7 +76,7 @@
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
-import type { Allow, Writer } from "./facts.js";
+import type { Allow, Life, Writer } from "./facts.js";
 import type { Requirement, RequirementWithId } from "./requirements.js";
 import { isTimeout, withTimeout } from "./timeout.js";
 import type { Facts } from "./types.js";
@@ -135,6 +135,8 @@ export interface Run extends Writer {
   attempt_: number;
   /** Its one outcome has been reported. */
   done_: boolean;
+  /** L10b: the run's execution, which an unregisterModule waits for. */
+  p_?: Promise<unknown>;
   /** A with-results batch's item errors, from its latest attempt. */
   errors_?: Map<RequirementWithId, Error>;
 }
@@ -212,7 +214,7 @@ export interface Batcher {
    * Cancel the queued requirement `only`, or with none every queued one
    * (stop()), adding each id to `ids`.
    */
-  drop_(ids: string[], only?: string): void;
+  drop_(ids: string[], only?: string, resolver?: string): void;
   /** Some requirement waits in a queue; `busy`: or a batch's end is due. */
   queued_(busy?: boolean): boolean;
 }
@@ -243,6 +245,11 @@ export interface Resolvers {
   inflight: ReadonlyMap<string, Run>;
   /** A batched requirement waits in a queue (see Batcher). */
   queued_(busy?: boolean): boolean;
+  /** L10 (K5): an unregistered resolver's runs are canceled, its queue too. */
+  drop_(resolver: string): void;
+  waits_(ids: string[]): unknown[];
+  /** Row (cd): retire the resolvers' runs from the module's keys. */
+  retire_(ids: string[], keys: ReadonlySet<string>, id: string): void;
 }
 
 /** 1.35's defaults: a 100 ms first wait, capped at 30 s. */
@@ -697,6 +704,9 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     report(run, last);
   }
 
+  /** Row (cd): each resolver's current life, which its runs share. */
+  // No prototype: a resolver id such as "toString" must not find Object.prototype.
+  const lives: Record<string, Life> = Object.create(null);
   /** A fresh run, stamped and in flight; `reqs` makes it a batch run. */
   const make = (
     resolverId: string,
@@ -708,6 +718,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       req_: req,
       reqs_: reqs,
       resolver_: resolverId,
+      life_: (lives[resolverId] ??= {}),
       controller_: new AbortController(),
       startedAt_: clock.now(),
       satisfied_: false,
@@ -729,7 +740,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   ) => {
     const run = make(resolverId, req);
     emit("resolver.start", () => ({ resolver: resolverId, req }));
-    execute(def, run, baseline).finally(() => {
+    (run.p_ = execute(def, run, baseline)).finally(() => {
       // 1.35 leaves flight here, a microtask after the outcome: a run
       // canceled or detached meanwhile has left already and asks for no
       // pass.
@@ -826,6 +837,28 @@ export function createResolvers(options: ResolversOptions): Resolvers {
       // all).
       ids[0] ||
         started([run]).forEach((old) => old?.reqs_ && part(old, requirementId));
+    },
+    // L10b: 1.35's drainResolvers waits on these (resolvers.ts:2051).
+    waits_: (ids) =>
+      [...inflight.values(), ...detached]
+        .filter((run) => ids.includes(run.resolver_))
+        .map((run) => run.p_),
+    // Row (cd): the module's runs, ended or not, may not write its keys.
+    retire_(ids, keys, id) {
+      for (const resolver of ids) {
+        const life = lives[resolver];
+        if (life) {
+          life.k_ = keys;
+          life.w_ = id;
+          delete lives[resolver];
+        }
+      }
+    },
+    drop_(resolver) {
+      for (const run of new Set(started([...inflight.values()]))) {
+        run!.resolver_ === resolver && cancel(run!);
+      }
+      batcher?.drop_([], undefined, resolver);
     },
     abortAll_() {
       const ids: string[] = [];

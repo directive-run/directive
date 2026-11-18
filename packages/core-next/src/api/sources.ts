@@ -102,6 +102,9 @@ export interface SourcesFeature {
   gate_(): void;
   stop_(): void;
   stopAsync_(): Promise<void>;
+  /** L10b: a module's sources, registered and unregistered. */
+  add_(entries: [string, unknown][]): void;
+  remove_(ids: string[]): void;
 }
 
 declare module "../kernel.js" {
@@ -425,7 +428,8 @@ export const withSources: SystemPart = (context) => {
   const gates: Gate[] = [];
   /** The ungated sources, which start attaches in declaration order. */
   const ungated: [string, Def][] = [];
-  for (const [id, def] of defs) {
+  /** A source's place: a gate, or the ungated list. */
+  const place = (id: string, def: Def) => {
     const { key, active } = def;
     const on = typeof active === "function";
     if (on || typeof key === "function") {
@@ -447,6 +451,9 @@ export const withSources: SystemPart = (context) => {
     } else {
       ungated.push([id, def]);
     }
+  };
+  for (const [id, def] of defs) {
+    place(id, def);
   }
   const disarm = (gate: Gate) => {
     clock.clearTimeout(gate.timer_!);
@@ -713,6 +720,41 @@ export const withSources: SystemPart = (context) => {
       gate();
     },
     gate_: gate,
+    // L10b: 1.35's registerDefinitions, a module's sources attached at once
+    // when started, ungated first, then the gates evaluated.
+    add_(entries: [string, Def][]) {
+      for (const [id, def] of entries) {
+        defs.push([id, def]);
+        place(id, def);
+      }
+      if (phase === "attached") {
+        for (const [id, def] of ungated) {
+          entries.some(([e]) => e === id) && attach(id, def);
+        }
+        gate();
+      }
+    },
+    // 1.35's cleanupModule: detached, a linger or backoff timer cancelled,
+    // and forgotten.
+    remove_(ids: string[]) {
+      const has = (id: string) => ids.includes(id);
+      for (const rec of attached) {
+        has(rec.id_) && !rec.detached_ && unsubscribe(rec);
+      }
+      for (const list of [defs, ungated, gates] as unknown[][]) {
+        for (let i = list.length; i--; ) {
+          const item = list[i] as Gate | [string];
+          if (has((item as Gate).id_ ?? (item as [string])[0])) {
+            (item as Gate).id_ && disarm(item as Gate);
+            list.splice(i, 1);
+          }
+        }
+      }
+      for (const id of ids) {
+        live.delete(id);
+        counters.delete(id);
+      }
+    },
     // Reverse attach order. A promise from unsubscribe is not awaited here.
     stop_() {
       if (phase !== "attached") {

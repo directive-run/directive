@@ -2613,5 +2613,848 @@
       "maxSnapshots": 20,
       "respectsAbort": false
     }
+  },
+  {
+    "group": "row-bb",
+    "why": "Fuzz seed 11, case 175 across every layer (L9 gate): row (bb), a `back` over a changeset whose indexes moved (l9-fuzz-bb-hook-onDerivationInvalidate-changed-back). At L9 the census seed draws no (bb) case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 3,
+              "throwsAt": 3
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": -2,
+              "throwsAt": 8
+            },
+            {
+              "facts": [1, 0],
+              "derived": [0],
+              "threshold": 2,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": -2,
+              "delay": 1,
+              "fails": 1,
+              "retry": 2,
+              "timeout": 3
+            },
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": -1,
+              "delay": 20,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 4
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": "retry",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "begin"
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 2122422069,
+          "value": 5
+        },
+        {
+          "op": "end"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 561163811,
+          "value": -1
+        },
+        {
+          "op": "back",
+          "steps": 1
+        },
+        {
+          "op": "resume"
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": null,
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 3
+    }
+  },
+  {
+    "group": "quirk-t-disable",
+    "why": "Deep fuzz seed 1, case 4038 across every layer (L9 gate): row t's error shape under the `disable` strategy, a::r1 times out on its first attempt and the next pass retracts its requirement (the three l9-fuzz-t-disable entries). At L9 the census seed draws no such case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": null
+            },
+            {
+              "facts": [1, 0],
+              "derived": [0],
+              "threshold": 3,
+              "throwsAt": 8
+            },
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": -1,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 1,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 1,
+              "value": 1,
+              "delay": 0,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 3
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1, 0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 4
+            },
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 6
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": -2,
+              "throwsAt": 4
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": 5,
+              "throwsAt": 8
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [
+            {
+              "reads": [0, 1],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 4
+            }
+          ],
+          "source": {
+            "gated": false
+          },
+          "snapshotEvents": [1]
+        }
+      ],
+      "boundary": "disable",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 2
+        },
+        {
+          "op": "pause"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 1119760493,
+          "value": 0
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 911085296,
+          "value": 3
+        },
+        {
+          "op": "end"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "begin"
+        },
+        {
+          "op": "forward",
+          "steps": 2
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 23,
+          "value": 0
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "publish",
+          "event": "unknown",
+          "value": 2
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1191064960,
+          "value": 2
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 147115226,
+          "value": 0
+        },
+        {
+          "op": "batch",
+          "module": 1,
+          "writes": [[573459187, -2], [89210891, 0]]
+        }
+      ],
+      "batch": null,
+      "maxSnapshots": 5,
+      "respectsAbort": false,
+      "maxRuns": 1
+    }
+  },
+  {
+    "group": "quirk-t-batch",
+    "why": "Deep fuzz seed 24301, case 3397 across every layer (L9 gate): row t's batch path, rb's own write retracts a requirement of the source that feeds it (l9-fuzz-t-batch-write-retracts-hook-onResolverCancel-changed). At L9 the census seed's PR count draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 3
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": 6,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 3,
+              "delay": 0,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 3
+            },
+            {
+              "fact": 1,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": -2,
+              "delay": 20,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1, 0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        },
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": 4,
+              "throwsAt": 6
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": 5,
+              "throwsAt": null
+            },
+            {
+              "facts": [2, 1, 0],
+              "derived": [1],
+              "threshold": 4,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": 5
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "retry",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "settle"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 6
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 201446219,
+          "value": 5
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 912016516,
+          "value": 0
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 983641736,
+          "value": 6
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 333049007,
+          "value": 6
+        },
+        {
+          "op": "dispatch",
+          "module": 1,
+          "event": 1671509005,
+          "value": 2
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 0,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "some",
+        "windowMs": 1,
+        "maxSize": 2,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": -1
+      }
+    }
+  },
+  {
+    "group": "row-av",
+    "why": "Deep fuzz seed 24301, case 2659 across every layer (L9 gate): rows (av) and (at), a fallback run's start for a queued batched requirement raised again, missing on 2.0 (l9-fuzz-av-at-fallback-external-start-missing). At L9 the census seed's PR count draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": -1,
+              "delay": 1,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": null
+            },
+            {
+              "reads": [1, 0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 7
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        },
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": null
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 2,
+              "throwsAt": 3
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": 3,
+              "priority": 1,
+              "writes": 0,
+              "value": 3,
+              "delay": 0,
+              "fails": 1,
+              "retry": 2,
+              "timeout": 3
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 6
+            },
+            {
+              "reads": [1],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 8
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "retry-later",
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 139717524,
+          "value": -2
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1243782431,
+          "value": 2
+        },
+        {
+          "op": "forward"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1757968322,
+          "value": 3
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "fallback",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 20,
+        "fails": 1,
+        "retry": 0,
+        "timeout": 3,
+        "writes": 1,
+        "value": 2
+      }
+    }
+  },
+  {
+    "group": "row-ap",
+    "why": "Fuzz seed 18, case 156 across every layer (L9 gate): row (ap), 2.0's batch window is not moved by re-adds of a clobbered bound requirement, so it flushes earlier (l9-fuzz-ap-external-start-early-flush). At L9 the census seed draws no (ap) case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 6
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 0,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 0,
+              "delay": 5,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": 2,
+              "delay": 5,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 10
+            },
+            {
+              "fact": 0,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 3,
+              "delay": 20,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": null
+            },
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 8
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": "retry-later",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": -1
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[823366339, -1]]
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "publish",
+          "event": "cross",
+          "value": 5
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1174190859,
+          "value": 2
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 2060131653,
+          "value": -2
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "tick"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "some",
+        "windowMs": 5,
+        "maxSize": 2,
+        "delay": 5,
+        "fails": 0,
+        "retry": 1,
+        "timeout": 50,
+        "writes": 2,
+        "value": 1
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 1
+    }
   }
 ]

@@ -5,7 +5,8 @@ revision 2, "Decisions for the owner") on 2026-11-15 with "I approve you for
 to do everything", under which Claude took each recommended option, and
 asked Claude to sign the entries for the approved rows on his behalf, as at
 the earlier gates (GATE-2.md, rule 1). This record is of gate run 1 of at
-most 3 (A3), and of run 2.
+most 3 (A3), of run 2, and of the owner's ruling on 24301:all#175
+(2026-11-17, "Seed d", below).
 
 ## What the L9 gate does
 
@@ -23,6 +24,37 @@ v2:dist. Two problems are open (below, "Stops"). The PR seed CI runs (24301)
 fails at L9 on a 2.0 hang in a batched case, and three other PR seeds pass
 only past CI's 120 s test timeout. The L8 gate's stop (the two `./internals`
 names) carries into this branch unchanged.
+
+## Seed d: the owner's ruling, and the rule change (2026-11-17)
+
+The question: "may a missing-record stop count at the 2.0 index of the last
+paired record before it, under 'Discard after the stop'?". Jason's answer,
+verbatim: "Approve the wider wording (Recommended)".
+
+- **The rule change** (diff/scenario.ts `stopsBefore`, README "fuzz"
+  section). A missing-record stop now also counts as first when the
+  engine's index of the last paired record before it (the stop's shared
+  match point, `Difference.shared.candidate`) is strictly below the point
+  the engine outworked the reference. The segment test stays as it was. A
+  missing stop with no paired record before it (the start, index -1), or
+  whose last paired record is at or past that point, is still a hang. Extra
+  and changed stops still count at their own record's index. Nothing else
+  changed.
+- **Self-tests** (diff/self/runaway-after-stop.test.ts, block (f)): 24301:all#175's
+  shape (a missing stop in the runaway's own step, after a paired record)
+  is now discarded; a missing record with no stop before it (no entry, or
+  an ordinary entry) is still a hang; an extra record after the stop is
+  dropped by the existing shared-point rule, so the case is still
+  discarded; an extra-record stop past the point is still a hang; and a
+  real difference before the missing stop still fails the discarded case.
+  With the widening switched off, the first, third and fifth fail, so the
+  block tests the change. The older (c) case (a missing stop in the
+  runaway's segment, with no record paired before the runaway) is still a
+  hang.
+- **Seed d's result.** PR seed 24301 at L9 exits 0 in 35 s: 287 cases, 2
+  runaways discarded, 1 of them after a stop, stopped by
+  `l7-fuzz-b-hook-onError-missing-batchFails` ×1. That is 24301:all#175,
+  inside the runaway limit. It no longer fails, shrinks or times out.
 
 ## The L9 decisions
 
@@ -142,6 +174,32 @@ and core-next). Each exit code, and what fails:
 | Root biome, error level | 0 | 1,467 files |
 | The 21 PR seeds, at CI's 120 s | 1 on 4 | 17 exit 0 (17 to 89 s each). 24301, 7, 9 and 11 time out (below, "Stops") |
 
+**Run 3** (2026-11-17, after merging main at 386f23bf: the L8 gate, L9-pre-a
+and L9-pre-b, and the seed d rule change):
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| The 21 PR seeds at L9 (7, 9 and 11 with a 1,800 s limit) | 0 each | 24301 35 s; 7 410 s, 9 490 s, 11 481 s; the other 17 19 to 83 s. Run 3 at a time |
+| diff self-tests (`diff/self`) | 0 | 19 files, 317 tests |
+| `check:expects` | 0 | |
+| `ratchet --update` | 0 | added 0, lost 0; holds 2,171 (the union of both sides) |
+| core-next `test`, `typecheck` | 0, 0 | 71 files, 678 passed |
+| Root biome, error level | 0 | 1,481 files |
+| `oracle:update`, then `conformance:checks` | 0, 0 | 12 files, 246 passed. The L8 stop's 9 `api-surface-next` failures are gone (#402 on main) |
+| `pnpm census` | 1 | 7 problems, all stale fuzz entries (Stops) |
+
+**Run 3, after the pins** (2026-11-17, five cases added to
+`diff/fuzz/pinned.json`, Stops):
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `oracle:update` (no `node_modules` or `.vite` under contracts, helpers, self, lib or diff) | 0 | |
+| `check:expects` | 0 | |
+| `conformance:checks` | 0 | 12 files, 246 passed |
+| diff self-tests (`diff/self`) | 0 | 19 files, 317 tests |
+| Root biome, error level | 0 | 1,481 files |
+| `pnpm census` | 0 | seed 24301, 287 cases (205 + 82 up to L9); no stale entry. Run again after this table's edit, with `oracle:update` and `conformance:checks` first |
+
 **CI's timeout.** CI runs one fuzz seed, the fixed 24301, inside `pnpm
 census`. The census runs the `conformance:diff` project with no override, so
 it gets that project's `testTimeout: 120_000` (vitest.config.ts). The other
@@ -218,9 +276,44 @@ show. #948 needs a replay with both traces to say which row it is.
   - Replayed alone, the case takes 11 s and is the seed's only failure.
   - L9b's triage put it under "harness". Under the committed rule it is a
     hang, and it is new at L9 only because trace cases first run on 2.0 now.
-  - It needs Jason: is a 2.0-only livelock after a batch-retry stop a 2.0
+  - It needed Jason: is a 2.0-only livelock after a batch-retry stop a 2.0
     bug, or should the discard rule cover a missing stop in the runaway's
     own step? The gate may not touch `packages/core-next/src`.
+  - **Resolved (2026-11-17)**: Jason approved the wider wording ("Seed d",
+    above). The case is discarded after the stop, and seed 24301 exits 0.
+- **Run 3: the census finds seven signed L9 fuzz entries stale.** With
+  seed 24301 now passing, the census sees which entries its 287 cases use.
+  Five groups' entries cover nothing on that seed: `row-bb`
+  (`l9-fuzz-bb-hook-onDerivationInvalidate-changed-back`), `quirk-t-disable`
+  (three entries), `quirk-t-batch`
+  (`l9-fuzz-t-batch-write-retracts-hook-onResolverCancel-changed`), `row-av`
+  (`l9-fuzz-av-at-fallback-external-start-missing`) and `row-ap`
+  (`l9-fuzz-ap-external-start-early-flush`). Their evidence is on other
+  seeds or deep runs (11:all#175, 7:all#187, 2:all#2625, 24301:all#2659,
+  24301:all#3397). Run 2 could not see this, as 24301 timed out. This is
+  not a merge leftover, and signed entries are not removed: the L8 gate's
+  fix for the same shape is a pinned case per group in
+  `diff/fuzz/pinned.json`, regenerated by index from its seed.
+  - **Closed (2026-11-17): one pinned case per group.** Each case was
+    rebuilt by index from its seed's across-every-layer phase (fast-check
+    `sample` with the seed; the rebuilt cases cover the entries their notes
+    name, which checks the generator) and replayed alone on 1.35 and 2.0:
+    every one is compared on v2, uses its group's entries and has 0
+    unexplained differences.
+
+    | Group | Pinned case | Entries it uses | Differences | Time |
+    | --- | --- | --- | --- | --- |
+    | `row-bb` | 11:all#175 | the (bb) `back` entry | 117 | 0.7 s |
+    | `quirk-t-disable` | 1:all#4038 (deep) | all three `l9-fuzz-t-disable` entries | 4 | 0.1 s |
+    | `quirk-t-batch` | 24301:all#3397 (deep) | `l9-fuzz-t-batch-write-retracts-hook-onResolverCancel-changed` | 37 | 0.1 s |
+    | `row-av` | 24301:all#2659 (deep) | `l9-fuzz-av-at-fallback-external-start-missing` | 14 | 0.1 s |
+    | `row-ap` | 18:all#156 | `l9-fuzz-ap-external-start-early-flush` | 22 | 0.1 s |
+
+    For `row-av`, 7:all#187 and 2:all#2625 also pass with the entry, but
+    7:all#187 takes 292 s alone, so the fast deep case is pinned. The pins
+    run first in the up-to-L9 phase, so that phase's later case numbers move
+    up by five. No entry was widened, removed or re-signed. The census then
+    finds no stale entry and exits 0 (below, "Run 3, after the pins").
 - **Three PR seeds need longer than CI's 120 s, though no case fails:**
   - Seed 7 takes 354 s. Case 7:all#187 (`traceRing`, `batchFallback`,
     `batchClobbered`) passes, but takes 340 s alone: 81,296 differences, with
@@ -238,7 +331,9 @@ show. #948 needs a replay with both traces to say which row it is.
 
 - Run 3: profile 7:all#187, then fix whatever in the harness grows with a
   trace that large. Rerun seeds 7, 9 and 11 at 120 s.
-- 24301:all#175: Jason's ruling (Stops), then rerun seed 24301 and the census.
+- 24301:all#175: done (2026-11-17, "Seed d").
+- Pinned cases for `row-bb`, `quirk-t-disable`, `quirk-t-batch`, `row-av`
+  and `row-ap`: done (2026-11-17, Stops, run 3).
 - A gate=L9 mutation run of this branch, to confirm the 135 conversions.
 - A payload tie-break for every record kind, as `traceRunText` does for
   `onTraceComplete`: 24301:up to L8#593 and #630 and L8's 1:all#4271 and

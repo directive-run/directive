@@ -548,7 +548,14 @@ engine's timer callbacks pass the reference's own total (the count where
 doing work the reference never did, so a record there may be the loop's
 own. The stop's record in that engine's trace must come strictly before
 that point, or, for a missing stop, its step and phase must end before the
-one the runaway started in. A runaway with no stop, before the stop, or on
+one the runaway started in, or the engine's index of the last paired record
+before it (the stop's shared match point) must come strictly before that
+point (Jason, 2026-11-17: "Approve the wider wording (Recommended)": "a
+missing-record stop counts at the 2.0 index of the last paired record
+before it"; 24301:all#175, where 2.0 runs away in the stop's own step after
+`l7-fuzz-b-hook-onError-missing-batchFails`). A missing stop with no paired
+record before it, or whose last one is at or past the point, is still a
+hang. A runaway with no stop, before the stop, or on
 an engine the stop is not on is still a hang; so is a loop whose own
 records match an `ends` entry, and a loop that started before the stop
 and ran out of budget after it. Differences before the stop are still
@@ -757,6 +764,14 @@ deliberate act, made visible on the pull request:
   The label is still required, the census still
   fails an entry that covers no real difference, and a head the guard cannot
   parse fails closed.
+- **Except names core-next now ships (Jason, 2026-11-17: "Route B: approve
+  the rule (Recommended)").** An engine PR that ships a name listed in
+  `contracts/next-unshipped.json` removes it in the same PR: alongside the
+  engine that file (with or without `harness.lock.json`) may change only by
+  pure removal, with no name added, no layer changed and `$comment`
+  unchanged. The label is still required. The guard does not check the
+  removed name really ships; the surface gate does, since a missing 1.35 name
+  that is not listed fails at any layer.
 
 To change the harness: edit, run `oracle:update`, run `pnpm conformance`,
 open the PR with the `oracle-change` label, and say in the description what
@@ -787,7 +802,7 @@ the oracle now accepts that it did not before.
 | diff: a stale divergence | An approved difference no longer occurs | Remove the entry |
 | ratchet: a listed test no longer passes | core-next regressed something it once passed (on source, or only in the built dist: a mangled member, the folded dev check) | Fix core-next; removing the entry needs a reason and the `oracle-change` label |
 | oracle-guard (tree) | The baseline loosened, or a harness file differs from the lock | Undo it, or `oracle:update` and label the PR |
-| Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together (beyond signed divergences) | Label it if the change is deliberate; split engine and oracle PRs, or have Jason sign the divergence |
+| Oracle guard (PR) | The PR changes the harness without the `oracle-change` label, or changes core-next and the harness together (beyond signed divergences or names removed from next-unshipped.json) | Label it if the change is deliberate; split engine and oracle PRs, or have Jason sign the divergence |
 
 ## The v1 pin rule
 
