@@ -1720,10 +1720,16 @@ export function sameRecord(d: Difference, stop: Difference): boolean {
  * the stop that ended the comparison first. A stop with a record in the
  * engine's trace (extra or changed) came first when that record's index is
  * strictly below `pastReferenceAt`. A stop that is the reference's alone
- * (missing) came first only when its segment (step, then setup, sync or
- * async phase) ends before the one the runaway started in: in the same
- * segment the engine may simply not have reached it yet, so that runaway is
- * still a hang.
+ * (missing) came first when its segment (step, then setup, sync or async
+ * phase) ends before the one the runaway started in, or when it counts at
+ * the engine's index of the last paired record before it (its shared match
+ * point, `Difference.shared`) and that index is strictly below
+ * `pastReferenceAt` (Jason, 2026-11-17: "Approve the wider wording
+ * (Recommended)", on 24301:all#175: "a missing-record stop counts at the
+ * 2.0 index of the last paired record before it"). A missing stop whose
+ * last paired record is at or past that point (the engine may simply not
+ * have reached it yet) is still a hang, and so is one with no paired record
+ * before it (the start of both traces, index -1).
  */
 export function stopsBefore(
   stop: Difference,
@@ -1735,6 +1741,11 @@ export function stopsBefore(
   }
   if (stop.at.candidate !== undefined) {
     return stop.at.candidate < pastReferenceAt;
+  }
+  // The wider wording (2026-11-17): the last paired record before the
+  // missing one, on the engine's trace.
+  if (stop.shared.candidate >= 0 && stop.shared.candidate < pastReferenceAt) {
+    return true;
   }
   const where = stop.where.reference;
   if (!where) {

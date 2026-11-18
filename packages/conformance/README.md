@@ -548,7 +548,14 @@ engine's timer callbacks pass the reference's own total (the count where
 doing work the reference never did, so a record there may be the loop's
 own. The stop's record in that engine's trace must come strictly before
 that point, or, for a missing stop, its step and phase must end before the
-one the runaway started in. A runaway with no stop, before the stop, or on
+one the runaway started in, or the engine's index of the last paired record
+before it (the stop's shared match point) must come strictly before that
+point (Jason, 2026-11-17: "Approve the wider wording (Recommended)": "a
+missing-record stop counts at the 2.0 index of the last paired record
+before it"; 24301:all#175, where 2.0 runs away in the stop's own step after
+`l7-fuzz-b-hook-onError-missing-batchFails`). A missing stop with no paired
+record before it, or whose last one is at or past the point, is still a
+hang. A runaway with no stop, before the stop, or on
 an engine the stop is not on is still a hang; so is a loop whose own
 records match an `ends` entry, and a loop that started before the stop
 and ran out of budget after it. Differences before the stop are still
