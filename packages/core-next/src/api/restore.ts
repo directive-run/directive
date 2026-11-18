@@ -13,7 +13,9 @@
  * Two development-only changes, owner-approved for 2.0; production is 1.35:
  * - (ag) every key and value is checked before any is written, so a restore
  *   that throws writes nothing (1.35 throws after the keys before the bad
- *   one are committed);
+ *   one are committed). A key whose module was unregistered is not checked:
+ *   1.35's store drops its write before validating it (core/facts.ts:521),
+ *   so it is dropped silently, as in production;
  * - (ah) a restore made before `initialize()` warns once, since the module
  *   inits will overwrite it; one made inside it (a module init) does not. Keyed on `initialize()`, not `start()`: the
  *   Aperture lab calls `initialize()`, then restores, then `start()`.
@@ -61,8 +63,12 @@ export const withRestore: SystemPart = (context) => {
         | ((key: string, value: unknown) => void)
         | undefined;
       if (check && Object.keys(module.schema?.facts ?? {}).length > 0) {
+        // Set by the store's unregisterKeys (dynamic.ts).
+        const gone = (store as { gone_?: Set<string> }).gone_;
         for (const [key, value] of entries) {
-          check(key, value);
+          if (!gone?.has(key)) {
+            check(key, value);
+          }
         }
       }
     }

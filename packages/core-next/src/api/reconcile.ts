@@ -31,8 +31,14 @@
 
 import isDevelopment from "#is-development";
 import { type ConstraintDef, createConstraints } from "./constraints.js";
-import type { ErrorsFeature, ReconcileFeature, SystemPart } from "./core.js";
+import type {
+  ErrorsFeature,
+  ReconcileFeature,
+  SystemContext,
+  SystemPart,
+} from "./core.js";
 import { DERIVATION_DEP_PREFIX, describeDep } from "./facts.js";
+import { evaluateKeySelector } from "./predicate.js";
 import type { RequirementKeyFn, RequirementWithId } from "./requirements.js";
 import { type ResolverDef, type Run, createResolvers } from "./resolvers.js";
 import type { ModuleDefinition } from "./types.js";
@@ -49,19 +55,27 @@ declare module "../kernel.js" {
 }
 
 export const withReconcile: SystemPart = (context) => {
+  const { constraints, resolvers } = context.module;
+  if (
+    !Object.keys(constraints ?? {}).length &&
+    !Object.keys(resolvers ?? {}).length
+  ) {
+    // No feature: the core's pass stays exactly the L1 pass, until a
+    // constraint or resolver is registered (L10).
+    context.l2_ = () => build(context);
+
+    return;
+  }
+  build(context);
+};
+
+const build = (context: SystemContext) => {
   const { kernel, module, system, reportError, schedule, settled } = context;
   const constraintDefs = (module.constraints ?? {}) as Record<
     string,
     ConstraintDef
   >;
   const resolverDefs = (module.resolvers ?? {}) as Record<string, ResolverDef>;
-  if (
-    Object.keys(constraintDefs).length === 0 &&
-    Object.keys(resolverDefs).length === 0
-  ) {
-    // No feature: the core's pass stays exactly the L1 pass.
-    return;
-  }
   const { hooks, clock, rng } = kernel;
   /** Builds a record only when `wants(at)` says it has a reader. */
   const emitter =
@@ -86,14 +100,16 @@ export const withReconcile: SystemPart = (context) => {
   // finishes after destroy()).
   const emitRun = emitter(hooks.wants, hooks.emit);
   const keys: Record<string, RequirementKeyFn> = {};
+  /** D4: a `key` given as field names (1.35's normalizeResolverKey). */
+  const keyFn = (key: any): RequirementKeyFn =>
+    Array.isArray(key) ? (req) => evaluateKeySelector(key, req as never) : key;
   for (const def of Object.values(resolverDefs)) {
     if (def?.key && typeof def.requirement === "string") {
-      keys[def.requirement] = def.key;
+      keys[def.requirement] = keyFn(def.key);
     }
   }
-  const derivationIds = new Set(Object.keys(module.derive ?? {}));
   /** Some constraint lists `abortOn` keys: only then is a baseline read. */
-  const bindings = Object.values(constraintDefs).some(
+  let bindings = Object.values(constraintDefs).some(
     (def) => (def?.abortOn?.length ?? 0) > 0,
   );
   /** `id::reason` pairs already reported as binding disabled (1.35). */
@@ -108,7 +124,7 @@ export const withReconcile: SystemPart = (context) => {
     const id = req.fromConstraint;
     const def = bindings && id ? constraintDefs[id] : undefined;
     const keys = def?.abortOn;
-    if (!keys || keys.length === 0) {
+    if (!keys || !keys.length) {
       return undefined;
     }
     if (!def.async && !constraints.isAsync(id)) {
@@ -136,11 +152,30 @@ export const withReconcile: SystemPart = (context) => {
     derived: context.derived,
     tracker: context.tracker,
     keys,
-    isDerivation: (name) => derivationIds.has(name),
+    // Read live: a derivation may be registered later (L10).
+    isDerivation: (name) =>
+      !!module.derive && Object.hasOwn(module.derive, name),
     watch: context.watch,
     clock,
-    onEvaluate: (id, active) =>
-      emit("constraint.evaluate", () => ({ id, active })),
+    // I2: `explain` only when the record is built (something listens), and
+    // only for a data form: a second, untracked walk (E11, as 1.35).
+    onEvaluate: (id, active) => {
+      emit("constraint.evaluate", () => {
+        const explain = constraints.explain_(id);
+
+        return explain ? { id, active, explain } : { id, active };
+      });
+      // 1.35 walks whenever a plugin is installed (engine.ts:1248); only
+      // development can tell, by its warnings.
+      if (
+        isDevelopment &&
+        !context.wants_("constraint.evaluate") &&
+        (kernel.features as any).plugins?.list.length
+      ) {
+        constraints.explain_(id);
+      }
+    },
+    pred: context.pred_,
     onError(id, error) {
       const strategy = reportError("constraint", id, error);
       emit("constraint.error", () => ({ id, error }));
@@ -325,12 +360,12 @@ export const withReconcile: SystemPart = (context) => {
     }
     counts.push(stamp, slot === CHANGED ? 1 : 0, slot - 1);
   };
-  if (Object.keys(resolverDefs).length > 0) {
+  if (Object.keys(resolverDefs).length) {
     context.writers.record = (key, stamp) => {
       // As 1.35: a write counts only while a run is in flight (or detached
       // and still going). One made with none (a plugin writing before the
       // first run starts) is nobody's.
-      if (resolvers.inflight.size === 0 && resolvers.detached_.size === 0) {
+      if (!resolvers.inflight.size && !resolvers.detached_.size) {
         return;
       }
       if (boundKeys?.has(key)) {
@@ -435,7 +470,7 @@ export const withReconcile: SystemPart = (context) => {
     // The runs whose requirements disappeared and that wrote this pass own
     // the pass's changes jointly (keyed siblings writing one fact).
     const joint = new Set<number>();
-    if (closed.size > 0 || closedTally.size > 0) {
+    if (closed.size || closedTally.size) {
       for (const req of removed) {
         const run = runFor(req.id);
         if (run && wrote(run.stamp_)) {
@@ -447,7 +482,7 @@ export const withReconcile: SystemPart = (context) => {
       // Looked up first, as 1.35 does: it may report a disabled binding.
       const bound = bindingOf(req);
       const run = runFor(req.id);
-      if (run && joint.size > 0 && satisfied(req, run, passKeys, joint)) {
+      if (run && joint.size && satisfied(req, run, passKeys, joint)) {
         // Its own write made the requirement go away: not canceled. It
         // stays in flight (stop aborts it, settle waits), is not retried,
         // and is superseded if the requirement comes back. One that has
@@ -496,7 +531,7 @@ export const withReconcile: SystemPart = (context) => {
       previous = new Map();
       for (const req of restored) {
         const deps =
-          passKeys.size > 0 && req.fromConstraint
+          passKeys.size && req.fromConstraint
             ? constraints.depsOf(req.fromConstraint)
             : undefined;
         if (
@@ -507,7 +542,7 @@ export const withReconcile: SystemPart = (context) => {
         }
       }
 
-      return passKeys.size > 0 ? constraints.evaluate(passKeys) : restored;
+      return passKeys.size ? constraints.evaluate(passKeys) : restored;
     },
     begin_() {
       const done = closed;
@@ -527,7 +562,7 @@ export const withReconcile: SystemPart = (context) => {
         ? constraints.evaluate()
         : (constraints.unaffected(passKeys) ?? constraints.evaluate(passKeys)),
     commit_(current, passKeys) {
-      if (restart.size > 0 && system.isRunning) {
+      if (restart.size && system.isRunning) {
         // Quirk j: the first pass after start() sees each one still wanted
         // as added, so it runs again; one no longer wanted is canceled.
         for (const req of current) {
@@ -537,7 +572,7 @@ export const withReconcile: SystemPart = (context) => {
         }
         restart.clear();
       }
-      const quiet = current.length === 0 && previous.size === 0;
+      const quiet = !current.length && !previous.size;
       const next = quiet ? previous : new Map<string, RequirementWithId>();
       const added: RequirementWithId[] = [];
       const removed: RequirementWithId[] = [];
@@ -558,8 +593,26 @@ export const withReconcile: SystemPart = (context) => {
             removed.push(req);
           }
         }
+        // The trace's record of the pass (L9 seam): what it added and
+        // removed, and each constraint with a current requirement, with its
+        // priority and what it read, all read here after the evaluation, as
+        // 1.35 reads them. `flight` is the live in-flight map: the trace reads
+        // each added requirement's resolver from it after the dispatch (L9b).
+        emit("requirement.diff", () => ({
+          added,
+          removed,
+          flight: resolvers.inflight,
+          hit: [...new Set(current.map((req) => req.fromConstraint))].map(
+            (id) => ({
+              id,
+              // I3 (L10): a constraint unregistered since is gone.
+              priority: constraints.state_(id)?.priority,
+              deps: Array.from(constraints.depsOf(id) ?? [], describeDep),
+            }),
+          ),
+        }));
       }
-      if (removed.length > 0) {
+      if (removed.length) {
         retract(removed, passKeys);
       }
       // One baseline for every run this pass dispatches, read before the
@@ -671,6 +724,10 @@ export const withReconcile: SystemPart = (context) => {
           hitCount: state.hitCount,
           lastActiveAt: state.lastActiveAt,
           meta: def.meta,
+          // S6: a data-form `when` is its own spec (filled by L11's compiler).
+          ...(constraints.specs_.has(state.id)
+            ? { whenSpec: constraints.specs_.get(state.id)![0] }
+            : {}),
           ...(abortOn ? { abortOn } : {}),
         };
       }),
@@ -683,13 +740,13 @@ export const withReconcile: SystemPart = (context) => {
       const all = [...previous.values()];
 
       return [
-        ...(runs.length > 0
+        ...(runs.length
           ? [
               `${runs.length} resolvers inflight: ${runs.map((r) => r.resolver_).join(", ")}`,
             ]
           : []),
         ...core,
-        ...(all.length > 0
+        ...(all.length
           ? [
               `${all.length} unmet requirements: ${all.map((r) => r.requirement.type).join(", ")}`,
             ]
@@ -754,6 +811,8 @@ export const withReconcile: SystemPart = (context) => {
     if (meta?.description) {
       lines.push(`├─ Description: ${meta.description}`);
     }
+    // I3: a data-form `when`'s clauses.
+    context.pred_?.print_(lines, constraints.explain_(from));
     const payload = Object.entries(req.requirement)
       .filter(([k]) => k !== "type")
       .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
@@ -762,7 +821,7 @@ export const withReconcile: SystemPart = (context) => {
       lines.push(`├─ Requirement payload: { ${payload} }`);
     }
     const entries = Object.entries(relevant).slice(0, 10);
-    if (entries.length > 0) {
+    if (entries.length) {
       lines.push("└─ Relevant facts:");
       entries.forEach(([k, v], i) => {
         const text = typeof v === "object" ? JSON.stringify(v) : String(v);
@@ -774,7 +833,51 @@ export const withReconcile: SystemPart = (context) => {
 
     return lines.join("\n");
   };
-  system.constraints = {
+  // L10: the hooks withDynamic's registry calls, after it writes the maps.
+  const keyOf = (def: ResolverDef | undefined) => {
+    if (def?.key && typeof def.requirement === "string") {
+      keys[def.requirement] = keyFn(def.key);
+    }
+  };
+  const constraint = (id: string, full?: unknown) => {
+    bindings ||= !!constraintDefs[id]!.abortOn?.length;
+    constraints.add_(id, full);
+  };
+  const resolver = (id: string) => keyOf(resolverDefs[id]);
+  context.kinds_.constraint = {
+    add_: (id) => constraint(id, constraintDefs[id]!.after?.length),
+    // R2: an assign drops the old spec before the new one is normalized.
+    replace_(id) {
+      constraints.specs_.delete(id);
+      constraint(id, 1);
+    },
+    remove_(id) {
+      constraints.remove_(id);
+      // 1.35 (engine.ts:2612–2631): a constraint registered again may warn again.
+      disabledBinding.delete(`${id}::async-declared`);
+      disabledBinding.delete(`${id}::async-promoted`);
+    },
+    call_: constraints.call_,
+    reads_: (key) =>
+      Object.keys(constraintDefs).some((id) =>
+        constraints.depsOf(id)?.has(key),
+      ),
+  };
+  context.kinds_.resolver = {
+    add_: resolver,
+    replace_: resolver,
+    remove_(id, def) {
+      const req = (def as ResolverDef | undefined)?.requirement;
+      if ((def as ResolverDef | undefined)?.key && typeof req === "string") {
+        delete keys[req];
+      }
+      resolvers.drop_(id);
+    },
+    waits_: resolvers.waits_,
+    // `call` on a resolver is dynamic.ts's own (it needs only the map).
+  };
+  system.constraints ??= {};
+  Object.assign(system.constraints as object, {
     disable(id: string) {
       // Quirk e: a dependent it held back is asked again.
       if (constraints.disable(id)) {
@@ -785,5 +888,5 @@ export const withReconcile: SystemPart = (context) => {
     // it dirty and asks for no pass; the next pass evaluates it.
     enable: (id: string) => constraints.enable(id),
     isDisabled: (id: string) => constraints.isDisabled(id),
-  };
+  });
 };

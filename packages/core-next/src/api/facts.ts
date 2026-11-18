@@ -323,7 +323,7 @@ export function createFactsStore<S extends Schema>(
         notify(listeners, key!);
       }
       notify(listeners, ALL);
-      for (let rounds = 0; pending.length > 0; ) {
+      for (let rounds = 0; pending.length; ) {
         if (++rounds > 100) {
           pending.length = 0;
           throw Object.assign(
