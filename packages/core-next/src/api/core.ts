@@ -1898,12 +1898,11 @@ export function createSystemCore<const M extends ModuleSchema>(
       context.fill_?.();
       initializing = false;
       initialized = true;
+      // 1.35 computes every derivation here, unguarded (engine.ts:3292–3297):
+      // one that throws is reported through onError, then the throw leaves
+      // initialize() and start(), and the derivations after it stay stale.
       for (const id of derivations.keys()) {
-        try {
-          read(id);
-        } catch {
-          // Reported through onError; the derivation stays stale.
-        }
+        read(id);
       }
     },
     start() {
