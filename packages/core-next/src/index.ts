@@ -45,6 +45,46 @@ export type {
   SchemaKind,
   SchemaKindNode,
 } from "./api/schema-introspection.js";
+// Predicate runtime and tools (L11): plain root exports, as in 1.35, so an app
+// bundles a tool only if it imports it. `createSystem` wires the evaluator
+// itself (withPredicates); these names are for calling it directly.
+export {
+  applyPatch,
+  evaluateKeySelector,
+  evaluatePredicate,
+  evaluatePredicateExplained,
+  evaluateTemplate,
+  extractDeps,
+  extractTemplateKeys,
+  isPredicate,
+  isTemplate,
+  memoizePredicate,
+} from "./api/predicate.js";
+export {
+  validatePredicate,
+  validatePredicateAgainstSchema,
+} from "./api/predicate-validate.js";
+export {
+  MAX_REPLAY_FRAMES,
+  framesFromHistory,
+  framesFromSnapshots,
+  replayUnder,
+  toReplayFrames,
+} from "./api/replay-under.js";
+export { MAX_SWEEP_POINTS, sweepUnder } from "./api/sweep-under.js";
+export {
+  diffClauses,
+  diffRules,
+  flattenPredicate,
+  toRulesMap,
+} from "./api/rules-diff.js";
+export { predicateHash } from "./api/predicate-hash.js";
+export { predict } from "./api/predict.js";
+export { doctor } from "./api/doctor.js";
+export { describePredicate } from "./api/predicate-describe.js";
+export { predicateToSQL, predicateToWhere } from "./api/predicate-to-sql.js";
+export { predicateToMongo } from "./api/predicate-to-mongo.js";
+export { predicateToPostgrest } from "./api/predicate-to-pgrest.js";
 export type {
   Branded,
   ChainableArrayType,
