@@ -17,7 +17,12 @@
  * `stopsBefore`), so (e) a loop whose own records match the `ends` entry,
  * and a loop that started before the stop, are still hangs; the stop must
  * be strictly before that point; and a discarded case still fails on a
- * difference before its stop.
+ * difference before its stop. (f) The wider wording (Jason, 2026-11-17:
+ * "Approve the wider wording (Recommended)"): a missing-record stop counts
+ * at the engine's index of the last paired record before it, so a missing
+ * stop in the runaway's own segment, after a record both engines made, is
+ * discarded (24301:all#175's shape); a missing record with no stop before
+ * it still fails; and an extra-record stop still counts at its own index.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -53,6 +58,8 @@ interface Marks {
   z?: boolean;
   /** The endless chain reports q (an extra record) in every callback. */
   loopQ?: boolean;
+  /** Reports x after b: an extra record (the reference reports none). */
+  x?: boolean;
   /** In the TICKS step: reports q (extra) in this tick, then spins. */
   qAt?: number;
 }
@@ -88,6 +95,9 @@ function reportQ(ctx: BuildContext): void {
     ctx.external(["q", marks.diff ? 1 : 0]);
   }
   ctx.external(["b", 0]);
+  if (marks.x) {
+    ctx.external(["x", 0]);
+  }
 }
 
 /** Runs away inside the step it is called in, when the engine spins. */
@@ -510,5 +520,93 @@ describe("(e) the runaway starts where the engine outworks the reference, not wh
       { engine: "v2", op: "changed", stream: "external", step: 1 },
     ]);
     expect(result.report).toMatch(/engines differ/);
+  });
+});
+
+describe("(f) a missing stop counts at the last paired record before it (Jason, 2026-11-17)", () => {
+  const reportThenSpin = fuzzCase([
+    {
+      op: "run",
+      label: "report, then spin",
+      fn: (_s, ctx) => {
+        reportQ(ctx);
+        spinNow(ctx);
+      },
+    },
+  ]);
+
+  it("24301:all#175's shape: a missing stop in the runaway's own segment, after a paired record, is discarded", async () => {
+    // 1.35 reports a, q, b; v2 reports a and b, then runs away in the same
+    // step. a is paired, below the point v2 outworked the reference.
+    const result = await runScenario(reportThenSpin, {
+      candidates: [marked("v2", { omit: true, spin: true })],
+      divergences: [ends("missing")],
+    });
+    expect(result.report).toBe("");
+    expect(result.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expect([result.ok, result.discarded, result.hung]).toEqual([
+      true,
+      ["v2"],
+      [],
+    ]);
+    const tally: FuzzTally = newFuzzTally();
+    tallyCase(tally, result);
+    expect(tally).toMatchObject({ runaway: 1, afterStop: 1 });
+  });
+
+  it("a missing record with no stop before it still fails: no entry, an ordinary entry", async () => {
+    const run = (divergences: Divergence[]) =>
+      runScenario(reportThenSpin, {
+        candidates: [marked("v2", { omit: true, spin: true })],
+        divergences,
+      });
+    expectHang(await run([]), "v2");
+    expectHang(await run([entry("q", { engine: "v2", op: "missing" })]), "v2");
+  });
+
+  it("an extra record after the missing stop is dropped by the existing rule: still discarded", async () => {
+    // x is past the stop's shared match point (isPastSharedPoint).
+    const result = await runScenario(reportThenSpin, {
+      candidates: [marked("v2", { omit: true, x: true, spin: true })],
+      divergences: [ends("missing")],
+    });
+    expect(result.report).toBe("");
+    expect([result.ok, result.discarded, result.hung]).toEqual([
+      true,
+      ["v2"],
+      [],
+    ]);
+    expect(result.unexplained).toEqual([]);
+  });
+
+  it("an extra-record stop still counts at its own index: past the point, a hang", async () => {
+    // Its last paired record is below the point; the widening is for a
+    // missing stop only.
+    const result = await runScenario(fuzzCase([TICK]), {
+      candidates: [marked("v2", { qAt: TICKS + 1, spin: true })],
+      divergences: [ends("extra")],
+    });
+    expect(result.ended).toMatchObject([{ engine: "v2", id: "q-ends" }]);
+    expectHang(result, "v2");
+  });
+
+  it("a real difference before the missing stop still fails the discarded case", async () => {
+    const Z: Step = {
+      op: "run",
+      label: "report z",
+      fn: (_s, ctx) => ctx.external(["z", marksOf(ctx).z ? 1 : 0]),
+    };
+    const result = await runScenario(
+      fuzzCase([Z, ...reportThenSpin.steps.slice(1)]),
+      {
+        candidates: [marked("v2", { z: true, omit: true, spin: true })],
+        divergences: [ends("missing")],
+      },
+    );
+    expect(result.discarded).toEqual(["v2"]);
+    expect(result.ok).toBe(false);
+    expect(result.unexplained).toMatchObject([
+      { engine: "v2", op: "changed", stream: "external", step: 1 },
+    ]);
   });
 });

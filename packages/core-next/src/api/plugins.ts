@@ -41,8 +41,11 @@ declare module "../kernel.js" {
   }
 }
 
-/** Record kind → the 1.35 hook and the record fields passed as its arguments. */
-const HOOKS: Record<string, string[]> = {
+/**
+ * Record kind → the 1.35 hook and the record fields passed as its arguments.
+ * withDynamic adds its own kinds (dynamic.ts).
+ */
+export const HOOKS: Record<string, string[]> = {
   "system.start": ["onStart", "system"],
   "system.stop": ["onStop", "system"],
   "system.destroy": ["onDestroy", "system"],

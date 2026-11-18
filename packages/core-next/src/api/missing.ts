@@ -56,15 +56,6 @@ export const withMissing: SystemPart = ({ system }) => {
         target[name] ??= () => featureMissing(prefix + name, layer);
       }
     };
-    for (const key of ["constraints", "resolvers", "effects"]) {
-      stub(
-        (s[key] ??= {}),
-        `${key}.`,
-        "register assign unregister call isDynamic listDynamic",
-        10,
-      );
-    }
-    stub(s, "", "registerModule unregisterModule", 10);
     stub(s, "", "getDistributableSnapshot watchDistributableSnapshot", 12);
   }
 };
