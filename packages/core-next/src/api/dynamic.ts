@@ -664,9 +664,13 @@ const modules = (ctx: SystemContext): Fn[] => {
       delete m.resolvers[key];
       delete m.owners_?.[key];
       // A key function another resolver declares for the type stays.
-      const kept = Object.values(m.resolvers).some(
-        (other: any) => other?.key && other.requirement === def?.requirement,
-      );
+      // Only a keyed definition's key function can go (reconcile's remove_
+      // reads nothing else), so only then is another one looked for (B5).
+      const kept =
+        !def?.key ||
+        Object.values(m.resolvers).some(
+          (other: any) => other?.key && other.requirement === def.requirement,
+        );
       hooks?.remove_(key, kept ? undefined : def);
       gone("resolver", key);
     }

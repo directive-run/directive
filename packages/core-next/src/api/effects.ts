@@ -86,6 +86,8 @@ interface EffectState {
   deps: Set<string> | null;
   /** T1: the cleared set the next auto-tracked run tracks into. */
   spare_: Set<string> | undefined;
+  /** Its definition reads prevFacts (counted in `readers`). */
+  prev_: boolean;
   /** L11 (D1): a data-form `on`, run over the facts and the previous ones. */
   gate_?: (facts: object, prev?: object) => boolean;
   /** The pass whose changed keys reached it (T2). */
@@ -177,13 +179,14 @@ export function createEffectsManager<S extends Schema>(
   let stopped = false;
   let previous: Record<string, unknown> | null = null;
   // A data-form `on` gate is handed prevFacts, so it reads them (D1, R4).
-  const reads = () =>
-    Object.values(definitions).some(
-      (d) =>
-        (!d?.deps && d?.on !== undefined) ||
-        (d?.run?.[PREV_READ] ?? declaresPrev(d?.run)),
-    );
-  let prevObserved = reads();
+  // Asked once per definition, when its state is made: `readers` counts the
+  // states whose definition reads them, so a register or unregister does not
+  // walk every definition (B5).
+  const reads = (d: any): boolean =>
+    (!d?.deps && d?.on !== undefined) ||
+    (d?.run?.[PREV_READ] ?? declaresPrev(d?.run));
+  let readers = 0;
+  let prevObserved = false;
 
   const depKey = options.depKey ?? ((name: string) => name);
   /**
@@ -236,6 +239,7 @@ export function createEffectsManager<S extends Schema>(
           ? new Set(deps.map(depKey))
           : null,
       gate_: gate?.[0],
+      prev_: reads(def),
       // From the start, as selection reads them: one shape for every state.
       spare_: undefined,
       hit_: 0,
@@ -245,12 +249,14 @@ export function createEffectsManager<S extends Schema>(
       link(state, key);
     }
     states.set(id, state);
+    state.prev_ && readers++;
 
     return state;
   }
   for (const id of Object.keys(definitions)) {
     order.push(make(id));
   }
+  prevObserved = readers > 0;
   /** L10: an effect leaves, after its cleanup; its index entries go. */
   const drop = (id: string) => {
     const state = get(id);
@@ -259,12 +265,13 @@ export function createEffectsManager<S extends Schema>(
       unlink(state, key);
     }
     states.delete(id);
+    state.prev_ && readers--;
 
     return order.indexOf(state);
   };
   /** L10 (K6): the last reader of `prev` leaving stops the copying; a new one starts it. */
   const reprev = () => {
-    if (prevObserved !== (prevObserved = reads())) {
+    if (prevObserved !== (prevObserved = readers > 0)) {
       snapshotPrevious();
     }
   };

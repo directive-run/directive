@@ -661,7 +661,9 @@ const build = (context: SystemContext) => {
         // A constraint held back by `after` was released (quirk e).
         schedule();
       }
-      const result = {
+      // Built only when `reconcile.end` is wanted: core calls it straight
+      // after this returns, with nothing run in between (B5).
+      return () => ({
         // As 1.35: a batch run is in neither list ((as) is for settle()
         // and inspect() only).
         unmet: current.filter((r) => !solo(r.id)),
@@ -673,9 +675,7 @@ const build = (context: SystemContext) => {
           id: r.id,
           resolverId: solo(r.id)?.resolver_ ?? "unknown",
         })),
-      };
-
-      return result;
+      });
     },
     // (as): a running batch is in flight, and one whose end is due; a
     // queued one is pending (1.35).
